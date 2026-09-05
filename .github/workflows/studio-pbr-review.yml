@@ -1,0 +1,86 @@
+name: Studio PBR quality review
+on:
+  push:
+    branches: [feat/studio-pbr-quality-review-20260906]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: studio-pbr-review-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  pbr-review:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-pbr-quality-review-20260906'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+      - name: Prepare locked renderer and image tools
+        run: |
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec playwright install --with-deps chromium
+      - name: Acquire official CC0 detailed originals into staging
+        run: python3 scripts/acquire_studio_pbr_review.py --output "$RUNNER_TEMP/pbr-review"
+      - name: Validate each model in the actual browser renderer
+        run: node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/pbr-review" "$GITHUB_WORKSPACE"
+      - name: Prepare pixel review and bounded source snapshots
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image,ImageDraw
+          import json,os,shutil,hashlib
+          out=Path(os.environ['RUNNER_TEMP'])/'pbr-review'
+          manifest=json.loads((out/'manifest.json').read_text()); assets=manifest['assets']
+          for start in range(0,len(assets),24):
+              sheet=Image.new('RGB',(1600,1400),'#e8e8ec'); draw=ImageDraw.Draw(sheet)
+              for index,a in enumerate(assets[start:start+24]):
+                  x=(index%6)*264+8; y=(index//6)*340+12
+                  with Image.open(out/a.get('previewPath',a['path'])) as image:
+                      image=image.convert('RGBA');image.thumbnail((252,280)); sheet.paste(image,(x+(252-image.width)//2,y+(280-image.height)//2),image)
+                  draw.text((x,y+286),f'{start+index+1:03d} '+a['name'][:30],fill='#15151b')
+                  draw.text((x,y+305),a['id'][:37],fill='#15151b')
+              sheet.save(out/f'pbr-review-{start//24+1:02d}.jpg',quality=94)
+          existing=Path('docs/reports/asset-visual-review-20260906')
+          if existing.exists(): shutil.copytree(existing,out/'existing-visual-review',dirs_exist_ok=True)
+          snapshot=out/'source-snapshot';snapshot.mkdir()
+          source_paths=['src/domains/creator/StudioCc0AssetLibraryPanel.tsx','src/domains/creator/studio-cc0-asset-delivery.ts','src/domains/creator/studio-original-free-asset-packs.ts','src/domains/creator/bg3d/studio-bg3d-environment-catalog.ts','src/domains/creator/studio-multi-object-layout.ts','src/domains/creator/vrm/studio-vrm-props.ts','src/domains/creator/StudioAssetMenuPanel.tsx','scripts/finalize_studio_asset_delivery.py']
+          for p in source_paths:
+              dest=snapshot/p;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,dest)
+          print('PBR FINAL COUNTS',len(assets),'models',sum(a['kind']=='model' for a in assets),'materials',sum(a['kind']=='surface-texture' for a in assets))
+          print('PBR MANIFEST',json.dumps([{'id':a['id'],'name':a['name'],'kind':a['kind'],'bytes':a['bytes'],'path':a['path'],'previewPath':a.get('previewPath')} for a in assets]))
+          # Keep source receipts and actual native files; no paid data, user uploads or fonts.
+          destination=Path('public/assets/studio/pbr-review-20260906');destination.mkdir(parents=True,exist_ok=True)
+          for name in ['assets','previews']:
+              if (out/name).exists():shutil.copytree(out/name,destination/name,dirs_exist_ok=True)
+          for name in ['manifest.json','delivery-report.json','source-receipts.json','browser-render-evidence.json','acquisition-plan.json']:
+              if (out/name).exists():shutil.copyfile(out/name,destination/name)
+          for p in out.glob('pbr-review-*.jpg'):shutil.copyfile(p,destination/p.name)
+          # Extracted raw dependencies are reproducible from official receipts and not re-published.
+          shutil.rmtree(out/'_source',ignore_errors=True)
+          PY
+      - name: Retain candidates on review branch without publishing catalog entries
+        run: |
+          test "$GITHUB_REF" = refs/heads/feat/studio-pbr-quality-review-20260906
+          git fetch origin "$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add -- public/assets/studio/pbr-review-20260906
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "feat(studio): retain rendered detailed PBR originals for pixel curation"
+          git push origin "HEAD:$GITHUB_REF"
+          git log -1 --format='PBR_REVIEW_COMMIT %H'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-pbr-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/pbr-review/
+          retention-days: 14
+          compression-level: 1
