@@ -6,19 +6,27 @@ import {
   Download,
   Flag,
   Gauge,
+  HandCoins,
   History,
   LayoutDashboard,
   Megaphone,
+  MessagesSquare,
   Receipt,
   Search,
   ShieldCheck,
   Ticket,
+  UsersRound,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { adminFetch } from "./admin-client";
+import {
+  adminFetchText,
+  downloadAdminFile,
+} from "./admin-client";
+import { useAdminToast } from "./use-admin-toast";
 
 import { useT } from "@/lib/i18n";
+import { useRouter } from "@/src/compat/navigation";
 
 interface AdminQuickPaletteProps {
   userId: string;
@@ -30,14 +38,14 @@ export function AdminQuickPalette({
   onSelectTab,
 }: AdminQuickPaletteProps) {
   const [open, setOpen] = useState(false);
-  // A command palette should land on its input, but `autoFocus` grabs focus wherever the node
-  // mounts and reads as an unexplained jump to a screen reader. Focusing on open is the same
-  // behaviour, scoped to the moment the palette actually appears.
   const inputRef = useRef<HTMLInputElement>(null);
+  const t = useT();
+  const router = useRouter();
+  const { showToast } = useAdminToast();
+
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
-  const t = useT();
 
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
@@ -45,6 +53,7 @@ export function AdminQuickPalette({
         event.preventDefault();
         setOpen((current) => !current);
       }
+      if (event.key === "Escape") setOpen(false);
     };
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
@@ -55,33 +64,21 @@ export function AdminQuickPalette({
     action();
   };
 
-  const handleExportUsers = async () => {
+  const handleExport = async (
+    path: string,
+    filename: string,
+    successMessage: string,
+  ) => {
     try {
-      const csv = await adminFetch<string>("/users/export/csv", userId);
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = "members.csv";
-      anchor.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      alert("다운로드 실패");
-    }
-  };
-
-  const handleExportRevenue = async () => {
-    try {
-      const csv = await adminFetch<string>("/revenue/export/csv", userId);
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = "revenue_ledger.csv";
-      anchor.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      alert("다운로드 실패");
+      const csv = await adminFetchText(path, userId);
+      downloadAdminFile(filename, csv, "text/csv;charset=utf-8");
+      showToast(successMessage);
+    } catch (error) {
+      showToast(
+        "다운로드 실패",
+        error instanceof Error ? error.message : "CSV를 내려받지 못했습니다.",
+        "error",
+      );
     }
   };
 
@@ -91,6 +88,8 @@ export function AdminQuickPalette({
         type="button"
         onClick={() => setOpen(true)}
         className="hidden items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-xs text-slate-400 backdrop-blur-xl transition-all hover:border-slate-700 hover:text-slate-200 md:flex"
+        aria-haspopup="dialog"
+        aria-expanded={open}
       >
         <Search className="size-3.5" />
         <span>{t("admin.palette.trigger")}</span>
@@ -102,17 +101,22 @@ export function AdminQuickPalette({
   }
 
   const itemClass =
-    "flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-indigo-600/20 hover:text-indigo-300";
+    "flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-colors data-[selected=true]:bg-indigo-600/20 data-[selected=true]:text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-300";
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 pt-20 backdrop-blur-md"
+      className="fixed inset-0 z-[80] flex items-start justify-center bg-black/70 p-4 pt-20 backdrop-blur-md"
       role="presentation"
       onMouseDown={(event) => {
         if (event.currentTarget === event.target) setOpen(false);
       }}
     >
-      <div className="animate-in fade-in zoom-in-95 w-full max-w-xl overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl duration-150">
+      <div
+        className="animate-in fade-in zoom-in-95 w-full max-w-xl overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl duration-150"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("admin.palette.trigger")}
+      >
         <Command className="w-full">
           <div className="flex items-center border-b border-slate-800 px-4">
             <Search className="mr-2 size-4 text-slate-400" />
@@ -132,9 +136,7 @@ export function AdminQuickPalette({
               className="px-2 py-1 text-[10px] font-semibold uppercase text-slate-500"
             >
               <Command.Item
-                onSelect={() =>
-                  runCommand(() => onSelectTab("dashboard"))
-                }
+                onSelect={() => runCommand(() => onSelectTab("dashboard"))}
                 className={itemClass}
               >
                 <LayoutDashboard className="size-4 text-indigo-400" />
@@ -162,6 +164,13 @@ export function AdminQuickPalette({
                 {t("admin.tabs.revenue")}
               </Command.Item>
               <Command.Item
+                onSelect={() => runCommand(() => onSelectTab("campaigns"))}
+                className={itemClass}
+              >
+                <HandCoins className="size-4 text-emerald-400" />
+                {t("admin.tabs.campaigns")}
+              </Command.Item>
+              <Command.Item
                 onSelect={() => runCommand(() => onSelectTab("promos"))}
                 className={itemClass}
               >
@@ -169,9 +178,7 @@ export function AdminQuickPalette({
                 {t("admin.tabs.promos")}
               </Command.Item>
               <Command.Item
-                onSelect={() =>
-                  runCommand(() => onSelectTab("announcements"))
-                }
+                onSelect={() => runCommand(() => onSelectTab("announcements"))}
                 className={itemClass}
               >
                 <Megaphone className="size-4 text-indigo-400" />
@@ -198,6 +205,28 @@ export function AdminQuickPalette({
                 <History className="size-4 text-indigo-400" />
                 {t("admin.audit.title")}
               </Command.Item>
+              <Command.Item
+                onSelect={() =>
+                  runCommand(() =>
+                    router.push("/admin/members", { scroll: false }),
+                  )
+                }
+                className={itemClass}
+              >
+                <UsersRound className="size-4 text-cyan-400" />
+                {t("admin.splitRoutes.members")}
+              </Command.Item>
+              <Command.Item
+                onSelect={() =>
+                  runCommand(() =>
+                    router.push("/admin/community", { scroll: false }),
+                  )
+                }
+                className={itemClass}
+              >
+                <MessagesSquare className="size-4 text-cyan-400" />
+                {t("admin.splitRoutes.community")}
+              </Command.Item>
             </Command.Group>
 
             <Command.Group
@@ -206,7 +235,13 @@ export function AdminQuickPalette({
             >
               <Command.Item
                 onSelect={() =>
-                  runCommand(() => void handleExportUsers())
+                  runCommand(() =>
+                    void handleExport(
+                      "/users/export/csv",
+                      "members.csv",
+                      "회원 CSV를 내려받았습니다.",
+                    ),
+                  )
                 }
                 className={itemClass}
               >
@@ -215,7 +250,13 @@ export function AdminQuickPalette({
               </Command.Item>
               <Command.Item
                 onSelect={() =>
-                  runCommand(() => void handleExportRevenue())
+                  runCommand(() =>
+                    void handleExport(
+                      "/revenue/export/csv",
+                      "revenue_ledger.csv",
+                      "정산 CSV를 내려받았습니다.",
+                    ),
+                  )
                 }
                 className={itemClass}
               >
@@ -231,7 +272,7 @@ export function AdminQuickPalette({
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => onSelectTab("ops"))}
-                className="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-rose-600/20 hover:text-rose-300"
+                className="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-colors data-[selected=true]:bg-rose-600/20 data-[selected=true]:text-rose-300 hover:bg-rose-600/20 hover:text-rose-300"
               >
                 <AlertTriangle className="size-4 text-rose-400" />
                 {t("admin.palette.maintenance")}

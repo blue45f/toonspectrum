@@ -8,6 +8,8 @@ import { STUDIO_AI_IMAGE_SIZES, type StudioAiImageSize } from "./studio-ai-clien
 
 import { cn } from "@/lib/utils";
 
+const BACKGROUND_PROMPT_MAX = 4_000;
+
 export function StudioAiBackgroundPanel({
   configured,
   prompt,
@@ -41,25 +43,31 @@ export function StudioAiBackgroundPanel({
 
       {!configured && (
         <p className="rounded-lg border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          이미지 생성용 API 키를 등록하면 바로 쓸 수 있어요. 위{" "}
-          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>을 열어 주세요.
+          프롬프트와 크기는 먼저 준비할 수 있어요. 실행하려면 위{" "}
+          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 이미지 API를 연결하세요.
         </p>
       )}
 
-      <label className="grid gap-1">
-        <span className="text-[0.62rem] font-semibold text-fg-2">무엇을 그릴까요?</span>
+      <div className="grid gap-1">
+        <div className="flex items-center justify-between gap-2 text-[0.62rem] font-semibold text-fg-2">
+          <span>무엇을 그릴까요?</span>
+          <span className="font-mono font-normal tabular-nums text-fg-3">
+            {prompt.length}/{BACKGROUND_PROMPT_MAX}
+          </span>
+        </div>
         <textarea
+          aria-label="무엇을 그릴까요?"
           value={prompt}
-          onChange={(e) => onPromptChange(e.target.value.slice(0, 500))}
+          onChange={(e) => onPromptChange(e.target.value.slice(0, BACKGROUND_PROMPT_MAX))}
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canGenerate) onGenerate();
           }}
           placeholder="예: 교실, 낮, 창문으로 햇빛이 들어오는 풍경"
           rows={3}
-          disabled={!configured || busy}
+          disabled={busy}
           className="min-h-[4.5rem] w-full resize-none rounded-lg border border-line bg-panel px-2.5 py-2 text-[0.68rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/30 disabled:opacity-60"
         />
-      </label>
+      </div>
 
       <div>
         <p className="mb-1 text-[0.62rem] font-semibold text-fg-2">크기</p>
@@ -70,18 +78,18 @@ export function StudioAiBackgroundPanel({
               <button
                 key={opt.value}
                 type="button"
-                disabled={!configured || busy}
+                disabled={busy}
                 aria-pressed={active}
                 title={opt.label}
                 onClick={() => onSizeChange(opt.value)}
                 className={cn(
-                  "min-h-8 rounded-full border px-2.5 text-[0.62rem] font-bold",
+                  "min-h-11 rounded-full border px-2.5 text-[0.62rem] font-bold",
                   STUDIO_EASE,
                   STUDIO_FOCUS_RING,
                   active
                     ? "border-accent bg-accent text-on-accent"
                     : "border-line bg-card text-fg-3 hover:bg-raised",
-                  (!configured || busy) && "opacity-55"
+                  busy && "opacity-55"
                 )}
               >
                 {opt.label}

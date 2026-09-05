@@ -7,6 +7,7 @@ import {
 } from "./brush/studio-brush-catalog-core";
 import { loadStudioBrushCatalogItemById } from "./brush/studio-brush-catalog-loader";
 import { isStudioBrushPackCatalogId } from "./brush/studio-brush-pack-id";
+import { describeStudioBrushRuntimeSemantics } from "./brush/studio-brush-semantic-quality";
 import { STUDIO_STABILIZER_MODES } from "./brush/studio-stroke-stabilizer";
 import { StudioBrushPresetIcon } from "./brush/StudioBrushPresetIcon";
 
@@ -39,6 +40,16 @@ function studioBrushTipLabel(item: StudioBrushTrayItem | null): string {
     default:
       return "원형 촉";
   }
+}
+
+function studioBrushRuntimeId(
+  item: StudioBrushTrayItem | null,
+  fallbackBrushId: string,
+): string {
+  const candidate = (item as { runtimeBrushId?: unknown } | null)?.runtimeBrushId;
+  return typeof candidate === "string" && candidate.trim().length > 0
+    ? candidate
+    : fallbackBrushId;
 }
 
 function studioStabilizerSummary(
@@ -115,15 +126,21 @@ export function StudioActiveBrushSummary({
     : needsProMetadata
       ? "프로 브러시"
       : "사용자";
-  const tipLabel = catalogItem
-    ? studioBrushTipLabel(catalogItem)
-    : needsProMetadata
-      ? metadataFailed
-        ? "세부 정보 지연"
-        : "정보 불러오는 중"
-      : studioBrushTipLabel(null);
+  const runtimeBrushId = studioBrushRuntimeId(catalogItem, brushId);
+  const runtimeSemantics = describeStudioBrushRuntimeSemantics(brushId, runtimeBrushId);
+  const tipLabel = runtimeSemantics?.tipLabelKo
+    ?? (catalogItem
+      ? studioBrushTipLabel(catalogItem)
+      : needsProMetadata
+        ? metadataFailed
+          ? "세부 정보 지연"
+          : "정보 불러오는 중"
+        : studioBrushTipLabel(null));
   const behavior = resolveStudioBrushBehaviorPresentation(brushId);
   const calligraphy = catalogItem?.previewStyle === "calligraphy";
+  const summaryTitle = runtimeSemantics
+    ? `${behavior.hintKo} 실제 엔진: ${runtimeSemantics.summaryKo}.`
+    : behavior.hintKo;
 
   useEffect(() => {
     if (!needsProMetadata) return;
@@ -147,8 +164,16 @@ export function StudioActiveBrushSummary({
       data-studio-brush-metadata-state={
         needsProMetadata ? (metadataFailed ? "error" : catalogItem ? "loaded" : "loading") : "ready"
       }
+      data-studio-brush-runtime-id={runtimeSemantics?.runtimeBrushId}
+      data-studio-brush-runtime-engine={runtimeSemantics?.engine}
+      data-studio-brush-runtime-tip={runtimeSemantics?.tip}
+      data-studio-brush-runtime-texture={runtimeSemantics?.texture}
+      data-studio-brush-runtime-dynamics={runtimeSemantics?.dynamics}
+      data-studio-brush-semantic-source={
+        runtimeSemantics ? "runtime-contract" : "preview-fallback"
+      }
       aria-busy={needsProMetadata && !metadataFailed && !catalogItem ? true : undefined}
-      title={behavior.hintKo}
+      title={summaryTitle}
       className={cn(
         "flex min-w-0 items-center gap-2 rounded-xl border border-line/70 bg-card/75 p-2",
         className,
@@ -189,6 +214,14 @@ export function StudioActiveBrushSummary({
           <span className="rounded-md bg-raised px-1.5 py-1 font-semibold text-fg-2">
             {mediaLabel} · {tipLabel}
           </span>
+          {runtimeSemantics ? (
+            <span
+              className="rounded-md bg-raised px-1.5 py-1 font-semibold text-fg-2"
+              data-studio-brush-runtime-chip="true"
+            >
+              {runtimeSemantics.textureLabelKo} · {runtimeSemantics.dynamicsLabelKo}
+            </span>
+          ) : null}
           <span className="rounded-md bg-raised px-1.5 py-1 tabular-nums">
             {Math.round(strokeWidth * 10) / 10}px
           </span>

@@ -508,9 +508,11 @@ export default defineConfig(({ mode }) => ({
             || id.endsWith("/src/domains/creator/live/studio-live-local-transport-support.ts")
             || id.endsWith("/src/domains/creator/studio-content-aware-fill-contract.ts")
             || id.endsWith("/src/domains/creator/studio-z-index.ts")
+            || id.endsWith("/src/domains/creator/studio-initial-primary-tool.ts")
           ) {
-            // These dependency-free leaves total less than 1 KiB, so co-locating their bounded
-            // capability constants removes three requests without capturing a feature runtime.
+            // These dependency-free leaves total less than 1 KiB. The initial-tool policy is
+            // already synchronous in workspace restoration; co-locate it instead of paying a
+            // separate startup request. Do not include the preferences repository or any UI.
             return "studio-tiny-capability-contracts";
           }
           if (

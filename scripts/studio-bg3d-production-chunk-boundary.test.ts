@@ -73,3 +73,47 @@ describe("BG3D production UI contract chunk boundary", () => {
     expect(runtimeImports).toEqual(expectedImports);
   });
 });
+
+describe("Studio startup capability chunk boundary", () => {
+  it("co-locates the initial tool leaf with existing tiny capability contracts", () => {
+    const matchedPaths: string[] = [];
+    let matchingGroups = 0;
+    visitTree(parseFile("vite.config.ts"), (node) => {
+      if (!ts.isIfStatement(node) || !ts.isBlock(node.thenStatement)) return;
+      const returnsCapabilityChunk = node.thenStatement.statements.some((statement) =>
+        ts.isReturnStatement(statement) &&
+        statement.expression !== undefined &&
+        ts.isStringLiteral(statement.expression) &&
+        statement.expression.text === "studio-tiny-capability-contracts",
+      );
+      if (!returnsCapabilityChunk) return;
+      matchingGroups += 1;
+      visitTree(node.expression, (condition) => {
+        if (ts.isStringLiteral(condition)) matchedPaths.push(condition.text);
+      });
+    });
+    expect(matchingGroups).toBe(1);
+    expect(matchedPaths.toSorted()).toEqual([
+      "/src/domains/creator/studio-id.ts",
+      "/src/domains/creator/live/studio-live-local-transport-support.ts",
+      "/src/domains/creator/studio-content-aware-fill-contract.ts",
+      "/src/domains/creator/studio-z-index.ts",
+      "/src/domains/creator/studio-initial-primary-tool.ts",
+    ].toSorted());
+  });
+
+  it("keeps the initial tool model free from database, panel and engine runtime imports", () => {
+    const file = "src/domains/creator/studio-initial-primary-tool.ts";
+    const emitted = ts.transpileModule(parseFile(file).text, {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+    }).outputText;
+    visitTree(ts.createSourceFile(file, emitted, ts.ScriptTarget.Latest, true), (node) => {
+      expect(ts.isImportDeclaration(node)).toBe(false);
+      if (ts.isExportDeclaration(node)) expect(node.moduleSpecifier).toBeUndefined();
+      if (ts.isCallExpression(node)) {
+        expect(node.expression.kind).not.toBe(ts.SyntaxKind.ImportKeyword);
+        expect(ts.isIdentifier(node.expression) && node.expression.text === "require").toBe(false);
+      }
+    });
+  });
+});

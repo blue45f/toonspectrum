@@ -15,7 +15,6 @@ import {
   Palette,
   ShieldCheck,
   Settings2,
-  Sparkles,
   TriangleAlert,
   UserRound,
   type LucideIcon,
@@ -32,8 +31,9 @@ import {
   type StudioAiRecentPromptsState,
 } from "./studio-ai-assist-ux";
 import { planStudioAiExecutionPreflight } from "./studio-ai-execution-preflight";
+import { StudioAiProductionLaunchpad } from "./StudioAiProductionLaunchpad";
 
-import type { ReactElement, ReactNode } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactElement, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -60,6 +60,9 @@ export interface StudioAiAssistHubProps {
   providerSlot?: ReactNode;
   recentState: StudioAiRecentPromptsState;
   onApplyPresetPrompt: (tool: StudioAiAssistToolId, prompt: string) => void;
+  onOpenScenario?: () => void;
+  scenarioDisabled?: boolean;
+  scenarioDisabledReason?: string;
   onOpenSuperSuite?: () => void;
   toolPanel: ReactNode;
   className?: string;
@@ -77,12 +80,17 @@ export function StudioAiAssistHub({
   providerSlot,
   recentState,
   onApplyPresetPrompt,
+  onOpenScenario,
+  scenarioDisabled,
+  scenarioDisabledReason,
   onOpenSuperSuite,
   toolPanel,
   className,
 }: StudioAiAssistHubProps): ReactElement {
   const toolPanelRef = useRef<HTMLDivElement>(null);
   const preflightDetailsId = useId();
+  const rawTabsId = useId();
+  const tabsId = `studio-ai-assist-${rawTabsId.replace(/:/gu, "")}`;
   const toolMeta = STUDIO_AI_ASSIST_TOOLS.find((t) => t.id === activeTool) ?? STUDIO_AI_ASSIST_TOOLS[0]!;
   const presets = presetsForAssistTool(activeTool);
   const recents = recentPromptsForTool(recentState, activeTool, 3);
@@ -101,6 +109,37 @@ export function StudioAiAssistHub({
     });
   };
 
+  const toolTabId = (tool: StudioAiAssistToolId) => `${tabsId}-tab-${tool}`;
+  const toolPanelId = (tool: StudioAiAssistToolId) => `${tabsId}-panel-${tool}`;
+  const handleToolTabKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    tool: StudioAiAssistToolId
+  ) => {
+    const index = STUDIO_AI_ASSIST_TOOLS.findIndex((item) => item.id === tool);
+    if (index < 0) return;
+    let nextIndex: number;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (index + 1) % STUDIO_AI_ASSIST_TOOLS.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex =
+        (index - 1 + STUDIO_AI_ASSIST_TOOLS.length) %
+        STUDIO_AI_ASSIST_TOOLS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = STUDIO_AI_ASSIST_TOOLS.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    const nextTool = STUDIO_AI_ASSIST_TOOLS[nextIndex]?.id;
+    if (!nextTool) return;
+    onToolChange(nextTool);
+    globalThis.requestAnimationFrame(() => {
+      document.getElementById(toolTabId(nextTool))?.focus();
+    });
+  };
+
   return (
     <div
       className={cn("flex min-h-0 flex-1 flex-col gap-2", className)}
@@ -113,7 +152,7 @@ export function StudioAiAssistHub({
         onMouseEnter={onPreloadSettings}
         onFocus={onPreloadSettings}
         className={cn(
-          "flex shrink-0 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
+          "flex min-h-11 shrink-0 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors",
           STUDIO_EASE,
           STUDIO_FOCUS_RING,
           connectionOk
@@ -137,25 +176,14 @@ export function StudioAiAssistHub({
         </span>
       </button>
 
-      {onOpenSuperSuite ? (
-        <button
-          type="button"
-          onClick={onOpenSuperSuite}
-          className={cn(
-            "flex shrink-0 items-center justify-between gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-left transition-colors hover:bg-accent/15",
-            STUDIO_EASE,
-            STUDIO_FOCUS_RING,
-          )}
-        >
-          <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold text-accent">
-            <Sparkles size={14} className="shrink-0 text-accent animate-pulse" aria-hidden />
-            AI 웹툰 생성 슈퍼 스위트
-          </span>
-          <span className="text-[0.62rem] font-medium text-accent/80">
-            툰필터 · 음영 · 콘티 · 말풍선 →
-          </span>
-        </button>
-      ) : null}
+      <StudioAiProductionLaunchpad
+        imageConfigured={imageConfigured}
+        textConfigured={textConfigured}
+        onOpenScenario={onOpenScenario}
+        onOpenSuperSuite={onOpenSuperSuite}
+        scenarioDisabled={scenarioDisabled}
+        scenarioDisabledReason={scenarioDisabledReason}
+      />
 
       {providerSlot ? <div className="shrink-0">{providerSlot}</div> : null}
 
@@ -164,6 +192,7 @@ export function StudioAiAssistHub({
         className="flex shrink-0 gap-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]"
         role="tablist"
         aria-label="AI 어시스트 도구"
+        aria-orientation="horizontal"
       >
         {STUDIO_AI_ASSIST_TOOLS.map((tool) => {
           const Icon = TOOL_ICONS[tool.id];
@@ -173,11 +202,15 @@ export function StudioAiAssistHub({
               key={tool.id}
               type="button"
               role="tab"
+              id={toolTabId(tool.id)}
+              aria-controls={toolPanelId(tool.id)}
               aria-selected={active}
+              tabIndex={active ? 0 : -1}
               title={tool.title}
               onClick={() => onToolChange(tool.id)}
+              onKeyDown={(event) => handleToolTabKeyDown(event, tool.id)}
               className={cn(
-                "inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full border px-2.5 py-1.5 text-[0.64rem] font-bold",
+                "inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[0.64rem] font-bold",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 active
@@ -314,7 +347,7 @@ export function StudioAiAssistHub({
                   title={preset.prompt}
                   onClick={() => applyPromptAndRevealToolPanel(preset.prompt)}
                   className={cn(
-                    "rounded-full border border-line bg-card px-2.5 py-1 text-[0.62rem] font-semibold text-fg-2",
+                    "min-h-11 rounded-full border border-line bg-card px-2.5 py-1 text-[0.62rem] font-semibold text-fg-2",
                     STUDIO_EASE,
                     STUDIO_FOCUS_RING,
                     "hover:border-accent/45 hover:bg-raised hover:text-fg"
@@ -338,7 +371,7 @@ export function StudioAiAssistHub({
                   title={prompt}
                   onClick={() => applyPromptAndRevealToolPanel(prompt)}
                   className={cn(
-                    "truncate rounded-lg border border-line/70 bg-canvas/40 px-2 py-1.5 text-left text-[0.6rem] text-fg-3",
+                    "min-h-11 truncate rounded-lg border border-line/70 bg-canvas/40 px-2 py-1.5 text-left text-[0.6rem] text-fg-3",
                     STUDIO_FOCUS_RING,
                     "hover:border-accent/40 hover:bg-raised hover:text-fg-2"
                   )}
@@ -354,6 +387,10 @@ export function StudioAiAssistHub({
         <div
           ref={toolPanelRef}
           className="min-h-[8rem] shrink-0 pb-1"
+          role="tabpanel"
+          id={toolPanelId(activeTool)}
+          aria-labelledby={toolTabId(activeTool)}
+          tabIndex={0}
           data-studio-ai-assist-tool-panel="true"
         >
           {toolPanel}
