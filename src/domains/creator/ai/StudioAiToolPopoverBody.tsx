@@ -5,10 +5,9 @@ import {
   Sparkles,
   WandSparkles,
 } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense } from "react";
 
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "../studio-chrome-ui";
-import { createStudioIntentLazyLoader } from "../studio-intent-lazy-loader";
 import {
   StudioAiAssistHub,
   StudioAiBackgroundPanel,
@@ -25,40 +24,20 @@ import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 import { pushStudioAiRecentPrompt } from "./studio-ai-assist-ux";
 import { isStudioAiConfigured } from "./studio-ai-client";
-import { compileStudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
-import {
-  consumeStudioAiSuperSuiteOpenRequest,
-  subscribeStudioAiSuperSuiteOpenRequest,
-} from "./studio-ai-super-suite-intent";
+import { requestStudioAiEpisodeProductionOpen } from "./studio-ai-episode-production-intent";
+import { preloadStudioAiEpisodeProductionModal } from "./studio-ai-episode-production-loader";
+import { requestStudioAiSuperSuiteOpen } from "./studio-ai-super-suite-intent";
+import { preloadStudioAiSuperSuiteModal } from "./studio-ai-super-suite-loader";
+import { StudioAiEpisodeProductionGateway } from "./StudioAiEpisodeProductionGateway";
+import { StudioAiSuperSuiteGateway } from "./StudioAiSuperSuiteGateway";
 
 import type { StudioMenu } from "../studio-editor-tool-model";
 import type { StudioServerAiProviderPreference } from "../studio-server-ai-client";
 import type { StudioToolBeltContentProps } from "../StudioToolBeltContent";
 
 import { useT } from "@/lib/i18n";
-import { lazyRetry } from "@/lib/lazy-retry";
 
-const studioAiEpisodeProductionModalLoader = createStudioIntentLazyLoader(() =>
-  import("./StudioAiEpisodeProductionModal").then((mod) => ({
-    default: mod.StudioAiEpisodeProductionModal,
-  }))
-);
 
-const StudioAiEpisodeProductionModal = lazyRetry(
-  studioAiEpisodeProductionModalLoader.load,
-  "StudioAiEpisodeProductionModal"
-);
-
-const studioAiSuperSuiteModalLoader = createStudioIntentLazyLoader(() =>
-  import("./StudioAiSuperSuiteModal").then((mod) => ({
-    default: mod.StudioAiSuperSuiteModal,
-  }))
-);
-
-const StudioAiSuperSuiteModal = lazyRetry(
-  studioAiSuperSuiteModalLoader.load,
-  "StudioAiSuperSuiteModal"
-);
 
 export interface StudioAiToolPopoverBodyProps {
   readonly toolBelt: StudioToolBeltContentProps;
@@ -68,20 +47,10 @@ export function StudioAiToolPopoverBody({
   toolBelt,
 }: StudioAiToolPopoverBodyProps) {
   const t = useT();
-  // One super-suite open state, seeded from any pending open-request and kept in
-  // sync with later requests, so a deep link and the in-panel launcher agree.
-  const [superSuiteOpen, setSuperSuiteOpen] = useState(() =>
-    consumeStudioAiSuperSuiteOpenRequest()
-  );
-  useEffect(
-    () => subscribeStudioAiSuperSuiteOpenRequest(() => setSuperSuiteOpen(true)),
-    []
-  );
   const lt = (fallback: string, key: string) => {
     const translated = t(key);
     return translated === key ? fallback : translated;
   };
-  const [episodeProductionOpen, setEpisodeProductionOpen] = useState(false);
 
   const {
     activePage,
@@ -273,10 +242,9 @@ export function StudioAiToolPopoverBody({
                 setMenu("integrations");
               }}
               onPreloadSettings={preloadStudioIntegrationsSettingsPanel}
-              onOpenEpisodeProduction={() => setEpisodeProductionOpen(true)}
-              onPreloadEpisodeProduction={studioAiEpisodeProductionModalLoader.preload}
-              onOpenSuperSuite={() => setSuperSuiteOpen(true)}
-              onPreloadSuperSuite={studioAiSuperSuiteModalLoader.preload}
+              onOpenEpisodeProduction={() => requestStudioAiEpisodeProductionOpen()}
+              onPreloadEpisodeProduction={preloadStudioAiEpisodeProductionModal}
+              onPreloadSuperSuite={preloadStudioAiSuperSuiteModal}
               recentState={aiRecentPrompts}
               onApplyPresetPrompt={applyAiAssistPresetPrompt}
               onOpenScenario={() => {
@@ -286,6 +254,9 @@ export function StudioAiToolPopoverBody({
               }}
               scenarioDisabled={masterEditMode}
               scenarioDisabledReason="마스터 편집 중에는 시나리오 제작을 사용할 수 없어요."
+              onOpenSuperSuite={() => {
+                requestStudioAiSuperSuiteOpen();
+              }}
               providerSlot={
                 textAiTransport.mode === "server" && configuredServerAiProviders.length > 0 ? (
                   <div className="rounded-xl border border-line bg-card/35 p-2.5">
@@ -481,40 +452,9 @@ export function StudioAiToolPopoverBody({
         </div>
       )}
 
-      {episodeProductionOpen ? (
-        <Suspense fallback={null}>
-          <StudioAiEpisodeProductionModal
-            open
-            onClose={() => setEpisodeProductionOpen(false)}
-            onApplyPrompt={applyEpisodeBatchPrompt}
-          />
-        </Suspense>
-      ) : null}
+      <StudioAiEpisodeProductionGateway onApplyPrompt={applyEpisodeBatchPrompt} />
 
-      {superSuiteOpen ? (
-        <Suspense
-          fallback={
-            <div
-              className="fixed inset-0 z-[120] grid place-items-center bg-black/45 p-4 backdrop-blur-sm"
-              role="status"
-              aria-live="polite"
-            >
-              <div className="rounded-xl border border-line bg-panel px-4 py-3 text-sm font-semibold text-fg shadow-xl">
-                AI 웹툰 레시피 도구를 여는 중…
-              </div>
-            </div>
-          }
-        >
-          <StudioAiSuperSuiteModal
-            open
-            onClose={() => setSuperSuiteOpen(false)}
-            onApplyPrompt={applySuperSuitePrompt}
-            onApplyPromptRecipe={(handoff) =>
-              applySuperSuitePrompt(compileStudioAiSuitePromptHandoff(handoff))
-            }
-          />
-        </Suspense>
-      ) : null}
+      <StudioAiSuperSuiteGateway onApplyPrompt={applySuperSuitePrompt} />
     </>
   );
 }

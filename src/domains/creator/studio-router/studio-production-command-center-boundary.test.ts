@@ -7,6 +7,10 @@ const routerSource = readFileSync(
   resolve(process.cwd(), "src/domains/creator/studio-router/StudioRouter.tsx"),
   "utf8",
 );
+const productionRouteSource = readFileSync(
+  resolve(process.cwd(), "src/domains/creator/studio-router/routes/StudioProductionRoute.tsx"),
+  "utf8",
+);
 const hubSource = readFileSync(
   resolve(
     process.cwd(),
@@ -17,11 +21,14 @@ const hubSource = readFileSync(
 
 describe("Studio production command center boundary", () => {
   it("mounts the production hub through an independent lazy route", () => {
-    expect(routerSource).toContain(
-      'import("../studio-production/StudioProductionHubPage")',
-    );
+    expect(routerSource).toContain('from "./routes/StudioProductionRoute"');
+    expect(productionRouteSource).toContain('import("../../studio-production/StudioProductionHubPage")');
+    expect(productionRouteSource).toContain("lazyRetry(");
+    expect(productionRouteSource).toContain("<Suspense");
+    expect(productionRouteSource).toContain("<StudioProductionHubPage");
+    expect(productionRouteSource).not.toContain('from "../../studio-production/StudioProductionHubPage"');
     expect(routerSource).toContain('case "production"');
-    expect(routerSource).toContain("<StudioProductionHubPage");
+    expect(routerSource).toContain("<StudioProductionRoute");
     expect(routerSource).not.toContain(
       'from "../studio-production/StudioProductionHubPage"',
     );

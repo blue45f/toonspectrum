@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_HYBRID_DCC_VIEWPORT_PREFERENCES_KEY } from "./studio-hybrid-dcc-viewport-interaction";
 import { createStudioHybridDccWorkspace, workspaceAddUnitCube, workspaceCommitObjectTransform, workspaceSetAssetVisibility } from "./studio-hybrid-dcc-workspace";
 import { StudioHybridDccViewport } from "./StudioHybridDccViewport";
+import { loadHybridDccViewportPreferences } from "./viewport-preferences-store";
 
 import type { ReactNode } from "react";
 
+const db = vi.hoisted(() => ({ rows: new Map<string, string>(), get: vi.fn(), set: vi.fn(), acquire: vi.fn(), asAsyncKeyValueStore: vi.fn() }));
+vi.mock("../studio-local-database-runtime", () => ({ acquireStudioLocalDatabase: db.acquire }));
 vi.mock("@react-three/fiber", () => ({
   Canvas: (_props: { children?: ReactNode }) => <div role="application" aria-label="test-3d-canvas"><button type="button" aria-label="canvas keyboard target" /></div>,
   useThree: vi.fn(),
@@ -18,8 +22,19 @@ vi.mock("@react-three/drei/core/PerformanceMonitor.js", () => ({ PerformanceMoni
 vi.mock("@react-three/drei/core/PerspectiveCamera.js", () => ({ PerspectiveCamera: () => null }));
 vi.mock("@react-three/drei/core/TransformControls.js", () => ({ TransformControls: () => null }));
 
-beforeEach(() => window.localStorage.clear());
-afterEach(() => { cleanup(); window.localStorage.clear(); });
+beforeEach(() => {
+  db.rows.clear();
+  db.get.mockReset().mockImplementation(async (key: string) => db.rows.get(key) ?? null);
+  db.set.mockReset().mockImplementation(async (key: string, value: string) => { db.rows.set(key, value); });
+  db.asAsyncKeyValueStore.mockReset().mockReturnValue(db);
+  db.acquire.mockReset().mockResolvedValue(db);
+});
+afterEach(async () => {
+  cleanup();
+  // Drain the real adapter's ordered writes before replacing the next test's database.
+  await loadHybridDccViewportPreferences();
+  vi.restoreAllMocks();
+});
 const workspace = () => workspaceAddUnitCube(workspaceAddUnitCube(createStudioHybridDccWorkspace("interaction-ui"), "cube-a"), "cube-b");
 const root = () => screen.getByLabelText("Hybrid DCC 3D 작업 뷰포트");
 function setup() {
@@ -92,7 +107,8 @@ describe("viewport interaction integration", () => {
     fireEvent.keyDown(screen.getByRole("button", { name: "canvas keyboard target" }), { key: "Tab", shiftKey: true });
     expect(root().getAttribute("data-snapping")).toBe("false");
   });
-  it("validates snap inputs and remembers view preferences in browser storage", () => {
+  it("validates snap inputs and restores preferences after the shared SQLite write completes", async () => {
+    const localWrite = vi.spyOn(Storage.prototype, "setItem");
     const { unmount, props } = setup();
     const input = screen.getByLabelText("이동 스냅 간격 (m)");
     fireEvent.change(input, { target: { value: "-2" } });
@@ -101,10 +117,14 @@ describe("viewport interaction integration", () => {
     fireEvent.change(input, { target: { value: "0.25" } });
     fireEvent.blur(input);
     fireEvent.click(screen.getByRole("button", { name: "그리드" }));
+    await waitFor(() => expect(JSON.parse(db.rows.get(STUDIO_HYBRID_DCC_VIEWPORT_PREFERENCES_KEY) ?? "null"))
+      .toMatchObject({ translationStep: 0.25, showGrid: false }));
+    expect(db.asAsyncKeyValueStore).toHaveBeenCalledWith("studio-ui-preferences-v1");
     unmount();
     render(<StudioHybridDccViewport {...props} />);
-    expect((screen.getByLabelText("이동 스냅 간격 (m)") as HTMLInputElement).value).toBe("0.25");
+    await waitFor(() => expect((screen.getByLabelText("이동 스냅 간격 (m)") as HTMLInputElement).value).toBe("0.25"));
     expect(screen.getByRole("button", { name: "그리드" }).getAttribute("aria-pressed")).toBe("false");
+    expect(localWrite).not.toHaveBeenCalled();
   });
   it("copies transforms between selections and submits one existing transform callback", () => {
     const { props, rerender, ws } = setup();

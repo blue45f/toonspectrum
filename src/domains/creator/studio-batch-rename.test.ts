@@ -4,9 +4,7 @@ import { planStudioBatchRename } from "./studio-batch-rename";
 
 import type { El } from "./studio-element-model";
 
-// Layer names live on the shared layer metadata, so the fixtures are typed as `El` — the same
-// intersection the planner and the assertions below read `name` from.
-function image(id: string, x: number, y: number, name?: string): El {
+function image(id: string, x: number, y: number, name?: string): Extract<El, { type: "image" }> {
   return {
     id,
     type: "image",
@@ -17,22 +15,22 @@ function image(id: string, x: number, y: number, name?: string): El {
     height: 20,
     rotation: 0,
     name,
-  } as El;
+  };
 }
 
-function text(id: string, x: number, y: number, name?: string): El {
+function text(id: string, x: number, y: number, name?: string): Extract<El, { type: "text" }> {
   return {
     id,
     type: "text",
     x,
     y,
-    width: 200,
-    rotation: 0,
     text: "대사",
+    width: 120,
+    rotation: 0,
     fontSize: 24,
     fill: "#111111",
     name,
-  } as El;
+  };
 }
 
 describe("studio batch rename", () => {
@@ -204,5 +202,50 @@ describe("studio batch rename", () => {
 
     expect(plan.kind).toBe("unchanged");
     if (plan.kind === "unchanged") expect(plan.reason).toContain("발견되지 않았어요");
+  });
+});
+
+
+describe("batch rename literal and numeric integrity", () => {
+  it("does not re-interpret template tokens inside an existing layer name", () => {
+    const source = "{type}-{n}-{name} $&";
+    const elements = [image("a", 0, 0, source), image("b", 10, 10, "B")];
+    const plan = planStudioBatchRename(elements, ["a", "b"], {
+      mode: "template", template: "{name} suffix", order: "layer-bottom",
+    });
+    expect(plan.kind).toBe("changed");
+    if (plan.kind !== "changed") throw new Error("expected a complete rename plan");
+    expect(plan.next[0]?.name).toBe(`${source} suffix`);
+    expect(elements[0]?.name).toBe(source);
+  });
+
+  it.each([
+    { start: Number.MAX_SAFE_INTEGER, step: 1 },
+    { start: Number.MIN_SAFE_INTEGER, step: -1 },
+    { start: 1e308, step: 1e308 },
+    { start: Number.POSITIVE_INFINITY, step: 1 },
+    { start: Number.NaN, step: 1 },
+    { start: 0.5, step: 1 },
+    { start: 1, step: 0.5 },
+  ])("rejects unsafe numbering atomically: %j", (numbers) => {
+    const elements = [image("a", 0, 0, "A"), image("b", 10, 10, "B")];
+    const plan = planStudioBatchRename(elements, ["a", "b"], {
+      mode: "template", template: "layer {n}", ...numbers,
+    });
+    expect(plan.kind).toBe("invalid");
+    expect(plan.previews).toEqual([]);
+    expect(elements.map((element) => element.name)).toEqual(["A", "B"]);
+    expect(plan).not.toHaveProperty("next");
+  });
+
+  it("retains valid large integer sequences without an unsafe intermediate product", () => {
+    const elements = [image("a", 0, 0), image("b", 10, 10), image("c", 20, 20), image("d", 30, 30)];
+    const plan = planStudioBatchRename(elements, elements.map((element) => element.id), {
+      mode: "template", template: "{n}", order: "layer-bottom", start: -7000000000000000, step: 4000000000000000,
+    });
+    expect(plan.kind).toBe("changed");
+    expect(plan.previews.map((preview) => preview.sequence)).toEqual([
+      -7000000000000000, -3000000000000000, 1000000000000000, 5000000000000000,
+    ]);
   });
 });

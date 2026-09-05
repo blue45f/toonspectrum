@@ -1,0 +1,71 @@
+{
+  "schema": "toonspectrum.asset-acquisition-plan.v1",
+  "checkedAt": "2026-09-06",
+  "status": "pilot-only-not-production",
+  "countingRule": "A source pack, file format, resolution, color variant or PBR component map is not an approved independent asset.",
+  "pilot": [
+    {
+      "id": "kenney-furniture",
+      "provider": "Kenney",
+      "license": "CC0-1.0",
+      "method": "explicit-free-download",
+      "pageUrl": "https://kenney.nl/assets/furniture-kit",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloadUrl": "https://kenney.nl/media/pages/assets/furniture-kit/440e0608a4-1677580847/kenney_furniture-kit.zip",
+      "role": "Stylized furniture candidates; not default realistic webtoon backgrounds.",
+      "pendingChecks": ["unique-model inventory", "GLB conversion", "units and pivot", "line-render silhouettes", "camera coverage", "runtime round trip"]
+    },
+    {
+      "id": "kenney-food",
+      "provider": "Kenney",
+      "license": "CC0-1.0",
+      "method": "explicit-free-download",
+      "pageUrl": "https://kenney.nl/assets/food-kit",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloadUrl": "https://kenney.nl/media/pages/assets/food-kit/83086fa91c-1719418518/kenney_food-kit.zip",
+      "role": "Stylized food props; must not be mislabeled as Korean food or realistic close-up assets.",
+      "pendingChecks": ["shape and variant deduplication", "GLB conversion", "silhouettes", "coherent scene styling", "runtime round trip"]
+    },
+    {
+      "id": "kenney-particles",
+      "provider": "Kenney",
+      "license": "CC0-1.0",
+      "method": "explicit-free-download",
+      "pageUrl": "https://kenney.nl/assets/particle-pack",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloadUrl": "https://kenney.nl/media/pages/assets/particle-pack/f8fe0f8cb8-1677578741/kenney_particle-pack.zip",
+      "role": "512px small effect-mask candidates only; not full-panel high-resolution finished art.",
+      "pendingChecks": ["actual dimensions", "alpha fringes on light and dark", "intended output scale", "near-duplicate masks", "brush or effect integration"]
+    },
+    {
+      "id": "ambientcg-wood095",
+      "provider": "ambientCG",
+      "license": "CC0-1.0",
+      "method": "explicit-free-download",
+      "pageUrl": "https://ambientcg.com/view?id=Wood095",
+      "licenseUrl": "https://docs.ambientcg.com/license/",
+      "downloadUrl": "https://ambientcg.com/get?file=Wood095_2K-JPG.zip",
+      "role": "One indoor wood material candidate; all maps and resolutions belong to one original.",
+      "pendingChecks": ["PBR map grouping", "normal-map convention", "repeat seams", "stylized shader compatibility", "output-scale review"]
+    },
+    {
+      "id": "ambientcg-fabric066",
+      "provider": "ambientCG",
+      "license": "CC0-1.0",
+      "method": "explicit-free-download",
+      "pageUrl": "https://ambientcg.com/view?id=Fabric066",
+      "licenseUrl": "https://docs.ambientcg.com/license/",
+      "downloadUrl": "https://ambientcg.com/get?file=Fabric066_2K-JPG.zip",
+      "role": "One fabric material candidate; no component-map count inflation.",
+      "pendingChecks": ["physical texture scale", "repeat seams", "moire at delivery size", "cloth close-up relevance", "runtime material test"]
+    }
+  ],
+  "backlog": [
+    {"source": "Quaternius", "url": "https://quaternius.itch.io/stylized-nature-megakit", "status": "free-standard-intake-pending", "reason": "Coherent stylized trees, plants and rocks; paid editions are not authorized for purchase."},
+    {"source": "Quaternius", "url": "https://quaternius.com/packs/ultimatemodularruins.html", "status": "source-intake-pending", "reason": "Fantasy ruins with actual environment coverage, not recolored props."},
+    {"source": "Quaternius", "url": "https://quaternius.com/packs/ultimatemodularscifi.html", "status": "source-intake-pending", "reason": "Science-fiction interior modules; evaluate line clarity and repetition."},
+    {"source": "Poly Haven", "url": "https://polyhaven.com/license", "status": "authorized-access-and-selection-pending", "reason": "CC0 assets; website scraping prohibited and API has separate terms. Do not copy site renders or scrape the catalog."},
+    {"source": "Original production", "status": "production-brief-only", "reason": "Native editable scene templates, Korean typography, bubbles, SFX, brushes and Korean everyday backgrounds are still to be produced; no generated assets are claimed."},
+    {"source": "Commission or direct creator agreement", "status": "not-ordered", "reason": "Korean school, office, convenience-store and historical scene kits require quality matching and explicit platform-embedding/redistribution rights. No purchase or artist commitment has been made."}
+  ]
+}

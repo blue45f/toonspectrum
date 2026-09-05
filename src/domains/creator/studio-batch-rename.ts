@@ -78,7 +78,7 @@ function clampDigits(value: number | undefined): number {
 
 function finiteInteger(value: number | undefined, fallback: number): number | null {
   if (value === undefined) return fallback;
-  return Number.isFinite(value) ? Math.trunc(value) : null;
+  return Number.isSafeInteger(value) ? value : null;
 }
 
 function sanitizeLayerName(value: string): string {
@@ -131,10 +131,13 @@ function renderTemplate(
   digits: number,
 ): string {
   const number = formatSequence(sequence, digits);
-  return template
-    .replaceAll("{n}", () => number)
-    .replaceAll("{name}", () => currentName)
-    .replaceAll("{type}", () => TYPE_LABELS[element.type]);
+  // Substitute template tokens once. Existing names are literal data, even
+  // when they contain another token (or replacement metacharacters).
+  return template.replace(/\{(n|name|type)\}/gu, (_match, token: string) => {
+    if (token === "n") return number;
+    if (token === "name") return currentName;
+    return TYPE_LABELS[element.type];
+  });
 }
 
 function duplicateResultNames(elements: readonly El[], changedIds: ReadonlySet<string>): string[] {
@@ -196,6 +199,15 @@ export function planStudioBatchRename(
       previews: [],
     };
   }
+  // Increment within the safe integer range rather than multiplying a large
+  // index first: an intermediate product can lose precision before subtraction.
+  const sequences: number[] = [];
+  for (let index = 0, value = start; index < ordered.length; index += 1, value += step) {
+    if (!Number.isSafeInteger(value)) {
+      return { kind: "invalid", reason: "번호가 안전한 정수 범위를 넘어 적용하지 않았어요.", previews: [] };
+    }
+    sequences.push(value);
+  }
   const digits = clampDigits(request.digits);
   const renameById = new Map<string, string>();
   const previews: StudioBatchRenamePreview[] = [];
@@ -207,7 +219,7 @@ export function planStudioBatchRename(
     }
     ordered.forEach((element, index) => {
       const currentName = currentLayerName(element);
-      const sequence = start + index * step;
+      const sequence = sequences[index]!;
       const nextName = sanitizeLayerName(
         renderTemplate(template, element, currentName, sequence, digits),
       );
@@ -221,7 +233,7 @@ export function planStudioBatchRename(
     }
     ordered.forEach((element, index) => {
       const currentName = currentLayerName(element);
-      const sequence = start + index * step;
+      const sequence = sequences[index]!;
       const nextName = sanitizeLayerName(
         replaceAllText(
           currentName,

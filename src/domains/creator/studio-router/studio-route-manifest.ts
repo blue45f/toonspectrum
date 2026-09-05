@@ -1,5 +1,9 @@
 import { STUDIO_LIFT3D_SUBJECTS } from "../lift3d/studio-lift3d-contract";
 import {
+  resolveStudioProductionScope,
+  studioProductionLifecycleKey,
+} from "../studio-production/studio-production-scope";
+import {
   parseStudioWorkspaceRoute,
   studioWorkspaceCanonicalHref,
   studioWorkspaceDocumentIdentity,
@@ -25,9 +29,9 @@ export type StudioRouteKind =
   | "invalid"
   | "lift3d"
   | "placeholder"
-  | "storyworld"
   | "production"
-  | "publish";
+  | "publish"
+  | "storyworld";
 
 export interface StudioRouteManifestEntry {
   readonly id: string;
@@ -166,6 +170,7 @@ export type StudioPlaceholderRouteId = "assets";
 export interface StudioProductionRouteResolution extends StudioResolvedRouteBase {
   readonly kind: "production";
   readonly surface: StudioProductionRouteId;
+  readonly editorHref: string;
 }
 
 export interface StudioPlaceholderRouteResolution extends StudioResolvedRouteBase {
@@ -186,9 +191,9 @@ export type StudioRouteResolution =
   | StudioInvalidRouteResolution
   | StudioLift3dRouteResolution
   | StudioPlaceholderRouteResolution
-  | StudioStoryworldRouteResolution
   | StudioProductionRouteResolution
-  | StudioPublishRouteResolution;
+  | StudioPublishRouteResolution
+  | StudioStoryworldRouteResolution;
 
 const PRODUCTION_ROUTE_IDS = new Set<StudioProductionRouteId>(
   STUDIO_PRODUCTION_ROUTE_IDS,
@@ -381,16 +386,36 @@ function resolveLift3d(
   });
 }
 
-function storyworldPathname(
-  workId: string | null,
-  remixSourceWorkId: string | null,
-): string {
-  if (workId !== null) {
-    return `/studio/work/${encodeURIComponent(workId)}/storyworld`;
+function resolveProduction(
+  pathname: string,
+  search: string | URLSearchParams | undefined,
+): StudioProductionRouteResolution | StudioInvalidRouteResolution | null {
+  const segments = normalizedSegments(pathname);
+  if (
+    segments === null
+    || segments.length !== 2
+    || !PRODUCTION_ROUTE_IDS.has(segments[1] as StudioProductionRouteId)
+  ) {
+    return null;
   }
-  if (remixSourceWorkId !== null) {
-    return `/studio/remix/${encodeURIComponent(remixSourceWorkId)}/storyworld`;
-  }
+  const resolvedScope = resolveStudioProductionScope({ pathname, search });
+  if (!resolvedScope.valid) return invalidResolution(pathname, search, resolvedScope.errorCode);
+  const surface = segments[1] as StudioProductionRouteId;
+  const canonicalPathname = `/studio/${surface}`;
+  return Object.freeze({
+    canonicalHref: href(canonicalPathname, queryParams(search)),
+    canonicalPathname,
+    kind: "production",
+    lifecycleKey: studioProductionLifecycleKey(surface, resolvedScope.scope),
+    editorHref: resolvedScope.scope.editorHref,
+    ownsDocumentTitle: true,
+    surface,
+  });
+}
+
+function storyworldPathname(workId: string | null, remixSourceWorkId: string | null): string {
+  if (workId !== null) return `/studio/work/${encodeURIComponent(workId)}/storyworld`;
+  if (remixSourceWorkId !== null) return `/studio/remix/${encodeURIComponent(remixSourceWorkId)}/storyworld`;
   return "/studio/storyworld";
 }
 
@@ -400,7 +425,6 @@ function resolveStoryworld(
 ): StudioStoryworldRouteResolution | StudioInvalidRouteResolution | null {
   const segments = normalizedSegments(pathname);
   if (segments === null) return invalidResolution(pathname, search, "invalid-path");
-
   let probePathname: string;
   if (segments.length === 2 && segments[1] === "storyworld") {
     probePathname = "/studio";
@@ -413,17 +437,10 @@ function resolveStoryworld(
   } else {
     return null;
   }
-
   const workspace = parseStudioWorkspaceRoute({ pathname: probePathname, search });
   if (!workspace.valid) return invalidResolution(pathname, search, workspace);
-  if (workspace.presentation !== "editor") {
-    return invalidResolution(pathname, search, "invalid-mode");
-  }
-
-  const canonicalPathname = storyworldPathname(
-    workspace.workId,
-    workspace.remixSourceWorkId,
-  );
+  if (workspace.presentation !== "editor") return invalidResolution(pathname, search, "invalid-mode");
+  const canonicalPathname = storyworldPathname(workspace.workId, workspace.remixSourceWorkId);
   return Object.freeze({
     canonicalHref: href(canonicalPathname, cleanIdentityQuery(search)),
     canonicalPathname,
@@ -432,30 +449,6 @@ function resolveStoryworld(
     ownsDocumentTitle: true,
     remixSourceWorkId: workspace.remixSourceWorkId,
     workId: workspace.workId,
-  });
-}
-
-function resolveProduction(
-  pathname: string,
-  search: string | URLSearchParams | undefined,
-): StudioProductionRouteResolution | null {
-  const segments = normalizedSegments(pathname);
-  if (
-    segments === null
-    || segments.length !== 2
-    || !PRODUCTION_ROUTE_IDS.has(segments[1] as StudioProductionRouteId)
-  ) {
-    return null;
-  }
-  const surface = segments[1] as StudioProductionRouteId;
-  const canonicalPathname = `/studio/${surface}`;
-  return Object.freeze({
-    canonicalHref: href(canonicalPathname, queryParams(search)),
-    canonicalPathname,
-    kind: "production",
-    lifecycleKey: canonicalPathname,
-    ownsDocumentTitle: true,
-    surface,
   });
 }
 
@@ -519,7 +512,7 @@ function scopedLifecycleKey(
 function resolveWorkScopedProduction(
   pathname: string,
   search: string | URLSearchParams | undefined,
-): StudioProductionRouteResolution | null {
+): StudioProductionRouteResolution | StudioInvalidRouteResolution | null {
   const scoped = resolveWorkScopedSurface(pathname);
   if (
     scoped === null
@@ -529,13 +522,16 @@ function resolveWorkScopedProduction(
   ) {
     return null;
   }
+  const resolvedScope = resolveStudioProductionScope({ pathname, search });
+  if (!resolvedScope.valid) return invalidResolution(pathname, search, resolvedScope.errorCode);
   const surface = scoped.candidateSurface as StudioProductionRouteId;
   const canonicalPathname = scopedCanonicalPathname(scoped.scope, scoped.parsed, surface);
   return Object.freeze({
     canonicalHref: href(canonicalPathname, queryParams(search)),
     canonicalPathname,
     kind: "production",
-    lifecycleKey: scopedLifecycleKey(scoped.scope, scoped.parsed, surface),
+    lifecycleKey: studioProductionLifecycleKey(surface, resolvedScope.scope),
+    editorHref: resolvedScope.scope.editorHref,
     ownsDocumentTitle: true,
     surface,
   });

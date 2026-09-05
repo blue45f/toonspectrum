@@ -3,34 +3,51 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(
-  fileURLToPath(new URL("./StudioAiToolPopoverBody.tsx", import.meta.url)),
-  "utf8"
-);
+function read(relative: string): string {
+  return readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8");
+}
+
+const popover = read("./StudioAiToolPopoverBody.tsx");
+const episodeGateway = read("./StudioAiEpisodeProductionGateway.tsx");
+const episodeLoader = read("./studio-ai-episode-production-loader.ts");
+const suiteGateway = read("./StudioAiSuperSuiteGateway.tsx");
+const suiteLoader = read("./studio-ai-super-suite-loader.ts");
 
 describe("StudioAiToolPopoverBody webtoon AI production wiring", () => {
-  it("keeps both advanced modals off the initial studio chunk", () => {
-    expect(source).toContain('import("./StudioAiEpisodeProductionModal")');
-    expect(source).toContain('import("./StudioAiSuperSuiteModal")');
-    expect(source).toContain("lazyRetry(");
-    expect(source).toContain("createStudioIntentLazyLoader");
-    expect(source).toContain("studioAiEpisodeProductionModalLoader.preload");
-    expect(source).toContain("studioAiSuperSuiteModalLoader.preload");
+  it("keeps both advanced modals off the initial studio chunk, behind intent-owned gateways", () => {
+    // The popover owns neither a dialog lifetime nor a lazy boundary; the gateways do.
+    expect(popover).not.toContain("import(");
+    expect(popover).not.toContain("useState(");
+    expect(episodeLoader).toContain('import("./StudioAiEpisodeProductionModal")');
+    expect(episodeLoader).toContain("createStudioIntentLazyLoader");
+    expect(episodeGateway).toContain("lazyRetry(");
+    expect(episodeGateway).toContain("studioAiEpisodeProductionModalLoader.load");
+    expect(suiteLoader).toContain('import("./StudioAiSuperSuiteModal")');
+    expect(suiteLoader).toContain("createStudioIntentLazyLoader");
+    expect(suiteGateway).toContain("studioAiSuperSuiteModalLoader.load");
   });
 
-  it("restores the previously hidden super-suite launcher and adds episode production", () => {
-    expect(source).toContain("onOpenEpisodeProduction={() => setEpisodeProductionOpen(true)}");
-    expect(source).toContain("onOpenSuperSuite={() => setSuperSuiteOpen(true)}");
-    expect(source).toContain("<StudioAiEpisodeProductionModal");
-    expect(source).toContain("<StudioAiSuperSuiteModal");
+  it("launches episode production and the super suite through intent, with chunk warm-up", () => {
+    expect(popover).toContain(
+      "onOpenEpisodeProduction={() => requestStudioAiEpisodeProductionOpen()}"
+    );
+    expect(popover).toContain(
+      "onPreloadEpisodeProduction={preloadStudioAiEpisodeProductionModal}"
+    );
+    expect(popover).toContain("requestStudioAiSuperSuiteOpen()");
+    expect(popover).toContain("onPreloadSuperSuite={preloadStudioAiSuperSuiteModal}");
+    expect(popover).toContain(
+      "<StudioAiEpisodeProductionGateway onApplyPrompt={applyEpisodeBatchPrompt} />"
+    );
+    expect(popover).toContain(
+      "<StudioAiSuperSuiteGateway onApplyPrompt={applySuperSuitePrompt} />"
+    );
   });
 
   it("hands approved prompts back to the existing non-destructive AI tool flow", () => {
-    expect(source).toContain('setAiAssistTool("composition")');
-    expect(source).toContain("setAiCompositionDraft(trimmed)");
-    expect(source).toContain("pushStudioAiRecentPrompt");
-    expect(source).toContain('setMenu("aiAssist")');
-    expect(source).toContain("onApplyPrompt={applyEpisodeBatchPrompt}");
-    expect(source).toContain("onApplyPrompt={applySuperSuitePrompt}");
+    expect(popover).toContain('setAiAssistTool("composition")');
+    expect(popover).toContain("setAiCompositionDraft(trimmed)");
+    expect(popover).toContain("pushStudioAiRecentPrompt");
+    expect(popover).toContain('setMenu("aiAssist")');
   });
 });

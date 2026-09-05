@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
+
+import { parseStudioWorkspaceRoute, studioWorkspaceDocumentIdentity } from "../studio-workspace-route";
 
 import { resolveStudioRoute, studioRouteOwnsDocumentTitle } from "./studio-route-manifest";
 
@@ -18,29 +18,58 @@ describe("Storyworld route integration", () => {
 
   it.each([
     ["/studio/storyworld", "?mode=upload"],
+    ["/studio/storyworld", "?mode=canvas"],
+    ["/studio/storyworld", "?mode=upload&mode=upload"],
     ["/studio/storyworld", "?id=work-1&remix=source-1"],
+    ["/studio/storyworld", "?id=work-1&id=work-1"],
+    ["/studio/storyworld", "?remix=source-1&remix=source-1"],
     ["/studio/work/work-1/storyworld", "?id=work-2"],
     ["/studio/remix/source-1/storyworld", "?remix=source-2"],
+    ["/studio/work/%5C/storyworld", ""],
+    ["/studio/work/%00/storyworld", ""],
+    ["/studio/remix/%7F/storyworld", ""],
+    ["/studio/work/%2E/storyworld", ""],
+    ["/studio/remix/%2E%2E/storyworld", ""],
+    ["/studio/work/%20work/storyworld", ""],
+    ["/studio/work/%/storyworld", ""],
+    ["/studio/work//storyworld", ""],
     ["/studio/storyworld/extra", ""],
-    // NOTE: "/studio/work/%2F/storyworld" is deliberately absent. An encoded slash in the
-    // work identity is accepted router-wide on main - "/studio/work/%2F/canvas" resolves to
-    // "editor" - because hasUnsafeStudioIdentityCharacter rejects backslashes and control
-    // characters but not "/". Asserting it here would make Storyworld stricter than every
-    // sibling route. If that input should be rejected, it belongs in the shared workspace
-    // identity parser, not in this one route.
   ] as const)("rejects conflicting or invalid Storyworld routes %s%s", (pathname, search) => {
     expect(resolveStudioRoute({ pathname, search }).kind).toBe("invalid");
+  });
+
+  // Studio identities are opaque: an encoded slash is data, not a path separator.
+  // Verify parity with the shared validator rather than inventing a second ID policy.
+  it.each(["/", "part/one", "%2F", "작품 1"])("preserves opaque identity %s across work and remix routes", (identity) => {
+    for (const scope of ["work", "remix"] as const) {
+      const pathname = `/studio/${scope}/${encodeURIComponent(identity)}/storyworld`;
+      const workspace = parseStudioWorkspaceRoute({ pathname: pathname.replace(/storyworld$/, "canvas") });
+      expect(workspace.valid).toBe(true);
+      if (!workspace.valid) throw new Error("Shared Studio identity fixture must be valid");
+      const resolved = resolveStudioRoute({ pathname });
+      expect(resolved).toMatchObject({
+        kind: "storyworld",
+        canonicalHref: pathname,
+        workId: workspace.workId,
+        remixSourceWorkId: workspace.remixSourceWorkId,
+        lifecycleKey: `/studio/${studioWorkspaceDocumentIdentity(workspace)}/storyworld`,
+      });
+      const queryKey = scope === "work" ? "id" : "remix";
+      expect(resolveStudioRoute({ pathname: "/studio/storyworld", search: new URLSearchParams({ [queryKey]: identity }) }))
+        .toEqual(resolved);
+      expect(resolveStudioRoute({ pathname: resolved.kind === "storyworld" ? resolved.canonicalPathname : pathname }))
+        .toEqual(resolved);
+    }
   });
 
   it("owns its title and has distinct document lifetimes", () => {
     expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/storyworld" })).toBe(true);
     const first = resolveStudioRoute({ pathname: "/studio/work/first/storyworld" });
     const second = resolveStudioRoute({ pathname: "/studio/work/second/storyworld" });
+    const remix = resolveStudioRoute({ pathname: "/studio/remix/first/storyworld" });
     expect(first.lifecycleKey).not.toBe(second.lifecycleKey);
-  });
-
-  it("keys the Storyworld surface by document lifecycle so routes do not share state", () => {
-    const router = readFileSync(new URL("./StudioRouter.tsx", import.meta.url), "utf8");
-    expect(router).toContain("key={resolution.lifecycleKey}");
+    expect(first.lifecycleKey).not.toBe(remix.lifecycleKey);
+    expect(resolveStudioRoute({ pathname: "/studio/work/%2F/storyworld" }).lifecycleKey)
+      .not.toBe(resolveStudioRoute({ pathname: "/studio/work/%252F/storyworld" }).lifecycleKey);
   });
 });

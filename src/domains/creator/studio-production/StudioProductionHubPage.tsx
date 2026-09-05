@@ -26,6 +26,11 @@ import {
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import {
+  resolveStudioProductionScope,
+  type StudioProductionScope as ProductionScope,
+} from "./studio-production-scope";
+
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
@@ -90,11 +95,6 @@ interface ProductionWorkspace {
   readonly inviteToken: string;
 }
 
-interface ProductionScope {
-  readonly key: string;
-  readonly label: string;
-  readonly editorHref: string;
-}
 
 const NAMESPACE = "studio-production-command-center-v1";
 const FALLBACK_NOW = "2026-09-05T00:00:00.000Z";
@@ -120,27 +120,6 @@ function stableToken(value: string): string {
   return `ts-${Math.abs(hash >>> 0).toString(36)}`;
 }
 
-function scopeFromPath(pathname: string): ProductionScope {
-  const work = pathname.match(/^\/studio\/work\/([^/]+)/u)?.[1];
-  if (work) {
-    const decoded = decodeURIComponent(work);
-    return {
-      key: `work:${decoded}`,
-      label: `작품 ${decoded}`,
-      editorHref: `/studio/work/${encodeURIComponent(decoded)}/canvas`,
-    };
-  }
-  const remix = pathname.match(/^\/studio\/remix\/([^/]+)/u)?.[1];
-  if (remix) {
-    const decoded = decodeURIComponent(remix);
-    return {
-      key: `remix:${decoded}`,
-      label: `리믹스 ${decoded}`,
-      editorHref: `/studio/remix/${encodeURIComponent(decoded)}/canvas`,
-    };
-  }
-  return { key: "draft", label: "새 프로젝트", editorHref: "/studio" };
-}
 
 function surfaceHref(surface: StudioProductionSurface, scope: ProductionScope): string {
   const scopedSurface = surface === "review" || surface === "versions" || surface === "present";
@@ -386,8 +365,35 @@ export function StudioProductionHubPage({
   readonly onOpenStudio: () => void;
 }) {
   const location = useLocation();
+  const resolution = resolveStudioProductionScope(location);
+  if (!resolution.valid) {
+    return (
+      <section className="m-4 rounded-xl border border-line p-4" role="alert">
+        <h1 className="font-bold">프로젝트 범위를 확인할 수 없습니다</h1>
+        <p className="my-3 text-sm">잘못되거나 서로 충돌하는 작품 정보입니다. 저장된 내용은 변경하지 않았습니다.</p>
+        <button type="button" className={buttonClass()} onClick={onOpenStudio}>
+          Studio 편집기로 돌아가기
+        </button>
+      </section>
+    );
+  }
+  return (
+    <StudioProductionHubWorkspace
+      key={resolution.scope.key}
+      surface={surface}
+      scope={resolution.scope}
+      onOpenStudio={onOpenStudio}
+    />
+  );
+}
+
+function StudioProductionHubWorkspace({ surface, scope, onOpenStudio }: {
+  readonly surface: StudioProductionSurface;
+  readonly scope: ProductionScope;
+  readonly onOpenStudio: () => void;
+}) {
+  const location = useLocation();
   const navigate = useNavigate();
-  const scope = useMemo(() => scopeFromPath(location.pathname), [location.pathname]);
   const initial = useMemo(() => initialWorkspace(scope.key), [scope.key]);
   const [workspace, setWorkspace] = useState<ProductionWorkspace>(initial);
   const [persistence, setPersistence] = useState<PersistenceState>("loading");
@@ -462,6 +468,9 @@ export function StudioProductionHubPage({
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.repeat) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true'], [role='textbox']")) return;
       if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       const next = STUDIO_PRODUCTION_SURFACES[Number(event.key) - 1];
       if (!next) return;
@@ -570,9 +579,9 @@ export function StudioProductionHubPage({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <Radio className="size-4 text-accent" aria-hidden="true" />
-              <span className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-fg-3">
-                Production command center
-              </span>
+              <h1 className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-fg-3">
+                Local production planner · {SURFACE_META[surface].label}
+              </h1>
               <Pill tone={releaseReady ? "success" : "warning"}>
                 {releaseReady ? "출시 가능" : "검수 필요"}
               </Pill>
@@ -581,7 +590,7 @@ export function StudioProductionHubPage({
               key={`${workspace.scopeKey}:${workspace.title}`}
               defaultValue={workspace.title}
               aria-label="프로젝트 제목"
-              className="mt-0.5 w-full max-w-3xl bg-transparent text-base font-black tracking-tight outline-none sm:text-lg"
+              className="mt-0.5 min-h-11 w-full max-w-3xl bg-transparent text-base font-black tracking-tight outline-none sm:text-lg"
               onBlur={(event) => {
                 const title = event.currentTarget.value.trim();
                 if (!title || title === workspaceRef.current.title) return;
@@ -671,7 +680,7 @@ export function StudioProductionHubPage({
             tone={openBlockers > 0 ? "danger" : openMajor > 0 ? "warning" : "success"}
           />
           <Metric
-            label="협업 인원"
+            label="로컬 담당자"
             value={`${workspace.members.length}명`}
             detail={scope.label}
           />
@@ -793,8 +802,8 @@ export function StudioProductionHubPage({
 
         {surface === "versions" ? (
           <Card
-            title="버전 및 복구"
-            description="주요 변경 전에 작업·검수 상태를 불변 체크포인트로 저장합니다."
+            title="작업·검수 체크포인트"
+            description="로컬 작업·검수 목록만 저장·복원합니다. 원고의 컷·레이어와 서버 버전은 포함하지 않습니다."
             action={(
               <button
                 type="button"

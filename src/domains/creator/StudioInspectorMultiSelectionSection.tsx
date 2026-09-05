@@ -20,10 +20,10 @@ export function StudioInspectorMultiSelectionSection({
     alignSelected,
     announceDrawingShortcut,
     commit,
-    disarmAllPixelTools,
-    duplicateSelected,
     elements,
     groups,
+    disarmAllPixelTools,
+    duplicateSelected,
     inspectorInteractionPolicy,
     inspectorTransientOwners,
     marqueeIds,
@@ -75,7 +75,7 @@ export function StudioInspectorMultiSelectionSection({
           elements={elements}
           selectedIds={marqueeIds}
           groups={groups}
-          commit={(next) => commit(next)}
+          commit={(next) => !inspectorInteractionPolicy.selection.disabled && commit(next)}
           announce={announceDrawingShortcut}
         />
       </fieldset>

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   encodeStudioOriginalAssetSvg,
   STUDIO_ORIGINAL_FREE_ASSETS,
+  STUDIO_RETIRED_ORIGINAL_FREE_ASSETS,
 } from "./studio-original-free-asset-packs";
 import {
   STUDIO_ASSET_DRAG_MAX_IMAGE_AXIS,
@@ -79,8 +80,9 @@ describe("shared asset drag payload", () => {
       + '<rect fill="url(#g)"/><use href="#g"/></svg>';
     expect(parseStudioAssetDragPayload(svgDragPayload(base64Svg(safeSvg)))).not.toBeNull();
     expect(parseStudioAssetDragPayload(svgDragPayload(percentSvg(safeSvg)))).not.toBeNull();
-    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(32);
-    for (const asset of STUDIO_ORIGINAL_FREE_ASSETS) {
+    const allLegacyAndSelectableAssets = [...STUDIO_ORIGINAL_FREE_ASSETS, ...STUDIO_RETIRED_ORIGINAL_FREE_ASSETS];
+    expect(allLegacyAndSelectableAssets).toHaveLength(32);
+    for (const asset of allLegacyAndSelectableAssets) {
       expect(parseStudioAssetDragPayload(svgDragPayload(
         encodeStudioOriginalAssetSvg(asset.svg)
       ))).not.toBeNull();

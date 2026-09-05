@@ -4,24 +4,27 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { StudioRouteLoading } from "../StudioLazySurfaceFallback";
 
 import { StudioEditorRoute } from "./routes/StudioEditorRoute";
+import { StudioProductionRoute } from "./routes/StudioProductionRoute";
 import { StudioPublishRoute } from "./routes/StudioPublishRoute";
+import { StudioStoryworldRoute } from "./routes/StudioStoryworldRoute";
 import { resolveStudioRoute } from "./studio-route-manifest";
-import {
-  StudioLift3dPage,
-  StudioToolsCompanionPage,
-  StudioStoryworldLabPage,
-} from "./studio-router-lazy-pages";
 import { StudioRouteFailure, StudioRoutePlaceholder } from "./StudioRouteFallbacks";
 
 import { lazyRetry } from "@/lib/lazy-retry";
 
-const StudioProductionHubPage = lazyRetry(
-  () => import("../studio-production/StudioProductionHubPage").then((module) => ({
-    default: module.StudioProductionHubPage,
+const StudioLift3dPage = lazyRetry(
+  () => import("../lift3d/StudioLift3dPage").then((module) => ({
+    default: module.StudioLift3dPage,
   })),
-  "StudioProductionHubPage",
+  "StudioLift3dPage",
 );
 
+const StudioToolsCompanionPage = lazyRetry(
+  () => import("../StudioToolsCompanionPage").then((module) => ({
+    default: module.StudioToolsCompanionPage,
+  })),
+  "StudioToolsCompanionPage",
+);
 
 export function StudioRouter() {
   const location = useLocation();
@@ -58,16 +61,6 @@ export function StudioRouter() {
           <StudioLift3dPage initialSubject={resolution.subject} />
         </Suspense>
       );
-    case "storyworld":
-      return (
-        <Suspense fallback={<StudioRouteLoading label="스토리월드 인과관계 랩을 여는 중..." />}>
-          <StudioStoryworldLabPage
-            key={resolution.lifecycleKey}
-            remixSourceWorkId={resolution.remixSourceWorkId}
-            workId={resolution.workId}
-          />
-        </Suspense>
-      );
     case "companion":
       return (
         <Suspense fallback={<StudioRouteLoading label="Studio 보조 창을 여는 중..." />}>
@@ -76,12 +69,18 @@ export function StudioRouter() {
       );
     case "production":
       return (
-        <Suspense fallback={<StudioRouteLoading label="제작 운영 허브를 여는 중..." />}>
-          <StudioProductionHubPage
-            surface={resolution.surface}
-            onOpenStudio={() => navigate("/studio")}
-          />
-        </Suspense>
+        <StudioProductionRoute
+          surface={resolution.surface}
+          onOpenStudio={() => navigate(resolution.editorHref)}
+        />
+      );
+    case "storyworld":
+      return (
+        <StudioStoryworldRoute
+          key={resolution.lifecycleKey}
+          remixSourceWorkId={resolution.remixSourceWorkId}
+          workId={resolution.workId}
+        />
       );
     case "placeholder":
       return (
