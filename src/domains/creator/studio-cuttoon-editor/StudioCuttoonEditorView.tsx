@@ -10,6 +10,7 @@ import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaboration
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "../studio-chrome-ui";
 import { StudioHelpCenterHost } from "../StudioHelpCenterHost";
 import { StudioToolHintPreferencesProvider } from "../StudioToolHint";
+import { StudioWorkspaceNavigator } from "../StudioWorkspaceNavigator";
 import { Container } from "@/components/container";
 import { cn } from "@/lib/utils";
 import { StudioCuttoonEditorChrome } from "./StudioCuttoonEditorChrome";
@@ -45,6 +46,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
     studioLiveTransportFactory,
     studioRootRef,
     tool,
+    uiDensityMode,
     watermarkPreferenceSnapshot,
   } = s;
   return (
@@ -67,8 +69,12 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
       reduceMotion={appSettings.other.reduceMotion}
     >
     <div
+      id="studio-app-shell"
       ref={studioRootRef}
       data-studio-mobile-immersive={mobileImmersive ? "true" : "false"}
+      data-studio-ui-density={uiDensityMode}
+      data-studio-reduce-motion={appSettings.other.reduceMotion ? "true" : "false"}
+      data-studio-device-kind={isMobile ? "mobile" : "desktop"}
       data-studio-editor="true"
       data-studio-app-shell="true"
       data-studio-watermark-persistence={watermarkPreferenceSnapshot.state}
@@ -112,6 +118,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
           : undefined
       }
     >
+      <StudioWorkspaceNavigator />
       <StudioCuttoonEditorHosts {...s} />
       <StudioCuttoonEditorDialogs {...s} />
       <Container

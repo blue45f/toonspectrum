@@ -53,6 +53,7 @@ import {
   toggleStudioLiveRemoteCursors,
   useStudioLiveViewPreferences,
 } from "./studio-live-view-preferences";
+import { StudioLiveCollaborationCommandCenter } from "./StudioLiveCollaborationCommandCenter";
 import { useStudioLiveCursorQuality } from "./use-studio-live-cursor-quality";
 
 import type {
@@ -346,6 +347,18 @@ export function StudioLiveCollaborationPanelView({
           : "같은 브라우저에서 이 주소로 탭을 하나 더 열면 커서와 획이 바로 같이 움직입니다. 서버 없이 이 기기 안에서만 동기화합니다."}
       </p>
 
+      <StudioLiveCollaborationCommandCenter
+        availability={availability}
+        mode={mode}
+        peers={peers}
+        chatMessages={chatMessages}
+        screenState={screenState}
+        syncSnapshot={syncSnapshot}
+        recovery={recovery}
+        followingSessionId={followingSessionId}
+        onToggleFollow={onToggleFollow}
+      />
+
       {onToggleRemoteCursors ? (
         <div
           className="mt-3 rounded-xl border border-line bg-card/55 p-3"
@@ -400,7 +413,9 @@ export function StudioLiveCollaborationPanelView({
 
       {syncSnapshot && syncPresentation ? (
         <div
-          className="mt-3 border-y border-line/80 py-3"
+          id="studio-live-sync-section"
+          tabIndex={-1}
+          className="mt-3 scroll-mt-4 border-y border-line/80 py-3 outline-none"
           data-studio-sync-safety-detail={syncSnapshot.phase}
         >
           <div className="flex items-start gap-2">
@@ -549,7 +564,11 @@ export function StudioLiveCollaborationPanelView({
         </div>
       ) : null}
 
-      <div className="mt-3 rounded-xl border border-line bg-card/55 p-3">
+      <div
+        id="studio-live-people-section"
+        tabIndex={-1}
+        className="mt-3 scroll-mt-4 rounded-xl border border-line bg-card/55 p-3 outline-none"
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <UsersRound className="shrink-0 text-accent" size={16} aria-hidden="true" />
@@ -636,8 +655,10 @@ export function StudioLiveCollaborationPanelView({
       </div>
 
       <div
+        id="studio-live-chat-section"
+        tabIndex={-1}
         aria-labelledby="studio-live-chat-title"
-        className="mt-3 rounded-xl border border-line bg-card/55 p-3"
+        className="mt-3 scroll-mt-4 rounded-xl border border-line bg-card/55 p-3 outline-none"
         data-studio-live-chat
         role="group"
       >
@@ -719,7 +740,11 @@ export function StudioLiveCollaborationPanelView({
         ) : null}
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div
+        id="studio-live-screen-section"
+        tabIndex={-1}
+        className="mt-3 grid scroll-mt-4 grid-cols-1 gap-2 outline-none sm:grid-cols-2"
+      >
         {screenState.localSharing ? (
           <Button
             className="min-h-11"
