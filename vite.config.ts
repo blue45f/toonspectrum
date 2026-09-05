@@ -419,6 +419,17 @@ export default defineConfig(({ mode }) => ({
           // the BG3D editor (+28%) and even the admin/feedback routes then had to download. Merging
           // only pays when the merged modules carry nothing behind them.
           if (
+            id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-workflow.ts")
+            || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-pass-readiness.ts")
+            || id.endsWith("/src/domains/creator/bg3d/studio-bg3d-production-multipass.ts")
+          ) {
+            // The editor already needs the scene summary and synchronous LT preflight. Keep these
+            // pure models and their dependency-free preset catalog in one request, rather than
+            // separate shared chunks introduced by the lazy Pro Suite. Never include panels,
+            // SceneDocument runtime, renderer engines or archive/Worker clients in this group.
+            return "studio-bg3d-production-models";
+          }
+          if (
             id.endsWith("/src/domains/creator/studio-workspaces.ts")
             || id.endsWith("/src/domains/creator/brush/studio-drawing-palettes.ts")
           ) {
