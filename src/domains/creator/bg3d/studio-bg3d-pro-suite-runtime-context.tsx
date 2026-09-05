@@ -5,6 +5,8 @@ import type {
   StudioBg3dShot,
 } from "./studio-bg3d-scene-document";
 import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
+import type { StudioBg3dProductionLookState } from "./studio-bg3d-production-pass-readiness";
+import type { StudioBg3dProductionSceneSummary } from "./studio-bg3d-production-workflow";
 
 export interface StudioBg3dProductionBatchProgress {
   readonly stage: "render" | "contact" | "archive";
@@ -30,6 +32,8 @@ export interface StudioBg3dProductionBatchRuntime {
   readonly availablePasses: readonly StudioBg3dShotBatchPass[];
   readonly selectedPasses: readonly StudioBg3dShotBatchPass[];
   readonly passLabels: Readonly<Record<StudioBg3dShotBatchPass, string>>;
+  /** Active SceneDocument LT settings used to prevent presets from promising skipped artifacts. */
+  readonly look?: StudioBg3dProductionLookState;
   readonly exportHeight: number | "per-shot";
   readonly exportHeightOptions: readonly number[];
   readonly includeLayeredPsd: boolean;
@@ -62,6 +66,10 @@ export interface StudioBg3dProSuiteRuntimeValue {
   readonly baseCamera: StudioBg3dCameraSettings;
   readonly productionShots: readonly StudioBg3dShot[];
   readonly productionBatch?: StudioBg3dProductionBatchRuntime;
+  /** Bounded projection used by the connected production workflow UI. */
+  readonly sceneSummary?: StudioBg3dProductionSceneSummary;
+  readonly onSetLineArtPreview?: (enabled: boolean) => void;
+  readonly onSetTransparentBackground?: (transparent: boolean) => void;
   readonly onApplyCameraView: (camera: StudioBg3dCameraSettings) => void;
   readonly onPreviewCameraView?: (camera: StudioBg3dCameraSettings) => void;
   readonly onFinishCameraViewPreview?: () => void;
