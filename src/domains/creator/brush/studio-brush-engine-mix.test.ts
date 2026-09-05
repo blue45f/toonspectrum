@@ -114,8 +114,25 @@ describe("mergeStudioBrushMixTraitSection", () => {
 
     const flowSpacing = mergeStudioBrushMixTraitSection("flow-spacing", dryMedia!, airbrush!);
     expect(flowSpacing.flow).toEqual(airbrush!.flow);
-    expect(flowSpacing.spacing).toEqual(airbrush!.spacing);
+    expect(flowSpacing.spacing).toMatchObject({
+      min: airbrush!.spacing.min,
+      max: airbrush!.spacing.max,
+      mappings: airbrush!.spacing.mappings,
+      jitter: airbrush!.spacing.jitter,
+    });
     expect(flowSpacing.spacingRatio).toBe(airbrush!.spacingRatio);
+    // Relative spacing is the portable behavior. Normalization projects it through the retained
+    // carrier width instead of copying the source brush's stale absolute-pixel cache.
+    const expectedSpacingBase = airbrush!.spacingRatio === null
+      ? airbrush!.spacing.base
+      : Math.min(
+          airbrush!.spacing.max,
+          Math.max(
+            airbrush!.spacing.min,
+            dryMedia!.width.base * airbrush!.spacingRatio,
+          ),
+        );
+    expect(flowSpacing.spacing.base).toBeCloseTo(expectedSpacingBase, 10);
     expect(flowSpacing.width).toEqual(dryMedia!.width);
 
     const scatter = mergeStudioBrushMixTraitSection("scatter-orientation", dryMedia!, airbrush!);
