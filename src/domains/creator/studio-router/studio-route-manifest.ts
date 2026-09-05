@@ -1,5 +1,9 @@
 import { STUDIO_LIFT3D_SUBJECTS } from "../lift3d/studio-lift3d-contract";
 import {
+  resolveStudioProductionScope,
+  studioProductionLifecycleKey,
+} from "../studio-production/studio-production-scope";
+import {
   parseStudioWorkspaceRoute,
   studioWorkspaceCanonicalHref,
   studioWorkspaceDocumentIdentity,
@@ -26,7 +30,8 @@ export type StudioRouteKind =
   | "lift3d"
   | "placeholder"
   | "production"
-  | "publish";
+  | "publish"
+  | "storyworld";
 
 export interface StudioRouteManifestEntry {
   readonly id: string;
@@ -58,6 +63,12 @@ export const STUDIO_ROUTE_MANIFEST = Object.freeze([
     kind: "lift3d",
     ownsDocumentTitle: true,
     pattern: "/studio/lift3d",
+  },
+  {
+    id: "studio-storyworld",
+    kind: "storyworld",
+    ownsDocumentTitle: true,
+    pattern: "/studio/(work/:workId|remix/:sourceWorkId)?/storyworld",
   },
   {
     id: "studio-companion",
@@ -136,6 +147,12 @@ export interface StudioLift3dRouteResolution extends StudioResolvedRouteBase {
   readonly subject: string | null;
 }
 
+export interface StudioStoryworldRouteResolution extends StudioResolvedRouteBase {
+  readonly kind: "storyworld";
+  readonly remixSourceWorkId: string | null;
+  readonly workId: string | null;
+}
+
 export const STUDIO_PRODUCTION_ROUTE_IDS = [
   "join",
   "present",
@@ -153,6 +170,7 @@ export type StudioPlaceholderRouteId = "assets";
 export interface StudioProductionRouteResolution extends StudioResolvedRouteBase {
   readonly kind: "production";
   readonly surface: StudioProductionRouteId;
+  readonly editorHref: string;
 }
 
 export interface StudioPlaceholderRouteResolution extends StudioResolvedRouteBase {
@@ -174,7 +192,8 @@ export type StudioRouteResolution =
   | StudioLift3dRouteResolution
   | StudioPlaceholderRouteResolution
   | StudioProductionRouteResolution
-  | StudioPublishRouteResolution;
+  | StudioPublishRouteResolution
+  | StudioStoryworldRouteResolution;
 
 const PRODUCTION_ROUTE_IDS = new Set<StudioProductionRouteId>(
   STUDIO_PRODUCTION_ROUTE_IDS,
@@ -370,7 +389,7 @@ function resolveLift3d(
 function resolveProduction(
   pathname: string,
   search: string | URLSearchParams | undefined,
-): StudioProductionRouteResolution | null {
+): StudioProductionRouteResolution | StudioInvalidRouteResolution | null {
   const segments = normalizedSegments(pathname);
   if (
     segments === null
@@ -379,15 +398,57 @@ function resolveProduction(
   ) {
     return null;
   }
+  const resolvedScope = resolveStudioProductionScope({ pathname, search });
+  if (!resolvedScope.valid) return invalidResolution(pathname, search, resolvedScope.errorCode);
   const surface = segments[1] as StudioProductionRouteId;
   const canonicalPathname = `/studio/${surface}`;
   return Object.freeze({
     canonicalHref: href(canonicalPathname, queryParams(search)),
     canonicalPathname,
     kind: "production",
-    lifecycleKey: canonicalPathname,
+    lifecycleKey: studioProductionLifecycleKey(surface, resolvedScope.scope),
+    editorHref: resolvedScope.scope.editorHref,
     ownsDocumentTitle: true,
     surface,
+  });
+}
+
+function storyworldPathname(workId: string | null, remixSourceWorkId: string | null): string {
+  if (workId !== null) return `/studio/work/${encodeURIComponent(workId)}/storyworld`;
+  if (remixSourceWorkId !== null) return `/studio/remix/${encodeURIComponent(remixSourceWorkId)}/storyworld`;
+  return "/studio/storyworld";
+}
+
+function resolveStoryworld(
+  pathname: string,
+  search: string | URLSearchParams | undefined,
+): StudioStoryworldRouteResolution | StudioInvalidRouteResolution | null {
+  const segments = normalizedSegments(pathname);
+  if (segments === null) return invalidResolution(pathname, search, "invalid-path");
+  let probePathname: string;
+  if (segments.length === 2 && segments[1] === "storyworld") {
+    probePathname = "/studio";
+  } else if (
+    segments.length === 4
+    && (segments[1] === "work" || segments[1] === "remix")
+    && segments[3] === "storyworld"
+  ) {
+    probePathname = `/studio/${segments[1]}/${segments[2]}/canvas`;
+  } else {
+    return null;
+  }
+  const workspace = parseStudioWorkspaceRoute({ pathname: probePathname, search });
+  if (!workspace.valid) return invalidResolution(pathname, search, workspace);
+  if (workspace.presentation !== "editor") return invalidResolution(pathname, search, "invalid-mode");
+  const canonicalPathname = storyworldPathname(workspace.workId, workspace.remixSourceWorkId);
+  return Object.freeze({
+    canonicalHref: href(canonicalPathname, cleanIdentityQuery(search)),
+    canonicalPathname,
+    kind: "storyworld",
+    lifecycleKey: `/studio/${studioWorkspaceDocumentIdentity(workspace)}/storyworld`,
+    ownsDocumentTitle: true,
+    remixSourceWorkId: workspace.remixSourceWorkId,
+    workId: workspace.workId,
   });
 }
 
@@ -451,7 +512,7 @@ function scopedLifecycleKey(
 function resolveWorkScopedProduction(
   pathname: string,
   search: string | URLSearchParams | undefined,
-): StudioProductionRouteResolution | null {
+): StudioProductionRouteResolution | StudioInvalidRouteResolution | null {
   const scoped = resolveWorkScopedSurface(pathname);
   if (
     scoped === null
@@ -461,13 +522,16 @@ function resolveWorkScopedProduction(
   ) {
     return null;
   }
+  const resolvedScope = resolveStudioProductionScope({ pathname, search });
+  if (!resolvedScope.valid) return invalidResolution(pathname, search, resolvedScope.errorCode);
   const surface = scoped.candidateSurface as StudioProductionRouteId;
   const canonicalPathname = scopedCanonicalPathname(scoped.scope, scoped.parsed, surface);
   return Object.freeze({
     canonicalHref: href(canonicalPathname, queryParams(search)),
     canonicalPathname,
     kind: "production",
-    lifecycleKey: scopedLifecycleKey(scoped.scope, scoped.parsed, surface),
+    lifecycleKey: studioProductionLifecycleKey(surface, resolvedScope.scope),
+    editorHref: resolvedScope.scope.editorHref,
     ownsDocumentTitle: true,
     surface,
   });
@@ -500,6 +564,8 @@ export function resolveStudioRoute({
   if (companion !== null) return companion;
   const lift3d = resolveLift3d(pathname, search);
   if (lift3d !== null) return lift3d;
+  const storyworld = resolveStoryworld(pathname, search);
+  if (storyworld !== null) return storyworld;
   const production = resolveProduction(pathname, search);
   if (production !== null) return production;
   const workScopedProduction = resolveWorkScopedProduction(pathname, search);

@@ -24,6 +24,7 @@ import {
   setUserLifecycleStatus,
 } from "../../server/user-lifecycle";
 
+import { requireMemberMutationAdmin } from "./admin-member-policy";
 import {
   type MemberStatus,
   countFrom,
@@ -106,7 +107,7 @@ function buildMemberConditions(
 
 function spreadsheetSafeCsvCell(value: unknown): string {
   let text = String(value ?? "");
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  if (/^[\s\uFEFF]*[=+\-@]|^[\t\r\n]/u.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '""')}"`;
 }
 
@@ -217,6 +218,7 @@ export class AdminMembersService {
     roleValue: unknown,
   ) {
     const admin = await requireAdminUser(userId);
+    requireMemberMutationAdmin(admin);
     const role = String(roleValue ?? "").toLowerCase();
     if (!MEMBER_ROLE_FILTERS.has(role)) {
       throw new BadRequestException({ error: "지원하지 않는 역할이에요." });
@@ -253,6 +255,7 @@ export class AdminMembersService {
     reasonValue?: unknown,
   ) {
     const admin = await requireAdminUser(userId);
+    requireMemberMutationAdmin(admin);
     const status = parseMemberStatus(statusValue);
     if (!status || status === "deleted") {
       throw new BadRequestException({
@@ -296,6 +299,7 @@ export class AdminMembersService {
     reasonValue?: unknown,
   ) {
     const admin = await requireAdminUser(userId);
+    requireMemberMutationAdmin(admin);
     if (!targetUserId) {
       throw new BadRequestException({ error: "대상 사용자가 필요해요." });
     }
@@ -399,6 +403,7 @@ export class AdminMembersService {
     reasonValue?: string,
   ) {
     const admin = await requireAdminUser(userId);
+    requireMemberMutationAdmin(admin);
     const status = parseMemberStatus(statusValue);
     if (!status || status === "deleted") {
       throw new BadRequestException("지원하지 않는 일괄 상태 변경입니다.");
@@ -407,13 +412,10 @@ export class AdminMembersService {
       throw new BadRequestException("대상 회원을 1명 이상 선택해 주세요.");
     }
 
-    const uniqueIds = Array.from(
-      new Set(
-        userIds
-          .map((id) => String(id ?? "").trim())
-          .filter(Boolean),
-      ),
-    ).slice(0, 200);
+    if (userIds.length > 200 || userIds.some((id) => typeof id !== "string" || !id.trim())) {
+      throw new BadRequestException("유효한 회원 ID를 최대 200개까지 전달해 주세요.");
+    }
+    const uniqueIds = Array.from(new Set(userIds.map((id) => id.trim())));
     const filteredIds = uniqueIds.filter((id) => id !== admin.id);
     const reason = parseString(reasonValue, "", 300);
 

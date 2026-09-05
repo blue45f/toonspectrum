@@ -135,7 +135,10 @@ export const ADMIN_BENCHMARK_ITERATIONS_MAX = 10;
 export const ADMIN_BENCHMARK_ITERATIONS_DEFAULT = 3;
 
 export function parseIpAddress(value: unknown) {
-  const trimmed = String(value ?? "").trim();
+  if (typeof value !== "string") {
+    throw new BadRequestException("IP 주소는 문자열로 입력해 주세요.");
+  }
+  const trimmed = value.trim();
   if (!trimmed) throw new BadRequestException("IP 주소를 입력해 주세요.");
 
   if (trimmed.includes("/")) {
@@ -145,7 +148,12 @@ export function parseIpAddress(value: unknown) {
     const addressType = net.isIP(address);
     if (addressType === 0) throw new BadRequestException("유효한 IP 주소를 입력해 주세요.");
 
-    const parsedCidr = Number.parseInt(cidr, 10);
+    // parseInt accepts trailing junk and decimals (e.g. 24oops -> 24).
+    // A security rule must match the entire prefix supplied by the operator.
+    if (!/^\d{1,3}$/u.test(cidr ?? "")) {
+      throw new BadRequestException("CIDR 범위가 유효하지 않습니다.");
+    }
+    const parsedCidr = Number(cidr);
     const maxCidr = addressType === 4 ? 32 : 128;
     if (!Number.isInteger(parsedCidr) || parsedCidr < 0 || parsedCidr > maxCidr) {
       throw new BadRequestException("CIDR 범위가 유효하지 않습니다.");

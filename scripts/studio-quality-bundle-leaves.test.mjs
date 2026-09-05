@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import test from "node:test";
+import { test } from "vitest";
 import ts from "typescript";
 
 const leaves = ["studio-page-review.ts", "studio-frame-animation-timing.ts"];

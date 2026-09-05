@@ -1,3 +1,4 @@
+import { StudioInspectorBatchRenameSection } from "./StudioInspectorBatchRenameSection";
 import { StudioInspectorSelectionActions } from "./StudioInspectorOrderAlignSection";
 import { StudioInspectorMutationLockNotice } from "./StudioInspectorUtilityPanels";
 
@@ -17,6 +18,10 @@ export function StudioInspectorMultiSelectionSection({
 }) {
   const {
     alignSelected,
+    announceDrawingShortcut,
+    commit,
+    elements,
+    groups,
     disarmAllPixelTools,
     duplicateSelected,
     inspectorInteractionPolicy,
@@ -65,6 +70,13 @@ export function StudioInspectorMultiSelectionSection({
           alignSelected={alignSelected}
           duplicateSelected={duplicateSelected}
           removeSelected={removeSelected}
+        />
+        <StudioInspectorBatchRenameSection
+          elements={elements}
+          selectedIds={marqueeIds}
+          groups={groups}
+          commit={(next) => !inspectorInteractionPolicy.selection.disabled && commit(next)}
+          announce={announceDrawingShortcut}
         />
       </fieldset>
     </section>

@@ -54,7 +54,8 @@ export function buildMemberQuery(
 
 export function getPageCount(total: number, pageSize: number): number {
   if (!Number.isFinite(total) || total <= 0) return 1;
-  return Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
+  const size = Number.isFinite(pageSize) ? Math.max(1, Math.floor(pageSize)) : 25;
+  return Math.max(1, Math.ceil(total / size));
 }
 
 export function clampPage(page: number, total: number, pageSize: number): number {
@@ -101,7 +102,7 @@ export interface MemberCsvRow {
 
 function spreadsheetSafeCsvCell(value: unknown): string {
   let text = String(value ?? "");
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  if (/^[\s\uFEFF]*[=+\-@]|^[\t\r\n]/u.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '""')}"`;
 }
 

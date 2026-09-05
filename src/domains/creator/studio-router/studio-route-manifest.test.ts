@@ -8,7 +8,7 @@ import {
 
 describe("Studio route manifest", () => {
   it("declares one owner for each Studio route family", () => {
-    expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(6);
+    expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(7);
     expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.id)).size).toBe(
       STUDIO_ROUTE_MANIFEST.length,
     );
@@ -153,7 +153,7 @@ describe("Studio route manifest", () => {
       "?scope=work%3Awork-1",
       "production",
       "/studio/share?scope=work%3Awork-1",
-      "/studio/share",
+      "/studio/work:work-1/share",
     ],
     [
       "/studio/join",
