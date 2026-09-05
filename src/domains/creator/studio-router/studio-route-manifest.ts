@@ -26,7 +26,8 @@ export type StudioRouteKind =
   | "lift3d"
   | "placeholder"
   | "production"
-  | "publish";
+  | "publish"
+  | "storyworld";
 
 export interface StudioRouteManifestEntry {
   readonly id: string;
@@ -58,6 +59,12 @@ export const STUDIO_ROUTE_MANIFEST = Object.freeze([
     kind: "lift3d",
     ownsDocumentTitle: true,
     pattern: "/studio/lift3d",
+  },
+  {
+    id: "studio-storyworld",
+    kind: "storyworld",
+    ownsDocumentTitle: true,
+    pattern: "/studio/(work/:workId|remix/:sourceWorkId)?/storyworld",
   },
   {
     id: "studio-companion",
@@ -136,6 +143,12 @@ export interface StudioLift3dRouteResolution extends StudioResolvedRouteBase {
   readonly subject: string | null;
 }
 
+export interface StudioStoryworldRouteResolution extends StudioResolvedRouteBase {
+  readonly kind: "storyworld";
+  readonly remixSourceWorkId: string | null;
+  readonly workId: string | null;
+}
+
 export const STUDIO_PRODUCTION_ROUTE_IDS = [
   "join",
   "present",
@@ -174,7 +187,8 @@ export type StudioRouteResolution =
   | StudioLift3dRouteResolution
   | StudioPlaceholderRouteResolution
   | StudioProductionRouteResolution
-  | StudioPublishRouteResolution;
+  | StudioPublishRouteResolution
+  | StudioStoryworldRouteResolution;
 
 const PRODUCTION_ROUTE_IDS = new Set<StudioProductionRouteId>(
   STUDIO_PRODUCTION_ROUTE_IDS,
@@ -391,6 +405,45 @@ function resolveProduction(
   });
 }
 
+function storyworldPathname(workId: string | null, remixSourceWorkId: string | null): string {
+  if (workId !== null) return `/studio/work/${encodeURIComponent(workId)}/storyworld`;
+  if (remixSourceWorkId !== null) return `/studio/remix/${encodeURIComponent(remixSourceWorkId)}/storyworld`;
+  return "/studio/storyworld";
+}
+
+function resolveStoryworld(
+  pathname: string,
+  search: string | URLSearchParams | undefined,
+): StudioStoryworldRouteResolution | StudioInvalidRouteResolution | null {
+  const segments = normalizedSegments(pathname);
+  if (segments === null) return invalidResolution(pathname, search, "invalid-path");
+  let probePathname: string;
+  if (segments.length === 2 && segments[1] === "storyworld") {
+    probePathname = "/studio";
+  } else if (
+    segments.length === 4
+    && (segments[1] === "work" || segments[1] === "remix")
+    && segments[3] === "storyworld"
+  ) {
+    probePathname = `/studio/${segments[1]}/${segments[2]}/canvas`;
+  } else {
+    return null;
+  }
+  const workspace = parseStudioWorkspaceRoute({ pathname: probePathname, search });
+  if (!workspace.valid) return invalidResolution(pathname, search, workspace);
+  if (workspace.presentation !== "editor") return invalidResolution(pathname, search, "invalid-mode");
+  const canonicalPathname = storyworldPathname(workspace.workId, workspace.remixSourceWorkId);
+  return Object.freeze({
+    canonicalHref: href(canonicalPathname, cleanIdentityQuery(search)),
+    canonicalPathname,
+    kind: "storyworld",
+    lifecycleKey: `/studio/${studioWorkspaceDocumentIdentity(workspace)}/storyworld`,
+    ownsDocumentTitle: true,
+    remixSourceWorkId: workspace.remixSourceWorkId,
+    workId: workspace.workId,
+  });
+}
+
 function resolvePlaceholder(
   pathname: string,
   search: string | URLSearchParams | undefined,
@@ -500,6 +553,8 @@ export function resolveStudioRoute({
   if (companion !== null) return companion;
   const lift3d = resolveLift3d(pathname, search);
   if (lift3d !== null) return lift3d;
+  const storyworld = resolveStoryworld(pathname, search);
+  if (storyworld !== null) return storyworld;
   const production = resolveProduction(pathname, search);
   if (production !== null) return production;
   const workScopedProduction = resolveWorkScopedProduction(pathname, search);

@@ -3,10 +3,22 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { loadStudioQualityReviewState } from "./quality-review-store";
 import { StudioContinuityPanel } from "./StudioContinuityPanel";
 
 import type { El } from "./studio-element-model";
 import type { PageState } from "./studio-page-state";
+
+
+const reviewDb = vi.hoisted(() => ({ rows: new Map<string, string>(), get: vi.fn(), set: vi.fn(), asAsyncKeyValueStore: vi.fn(), acquire: vi.fn() }));
+vi.mock("./studio-local-database-runtime", () => ({ acquireStudioLocalDatabase: reviewDb.acquire }));
+function resetReviewDatabase() {
+  reviewDb.rows.clear();
+  reviewDb.get.mockReset().mockImplementation(async (key: string) => reviewDb.rows.get(key) ?? null);
+  reviewDb.set.mockReset().mockImplementation(async (key: string, value: string) => { reviewDb.rows.set(key, value); });
+  reviewDb.asAsyncKeyValueStore.mockReset().mockReturnValue(reviewDb);
+  reviewDb.acquire.mockReset().mockResolvedValue(reviewDb);
+}
 
 function page(
   elements: readonly El[],
@@ -36,11 +48,13 @@ function frame(): Extract<El, { type: "frame" }> {
 }
 
 beforeEach(() => {
+  resetReviewDatabase();
   localStorage.clear();
 });
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  await loadStudioQualityReviewState("__test_flush__");
   vi.clearAllMocks();
 });
 
@@ -85,6 +99,7 @@ describe("StudioContinuityPanel quality center", () => {
       name: "의도된 상태로 확인",
     });
     expect(acknowledge).toBeDefined();
+    await waitFor(() => expect((acknowledge as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(acknowledge!);
     fireEvent.click(screen.getByRole("checkbox", { name: /확인됨/u }));
     expect(screen.getByRole("button", { name: "확인 취소" }).getAttribute("aria-pressed")).toBe("true");

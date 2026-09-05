@@ -1,11 +1,23 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { loadStudioQualityReviewState } from "./quality-review-store";
 import { inspectStudioQuality } from "./studio-quality-inspection";
 import { StudioContinuityPanel } from "./StudioContinuityPanel";
 
 import type { PageState } from "./studio-page-state";
+
+
+const reviewDb = vi.hoisted(() => ({ rows: new Map<string, string>(), get: vi.fn(), set: vi.fn(), asAsyncKeyValueStore: vi.fn(), acquire: vi.fn() }));
+vi.mock("./studio-local-database-runtime", () => ({ acquireStudioLocalDatabase: reviewDb.acquire }));
+function resetReviewDatabase() {
+  reviewDb.rows.clear();
+  reviewDb.get.mockReset().mockImplementation(async (key: string) => reviewDb.rows.get(key) ?? null);
+  reviewDb.set.mockReset().mockImplementation(async (key: string, value: string) => { reviewDb.rows.set(key, value); });
+  reviewDb.asAsyncKeyValueStore.mockReset().mockReturnValue(reviewDb);
+  reviewDb.acquire.mockReset().mockResolvedValue(reviewDb);
+}
 
 const raster = vi.hoisted(() => ({ inspect: vi.fn() }));
 vi.mock("./studio-quality-raster-inspection", () => ({ inspectStudioRasterAssets: raster.inspect }));
@@ -21,18 +33,19 @@ function manualCheckbox(): HTMLInputElement {
 }
 function seed(key: string, pages: PageState[], extra: Record<string, unknown> = {}): void {
   const report = inspectStudioQuality({ pages });
-  localStorage.setItem(`toonstudio:quality-inspection:v2:${encodeURIComponent(key)}`, JSON.stringify({
+  reviewDb.rows.set(`toonstudio:quality-inspection:v2:${encodeURIComponent(key)}`, JSON.stringify({
     manualRevisionKey: report.revisionKey, manualCheckIds: manualIds,
     acknowledgedIssueIds: report.issues.map((issue) => issue.id), ...extra,
   }));
 }
 beforeEach(() => {
+  resetReviewDatabase();
   localStorage.clear();
   raster.inspect.mockReset();
   raster.inspect.mockResolvedValue({ status: "complete", issues: [], assetReferenceCount: 0,
     probedSourceCount: 0, skippedSourceCount: 0 });
 });
-afterEach(cleanup);
+afterEach(async () => { cleanup(); await loadStudioQualityReviewState("__test_flush__"); vi.restoreAllMocks(); });
 
 describe("quality center review ownership", () => {
   it("supports omitted pages without repeated raster effects and rescans explicitly", async () => {
@@ -49,6 +62,7 @@ describe("quality center review ownership", () => {
     fireEvent.click(manualCheckbox());
     expect(manualCheckbox().checked).toBe(true);
     expect(localStorage.length).toBe(0);
+    expect(reviewDb.set).not.toHaveBeenCalled();
     view.unmount();
     render(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={pages} />);
     expect(manualCheckbox().checked).toBe(false);
@@ -104,5 +118,55 @@ describe("quality center review ownership", () => {
     await waitFor(() => expect(manualCheckbox().checked).toBe(true));
     expect(screen.queryByText("마감 준비 완료")).toBeNull();
     expect(screen.getByText(/이 환경에서는 이미지 원본 해상도 검사를 실행할 수 없습니다/u)).not.toBeNull();
+  });
+});
+
+
+describe("quality review SQLite failure and completion feedback", () => {
+  it("saves authored checks through SQLite and restores the same revision on remount", async () => {
+    const pages = [page()];
+    const props = { open: true, onClose: vi.fn(), issues: emptyIssues, pages, documentKey: "roundtrip" };
+    const view = render(<StudioContinuityPanel {...props} />);
+    await waitFor(() => expect(manualCheckbox().disabled).toBe(false));
+    fireEvent.click(manualCheckbox());
+    await waitFor(() => expect(JSON.parse(reviewDb.rows.get("toonstudio:quality-inspection:v2:roundtrip") ?? "{}").manualCheckIds).toContain("mobile"));
+    view.unmount();
+    render(<StudioContinuityPanel {...props} />);
+    await waitFor(() => expect(manualCheckbox().checked).toBe(true));
+    expect(localStorage.length).toBe(0);
+  });
+  it("waits for a durable write and retains edits honestly when that write fails", async () => {
+    reviewDb.set.mockRejectedValue(new Error("quota"));
+    render(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={[page()]} documentKey="quota" />);
+    await waitFor(() => expect(manualCheckbox().disabled).toBe(false));
+    fireEvent.click(manualCheckbox());
+    await waitFor(() => expect(screen.getByText(/현재 탭에만 보관됩니다/u)).toBeTruthy());
+    expect(manualCheckbox().checked).toBe(true);
+    expect(reviewDb.asAsyncKeyValueStore).toHaveBeenCalledWith("studio-quality-review-v2");
+    expect(localStorage.length).toBe(0);
+  });
+  it("never overwrites a corrupt row with an empty or demo receipt", async () => {
+    const key = "toonstudio:quality-inspection:v2:corrupt";
+    reviewDb.rows.set(key, "{broken");
+    render(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={[page()]} documentKey="corrupt" />);
+    await waitFor(() => expect(manualCheckbox().disabled).toBe(false));
+    fireEvent.click(manualCheckbox());
+    expect(manualCheckbox().checked).toBe(true);
+    expect(reviewDb.rows.get(key)).toBe("{broken");
+    expect(reviewDb.set).not.toHaveBeenCalled();
+    expect(screen.getByText(/현재 탭에만 보관됩니다/u)).toBeTruthy();
+  });
+  it("does not apply a late old-document read to the new document", async () => {
+    let finish!: (value: string) => void;
+    reviewDb.get.mockImplementationOnce(() => new Promise<string>((resolveRead) => { finish = resolveRead; }));
+    const pages = [page()];
+    const view = render(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={pages} documentKey="first" />);
+    await waitFor(() => expect(reviewDb.get).toHaveBeenCalled());
+    expect(manualCheckbox().disabled).toBe(true);
+    view.rerender(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={pages} documentKey="second" />);
+    await waitFor(() => expect(manualCheckbox().disabled).toBe(false));
+    await act(async () => finish(JSON.stringify({ manualRevisionKey: inspectStudioQuality({ pages }).revisionKey, manualCheckIds: manualIds })));
+    await waitFor(() => expect(manualCheckbox().checked).toBe(false));
+    expect(screen.queryByText("마감 준비 완료")).toBeNull();
   });
 });

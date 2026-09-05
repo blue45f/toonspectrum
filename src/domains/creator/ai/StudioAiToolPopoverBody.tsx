@@ -5,7 +5,7 @@ import {
   Sparkles,
   WandSparkles,
 } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense } from "react";
 
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "../studio-chrome-ui";
 import {
@@ -24,26 +24,14 @@ import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 import { pushStudioAiRecentPrompt } from "./studio-ai-assist-ux";
 import { isStudioAiConfigured } from "./studio-ai-client";
-import { compileStudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
-import {
-  consumeStudioAiSuperSuiteOpenRequest,
-  subscribeStudioAiSuperSuiteOpenRequest,
-} from "./studio-ai-super-suite-intent";
+import { requestStudioAiSuperSuiteOpen } from "./studio-ai-super-suite-intent";
+import { StudioAiSuperSuiteGateway } from "./StudioAiSuperSuiteGateway";
 
 import type { StudioMenu } from "../studio-editor-tool-model";
 import type { StudioServerAiProviderPreference } from "../studio-server-ai-client";
 import type { StudioToolBeltContentProps } from "../StudioToolBeltContent";
 
 import { useT } from "@/lib/i18n";
-import { lazyRetry } from "@/lib/lazy-retry";
-
-const StudioAiSuperSuiteModal = lazyRetry(
-  () =>
-    import("./StudioAiSuperSuiteModal").then((mod) => ({
-      default: mod.StudioAiSuperSuiteModal,
-    })),
-  "StudioAiSuperSuiteModal"
-);
 
 export interface StudioAiToolPopoverBodyProps {
   readonly toolBelt: StudioToolBeltContentProps;
@@ -53,13 +41,6 @@ export function StudioAiToolPopoverBody({
   toolBelt,
 }: StudioAiToolPopoverBodyProps) {
   const t = useT();
-  const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState(() =>
-    consumeStudioAiSuperSuiteOpenRequest()
-  );
-  useEffect(
-    () => subscribeStudioAiSuperSuiteOpenRequest(() => setAiSuperSuiteOpen(true)),
-    []
-  );
   const lt = (fallback: string, key: string) => {
     const translated = t(key);
     return translated === key ? fallback : translated;
@@ -134,7 +115,6 @@ export function StudioAiToolPopoverBody({
     setAiAssistTool("background");
     setAiBgPrompt(prompt);
     setMenu("aiAssist");
-    setAiSuperSuiteOpen(false);
   };
 
   return (
@@ -240,7 +220,7 @@ export function StudioAiToolPopoverBody({
                   scenarioDisabled={masterEditMode}
                   scenarioDisabledReason="마스터 편집 중에는 시나리오 제작을 사용할 수 없어요."
                   onOpenSuperSuite={() => {
-                    setAiSuperSuiteOpen(true);
+                    requestStudioAiSuperSuiteOpen();
                   }}
                   providerSlot={
                 textAiTransport.mode === "server" && configuredServerAiProviders.length > 0 ? (
@@ -436,30 +416,7 @@ export function StudioAiToolPopoverBody({
           </Suspense>
         </div>
       )}
-      {aiSuperSuiteOpen ? (
-        <Suspense
-          fallback={
-            <div
-              className="fixed inset-0 z-[120] grid place-items-center bg-black/45 p-4 backdrop-blur-sm"
-              role="status"
-              aria-live="polite"
-            >
-              <div className="rounded-xl border border-line bg-panel px-4 py-3 text-sm font-semibold text-fg shadow-xl">
-                AI 웹툰 레시피 도구를 여는 중…
-              </div>
-            </div>
-          }
-        >
-          <StudioAiSuperSuiteModal
-            open
-            onClose={() => setAiSuperSuiteOpen(false)}
-            onApplyPrompt={applySuperSuitePrompt}
-            onApplyPromptRecipe={(handoff) =>
-              applySuperSuitePrompt(compileStudioAiSuitePromptHandoff(handoff))
-            }
-          />
-        </Suspense>
-      ) : null}
+      <StudioAiSuperSuiteGateway onApplyPrompt={applySuperSuitePrompt} />
     </>
   );
 }

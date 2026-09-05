@@ -570,9 +570,9 @@ export function StudioProductionHubPage({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <Radio className="size-4 text-accent" aria-hidden="true" />
-              <span className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-fg-3">
-                Production command center
-              </span>
+              <h1 className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-fg-3">
+                Production command center · {SURFACE_META[surface].label}
+              </h1>
               <Pill tone={releaseReady ? "success" : "warning"}>
                 {releaseReady ? "출시 가능" : "검수 필요"}
               </Pill>
@@ -581,7 +581,7 @@ export function StudioProductionHubPage({
               key={`${workspace.scopeKey}:${workspace.title}`}
               defaultValue={workspace.title}
               aria-label="프로젝트 제목"
-              className="mt-0.5 w-full max-w-3xl bg-transparent text-base font-black tracking-tight outline-none sm:text-lg"
+              className="mt-0.5 min-h-11 w-full max-w-3xl bg-transparent text-base font-black tracking-tight outline-none sm:text-lg"
               onBlur={(event) => {
                 const title = event.currentTarget.value.trim();
                 if (!title || title === workspaceRef.current.title) return;

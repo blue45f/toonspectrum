@@ -51,7 +51,7 @@ concurrency:
 #
 # 되돌리는 법: 아래 값을 "false" 로 바꾸면 원래 게이트가 그대로 복구된다.
 env:
-  CI_CORE_BYPASS: "true"
+  CI_CORE_BYPASS: "false"
 
 jobs:
   # ── core 를 구성하는 병렬 잡 ─────────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { loadStudioQualityReviewState, saveStudioQualityReviewState } from "./quality-review-store";
 import { inspectStudioQualityFinishSupplement } from "./studio-quality-finish-bridge";
 import {
   inspectStudioQuality,
@@ -190,26 +191,26 @@ function safeStorageKey(documentKey: string | undefined): string | null {
   return normalized ? `toonstudio:quality-inspection:v2:${encodeURIComponent(normalized)}` : null;
 }
 
-function readPersistedState(storageKey: string | null): PersistedQualityState {
-  if (storageKey === null) return {};
-  try {
-    if (typeof localStorage === "undefined") return {};
-    const parsed: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    const record = parsed as Record<string, unknown>;
-    return {
-      acknowledgedIssueIds: Array.isArray(record.acknowledgedIssueIds)
-        ? record.acknowledgedIssueIds.filter((id): id is string => typeof id === "string")
-        : [],
-      manualCheckIds: Array.isArray(record.manualCheckIds)
-        ? record.manualCheckIds.filter((id): id is ManualCheckId =>
-            MANUAL_CHECKS.some((check) => check.id === id))
-        : [],
-      manualRevisionKey: typeof record.manualRevisionKey === "string" ? record.manualRevisionKey : undefined,
-    };
-  } catch {
-    return {};
+async function readPersistedState(storageKey: string): Promise<PersistedQualityState> {
+  const serialized = await loadStudioQualityReviewState(storageKey);
+  if (serialized === null) return {};
+  const parsed: unknown = JSON.parse(serialized);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("검토 기록 형식이 올바르지 않습니다.");
   }
+  const record = parsed as Record<string, unknown>;
+  if ((record.acknowledgedIssueIds !== undefined && !Array.isArray(record.acknowledgedIssueIds)) ||
+      (record.manualCheckIds !== undefined && !Array.isArray(record.manualCheckIds)) ||
+      (record.manualRevisionKey !== undefined && typeof record.manualRevisionKey !== "string")) {
+    throw new Error("검토 기록을 안전하게 복원할 수 없습니다.");
+  }
+  return {
+    acknowledgedIssueIds: Array.isArray(record.acknowledgedIssueIds)
+      ? record.acknowledgedIssueIds.filter((id): id is string => typeof id === "string") : [],
+    manualCheckIds: Array.isArray(record.manualCheckIds)
+      ? record.manualCheckIds.filter((id): id is ManualCheckId => MANUAL_CHECKS.some((check) => check.id === id)) : [],
+    manualRevisionKey: typeof record.manualRevisionKey === "string" ? record.manualRevisionKey : undefined,
+  };
 }
 
 function pageLabel(
@@ -327,6 +328,8 @@ export function StudioContinuityPanel({
   );
   const storageKey = useMemo(() => safeStorageKey(documentKey), [documentKey]);
   const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
+  const [writableReviewKey, setWritableReviewKey] = useState<string | null>(null);
+  const [reviewPersistence, setReviewPersistence] = useState<"loading" | "saved" | "saving" | "memory">("loading");
 
   // A rescan is a new measurement request even when the immutable pages did not change.
   const scanInput = useMemo(() => ({ pages, epoch: scanEpoch }), [pages, scanEpoch]);
@@ -351,6 +354,7 @@ export function StudioContinuityPanel({
     [issues, openCommentCount, scanInput, rasterInspection, finishSupplement]
   );
   const currentReviewKey = `${storageKey}:${report.revisionKey}`;
+  const reviewStateReady = loadedStorageKey === currentReviewKey;
   const acknowledgedIssueIds = useMemo(() => new Set(
     loadedStorageKey === currentReviewKey
       ? report.issues.filter((issue) =>
@@ -406,46 +410,44 @@ export function StudioContinuityPanel({
 
   useEffect(() => {
     if (!open) return;
-    const persisted = readPersistedState(storageKey);
-    setAcknowledgedIssueIds(new Set(
-      persisted.manualRevisionKey === report.revisionKey ? persisted.acknowledgedIssueIds ?? [] : []
-    ));
-    setCompletedManualChecks(
-      persisted.manualRevisionKey === report.revisionKey
-        ? new Set(
-            (persisted.manualCheckIds ?? []).filter((id): id is ManualCheckId =>
-              MANUAL_CHECKS.some((check) => check.id === id)
-            )
-          )
-        : new Set()
-    );
-    setLoadedStorageKey(`${storageKey}:${report.revisionKey}`);
+    let active = true;
+    const reviewKey = `${storageKey}:${report.revisionKey}`;
+    setLoadedStorageKey(null);
+    setWritableReviewKey(null);
+    setReviewPersistence(storageKey === null ? "memory" : "loading");
+    const restore = (persisted: PersistedQualityState, durable: boolean) => {
+      if (!active) return;
+      const sameRevision = persisted.manualRevisionKey === report.revisionKey;
+      setAcknowledgedIssueIds(new Set(sameRevision ? persisted.acknowledgedIssueIds ?? [] : []));
+      setCompletedManualChecks(new Set(sameRevision ? persisted.manualCheckIds ?? [] : []));
+      setLoadedStorageKey(reviewKey);
+      setWritableReviewKey(durable ? reviewKey : null);
+      setReviewPersistence(durable ? "saved" : "memory");
+    };
+    if (storageKey === null) {
+      restore({}, false);
+    } else {
+      void readPersistedState(storageKey)
+        .then((persisted) => restore(persisted, true))
+        .catch(() => restore({}, false));
+    }
+    return () => { active = false; };
   }, [open, report.revisionKey, storageKey]);
 
   useEffect(() => {
-    if (
-      storageKey === null ||
-      loadedStorageKey !== `${storageKey}:${report.revisionKey}`
-    ) {
-      return;
-    }
+    if (storageKey === null || loadedStorageKey !== currentReviewKey || writableReviewKey !== currentReviewKey) return;
+    let active = true;
     const payload: PersistedQualityState = {
       acknowledgedIssueIds: [...acknowledgedIssueIds].sort(),
       manualCheckIds: [...completedManualChecks].sort(),
       manualRevisionKey: report.revisionKey,
     };
-    try {
-      globalThis.localStorage?.setItem(storageKey, JSON.stringify(payload));
-    } catch {
-      // Storage can be unavailable in private/embedded contexts. The current session still works.
-    }
-  }, [
-    acknowledgedIssueIds,
-    completedManualChecks,
-    loadedStorageKey,
-    report.revisionKey,
-    storageKey,
-  ]);
+    setReviewPersistence("saving");
+    void saveStudioQualityReviewState(storageKey, JSON.stringify(payload))
+      .then(() => { if (active) setReviewPersistence("saved"); })
+      .catch(() => { if (active) setReviewPersistence("memory"); });
+    return () => { active = false; };
+  }, [acknowledgedIssueIds, completedManualChecks, currentReviewKey, loadedStorageKey, report.revisionKey, storageKey, writableReviewKey]);
 
   useEffect(() => {
     const validIds = new Set(
@@ -587,6 +589,12 @@ export function StudioContinuityPanel({
               문서 무결성, 이미지 디코딩·해상도, 레이어, 대사 잘림·대비, 컷 간격,
               검토 상태와 이야기 연속성을 한 번에 검사합니다. 자동으로 확정할 수 없는 연출은
               통과시키지 않고 수동 확인으로 분리합니다.
+            </p>
+            <p className="mt-1 text-xs text-fg-3" role="status">
+              {!reviewStateReady ? "검토 기록을 불러오는 중…" : null}
+              {reviewStateReady && reviewPersistence === "saving" ? "검토 기록을 SQLite/OPFS에 저장 중…" : null}
+              {reviewStateReady && reviewPersistence === "saved" ? "검토 기록: SQLite/OPFS 저장됨" : null}
+              {reviewStateReady && reviewPersistence === "memory" ? "검토 기록은 현재 탭에만 보관됩니다. 저장된 원본은 변경하지 않습니다." : null}
             </p>
           </div>
           <div className="hidden shrink-0 items-center gap-2 lg:flex" aria-label="마감 검사 요약">
@@ -935,6 +943,7 @@ export function StudioContinuityPanel({
                               {canAcknowledge && (
                                 <button
                                   type="button"
+                                  disabled={!reviewStateReady}
                                   onClick={() =>
                                     setAcknowledgedIssueIds((current) => {
                                       const next = new Set(current);
@@ -1006,6 +1015,7 @@ export function StudioContinuityPanel({
                     >
                       <input
                         type="checkbox"
+                        disabled={!reviewStateReady}
                         checked={checked}
                         onChange={(event) =>
                           setCompletedManualChecks((current) => {
