@@ -8,16 +8,17 @@
  */
 import {
   planStudioSelectionLayoutPatch,
-  resolveStudioFigmaSelectionLayoutMetrics,
   unionStudioSelectionBounds,
   type StudioFigmaSelectionLayoutMetrics,
   type StudioFigmaSelectionLayoutPatch,
 } from "./studio-figma-selection-ux";
-import { studioGroupUniformResizeMemberCanRotate } from "./studio-group-uniform-resize";
 import {
   planStudioSelectionTransformCommit,
   type StudioSelectionTransformCommitPlan,
 } from "./studio-selection-transform-commit";
+import {
+  resolveStudioFigmaSelectionLayoutMetrics as resolvePrecisionSelectionLayoutMetrics,
+} from "./studio-selection-transform-metrics";
 
 import type { El } from "./studio-element-model";
 
@@ -106,38 +107,18 @@ function rotateBoxOriginAboutCentre(
   };
 }
 
-function multiRotationDisabledReason(elements: readonly El[]): string | null {
-  const blocker = elements.find((element) => !studioGroupUniformResizeMemberCanRotate(element));
-  if (!blocker) return null;
-  const blockerReason = resolveStudioFigmaSelectionLayoutMetrics([blocker])?.rotationDisabledReason;
-  return blockerReason
-    ? `선택 안에 함께 회전할 수 없는 요소가 있어요. ${blockerReason}`
-    : "선택 안에 함께 회전할 수 없는 요소가 있어요. 해당 요소를 제외한 뒤 다시 시도하세요.";
-}
-
 /**
- * Production Inspector metrics. The lower-level Figma-style resolver intentionally remains
- * conservative for generic callers; this bridge promotes W/H and relative rotation only where
- * the exact group planner is wired and can honour them atomically.
+ * Production Inspector metrics.
+ *
+ * phase-180 moved capability promotion into the precision resolver, which derives the same group
+ * W/H and relative-rotation verdict from the same predicate and additionally reports the resize
+ * anchor, aspect-lock and stroke-width facts the precision panel needs. This bridge stays as the
+ * Inspector-facing name and delegates, so there is one promotion rule rather than two.
  */
 export function resolveStudioInspectorSelectionLayoutMetrics(
   elements: readonly El[],
 ): StudioFigmaSelectionLayoutMetrics | null {
-  const metrics = resolveStudioFigmaSelectionLayoutMetrics(elements);
-  if (!metrics || elements.length < 2) return metrics;
-  const rotationDisabledReason = multiRotationDisabledReason(elements);
-  return {
-    ...metrics,
-    hasFixedSize: true,
-    supportsWidth: true,
-    supportsHeight: true,
-    supportsRotation: rotationDisabledReason === null,
-    rotationIsRelative: true,
-    sizeDisabledReason: null,
-    widthDisabledReason: null,
-    heightDisabledReason: null,
-    rotationDisabledReason,
-  };
+  return resolvePrecisionSelectionLayoutMetrics(elements);
 }
 
 function describeChange(

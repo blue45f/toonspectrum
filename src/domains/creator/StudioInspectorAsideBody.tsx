@@ -1,9 +1,10 @@
 import { Suspense, useId, useMemo } from "react";
 
-import { selectStudioFigmaDesignTargets } from "./studio-figma-selection-ux";
-import { studioGroupUniformResizeMemberCanRotate } from "./studio-group-uniform-resize";
-import { resolveStudioInspectorSelectionLayoutMetrics } from "./studio-inspector-multi-selection";
 import { isEffectivelyHidden } from "./studio-layers";
+import {
+  resolveStudioFigmaSelectionLayoutMetrics,
+  selectStudioFigmaDesignTargets,
+} from "./studio-selection-transform-advanced";
 import { StudioPathBooleanPanel } from "./studio-page-lazy-ui";
 import {
   resolveStudioSelectMatchingOptions,
@@ -54,12 +55,9 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
   const figmaDesignTargets = inspectorContentMode === "selection"
     ? selectStudioFigmaDesignTargets(elements, marqueeIds, selected)
     : [];
-  // The Inspector bridge promotes group W/H and relative rotation on top of the conservative
-  // Figma-style resolver, so the numeric panel and the atomic group planner agree on capability.
-  const figmaSelectionMetrics = resolveStudioInspectorSelectionLayoutMetrics(figmaDesignTargets);
-  const multiRotationSupported =
-    figmaDesignTargets.length < 2
-    || figmaDesignTargets.every(studioGroupUniformResizeMemberCanRotate);
+  // The precision resolver promotes group W/H and relative rotation on top of the conservative
+  // Figma-style metrics, so the numeric panel and the atomic group planner agree on capability.
+  const figmaSelectionMetrics = resolveStudioFigmaSelectionLayoutMetrics(figmaDesignTargets);
   const matchingSourceId =
     figmaDesignTargets.length === 1 ? figmaDesignTargets[0]!.id : null;
   const visibleMatchingElements = useMemo(
@@ -148,7 +146,7 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
               <StudioFigmaDesignPanel
                 metrics={figmaSelectionMetrics}
                 disabled={inspectorInteractionPolicy.selection.disabled}
-                multiRotationSupported={multiRotationSupported}
+                disabledReason={inspectorInteractionPolicy.selection.reason}
                 onChange={applyFigmaSelectionLayoutPatch}
                 onZoomToSelection={zoomToSelection}
                 onFlipHorizontal={() => flipSelected("horizontal")}

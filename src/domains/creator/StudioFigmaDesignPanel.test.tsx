@@ -73,7 +73,7 @@ describe("StudioFigmaDesignPanel", () => {
     expect(onChange).not.toHaveBeenCalled();
     fireEvent.keyDown(width, { key: "Enter" });
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith({ width: 150 });
+    expect(onChange).toHaveBeenCalledWith({ width: 150, resizeAnchor: "top-left" });
 
     fireEvent.change(rotation, { target: { value: "15" } });
     fireEvent.blur(rotation);
@@ -171,11 +171,11 @@ describe("StudioFigmaDesignPanel", () => {
 
     fireEvent.change(width, { target: { value: "180" } });
     fireEvent.keyDown(width, { key: "Enter" });
-    expect(onChange).toHaveBeenLastCalledWith({ width: 180 });
+    expect(onChange).toHaveBeenLastCalledWith({ width: 180, resizeAnchor: "top-left" });
 
     fireEvent.change(height, { target: { value: "120" } });
     fireEvent.keyDown(height, { key: "Enter" });
-    expect(onChange).toHaveBeenLastCalledWith({ height: 120 });
+    expect(onChange).toHaveBeenLastCalledWith({ height: 120, resizeAnchor: "top-left" });
 
     fireEvent.change(rotation, { target: { value: "15" } });
     fireEvent.keyDown(rotation, { key: "Enter" });
@@ -193,16 +193,15 @@ describe("StudioFigmaDesignPanel", () => {
   });
 
   it("keeps an incompatible group rotation visible, disabled and explained", () => {
-    const elements = [
+    renderPanel([
       {
         id: "a",
-        type: "image",
-        src: "data:image/png;base64,AA==",
+        type: "frame",
         x: 10,
         y: 20,
         width: 40,
         height: 30,
-      } as ImageEl,
+      } as unknown as El,
       {
         id: "b",
         type: "image",
@@ -212,22 +211,16 @@ describe("StudioFigmaDesignPanel", () => {
         width: 20,
         height: 20,
       } as ImageEl,
-    ];
-    render(
-      <StudioFigmaDesignPanel
-        metrics={resolveStudioFigmaSelectionLayoutMetrics(elements)}
-        multiRotationSupported={false}
-        onChange={vi.fn()}
-      />,
-    );
+    ]);
     openGeometry();
 
+    // Size stays live for the group; only the angle is impossible, and it says so in place.
     const width = screen.getByLabelText("너비 W") as HTMLInputElement;
     const rotation = screen.getByLabelText("회전(상대)") as HTMLInputElement;
     expect(width.disabled).toBe(false);
     expect(rotation.disabled).toBe(true);
-    expect(rotation.title).toContain("프레임");
-    expect(screen.getByRole("status").textContent).toContain("묶음 회전");
+    expect(rotation.title).toContain("회전할 수 없는 요소");
+    expect(screen.getByText(/회전할 수 없는 요소/u)).toBeTruthy();
   });
 
   it("drops a half-typed draft when the selected target changes", () => {
@@ -281,7 +274,7 @@ describe("StudioFigmaDesignPanel", () => {
     const opacity = screen.getByLabelText("불투명도") as HTMLInputElement;
     fireEvent.change(width, { target: { value: "-10" } });
     fireEvent.keyDown(width, { key: "Enter" });
-    expect(onChange).toHaveBeenLastCalledWith({ width: 1 });
+    expect(onChange).toHaveBeenLastCalledWith({ width: 1, resizeAnchor: "top-left" });
     fireEvent.change(opacity, { target: { value: "140" } });
     fireEvent.keyDown(opacity, { key: "Enter" });
     expect(onChange).toHaveBeenLastCalledWith({ opacity: 1 });

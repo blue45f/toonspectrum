@@ -68,7 +68,7 @@ describe("StudioFigmaDesignPanel production multi-selection", () => {
     expect(onChange).not.toHaveBeenCalled();
     fireEvent.keyDown(width, { key: "Enter" });
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith({ width: 220 });
+    expect(onChange).toHaveBeenCalledWith({ width: 220, resizeAnchor: "top-left" });
 
     const rotation = screen.getByLabelText("회전(상대)") as HTMLInputElement;
     fireEvent.change(rotation, { target: { value: "15" } });

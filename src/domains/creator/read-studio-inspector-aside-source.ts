@@ -19,6 +19,10 @@ export const STUDIO_INSPECTOR_ASIDE_SURFACE_FILES = [
   "StudioInspectorTypographySection.tsx",
   "StudioInspectorRulersSection.tsx",
   "StudioInspectorOrderAlignSection.tsx",
+  "StudioTransformField.tsx",
+  "StudioTransformGeometryFields.tsx",
+  "StudioTransformPrecisionControls.tsx",
+  "StudioTransformQuickActions.tsx",
 ] as const;
 
 export function readStudioInspectorAsideSurface(): string {

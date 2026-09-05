@@ -88,11 +88,15 @@ describe("Studio inspector multi-selection scope", () => {
       "reorder",
     );
 
-    expect(applyPatchSource).toContain("planStudioFigmaMultiEdit({");
+    // One planner owns the group edit: the precision path is the only one that honours the
+    // resize anchor, aspect lock and stroke-width policy the transform panel now emits.
+    expect(applyPatchSource).toContain("planStudioMultiSelectionLayoutPatch(");
+    expect(applyPatchSource).not.toContain("planStudioFigmaMultiEdit(");
+    expect(applyPatchSource).not.toContain("planStudioInspectorMultiSelectionLayoutPatch(");
+    expect(applyPatchSource).toContain("isEffectivelyHidden(element, groups)");
     expect(applyPatchSource).toContain("isEffectivelyLocked(element, groups)");
-    expect(applyPatchSource).toContain('if (plan.kind === "unchanged")');
-    expect(applyPatchSource).toContain("if (!commit(plan.next)) return");
+    expect(applyPatchSource).toContain("if (!commit(next)) return");
     expect(applyPatchSource).toContain("setError(null)");
-    expect(applyPatchSource).toContain("announceDrawingShortcut(plan.announcement)");
+    expect(applyPatchSource.match(/commit\(/gu)?.length).toBe(1);
   });
 });
