@@ -1,0 +1,57 @@
+name: Studio asset curation pilot
+on:
+  push:
+    branches: [feat/studio-curated-assets-quality-20260906]
+    paths:
+      - scripts/studio_asset_curation.py
+      - scripts/acquire_studio_asset_pilot.py
+      - scripts/tests/test_studio_asset_curation.py
+      - data/studio-assets/acquisition-plan.json
+      - .github/workflows/studio-asset-curation-pilot.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-asset-curation-pilot-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  quarantine-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Test evidence gates and safe extraction (synthetic fixtures)
+        run: python3 -m unittest discover -s scripts/tests -p test_studio_asset_curation.py -v
+      - name: Acquire only the five explicitly selected free CC0 packs
+        run: >-
+          python3 scripts/acquire_studio_asset_pilot.py
+          data/studio-assets/acquisition-plan.json
+          --output "$RUNNER_TEMP/studio-asset-quarantine"
+      - name: Report actual acquisition state, never approval
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ['RUNNER_TEMP']) / 'studio-asset-quarantine/quarantine-index.json'
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write('## Quarantine acquisition only\n\n')
+              if p.exists():
+                  data = json.loads(p.read_text())
+                  f.write('```json\n' + json.dumps(data, ensure_ascii=False, indent=2)[:16000] + '\n```\n')
+              else:
+                  f.write('No acquisition report exists. No successful acquisition is claimed.\n')
+              f.write('\nFiles and packs are not approved originals. No editor integration or production publishing occurred.\n')
+          PY
+      - name: Retain quarantine evidence (not a production release)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: studio-asset-quarantine-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-asset-quarantine/
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
