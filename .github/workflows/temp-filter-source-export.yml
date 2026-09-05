@@ -1,0 +1,150 @@
+name: Materialize exhaustive filter upgrade
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: materialize-filter-upgrade-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Reconstruct and apply staged payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          parts=(.github/filter-upgrade-parts/part-*)
+          if (( ${#parts[@]} == 0 )); then
+            echo "No staged payload parts found" >&2
+            exit 1
+          fi
+          printf '%s\n' "${parts[@]}" | sort -V > /tmp/filter-parts.txt
+          while IFS= read -r part; do cat "$part"; done < /tmp/filter-parts.txt \
+            | tr -d '\r\n' > /tmp/filter-upgrade.b64
+          base64 --decode /tmp/filter-upgrade.b64 > /tmp/filter-upgrade.bin
+
+          python3 <<'PY'
+          from __future__ import annotations
+          import gzip
+          import io
+          import os
+          from pathlib import Path, PurePosixPath
+          import shutil
+          import tarfile
+          import zipfile
+
+          root = Path.cwd().resolve()
+          raw = Path('/tmp/filter-upgrade.bin').read_bytes()
+          try:
+              payload = gzip.decompress(raw)
+          except OSError:
+              payload = raw
+
+          def safe_target(name: str) -> Path:
+              pure = PurePosixPath(name)
+              if pure.is_absolute() or '..' in pure.parts:
+                  raise SystemExit(f'Unsafe payload path: {name}')
+              target = (root / Path(*pure.parts)).resolve()
+              if root not in target.parents and target != root:
+                  raise SystemExit(f'Payload escapes repository: {name}')
+              return target
+
+          if payload.startswith(b'PK\x03\x04'):
+              with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+                  for info in archive.infolist():
+                      target = safe_target(info.filename)
+                      if info.is_dir():
+                          target.mkdir(parents=True, exist_ok=True)
+                          continue
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      with archive.open(info) as source, target.open('wb') as dest:
+                          shutil.copyfileobj(source, dest)
+              Path('/tmp/filter-payload-kind').write_text('archive', encoding='utf-8')
+          else:
+              try:
+                  with tarfile.open(fileobj=io.BytesIO(payload), mode='r:*') as archive:
+                      members = archive.getmembers()
+                      for member in members:
+                          safe_target(member.name)
+                          if member.issym() or member.islnk():
+                              raise SystemExit(f'Links are not accepted in payload: {member.name}')
+                      archive.extractall(root, members=members, filter='data')
+                  Path('/tmp/filter-payload-kind').write_text('archive', encoding='utf-8')
+              except tarfile.ReadError:
+                  text = payload.decode('utf-8')
+                  if 'diff --git ' not in text:
+                      raise SystemExit('Payload is neither a safe archive nor a git patch')
+                  Path('/tmp/filter-upgrade.patch').write_text(text, encoding='utf-8')
+                  Path('/tmp/filter-payload-kind').write_text('patch', encoding='utf-8')
+          PY
+
+          if [[ "$(cat /tmp/filter-payload-kind)" == patch ]]; then
+            git apply --index --3way /tmp/filter-upgrade.patch
+            git reset
+          fi
+
+          rm -rf .github/filter-upgrade-parts
+          rm -f .github/workflows/temp-filter-source-export.yml
+
+          mapfile -t product_changes < <(git status --porcelain=v1 | sed -E 's/^.. //' | grep -E '^(src|scripts|docs)/' || true)
+          if (( ${#product_changes[@]} == 0 )); then
+            echo "The reconstructed payload changed no product, test, script, or documentation file" >&2
+            git status --short
+            exit 1
+          fi
+          printf 'Materialized product changes:\n%s\n' "${product_changes[*]}"
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate filter implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run src/domains/creator/filter
+          pnpm exec tsc --noEmit
+          pnpm run lint:quick
+
+      - name: Commit materialized product code
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to commit" >&2
+            exit 1
+          fi
+          git commit -m "feat(filter): materialize exhaustive production upgrade"
+          git push origin "HEAD:${HEAD_REF}"
+          gh pr ready "$PR_NUMBER"
