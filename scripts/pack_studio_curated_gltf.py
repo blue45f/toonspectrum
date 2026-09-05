@@ -16,6 +16,7 @@ import struct
 from urllib.parse import unquote, urlsplit
 
 MAX_FILE = 64 * 1024 * 1024
+MAX_IMAGES = 512
 
 
 def digest(data: bytes) -> str:
@@ -23,14 +24,15 @@ def digest(data: bytes) -> str:
 
 
 def dependency(base: Path, uri: object) -> Path:
-    if not isinstance(uri, str) or not uri or '\\' in uri or '\x00' in uri:
+    if not isinstance(uri, str) or not uri or '\\' in uri or any(ord(c) < 32 for c in uri):
         raise ValueError('invalid dependency URI')
     parsed = urlsplit(uri)
     if parsed.scheme or parsed.netloc or parsed.query or parsed.fragment:
         raise ValueError('only relative local files are supported')
-    name = unquote(parsed.path)
-    if Path(name).is_absolute() or any(x in {'.', '..'} for x in name.split('/')):
-        raise ValueError('path traversal')
+    name = unquote(parsed.path, errors='strict')
+    if (not name or '\\' in name or ':' in name or any(ord(c) < 32 for c in name)
+            or Path(name).is_absolute() or any(x in {'', '.', '..'} for x in name.split('/'))):
+        raise ValueError('path traversal or unsafe decoded URI')
     root = base.resolve(strict=True)
     result = root / name
     for part in [result, *result.parents]:
@@ -47,11 +49,14 @@ def dependency(base: Path, uri: object) -> Path:
 def pack(source: Path, destination: Path) -> dict:
     if source.is_symlink() or source.suffix.lower() != '.gltf' or source.stat().st_size > 4 * 1024 * 1024:
         raise ValueError('invalid source')
+    if destination.suffix.lower() != '.glb':
+        raise ValueError('destination must be a GLB file')
     if destination.exists() or destination.is_symlink():
         raise ValueError('destination already exists')
     raw = source.read_bytes()
     doc = json.loads(raw)
-    if not isinstance(doc, dict) or doc.get('asset', {}).get('version') != '2.0':
+    if (not isinstance(doc, dict) or not isinstance(doc.get('asset'), dict)
+            or doc['asset'].get('version') != '2.0'):
         raise ValueError('requires glTF 2.0')
     buffers = doc.get('buffers', [])
     if not isinstance(buffers, list) or len(buffers) != 1 or not isinstance(buffers[0], dict):
@@ -66,15 +71,22 @@ def pack(source: Path, destination: Path) -> dict:
     if not isinstance(views, list):
         raise ValueError('invalid buffer views')
     for v in views:
-        offset, length = v.get('byteOffset', 0), v.get('byteLength')
-        if v.get('buffer') != 0 or type(offset) is not int or type(length) is not int or offset < 0 or length <= 0 or offset + length > len(geometry):
+        if not isinstance(v, dict):
             raise ValueError('invalid geometry view')
+        offset, length = v.get('byteOffset', 0), v.get('byteLength')
+        if (type(v.get('buffer')) is not int or v['buffer'] != 0
+                or type(offset) is not int or type(length) is not int
+                or offset < 0 or length <= 0 or offset + length > len(geometry)):
+            raise ValueError('invalid geometry view')
+    images = doc.get('images', [])
+    if not isinstance(images, list) or len(images) > MAX_IMAGES:
+        raise ValueError('invalid images or image count exceeds budget')
     original_views = copy.deepcopy(views)
     original_semantics = {k: copy.deepcopy(v) for k, v in doc.items() if k not in {'buffers', 'bufferViews', 'images'}}
     data = bytearray(geometry)
     texture_report = []
     shared_images: dict[str, int] = {}
-    for image in doc.get('images', []):
+    for image in images:
         if not isinstance(image, dict) or 'bufferView' in image:
             raise ValueError('requires unambiguous external images')
         uri = image.get('uri')
@@ -117,13 +129,24 @@ def pack(source: Path, destination: Path) -> dict:
     return {'source': source.name, 'output': destination.name, 'sourceSha256': digest(raw), 'geometrySha256': digest(geometry), 'glbSha256': digest(result), 'bytes': len(result), 'textures': texture_report, 'geometryBytesPreserved': True, 'sceneAndMaterialMetadataPreserved': True, 'externalDependencies': 0, 'status': 'packaged-not-art-approved'}
 
 
+def pack_with_provenance(source: Path, destination: Path) -> dict:
+    provenance = destination.with_suffix('.provenance.json')
+    if provenance.exists() or provenance.is_symlink():
+        raise ValueError('provenance destination already exists')
+    report = pack(source, destination)
+    # Exclusive creation also rejects a file or symlink introduced after the preflight.
+    # A concurrent collision reports failure; it never overwrites someone else's file.
+    with provenance.open('x', encoding='utf-8') as f:
+        f.write(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
+    return report
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
     parser.add_argument('destination', type=Path)
     args = parser.parse_args()
-    report = pack(args.source, args.destination)
-    args.destination.with_suffix('.provenance.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    report = pack_with_provenance(args.source, args.destination)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0
 
