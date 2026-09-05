@@ -12,6 +12,7 @@
   "files": [
     "playwright.bg3d-runtime.config.ts",
     "scripts/studio-bg3d-runtime-reporter.ts",
-    "scripts/studio-bg3d-runtime-setup.mts"
+    "scripts/studio-bg3d-runtime-setup.mts",
+    "e2e/studio-bg3d-production-rotation.spec.ts"
   ]
 }
