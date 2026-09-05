@@ -2,15 +2,19 @@ name: Studio brush and filter stability
 
 on:
   push:
-    branches: [fix/studio-brush-filter-stability-20260906]
+    branches: [main]
+    paths: ['src/domains/creator/**', 'scripts/verify-studio-brushes.mts', 'scripts/verify-studio-filter-dialog.mts', '.github/workflows/studio-brush-filter-stability.yml']
+  pull_request:
+    branches: [main]
+    paths: ['src/domains/creator/**', 'scripts/verify-studio-brushes.mts', 'scripts/verify-studio-filter-dialog.mts', '.github/workflows/studio-brush-filter-stability.yml']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: studio-brush-filter-stability-${{ github.ref }}
-  cancel-in-progress: true
+  group: studio-brush-filter-stability-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -20,24 +24,19 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
-      - name: Archive reviewable source at the tested commit
-        run: |
-          mkdir -p /tmp/studio-stability-source
-          git rev-parse HEAD > /tmp/studio-stability-source/commit.txt
-          git archive --format=tar.gz HEAD src scripts packages lib tests package.json tsconfig.json vitest.config.ts .github/workflows > /tmp/studio-stability-source/source.tar.gz
-      - uses: actions/upload-artifact@v6
-        with:
-          name: studio-stability-source
-          path: /tmp/studio-stability-source
-          retention-days: 3
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Filter worker regression tests
-        run: pnpm exec vitest run src/domains/creator/studio-image-filter-worker-client.test.ts
+      - name: Worker recovery and textured-brush regressions
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/studio-image-filter-worker-client.test.ts
+          src/domains/creator/studio-image-filter-worker-stability.test.ts
+          src/domains/creator/brush/studio-brush-r8-grain-hydrator.test.ts
+          src/domains/creator/brush/studio-brush-r8-png-decoder.test.ts
       - run: pnpm run build:bundle
       - uses: actions/upload-artifact@v6
         with:
@@ -52,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [filters, brushes]
+        suite: [filters, desktop, long, shapes, mobile, durability]
     env:
       NODE_OPTIONS: --max-old-space-size=8192
       TOONSPECTRUM_VERIFY_DIR: /tmp/studio-stability-evidence
@@ -69,14 +68,17 @@ jobs:
         with:
           name: studio-stability-dist
           path: dist
-      - name: Every filter through the shipped dialog, pixel change and undo
+      - name: Every dialog filter repeated in the same browser session
         if: matrix.suite == 'filters'
         env:
           TOONSPECTRUM_FILTER_DIALOG_SURVEY: '1'
+          TOONSPECTRUM_FILTER_DIALOG_ROUNDS: '3'
         run: pnpm run verify:studio-filter-dialog
-      - name: Every listed brush with short and long strokes, undo, redo and durability
-        if: matrix.suite == 'brushes'
+      - name: Brush catalogue, long strokes, geometry, touch targets and save recovery
+        if: matrix.suite != 'filters'
         env:
+          TOONSPECTRUM_BRUSH_VERIFY_STAGE: ${{ matrix.suite }}
+          TOONSPECTRUM_BRUSH_STABILITY_ROUNDS: '2'
           TOONSPECTRUM_BRUSH_SURVEY: '1'
           TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX: '1'
         run: pnpm run verify:studio-brushes

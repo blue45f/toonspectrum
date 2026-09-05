@@ -1,0 +1,27 @@
+name: Apply reviewed studio stability patch
+
+on:
+  push:
+    branches: [fix/studio-brush-filter-stability-20260906]
+    paths: ['scripts/.studio-stability.patch']
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Apply exact reviewed patch on the feature branch only
+        run: |
+          test "$(git hash-object scripts/.studio-stability.patch)" = 911442fa4d4ec630073d17e45d35cb1fb52f2ffe
+          git apply --check scripts/.studio-stability.patch
+          git apply --index scripts/.studio-stability.patch
+          git rm scripts/.studio-stability.patch .github/workflows/apply-studio-stability-patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "fix(studio): recover filter workers and brush decoding during long sessions"
+          git push origin HEAD:refs/heads/fix/studio-brush-filter-stability-20260906
+          git rev-parse HEAD

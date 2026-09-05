@@ -1,0 +1,463 @@
+--- a/src/domains/creator/studio-image-filter-worker-client.ts
++++ b/src/domains/creator/studio-image-filter-worker-client.ts
+@@ -40,6 +40,8 @@
+         preventDefault?(): void;
+       }) => void)
+     | null;
++  /** Deserialization failures do not dispatch `error`; settle them explicitly. */
++  onmessageerror?: ((event: MessageEvent<unknown>) => void) | null;
+   postMessage(message: StudioImageFilterWorkerRequestMessage, transfer: Transferable[]): void;
+   terminate(): void;
+ }
+@@ -285,14 +287,28 @@
+ }
+ 
+ function deserializeWorkerError(response: {
+-  readonly error: {
+-    readonly message: string;
+-    readonly name: string;
+-  };
++  readonly error?: unknown;
+ }): Error {
+-  const error = new Error(response.error.message);
+-  error.name = response.error.name || "Error";
++  const payload = response.error;
++  if (!payload || typeof payload !== "object"
++    || !("message" in payload) || typeof payload.message !== "string") {
++    return createWorkerUnavailableError("이미지 필터 Worker의 오류 응답 형식이 올바르지 않습니다.");
++  }
++  const error = new Error(payload.message);
++  error.name = "name" in payload && typeof payload.name === "string" && payload.name
++    ? payload.name
++    : "Error";
+   return error;
++}
++
++function assertResultDimensions(
++  result: StudioImageDataLike,
++  source: StudioImageDataLike,
++): void {
++  assertStudioImageFilterImageData(result, "이미지 필터 Worker 결과");
++  if (result.width !== source.width || result.height !== source.height) {
++    throw new RangeError("이미지 필터 Worker 결과 크기가 원본과 일치하지 않습니다.");
++  }
+ }
+ 
+ function runImageFilterWithWorker(
+@@ -304,6 +320,7 @@
+     let settled = false;
+     let requestPosted = false;
+     let readyTimer: ReturnType<typeof setTimeout> | null = null;
++    let runTimer: ReturnType<typeof setTimeout> | null = null;
+     const message: StudioImageFilterWorkerRunMessage = {
+       type: "studio-image-filter/run",
+       version: STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
+@@ -312,9 +329,11 @@
+ 
+     const cleanup = () => {
+       if (readyTimer !== null) clearTimeout(readyTimer);
++      if (runTimer !== null) clearTimeout(runTimer);
+       signal?.removeEventListener("abort", onAbort);
+       worker.onmessage = null;
+       worker.onerror = null;
++      worker.onmessageerror = null;
+       worker.terminate();
+     };
+     const finish = (callback: () => void) => {
+@@ -325,6 +344,7 @@
+     };
+     const onAbort = () => finish(() => reject(createAbortError()));
+     worker.onmessage = (event) => {
++      if (settled) return;
+       const response = event.data;
+       if (
+         !response
+@@ -342,6 +362,10 @@
+         }
+         try {
+           requestPosted = true;
++          runTimer = setTimeout(
++            () => finish(() => reject(new Error("이미지 필터 Worker 계산 시간이 초과되었습니다."))),
++            30_000,
++          );
+           worker.postMessage(message, studioImageFilterRequestTransfers(message));
+         } catch (error) {
+           requestPosted = false;
+@@ -365,7 +389,7 @@
+         return;
+       }
+       try {
+-        assertStudioImageFilterImageData(response.imageData, "이미지 필터 Worker 결과");
++        assertResultDimensions(response.imageData, request.imageData);
+       } catch (error) {
+         finish(() => reject(error));
+         return;
+@@ -384,6 +408,10 @@
+             );
+       finish(() => reject(error));
+     };
++
++    worker.onmessageerror = () => finish(() => reject(createWorkerUnavailableError(
++      "이미지 필터 Worker 응답을 읽지 못했습니다.",
++    )));
+ 
+     signal?.addEventListener("abort", onAbort, { once: true });
+     if (signal?.aborted) {
+@@ -489,6 +517,7 @@
+     if (worker) {
+       worker.onmessage = null;
+       worker.onerror = null;
++      worker.onmessageerror = null;
+       worker.terminate();
+     }
+     worker = null;
+@@ -540,7 +569,6 @@
+     };
+     try {
+       task.posted = true;
+-      worker.postMessage(message, studioImageFilterRequestTransfers(message));
+       runTimer = setTimeout(() => {
+         const timedOut = current;
+         if (!timedOut) return;
+@@ -550,6 +578,7 @@
+           () => pending.reject(new Error("이미지 필터 Worker 계산 시간이 초과되었습니다.")),
+         ));
+       }, 30_000);
++      worker.postMessage(message, studioImageFilterRequestTransfers(message));
+     } catch (error) {
+       task.posted = false;
+       rejectCurrentWorkerUnavailable(
+@@ -563,6 +592,7 @@
+     worker = nextWorker;
+     ready = false;
+     worker.onmessage = (event) => {
++      if (disposed || worker !== nextWorker) return;
+       const response = event.data;
+       if (
+         !response
+@@ -610,7 +640,7 @@
+         return;
+       }
+       try {
+-        assertStudioImageFilterImageData(response.imageData, "이미지 필터 Worker 결과");
++        assertResultDimensions(response.imageData, task.request.imageData);
+       } catch (error) {
+         closeWorker();
+         completeCurrent((pending) => settle(pending, () => pending.reject(error)));
+@@ -622,6 +652,7 @@
+       ));
+     };
+     worker.onerror = (event) => {
++      if (disposed || worker !== nextWorker) return;
+       event.preventDefault?.();
+       const error = event.error instanceof Error
+         ? event.error
+@@ -630,6 +661,10 @@
+           );
+       closeWorker();
+       completeCurrent((pending) => settle(pending, () => pending.reject(error)));
++    };
++    worker.onmessageerror = () => {
++      if (disposed || worker !== nextWorker) return;
++      rejectCurrentWorkerUnavailable("이미지 필터 Worker 응답을 읽지 못했습니다.");
+     };
+     readyTimer = setTimeout(
+       () => rejectCurrentWorkerUnavailable(
+@@ -697,7 +732,15 @@
+           settled: false,
+           onAbort: () => {
+             settle(task, () => reject(createAbortError()));
+-            if (current !== task) queueMicrotask(pump);
++            if (current === task && !task.posted) {
++              completeCurrent();
++            } else if (current !== task) {
++              // A busy Worker may take seconds. Do not retain cancelled full-size buffers
++              // until it finishes while a slider keeps producing newer previews.
++              const index = queue.indexOf(task);
++              if (index !== -1) queue.splice(index, 1);
++              queueMicrotask(pump);
++            }
+           },
+         } satisfies StudioImageFilterSessionTask;
+         task.signal?.addEventListener("abort", task.onAbort, { once: true });
+@@ -828,6 +871,7 @@
+     if (worker) {
+       worker.onmessage = null;
+       worker.onerror = null;
++      worker.onmessageerror = null;
+       worker.terminate();
+     }
+     worker = null;
+@@ -990,6 +1034,7 @@
+     loadedSource = null;
+     loadingSource = null;
+     worker.onmessage = (event) => {
++      if (disposed || worker !== nextWorker) return;
+       const response = event.data;
+       if (
+         !response
+@@ -1075,13 +1120,7 @@
+         return;
+       }
+       try {
+-        assertStudioImageFilterImageData(response.imageData, "이미지 필터 Worker 결과");
+-        if (
+-          response.imageData.width !== task.request.imageData.width
+-          || response.imageData.height !== task.request.imageData.height
+-        ) {
+-          throw new RangeError("이미지 필터 Worker 결과 크기가 상주 원본과 일치하지 않습니다.");
+-        }
++        assertResultDimensions(response.imageData, task.request.imageData);
+       } catch (error) {
+         closeWorker();
+         completeCurrent((pending) => settle(pending, () => pending.reject(error)));
+@@ -1093,6 +1132,7 @@
+       ));
+     };
+     worker.onerror = (event) => {
++      if (disposed || worker !== nextWorker) return;
+       event.preventDefault?.();
+       const error = event.error instanceof Error
+         ? event.error
+@@ -1101,6 +1141,10 @@
+           );
+       closeWorker();
+       completeCurrent((pending) => settle(pending, () => pending.reject(error)));
++    };
++    worker.onmessageerror = () => {
++      if (disposed || worker !== nextWorker) return;
++      rejectCurrentWorkerUnavailable("이미지 필터 Worker 응답을 읽지 못했습니다.");
+     };
+     readyTimer = setTimeout(
+       () => rejectCurrentWorkerUnavailable(
+@@ -1181,6 +1225,8 @@
+             if (current === task && task.phase === "queued") {
+               completeCurrent();
+             } else if (current !== task) {
++              const index = queue.indexOf(task);
++              if (index !== -1) queue.splice(index, 1);
+               queueMicrotask(pump);
+             }
+           },
+--- a/src/domains/creator/brush/studio-brush-r8-grain-hydrator.ts
++++ b/src/domains/creator/brush/studio-brush-r8-grain-hydrator.ts
+@@ -13,6 +13,8 @@
+   resolveStudioBrushR8GrainSampler,
+   type StudioBrushR8GrainHydrationResult,
+ } from "./studio-brush-r8-grain-runtime";
++
++import { createStudioBrushR8PngDecoder } from "./studio-brush-r8-png-decoder";
+ 
+ import type { DownloadedStudioWorkAsset } from "../studio-work-asset-client";
+ 
+@@ -102,13 +104,7 @@
+ const DEFAULT_MAXIMUM_CONCURRENT = 3;
+ const MAXIMUM_CONCURRENT_LIMIT = 8;
+ 
+-let imageJsModulePromise: Promise<typeof import("image-js")> | null = null;
+-
+-async function defaultDecodePng(bytes: Uint8Array): Promise<StudioBrushR8DecodedPng> {
+-  imageJsModulePromise ??= import("image-js");
+-  const { decodePng } = await imageJsModulePromise;
+-  return decodePng(bytes);
+-}
++const defaultDecodePng = createStudioBrushR8PngDecoder(() => import("image-js"));
+ 
+ function ownDataValue(value: unknown, key: string): unknown {
+   if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+--- a/scripts/verify-studio-brushes.mts
++++ b/scripts/verify-studio-brushes.mts
+@@ -169,6 +169,14 @@
+       )
+     : STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
+ const BRUSH_MATRIX_CATALOG_COUNT = BRUSH_MATRIX_CATALOG_ITEMS.length;
++/** Repeat the complete short-stroke matrix in the SAME page/context, without reloading on success. */
++const STABILITY_ROUNDS = Number(process.env.TOONSPECTRUM_BRUSH_STABILITY_ROUNDS ?? "1");
++if (!Number.isSafeInteger(STABILITY_ROUNDS) || STABILITY_ROUNDS < 1 || STABILITY_ROUNDS > 20) {
++  throw new RangeError("TOONSPECTRUM_BRUSH_STABILITY_ROUNDS must be an integer from 1 to 20");
++}
++const DESKTOP_STABILITY_CASES = Array.from(
++  { length: STABILITY_ROUNDS }, () => BRUSH_MATRIX_CATALOG_ITEMS,
++).flat();
+ const LONG_BRUSH_CATALOG_CANDIDATES: readonly StudioBrushCatalogItem[] =
+   ALL_BRUSH_LONG_MATRIX
+     ? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS
+@@ -280,6 +288,8 @@
+ 
+ interface DesktopBrushResult {
+   ok: boolean;
++  stabilityRounds: number;
++  uniquePresetCount: number;
+   catalogSessionCount: number;
+   catalogDialogCount: number;
+   catalogItemCount: number;
+@@ -1586,6 +1596,13 @@
+       log(`DEBUG global __debugPerfectInk=${String(flag)}`);
+     }
+ 
++    // Desktop palettes now mount their contents inside an explicit popup. Open it through the
++    // shipped control before asserting the summary; waiting for unmounted content never tests ink.
++    const subToolsTrigger = page.locator('[data-studio-drawing-palette-icon-trigger="sub-tools"]');
++    if (await subToolsTrigger.count() > 0
++      && await subToolsTrigger.getAttribute("aria-expanded") !== "true") {
++      await subToolsTrigger.click();
++    }
+     const summary = page.locator('[data-studio-inspector-brush-summary="true"]');
+     await summary.waitFor({ state: "attached", timeout: 20_000 });
+     const inspectorSummaryCount = await summary.count();
+@@ -1595,6 +1612,10 @@
+       .count();
+     invariant(inspectorSummaryCount === 1, "desktop inspector is missing its read-only brush summary");
+     invariant(inspectorQuickTrayCount === 0, "desktop inspector still duplicates the quick brush shelf");
++    if (await subToolsTrigger.count() > 0
++      && await subToolsTrigger.getAttribute("aria-expanded") === "true") {
++      await subToolsTrigger.click();
++    }
+ 
+     const firstCatalog = await openDesktopCatalog(page);
+     const catalogSessionCount = await page
+@@ -1635,7 +1656,7 @@
+     invariant(stageBox && viewport, "could not measure the desktop canvas");
+ 
+     const evidence: BrushStrokeEvidence[] = [];
+-    for (const [index, preset] of BRUSH_MATRIX_CATALOG_ITEMS.entries()) {
++    for (const [index, preset] of DESKTOP_STABILITY_CASES.entries()) {
+       try {
+       const expectedSelection = await materializeStudioBrushCatalogSelection(preset.id);
+       invariant(expectedSelection, `${preset.id}: product catalogue selection did not materialize`);
+@@ -1675,7 +1696,7 @@
+       }
+       const safeCanvasPoint = async ({ x, y }: { x: number; y: number }) =>
+         page.evaluate(({ x: pointerX, y: pointerY }) =>
+-          document.elementFromPoint(pointerX, pointerY)?.closest(".konvajs-content") !== null,
++          Boolean(document.elementFromPoint(pointerX, pointerY)?.closest(".konvajs-content")),
+         { x, y }
+       );
+       let evidencePoint = point;
+@@ -2235,7 +2256,7 @@
+         );
+       }
+       log(
+-        `desktop ${index + 1}/${BRUSH_MATRIX_CATALOG_COUNT} `
++        `desktop ${index + 1}/${DESKTOP_STABILITY_CASES.length} `
+           + `${preset.id}: select/${operation}/undo/redo OK`,
+       );
+       } catch (error) {
+@@ -2244,7 +2265,7 @@
+         if (!DESKTOP_SURVEY_MODE) throw error;
+         const message = error instanceof Error ? error.message : String(error);
+         surveyFailures.push(message);
+-        log(`SURVEY FAILURE ${index + 1}/${BRUSH_MATRIX_CATALOG_COUNT} ${message}`);
++        log(`SURVEY FAILURE ${index + 1}/${DESKTOP_STABILITY_CASES.length} ${message}`);
+         await installCleanStudioState(page);
+         // 실패 진단(캔버스 덤프·검열) 직후의 페이지는 무겁다 — 기본 7초 내비게이션
+         // 타임아웃이 복구 리로드를 두 번이나 죽였다(실측). 복구에만 넉넉한 한도를 준다.
+@@ -2269,7 +2290,7 @@
+     reportBrowserErrors(errors);
+     invariant(errors.messages.length === 0, "desktop browser emitted console/page errors");
+     invariant(errors.failedResponses.length === 0, "desktop browser received unexpected 5xx responses");
+-    const ok = evidence.length === BRUSH_MATRIX_CATALOG_COUNT && evidence.every((entry) =>
++    const ok = evidence.length === DESKTOP_STABILITY_CASES.length && evidence.every((entry) =>
+       entry.selected
+       && entry.visualChanged
+       && (entry.operation === "paint" || entry.eraseLiveOperationActive === true)
+@@ -2301,6 +2322,8 @@
+     );
+     return {
+       ok,
++      stabilityRounds: STABILITY_ROUNDS,
++      uniquePresetCount: BRUSH_MATRIX_CATALOG_COUNT,
+       catalogSessionCount,
+       catalogDialogCount,
+       catalogItemCount: PRODUCT_BRUSH_CATALOG_COUNT,
+@@ -2315,6 +2338,18 @@
+       surveyMode: DESKTOP_SURVEY_MODE,
+       errorCount: errors.messages.length + errors.failedResponses.length,
+     };
++  } catch (error) {
++    await page.screenshot({ path: join(SCRATCH, "studio-brush-desktop-failure.png") })
++      .catch(() => undefined);
++    writeFileSync(join(SCRATCH, "studio-brush-desktop-failure.json"), JSON.stringify({
++      ok: false,
++      error: error instanceof Error ? error.message : String(error),
++      browserErrors: errors,
++      surveyFailures,
++      requestedRounds: STABILITY_ROUNDS,
++      uniquePresetCount: BRUSH_MATRIX_CATALOG_COUNT,
++    }, null, 2));
++    throw error;
+   } finally {
+     await context.close();
+   }
+@@ -4380,6 +4415,8 @@
+         STUDIO_ALL_BRUSH_CATALOG_ITEMS.length - STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.length,
+     },
+     desktop: {
++      stabilityRounds: desktop.stabilityRounds,
++      uniquePresetCount: desktop.uniquePresetCount,
+       selectedAndRendered: desktop.evidence.filter((entry) => entry.selected && entry.visualChanged)
+         .length,
+       undoPassed: desktop.evidence.filter((entry) => entry.undoRestoredPixels).length,
+--- a/scripts/verify-studio-filter-dialog.mts
++++ b/scripts/verify-studio-filter-dialog.mts
+@@ -59,6 +59,10 @@
+ 
+ /** Survey mode: TOONSPECTRUM_FILTER_DIALOG_SURVEY=1 drives every menu kind, not just the five representatives. */
+ const SURVEY_MODE = process.env.TOONSPECTRUM_FILTER_DIALOG_SURVEY === "1";
++const STABILITY_ROUNDS = Number(process.env.TOONSPECTRUM_FILTER_DIALOG_ROUNDS ?? "1");
++if (!Number.isSafeInteger(STABILITY_ROUNDS) || STABILITY_ROUNDS < 1 || STABILITY_ROUNDS > 20) {
++  throw new RangeError("TOONSPECTRUM_FILTER_DIALOG_ROUNDS must be an integer from 1 to 20");
++}
+ 
+ /**
+  * Menu rows that open a different surface than the pixel-filter dialog:
+@@ -99,6 +103,7 @@
+ 
+ interface FilterCaseResult {
+   label: string;
++  round?: number;
+   group: string;
+   ok: boolean;
+   openMs: number | null;
+@@ -112,6 +117,7 @@
+ 
+ interface FilterDialogReport {
+   ok: boolean;
++  stabilityRounds: number;
+   mode: "representative" | "survey";
+   startedAt: string;
+   finishedAt: string;
+@@ -489,9 +495,12 @@
+         : `representative mode: ${cases.length} cases`,
+     );
+ 
+-    for (const filterCase of cases) {
++    // A reload per round would hide retained Worker/cache/listener problems.
++    const repeatedCases = Array.from({ length: STABILITY_ROUNDS }, () => cases).flat();
++    for (const [index, filterCase] of repeatedCases.entries()) {
+       const result: FilterCaseResult = {
+         label: filterCase.label,
++        round: Math.floor(index / cases.length) + 1,
+         group: filterCase.group,
+         ok: false,
+         openMs: null,
+@@ -565,6 +574,8 @@
+       } catch (error) {
+         result.failure = String(error instanceof Error ? error.message : error);
+         log(`${filterCase.label}: FAILED — ${result.failure}`);
++        await page.screenshot({ path: join(SCRATCH, `studio-filter-failure-${index}.png`) })
++          .catch(() => undefined);
+         // Recover to a known state so later cases still run from the baseline document.
+         await page.keyboard.press("Escape").catch(() => undefined);
+         await page.waitForTimeout(300);
+@@ -777,7 +788,9 @@
+   }
+ 
+   const report: FilterDialogReport = {
+-    ok: results.length > 0 && results.every((result) => result.ok),
++    ok: results.length > 0 && results.every((result) => result.ok)
++      && browserErrors.messages.length === 0 && browserErrors.failedResponses.length === 0,
++    stabilityRounds: STABILITY_ROUNDS,
+     mode: SURVEY_MODE ? "survey" : "representative",
+     startedAt,
+     finishedAt: new Date().toISOString(),
