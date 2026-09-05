@@ -82,7 +82,10 @@ export function StudioProjectCenterSearch(): ReactElement {
     let matched = 0;
     for (const button of buttons) {
       if (!originalHiddenRef.current.has(button)) {
-        originalHiddenRef.current.set(button, button.hidden);
+        // TypeScript 6 models HTMLElement.hidden as boolean | "until-found".
+        // The project center only needs to preserve whether the authored element
+        // was hidden at all, so normalize through the attribute contract.
+        originalHiddenRef.current.set(button, button.hasAttribute("hidden"));
       }
       const originallyHidden = originalHiddenRef.current.get(button) ?? false;
       const haystack = normalizeProjectQuery([
