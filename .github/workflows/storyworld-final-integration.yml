@@ -85,13 +85,25 @@ jobs:
           subprocess.run(['git','add','--',str(ci)], check=True)
           print('Reconciled Storyworld + production routes; full core verification is enabled.')
           PY
-      - name: Repair the exact inherited DCC preference authority violation
+      - name: Repair the exact inherited DCC preference and camera lint violations
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin 0b82e0329bf1c6c2b6519135ea8cbac2900d4685
           git show 0b82e0329bf1c6c2b6519135ea8cbac2900d4685:.github/storyworld-dcc-preferences-repair.py > "$RUNNER_TEMP/dcc-preferences-repair.py"
           python3 "$RUNNER_TEMP/dcc-preferences-repair.py"
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          path = Path('src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig.tsx')
+          data = path.read_bytes()
+          assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == 'cdfc396ca14b668d22661ebad69771241e2ae002'
+          source = data.decode()
+          old = '  "use no memo";\n  // OrbitControls mutate camera/target without changing their identities. This imperative bridge\n  // must read those live values at every requested reconciliation, not a memoized render snapshot.'
+          new = '  // The effect invokes the imperative reconciler with live Three.js resources. Mutable\n  // camera/target values are read inside that call, never cached as a render-time snapshot.'
+          assert source.count(old) == 1
+          path.write_text(source.replace(old, new, 1))
+          PY
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -101,16 +113,42 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Check reconciled source boundaries and preference formatting
         run: |
-          pnpm exec eslint --fix --max-warnings=0 src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.ts src/domains/creator/hybrid-dcc/viewport-preferences-store.ts src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx
-          git add -- src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.ts src/domains/creator/hybrid-dcc/viewport-preferences-store.ts src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx
+          pnpm exec eslint --fix --max-warnings=0 src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.ts src/domains/creator/hybrid-dcc/viewport-preferences-store.ts src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig.tsx
+          git add -- src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.ts src/domains/creator/hybrid-dcc/viewport-preferences-store.ts src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig.tsx
           pnpm exec eslint --max-warnings=0 src/domains/creator/storyworld src/domains/creator/studio-router/StudioRouter.tsx src/domains/creator/studio-router/studio-route-manifest.ts src/domains/creator/studio-router/studio-route-manifest.test.ts src/domains/creator/studio-router/studio-storyworld-route.test.ts
           pnpm run validate:architecture
-      - name: Run actual storage, router, production hub and CI contracts
-        run: pnpm exec vitest run src/domains/creator/storyworld src/domains/creator/studio-router src/domains/creator/studio-browser-kv-authority-boundary.test.ts src/app/routes/app-route-title-ownership.test.ts scripts/integration-test-runner-ci-policy.test.mjs src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx src/domains/creator/hybrid-dcc/studio-hybrid-dcc-viewport-interaction.test.ts
+      - name: Run actual storage, router, production hub, camera and CI contracts
+        run: pnpm exec vitest run src/domains/creator/storyworld src/domains/creator/studio-router src/domains/creator/studio-browser-kv-authority-boundary.test.ts src/app/routes/app-route-title-ownership.test.ts scripts/integration-test-runner-ci-policy.test.mjs src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx src/domains/creator/hybrid-dcc/studio-hybrid-dcc-viewport-interaction.test.ts src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig.test.tsx
       - name: Check full Web and API types
         run: pnpm run typecheck
       - name: Verify standalone semantic receipts with real types
         run: pnpm exec node scripts/verify-storyworld-lab.mjs
+      - name: Record only the tested source delta and exact parent identities
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          output = Path(os.environ['RUNNER_TEMP']) / 'storyworld-integration'
+          output.mkdir()
+          main, head = os.environ['MAIN_HEAD'], os.environ['PRODUCT_HEAD']
+          paths = subprocess.check_output(['git','diff','--cached','--name-only',main], text=True).splitlines()
+          allowed = {'.github/workflows/ci.yml', 'docs/studio-storyworld-causality-lab-2026-09-05.md', 'scripts/verify-storyworld-lab.mjs', 'src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.ts', 'src/domains/creator/hybrid-dcc/useStudioHybridDccViewportPreferences.persistence.test.tsx', 'src/domains/creator/hybrid-dcc/viewport-preferences-store.ts', 'src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig.tsx', 'src/domains/creator/studio-router/StudioRouter.tsx', 'src/domains/creator/studio-router/studio-route-manifest.ts', 'src/domains/creator/studio-router/studio-route-manifest.test.ts', 'src/domains/creator/studio-router/studio-storyworld-route.test.ts'}
+          assert all(path in allowed or path.startswith('src/domains/creator/storyworld/') for path in paths)
+          assert not subprocess.check_output(['git','diff','--name-only'], text=True).strip(), 'Unstaged source differs from tested tree'
+          tree = subprocess.check_output(['git','write-tree'], text=True).strip()
+          files = []
+          for path in paths:
+              data = Path(path).read_bytes()
+              files.append({'path':path, 'blobSha':hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest(), 'content':data.decode()})
+          (output/'candidate.json').write_text(json.dumps({'main':main,'head':head,'tree':tree,'files':files}, ensure_ascii=False))
+          (output/'candidate.patch').write_bytes(subprocess.check_output(['git','diff','--cached','--binary',main]))
+          print('TESTED_TREE=' + tree)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: storyworld-tested-integration
+          path: ${{ runner.temp }}/storyworld-integration/
+          retention-days: 7
       - name: Publish reviewed integration to the feature branch only
         env:
           PUSH_TOKEN: ${{ github.token }}
@@ -120,8 +158,7 @@ jobs:
           test "$(git ls-remote origin "refs/heads/$PRODUCT_BRANCH" | cut -f1)" = "$PRODUCT_HEAD"
           test "$(git rev-parse HEAD)" = "$PRODUCT_HEAD"
           git diff --cached --check
-          git diff --cached --stat
-          git commit -m 'merge(studio): preserve Storyworld and production routes with real CI enabled'
+          git commit -m 'fix(studio): reconcile Storyworld with current main and real CI'
           test "$(git rev-parse HEAD^1)" = "$PRODUCT_HEAD"
           test "$(git rev-parse HEAD^2)" = "$MAIN_HEAD"
           auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
