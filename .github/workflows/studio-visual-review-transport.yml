@@ -12,145 +12,104 @@ jobs:
   visual-evidence:
     if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/feat/studio-assets-visual-curation-20260906'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: docs/reports/asset-visual-review-20260906/review-01.pdf
+          archive: false
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: docs/reports/asset-visual-review-20260906/review-02.pdf
+          archive: false
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: docs/reports/asset-visual-review-20260906/review-03.pdf
+          archive: false
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: docs/reports/asset-visual-review-20260906/review-04.pdf
+          archive: false
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: docs/reports/asset-visual-review-20260906/review-05.pdf
+          archive: false
+          retention-days: 14
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 24.16.0
-      - name: Prepare visual inventory and review-only model staging
+      - name: Prepare reviewed candidate acquisition code
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          python3 -m pip install --disable-pip-version-check Pillow==11.3.0
-          python3 - <<'PY'
-          from pathlib import Path
-          import json,os,re,shutil,hashlib,subprocess
-          root=Path.cwd(); out=root/'docs/reports/asset-visual-review-20260906'; out.mkdir(parents=True,exist_ok=True)
-          tmp=Path(os.environ['RUNNER_TEMP'])/'legacy-visual'; tmp.mkdir()
-          files=[Path(p) for p in subprocess.check_output(['git','ls-files','public'],text=True).splitlines()]
-          scope=[p for p in files if str(p).startswith(('public/assets/3d/','public/assets/studio/','public/vrm/')) and '/cc0-20260906/' not in str(p)]
-          inventory=[{'path':str(p),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in scope]
-          (out/'existing-static-inventory.json').write_text(json.dumps(inventory,indent=2)+'\n')
-          assets=[]
-          for index,p in enumerate(scope):
-              if p.suffix.lower()!='.glb': continue
-              dest=tmp/'assets'/p.relative_to('public'); dest.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(p,dest)
-              assets.append({'id':f'legacy-{index:04d}-{re.sub(r"[^a-z0-9-]","-",p.stem.lower())}','name':p.stem,'kind':'model','category':'existing-bundled-model','path':dest.relative_to(tmp).as_posix(),'sourcePath':str(p),'technicalChecks':[]})
-          (tmp/'manifest.json').write_text(json.dumps({'schema':'toonspectrum.asset-delivery.v1','assets':assets},indent=2))
-          (tmp/'delivery-report.json').write_text('{}')
-          print('EXISTING STATIC FILES',len(scope),'GLB TO RENDER',len(assets))
-          print('EXISTING PATHS',json.dumps([str(p) for p in scope],ensure_ascii=False))
-          PY
+          set -euo pipefail
+          gh api repos/blue45f/toonspectrum/git/blobs/ab4709d8cf50c1459b746e4ef516f2b50f5bf8eb --jq .content | base64 --decode > scripts/acquire_studio_pbr_assets.py
+          test "$(git hash-object scripts/acquire_studio_pbr_assets.py)" = ab4709d8cf50c1459b746e4ef516f2b50f5bf8eb
+          python3 -m pip install --disable-pip-version-check Pillow==11.3.0 defusedxml==0.7.1
+          python3 -m py_compile scripts/acquire_studio_pbr_assets.py
           npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
           pnpm install --frozen-lockfile --ignore-scripts
-          pnpm exec tsx -e 'import fs from "node:fs"; import {STUDIO_ORIGINAL_FREE_ASSETS,STUDIO_RETIRED_ORIGINAL_FREE_ASSETS} from "./src/domains/creator/studio-original-free-asset-packs.ts"; fs.writeFileSync(process.env.RUNNER_TEMP+"/legacy-originals.json", JSON.stringify([...STUDIO_ORIGINAL_FREE_ASSETS,...STUDIO_RETIRED_ORIGINAL_FREE_ASSETS]));'
-      - name: Render every existing GLB without changing production assets
+      - name: Acquire native 2K PBR originals into review staging only
+        run: python3 scripts/acquire_studio_pbr_assets.py --output "$RUNNER_TEMP/studio-pbr-candidates"
+      - name: Render detailed models and package visible review pages
         run: |
           pnpm exec playwright install --with-deps chromium
-          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/legacy-visual" "$GITHUB_WORKSPACE"
-          node --input-type=module <<'JS'
-          import fs from 'node:fs/promises';
-          import path from 'node:path';
-          import {chromium} from 'playwright';
-          const assets=JSON.parse(await fs.readFile(process.env.RUNNER_TEMP+'/legacy-originals.json','utf8'));
-          const dir=process.env.RUNNER_TEMP+'/legacy-svg'; await fs.mkdir(dir,{recursive:true});
-          const browser=await chromium.launch({headless:true});
-          const page=await browser.newPage({viewport:{width:480,height:360}});
-          for(const asset of assets){
-            await page.setContent('<style>html,body{margin:0;width:480px;height:360px;background:#eeeeee}img{width:100%;height:100%;object-fit:contain}</style><img id="asset" src="data:image/svg+xml;charset=utf-8,'+encodeURIComponent(asset.svg)+'">');
-            await page.locator('#asset').evaluate(img=>img.decode());
-            await page.screenshot({path:path.join(dir,asset.id+'.png')});
-          }
-          await browser.close();
-          console.log('RENDERED ORIGINAL SVG',assets.length);
-          JS
-      - name: Publish review PDFs with exact per-cell identity maps
-        run: |
+          node scripts/render_studio_asset_delivery.mjs "$RUNNER_TEMP/studio-pbr-candidates" "$GITHUB_WORKSPACE"
           python3 - <<'PY'
           from pathlib import Path
           from PIL import Image,ImageDraw
-          import json,os,math
-          root=Path.cwd(); out=root/'docs/reports/asset-visual-review-20260906'; tmp=Path(os.environ['RUNNER_TEMP'])
-          ccroot=root/'public/assets/studio/cc0-20260906'
-          cc=json.loads((ccroot/'manifest.json').read_text())['assets']
-          legacy=json.loads((tmp/'legacy-visual/manifest.json').read_text())['assets']
-          rows=[{'id':a['id'],'sourcePath':a['path'],'preview':str(ccroot/a.get('previewPath',a['path'])),'group':'cc0-original'} for a in cc]
-          rows += [{'id':a['id'],'sourcePath':a['sourcePath'],'preview':str(tmp/'legacy-visual'/a['previewPath']),'group':'existing-glb'} for a in legacy]
-          rows += [{'id':p.stem,'sourcePath':'studio-original-free-asset-packs.ts:'+p.stem,'preview':str(p),'group':'original-svg'} for p in sorted((tmp/'legacy-svg').glob('*.png'))]
-          inv=json.loads((out/'existing-static-inventory.json').read_text())
-          rows += [{'id':Path(a['path']).stem,'sourcePath':a['path'],'preview':str(root/a['path']),'group':'existing-raster'} for a in inv if Path(a['path']).suffix.lower() in {'.png','.jpg','.jpeg','.webp'}]
-          sheets=[]; index=[]
-          for page,start in enumerate(range(0,len(rows),24),1):
-              sheet=Image.new('RGB',(1600,1400),'#ededf0'); draw=ImageDraw.Draw(sheet)
-              draw.text((24,16),f'ToonStudio visual inventory | page {page} | cell order: left to right, top to bottom',fill='#181820')
-              for local,row in enumerate(rows[start:start+24]):
-                  x=(local%6)*264+8; y=(local//6)*340+46
-                  with Image.open(row['preview']) as original:
-                      image=original.convert('RGBA'); image.thumbnail((252,278))
-                  sheet.paste(image,(x+(252-image.width)//2,y+(278-image.height)//2),image)
-                  label=f'{start+local+1:04d} '+row['id']
-                  draw.text((x+2,y+283),label[:38],fill='#111118')
-                  draw.text((x+2,y+298),label[38:76],fill='#111118')
-                  draw.text((x+2,y+315),row['group'],fill='#55555f')
-                  index.append({'number':start+local+1,'page':page,'cell':local+1,'id':row['id'],'sourcePath':row['sourcePath'],'group':row['group'],'visuallyReviewed':False})
+          import json,os,shutil
+          out=Path(os.environ['RUNNER_TEMP'])/'studio-pbr-candidates'
+          assets=json.loads((out/'manifest.json').read_text())['assets']
+          sheets=[]
+          for page,start in enumerate(range(0,len(assets),12),1):
+              sheet=Image.new('RGB',(1600,1400),'#e7e8ed'); draw=ImageDraw.Draw(sheet)
+              draw.text((24,16),f'Actual PBR original candidates | page {page} | Not yet artistically approved',fill='#111118')
+              for i,a in enumerate(assets[start:start+12]):
+                  x=(i%4)*400; y=(i//4)*446+40
+                  with Image.open(out/a.get('previewPath',a['path'])) as original:
+                      img=original.convert('RGBA');img.thumbnail((384,374))
+                  sheet.paste(img,(x+(400-img.width)//2,y),img)
+                  draw.text((x+8,y+380),f'{start+i+1:03d} '+a['id'][:46],fill='#111118')
+                  draw.text((x+8,y+398),a['kind']+' | '+a['selectionTerm'],fill='#333344')
               sheets.append(sheet)
-          # Split into bounded PDFs for reliable review tooling, with page/cell identity preserved.
-          for start in range(0,len(sheets),12):
-              part=sheets[start:start+12]
-              target=out/f'review-{start//12+1:02d}.pdf'
-              part[0].save(target,'PDF',save_all=True,append_images=part[1:],resolution=144,quality=93,title='ToonStudio real asset review')
-          (out/'review-index.json').write_text(json.dumps({'totalVisualItems':len(rows),'pages':len(sheets),'items':index,'notice':'Rendered evidence, not an artistic approval. Source code catalogs, brush strokes and runtime clothing states need their own review.'},indent=2))
-          (out/'legacy-render-evidence.json').write_text((tmp/'legacy-visual/browser-render-evidence.json').read_text())
-          print('VISUAL REVIEW ITEMS',len(rows),'PAGES',len(sheets),'PDFS',math.ceil(len(sheets)/12))
-          print('PDF SIZES',[(p.name,p.stat().st_size) for p in out.glob('*.pdf')])
+          sheets[0].save(out/'pbr-candidates-review.pdf','PDF',save_all=True,append_images=sheets[1:],resolution=144,quality=94)
+          records=Path('docs/reports/asset-visual-review-20260906')
+          for file in ['delivery-report.json','manifest.json','browser-render-evidence.json']:
+              shutil.copyfile(out/file,records/('pbr-'+file))
+          print('PBR REVIEW CANDIDATES',len(assets),'PAGES',len(sheets))
           PY
-      - name: Inspect official high-detail candidates without downloading unreviewed binaries
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import urllib.request,json,time
-          out=Path('docs/reports/asset-visual-review-20260906')
-          def get(route):
-              req=urllib.request.Request('https://api.polyhaven.com/'+route,headers={'User-Agent':'ToonStudio-AssetCuration/1.0 (blue45f/toonspectrum)'})
-              with urllib.request.urlopen(req,timeout=45) as r:
-                  raw=r.read(8*1024*1024+1)
-              if len(raw)>8*1024*1024: raise ValueError('JSON response exceeds budget')
-              return json.loads(raw)
-          all_assets=get('assets')
-          groups={'models':('chair','table','plant','potted','lamp','sofa','book','food','bowl','pot','barrel','bench','cabinet'), 'textures':('wood','fabric','brick','metal','plaster','asphalt','concrete','stone','leather','tile','paper','ground')}
-          candidates={}
-          for kind,terms in groups.items():
-              result=[]; seen=set()
-              ordered=sorted([(k,v) for k,v in all_assets.items() if v.get('type')==({'models':2,'textures':1}[kind])],key=lambda item:item[1].get('download_count',0),reverse=True)
-              for term in terms:
-                  matches=[(k,v) for k,v in ordered if term in (k+' '+v.get('name','')+' '+str(v.get('category',''))).lower() and k not in seen][:3]
-                  for key,v in matches:
-                      seen.add(key); result.append({'id':key,'name':v.get('name'),'category':v.get('category'),'polycount':v.get('polycount'),'maxResolution':v.get('max_resolution'),'selectionTerm':term})
-              candidates[kind]=result
-              print('OFFICIAL CANDIDATES',kind,json.dumps(result,ensure_ascii=False))
-              if result:
-                  time.sleep(1); files=get('files/'+result[0]['id']); (out/f'polyhaven-{kind}-file-example.json').write_text(json.dumps(files,indent=2))
-                  print('FILE SCHEMA',kind,json.dumps(files)[:16000])
-          (out/'polyhaven-candidates.json').write_text(json.dumps(candidates,indent=2))
-          PY
-      - name: Commit evidence to the review branch only
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: ${{ runner.temp }}/studio-pbr-candidates/pbr-candidates-review.pdf
+          archive: false
+          retention-days: 14
+      - name: Preserve acquisition source and exact outcomes on review branch only
         run: |
           test "$GITHUB_REF" = refs/heads/feat/studio-assets-visual-curation-20260906
           git fetch origin "$GITHUB_REF_NAME"
           test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
-          git add -- docs/reports/asset-visual-review-20260906
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "test(studio): retain real asset review pages and source identity map"
+          git add -- scripts/acquire_studio_pbr_assets.py docs/reports/asset-visual-review-20260906/pbr-delivery-report.json docs/reports/asset-visual-review-20260906/pbr-manifest.json docs/reports/asset-visual-review-20260906/pbr-browser-render-evidence.json
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit --quiet -m "feat(studio): acquire and render detailed PBR review candidates"
           git push origin "HEAD:$GITHUB_REF"
-          git log -1 --format='VISUAL_EVIDENCE_COMMIT %H'
+          git log -1 --format='PBR_EVIDENCE_COMMIT %H'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: studio-visual-evidence-${{ github.run_id }}
+          name: studio-pbr-candidates-${{ github.run_id }}
           path: |
-            docs/reports/asset-visual-review-20260906/
-            ${{ runner.temp }}/legacy-visual/
+            ${{ runner.temp }}/studio-pbr-candidates/
+            !${{ runner.temp }}/studio-pbr-candidates/_source/
           retention-days: 14
+          if-no-files-found: warn
           compression-level: 1
