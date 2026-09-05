@@ -1,0 +1,63 @@
+name: Quality inspection PR 737 repair
+
+on:
+  push:
+    branches: [feat/studio-quality-inspection-20260905]
+    paths: [.github/workflows/quality-inspection-repair-737.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-inspection-repair-737
+  cancel-in-progress: false
+
+jobs:
+  source-diagnostics:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Inspect exact merge and export text sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/quality-737"
+          git config user.name "quality-inspection-verifier"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git rev-parse HEAD origin/main > "$RUNNER_TEMP/quality-737/revisions.txt"
+          if git merge --no-commit --no-ff origin/main; then
+            printf 'conflict-free\n' > "$RUNNER_TEMP/quality-737/merge-status.txt"
+          else
+            git diff --name-only --diff-filter=U > "$RUNNER_TEMP/quality-737/conflicts.txt"
+            git diff > "$RUNNER_TEMP/quality-737/conflict.diff"
+            git merge --abort
+          fi
+          python3 - <<'PY'
+          import os, pathlib, subprocess, zipfile
+          root = pathlib.Path('.')
+          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'quality-737' / 'sources.zip'
+          names = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for name in names:
+                  p = root / name
+                  if not p.is_file() or p.stat().st_size > 2_000_000:
+                      continue
+                  if p.suffix.lower() in {'.ts','.tsx','.mjs','.mts','.js','.json','.yaml','.yml','.md','.css','.sql'}:
+                      if p.parts[0] not in {'public','data','marketplace-benchmark'}:
+                          z.write(p, name)
+          print(out, out.stat().st_size)
+          PY
+          git status --short
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-737-source-${{ github.run_id }}
+          path: ${{ runner.temp }}/quality-737
+          retention-days: 3
+          if-no-files-found: error
