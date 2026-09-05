@@ -45,6 +45,7 @@ export function CharacterSlotCard({
     const direction = characterGridDirectionForKey(event.key);
     if (!direction) return;
     event.preventDefault();
+    event.stopPropagation();
     onKeyNavigate(direction);
   };
 
@@ -107,13 +108,13 @@ export function CharacterSlotCard({
         ) : null}
       </span>
       <span className={cn("flex min-w-0 flex-col gap-0.5 px-2.5 py-2", unavailable && "opacity-70")}>
-        <span className="truncate text-[0.8rem] font-semibold leading-tight text-fg">{entry.label}</span>
+        <span className="break-words text-[0.8rem] font-semibold leading-tight text-fg">{entry.label}</span>
         <span className="line-clamp-1 text-[0.68rem] leading-snug text-fg-3">{entry.hint}</span>
         {badge.detail ? (
           <span
             id={detailId}
             className={cn(
-              "mt-1 hidden text-[0.66rem] leading-snug group-hover:block group-focus-visible:block",
+              "mt-1 block break-words text-[0.66rem] leading-snug",
               badge.tone === "bad" ? "text-bad" : "text-warn",
             )}
           >
