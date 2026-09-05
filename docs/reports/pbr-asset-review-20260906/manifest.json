@@ -1,0 +1,2476 @@
+{
+  "schema": "toonspectrum.asset-delivery.v1",
+  "assets": [
+    {
+      "id": "polyhaven-modern-arm-chair-01",
+      "name": "Modern Arm Chair 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "chair",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/modern_arm_chair_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-modern-arm-chair-01/modern_arm_chair_01.glb",
+      "bytes": 9219832,
+      "sha256": "2c02cde1c1a10f14bd4730f8ef8500cd2a7f23ef41f6f3c06cd42044ee2d6a58",
+      "geometrySha256": "7ec5456f39f019ece119bce6db03ec7974ca446a7e87155bf8a60d53e70e2069",
+      "textureCount": 6,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-modern-arm-chair-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.8203444182872772,
+        1.0228520567470696,
+        0.9865616858005524
+      ],
+      "previewFitScale": 1.9553169852935626
+    },
+    {
+      "id": "polyhaven-outdoor-table-chair-set-01",
+      "name": "Outdoor Table Chair Set 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "chair",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/outdoor_table_chair_set_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-outdoor-table-chair-set-01/outdoor_table_chair_set_01.glb",
+      "bytes": 3198912,
+      "sha256": "71c1ab88cd3da25dbc4b860ff25dd8ef3a6ee2023e3f726db7cce6e54da80669",
+      "geometrySha256": "5570a4a31ee5ed6a61c84b5e843e948c80f851815c14c37bd3c423d0d7e0790b",
+      "textureCount": 6,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-outdoor-table-chair-set-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.7416651475364862,
+        0.8585816156119108,
+        1.717319749339894
+      ],
+      "previewFitScale": 1.164605485244529
+    },
+    {
+      "id": "polyhaven-wooden-table-02",
+      "name": "Wooden Table 02",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "table",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wooden_table_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-wooden-table-02/wooden_table_02.glb",
+      "bytes": 1946960,
+      "sha256": "9b55915c1f9eba2c1e40dbb3c1026b62a7a85a998585bf71652c643e5ba5de35",
+      "geometrySha256": "3cf3fb11c31cef9381954747d3188d96c47a06f5d4fd9ba7b9860e878b80a1a7",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-wooden-table-02.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        1.13441663980484,
+        0.7995428870490286,
+        0.7060248255729675
+      ],
+      "previewFitScale": 1.7630206837798774
+    },
+    {
+      "id": "polyhaven-tea-set-01",
+      "name": "Tea Set 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "table",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/tea_set_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-tea-set-01/tea_set_01.glb",
+      "bytes": 5174804,
+      "sha256": "a0bc6ae3874e769928246e9229b3b2ec062368fa2feccfeaa3371f01472bbde3",
+      "geometrySha256": "ec01b793e68a8d07d1893330243d3c3a4ebe9fc0eca85280a9461dfed9f56583",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-tea-set-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.9184822738170624,
+        0.1649930527782999,
+        0.483876571059227
+      ],
+      "previewFitScale": 2.1775052791038925
+    },
+    {
+      "id": "polyhaven-potted-plant-02",
+      "name": "Potted Plant 02",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "potted",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/potted_plant_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-potted-plant-02/potted_plant_02.glb",
+      "bytes": 4874508,
+      "sha256": "ee1904655b5db81d699ce8ad98c79c8f9aae26710a2bfb6cdf5efc243d959b5a",
+      "geometrySha256": "7e2c05d2199986cdd288be1bd30042cd056a24427b22a500d56da8be4fef33ae",
+      "textureCount": 6,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-potted-plant-02.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.7011570334434509,
+        0.8411787391305552,
+        0.6573865756508894
+      ],
+      "previewFitScale": 2.377615965504794
+    },
+    {
+      "id": "polyhaven-potted-plant-04",
+      "name": "Potted Plant 04",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "potted",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/potted_plant_04",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-potted-plant-04/potted_plant_04.glb",
+      "bytes": 6254684,
+      "sha256": "90181984aba61bdc820f540b7cd1bfde544d6f6e89ce4b4a421f620351888022",
+      "geometrySha256": "8abe2383fd6cbcab7d761f6d2f58f672037f782dce1f2491fe6ae260969e68cd",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-potted-plant-04.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.16788632422685623,
+        0.2674576655845158,
+        0.18475142866373062
+      ],
+      "previewFitScale": 7.477818949885384
+    },
+    {
+      "id": "polyhaven-street-lamp-01",
+      "name": "Street Lamp 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "lamp",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/street_lamp_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-street-lamp-01/street_lamp_01.glb",
+      "bytes": 6900596,
+      "sha256": "4b926cd8d3d3f12cb0eed758e926a2159228c1de6c8e9021de8cc2a6d2977033",
+      "geometrySha256": "b7abddb799d9b6866dd86ea03bc7e11f24034c99e32f4543a5ec1650b73e25cb",
+      "textureCount": 4,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-street-lamp-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.7043362259864807,
+        3.8705554008483887,
+        0.38649316132068634
+      ],
+      "previewFitScale": 0.5167217086110224
+    },
+    {
+      "id": "polyhaven-modern-ceiling-lamp-01",
+      "name": "Modern Ceiling Lamp 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "lamp",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/modern_ceiling_lamp_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-modern-ceiling-lamp-01/modern_ceiling_lamp_01.glb",
+      "bytes": 1070968,
+      "sha256": "4a4c755bad1cb160ef9104c656de8a106aa301a0d7d651bcd63151d4bbae641a",
+      "geometrySha256": "7aeeea39c0bbb204921b1172efc58838911257e32f6d76ad46ed291db7b83a18",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-modern-ceiling-lamp-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.4316493272781372,
+        0.9515514969825745,
+        0.4316607564687729
+      ],
+      "previewFitScale": 2.1018305434252555
+    },
+    {
+      "id": "polyhaven-sofa-02",
+      "name": "Sofa 02",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "sofa",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/sofa_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-sofa-02/sofa_02.glb",
+      "bytes": 1265800,
+      "sha256": "259d5fb630a548fbc2c83c4fb96be5002da90780441c0725aea13b0c118324b2",
+      "geometrySha256": "ed80813ce96dccc49409f33e8e723b5011898abbdc0a92cf6d8759c263504cce",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-sofa-02.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        1.8071673512458801,
+        0.7094889283180237,
+        0.8177513778209686
+      ],
+      "previewFitScale": 1.1067043672635957
+    },
+    {
+      "id": "polyhaven-sofa-03",
+      "name": "Sofa 03",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "sofa",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/sofa_03",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-sofa-03/sofa_03.glb",
+      "bytes": 2291804,
+      "sha256": "05a08523cc81451d232064542b6f8078a60ef4b95ce5e0e2a22a0115fce863b1",
+      "geometrySha256": "dfc41109422b47f5f1f7c854c72a964f16f178fe56ee833dcba318068329bbae",
+      "textureCount": 4,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-sofa-03.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        2.73117733001709,
+        1.1182640366605483,
+        0.9250842034816742
+      ],
+      "previewFitScale": 0.7322849300259406
+    },
+    {
+      "id": "polyhaven-book-encyclopedia-set-01",
+      "name": "Book Encyclopedia Set 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "book",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/book_encyclopedia_set_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-book-encyclopedia-set-01/book_encyclopedia_set_01.glb",
+      "bytes": 4660236,
+      "sha256": "ecc9e3b577a947b489c47916fab8276db1ca0cb62a9820059805fb7169e99554",
+      "geometrySha256": "aff55d0807c42a9690c0c04351569698c4b21e4378f1574745a7c8b45f62edd8",
+      "textureCount": 6,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-book-encyclopedia-set-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.5512974252924323,
+        0.23741818653931634,
+        0.16306233406066895
+      ],
+      "previewFitScale": 3.627805805439981
+    },
+    {
+      "id": "polyhaven-wooden-bowl-01",
+      "name": "Wooden Bowl 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "bowl",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wooden_bowl_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-wooden-bowl-01/wooden_bowl_01.glb",
+      "bytes": 6464856,
+      "sha256": "e51477bf60c52466ad99e42cca839140b672c5c931d5ffb011568b2206a082ef",
+      "geometrySha256": "667662e24b9f898097d96d89286c7f048bcbdfb6dad397c8acb1c60f72a83181",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-wooden-bowl-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.31308163702487946,
+        0.09369255532510579,
+        0.3091423809528351
+      ],
+      "previewFitScale": 6.388110203477272
+    },
+    {
+      "id": "polyhaven-wooden-bowl-02",
+      "name": "Wooden Bowl 02",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "bowl",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wooden_bowl_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-wooden-bowl-02/wooden_bowl_02.glb",
+      "bytes": 8461024,
+      "sha256": "9071dd4dc81d9ed04b6616bb7a40ae188fe0ba795a5423561df76cf2040fa6df",
+      "geometrySha256": "89b3261cb186277c1263cb90edbcc712545b6a80370a307fb70ac1f41dcdff09",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-wooden-bowl-02.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.13071347028017044,
+        0.07309794479806442,
+        0.12453967705368996
+      ],
+      "previewFitScale": 15.300641897986583
+    },
+    {
+      "id": "polyhaven-wine-barrel-01",
+      "name": "Wine Barrel 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "barrel",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wine_barrel_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-wine-barrel-01/wine_barrel_01.glb",
+      "bytes": 2230084,
+      "sha256": "dfd78d88134dfd7e2042eeaf83c0ed9747172934be9dd3248b7e22f9f1745ab2",
+      "geometrySha256": "5dbff73b65d8ec1e5dc6021676d6cd0bc32904b3c435378d5d722ec80a9a3077",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-wine-barrel-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.7419015169143677,
+        0.8712633550167084,
+        0.756035715341568
+      ],
+      "previewFitScale": 2.2955171802923418
+    },
+    {
+      "id": "polyhaven-barrel-03",
+      "name": "Barrel 03",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "barrel",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/barrel_03",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-barrel-03/barrel_03.glb",
+      "bytes": 2080308,
+      "sha256": "11c1032f5096c23b8f88f0e1a1cc9c285d29978b6d40d81700ab7077229458dc",
+      "geometrySha256": "a88942a5364b00abe11d8dc146fbb074aac3fcf863c770817935cef446736edf",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-barrel-03.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.633943498134613,
+        0.9304736243899825,
+        0.6385995149612427
+      ],
+      "previewFitScale": 2.1494429799782857
+    },
+    {
+      "id": "polyhaven-modular-street-seating",
+      "name": "Modular Street Seating",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "bench",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/modular_street_seating",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-modular-street-seating/modular_street_seating.glb",
+      "bytes": 26413824,
+      "sha256": "7cd8931fb88fea47b0d9114fb5e26c970132a66c1c4fc176e2614906fb0e6733",
+      "geometrySha256": "65634a5c10921d48db7a682dc5c585999598ac299c9edd752c7e6714fc26272c",
+      "textureCount": 12,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-modular-street-seating.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        4.340000033378601,
+        0.9500000661473655,
+        0.7703700959682465
+      ],
+      "previewFitScale": 0.460829489543354
+    },
+    {
+      "id": "polyhaven-bench-vice-01",
+      "name": "Bench Vice 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "bench",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/bench_vice_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-bench-vice-01/bench_vice_01.glb",
+      "bytes": 9237936,
+      "sha256": "a730eee1ed86cd18ac43be7a00de8b854c2995a59670f8182a6b4d5c19032e2e",
+      "geometrySha256": "5a9d03ec38d5282414f82acda80649c8fe0fab6271b034abbe183014bc81a63c",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source",
+        "Three.js-load",
+        "three-angle-nonempty-render",
+        "GPU-resource-disposal"
+      ],
+      "previewPath": "previews/polyhaven-bench-vice-01.png",
+      "browserRenderVerified": true,
+      "sourceBounds": [
+        0.20048236846923828,
+        0.2851486812385675,
+        0.3957216948329578
+      ],
+      "previewFitScale": 5.0540569953948085
+    },
+    {
+      "id": "polyhaven-plywood",
+      "name": "Plywood",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "wood",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/plywood",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-plywood/plywood.webp",
+      "bytes": 2221502,
+      "sha256": "62a02abd9467915a551060903e986c637d24dee8bfed8bcf235c395f9874edee",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "050a15a796413b91c9cd5ca026dd3c4df83746bb1103ae14ae91503577dead8c",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-plywood/plywood_rough_2k.png",
+          "sha256": "294a8751373c862539b26334cfcede6dbb2b9464042d5186b620465cae64e3d2",
+          "bytes": 3058798
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-plywood/plywood_nor_gl_2k.jpg",
+          "sha256": "2391dbe49aaecd6584d12731d4470bf91ba33b5c7f05c78ec5900fcae28f0310",
+          "bytes": 2836023
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-plywood/plywood_ao_2k.png",
+          "sha256": "8311e237d711b4222824710d8f96344e173f315ad00d745af1b40462355e7f0d",
+          "bytes": 2966118
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-plywood/plywood_disp_2k.jpg",
+          "sha256": "430acfebe624e111516ed598ae53da0bc93c198e010c781fc166c158e2a75627",
+          "bytes": 2050091
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-laminate-floor-02",
+      "name": "Laminate Floor 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "wood",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/laminate_floor_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-laminate-floor-02/laminate_floor_02.webp",
+      "bytes": 1713680,
+      "sha256": "5c8b0761ec50e1ca81a161435d7586ef27a3e7ea71209f6793c0aaaf8bb87ab1",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "2a1e6519309b369f749f06aaf241ac67ea762c686b6a848c1a79331b18a30521",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-laminate-floor-02/laminate_floor_02_rough_2k.jpg",
+          "sha256": "f547988692d1b53274b3023e9ed89d8280087a5ff1018cd64f83e77440ab54c4",
+          "bytes": 2545321
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-laminate-floor-02/laminate_floor_02_nor_gl_2k.jpg",
+          "sha256": "49aa58c34c6770d209e63f9bdb4d16326f5dab24474cfeb18433e63fc54456de",
+          "bytes": 2420220
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-laminate-floor-02/laminate_floor_02_ao_2k.jpg",
+          "sha256": "2c99e8f63e2307d52f93355b6fe93af9b1b74e276848777095aae1adac9660f3",
+          "bytes": 1845680
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-laminate-floor-02/laminate_floor_02_disp_2k.jpg",
+          "sha256": "9e0abd8ebb3b536bcfaab65c71ebbe62cef0616088210858ccc62875ad9afc1e",
+          "bytes": 2051856
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-wood-table-001",
+      "name": "Wood Table 001",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "wood",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-wood-table-001/wood_table_001.webp",
+      "bytes": 1184062,
+      "sha256": "9757265f803bf9974b9aee1f3b976032f37e9848a5ac68b2b0f788fcf6e65a12",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "63ae5cd186197b40f18bc020fe2b652bb08df4d9fc6240c6cbf8a7e3bc32c096",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-wood-table-001/wood_table_001_rough_2k.jpg",
+          "sha256": "c788876d80e4d96598590631f8de92447fb1b0ba1265a812514ee717d270ac3e",
+          "bytes": 963377
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-wood-table-001/wood_table_001_nor_gl_2k.jpg",
+          "sha256": "d56f02c911391267ddc6adc92e8a5bc29b9803196e8d57ad5b9702e6c842dc28",
+          "bytes": 385020
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-wood-table-001/wood_table_001_ao_2k.jpg",
+          "sha256": "2f3b03a12717af4566b41c67d6f87c430464a2dc295e3267fd82e4104575f77f",
+          "bytes": 878608
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-wood-table-001/wood_table_001_disp_2k.jpg",
+          "sha256": "7737780244d392c9ae384343dc92feb381cb3cf703924ac019c5d976a7009636",
+          "bytes": 1177053
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-denmin-fabric-02",
+      "name": "Denim Fabric 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "fabric",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-denmin-fabric-02/denmin_fabric_02.webp",
+      "bytes": 2600338,
+      "sha256": "a4b2ced5145a0433181021df1069f4ee64199914e2933f97148250e7cf3bbbd3",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "735c5845b8618ee88ca1b5b2aa9e859cead29a657c3f8c7c4498a2b9919587dc",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-denmin-fabric-02/denmin_fabric_02_rough_2k.png",
+          "sha256": "fd6a8cb23635f3dc68b531ea1453dd541a34b9bbeb29db20e751991085c25530",
+          "bytes": 3079063
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-denmin-fabric-02/denmin_fabric_02_nor_gl_2k.jpg",
+          "sha256": "b97267814817ece4b4b16571f710e84f862630ab107dde9e95c4d52978f21c52",
+          "bytes": 3799091
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-denmin-fabric-02/denmin_fabric_02_ao_2k.png",
+          "sha256": "c043449ea6c3af636de6b297968c788b4a09ff9a41da05ee676dc254f51838ef",
+          "bytes": 3158136
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-denmin-fabric-02/denmin_fabric_02_disp_2k.jpg",
+          "sha256": "e95e3dfa21693cd9652be1f2532b8ac940a5c8a1bda8359f7227ba3a8a78bb18",
+          "bytes": 1923529
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-red-brick",
+      "name": "Red Brick",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "brick",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/red_brick",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-red-brick/red_brick.webp",
+      "bytes": 1508862,
+      "sha256": "2400d48280315e35fd3eb59958ee92478363e03788f02a03fd476e11231dd2ba",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "a1ae5ba7e63026971ceaf68ebbcf8982d9c2dadde1c99996c49b8ac1160af995",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-red-brick/red_brick_rough_2k.jpg",
+          "sha256": "b8b6b882b467647162433914b3e4db16e91852a0bdf866e6bcea4a76683ea00d",
+          "bytes": 552848
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-red-brick/red_brick_nor_gl_2k.jpg",
+          "sha256": "dd2ce5b5c42f04f02fce555d53eae42503733a0a42e76ae9a18bfb9d0680da5b",
+          "bytes": 4327452
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-red-brick/red_brick_ao_2k.jpg",
+          "sha256": "5527fb221bf4506a2c5eb78d0b94e442ea4ec91cfa2ae17ae93bc78e88bd05ed",
+          "bytes": 2989135
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-red-brick/red_brick_disp_2k.jpg",
+          "sha256": "6fbe5a45fb9fb303d66c2a9b9ac8c93b3246a7484ab3babaca493d35f22d8bd4",
+          "bytes": 1005806
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-red-brick-03",
+      "name": "Red Brick 03",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "brick",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/red_brick_03",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-red-brick-03/red_brick_03.webp",
+      "bytes": 2383492,
+      "sha256": "23c6a8d4e3bb436557b050240b3b98f53c03483ca8599d06abe86e2b066434f1",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "c37ef11bb94a533d1c758c5c7d7199264e90f19b23946766c7c59aa189c11ff6",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-red-brick-03/red_brick_03_rough_2k.jpg",
+          "sha256": "54cbcc8acdbdfbc0a38407509ef72058ef5847b5713e689fa37ce9cc504c41c1",
+          "bytes": 1329161
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-red-brick-03/red_brick_03_nor_gl_2k.jpg",
+          "sha256": "3bcb8714c450369915a9608a9e5318433a5e5df932184519bdbfd993dec16a9f",
+          "bytes": 3684630
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-red-brick-03/red_brick_03_ao_2k.jpg",
+          "sha256": "3891e9f879575b70fef2abc854ececd813c906f26bb6e333b9d91f3ff39615ab",
+          "bytes": 1666638
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-red-brick-03/red_brick_03_disp_2k.jpg",
+          "sha256": "f48b733ec52e43ef35fd9285a9fd4592356cf25ec86e29d711a0ad33ef3dfc7a",
+          "bytes": 595929
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-medieval-blocks-03",
+      "name": "Medieval Blocks 03",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "brick",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/medieval_blocks_03",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-medieval-blocks-03/medieval_blocks_03.webp",
+      "bytes": 2045316,
+      "sha256": "47f0400023f1141fda1f949e2c226d850a25f203825410541d52ad8c8131e21c",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "63cc2220ed9e72c8dda620474c10fc26657552c5309c77c114b5ac725edfb902",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-medieval-blocks-03/medieval_blocks_03_rough_2k.jpg",
+          "sha256": "6d84d13c65a63e968aaa3f77f7e06d8866f1323698a56ef3ca6d88a7b99d5c08",
+          "bytes": 1865375
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-medieval-blocks-03/medieval_blocks_03_nor_gl_2k.jpg",
+          "sha256": "16c8a4e4828752992725a57b2b69d32021f15dbc3548bced3f786a03e40cf5fe",
+          "bytes": 5073770
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-medieval-blocks-03/medieval_blocks_03_ao_2k.jpg",
+          "sha256": "bc5ae6fd51cd89e977adfeefc5c9ebe41dbf156c39f0d975c4bff7378b513247",
+          "bytes": 1843687
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-medieval-blocks-03/medieval_blocks_03_disp_2k.png",
+          "sha256": "fd4db479dad705ce6a9ed80814d0c7b59975b6c53da0b689b1ba87155a34c028",
+          "bytes": 12817
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-metal-plate",
+      "name": "Metal Plate",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "metal",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/metal_plate",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-metal-plate/metal_plate.webp",
+      "bytes": 1140846,
+      "sha256": "52e67fb6b6e21bf5453c9380f0973185cd93ca1e4015ed6e52e7f20f997108fe",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "864c9a653acd1f5034c9bbe7f955b18cc9687a81bbdfa805e7a2319939676910",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-metal-plate/metal_plate_rough_2k.jpg",
+          "sha256": "3cdc139df4ec5b304dd986278c1fb026c67c42e6623f0ee5caa7f373d51c7bef",
+          "bytes": 3045988
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-metal-plate/metal_plate_nor_gl_2k.jpg",
+          "sha256": "146f8c00874a584bcc4a184643e72f160da2a7568d469198e02b26c9ff93cf43",
+          "bytes": 2516654
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-metal-plate/metal_plate_ao_2k.jpg",
+          "sha256": "31e586f0bde9f28331077b30495f0f324aa9f91a9d656205d03242d1d3e2e439",
+          "bytes": 2392031
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-metal-plate/metal_plate_disp_2k.jpg",
+          "sha256": "c4ba1bc602d25bdd4725d856bbe5713373fa08456543d4d0168d9ff4e37c5f52",
+          "bytes": 1067841
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-green-metal-rust",
+      "name": "Green Metal Rust",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "metal",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/green_metal_rust",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-green-metal-rust/green_metal_rust.webp",
+      "bytes": 358456,
+      "sha256": "474cc51d6d0ddfad34afdcc7f4ad196d42da80a8a3130c56fc708b11ec720403",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "727515554ffb6410be82d3625a2837fe46612cb186ec391f77c50bd52c4d7ab2",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-green-metal-rust/green_metal_rust_rough_2k.jpg",
+          "sha256": "0a691b35df773ab86dbbc86b787f8efaa81497780820abec0832b1e7aac309a6",
+          "bytes": 690649
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-green-metal-rust/green_metal_rust_nor_gl_2k.jpg",
+          "sha256": "45ec5d256c91ccf4a87dd4c4a90f6c58b460f3862287f014bfde432055ece239",
+          "bytes": 357436
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-green-metal-rust/green_metal_rust_ao_2k.jpg",
+          "sha256": "3d33ff3a82c9b52080b0ee8667b019f388f2f14d7ecc3d06f4826d1a62103378",
+          "bytes": 1488796
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-green-metal-rust/green_metal_rust_disp_2k.jpg",
+          "sha256": "5bc582398111393bcf470e870c666db1439118825978dc5b1b075a478066dfca",
+          "bytes": 1013126
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-rust-coarse-01",
+      "name": "Rust Coarse 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "metal",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/rust_coarse_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-rust-coarse-01/rust_coarse_01.webp",
+      "bytes": 1751086,
+      "sha256": "0cb309de48b9e26e1ffb3e1e3a8f9de04f78a72ce352f6b85330f17626065077",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "5b8801674fa53ff1b6f7853300f50aa7a1b31e69278554803bd957fe9fa7e392",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-rust-coarse-01/rust_coarse_01_rough_2k.jpg",
+          "sha256": "652eaa2e668c4d24b038716e01c460e6614429634f67ddbcd7f9593296a24885",
+          "bytes": 2845362
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-rust-coarse-01/rust_coarse_01_nor_gl_2k.jpg",
+          "sha256": "495d3c87da059827ffaf49dae59f967cb3e0b187f4426ab0a47088c3fa83e50b",
+          "bytes": 3685688
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-rust-coarse-01/rust_coarse_01_ao_2k.jpg",
+          "sha256": "4340b7de13e1690b2132234ec631d9b1166c70ae2c8076b2d32cf51808bad7f5",
+          "bytes": 2817642
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-rust-coarse-01/rust_coarse_01_disp_2k.jpg",
+          "sha256": "50aa9c1c01cad6d5b445da5ba9b733058cfee07b173ee4dc0d1ab16dce7264b7",
+          "bytes": 1477214
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-beige-wall-001",
+      "name": "Beige Wall 001",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "plaster",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/beige_wall_001",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-beige-wall-001/beige_wall_001.webp",
+      "bytes": 212364,
+      "sha256": "20f4c694aed1e27147b60a0a001b4c1d0b8c08842cd6b76eb644a455b62d2040",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "222d4d2e7d5c425c97e5a66790852388cec7706714d773f769fba6bfe08cea4e",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-beige-wall-001/beige_wall_001_rough_2k.jpg",
+          "sha256": "a76e2307d8ec47d1be1d4710851fc4545db7aecfa176333738a6756358b64767",
+          "bytes": 656368
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-beige-wall-001/beige_wall_001_nor_gl_2k.jpg",
+          "sha256": "7f5cbecd6766f44034f3b78b4addb1559e12bdd5a77501bd418a736609e7cedc",
+          "bytes": 815507
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-beige-wall-001/beige_wall_001_ao_2k.jpg",
+          "sha256": "371d80c90b63a478093581d4f61ab9b439f233ae6fe970cb62a71d95d64e2ccf",
+          "bytes": 514646
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-beige-wall-001/beige_wall_001_disp_2k.jpg",
+          "sha256": "680a346a91bee95e98d01621161ef56fe3bbc18170f9ae33da238ecdfc7cb93f",
+          "bytes": 569866
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-painted-plaster-wall",
+      "name": "Painted Plaster Wall",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "plaster",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/painted_plaster_wall",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-painted-plaster-wall/painted_plaster_wall.webp",
+      "bytes": 1723740,
+      "sha256": "bf4afe29dc257bf81d263c6ebd23070b596c5b235da61cb0c2a45d78e3210576",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "6fd812ed8dd5be1873c29aeef38ce9bf1fb30a22c6d4b3a12db725e98c26a1be",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-painted-plaster-wall/painted_plaster_wall_rough_2k.jpg",
+          "sha256": "35aad595469533cc3b7cc209cc6c7e065d660211f02c867f4492d3b371b1fee1",
+          "bytes": 1595466
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-painted-plaster-wall/painted_plaster_wall_nor_gl_2k.jpg",
+          "sha256": "2d601a46ed5ce2af866741c53cafa3cba472620c272e633b6484d4de16a80eb1",
+          "bytes": 4048392
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-painted-plaster-wall/painted_plaster_wall_ao_2k.jpg",
+          "sha256": "3d89b5ea1f9d93d611ab0015d887b620ec9c6623e19effadba84ee9345c4c6fc",
+          "bytes": 2176195
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-painted-plaster-wall/painted_plaster_wall_disp_2k.jpg",
+          "sha256": "80859875e00fde2c883d37a4eb47728bece60f9eb7c8a907ce40b20d8faf5ed1",
+          "bytes": 1565195
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-white-plaster-02",
+      "name": "White Plaster 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "plaster",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/white_plaster_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-white-plaster-02/white_plaster_02.webp",
+      "bytes": 2169740,
+      "sha256": "7b88621644f2e68fae52560750d06b2b97766ddafbe7724537fd5589a3c0ab86",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "0ca5245ba70777d3e41ff4566c9f8d363855461891802c55cb7dc0f6f85f084e",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-white-plaster-02/white_plaster_02_rough_2k.jpg",
+          "sha256": "a3dc1911f6e25d88fdb0031fe0cfb602eec5496084c508774c60691bed087417",
+          "bytes": 1604444
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-white-plaster-02/white_plaster_02_nor_gl_2k.jpg",
+          "sha256": "083579b03a8f31ec1886512e5972f3b893610bf26a2098f97910e0f46745cdc9",
+          "bytes": 3379814
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-white-plaster-02/white_plaster_02_ao_2k.jpg",
+          "sha256": "4dd72e594056fae1653118bdc86638381c65605edcbdf37e6a27c762782d55fe",
+          "bytes": 2141148
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-white-plaster-02/white_plaster_02_disp_2k.jpg",
+          "sha256": "7a477010377e267bbf3c650037f0659c9b5b0c7860f8056e0145600145ef66fc",
+          "bytes": 1007108
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-asphalt-02",
+      "name": "Asphalt 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "asphalt",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/asphalt_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-asphalt-02/asphalt_02.webp",
+      "bytes": 2557126,
+      "sha256": "220beba3903547915dd0f1d3d807079876b41fc9d37e1157ef1b1b3e464d34e3",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "28f5ba8690553f192c0e5e1a5ff40f34765b4b93f4cc7059b1a3e9c795b6c28c",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-asphalt-02/asphalt_02_rough_2k.jpg",
+          "sha256": "b9a516b61b7040a9245ac206642d5f767ad9589a0169c4a1668221429e8a998c",
+          "bytes": 2230457
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-asphalt-02/asphalt_02_nor_gl_2k.jpg",
+          "sha256": "ffe49db71a0fd34c1e259625df66a302a237597d6ef655307987ec4e45bc6f21",
+          "bytes": 4943950
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-asphalt-02/asphalt_02_ao_2k.jpg",
+          "sha256": "5fe1737cbbcd55f2fec3632d6170762e5733f24bbc7a7816afb22a23c710b11f",
+          "bytes": 2039487
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-asphalt-02/asphalt_02_disp_2k.jpg",
+          "sha256": "943f254ed5e1504131547b35afe3798771cdda33842b7fdc6c0288b8312a44b0",
+          "bytes": 1131595
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-aerial-asphalt-01",
+      "name": "Aerial Asphalt 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "asphalt",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/aerial_asphalt_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-aerial-asphalt-01/aerial_asphalt_01.webp",
+      "bytes": 2364940,
+      "sha256": "8a3b77ce3009b6a337a353b33670587a3a16f8577d10d1e2e3ef5403ec8f3576",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "a85ce28b8e6ed90acb0234832969b27f5b73fe055a0d5b94f34fc2943d319fb5",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-aerial-asphalt-01/aerial_asphalt_01_rough_2k.jpg",
+          "sha256": "20fdcdc9fc2a3efef83fd8a3453d2bc0a8543ee3ebb2badf148e4c142704eeff",
+          "bytes": 1392536
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-aerial-asphalt-01/aerial_asphalt_01_nor_gl_2k.jpg",
+          "sha256": "cb7e5b75ff47ad672ab820f71b77566419b612e52e7791c5ed90a7fa27b71807",
+          "bytes": 2751902
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-aerial-asphalt-01/aerial_asphalt_01_ao_2k.jpg",
+          "sha256": "fb9da6e73cbfca310032ee113389be2f084c4d28cd688f663952e4747d5532d0",
+          "bytes": 1929805
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-aerial-asphalt-01/aerial_asphalt_01_disp_2k.jpg",
+          "sha256": "33b633f9325fd444f00caeaa8755873f7d0e1013f04b719e8b25f32c36749ea6",
+          "bytes": 542594
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-asphalt-01",
+      "name": "Asphalt 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "asphalt",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/asphalt_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-asphalt-01/asphalt_01.webp",
+      "bytes": 1541480,
+      "sha256": "733f8932f598cfe63ce85030dad5826735feec56f1b5c1e64d02d0cbfb69fff4",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "10fe1dafe34fec51397dbe9011f798c68c4e3fc16abfd4d7aea0123122db8993",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-asphalt-01/asphalt_01_rough_2k.jpg",
+          "sha256": "c6962037eb41c6f0feafba22353e315d37ae8c8ea472dfd7d4fe28136904ceb5",
+          "bytes": 1599661
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-asphalt-01/asphalt_01_nor_gl_2k.jpg",
+          "sha256": "60fd6af2aae30bb3fd2231227ecbe52d0ced2c761d53a64f50dea59d173307cd",
+          "bytes": 4845665
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-asphalt-01/asphalt_01_ao_2k.jpg",
+          "sha256": "0cbbf5252a632482c9ce15fd53b26a6b468250114b8e3fef20d0393d139d2611",
+          "bytes": 4048107
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-asphalt-01/asphalt_01_disp_2k.jpg",
+          "sha256": "c5c3e80e20613b1b925dd91da579238564ae3a0a29b8bea58101f3ed87d0fbec",
+          "bytes": 1389676
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-concrete-floor-worn-001",
+      "name": "Concrete Floor Worn 001",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "concrete",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/concrete_floor_worn_001",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-concrete-floor-worn-001/concrete_floor_worn_001.webp",
+      "bytes": 557924,
+      "sha256": "da72f82f9f883910e78fa8ff01643a5eadc12001b1e961266f06a4b474c6e9e1",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "e29b45cdcd6d02fae3c087c456196ffa750779a9b62e7071aa3831dc322a0cc4",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-concrete-floor-worn-001/concrete_floor_worn_001_rough_2k.jpg",
+          "sha256": "b904992f0d75da2c41edf832bbb838622cca076f48f7913065a152c3b640690e",
+          "bytes": 735249
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-concrete-floor-worn-001/concrete_floor_worn_001_nor_gl_2k.jpg",
+          "sha256": "3b782137e34d63fd59b2e92b4e27b2ee4d082caf9dd23f00dc7ab4da5513daef",
+          "bytes": 870609
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-concrete-floor-worn-001/concrete_floor_worn_001_ao_2k.jpg",
+          "sha256": "94ac734a35df1d1ca15bbb4970f4bf56f9f827930b5532d8a5b971de63ec58b5",
+          "bytes": 689586
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-concrete-floor-worn-001/concrete_floor_worn_001_disp_2k.jpg",
+          "sha256": "793a833047c28b17344ca7543c32de39fb5d86d17e33ab380cf8639040d3a637",
+          "bytes": 666150
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-concrete-floor-02",
+      "name": "Concrete Floor 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "concrete",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-concrete-floor-02/concrete_floor_02.webp",
+      "bytes": 2708530,
+      "sha256": "aa4d80c39b1691d4411847cb5c6df103eea3f930d52e99b87ace5dfd9bca799b",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "b08a20dcb306d08ee7f4a05ec216b19b7fd37e95745998ec5f81ecedaac1f0e9",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-concrete-floor-02/concrete_floor_02_rough_2k.jpg",
+          "sha256": "cb539b0f8fdc8c63241683e01c923eb040fa701ec4c60cff27b674294746ae67",
+          "bytes": 1417673
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-concrete-floor-02/concrete_floor_02_nor_gl_2k.jpg",
+          "sha256": "ce12d18f283f884f4be6f6c110f81582376049caada1e226958659d3d5fbaae1",
+          "bytes": 935810
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-concrete-floor-02/concrete_floor_02_ao_2k.jpg",
+          "sha256": "c224b43f7f6733f1f457ebb1c6bfe95f3bfa58f8a8d2425e2bd1a3bd110d0c06",
+          "bytes": 1692305
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-concrete-floor-02/concrete_floor_02_disp_2k.jpg",
+          "sha256": "42d7bc227614d6a12a7d0d4f009bd17db478965957b9b23b87daceaa10eb1d08",
+          "bytes": 438795
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-concrete-layers-02",
+      "name": "Concrete Layers 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "concrete",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/concrete_layers_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-concrete-layers-02/concrete_layers_02.webp",
+      "bytes": 1264740,
+      "sha256": "a1fe314af07810ce43a48071419c68d55ce4dc308ec83a7369b3e202b9240d37",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "f70070187573ad05457c65c3efe7fb25fe1e071a5490c760e5b90f845aab9b91",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-concrete-layers-02/concrete_layers_02_rough_2k.jpg",
+          "sha256": "d90cfb52d690c4ac843e29e05ffc3d67f510f6a5aa1ef0f0f467d693d7d958b7",
+          "bytes": 1920563
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-concrete-layers-02/concrete_layers_02_nor_gl_2k.jpg",
+          "sha256": "6985e0782adb226423d81cdd080b0e06012fdfb20eb3952d2459218fdd3977e9",
+          "bytes": 3389363
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-concrete-layers-02/concrete_layers_02_ao_2k.jpg",
+          "sha256": "0e974d416b1414aa14bd852cfe4dd1116f5f16c09410e908cf6b5156d351dd3f",
+          "bytes": 1941520
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-concrete-layers-02/concrete_layers_02_disp_2k.jpg",
+          "sha256": "cc3415968ecb936d4d748734cb653d3db3490ae7ad68d6538e2aae98ce6241cf",
+          "bytes": 899564
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-coast-sand-rocks-02",
+      "name": "Coast Sand Rocks 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "stone",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/coast_sand_rocks_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-coast-sand-rocks-02/coast_sand_rocks_02.webp",
+      "bytes": 1457758,
+      "sha256": "c5ac1e1014f14a2b451ff09e8d03cd8387199b9c1805e42074f4d3080dd0a80a",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "98a8850f24cba18e4c99e46c56f5675f910809ee7f75df3e8587ec9e27088ed6",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-coast-sand-rocks-02/coast_sand_rocks_02_rough_2k.jpg",
+          "sha256": "1751909cb470fb6cb2a7e01b2dfb9e009088a0dafa5ea6fba43fb5a1215ec6fa",
+          "bytes": 2218518
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-coast-sand-rocks-02/coast_sand_rocks_02_nor_gl_2k.jpg",
+          "sha256": "e75cd105d218aae5bf669630635e6753a78f6325bc799be3d0ee8b974853a84d",
+          "bytes": 4810192
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-coast-sand-rocks-02/coast_sand_rocks_02_ao_2k.jpg",
+          "sha256": "8551ee1edd1257b99b2972ec0fc086e2ecfa98ece85a296d4500e8a6ea064498",
+          "bytes": 3125761
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-coast-sand-rocks-02/coast_sand_rocks_02_disp_2k.jpg",
+          "sha256": "109dfa81b1085e1b1d32ba740c0efb04b06e0b497925ef8e58e9c3c0e6753617",
+          "bytes": 1044275
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-aerial-rocks-02",
+      "name": "Aerial Rocks 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "stone",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/aerial_rocks_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-aerial-rocks-02/aerial_rocks_02.webp",
+      "bytes": 2194960,
+      "sha256": "568839450db3201fced07bc94de1bbea19e604c57d8059da93de80d19c80f7f0",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "f759d2471cb6a4b3b37d0a5a249adbad1d4d48d67825f37622a603dac8d9bb22",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-aerial-rocks-02/aerial_rocks_02_rough_2k.jpg",
+          "sha256": "f1808dec1ad6dd77881baa41813d9718bb93e9aa1dabdcd9d6dc9b7f45dd90da",
+          "bytes": 1475961
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-aerial-rocks-02/aerial_rocks_02_nor_gl_2k.jpg",
+          "sha256": "e7ad2a65b446ef70c3eb8b32267bee74d91d9759ed52c349c38e34cfd62d079e",
+          "bytes": 4300188
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-aerial-rocks-02/aerial_rocks_02_ao_2k.jpg",
+          "sha256": "c5c2f5f4158e2f49e8b751361f9e868417c6ac27700297970ab5a9b628bec7f2",
+          "bytes": 1342810
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-aerial-rocks-02/aerial_rocks_02_disp_2k.jpg",
+          "sha256": "d67a273e73cafdcda427a969660edcd1e58ab124fc9f17206068995d4f5b735b",
+          "bytes": 320733
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-aerial-grass-rock",
+      "name": "Aerial Grass Rock",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "stone",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/aerial_grass_rock",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-aerial-grass-rock/aerial_grass_rock.webp",
+      "bytes": 1946996,
+      "sha256": "dd34ff923a6065b6805d34f7c1030d8938eeb7725dde8020fcb14eda3becc348",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "1a2ddfa4652adbe00447b940c40019d46f4b88245bc1b341cdf622c2110b7bc5",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-aerial-grass-rock/aerial_grass_rock_rough_2k.jpg",
+          "sha256": "fc0fff40e3378f2f54d225db6e3e566a8563bb2c143eef0f09b543c9d4698776",
+          "bytes": 1495844
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-aerial-grass-rock/aerial_grass_rock_nor_gl_2k.jpg",
+          "sha256": "c6aa14b042ce243f93a6ca807f46a085711c23ad316b104578e92df7770ee285",
+          "bytes": 3799025
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-aerial-grass-rock/aerial_grass_rock_ao_2k.jpg",
+          "sha256": "2eb11d2282c78126dff97697ae87a35ac5c1e2b7a3aa0b1c67473a0ae0621d03",
+          "bytes": 2162395
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-aerial-grass-rock/aerial_grass_rock_disp_2k.jpg",
+          "sha256": "402db9334208ac6b505e4aa955ee9564d04073e5507b49adfc84282c26181dc8",
+          "bytes": 530342
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-brown-leather",
+      "name": "Brown Leather",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "leather",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brown_leather",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-brown-leather/brown_leather.webp",
+      "bytes": 1677058,
+      "sha256": "b01330d021280e0842f89ebefd9ae845f834d74699f3b5c074fd6c8d9c2a3b65",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "b0de2403a31efa31e501b0028c0bd8e504d5bd6318f4a5ce90c550c3067f96d8",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-brown-leather/brown_leather_rough_2k.jpg",
+          "sha256": "8a47afca2630310849034fe40ca9497db0956c67c0d933e6efd49d3cd2befe83",
+          "bytes": 2801956
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-brown-leather/brown_leather_nor_gl_2k.jpg",
+          "sha256": "3386277290af50b4d464dc9a9f195bbf8dd6f137b9ae0274552397d2f0135c98",
+          "bytes": 3030702
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-brown-leather/brown_leather_ao_2k.jpg",
+          "sha256": "0f1f8753775779d4e25512f4d08aec1e7dbb73b1d0dc98df66af2071fe8bfa77",
+          "bytes": 1541878
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-brown-leather/brown_leather_disp_2k.jpg",
+          "sha256": "37ff21737b1ca5ea8cfe88d9a8fe1e2ace0ef190d9ee2d23369307f63c7c3eab",
+          "bytes": 1027529
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-marble-01",
+      "name": "Marble 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "tile",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/marble_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-marble-01/marble_01.webp",
+      "bytes": 846192,
+      "sha256": "719860fbf33cabe231f297134ae07351ed9ef56d949fbfab923f5fde2ba5111c",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "d403786171716f86718bdd67eba923d4fb6125c0636bacef0e6a21dd5d623a48",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-marble-01/marble_01_rough_2k.jpg",
+          "sha256": "1b970e033856c93ee7390d947da5340e101b489fc8c1463354ea9e6655ce039a",
+          "bytes": 281388
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-marble-01/marble_01_nor_gl_2k.jpg",
+          "sha256": "d5e17ccb2913adbf28fcb781fddf0aa711259ddea6c1c918442f9a3589aa4660",
+          "bytes": 409581
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-marble-01/marble_01_ao_2k.jpg",
+          "sha256": "e0d535b591430f1ebfd8ffa38086949bb074ae470f6fec7f3dcd55f594f52d4e",
+          "bytes": 999921
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-marble-01/marble_01_disp_2k.jpg",
+          "sha256": "7f9b2a458bb6f5b5314380a26ab800d0e8b93cfc350351326328e539fed4988e",
+          "bytes": 231514
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-leather-white",
+      "name": "Leather White",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "tile",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/leather_white",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-leather-white/leather_white.webp",
+      "bytes": 1857864,
+      "sha256": "133f42aaeea736e7cb78335c1761da62aacde0ac526f4b22a6cd5e018bac79b9",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "5b2d3f7c2f6f10ea65a644353a9f4e0ce87a6737e09b4cb38c1e1ad3257c86a4",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-leather-white/leather_white_rough_2k.png",
+          "sha256": "e42877acb3c598f53b0a1fecf50ace66a29b56bf19b25cbc5252cd1593bc6d34",
+          "bytes": 3008509
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-leather-white/leather_white_nor_gl_2k.jpg",
+          "sha256": "f06e81389faf7c4bef47b8ed5a5c433b6e3b7d0ac77e4090f65ed9d964a589f6",
+          "bytes": 3176928
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-leather-white/leather_white_ao_2k.png",
+          "sha256": "68c32c01a8db17f636b7c1a006a1ad279f1a0195c5132ebb46230c3539ec2892",
+          "bytes": 3253395
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-leather-white/leather_white_disp_2k.jpg",
+          "sha256": "16133711439f9c5bb8fe1c97f9fd0937eab8048d43a8707f7d1fd688d5537fc1",
+          "bytes": 2785869
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-floor-tiles-06",
+      "name": "Floor Tiles 06",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "tile",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/floor_tiles_06",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-floor-tiles-06/floor_tiles_06.webp",
+      "bytes": 910756,
+      "sha256": "39c2f3a59ebbfd98cdaadc57bf26c8d0297809f20f1320d87c146ca058094374",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "fe326c219d096e8f5d31c9be6da5a617f34c58b3042d0733f7d4450a38906b37",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-floor-tiles-06/floor_tiles_06_rough_2k.jpg",
+          "sha256": "9b8058cb0f471db05bca1ca47fa9190ea6c31a1684c93c17123e4ecfa2d70e28",
+          "bytes": 483344
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-floor-tiles-06/floor_tiles_06_nor_gl_2k.jpg",
+          "sha256": "930ee26e4018f0d44d8f011b364b141c7ccf02bd3e47b85e591cbbaeb9f47046",
+          "bytes": 1010594
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-floor-tiles-06/floor_tiles_06_ao_2k.jpg",
+          "sha256": "b2ff3e6d1ceb30689aa803eb04b58b9b550ad79db0a94b69896157f2657a3238",
+          "bytes": 1109365
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-floor-tiles-06/floor_tiles_06_disp_2k.jpg",
+          "sha256": "56a920b67b41556f48a67ddf2ee05ea4b5d6f5749663bcd5f53ac65be876e332",
+          "bytes": 358381
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-decrepit-wallpaper",
+      "name": "Decrepit Wallpaper",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "paper",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/decrepit_wallpaper",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-decrepit-wallpaper/decrepit_wallpaper.webp",
+      "bytes": 1676618,
+      "sha256": "e29e4bad40d0579fb9a615c54b878a1c54125b02c85819d88925ebf429fef925",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "6a16d2c30016b98cce1176e85c64075fe48255d0302e7d7b9f71198fbe818cf1",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-decrepit-wallpaper/decrepit_wallpaper_rough_2k.jpg",
+          "sha256": "524833c0da045ce27e2ae11936284fea130e6e18e7463e10648fdc701dad5766",
+          "bytes": 1660507
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-decrepit-wallpaper/decrepit_wallpaper_nor_gl_2k.jpg",
+          "sha256": "95507032d5039128729d132c0a5ce76e3fa0e43c8db077b480498ab6cbb42ed9",
+          "bytes": 2906832
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-decrepit-wallpaper/decrepit_wallpaper_ao_2k.jpg",
+          "sha256": "3f3982a6ca6c1aa557c37652f978d6932e5227dcf2175b4d5e33f4797d775dec",
+          "bytes": 1770378
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-decrepit-wallpaper/decrepit_wallpaper_disp_2k.jpg",
+          "sha256": "605df55308d9ee0df80e4ae5addba8ebf0bb0e15b390d1df745d3f3175ec4aa2",
+          "bytes": 525309
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-brown-mud-leaves-01",
+      "name": "Brown Mud Leaves 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "ground",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brown_mud_leaves_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-brown-mud-leaves-01/brown_mud_leaves_01.webp",
+      "bytes": 2312930,
+      "sha256": "be8bb8ca9e2514b0b1f86fe280a0ed9b1d7bc2a7631c2333f0022e11ae11681b",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "29c997d77f56e4ea16d3e998a306be0c17fddb28ab4822657c7cd8249040ffda",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-brown-mud-leaves-01/brown_mud_leaves_01_rough_2k.jpg",
+          "sha256": "9556215f5fef905c37cdf19c77aef7822f124890f8fb7dcce65d57c5eafc0ca5",
+          "bytes": 2421908
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-brown-mud-leaves-01/brown_mud_leaves_01_nor_gl_2k.jpg",
+          "sha256": "b6ec386e00d9d2a1c3a1da6a98a67066b0dfaa88ddb779341df29700cf081bdf",
+          "bytes": 5688696
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-brown-mud-leaves-01/brown_mud_leaves_01_ao_2k.jpg",
+          "sha256": "76c342dc7b5ee7dc5f2246e24147f16afcaa2c0b31599da4c385404416e16eb8",
+          "bytes": 3813568
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-brown-mud-leaves-01/brown_mud_leaves_01_disp_2k.jpg",
+          "sha256": "3688c1acc705f604ffdaf956064c898658bcd2d8b0258e437e671390c896abb8",
+          "bytes": 1788400
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-forrest-ground-01",
+      "name": "Forest Ground 01",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "ground",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/forrest_ground_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-forrest-ground-01/forrest_ground_01.webp",
+      "bytes": 2305330,
+      "sha256": "528a833a620c59d1570e4c58aac5ad871cbbf52c6a172db0186014b93c68188a",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "e4d557ff61a0b42712a58e8a2e91c6010738977d4e172b7af47abd7d406ae735",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-forrest-ground-01/forrest_ground_01_rough_2k.jpg",
+          "sha256": "e09258c7f055156a7607f1b21dccf38c7efd847e7d030271d5ffcc4a722df37d",
+          "bytes": 920422
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-forrest-ground-01/forrest_ground_01_nor_gl_2k.jpg",
+          "sha256": "aa23fa930c6303490f842f7c016c19d838263e8e4538d42508a9332e3fd76b69",
+          "bytes": 5551101
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-forrest-ground-01/forrest_ground_01_ao_2k.jpg",
+          "sha256": "3da52f2f2182f2cf0a7b417e10764ee1ff446df0bc9fb12d49c4e3570ea3effe",
+          "bytes": 2493578
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-forrest-ground-01/forrest_ground_01_disp_2k.jpg",
+          "sha256": "1d5c63d39e67af44e96cc9d5752273982bc5c82c9855695dada4abc2fc20575d",
+          "bytes": 1036491
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    },
+    {
+      "id": "polyhaven-rocky-terrain-02",
+      "name": "Rocky Terrain 02",
+      "kind": "surface-texture",
+      "category": "surface-material",
+      "style": "pbr-detailed",
+      "selectionTerm": "ground",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/rocky_terrain_02",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-06"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": false,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-rocky-terrain-02/rocky_terrain_02.webp",
+      "bytes": 1531888,
+      "sha256": "01572c9137f414967aeba786379007a0ec7d7a07cc14a718cf0a1304d76d2348",
+      "width": 2048,
+      "height": 2048,
+      "sourceSha256": "9b042fe0618ffbc3650592456d7d8d265ba9a1cb5ce802f5f1d86b7ee79508a1",
+      "pbrMaps": [
+        {
+          "role": "rough",
+          "path": "assets/polyhaven-rocky-terrain-02/rocky_terrain_02_rough_2k.jpg",
+          "sha256": "89f3c7b9e467160a821cbac32a1fdfd75f13cb87c9deeb22099d16677a711126",
+          "bytes": 1589303
+        },
+        {
+          "role": "nor_gl",
+          "path": "assets/polyhaven-rocky-terrain-02/rocky_terrain_02_nor_gl_2k.jpg",
+          "sha256": "556ed903180a9431b253fc1c334c769dc4615c5c0f4ef1cedf20533ae8409ce8",
+          "bytes": 4149208
+        },
+        {
+          "role": "ao",
+          "path": "assets/polyhaven-rocky-terrain-02/rocky_terrain_02_ao_2k.jpg",
+          "sha256": "30a581b6d3f11db1f5f4f5bd3cbe89695d94042455311bb44a54f6691743a648",
+          "bytes": 1767074
+        },
+        {
+          "role": "disp",
+          "path": "assets/polyhaven-rocky-terrain-02/rocky_terrain_02_disp_2k.jpg",
+          "sha256": "84a544dad4d12da56962297dbc7c64813c918ca4942cc8b71b5a18799e454c24",
+          "bytes": 759583
+        }
+      ],
+      "technicalChecks": [
+        "official-API-checksum",
+        "native-2K-source",
+        "decoded-pixel-deduplication",
+        "PBR-map-dimensions"
+      ]
+    }
+  ]
+}

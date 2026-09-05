@@ -1,0 +1,100 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/tea_set_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "antique",
+      "tea",
+      "cup",
+      "english",
+      "ornate",
+      "vintage",
+      "floral",
+      "decorative",
+      "ceramic",
+      "food",
+      "coffee",
+      "victorian"
+    ],
+    "name": "Tea Set 01",
+    "categories": [
+      "props",
+      "dishes"
+    ],
+    "date_published": 1636070400,
+    "sponsors": [
+      "66627515"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 40296,
+    "texel_density": 10027.140686194824,
+    "dimensions": [
+      918.4822738170624,
+      483.876571059227,
+      164.99304870376363
+    ],
+    "files_hash": "56e8ed17e683a9335871e8e8ad9a444ba44e6c1c",
+    "description": "Free 8K model of an antique Victorian English ceramic tea set with ornate floral decals, gold trim, teapot, cups, saucers, perfect as decorative props and dishes.",
+    "authors": {
+      "James Ray Cock": "texturing",
+      "Rico Cilliers": "modeling",
+      "Jurita Burger": "graphic design"
+    },
+    "category_id": "fa8c9a42-0ea9-51d5-8cb9-734e1d7b9212",
+    "category": "Food & Kitchen/Tableware/Tea & Coffee Sets",
+    "attributes": {
+      "material": [
+        "ceramic",
+        "metal"
+      ],
+      "condition": [
+        "clean"
+      ]
+    },
+    "download_count": 52949,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/tea_set_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/tea_set_01/tea_set_01_2k.gltf",
+      "bytes": 15836,
+      "sha256": "c75b639cc1327c9bf44fee11b1e50ac7fd1c4ea8b56eb0ff98c5bc93d9d76c26",
+      "sourceMd5": "57728b8f9b0a9fbf46b4f07ef49255d2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/tea_set_01/tea_set_01.bin",
+      "bytes": 941776,
+      "sha256": "5ddd90f031a71832842f9030c2f7f0aa07b2c96f3d3cc4aa5cfaa5dbb14aa7b0",
+      "sourceMd5": "9f26672d452e5d155da484951b6277ae"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/tea_set_01/tea_set_01_arm_2k.jpg",
+      "bytes": 1741151,
+      "sha256": "f74ea16141becbcea8ab9aad02dd7e077c8acab307d126ff73750cf127e62bc7",
+      "sourceMd5": "3a61bf7581a4abc90be65741fd49f7f8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/tea_set_01/tea_set_01_diff_2k.jpg",
+      "bytes": 1677311,
+      "sha256": "3ee0b64baddfe9fe19883a323629785a4914d64313a0b9eb4375058f4786fcc4",
+      "sourceMd5": "2f62fae5df67eab5733f5bd62a81f61e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/tea_set_01/tea_set_01_nor_gl_2k.jpg",
+      "bytes": 805167,
+      "sha256": "79aa99b7e50d47cc2854f57ca57979722d110b998d126d5b058239ae61a85bef",
+      "sourceMd5": "fd5102090119134edf3f86ff058dab3f"
+    }
+  ]
+}

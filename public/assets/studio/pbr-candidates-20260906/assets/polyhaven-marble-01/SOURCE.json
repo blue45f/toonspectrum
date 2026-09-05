@@ -1,0 +1,90 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/marble_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "marble",
+      "smooth",
+      "even",
+      "tiles"
+    ],
+    "date_published": 1540420244,
+    "name": "Marble 01",
+    "categories": [
+      "floor",
+      "man made",
+      "indoor",
+      "clean",
+      "wall"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "sponsors": [
+      "3267566",
+      "7934315"
+    ],
+    "dimensions": [
+      1500,
+      1500
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "11a4d204569907b76e1c4f7ef06a8b3fa90b5930",
+    "description": "Free 8K marble texture of smooth, even cream-beige tiles with subtle veining and low sheen, clean indoor floor and wall material.",
+    "category_id": "332a7c92-1556-5937-b7a9-8a0f52d20df4",
+    "category": "Stone/Slabs & Tiles/Marble",
+    "attributes": {
+      "surface_use": "floor",
+      "origin": "man_made",
+      "setting": "indoor",
+      "condition": [
+        "clean"
+      ]
+    },
+    "download_count": 313078,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/marble_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_01/marble_01_diff_2k.jpg",
+      "bytes": 1269188,
+      "sha256": "d403786171716f86718bdd67eba923d4fb6125c0636bacef0e6a21dd5d623a48",
+      "sourceMd5": "4eeefea16242cecb3b429ac0c8f88740"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_01/marble_01_rough_2k.jpg",
+      "bytes": 281388,
+      "sha256": "1b970e033856c93ee7390d947da5340e101b489fc8c1463354ea9e6655ce039a",
+      "sourceMd5": "c4cf0375d84277c6020bf230823efdcc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_01/marble_01_nor_gl_2k.jpg",
+      "bytes": 409581,
+      "sha256": "d5e17ccb2913adbf28fcb781fddf0aa711259ddea6c1c918442f9a3589aa4660",
+      "sourceMd5": "f25efb0b61ec7ac183b3b0f4d032ed17"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_01/marble_01_ao_2k.jpg",
+      "bytes": 999921,
+      "sha256": "e0d535b591430f1ebfd8ffa38086949bb074ae470f6fec7f3dcd55f594f52d4e",
+      "sourceMd5": "1de878f3c292637e3a101d81bfbfca69"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/marble_01/marble_01_disp_2k.jpg",
+      "bytes": 231514,
+      "sha256": "7f9b2a458bb6f5b5314380a26ab800d0e8b93cfc350351326328e539fed4988e",
+      "sourceMd5": "bffad2241d7a3d60a64d3d496332df91"
+    }
+  ]
+}

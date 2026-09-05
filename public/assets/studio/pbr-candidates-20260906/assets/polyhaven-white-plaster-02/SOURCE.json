@@ -1,0 +1,91 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/white_plaster_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "smooth",
+      "flat",
+      "even"
+    ],
+    "date_published": 1531287574,
+    "name": "White Plaster 02",
+    "categories": [
+      "plaster-concrete",
+      "wall",
+      "man made",
+      "outdoor",
+      "indoor",
+      "clean",
+      "floor"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      1000,
+      1000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "sponsors": [
+      "20953239",
+      "77433244"
+    ],
+    "files_hash": "508068441dd24eb06ef6d269a43f6ea7c8bade6b",
+    "description": "Free 8K plaster texture: smooth, flat white plaster with a soft matte finish, fine micro-roughness and subtle dirt speckling across the surface.",
+    "category_id": "ebaa964c-b45c-52e2-bd50-892d64616d87",
+    "category": "Concrete/Plaster & Stucco/Bare Plaster",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "clean"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "download_count": 226545,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/white_plaster_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_plaster_02/white_plaster_02_diff_2k.jpg",
+      "bytes": 2568315,
+      "sha256": "0ca5245ba70777d3e41ff4566c9f8d363855461891802c55cb7dc0f6f85f084e",
+      "sourceMd5": "35f9c96c16aa0d934da7884b232f6d07"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_plaster_02/white_plaster_02_rough_2k.jpg",
+      "bytes": 1604444,
+      "sha256": "a3dc1911f6e25d88fdb0031fe0cfb602eec5496084c508774c60691bed087417",
+      "sourceMd5": "47f989e9fd3e69e667244ff4b9f406f8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_plaster_02/white_plaster_02_nor_gl_2k.jpg",
+      "bytes": 3379814,
+      "sha256": "083579b03a8f31ec1886512e5972f3b893610bf26a2098f97910e0f46745cdc9",
+      "sourceMd5": "a9fa643c4a200686ad89598b545b2adc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_plaster_02/white_plaster_02_ao_2k.jpg",
+      "bytes": 2141148,
+      "sha256": "4dd72e594056fae1653118bdc86638381c65605edcbdf37e6a27c762782d55fe",
+      "sourceMd5": "c16d5e5f3ac0b894cbbe33f02654d11f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/white_plaster_02/white_plaster_02_disp_2k.jpg",
+      "bytes": 1007108,
+      "sha256": "7a477010377e267bbf3c650037f0659c9b5b0c7860f8056e0145600145ef66fc",
+      "sourceMd5": "4078dba6ea1f4df9602d28e243e5ab21"
+    }
+  ]
+}
