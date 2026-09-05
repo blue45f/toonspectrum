@@ -14,6 +14,8 @@ export type Studio2dAssetMetadata = (typeof manifest.assets)[number];
 export type Studio2dOrientation = "all" | "landscape" | "portrait" | "square";
 export type Studio2dQualityFilter = "all" | "recommended" | "large" | "raster" | "vector";
 export type Studio2dSort = "recommended" | "resolution" | "name";
+export type Studio2dEnvironment = "all" | "실내" | "실외";
+export type Studio2dTimeOfDay = "all" | "낮" | "노을" | "밤";
 
 export interface Studio2dFilters {
   readonly query?: string;
@@ -21,6 +23,9 @@ export interface Studio2dFilters {
   readonly quality?: Studio2dQualityFilter;
   readonly orientation?: Studio2dOrientation;
   readonly emptySceneOnly?: boolean;
+  readonly environment?: Studio2dEnvironment;
+  readonly timeOfDay?: Studio2dTimeOfDay;
+  readonly textFreeOnly?: boolean;
   readonly sort?: Studio2dSort;
 }
 
@@ -81,7 +86,11 @@ export function filterStudio2dScenes<T extends Studio2dScene>(
       if (filters.quality === "raster" && !scene.imgSrc) continue;
       if (filters.quality === "vector" && (scene.imgSrc || !scene.svg)) continue;
       // Unknown content is not silently admitted as an empty/person-free scene.
-      if (filters.emptySceneOnly && (!asset || asset.containsPeople)) continue;
+      if (filters.emptySceneOnly && (!asset || asset.containsPeople !== false)) continue;
+      // Descriptive filters require matching, reviewed source metadata. Unknown is not false.
+      if (filters.textFreeOnly && (!asset || asset.containsText !== false)) continue;
+      if (filters.environment && filters.environment !== "all" && asset?.environment !== filters.environment) continue;
+      if (filters.timeOfDay && filters.timeOfDay !== "all" && asset?.timeOfDay !== filters.timeOfDay) continue;
       if (filters.orientation && filters.orientation !== "all") {
         if (!asset || studio2dOrientation(asset.width, asset.height) !== filters.orientation) continue;
       }
