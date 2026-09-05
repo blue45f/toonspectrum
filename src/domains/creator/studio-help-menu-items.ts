@@ -122,9 +122,11 @@ export function buildStudioHelpGroupItems(
 
   const manual: StudioMainMenuItem = {
     id: "user-manual",
+    commandId: "help.user-manual",
     label: label["user-manual"],
     icon: BookOpen,
-    // This is a documentation link, not a mutable editor command.
+    // Reuse this same non-mutating action from the command search.
+    searchActivation: "execute",
     onSelect: () => { window.open("/studio/manual", "_blank", "noopener,noreferrer"); },
   };
   const learningWithSeparator = [manual, ...learning].map((item, index, items) =>

@@ -5,7 +5,8 @@ on:
     branches: [main]
     paths:
       - 'src/domains/creator/manual/**'
-      - 'src/domains/creator/studio-help-menu-items.ts'
+      - 'src/domains/creator/studio-help-menu-items*'
+      - 'src/domains/creator/studio-command-catalog*'
       - 'src/app/routes/groups/creator.routes.tsx'
       - 'src/app/routes/groups/studio-manual.routes.test.tsx'
       - 'src/app/routes/app-route-title-ownership.ts'
@@ -34,10 +35,22 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Manual and route regression tests
-        run: pnpm exec vitest run src/domains/creator/manual/studio-manual.test.ts src/app/routes/groups/studio-manual.routes.test.tsx
+      - name: Manual, route and existing menu/catalog regression tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/manual/studio-manual.test.ts
+          src/app/routes/groups/studio-manual.routes.test.tsx
+          src/domains/creator/studio-help-menu-items.test.ts
+          src/domains/creator/studio-command-catalog.test.ts
+          src/domains/creator/studio-main-menu-groups.test.ts
+          src/domains/creator/studio-main-menu-group-spec.test.ts
       - name: Lint changed manual surface
-        run: pnpm exec eslint src/domains/creator/manual src/app/routes/groups/creator.routes.tsx src/app/routes/groups/studio-manual.routes.test.tsx src/app/routes/app-route-title-ownership.ts src/domains/creator/studio-help-menu-items.ts scripts/verify-studio-manual.mjs
+        run: >-
+          pnpm exec eslint src/domains/creator/manual
+          src/app/routes/groups/creator.routes.tsx src/app/routes/groups/studio-manual.routes.test.tsx
+          src/app/routes/app-route-title-ownership.ts src/domains/creator/studio-help-menu-items.ts
+          src/domains/creator/studio-help-menu-items.test.ts src/domains/creator/studio-command-catalog.ts
+          src/domains/creator/studio-command-catalog-base.ts scripts/verify-studio-manual.mjs
       - run: pnpm run build:bundle
       - run: pnpm exec playwright install --with-deps chromium
       - name: Desktop, mobile, search, direct links, clipboard and print
