@@ -1,0 +1,28 @@
+{
+  "schema": "toonspectrum.visual-curation-decisions.v1",
+  "reviewedOn": "2026-09-06",
+  "evidenceRevision": "0c99edac76dc728f8ba3a58b887a3ce35bcfab7b",
+  "inventoryVisualItems": 1351,
+  "reviewedItemNumbers": {"from": 1, "through": 1351},
+  "method": "Direct visual inspection of rendered contact sheets; targeted full preview inspection for the defective wine glass and classroom background.",
+  "evidence": {"bundleSheets": "review-sheet-01.jpg through review-sheet-23.jpg", "remainingInventoryPages": "review index pages 46 through 57", "index": "review-index.json"},
+  "quarantine": [{"id": "kenney-food-glass-wine", "reason": "Visible black/pink stippled rendering defect across the glass. Keep legacy file and identity; exclude new selection until repaired and re-reviewed.", "sha256": "9612552070537941a8558ee2bf41b3ff109e74d81481b10a0e0ed7ac3787df4a"}],
+  "groupRotationVariants": ["kenney-particles-flame-05-rotated", "kenney-particles-flame-06-rotated", "kenney-particles-muzzle-01-rotated", "kenney-particles-muzzle-02-rotated", "kenney-particles-muzzle-03-rotated", "kenney-particles-muzzle-04-rotated", "kenney-particles-muzzle-05-rotated", "kenney-particles-spark-05-rotated", "kenney-particles-spark-06-rotated", "kenney-particles-trace-01-rotated", "kenney-particles-trace-02-rotated", "kenney-particles-trace-03-rotated", "kenney-particles-trace-04-rotated", "kenney-particles-trace-05-rotated", "kenney-particles-trace-06-rotated", "kenney-particles-trace-07-rotated"],
+  "rotationVariantCaveat": "Visual rotation derivatives, not claims of byte-identical or pixel-identical duplicate files.",
+  "repair": [
+    {"categories": ["daily-prop", "genre-prop"], "count": 16, "reason": "Opaque full-canvas backdrop interferes with compositing. Remove only exact repository-authored backdrop; retain illustrated shapes and IDs."},
+    {"ids": ["original-soft-snow-overlay", "original-night-bokeh", "original-golden-dust"], "reason": "Correlated particle positions create repeated diagonal bands. Replace with deterministic stratified scatter."},
+    {"target": "catalog-preview-presentation", "reason": "White/transparent objects lose contrast on pale previews. Use neutral checkerboard, accurate PBR/low-poly labels and on-demand small thumbnails."}
+  ],
+  "alreadyExcludedBeforeThisReview": [
+    {"sourcePrefix": "public/assets/3d/outfits/", "count": 18, "finding": "Oval placeholder meshes, not usable fitted clothing. Existing runtime already excludes these legacy GLBs; do not count them as newly removed."},
+    {"packageId": "original-everyday-spaces", "count": 8, "finding": "Blockout-only backgrounds already retired from new selection in PR 770; preserve legacy ID lookup."}
+  ],
+  "retainedWithContext": [
+    "Purposeful low-poly modular roads, ground pieces, buildings and plants are retained as low-poly, not mislabeled high-detail art.",
+    "Arcade rear view and environment roof occlusion are preview-camera limitations, not evidence that the actual source mesh is defective.",
+    "Existing VRM thumbnails were inspected, but thumbnail review does not establish fitted clothing or pose quality.",
+    "The classroom background includes Japanese signage. It is coherent art; locale-specific signage is not a reason to delete it as corrupted."
+  ],
+  "notClaimed": ["Full-resolution artistic approval of every original", "All angles of every legacy model", "All generated brush/filter/pose/wardrobe combinations", "Studio save/restore round trip for every asset", "1351 distinct original assets (the inventory also contains preview images)", "Production deployment"]
+}
