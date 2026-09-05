@@ -1,0 +1,60 @@
+name: Webtoon CI failure summary
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: Completed failing Actions job to summarize
+        required: true
+        default: '101251271840'
+        type: string
+  push:
+    branches: [codex/webtoon-assistant-quality-ux-20260905]
+    paths: [.github/workflows/webtoon-ci-failure-summary.yml]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  failure-summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      FAILED_JOB_ID: ${{ inputs.job_id || '101251271840' }}
+    steps:
+      - name: Read failed job log
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$FAILED_JOB_ID" =~ ^[0-9]+$ ]]
+          gh api "repos/$REPOSITORY/actions/jobs/$FAILED_JOB_ID/logs" > "$RUNNER_TEMP/failed-core.log"
+      - name: Print bounded failure diagnostics
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          raw = (pathlib.Path(os.environ['RUNNER_TEMP']) / 'failed-core.log').read_text(errors='replace')
+          raw = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', raw)
+          lines = raw.splitlines()
+          pattern = re.compile(r'\bFAIL\b|AssertionError:|Unhandled (?:Error|Rejection)|Test Files\s|\bTests\s+\d+|FATAL ERROR|heap out of memory|\[error\]|Process completed with exit code')
+          hits = [index for index, line in enumerate(lines) if pattern.search(line)]
+          print(f'Job {os.environ["FAILED_JOB_ID"]}: {len(lines)} log lines; {len(hits)} diagnostic markers')
+          selected = set()
+          for index in hits[-25:]:
+              selected.update(range(max(0, index - 2), min(len(lines), index + 15)))
+          selected.update(range(max(0, len(lines) - 45), len(lines)))
+          previous = -2
+          for index in sorted(selected)[-300:]:
+              if index != previous + 1:
+                  print('...')
+              print(f'{index + 1}: {lines[index][:1200]}')
+              previous = index
+          if not hits:
+              print('No standard failure marker found; inspect the tail above.')
+          PY
