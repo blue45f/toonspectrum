@@ -1,0 +1,18 @@
+{
+  "passed": 10,
+  "checks": [
+    "closed-library-zero-catalog-download",
+    "real-manifest-loaded-24-tiles-detailed-source-first",
+    "detailed-style-and-assembly-opt-in",
+    "quarantined-wine-unavailable-even-with-assembly",
+    "construction-components-separated-from-default-selection",
+    "actual-white-alpha-masks-on-dark-background",
+    "real-2K-image-fetch-SHA256-decode-dimensions-and-insert-callback",
+    "390px-layout-no-horizontal-overflow",
+    "actual-GLB-download",
+    "failed-manifest-retry-recovers"
+  ],
+  "pageErrors": [],
+  "mode": "actual-component-vite-browser-fixture",
+  "fullStudioSaveRestore": false
+}

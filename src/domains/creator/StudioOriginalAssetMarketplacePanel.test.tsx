@@ -23,7 +23,7 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
 
     expect(html).toContain('data-studio-original-marketplace="local-phase-1"');
     expect(html).toContain("독자 무료 스타터 마켓");
-    expect(html).toContain("24 FREE");
+    expect(html).toContain("21 FREE");
     expect(html).toContain("LOCAL PHASE 1");
     expect(html).toContain("결제·클라우드 동기화 없이");
     expect(html).toContain("결제 기능도 비활성");
@@ -48,13 +48,17 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
     expect(html).toContain("메타데이터 전용 로컬 명세 내보내기");
   });
 
-  it("renders all 24 selectable, draggable starter assets with real placement actions", () => {
+  it("renders all 21 selectable, draggable starter assets with real placement actions", () => {
     const html = renderPanel();
 
-    expect(html.match(/data-studio-original-asset=/g)).toHaveLength(24);
+    expect(html.match(/data-studio-original-asset=/g)).toHaveLength(21);
     expect(html).not.toContain('data-studio-original-asset="original-compact-studio-room"');
     expect(html).toContain('data-studio-original-asset="original-city-bicycle"');
-    expect(html).toContain('data-studio-original-asset="original-night-bokeh"');
+    expect(html).not.toContain('data-studio-original-asset="original-night-bokeh"');
+    expect(html).not.toContain('data-studio-original-asset="original-soft-snow-overlay"');
+    expect(html).not.toContain('data-studio-original-asset="original-golden-dust"');
+    expect(html).toContain('data-studio-original-asset="original-rain-pane-overlay"');
+    expect(html).toContain('data-studio-original-asset="original-spring-petals"');
     expect(html).toContain('data-studio-original-asset="original-sci-fi-airlock"');
     expect(html).toContain("선택한 컷 또는 현재 보이는 위치에 추가");
     expect(html).toContain("캔버스로 끌어 배치할 수 있습니다.");

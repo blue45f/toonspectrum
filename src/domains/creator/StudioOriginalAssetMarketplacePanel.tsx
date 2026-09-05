@@ -453,7 +453,8 @@ export function StudioOriginalAssetMarketplacePanel({
     categories: selectedCategories,
   });
   const previewPackage = previewAsset
-    ? findStudioOriginalFreeAssetPackage(previewAsset.packageId)
+    ? STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.find((pkg) => pkg.id === previewAsset.packageId)
+      ?? findStudioOriginalFreeAssetPackage(previewAsset.packageId)
     : null;
   const updateCount = STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.filter((pkg) => {
     const installed = library.packages.find((entry) => entry.packageId === pkg.id);

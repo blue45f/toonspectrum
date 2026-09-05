@@ -1,0 +1,42 @@
+{
+  "schema": "toonspectrum.asset-visual-review.v1",
+  "reviewDate": "2026-09-06",
+  "reviewedPreviewItems": 1398,
+  "baselineCc0Originals": 1097,
+  "legacyFileAndSvgPreviews": 254,
+  "newPbrOriginals": 47,
+  "newPbrModels": 17,
+  "newPbrMaterials": 30,
+  "newlyHiddenSelections": [
+    "kenney-food-glass-wine",
+    "original-soft-snow-overlay",
+    "original-night-bokeh",
+    "original-golden-dust"
+  ],
+  "previouslyRetiredBackgrounds": 8,
+  "alreadyExcludedLegacyOutfitModels": 18,
+  "publicCatalogSourceRecords": 1144,
+  "publicCatalogSelectableOriginals": 1143,
+  "selectableOriginalSvgs": 21,
+  "legacyAndActiveSvgObjects": 32,
+  "decisions": {
+    "keep-preview-reviewed": 1177,
+    "assembly-opt-in": 191,
+    "hide-from-new-selection": 4,
+    "already-outside-production-catalog": 18,
+    "previously-retired-blockout": 8
+  },
+  "originalByteSetSha256": "ef76850505ca7ebd90841616651f76a8d9d9e43e762774811f94e201d5d2a3e8",
+  "legacyByteSetSha256": "d5f6d5b3bf944c9a4709e84b225b8a899d6240bb294ce547526cfde4a79b75fc",
+  "additionalInspection": [
+    "all 96 white-alpha masks on dark background",
+    "faulty wine glass individual rendered preview"
+  ],
+  "notVerified": [
+    "every asset at native-resolution 100-percent zoom",
+    "all runtime-generated garments and body poses",
+    "all brush and template parameter combinations",
+    "complete Studio save/restore round trips"
+  ],
+  "storageChanges": "No user uploads, saved works, OPFS, source asset URLs or legacy asset IDs deleted."
+}

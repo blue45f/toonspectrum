@@ -1,3 +1,5 @@
+import { isStudioAssetVisuallySelectable } from "./studio-asset-visual-curation";
+
 import type { StudioAsset } from "./studio-asset-library";
 
 export const STUDIO_CC0_DELIVERY_ROOT = "/assets/studio/cc0-20260906/";
@@ -30,6 +32,7 @@ export const STUDIO_CC0_CATEGORY_LABELS: Readonly<Record<string, string>> = Obje
   "outdoor-prop": "야외 · 캠핑 소품",
   "effect-mask": "투명 효과 마스크",
   "surface-material": "표면 재질",
+  "pbr-detailed-prop": "상세 3D 소품",
 });
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -90,7 +93,7 @@ export function parseStudioCc0Catalog(value: unknown): readonly StudioCc0Asset[]
 
 export function filterStudioCc0Assets(assets: readonly StudioCc0Asset[], query: string, kind?: StudioCc0AssetKind): readonly StudioCc0Asset[] {
   const terms = query.normalize("NFKC").toLocaleLowerCase("ko-KR").split(/\s+/u).filter(Boolean);
-  return assets.filter(asset => (!kind || asset.kind === kind) && terms.every(term =>
+  return assets.filter(asset => isStudioAssetVisuallySelectable(asset.id) && (!kind || asset.kind === kind) && terms.every(term =>
     [asset.name, asset.category, STUDIO_CC0_CATEGORY_LABELS[asset.category] ?? "", asset.provider]
       .join(" ").normalize("NFKC").toLocaleLowerCase("ko-KR").includes(term)));
 }

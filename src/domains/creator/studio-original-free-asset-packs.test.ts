@@ -11,15 +11,15 @@ import {
 } from "./studio-original-free-asset-packs";
 
 describe("ToonSpectrum original free starter asset packs", () => {
-  it("ships three selectable packages and 24 unique non-blockout SVG assets", () => {
+  it("ships three selectable packages and 21 selectable reviewed SVG assets", () => {
     expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(3);
-    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(24);
+    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(21);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.map((pkg) => pkg.id)).size)
       .toBe(3);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSETS.map((asset) => asset.id)).size)
-      .toBe(24);
+      .toBe(21);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSETS.map((asset) => asset.contentFingerprint)).size)
-      .toBe(24);
+      .toBe(21);
   });
 
   it("makes provenance and CC0-safe rights explicit at package and item level", () => {
@@ -36,7 +36,7 @@ describe("ToonSpectrum original free starter asset packs", () => {
         cloudSync: "unavailable",
       });
       expect(pkg.license).toBe(STUDIO_ORIGINAL_FREE_ASSET_LICENSE);
-      expect(pkg.includedItems).toHaveLength(8);
+      expect(pkg.includedItems).toHaveLength(pkg.includedItems.some((asset) => asset.category === "atmosphere-fx") ? 5 : 8);
       for (const asset of pkg.includedItems) {
         expect(asset.packageId).toBe(pkg.id);
         expect(asset.origin).toBe("original-procedural");
@@ -65,7 +65,7 @@ describe("ToonSpectrum original free starter asset packs", () => {
     expect(filterStudioOriginalFreeAssets({
       query: "오버레이",
       categories: ["atmosphere-fx"],
-    })).toHaveLength(8);
+    })).toHaveLength(5);
     expect(filterStudioOriginalFreeAssets({
       packageIds: ["original-daily-props"],
       categories: ["daily-prop"],

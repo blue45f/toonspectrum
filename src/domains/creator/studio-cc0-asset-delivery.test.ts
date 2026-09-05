@@ -67,8 +67,8 @@ describe("CC0 delivery catalog boundary", () => {
 
 describe("blockout-only starter retirement", () => {
   it("removes eight draft backgrounds from new selection without deleting their identities", () => {
-    expect(STUDIO_RETIRED_ORIGINAL_FREE_ASSETS).toHaveLength(8);
-    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(24);
+    expect(STUDIO_RETIRED_ORIGINAL_FREE_ASSETS).toHaveLength(11);
+    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(21);
     expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(3);
     expect(filterStudioOriginalFreeAssets({categories: ["modern-background"]})).toHaveLength(0);
     for (const asset of STUDIO_RETIRED_ORIGINAL_FREE_ASSETS) {
@@ -78,7 +78,7 @@ describe("blockout-only starter retirement", () => {
   });
   it("keeps other starter categories and unknown-ID semantics unchanged", () => {
     expect(filterStudioOriginalFreeAssets({categories: ["daily-prop"]})).toHaveLength(8);
-    expect(filterStudioOriginalFreeAssets({categories: ["atmosphere-fx"]})).toHaveLength(8);
+    expect(filterStudioOriginalFreeAssets({categories: ["atmosphere-fx"]})).toHaveLength(5);
     expect(filterStudioOriginalFreeAssets({categories: ["genre-prop"]})).toHaveLength(8);
     expect(findStudioOriginalFreeAsset("missing")).toBeNull();
     expect(findStudioOriginalFreeAssetPackage(undefined)).toBeNull();

@@ -24,7 +24,7 @@ import {useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {StudioCc0AssetLibraryPanel} from '/src/domains/creator/StudioCc0AssetLibraryPanel.tsx';
 import '/src/styles/globals.css';
-function App(){const [inserted,setInserted]=useState(null);return <main className="mx-auto min-h-screen w-full max-w-xl bg-canvas p-3 text-fg"><h1 className="mb-3 text-lg font-bold">에셋 라이브러리 검증</h1><StudioCc0AssetLibraryPanel onUseAsset={asset=>{setInserted({id:asset.id,width:asset.width,height:asset.height,license:asset.rights?.licenseId,bytes:asset.dataUrl.length});return true;}}/><output data-inserted-id={inserted?.id ?? ''}>{inserted ? JSON.stringify(inserted) : ''}</output></main>}
+function App(){const [inserted,setInserted]=useState(null);return <main className="mx-auto min-h-screen w-full max-w-xl bg-canvas p-3 text-fg"><h1 className="mb-3 text-lg font-bold">에셋 라이브러리 검증</h1><StudioCc0AssetLibraryPanel onUseAsset={asset=>{setInserted({id:asset.id,width:asset.width,height:asset.height,license:asset.rights?.licenseId,bytes:asset.dataUrl.length});return true;}}/><output className="mt-3 block break-all text-xs" data-inserted-id={inserted?.id ?? ''}>{inserted ? JSON.stringify(inserted) : ''}</output></main>}
 createRoot(document.getElementById('root')).render(<App/>);`);
   server=await createServer({root,server:{host:'127.0.0.1',port:0},logLevel:'warn'});
   await server.listen();

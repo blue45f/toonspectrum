@@ -4,6 +4,7 @@
  * Every SVG below is generated from code in this repository. No marketplace thumbnail,
  * product file, texture, model, product name or description is embedded or referenced.
  */
+import { isStudioAssetVisuallySelectable } from "./studio-asset-visual-curation";
 import {
   STUDIO_MARKETPLACE_PACKAGE_SCHEMA,
   type StudioMarketplaceIncludedItem,
@@ -12,6 +13,7 @@ import {
   type StudioMarketplacePackage,
   type StudioMarketplacePlacementPreset,
 } from "./studio-marketplace-packages";
+
 
 import type { StudioAsset } from "./studio-asset-library";
 
@@ -671,10 +673,26 @@ const ALL_STUDIO_ORIGINAL_FREE_ASSET_PACKAGES: readonly StudioOriginalFreeAssetP
   ]);
 
 /** Blockout-only backgrounds are retained for old works, not advertised as finished art. */
-export const STUDIO_RETIRED_ORIGINAL_FREE_ASSETS = Object.freeze([...EVERYDAY_ASSETS]);
+export const STUDIO_RETIRED_ORIGINAL_FREE_ASSETS = Object.freeze([
+  ...EVERYDAY_ASSETS,
+  ...ATMOSPHERE_ASSETS.filter((asset) => !isStudioAssetVisuallySelectable(asset.id)),
+]);
 
 export const STUDIO_ORIGINAL_FREE_ASSET_PACKAGES: readonly StudioOriginalFreeAssetPackage[] =
-  Object.freeze(ALL_STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.filter((pkg) => pkg.id !== EVERYDAY_PACKAGE_ID));
+  Object.freeze(ALL_STUDIO_ORIGINAL_FREE_ASSET_PACKAGES
+    .filter((pkg) => pkg.id !== EVERYDAY_PACKAGE_ID)
+    .map((pkg) => {
+      if (pkg.id !== ATMOSPHERE_PACKAGE_ID) return pkg;
+      return Object.freeze({
+        ...pkg,
+        version: "1.1.0",
+        packageFingerprint: `original-pack:v1:${pkg.id}:1.1.0`,
+        summary: "비·안개·햇살·봄 꽃잎·가을 낙엽의 분위기 효과 5종입니다.",
+        includedItems: Object.freeze(pkg.includedItems.filter((asset) => isStudioAssetVisuallySelectable(asset.id))),
+        changelog: [{version: "1.1.0", releasedAt: "2026-09-06", changes: ["대각선 중첩이 확인된 효과 3종을 신규 선택에서 제외", "기존 작품과 원본 ID는 유지"]}, ...pkg.changelog],
+        updatedAt: "2026-09-06T00:00:00.000Z",
+      });
+    }));
 
 const ALL_STUDIO_ORIGINAL_FREE_ASSETS = Object.freeze(
   ALL_STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.flatMap((pkg) => pkg.includedItems)
