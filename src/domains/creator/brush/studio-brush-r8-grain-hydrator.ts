@@ -14,6 +14,8 @@ import {
   type StudioBrushR8GrainHydrationResult,
 } from "./studio-brush-r8-grain-runtime";
 
+import { createStudioBrushR8PngDecoder } from "./studio-brush-r8-png-decoder";
+
 import type { DownloadedStudioWorkAsset } from "../studio-work-asset-client";
 
 export interface StudioBrushR8GrainPageLike {
@@ -102,13 +104,7 @@ interface StudioBrushR8GrainHydrationRun {
 const DEFAULT_MAXIMUM_CONCURRENT = 3;
 const MAXIMUM_CONCURRENT_LIMIT = 8;
 
-let imageJsModulePromise: Promise<typeof import("image-js")> | null = null;
-
-async function defaultDecodePng(bytes: Uint8Array): Promise<StudioBrushR8DecodedPng> {
-  imageJsModulePromise ??= import("image-js");
-  const { decodePng } = await imageJsModulePromise;
-  return decodePng(bytes);
-}
+const defaultDecodePng = createStudioBrushR8PngDecoder(() => import("image-js"));
 
 function ownDataValue(value: unknown, key: string): unknown {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
