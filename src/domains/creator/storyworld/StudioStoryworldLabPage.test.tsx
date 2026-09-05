@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -70,8 +71,13 @@ describe("Storyworld actual page integration", () => {
     const b = JSON.parse(window.localStorage.getItem("toonspectrum:storyworld-lab:v1:work:work-b") ?? "null");
     expect(a.project.title).toBe("A의 사적인 초안");
     expect(b.project.title).toBe(STORYWORLD_DEMO_PROJECT.title);
-    const router = readFileSync(new URL("../studio-router/StudioRouter.tsx", import.meta.url), "utf8");
+    // Vite rewrites import.meta.url in jsdom. Read the actual checkout, not a browser URL.
+    const router = readFileSync(resolve(process.cwd(), "src/domains/creator/studio-router/StudioRouter.tsx"), "utf8");
     expect(router).toContain("key={resolution.lifecycleKey}");
+    view.rerender(page("work-a"));
+    act(() => vi.advanceTimersByTime(300));
+    const restored = JSON.parse(window.localStorage.getItem("toonspectrum:storyworld-lab:v1:work:work-a") ?? "null");
+    expect(restored.project.title).toBe("A의 사적인 초안");
   });
 
   it("keeps the current project after malformed JSON is rejected", () => {
