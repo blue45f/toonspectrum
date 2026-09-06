@@ -246,7 +246,7 @@ describe("studio impasto relief shading v1 (dli/paint MIT port)", () => {
    * `Math.sqrt` defeats V8's lowering of it to a hardware instruction, so a spied call is not the
    * call the budget measures.
    */
-  it("calls exactly four transcendentals per shaded pixel, and nothing else", () => {
+  it("calls exactly three transcendentals per shaded pixel, and nothing else", () => {
     // EVERY `Math` member whose cost is more than a machine instruction, not a hand-picked few.
     // A census listing only the functions the shader happens to call today convicts nothing when
     // it starts calling one it does not: a per-pixel `Math.tan`, `Math.cbrt` or `Math.log2` would

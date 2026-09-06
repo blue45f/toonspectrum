@@ -207,7 +207,6 @@ describe("studio tool hints (rich hover copy)", () => {
     expect(studioFilterCatalogEntry("curves")?.group).toBe("tone");
     expect(studioFilterCatalogEntry("channel-mixer")?.group).toBe("color");
     expect(studioFilterCatalogEntry("gradient-map")?.group).toBe("color");
-    // Purpose-group vocabulary since #771 (c9ef0ff7): 블러 → 흐림·초점.
     expect(studioFilterGroupLabel("blur")).toBe("흐림·초점");
     expect(STUDIO_FILTER_CATALOG.some((e) => e.engine === "gaussian-blur")).toBe(true);
     expect(STUDIO_FILTER_CATALOG.some((e) => e.engine === "motion-blur")).toBe(true);
