@@ -360,7 +360,10 @@ function shoulderBag() {
 await mkdir(output,{recursive:true});
 const manifest=[];
 for(const asset of [microphone(),cap(),beret(),sunglasses(),headphones(),ribbon(),beanie(),wizardHat(),smartphone(),camera(),medicalBag(),shoulderBag()]) {
-  const root=asset.scene(); let triangles=0;
+  const root=asset.scene();
+  // The persisted ribbon contact is the knot, not the left edge of a loop.
+  if(asset.id==="ribbon")root.position.x=-.05;
+  let triangles=0;
   root.traverse((node)=>{const mesh=node as T.Mesh;if(!mesh.isMesh)return; const position=mesh.geometry.getAttribute("position");
     if(!Array.from(position.array).every(Number.isFinite))throw new Error(`Non-finite geometry in ${asset.id}`);
     triangles+=(mesh.geometry.index?.count??position.count)/3;
@@ -374,4 +377,14 @@ for(const asset of [microphone(),cap(),beret(),sunglasses(),headphones(),ribbon(
   root.traverse((node)=>{if((node as T.Mesh).isMesh)(node as T.Mesh).geometry.dispose();});
 }
 await writeFile(resolve(output,"wearable-v5-manifest.json"),`${JSON.stringify({version:5,assets:manifest},null,2)}\n`);
+// Public asset URLs are immutable for one year. Keep the request revision tied to the actual bytes.
+// Alternate export directories must not mutate the application's committed revision module.
+if (output === resolve("public/assets/3d")) {
+  const revisions = Object.fromEntries(manifest.map((asset) => [`/assets/3d/${asset.file}`, asset.sha256]));
+  await writeFile(
+    resolve("src/domains/creator/vrm/studio-vrm-prop-asset-revisions.ts"),
+    "/** Generated from wearable-v5-manifest.json; regenerate with generate-studio-wearable-v5.mts. */\n"
+      + `export const STUDIO_VRM_PROP_ASSET_REVISIONS: Readonly<Record<string, string>> = Object.freeze(${JSON.stringify(revisions, null, 2)});\n`,
+  );
+}
 console.log(JSON.stringify(manifest,null,2));

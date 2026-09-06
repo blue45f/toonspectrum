@@ -15,6 +15,7 @@ export const STUDIO_VRM_PROP_VISUAL_QUARANTINE: Readonly<Record<string, string>>
   earmuffs: "쿠션·이어컵 없이 구와 굵은 관으로 표현됨",
   hairpin: "핀 구조 없이 구와 막대만 조합됨",
   goggles: "렌즈 하우징과 얼굴 접촉 구조가 없는 다각형 링",
+  shoulderbag: "어깨 접촉점과 스트랩 방향이 몸 안으로 묻혀 착용 품질 재검수가 필요함",
   cape: "어깨 재단과 드레이프가 없는 직사각형 평판",
   wings: "깃털·날개 윤곽 없이 구형 조각 두 개로 표현됨",
   scarf: "천의 접힘 없이 굵은 링과 직사각형 막대로 표현됨",

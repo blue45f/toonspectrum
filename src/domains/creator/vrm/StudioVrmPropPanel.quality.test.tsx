@@ -3,12 +3,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DEFAULT_VRM_PROP_RIG_METRICS } from "./studio-vrm-prop-rig";
 import {
   STUDIO_VRM_PROP_VISUAL_QUARANTINE,
   isStudioVrmPropSelectable,
   studioVrmPropQualityNotice,
 } from "./studio-vrm-prop-quality-policy";
+import { DEFAULT_VRM_PROP_RIG_METRICS } from "./studio-vrm-prop-rig";
 import {
   VRM_PROPS,
   createPropInstance,
@@ -21,14 +21,14 @@ import { StudioVrmPropPanel } from "./StudioVrmPropPanel";
 
 afterEach(cleanup);
 
-function renderPanel(items: PropInstance[] = [], vrmReady = true) {
+function renderPanel(items: PropInstance[] = [], vrmReady = true, hairRisk = false) {
   const onAdd = vi.fn();
   const onUpdate = vi.fn();
   const onRemove = vi.fn();
   const rendered = render(
     <StudioVrmPropPanel
       vrmReady={vrmReady}
-      rigMetrics={DEFAULT_VRM_PROP_RIG_METRICS}
+      rigMetrics={hairRisk ? { ...DEFAULT_VRM_PROP_RIG_METRICS, faceSocket: { ...DEFAULT_VRM_PROP_RIG_METRICS.faceSocket, hairClearanceRequired: true } } : DEFAULT_VRM_PROP_RIG_METRICS}
       items={items}
       selectedUid={items[0]?.uid ?? null}
       onSelect={vi.fn()}
@@ -50,7 +50,7 @@ function addButtonLabels(container: HTMLElement): string[] {
 describe("wearable visual-quality selection policy", () => {
   it("keeps every quarantined ID resolvable and documents its visual defect", () => {
     const entries = Object.entries(STUDIO_VRM_PROP_VISUAL_QUARANTINE);
-    expect(entries).toHaveLength(34);
+    expect(entries).toHaveLength(35);
     for (const [id, reason] of entries) {
       expect(propDefById(id)).toBeDefined();
       expect(isStudioVrmPropSelectable(id)).toBe(false);
@@ -99,6 +99,14 @@ describe("wearable visual-quality selection policy", () => {
     expect((button as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(button);
     expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it("warns about native hair clearance without modifying an existing head attachment", () => {
+    const item = createPropInstance("cap", "hair-clearance-cap")!;
+    const { onUpdate, onRemove } = renderPanel([item], true, true);
+    expect(screen.getByRole("note", { name: "헤어 간섭 안내" }).textContent).toContain("측면");
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(onRemove).not.toHaveBeenCalled();
   });
 
   it("keeps saved quarantined items and their transforms intact and editable", () => {

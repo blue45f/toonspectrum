@@ -28,7 +28,7 @@
       "triangles": 36860,
       "drawCalls": 4,
       "bytes": 903144,
-      "sha256": "69d212509c74910ca0e0f016568e4650fce77c166932e8f61985b241e3861589"
+      "sha256": "05538270d4efec2c010dcbd645ee288fc64154d219542cad3223e54277bf8593"
     },
     {
       "id": "cap",
@@ -57,7 +57,7 @@
       "triangles": 14664,
       "drawCalls": 4,
       "bytes": 359024,
-      "sha256": "89fcf4469b018769d76258bb8c67aacc979a010297edc11d2ee3e098cede353a"
+      "sha256": "340a42cf041a45443ef92f534f6e7e92eddb429552a2d1037cafa05f18fb0361"
     },
     {
       "id": "beret",
@@ -86,7 +86,7 @@
       "triangles": 6336,
       "drawCalls": 3,
       "bytes": 152220,
-      "sha256": "b55fccf648bf9e0601dffb5c5254fb24ebd1f93ef999bacac3c50510e9b99206"
+      "sha256": "f61be1f65284ec638ae8ec6e3278cbd8335b1a59ed98abc402e63659599359c5"
     },
     {
       "id": "sunglasses",
@@ -160,20 +160,20 @@
       ],
       "bounds": [
         [
-          -0.05530203506350517,
+          -0.10530203506350518,
           -0.07400000095367432,
           -0.013000000268220901
         ],
         [
-          0.05530203506350517,
+          0.00530203506350517,
           0.026924096047878265,
           0.013000000268220901
         ]
       ],
       "triangles": 8460,
       "drawCalls": 2,
-      "bytes": 207772,
-      "sha256": "05936396658c2f0bf83f345c7414f147deb0ecbdd8889018c2b1d39da96d858a"
+      "bytes": 207820,
+      "sha256": "227457557bb06dc73d709e76ae83324100fed5437b6ebdc462595ba62bf50395"
     },
     {
       "id": "beanie",
@@ -347,7 +347,7 @@
       "triangles": 8124,
       "drawCalls": 3,
       "bytes": 205032,
-      "sha256": "dc87fb3fe9ca43d6a74579bad17a1d9f8fe66084a4469b6e434bfb94ca8c53c1"
+      "sha256": "362ee5016d5ad8f5d84b576df229a768a7979605f6e9b994420832de353f1905"
     }
   ]
 }

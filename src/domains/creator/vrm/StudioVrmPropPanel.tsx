@@ -17,6 +17,7 @@ import {
 
 import { StudioThreeDToggleControl } from "../StudioThreeDToggle";
 
+import { isStudioVrmPropSelectable, studioVrmPropQualityNotice } from "./studio-vrm-prop-quality-policy";
 import {
   inspectAutoGripReadiness,
   type AutoGripReadiness,
@@ -42,7 +43,10 @@ import {
   type Vec3,
 } from "./studio-vrm-props";
 
+
 import { cn } from "@/lib/utils";
+
+const SELECTABLE_PROP_COUNT = VRM_PROPS.filter(({ id }) => isStudioVrmPropSelectable(id)).length;
 
 export interface StudioVrmPropPanelProps {
   readonly vrmReady: boolean;
@@ -63,7 +67,7 @@ const RECOMMENDED_PROP_IDS = [
   "smartphone",
   "mug",
   "book",
-  "sword",
+  "mic",
   "glasses",
   "cap",
   "backpack",
@@ -495,6 +499,7 @@ function SelectedEditor({
   onUpdate,
   onStatus,
 }: SelectedEditorProps) {
+  const qualityNotice = studioVrmPropQualityNotice(item.propId);
   const editorTitleId = useId();
   const sectionBaseId = useId();
   const boneSelectId = useId();
@@ -615,6 +620,16 @@ function SelectedEditor({
       className="border-t border-line/70 bg-panel/45 px-2.5 py-3"
       aria-labelledby={editorTitleId}
     >
+      {qualityNotice ? (
+        <p role="note" aria-label="소품 품질 안내" className="mb-3 rounded-lg border border-line bg-panel p-3 text-xs leading-relaxed text-fg-2">
+          품질 개선 대기 소품입니다. 기존 장면의 부착과 편집은 유지되지만 새로 추가할 수 없습니다. {qualityNotice}
+        </p>
+      ) : null}
+      {item.bone === "head" && rigMetrics.faceSocket.hairClearanceRequired ? (
+        <p role="note" aria-label="헤어 간섭 안내" className="mb-3 rounded-lg border border-line bg-panel p-3 text-xs leading-relaxed text-fg-2">
+          볼륨 헤어나 기본 머리장식이 소품과 겹칠 수 있습니다. 측면에서 확인하고 소품 위치와 크기를 조정해 주세요.
+        </p>
+      ) : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h4
@@ -1005,11 +1020,13 @@ export function StudioVrmPropPanel({
   const [statusMessage, setStatusMessage] = useState("");
 
   const quickDefinitions = recentPropIds
+    .filter(isStudioVrmPropSelectable)
     .map((id) => propDefById(id))
     .filter((definition): definition is PropDef => Boolean(definition))
     .slice(0, 8);
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
   const filteredDefinitions = VRM_PROPS.filter((definition) => {
+    if (!isStudioVrmPropSelectable(definition.id)) return false;
     if (category !== "all" && definition.category !== category) return false;
     if (!normalizedQuery) return true;
     const searchText = `${definition.label} ${definition.hint} ${
@@ -1069,7 +1086,7 @@ export function StudioVrmPropPanel({
   }
 
   function handleAdd(definition: PropDef): void {
-    if (!vrmReady) return;
+    if (!vrmReady || !isStudioVrmPropSelectable(definition.id)) return;
     setRecentPropIds((current) => [
       definition.id,
       ...current.filter((id) => id !== definition.id),
@@ -1319,7 +1336,7 @@ export function StudioVrmPropPanel({
             전체 소품 찾기
           </span>
           <span className="flex shrink-0 items-center gap-1 text-[0.64rem] font-normal tabular-nums text-fg-3">
-            {VRM_PROPS.length}종
+            {SELECTABLE_PROP_COUNT}종
             <ChevronDown
               size={14}
               className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"

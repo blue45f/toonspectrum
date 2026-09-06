@@ -96,7 +96,7 @@ for (const filename of ["sample.vrm", "AvatarSample_B.vrm"]) {
       expect(attached.rotationDeg).toEqual(item.rotationDeg);
       expect(attached.usesSmartRig).toBe(false);
       const manual = createPropInstance("cap", "manual-cap")!;
-      manual.rig = { ...manual.rig!, mode: "manual" };
+      manual.rig = { ...manual.rig!, mode: "custom" };
       expect(resolvePropAttachment(definition, manual, metrics).socketPosition).toEqual(definition.defaultPosition);
     });
   });

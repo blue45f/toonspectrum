@@ -1,5 +1,6 @@
 import * as THREE from "three";
 
+import { measureStudioVrmHeadSurface, studioVrmHeadwearSurfaceSocket } from "./studio-vrm-head-surface";
 import { clampStudioVrmJointRotation } from "./studio-vrm-joint-limits";
 import {
   VRM_PROP_GRIP_FIT_MAX,
@@ -55,7 +56,12 @@ export interface VrmPropHandSocket {
 }
 
 /** head bone 로컬 공간의 얼굴/눈 착용 소켓(선글라스·마스크 등). */
-export type VrmPropFaceSocket = VrmPropHandSocket;
+export interface VrmPropFaceSocket extends VrmPropHandSocket {
+  surfaceMeasured?: boolean;
+  /** Crown height in head-bone local metres, unaffected by body root scale. */
+  surfaceCrownHeight?: number;
+  hairClearanceRequired?: boolean;
+}
 
 export type PropMetricSource = "measured" | "derived" | "fallback";
 
@@ -301,7 +307,15 @@ export function sanitizeVrmPropRigMetrics(raw: unknown): VrmPropRigMetrics {
       leftHand: sanitizeHandSocket(rawHandSockets.leftHand, FALLBACK_HAND_SOCKETS.leftHand),
       rightHand: sanitizeHandSocket(rawHandSockets.rightHand, FALLBACK_HAND_SOCKETS.rightHand),
     },
-    faceSocket: sanitizeHandSocket(value.faceSocket, FALLBACK_FACE_SOCKET),
+    faceSocket: {
+      ...sanitizeHandSocket(value.faceSocket, FALLBACK_FACE_SOCKET),
+      ...(value.faceSocket?.surfaceMeasured === true
+        && Number.isFinite(value.faceSocket.surfaceCrownHeight)
+        && value.faceSocket.surfaceCrownHeight! > 0
+        && value.faceSocket.surfaceCrownHeight! < 0.5
+        ? { surfaceMeasured: true, surfaceCrownHeight: value.faceSocket.surfaceCrownHeight,
+          ...(value.faceSocket.hairClearanceRequired ? { hairClearanceRequired: true } : {}) } : {}),
+    },
     boneWorldPositions,
     sources: {
       avatarHeight: metricSource(rawSources.avatarHeight, "fallback"),
@@ -334,7 +348,7 @@ export function scaleVrmPropRigMetrics(
     hand: metrics.hand * handScale,
     leftHand: metrics.leftHand * handScale,
     rightHand: metrics.rightHand * handScale,
-    head: metrics.head * height,
+    head: metrics.head * (metrics.faceSocket.surfaceMeasured ? width : height),
     eyeDistance: metrics.eyeDistance * width,
     shoulder: metrics.shoulder * width,
     hip: metrics.hip * width,
@@ -525,11 +539,20 @@ export function measureVrmPropRigMetrics(vrm: VRM): VrmPropRigMetrics {
   }
 
   const neckToHead = distance(boneWorldPositions.neck, boneWorldPositions.head);
-  const [head, headSource] = measuredOrFallback(
+  const [boneHead, boneHeadSource] = measuredOrFallback(
     neckToHead === null ? null : neckToHead * 1.2,
     FALLBACK_METRICS.head,
     METRIC_RANGES.head
   );
+
+  let surface: ReturnType<typeof measureStudioVrmHeadSurface> = null;
+  try {
+    surface = measureStudioVrmHeadSurface(vrm);
+  } catch {
+    // A malformed or incomplete mesh must not prevent bone-based fitting.
+  }
+  const head = surface?.head ?? boneHead;
+  const headSource: PropMetricSource = surface ? "measured" : boneHeadSource;
 
   const leftHandLength = distance(boneWorldPositions.leftHand, boneWorldPositions.leftMiddleProximal);
   const rightHandLength = distance(boneWorldPositions.rightHand, boneWorldPositions.rightMiddleProximal);
@@ -563,7 +586,7 @@ export function measureVrmPropRigMetrics(vrm: VRM): VrmPropRigMetrics {
   let heightMeasured: number | null = null;
   let heightSource: PropMetricSource = "fallback";
   if (headPosition && feet.length > 0) {
-    heightMeasured = headPosition[1] + head * 0.5 - Math.min(...feet.map((foot) => foot[1]));
+    heightMeasured = headPosition[1] + boneHead * 0.5 - Math.min(...feet.map((foot) => foot[1]));
     heightSource = "measured";
   } else if (headPosition && boneWorldPositions.hips) {
     heightMeasured = Math.abs(headPosition[1] - boneWorldPositions.hips[1]) * 2.65;
@@ -571,14 +594,14 @@ export function measureVrmPropRigMetrics(vrm: VRM): VrmPropRigMetrics {
   }
   const avatarHeight = sanitizedMetric(heightMeasured, FALLBACK_METRICS.avatarHeight, METRIC_RANGES.avatarHeight);
 
-  // VRM humanoid에는 눈 간격 표준 본이 없으므로 실측된 머리 치수에서 안정적으로 추정한다.
-  const eyeDistance = sanitizedMetric(head * 0.355, FALLBACK_METRICS.eyeDistance, METRIC_RANGES.eyeDistance);
-  const eyeSource: PropMetricSource = headSource === "fallback" ? "fallback" : "derived";
+  // Prefer usable eye bones; otherwise derive optical spacing from the measured skull width.
+  const eyeDistance = sanitizedMetric(surface?.eyeDistance ?? head * 0.355, FALLBACK_METRICS.eyeDistance, METRIC_RANGES.eyeDistance);
+  const eyeSource: PropMetricSource = surface?.eyeDistanceSource ?? (headSource === "fallback" ? "fallback" : "derived");
   const handSockets: Record<PropHandBone, VrmPropHandSocket> = {
     leftHand: measureHandSocket("left", boneNodes, boneWorldPositions),
     rightHand: measureHandSocket("right", boneNodes, boneWorldPositions),
   };
-  const faceSocket = measureFaceSocket(boneNodes, boneWorldPositions, head);
+  const faceSocket = surface?.faceSocket ?? measureFaceSocket(boneNodes, boneWorldPositions, head);
 
   return sanitizeVrmPropRigMetrics({
     avatarHeight,
@@ -813,7 +836,9 @@ export function resolvePropAttachment(
   // 표현하는 head-bone 접점을 유지하고, neck으로 옮긴 항목도 임의로 얼굴에 재배치하지 않는다.
   const faceWear = !handSocket && usesVrmPropFaceSocket(def, instance.bone);
   const faceSocket = faceWear ? metrics.faceSocket : null;
-  const activeSocket = handSocket ?? faceSocket;
+  const headwearSocket = rig.mode === "auto"
+    ? studioVrmHeadwearSurfaceSocket(def.id, instance.bone, metrics.faceSocket) : null;
+  const activeSocket = handSocket ?? headwearSocket ?? faceSocket;
   const socketBasis = activeSocket
     ? new THREE.Quaternion(...activeSocket.rotationQuaternion).normalize()
     : new THREE.Quaternion();

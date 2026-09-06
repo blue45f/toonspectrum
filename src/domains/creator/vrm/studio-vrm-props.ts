@@ -454,7 +454,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   },
   medicalBag: {
     // 반원 손잡이의 빈 중심이 아니라 실제 상단 손잡이 튜브 중심선에 손바닥을 둔다.
-    anchors: [handAnchor("primary", "primary", [0, 0.155, 0], 0.012)],
+    anchors: [handAnchor("primary", "primary", [0, 0.155, 0], 0.012, [0, -1, 0], [0, 0, 1])],
     grip: grip("handle", 0.012, 60, 44),
     fit: fit("hand", 0.075, 0.72, 1.45),
   },
