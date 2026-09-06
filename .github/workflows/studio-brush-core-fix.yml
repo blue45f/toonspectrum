@@ -1,0 +1,87 @@
+name: Studio brush core fix
+on:
+  push:
+    branches: [fix/studio-brush-stability-core-20260906]
+permissions:
+  contents: write
+concurrency:
+  group: studio-brush-core-fix-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  apply-fix:
+    if: ${{ !contains(github.event.head_commit.message, '[brush-core-final]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Finish transparent wet-media aggregate contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/verify-studio-brushes.mts')
+          s=p.read_text()
+          def one(old,new,label):
+              global s
+              n=s.count(old)
+              if n!=1: raise SystemExit(f'{label}: expected 1 anchor, found {n}')
+              s=s.replace(old,new,1)
+          # The preceding verified publication already added transparentPaint handling to the
+          # gesture/persistence/history path. Finish only the receipt/aggregate semantics here so
+          # a water-only tool is not falsely reported as visible ink.
+          if 'visualChangeRequired: boolean;' not in s:
+              one('''  visualChanged: boolean;\n  eraseLiveOperationActive: boolean | null;\n''','''  visualChanged: boolean;\n  /** False only for tools whose product contract intentionally leaves blank paper unchanged. */\n  visualChangeRequired: boolean;\n  eraseLiveOperationActive: boolean | null;\n''','evidence contract')
+          if 'visualChangeRequired: !transparentPaint,' not in s:
+              one('''        visualChanged,\n        eraseLiveOperationActive,\n''','''        visualChanged,\n        visualChangeRequired: !transparentPaint,\n        eraseLiveOperationActive,\n''','evidence visibility semantics')
+          if '&& (!entry.visualChangeRequired || entry.visualChanged)' not in s:
+              one('''      entry.selected\n      && entry.visualChanged\n''','''      entry.selected\n      && (!entry.visualChangeRequired || entry.visualChanged)\n''','aggregate visibility')
+          required = [
+              'const transparentPaint = operation === "paint"',
+              'transparentPaint || hasMeaningfulPixelChange(immediateDiff)',
+              'transparentPaint || visualChanged',
+              'const persistedTransparentStroke = transparentPaint',
+              'const undoRestoredPixels = transparentPaint ||',
+              'const redoRestoredStroke = transparentPaint ||',
+              'visualChangeRequired: !transparentPaint,',
+              '&& (!entry.visualChangeRequired || entry.visualChanged)',
+          ]
+          missing=[token for token in required if token not in s]
+          if missing: raise SystemExit('missing expected transparent-brush safeguards: '+repr(missing))
+          p.write_text(s)
+          PY
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Source regression, lint and typecheck
+        run: |
+          pnpm exec vitest run src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts
+          pnpm exec eslint --max-warnings=0 scripts/verify-studio-brushes.mts
+          pnpm exec tsc -p tsconfig.json --pretty false --noEmit
+      - name: Build production bundle
+        run: pnpm run build
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify water-only and ordinary pigment brush in shipped UI
+        env:
+          TOONSPECTRUM_BRUSH_VERIFY_STAGE: desktop
+          TOONSPECTRUM_BRUSH_VERIFY_IDS: inkwash-water-brush,core-round
+        run: pnpm run verify:studio-brushes
+      - name: Commit verified source fix
+        run: |
+          git add scripts/verify-studio-brushes.mts
+          git diff --cached --check
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit -m 'fix(studio): make transparent brush aggregate semantics explicit [brush-core-final]'
+          git push origin HEAD:${GITHUB_REF_NAME}
