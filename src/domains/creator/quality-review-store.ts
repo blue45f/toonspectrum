@@ -2,6 +2,17 @@
 export const STUDIO_QUALITY_REVIEW_NAMESPACE = "studio-quality-review-v2";
 const MAX_BYTES = 1_048_576;
 let writeTail: Promise<void> = Promise.resolve();
+let runtimeModule: Promise<typeof import("./studio-local-database-runtime")> | undefined;
+
+function loadRuntime() {
+  // Share only the lazy module load. Every operation still acquires the current
+  // database owner; a failed acquisition must never become a cached DB handle.
+  runtimeModule ??= import("./studio-local-database-runtime").catch((error) => {
+    runtimeModule = undefined;
+    throw error;
+  });
+  return runtimeModule;
+}
 
 function bounded(value: string): void {
   if (new TextEncoder().encode(value).byteLength > MAX_BYTES) {
@@ -9,7 +20,7 @@ function bounded(value: string): void {
   }
 }
 async function acquireStore() {
-  const { acquireStudioLocalDatabase } = await import("./studio-local-database-runtime");
+  const { acquireStudioLocalDatabase } = await loadRuntime();
   const database = await acquireStudioLocalDatabase();
   return database.asAsyncKeyValueStore(STUDIO_QUALITY_REVIEW_NAMESPACE);
 }

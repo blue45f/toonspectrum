@@ -1,14 +1,41 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadStudioQualityReviewState } from "./quality-review-store";
 import { StudioContinuityPanel } from "./StudioContinuityPanel";
 
 import type { El } from "./studio-element-model";
 import type { PageState } from "./studio-page-state";
 
+
+// Own complete store operations before their first await, including reads that
+// have not reached the lazy runtime import yet. Import snapshots and a sentinel
+// read do not own another read's pending get() response.
+const reviewOperations = vi.hoisted(() => ({ pending: new Set<Promise<unknown>>() }));
+vi.mock("./quality-review-store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./quality-review-store")>();
+  function track<T>(operation: Promise<T>): Promise<T> {
+    reviewOperations.pending.add(operation);
+    // Use both handlers instead of an ignored finally() rejection chain.
+    void operation.then(
+      () => { reviewOperations.pending.delete(operation); },
+      () => { reviewOperations.pending.delete(operation); }
+    );
+    return operation;
+  }
+  return {
+    ...actual,
+    loadStudioQualityReviewState: (key: string) => track(actual.loadStudioQualityReviewState(key)),
+    saveStudioQualityReviewState: (key: string, serialized: string) =>
+      track(actual.saveStudioQualityReviewState(key, serialized)),
+  };
+});
+async function drainReviewOperations(): Promise<void> {
+  while (reviewOperations.pending.size > 0) {
+    await Promise.allSettled([...reviewOperations.pending]);
+  }
+}
 
 const reviewDb = vi.hoisted(() => ({ rows: new Map<string, string>(), get: vi.fn(), set: vi.fn(), asAsyncKeyValueStore: vi.fn(), acquire: vi.fn() }));
 vi.mock("./studio-local-database-runtime", () => ({ acquireStudioLocalDatabase: reviewDb.acquire }));
@@ -48,13 +75,15 @@ function frame(): Extract<El, { type: "frame" }> {
 }
 
 beforeEach(() => {
+  expect(reviewOperations.pending.size).toBe(0);
   resetReviewDatabase();
   localStorage.clear();
 });
 
 afterEach(async () => {
   cleanup();
-  await loadStudioQualityReviewState("__test_flush__");
+  await act(async () => { await drainReviewOperations(); });
+  expect(reviewOperations.pending.size).toBe(0);
   vi.clearAllMocks();
 });
 

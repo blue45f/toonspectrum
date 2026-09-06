@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 type ManifestEntry = {
   name?: unknown;
@@ -321,7 +322,7 @@ function canonicalizeAssetId(input: string): string {
     .slice(0, 150);
 }
 
-function buildAssetId(plan: UploadPlanItem, index: number, used: Set<string>): string {
+export function buildAssetId(plan: UploadPlanItem, index: number, used: Set<string>): string {
   const categoryPart = canonicalizeAssetId(plan.category || "asset").toLowerCase();
   const raw = canonicalizeAssetId(`${plan.name || plan.sourcePath}`).toLowerCase();
   const suffix = plan.seed != null ? `seed-${plan.seed}` : `idx-${index + 1}`;
@@ -331,10 +332,13 @@ function buildAssetId(plan: UploadPlanItem, index: number, used: Set<string>): s
   if (candidate.length > 120) {
     candidate = candidate.slice(0, 120);
   }
+  const baseCandidate = candidate;
+  let collision = 0;
   while (used.has(candidate)) {
     const hash = createHash("sha256").update(plan.path + index).digest("hex").slice(0, 6);
-    const tail = `-${hash}`;
-    candidate = (candidate.slice(0, 120 - tail.length) + tail).replace(/[-._]+$/u, "");
+    const tail = collision === 0 ? `-${hash}` : `-${hash}-${collision}`;
+    candidate = (baseCandidate.slice(0, 120 - tail.length) + tail).replace(/[-._]+$/u, "");
+    collision += 1;
     if (candidate.length < 4) {
       candidate = `asset-${hash}`;
     }
@@ -343,35 +347,29 @@ function buildAssetId(plan: UploadPlanItem, index: number, used: Set<string>): s
   return candidate;
 }
 
-const TEXT_DECODER = new TextDecoder();
+const TEXT_DECODER = new TextDecoder("utf-8", { fatal: true });
 
-function readUInt32LE(bytes: Uint8Array, offset: number): number {
-  return (
-    (bytes[offset] || 0)
-    + ((bytes[offset + 1] || 0) << 8)
-    + ((bytes[offset + 2] || 0) << 16)
-    + ((bytes[offset + 3] || 0) << 24)
-  );
-}
-
-function detectVrmModelFromGlb(bytes: Uint8Array): boolean {
-  if (bytes.length < 32) return false;
-  if (readUInt32LE(bytes, 0) !== 0x46546c67) return false; // glTF magic
-  if (readUInt32LE(bytes, 4) !== 2) return false;
-  const jsonChunkLength = readUInt32LE(bytes, 12);
-  if (readUInt32LE(bytes, 20) !== 0x4e4f534a) return false; // JSON
-  const jsonStart = 28;
+// A container/marker probe, not a glTF schema or VRM humanoid validator.
+export function detectVrmModelFromGlb(bytes: Uint8Array): boolean {
+  if (bytes.byteLength < 20) return false;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(0, true) !== 0x46546c67) return false; // glTF magic
+  if (view.getUint32(4, true) !== 2) return false;
+  if (view.getUint32(8, true) !== bytes.byteLength) return false;
+  const jsonChunkLength = view.getUint32(12, true);
+  if (view.getUint32(16, true) !== 0x4e4f534a) return false; // JSON
+  const jsonStart = 20; // 12-byte GLB header followed by an 8-byte chunk header.
+  if (jsonChunkLength === 0 || jsonChunkLength % 4 !== 0) return false;
+  if (jsonChunkLength > bytes.byteLength - jsonStart) return false;
   const jsonEnd = jsonStart + jsonChunkLength;
-  if (!Number.isSafeInteger(jsonEnd) || jsonEnd > bytes.length) return false;
-  const rawJson = TEXT_DECODER.decode(bytes.slice(jsonStart, jsonEnd));
 
   let doc: unknown;
   try {
-    doc = JSON.parse(rawJson);
+    doc = JSON.parse(TEXT_DECODER.decode(bytes.subarray(jsonStart, jsonEnd)));
   } catch {
     return false;
   }
-  if (!(doc && typeof doc === "object")) return false;
+  if (!(doc && typeof doc === "object") || Array.isArray(doc)) return false;
 
   const asset = (doc as { asset?: unknown }).asset;
   const assetVersion =
@@ -392,7 +390,7 @@ function detectVrmModelFromGlb(bytes: Uint8Array): boolean {
   return hasExtensions;
 }
 
-function resolveAssetKind(plan: UploadPlanItem, override: AssetTypeFlag, bytes: Uint8Array, detect: boolean): AssetKind {
+export function resolveAssetKind(plan: UploadPlanItem, override: AssetTypeFlag, bytes: Uint8Array, detect: boolean): AssetKind {
   const declaredKind = plan.subtype;
   if (declaredKind === "image" || declaredKind === "vrm" || declaredKind === "background3d") {
     return declaredKind;
@@ -428,11 +426,11 @@ function createDescriptor(assetId: string, kind: AssetKind): string {
   return JSON.stringify(descriptor);
 }
 
-function makeFormData(fileBytes: Uint8Array, filename: string, kind: AssetKind, assetId: string): FormData {
+export function makeFormData(fileBytes: Uint8Array, filename: string, kind: AssetKind, assetId: string): FormData {
   const formData = new FormData();
   const mime = kind === "image" ? "application/octet-stream" : "model/gltf-binary";
-  const blobSource = Buffer.from(fileBytes).buffer;
-  const blob = new Blob([blobSource], { type: mime });
+  // Copy only the view, never the entire pooled Buffer backing store.
+  const blob = new Blob([new Uint8Array(fileBytes)], { type: mime });
   formData.append("file", blob, filename);
   formData.append("elementType", kind);
   formData.append("descriptor", createDescriptor(assetId, kind));
@@ -694,4 +692,6 @@ async function main(): Promise<void> {
   }
 }
 
-void main();
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  void main();
+}
