@@ -42,9 +42,8 @@ function moduleImports(fileName: string) {
 }
 
 describe("Studio BG3D asset-library ownership boundary", () => {
-  it("keeps the leaf panel renderer-free and prevents a reverse editor import", () => {
+  it("keeps the canonical leaf panel renderer-free and prevents a reverse editor import", () => {
     const imports = moduleImports("./StudioBg3dAssetLibraryPanel.tsx");
-
     expect(imports.valueImports).toEqual([
       "lucide-react",
       "react",
@@ -55,6 +54,24 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     expect([...imports.valueImports, ...imports.typeImports]).not.toContain("./StudioBackground3D");
     expect(imports.valueImports).not.toContain("three");
     expect(imports.valueImports.some((source) => source.startsWith("@react-three/"))).toBe(false);
+  });
+
+  it("keeps the reference-rebuild wrapper renderer-free and delegates to the canonical file input", () => {
+    const imports = moduleImports("./StudioBg3dAssetLibraryPanelWithPresets.tsx");
+    expect(imports.valueImports).toEqual([
+      "react", "./StudioBg3dAssetLibraryPanel", "./StudioReferenceRebuildPresets",
+    ]);
+    expect(imports.dynamicImports).toEqual([]);
+    const wrapper = moduleSource("./StudioBg3dAssetLibraryPanelWithPresets.tsx");
+    expect(wrapper).toContain("<ExistingAssetLibraryPanel {...props} />");
+    expect(wrapper).toContain("input.files = transfer.files");
+    expect(wrapper).toContain('input.dispatchEvent(new Event("change", { bubbles: true }))');
+    expect(wrapper).toContain("importButton.disabled");
+    expect(wrapper).not.toContain("saveVerifiedBg3dModel");
+    expect(wrapper).not.toContain("importVerifiedBg3dModelsAtomically");
+    const presets = moduleImports("./StudioReferenceRebuildPresets.tsx");
+    expect(presets.valueImports).toEqual(["react"]);
+    expect(presets.dynamicImports).toEqual([]);
   });
 
   it("keeps persistence, validation, resource disposal, scene, history, and selection in the parent", () => {
@@ -72,7 +89,8 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     }\n${moduleSource("./useStudioBg3dEditorState.ts")}`;
 
     expect(editorImports.valueImports).not.toContain("./StudioBg3dAssetLibraryPanel");
-    expect(editorImports.dynamicImports).toContain("./StudioBg3dAssetLibraryPanel");
+    expect(editorImports.valueImports).not.toContain("./StudioBg3dAssetLibraryPanelWithPresets");
+    expect(editorImports.dynamicImports).toContain("./StudioBg3dAssetLibraryPanelWithPresets");
     expect(editorSource).toContain("<LazyStudioBg3dAssetLibraryPanel");
     expect(editorSource).toContain('if (tab === "models") setModelsPanelActivated(true)');
     expect(editorSource).toContain("modelsPanelActivated ? (");
