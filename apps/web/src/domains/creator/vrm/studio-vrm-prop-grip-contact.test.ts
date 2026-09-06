@@ -10,7 +10,7 @@ import { POSER_FINGER_BONES, pickNaturalIdlePose } from "../studio-pose-presets"
 
 (globalThis as unknown as { self: typeof globalThis }).self = globalThis;
 
-const MODEL = { id: "avatar-a", name: "하arin", file: "public/vrm/AvatarSample_A.vrm" };
+const MODEL = { id: "avatar-a", name: "하arin", file: "apps/web/public/vrm/AvatarSample_A.vrm" };
 
 async function load(file: string) {
   const buf = fs.readFileSync(path.resolve(file)).buffer;

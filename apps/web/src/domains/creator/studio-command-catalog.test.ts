@@ -41,7 +41,7 @@ import type {
 } from "./studio-command-catalog";
 import type { StudioCommand } from "@toonspectrum/studio-command-registry";
 
-const REPO_ROOT = path.resolve(__dirname, "../../..");
+const REPO_ROOT = path.resolve(__dirname, "../../../..");
 
 function readSource(relative: string): string {
   return readFileSync(path.join(REPO_ROOT, relative), "utf-8");

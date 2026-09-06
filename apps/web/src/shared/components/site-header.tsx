@@ -7,6 +7,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { AuthMenuShell } from "../../domains/auth/components/auth-menu-shell";
+
 import { ToonSpectrumMark } from "./visual-marks";
 
 import { cx } from "@/shared/lib/cx";

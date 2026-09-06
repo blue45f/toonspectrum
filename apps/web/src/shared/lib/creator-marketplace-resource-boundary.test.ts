@@ -11,7 +11,7 @@ const appModule = readFileSync(
   "utf8"
 );
 const drizzleConfig = readFileSync(
-  new URL("../drizzle.config.ts", import.meta.url),
+  new URL("../../../../../drizzle.config.ts", import.meta.url),
   "utf8"
 );
 const client = readFileSync(
