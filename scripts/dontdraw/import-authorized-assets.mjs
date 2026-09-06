@@ -1,10 +1,10 @@
 /** Offline intake for owner-supplied Dontdraw originals. Never scrapes/downloads products. */
 import { createHash } from "node:crypto";
-import { lstat, mkdir, mkdtemp, realpath, rename, rm, rmdir, writeFile } from "node:fs/promises";
+import { lstat, mkdir, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { readBoundedFile } from "./bounded-file.mjs";
+import { readStableFile, stagePrivateBundle } from "./authorized-intake-io.mjs";
 import { buildIntakeReviewQueue, intakeExitCode } from "./intake-review-queue.mjs";
 
 export const SOURCE_SCHEMA = "toonstudio.dontdraw-source.v1";
@@ -88,8 +88,8 @@ async function sourceFile(root, relativePath) {
   return resolved;
 }
 
-async function inspectFile(filename, maximumBytes = MAX_FILE_BYTES) {
-  const bytes = await readBoundedFile(filename, maximumBytes);
+async function inspectFile(filename, maxBytes = MAX_FILE_BYTES) {
+  const bytes = await readStableFile(filename, maxBytes);
   return { bytes, sha256: createHash("sha256").update(bytes).digest("hex"), size: bytes.length };
 }
 
@@ -151,9 +151,12 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
   if (!(await lstat(root)).isDirectory()) throw new Error("sourceDir must be a directory");
   const sourceManifest = await sourceFile(root, manifestPath);
   const manifestStat = await lstat(sourceManifest);
-  if (!manifestStat.isFile() || manifestStat.size > MAX_MANIFEST_BYTES) throw new Error("Source manifest exceeds 8 MiB");
-  const manifestBytes = await readBoundedFile(sourceManifest, MAX_MANIFEST_BYTES);
-  const input = validateSourceManifest(JSON.parse(manifestBytes.toString("utf8")));
+  if (manifestStat.isFile() && manifestStat.size > MAX_MANIFEST_BYTES) {
+    throw new Error(`Source manifest exceeds 8 MiB (${MAX_MANIFEST_BYTES} bytes)`);
+  }
+  // The stable reader rejects FIFOs/devices before open; invalid UTF-8 must fail, never be replaced.
+  const manifestBytes = await readStableFile(sourceManifest, MAX_MANIFEST_BYTES);
+  const input = validateSourceManifest(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(manifestBytes)));
   const destination = outputDir ? path.resolve(outputDir) : undefined;
   if (write && !destination) throw new Error("--output is required with --write");
   if (destination && (within(root, destination) || within(destination, root))) throw new Error("Output and source must not overlap");
@@ -208,52 +211,55 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
     await mkdir(path.dirname(destination), { recursive: true });
     const actualDestination = path.join(await realpath(path.dirname(destination)), path.basename(destination));
     if (within(root, actualDestination) || within(actualDestination, root)) throw new Error("Output and source must not overlap through symlinks");
-    // mkdir is an exclusive reservation; never replace an existing output or follow its symlink.
-    await mkdir(destination, { mode: 0o700 });
-    let temporary;
-    try {
-      temporary = await mkdtemp(path.join(destination, ".staging-"));
+    // Exclusive private reservation; /ready appears only after every source and output has passed,
+    // and a failed run cleans up only its own staging data (identity-checked, never a substituted path).
+    await stagePrivateBundle(actualDestination, async (temporary) => {
       await mkdir(path.join(temporary, "files"), { mode: 0o700 });
       for (const item of entries) {
-        // Re-resolve and re-hash before staging to detect changes after the first inspection.
+        // Re-read bounded, stable bytes and validate BEFORE writing; never copy a moving source.
         const originalPath = await sourceFile(root, item.entry.provenance.sourcePath);
         if (originalPath !== item.absolutePath) throw new Error("Source path changed before staging");
-        const outputPath = path.join(temporary, item.entry.path);
         const inspected = await inspectFile(originalPath);
         if (inspected.sha256 !== item.sha256) throw new Error("Source changed before staging");
+        const outputPath = path.join(temporary, item.entry.path);
         await writeFile(outputPath, inspected.bytes, { flag: "wx", mode: 0o600 });
+        if ((await inspectFile(outputPath)).sha256 !== item.sha256) throw new Error("Staged file hash mismatch");
       }
       await writeFile(path.join(temporary, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx", mode: 0o600 });
       await writeFile(path.join(temporary, "intake-report.json"), `${JSON.stringify(report, null, 2)}\n`, { flag: "wx", mode: 0o600 });
       await writeFile(path.join(temporary, "review-queue.json"), `${JSON.stringify(reviewQueue, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-      // A complete bundle appears at /ready only after every source and output has passed.
-      await rename(temporary, path.join(destination, "ready"));
-    } catch (error) {
-      // Remove only this operation's staging directory, never unrelated concurrent files.
-      if (temporary) await rm(temporary, { recursive: true, force: true });
-      await rmdir(destination).catch(() => {});
-      throw error;
-    }
+    });
   }
   return { report, manifest, reviewQueue };
 }
 
-export async function runCli(argv) {
-  if (argv.includes("--help")) {
-    console.log("node scripts/dontdraw/import-authorized-assets.mjs --source-dir /originals --manifest source.json [--output /new-batch --write]\nDefault is read-only inspection. --write stages an offline bundle under /new-batch/ready, not a public upload. Exit: 0=structurally ready, 1=invalid/error, 2=conversion/unsupported/empty batch.");
-    return 0;
-  }
+export function parseCliOptions(argv) {
   const options = { manifestPath: "source.json", write: false };
-  const names = { "--source-dir": "sourceDir", "--manifest": "manifestPath", "--output": "outputDir" };
+  // A Map keeps prototype names such as "toString" from resolving as options.
+  const names = new Map([["--source-dir", "sourceDir"], ["--manifest", "manifestPath"], ["--output", "outputDir"]]);
+  const seen = new Set();
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === "--") continue;
-    if (argv[i] === "--write") { options.write = true; continue; }
-    const key = names[argv[i]];
-    if (!key || !argv[i + 1] || argv[i + 1].startsWith("--")) throw new Error(`Unknown option or missing value: ${argv[i]}`);
+    const flag = argv[i];
+    if (flag === "--") continue;
+    if (seen.has(flag)) throw new Error(`Duplicate option: ${flag}`);
+    seen.add(flag);
+    if (flag === "--write") { options.write = true; continue; }
+    const key = names.get(flag);
+    if (!key || !argv[i + 1]?.trim() || argv[i + 1].startsWith("--")) throw new Error(`Unknown option or missing value: ${flag}`);
     options[key] = argv[++i];
   }
   if (!options.sourceDir) throw new Error("--source-dir is required");
-  const result = await prepareAuthorizedImport(options);
+  if (options.write && !options.outputDir) throw new Error("--output is required with --write");
+  return options;
+}
+
+export async function runCli(argv) {
+  // Only a standalone --help succeeds; "--write --help" must not mask a broken command with exit 0.
+  if (argv.length === 1 && argv[0] === "--help") {
+    console.log("node scripts/dontdraw/import-authorized-assets.mjs --source-dir /originals --manifest source.json [--output /new-batch --write]\nDefault is read-only inspection. --write stages an offline bundle under /new-batch/ready, not a public upload.\nExit code: 0 = structurally ready for review (not publication); 1 = invalid files or command failure; 2 = conversion required, unsupported format or empty batch.");
+    return 0;
+  }
+  const result = await prepareAuthorizedImport(parseCliOptions(argv));
   console.log(JSON.stringify({ ...result.report, reviewQueue: result.reviewQueue }, null, 2));
   return intakeExitCode(result.report);
 }
