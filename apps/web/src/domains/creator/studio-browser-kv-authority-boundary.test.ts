@@ -32,7 +32,7 @@ interface BrowserKvAllowance {
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const WORKSPACE_ROOT = resolve(HERE, "../../..");
+const WORKSPACE_ROOT = resolve(HERE, "../../../..");
 const CREATOR_ROOT = resolve(WORKSPACE_ROOT, "apps/web/src/domains/creator");
 const PACKAGE_ROOT = resolve(WORKSPACE_ROOT, "packages");
 const PAGES_HISTORY_DURABLE_RUNTIME_SOURCE = readFileSync(

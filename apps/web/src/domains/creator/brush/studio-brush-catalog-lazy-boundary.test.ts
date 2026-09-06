@@ -21,7 +21,7 @@ const summarySource = readFileSync(
   new URL("../StudioActiveBrushSummary.tsx", import.meta.url),
   "utf8"
 );
-const viteSource = readFileSync(new URL("../../../../../vite.config.ts", import.meta.url), "utf8");
+const viteSource = readFileSync(new URL("../../../../../../vite.config.ts", import.meta.url), "utf8");
 
 describe("Studio brush catalogue lazy boundary", () => {
   it("keeps launch-safe core metadata independent from pro descriptors and library filtering", () => {
