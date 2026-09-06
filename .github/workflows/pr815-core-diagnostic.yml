@@ -1,0 +1,35 @@
+name: PR 815 core diagnostic
+on:
+  push:
+    branches: [fix/studio-3d-fit-final-20260906]
+    paths: ['.github/workflows/pr815-core-diagnostic.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+      - name: Capture exact failed Vitest tails
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-diagnostics/pr815
+          for job in 101454378351 101454378496 101454378429; do
+            gh api "repos/blue45f/toonspectrum/actions/jobs/$job/logs" > ".ci-diagnostics/pr815/$job.log"
+            tail -n 260 ".ci-diagnostics/pr815/$job.log" > ".ci-diagnostics/pr815/$job.tail.log"
+            rm ".ci-diagnostics/pr815/$job.log"
+          done
+      - name: Persist diagnostic evidence on this branch only
+        run: |
+          set -euo pipefail
+          git add .ci-diagnostics/pr815
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit -m 'chore(ci): retain PR 815 failed shard tails for diagnosis'
+          git push origin HEAD:${GITHUB_REF_NAME}
