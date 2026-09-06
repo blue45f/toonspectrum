@@ -2,7 +2,7 @@
 export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
   "/creator-hub": "창작 허브",
   "/opportunities": "작가 기회센터",
-  "/references": "창작 레퍼런스",
+  "/creator-hub/references": "창작 레퍼런스",
   "/learn/recipes": "웹툰 제작 레시피",
   "/story-lab": "스토리 연구실",
   "/discover/works": "만화·작법서 탐색",

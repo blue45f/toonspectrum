@@ -7,7 +7,7 @@ Adds a Korean-first creator resource domain without changing Studio document for
 | Route | Implemented behavior |
 | --- | --- |
 | `/creator-hub` | Navigation, local workspace counts, attribution Markdown, JSON backup/validated restore |
-| `/references` | Met search, strict public-domain filter, original links, lazy previews, saved references |
+| `/creator-hub/references` | Met search, strict public-domain filter, original links, lazy previews, saved references |
 | `/opportunities` | BizInfo adapter, keyword matching within the most recent 100 entries, eligibility text, KST date labels, all-day ICS export |
 | `/discover/works` | Kakao book metadata search; link to existing catalog; no automatic same-title/ISBN adaptation graph |
 | `/learn/recipes` | Six original interactive exercises, 24 persisted completion steps, editable SVG frames |

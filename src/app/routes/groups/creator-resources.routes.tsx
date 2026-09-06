@@ -16,7 +16,7 @@ const SourcesPage = lazyRetry(() => import("@/src/domains/creator-resources/Sour
 export const creatorResourcesRoutes = defineAppRoutes([
   { id: "resources-hub", path: "/creator-hub", element: <CreatorHubPage /> },
   { id: "resources-opportunities", path: "/opportunities", element: <OpportunitiesPage /> },
-  { id: "resources-references", path: "/references", element: <ReferencesPage /> },
+  { id: "resources-references", path: "/creator-hub/references", element: <ReferencesPage /> },
   { id: "resources-recipes", path: "/learn/recipes", element: <RecipesPage /> },
   { id: "resources-story", path: "/story-lab", element: <StoryLabPage /> },
   { id: "resources-works", path: "/discover/works", element: <WorksPage /> },
