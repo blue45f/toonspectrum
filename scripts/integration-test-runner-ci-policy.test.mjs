@@ -49,25 +49,17 @@ describe("database integration runner CI policy", () => {
   it("keeps `pnpm test` equal to the root suite plus the quiet perf-budget pass", () => {
     const packageManifest = readJson("package.json");
 
-    // CI shards `test:root` and runs `test:perf` on its own runner; `pnpm test` must stay the
-    // exact union so a local run and CI prove the same thing.
     expect(packageManifest.scripts?.["test:root"]).toBe("vitest run");
     expect(packageManifest.scripts?.test).toBe("pnpm run test:root && pnpm run test:perf");
     expect(packageManifest.scripts?.["test:perf"]).toBe(
       "vitest run --config vitest.perf.config.ts",
     );
-    // The bundle-only build the browser gates use must be exactly the `vite build` half of
-    // `build`: tsc is `noEmit`, so the dist is byte-identical and `typecheck` proves the types.
     expect(packageManifest.scripts?.build).toBe(
       "NODE_OPTIONS='--max-old-space-size=8192' tsc -p tsconfig.json && NODE_OPTIONS='--max-old-space-size=8192' vite build",
     );
     expect(packageManifest.scripts?.["build:bundle"]).toBe(
       "NODE_OPTIONS='--max-old-space-size=8192' vite build",
     );
-    // pnpm runs `pre<script>`/`post<script>` around any script name. `build` gets the catalog
-    // generation (public/data/ is gitignored, so without it the bundle ships no catalog) and the
-    // third-party notices plus CSP verification; the bundle-only build must get the same, or the
-    // dist the browser gates drive is not the dist production serves.
     expect(packageManifest.scripts?.prebuild).toBe("pnpm catalog:gen");
     expect(packageManifest.scripts?.["prebuild:bundle"]).toBe("pnpm run prebuild");
     expect(packageManifest.scripts?.["postbuild:bundle"]).toBe("pnpm run postbuild");
@@ -79,9 +71,6 @@ describe("database integration runner CI policy", () => {
   it("never forwards a standalone `--` through `pnpm run`", () => {
     const workflow = readYaml(".github/workflows/ci.yml");
 
-    // pnpm 11 passes a standalone `--` to the script verbatim. Vitest then puts everything after
-    // it in options["--"] and Playwright stops parsing options at it, so `--shard` and `--grep`
-    // silently vanish: every shard and both visual lanes ran the entire suite in run 2643.
     for (const [jobId, job] of Object.entries(workflow.jobs ?? {})) {
       for (const command of runCommands(job)) {
         for (const line of command.split("\n")) {
@@ -103,8 +92,6 @@ describe("database integration runner CI policy", () => {
     const command = runCommands(workflow.jobs.test).find((run) => run.startsWith(prefix));
     expect(command).toBeDefined();
 
-    // pnpm 11 forwards a standalone `--` verbatim; Vitest puts everything after it in
-    // options["--"] instead of parsing --shard. Inspect the real parser, not just the YAML text.
     const argumentsText = command.slice(prefix.length)
       .replace("${{ matrix.shard }}", String(shard))
       .replace("${{ strategy.job-total }}", String(total));
@@ -135,11 +122,8 @@ describe("database integration runner CI policy", () => {
       STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: "webdex_runtime",
     });
     expect(shardJob?.["timeout-minutes"]).toBe(30);
-
-    // The browser probes in packages/studio-engine-* launch a real Chromium from Vitest.
     expect(shardCommands).toContain(PLAYWRIGHT_INSTALL);
 
-    // Every shard provisions and migration-proves its own database before its slice of the suite.
     const stepNames = (shardJob?.steps ?? []).map((step) => step.name);
     const shardStepIndex = (shardJob?.steps ?? []).findIndex(
       (step) => step.run === ROOT_SHARD_COMMAND,
@@ -163,8 +147,6 @@ describe("database integration runner CI policy", () => {
     });
     expect(shardCommands.filter((command) => command === ROOT_SHARD_COMMAND)).toHaveLength(1);
 
-    // The wall-clock budget pass needs a runner that is doing nothing else, then the disposable
-    // Redis and workerd integrations ride the same quiet runner because each is seconds long.
     expect(serialJob?.name).toBe("test (serial lane)");
     expect(serialJob?.services).toBeUndefined();
     expect(serialJob?.strategy).toBeUndefined();
@@ -175,7 +157,6 @@ describe("database integration runner CI policy", () => {
       "pnpm run test:cloudflare-realtime",
     ]);
 
-    // Nothing runs the full `pnpm run test` (root + perf) or repeats a serial-lane check elsewhere.
     const everyCommand = Object.values(workflow.jobs ?? {}).flatMap(runCommands);
     expect(everyCommand).not.toContain("pnpm run test");
     for (const once of [
@@ -219,10 +200,6 @@ describe("database integration runner CI policy", () => {
 
   it("cancels superseded pull request runs without touching main", () => {
     const workflow = readYaml(".github/workflows/ci.yml");
-
-    // A PR is one concurrency group, so a new push frees the six-plus runners its previous run
-    // was holding. A main push is keyed by its own SHA: main runs never cancel or queue behind
-    // each other, because each commit must keep its own red/green signal.
     expect(workflow.concurrency).toEqual({
       group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}",
       "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
@@ -242,8 +219,6 @@ describe("database integration runner CI policy", () => {
     for (const dependency of coreJob?.needs ?? []) {
       expect(workflow.jobs?.[dependency], dependency).toBeDefined();
     }
-    // A skipped required check reads as green to branch protection, so the gate must always run
-    // and read the upstream results itself.
     expect(coreJob?.if).toBe("${{ always() }}");
     expect(coreJob?.services).toBeUndefined();
     expect(usesActions(coreJob)).toEqual([]);
@@ -252,7 +227,6 @@ describe("database integration runner CI policy", () => {
     expect(gateStep?.run).toContain("exit 1");
     expect(gateStep?.["continue-on-error"]).not.toBe(true);
 
-    // The checks that used to live inside the single core job each keep their own runner.
     expect(runCommands(workflow.jobs?.lint)).toEqual([
       "pnpm install --frozen-lockfile",
       "pnpm run validate:architecture",
@@ -282,9 +256,8 @@ describe("database integration runner CI policy", () => {
     expect(playwrightVersion).toMatch(/^\d+\.\d+\.\d+$/u);
     expect(packageManifest.devDependencies?.["@playwright/test"]).toBe(playwrightVersion);
 
-    // The proof runs parallel to core on its own VM: no `needs`, no services, nothing shared.
     expect(parityJob).toMatchObject({
-      "runs-on": "ubuntu-latest",
+      "runs-on": "ubuntu-24.04",
       "timeout-minutes": 20,
       env: {
         NODE_OPTIONS: "--max-old-space-size=8192",
@@ -293,11 +266,6 @@ describe("database integration runner CI policy", () => {
     expect(parityJob?.needs).toBeUndefined();
     expect(parityJob?.if).toBeUndefined();
     expect(parityJob?.services).toBeUndefined();
-    // The trailing upload-artifact is the failure evidence path, not a runner dependency: it runs
-    // only `if: failure()` and touches nothing before the proof. This job had failed seven times in
-    // a row leaving no page state behind, which is why the sibling studio-3d-visual job already
-    // carries the same step. Keeping it in this pinned list means a *new* action still trips the
-    // contract, which is what "fresh runner" is guarding.
     expect(usesActions(parityJob)).toEqual([
       "actions/checkout@v6",
       "pnpm/action-setup@v6",
@@ -325,18 +293,12 @@ describe("database integration runner CI policy", () => {
     expect(parityStep?.if).toBeUndefined();
     expect(parityStep?.["continue-on-error"]).not.toBe(true);
 
-    // No other job may run the headed parity proof: it belongs on this isolated runner only.
     for (const [jobId, job] of Object.entries(workflow.jobs ?? {})) {
       if (jobId === "studio-3d-runtime") continue;
       expect(runCommands(job).some((command) => command.includes("verify:studio-3d-console")), jobId)
         .toBe(false);
     }
 
-    // The release-facing "CI / verify" check is core AND the proof. It needs the five core gates
-    // directly rather than the `core` job: a gate job also waits for a runner, and on a saturated
-    // queue that wait alone cost 30 minutes per hop (run 2643). A failed or cancelled upstream job
-    // must still produce a failing verify, never a merge-neutral skipped one, so the gate always
-    // runs and reads every result itself.
     expect(releaseGate?.name).toBe("verify");
     expect(releaseGate?.needs).toEqual([
       ...workflow.jobs.core.needs,
@@ -360,9 +322,6 @@ describe("database integration runner CI policy", () => {
     const workflow = readYaml(".github/workflows/ci.yml");
     const spec = readText("e2e/studio-3d-visual-verification.spec.ts");
 
-    // The 3D visual suite: one `@slow` case (7.5 minutes on SwiftShader) alone in one lane, every
-    // other case in the second. Playwright's `--shard` splits by case count, which cannot balance
-    // a single seven-minute case, so the split is by tag.
     const visualJob = workflow.jobs?.["studio-3d-visual"];
     expect(visualJob?.name).toBe("studio-3d-visual (${{ matrix.lane }})");
     expect(visualJob?.strategy?.["fail-fast"]).toBe(false);
@@ -370,8 +329,6 @@ describe("database integration runner CI policy", () => {
       "--grep=@slow",
       "--grep-invert=@slow",
     ]);
-    // No `--` between the script and the filter: pnpm 11 forwards a standalone `--` verbatim and
-    // Playwright stops reading options at it, so both lanes ran the whole suite (run 2643).
     expect(runCommands(visualJob)).toContain(
       "pnpm run verify:studio-3d-visual ${{ matrix.filter }}",
     );
@@ -380,8 +337,6 @@ describe("database integration runner CI policy", () => {
       'test("3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다", { tag: "@slow" }',
     );
 
-    // The in-app sweeps: two jobs, each with its own bundle build, covering the four verifiers
-    // exactly once between them.
     const routeJob = workflow.jobs?.["studio-inapp-browser"];
     const featureJob = workflow.jobs?.["studio-inapp-feature-sweep"];
     const routeCommands = runCommands(routeJob);
@@ -400,8 +355,6 @@ describe("database integration runner CI policy", () => {
       expect(job?.needs).toBeUndefined();
     }
 
-    // Every browser gate serves the same dist the tsc-inclusive `build` job produces; only the
-    // `build` job pays for tsc, and it pays exactly once.
     const everyCommand = Object.values(workflow.jobs ?? {}).flatMap(runCommands);
     expect(everyCommand.filter((command) => command === "pnpm run build")).toHaveLength(1);
     expect(runCommands(workflow.jobs?.["studio-filter-dialog"])).toContain("pnpm run build:bundle");
