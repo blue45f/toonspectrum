@@ -22,22 +22,22 @@ import {
   googleInkMeshProviderDescriptor,
   hokusaiProviderDescriptor,
   perfectFreehandProviderDescriptor,
-} from "../../../packages/studio-brush-platform/src/providers";
+} from "../../../../../packages/studio-brush-platform/src/providers";
 import {
   canvasKitGpuProviderDescriptor,
   canvasKitProviderDescriptor,
   skiaGraphiteWebgpuProviderDescriptor,
-} from "../../../packages/studio-engine-skia/src/descriptor";
+} from "../../../../../packages/studio-engine-skia/src/descriptor";
 import {
   velloCpuProviderDescriptor,
   velloGpuBrowserProviderDescriptor,
   velloSvgNativeProviderDescriptor,
-} from "../../../packages/studio-engine-vello/src/descriptor";
+} from "../../../../../packages/studio-engine-vello/src/descriptor";
 
 import type { StudioAsyncKeyValueStore } from "./studio-local-database";
-import type { KppImportResult } from "../../../packages/studio-format-gateway/src/kpp";
-import type { MybImportResult } from "../../../packages/studio-format-gateway/src/myb";
-import type { SvgImportResult } from "../../../packages/studio-format-gateway/src/svg";
+import type { KppImportResult } from "../../../../../packages/studio-format-gateway/src/kpp";
+import type { MybImportResult } from "../../../../../packages/studio-format-gateway/src/myb";
+import type { SvgImportResult } from "../../../../../packages/studio-format-gateway/src/svg";
 import type {
   EngineCapabilityRegistry,
   ProviderDescriptor,

@@ -3,13 +3,13 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { FeedbackThread } from "./FeedbackThread";
 
-import type { FeedbackEntry, FeedbackProgress } from "@/packages/core/src/feedback";
+import type { FeedbackEntry, FeedbackProgress } from "@toonspectrum/core/feedback";
 
 import { useApp } from "@/lib/store";
 import {
   FEEDBACK_AREA_LABELS, FEEDBACK_KIND_LABELS, FEEDBACK_PROGRESS, FEEDBACK_PROGRESS_LABELS, feedbackTimeLabel,
-} from "@/packages/core/src/feedback";
-import { isFeedbackEntry, isFeedbackVote } from "@/packages/core/src/feedback-response";
+} from "@toonspectrum/core/feedback";
+import { isFeedbackEntry, isFeedbackVote } from "@toonspectrum/core/feedback-response";
 import { api, getApiErrorMessage } from "@/src/infrastructure/api";
 
 function ProgressEditor({ post, readOnly, onUpdated }: { post: FeedbackEntry; readOnly: boolean; onUpdated: (patch: Partial<FeedbackEntry>) => void }) {

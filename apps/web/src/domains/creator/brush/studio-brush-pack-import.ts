@@ -34,14 +34,14 @@ import {
   CspToolFileError,
   type CspSutSqliteReader,
   type CspToolFileImportResult,
-} from "../../../../packages/studio-format-gateway/src/csp-sut";
-import { parseKppPreset, KppParseError } from "../../../../packages/studio-format-gateway/src/kpp";
+} from "../../../../../../packages/studio-format-gateway/src/csp-sut";
+import { parseKppPreset, KppParseError } from "../../../../../../packages/studio-format-gateway/src/kpp";
 import {
   importKritaBundle,
   KritaBundleError,
   type KritaBundleImportResult,
-} from "../../../../packages/studio-format-gateway/src/krita-bundle";
-import { importMybBrush, MybParseError } from "../../../../packages/studio-format-gateway/src/myb";
+} from "../../../../../../packages/studio-format-gateway/src/krita-bundle";
+import { importMybBrush, MybParseError } from "../../../../../../packages/studio-format-gateway/src/myb";
 import { STABILIZER_MAX } from "../studio-brush";
 
 import {
@@ -68,7 +68,7 @@ import type {
   BrushLibraryRepositoryPort,
 } from "./studio-brush-library-repository";
 import type { StudioBrushPackFormat } from "./studio-brush-pack-format";
-import type { FormatIssue } from "../../../../packages/studio-format-gateway/src/format-common";
+import type { FormatIssue } from "../../../../../../packages/studio-format-gateway/src/format-common";
 import type {
   BrushProgramIR,
   DynamicMappingIR,

@@ -1,6 +1,6 @@
 import { applyStabilizer } from "@toonspectrum/studio-brush-platform";
 
-import { selectStabilizerBackend } from "../../../../packages/studio-brush-platform/src/stabilizer-provider";
+import { selectStabilizerBackend } from "../../../../../../packages/studio-brush-platform/src/stabilizer-provider";
 import { studioStrokeRouteBrushFamilyKey } from "../brush/studio-stroke-route-tournament";
 
 import type { StudioLiveInkBackendDecision } from "./studio-live-ink-backend";
@@ -9,7 +9,7 @@ import type {
   SelectStabilizerBackendOptions,
   StabilizerBackendId,
   StabilizerProcessParams,
-} from "../../../../packages/studio-brush-platform/src/stabilizer-provider";
+} from "../../../../../../packages/studio-brush-platform/src/stabilizer-provider";
 import type { ModeledSampleIR, StabilizerGraphIR } from "@toonspectrum/studio-project-model";
 
 /**

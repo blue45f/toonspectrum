@@ -19,7 +19,7 @@ describe("Studio Hokusai Worker boundary", () => {
 
   it("loads the pinned local WASM adapter only inside a Dedicated Worker", () => {
     expect(source).toContain(
-      "../../../packages/studio-hokusai-wasm/pkg/studio_hokusai_wasm.js",
+      "../../../../../packages/studio-hokusai-wasm/pkg/studio_hokusai_wasm.js",
     );
     expect(source).toContain('scopeName !== "DedicatedWorkerGlobalScope"');
     expect(source).toContain("typeof WebAssembly");

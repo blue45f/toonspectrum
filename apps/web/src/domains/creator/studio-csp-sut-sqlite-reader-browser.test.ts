@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { CSP_TOOL_FILE_LIMITS } from "../../../packages/studio-format-gateway/src/csp-sut";
+import { CSP_TOOL_FILE_LIMITS } from "../../../../../packages/studio-format-gateway/src/csp-sut";
 import { buildAuthoredSutFixture } from "../../../tests/corpus/formats/csp-sut-fixtures";
 
 import type { Browser, Page } from "playwright";

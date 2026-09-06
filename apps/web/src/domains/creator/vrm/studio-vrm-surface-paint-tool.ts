@@ -22,7 +22,7 @@ import type {
   StudioVrmTexturePaintRayHit,
   StudioVrmTexturePaintRuntime,
 } from "./studio-vrm-texture-paint-runtime";
-import type { SurfaceBrushExecutionResult } from "../../../../packages/studio-brush-platform/src/brush-composition";
+import type { SurfaceBrushExecutionResult } from "../../../../../../packages/studio-brush-platform/src/brush-composition";
 import type {
   BrushProgramIR,
   DeviceCalibrationIR,

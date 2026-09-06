@@ -11,9 +11,9 @@ import {
 } from "@toonspectrum/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { parseKppPreset } from "../../../packages/studio-format-gateway/src/kpp";
-import { importMybBrush } from "../../../packages/studio-format-gateway/src/myb";
-import { parseSvgToScene } from "../../../packages/studio-format-gateway/src/svg";
+import { parseKppPreset } from "../../../../../packages/studio-format-gateway/src/kpp";
+import { importMybBrush } from "../../../../../packages/studio-format-gateway/src/myb";
+import { parseSvgToScene } from "../../../../../packages/studio-format-gateway/src/svg";
 
 import {
   STUDIO_ASSET_METADATA_CATALOG_KEY,
@@ -31,7 +31,7 @@ import type {
   StudioLocalDatabase,
   StudioSqliteApiHandle,
 } from "./studio-local-database";
-import type { KppImportResult } from "../../../packages/studio-format-gateway/src/kpp";
+import type { KppImportResult } from "../../../../../packages/studio-format-gateway/src/kpp";
 import type { AssetMetadataIR } from "@toonspectrum/studio-project-model";
 
 // ---------------------------------------------------------------------------

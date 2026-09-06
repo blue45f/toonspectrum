@@ -1,11 +1,11 @@
 import { ShieldCheck } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import type { FeedbackComment } from "@/packages/core/src/feedback";
+import type { FeedbackComment } from "@toonspectrum/core/feedback";
 
 import { useApp } from "@/lib/store";
-import { feedbackTimeLabel } from "@/packages/core/src/feedback";
-import { assertFeedbackComments, isFeedbackComment } from "@/packages/core/src/feedback-response";
+import { feedbackTimeLabel } from "@toonspectrum/core/feedback";
+import { assertFeedbackComments, isFeedbackComment } from "@toonspectrum/core/feedback-response";
 import { api, getApiErrorMessage } from "@/src/infrastructure/api";
 
 function Reply({ reply, depth = 0 }: { reply: FeedbackComment; depth?: number }) {

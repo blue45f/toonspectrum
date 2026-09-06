@@ -9,7 +9,7 @@ import type {
   CspSqliteReadContext,
   CspSqliteSnapshot,
   CspSutSqliteReader,
-} from "../../../packages/studio-format-gateway/src/csp-sut";
+} from "../../../../../packages/studio-format-gateway/src/csp-sut";
 
 export const STUDIO_CSP_SUT_SQLITE_WORKER_TIMEOUT_MS = 45_000;
 

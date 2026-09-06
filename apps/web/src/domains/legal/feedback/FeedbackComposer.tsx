@@ -1,13 +1,13 @@
 import { ArrowUpRight, Globe2, Send } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
-import type { FeedbackEntry, FeedbackKind } from "@/packages/core/src/feedback";
+import type { FeedbackEntry, FeedbackKind } from "@toonspectrum/core/feedback";
 
 import { useApp } from "@/lib/store";
 import {
   FEEDBACK_AREAS, FEEDBACK_AREA_LABELS, FEEDBACK_KINDS, FEEDBACK_KIND_LABELS, validateFeedbackInput,
-} from "@/packages/core/src/feedback";
-import { isFeedbackEntry } from "@/packages/core/src/feedback-response";
+} from "@toonspectrum/core/feedback";
+import { isFeedbackEntry } from "@toonspectrum/core/feedback-response";
 import { api, getApiErrorMessage } from "@/src/infrastructure/api";
 
 interface Props {

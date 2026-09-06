@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { SITE_URL, siteUrl } from "../../packages/core/src/business";
+import { SITE_URL, siteUrl } from "../../../../packages/core/src/business";
 
 const ROOT = process.cwd();
 const CANONICAL_ORIGIN = "https://www.toonstudio.cloud";

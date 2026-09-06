@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CSP_TOOL_FILE_LIMITS } from "../../../packages/studio-format-gateway/src/csp-sut";
+import { CSP_TOOL_FILE_LIMITS } from "../../../../../packages/studio-format-gateway/src/csp-sut";
 import { buildAuthoredSutFixture } from "../../../tests/corpus/formats/csp-sut-fixtures";
 
 import {

@@ -34,7 +34,7 @@ let server;
 let browser;
 try {
   server = await createServer({ configFile: false, root, plugins: [react()], resolve: { alias: { "@": root } },
-    server: { host: "127.0.0.1", port: 0 }, publicDir: path.join(root, "public"),
+    server: { host: "127.0.0.1", port: 0 }, publicDir: path.join(root, "apps", "web", "public"),
     optimizeDeps: { entries: [path.join(fixture, "index.html")] } });
   await server.listen();
   const address = server.httpServer.address();

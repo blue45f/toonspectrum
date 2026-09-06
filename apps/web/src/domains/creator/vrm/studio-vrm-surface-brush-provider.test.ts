@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   executeSurfaceBrushStroke,
   SurfaceBrushCancelledError,
-} from "../../../../packages/studio-brush-platform/src/brush-composition";
+} from "../../../../../../packages/studio-brush-platform/src/brush-composition";
 import { createStudioThreeMeshBvhProvider } from "../studio-three-mesh-bvh-provider";
 
 import {

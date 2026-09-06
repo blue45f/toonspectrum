@@ -123,7 +123,7 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
       'STUDIO_HYBRID_DCC_WORKSPACE_PERSISTENCE_ROOT = "dcc-workspaces"',
     );
     expect(
-      read("../../../packages/studio-project-model/src/browser/opfs-journal-store.ts"),
+      read("../../../../../packages/studio-project-model/src/browser/opfs-journal-store.ts"),
     ).toContain('"toonspectrum-studio-projects"');
     expect(read("./studio-local-database.ts")).toContain(
       'STUDIO_SQLITE_OPFS_DIRECTORY = "toonspectrum-studio-sqlite"',

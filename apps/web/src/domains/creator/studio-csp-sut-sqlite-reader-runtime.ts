@@ -13,7 +13,7 @@ import type {
   CspSqliteSnapshot,
   CspSqliteTableSnapshot,
   CspSqliteValue,
-} from "../../../packages/studio-format-gateway/src/csp-sut";
+} from "../../../../../packages/studio-format-gateway/src/csp-sut";
 
 type SqliteWasmValue = string | number | bigint | Uint8Array | null;
 const SQLITE_HEADER = new TextEncoder().encode("SQLite format 3\0");

@@ -1,7 +1,7 @@
 import type {
   CspSqliteReadContext,
   CspSqliteSnapshot,
-} from "../../../packages/studio-format-gateway/src/csp-sut";
+} from "../../../../../packages/studio-format-gateway/src/csp-sut";
 
 export const STUDIO_CSP_SUT_SQLITE_WORKER_PROTOCOL_VERSION = 1 as const;
 

@@ -1,11 +1,11 @@
 import { RemoteKillSwitch } from "@toonspectrum/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
-import { INK_DEFAULT_PARAMS } from "../../../../packages/studio-brush-platform/src/ink-modeler";
+import { INK_DEFAULT_PARAMS } from "../../../../../../packages/studio-brush-platform/src/ink-modeler";
 import {
   STABILIZER_BACKEND_IDS,
   selectStabilizerBackend,
-} from "../../../../packages/studio-brush-platform/src/stabilizer-provider";
+} from "../../../../../../packages/studio-brush-platform/src/stabilizer-provider";
 import { studioStrokeRouteBrushFamilyKey } from "../brush/studio-stroke-route-tournament";
 
 import {

@@ -15,12 +15,13 @@ import {
 // route actually commits with.
 import "@/src/domains/catalog/references/reference-i18n";
 
+const WEB_PUBLIC = path.resolve(process.cwd(), "apps/web/public");
 // Production routes fetch these static assets before their lazy component
 // commits. Direct component tests have no HTTP server, so mirror the same
 // validated registration from disk once per isolated Vitest graph.
 for (const locale of STUDIO_I18N_ASSET_LOCALES) {
   const source = readFileSync(
-    path.resolve(process.cwd(), "public", "i18n", "studio", `${locale}.json`),
+    path.join(WEB_PUBLIC, "i18n", "studio", `${locale}.json`),
     "utf8",
   );
   const dictionary = parseStudioI18nDictionary(source);
@@ -34,7 +35,7 @@ for (const locale of STUDIO_I18N_ASSET_LOCALES) {
 // than eagerly registering all 75 — keeps the same loader, parser and fallback chain under test
 // while a test file only pays for the locales it actually awaits.
 setAppI18nAssetSource(async (assetLocale) => {
-  const assetPath = path.resolve(process.cwd(), "public", "i18n", "app", `${assetLocale}.json`);
+  const assetPath = path.join(WEB_PUBLIC, "i18n", "app", `${assetLocale}.json`);
   return existsSync(assetPath) ? readFileSync(assetPath, "utf8") : null;
 });
 
