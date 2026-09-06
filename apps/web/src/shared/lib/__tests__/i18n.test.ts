@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, extname } from "node:path";
+import { dirname, join, extname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -84,7 +85,10 @@ async function withLocalStorage<T>(fn: () => T | Promise<T>): Promise<T> {
 }
 
 function collectSourceI18nKeys(): Set<string> {
-  const roots = ["components", "lib", "src"];
+  // Post apps/web move: scan the web src tree from this file, not cwd-relative
+  // pre-move roots like `components/` / `lib/` / `src/`.
+  const webSrcRoot = dirname(fileURLToPath(new URL("../../..", import.meta.url)));
+  const roots = [webSrcRoot];
   const visited = new Set<string>();
   const used = new Set<string>();
   const keyRe = /\bt\(\s*["'`]([^"'`]+)["'`]\s*\)/g;
@@ -348,8 +352,8 @@ describe("translation dictionary completeness", () => {
   it("keeps every t() key covered by its shell or lazy route dictionaries", () => {
     const usedKeys = collectSourceI18nKeys();
     const shellKeys = new Set([...Object.keys(i18nDict.ko), ...Object.keys(i18nDict.en)]);
-    const adminEn = readRouteDictionary("apps/web/public/i18n/admin");
-    const adminKo = readRouteDictionary("apps/web/public/i18n/admin");
+    const adminEn = readRouteDictionary("apps/web/public/i18n/admin/en.json");
+    const adminKo = readRouteDictionary("apps/web/public/i18n/admin/ko.json");
     const adminKeys = [...usedKeys].filter((key) => key.startsWith("admin."));
     const shellMissing = [...usedKeys]
       .filter((key) => !key.startsWith("admin.") && !shellKeys.has(key))

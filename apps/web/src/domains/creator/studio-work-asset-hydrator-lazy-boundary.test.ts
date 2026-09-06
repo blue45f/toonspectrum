@@ -14,7 +14,10 @@ const runtimeSource = readFileSync(
   "utf8"
 );
 const studioPageSource = readStudioPageCompositionSource();
-const viteConfigSource = readFileSync(new URL("../../../vite.config.ts", import.meta.url), "utf8");
+const viteManualChunksSource = readFileSync(
+  new URL("../../../../../apps/web/config/vite-manual-chunks.ts", import.meta.url),
+  "utf8",
+);
 
 describe("Studio work-asset hydrator lazy boundary", () => {
   it("keeps the synchronous façade free of the request client value graph", () => {
@@ -37,9 +40,9 @@ describe("Studio work-asset hydrator lazy boundary", () => {
   });
 
   it("co-locates only dependency-free linked surface contracts in the existing micro chunk", () => {
-    expect(viteConfigSource).toContain("/studio-element-model.ts");
-    expect(viteConfigSource).toContain("/studio-raster-image-presentation.ts");
-    expect(viteConfigSource).toContain('return "studio-core-micro-contracts";');
-    expect(viteConfigSource).not.toContain('return "studio-linked-3d-contract";');
+    expect(viteManualChunksSource).toContain("/studio-element-model.ts");
+    expect(viteManualChunksSource).toContain("/studio-raster-image-presentation.ts");
+    expect(viteManualChunksSource).toContain('return "studio-core-micro-contracts";');
+    expect(viteManualChunksSource).not.toContain('return "studio-linked-3d-contract";');
   });
 });

@@ -22,14 +22,14 @@ import {
 (globalThis as unknown as { self: typeof globalThis }).self = globalThis;
 
 const CORE = [
-  { id: "sample-vrm", name: "루미", file: "public/vrm/sample.vrm" },
-  { id: "avatar-a", name: "하린", file: "public/vrm/AvatarSample_A.vrm" },
-  { id: "avatar-b", name: "세라", file: "public/vrm/AvatarSample_B.vrm" },
-  { id: "avatar-c", name: "유나", file: "public/vrm/AvatarSample_C.vrm" },
-  { id: "mio", name: "미오", file: "public/vrm/fem_vroid.vrm" },
-  { id: "noa", name: "노아", file: "public/vrm/masc_vroid.vrm" },
-  { id: "alicia", name: "아리시아", file: "public/vrm/AliciaSolid.vrm" },
-  { id: "jennifer", name: "제니퍼", file: "public/vrm/Jennifer.vrm" },
+  { id: "sample-vrm", name: "루미", file: "apps/web/public/vrm/sample.vrm" },
+  { id: "avatar-a", name: "하린", file: "apps/web/public/vrm/AvatarSample_A.vrm" },
+  { id: "avatar-b", name: "세라", file: "apps/web/public/vrm/AvatarSample_B.vrm" },
+  { id: "avatar-c", name: "유나", file: "apps/web/public/vrm/AvatarSample_C.vrm" },
+  { id: "mio", name: "미오", file: "apps/web/public/vrm/fem_vroid.vrm" },
+  { id: "noa", name: "노아", file: "apps/web/public/vrm/masc_vroid.vrm" },
+  { id: "alicia", name: "아리시아", file: "apps/web/public/vrm/AliciaSolid.vrm" },
+  { id: "jennifer", name: "제니퍼", file: "apps/web/public/vrm/Jennifer.vrm" },
 ] as const;
 
 function extractFingers(bones: PoseBoneMap): FingerRotationMap {

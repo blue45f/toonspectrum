@@ -23,7 +23,7 @@ import { describe, expect, it } from "vitest";
  */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, "../../..");
+const ROOT = path.resolve(HERE, "../../../../..");
 
 /** Durable render surfaces: retained Canvas, SVG export, and the shared alias/bake boundary. */
 const ROUTE_ROOTS = [
@@ -62,8 +62,14 @@ function resolveSpecifier(fromFile: string, specifier: string): string | null {
   let absolute: string;
   if (bare.startsWith(".")) {
     absolute = path.resolve(ROOT, path.dirname(fromFile), bare);
+  } else if (bare.startsWith("@/shared/") || bare === "@/shared") {
+    // Match vite/vitest: `@/shared` -> apps/web/src/shared
+    absolute = path.resolve(ROOT, "apps/web/src/shared", bare.slice("@/shared".length).replace(/^\//u, ""));
+  } else if (bare.startsWith("@/domains/") || bare === "@/domains") {
+    absolute = path.resolve(ROOT, "apps/web/src/domains", bare.slice("@/domains".length).replace(/^\//u, ""));
   } else if (bare.startsWith("@/")) {
-    absolute = path.resolve(ROOT, bare.slice(2));
+    // Match vite/vitest: `@` -> apps/web (so `@/src/...` keeps working)
+    absolute = path.resolve(ROOT, "apps/web", bare.slice(2));
   } else {
     return null;
   }

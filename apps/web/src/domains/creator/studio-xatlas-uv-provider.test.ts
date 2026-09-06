@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -609,8 +610,8 @@ describe("StudioXAtlasUvProvider", () => {
     if (typeof apiConstructor !== "function") {
       throw new TypeError("xatlasjs API constructor is unavailable");
     }
-    const wasmPath = fileURLToPath(
-      new URL("../../../node_modules/xatlasjs/dist/node/xatlas.wasm", import.meta.url),
+    const wasmPath = createRequire(import.meta.url).resolve(
+      "xatlasjs/dist/node/xatlas.wasm",
     );
     const api = await new Promise<object>((resolve, reject) => {
       const holder: { instance: object | null } = { instance: null };

@@ -388,11 +388,14 @@ export default defineConfig(({ mode }) => ({
   root: webRoot,
   publicDir: path.resolve(webRoot, "public"),
   resolve: {
-    alias: {
-      "@/shared": path.resolve(webRoot, "src/shared"),
-      "@/domains": path.resolve(webRoot, "src/domains"),
-      "@": webRoot,
-    },
+    // Array form keeps longer `@/shared` / `@/domains` / `@/src` matches ahead of bare `@`
+    // for rolldown resolvers that do not sort by find length.
+    alias: [
+      { find: "@/shared", replacement: path.resolve(webRoot, "src/shared") },
+      { find: "@/domains", replacement: path.resolve(webRoot, "src/domains") },
+      { find: "@/src", replacement: path.resolve(webRoot, "src") },
+      { find: "@", replacement: webRoot },
+    ],
   },
   // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.
   assetsInclude: ["**/*.wasm"],

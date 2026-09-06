@@ -44,12 +44,12 @@ async function loadBundledVrm(relativePath: string) {
 }
 
 const CHARACTERS = [
-  { id: "sample", name: "루미", file: "public/vrm/sample.vrm" },
-  { id: "avatar-a", name: "하린", file: "public/vrm/AvatarSample_A.vrm" },
-  { id: "avatar-b", name: "세라", file: "public/vrm/AvatarSample_B.vrm" },
-  { id: "avatar-c", name: "유나", file: "public/vrm/AvatarSample_C.vrm" },
-  { id: "alicia", name: "아리시아", file: "public/vrm/AliciaSolid.vrm" },
-  { id: "mio", name: "미오", file: "public/vrm/fem_vroid.vrm" },
+  { id: "sample", name: "루미", file: "apps/web/public/vrm/sample.vrm" },
+  { id: "avatar-a", name: "하린", file: "apps/web/public/vrm/AvatarSample_A.vrm" },
+  { id: "avatar-b", name: "세라", file: "apps/web/public/vrm/AvatarSample_B.vrm" },
+  { id: "avatar-c", name: "유나", file: "apps/web/public/vrm/AvatarSample_C.vrm" },
+  { id: "alicia", name: "아리시아", file: "apps/web/public/vrm/AliciaSolid.vrm" },
+  { id: "mio", name: "미오", file: "apps/web/public/vrm/fem_vroid.vrm" },
 ] as const;
 
 function applyNaturalIdle(vrm: import("@pixiv/three-vrm").VRM, characterId: string) {
@@ -137,7 +137,7 @@ describe("relaxed hand palm orientation across bundled characters", () => {
   }, 180_000);
 
   it("does not force palm twist on a clearly raised arm (wave-like)", async () => {
-    const vrm = await loadBundledVrm("public/vrm/AvatarSample_A.vrm");
+    const vrm = await loadBundledVrm("apps/web/public/vrm/AvatarSample_A.vrm");
     const bones: PoseBoneMap = {
       rightUpperArm: { direction: { sideX: 0.48, y: 0.66, z: 0.08 } },
       rightLowerArm: { direction: { sideX: 0.18, y: 0.96, z: 0.1 } },

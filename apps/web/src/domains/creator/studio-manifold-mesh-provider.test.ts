@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -292,9 +293,8 @@ describe("Studio Manifold mesh provider", () => {
 
   it("executes a real Manifold WASM union without exposing vendor handles", async () => {
     const factory = await import("manifold-3d");
-    const wasmPath = new URL("../../../node_modules/manifold-3d/manifold.wasm",
-      import.meta.url,
-    ).pathname;
+    const require = createRequire(import.meta.url);
+    const wasmPath = require.resolve("manifold-3d/manifold.wasm");
     const module = await factory.default({ locateFile: () => wasmPath });
     module.setup();
     const seed = module.Manifold.tetrahedron();

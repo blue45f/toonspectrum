@@ -11,7 +11,11 @@ const pageOrchestrationBoundarySource = readFileSync(
   "utf8",
 );
 const viteConfigSource = readFileSync(
-  new URL("../../../vite.config.ts", import.meta.url),
+  new URL("../../../../../vite.config.ts", import.meta.url),
+  "utf8",
+);
+const viteManualChunksSource = readFileSync(
+  new URL("../../../../../apps/web/config/vite-manual-chunks.ts", import.meta.url),
   "utf8",
 );
 
@@ -70,7 +74,7 @@ describe("Studio quality-first build-size policy", () => {
 
   it("allows Babylon only through one exact lazy specialist boundary", () => {
     expect(bundleCheckSource).toContain(
-      '"apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts"',
+      '"src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts"',
     );
     expect(bundleCheckSource).toContain(
       "const babylonManifestPattern = /(?:@babylonjs|babylon(?:\\.js)?)/i",
@@ -78,11 +82,12 @@ describe("Studio quality-first build-size policy", () => {
     expect(bundleCheckSource).toContain(
       'const approvedBabylonRuntimeChunkName = "studio-bg3d-babylon-runtime"',
     );
-    expect(viteConfigSource).toContain('id.includes("/node_modules/@babylonjs/")');
-    expect(viteConfigSource).toContain(
+    expect(viteConfigSource).toContain('createStudioManualChunks');
+    expect(viteManualChunksSource).toContain('id.includes("/node_modules/@babylonjs/")');
+    expect(viteManualChunksSource).toContain(
       'id.includes("/node_modules/babylonjs-gltf2interface/")',
     );
-    expect(viteConfigSource).toContain(
+    expect(viteManualChunksSource).toContain(
       'return "studio-bg3d-babylon-runtime"',
     );
 
