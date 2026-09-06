@@ -69,8 +69,18 @@ replace('  private resetActiveState(): void {\n    this.clearCapRepaintWake();',
 replace('  private clearActiveRect(): void {\n    this.clearCanvas(this.activeContext, this.activeCanvas);',
 '  private clearActiveRect(): void {\n    this.pencilTip.discard();\n    this.clearCanvas(this.activeContext, this.activeCanvas);');
 fs.writeFileSync(file, text);
-// Resolve repository formatting errors before unit tests/build; lint failures stay fatal.
+// Format and lint every changed source/test file, not only the integration target.
+// Stage the exact files exercised by the following tests so publication cannot omit fixes.
 // Existing commit hooks, push hooks and protected-branch checks remain enabled.
-execFileSync('pnpm', ['exec', 'eslint', file, '--fix'], { stdio: 'inherit' });
-execFileSync('pnpm', ['exec', 'eslint', file], { stdio: 'inherit' });
-console.log('Applied and lint-checked reviewed moving-tip integration anchors');
+const checkedFiles = [
+  file,
+  'src/domains/creator/live/studio-live-pencil-paint-program.ts',
+  'src/domains/creator/live/studio-live-pencil-pass-compositing.test.ts',
+  'src/domains/creator/live/studio-live-retained-media-stability.test.ts',
+  'src/domains/creator/live/studio-live-transient-tip.test.ts',
+  'src/domains/creator/live/studio-live-transient-tip.ts',
+];
+execFileSync('pnpm', ['exec', 'eslint', ...checkedFiles, '--fix'], { stdio: 'inherit' });
+execFileSync('pnpm', ['exec', 'eslint', ...checkedFiles], { stdio: 'inherit' });
+execFileSync('git', ['add', '--', ...checkedFiles], { stdio: 'inherit' });
+console.log('Applied, lint-checked and staged the reviewed retained-pencil implementation');
