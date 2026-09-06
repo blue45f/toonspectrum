@@ -1,0 +1,35 @@
+name: Dontdraw intake contracts
+
+on:
+  pull_request:
+    paths:
+      - "scripts/dontdraw/**"
+      - ".github/workflows/dontdraw-intake.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/dontdraw/**"
+      - ".github/workflows/dontdraw-intake.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dontdraw-intake-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dontdraw-intake-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Check offline intake syntax
+        run: |
+          node --check scripts/dontdraw/import-authorized-assets.mjs
+          node --check scripts/dontdraw/authorized-intake-io.mjs
+      - name: Execute intake and filesystem regression contracts
+        run: node --test scripts/dontdraw/*.test.mjs
