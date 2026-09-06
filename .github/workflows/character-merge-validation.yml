@@ -25,9 +25,13 @@ on:
 permissions:
   contents: read
 
+# main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
+# cancel-in-progress 가 취소할 대상을 갖지 못한다 (ref 로 묶어야 같은 그룹이 된다). 이 게이트는
+# 브랜치 보호의 필수 체크가 아니므로 최신 main 상태만 검증하면 되고, 커밋별 신호가 필요한
+# ci.yml 은 그대로 SHA 로 묶어 둔다.
 concurrency:
-  group: character-merge-validation-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: character-merge-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   character-merge-validation:

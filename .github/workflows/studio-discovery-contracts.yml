@@ -1,16 +1,16 @@
 name: Studio discovery contracts
 
 on:
-  push:
-    branches: [fix/studio-brush-filter-discovery-20260906]
-  pull_request:
-    paths:
-      - 'src/domains/creator/brush/**'
-      - 'src/domains/creator/filter/**'
-      - '.github/workflows/studio-discovery-contracts.yml'
+  # The broader Studio discovery UX workflow already exercises these contracts on PRs.
+  # Keep this focused machine-readable report available for deliberate operator runs.
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: studio-discovery-contracts-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   contracts:
