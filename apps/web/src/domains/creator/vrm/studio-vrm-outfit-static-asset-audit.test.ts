@@ -83,7 +83,7 @@ describe("legacy static outfit GLB authority audit", () => {
   });
 
   it("keeps the historical directory outside the product runtime graph", () => {
-    const source = productionSources(join(process.cwd(), "src", "domains", "creator")).join("\n");
+    const source = productionSources(join(process.cwd(), "apps/web", "src", "domains", "creator")).join("\n");
     expect(source).not.toContain("/assets/3d/outfits/");
     for (const fileName of LEGACY_OUTFIT_FILES) expect(source).not.toContain(fileName);
 
