@@ -1,1 +1,1 @@
-export * from "../src/domains/creator/contracts/studio-live-auth-ticket";
+export * from "../../domains/creator/contracts/studio-live-auth-ticket";

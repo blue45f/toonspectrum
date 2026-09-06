@@ -43,9 +43,9 @@ process.env.DATABASE_URL = testDatabaseTarget.databaseUrl;
 export default defineConfig({
   resolve: {
     alias: {
-      "@": path.resolve(root, "apps/web"),
       "@/shared": path.resolve(root, "apps/web/src/shared"),
       "@/domains": path.resolve(root, "apps/web/src/domains"),
+      "@": path.resolve(root, "apps/web"),
     },
   },
   test: {

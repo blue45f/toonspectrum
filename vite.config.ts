@@ -384,9 +384,9 @@ export default defineConfig(({ mode }) => ({
   publicDir: path.resolve(webRoot, "public"),
   resolve: {
     alias: {
-      "@": webRoot,
       "@/shared": path.resolve(webRoot, "src/shared"),
       "@/domains": path.resolve(webRoot, "src/domains"),
+      "@": webRoot,
     },
   },
   // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.

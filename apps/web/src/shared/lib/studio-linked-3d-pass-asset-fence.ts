@@ -1,1 +1,1 @@
-export * from "../src/domains/creator/contracts/studio-linked-3d-pass-asset-fence";
+export * from "../../domains/creator/contracts/studio-linked-3d-pass-asset-fence";
