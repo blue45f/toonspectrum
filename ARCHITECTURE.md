@@ -8,3 +8,25 @@
 The root contains monorepo configuration, CI/deployment configuration, and documentation. The @/* alias resolves to apps/web/*; backend code must not import from the web app.
 
 Generated QA output belongs in CI artifacts and is ignored under qa-results/.
+
+## Source layout
+
+The repository keeps deployment wiring at the root and separates runtime applications:
+
+```text
+apps/web/
+  src/app/           bootstrap, routing, service workers, shell
+  src/domains/      feature pages and feature-local UI/state
+  src/shared/       cross-feature browser runtime (catalog, compat, hooks, infrastructure, types)
+  components/       reusable product UI pending domain ownership
+  lib/              catalog/data contracts and server-shaped client helpers
+  public/            shipped browser assets and generated catalog data
+apps/api/
+  src/modules/      Nest feature modules
+  src/infrastructure/ adapters and external services
+  src/db/           persistence schema and migrations
+api/                 thin Vercel adapters only
+packages/            shared contracts and engines
+```
+
+New cross-feature web code belongs in `apps/web/src/shared`; feature behavior belongs in the matching `src/domains/<feature>` directory, with tests colocated beside the implementation. The static catalog runtime is under `src/shared/catalog` so its eager installer and lazy engine have one discoverable home.

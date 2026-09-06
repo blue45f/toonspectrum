@@ -36,7 +36,7 @@ import { TitleCard } from "@/components/title-card";
 // 배포 환경에서도 root-relative 이미지 경로가 올바른 오리진을 가리키도록 정규화한다.
 import { withCsrfProtection } from "@/lib/csrf";
 import { cn } from "@/lib/utils";
-import { resolveAssetUrl } from "@/src/catalog-static";
+import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 
 interface Character {
   id: string;

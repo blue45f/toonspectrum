@@ -41,7 +41,7 @@ describe("vite migration", () => {
   });
 
   it("keeps the static catalog fetch installer out of the initial catalog engine bundle", () => {
-    const installer = readFileSync(join(process.cwd(), "apps/web/src/catalog-static.ts"), "utf8");
+    const installer = readFileSync(join(process.cwd(), "apps/web/src/shared/catalog/catalog-static.ts"), "utf8");
 
     expect(installer).toContain('import("./catalog-static-engine")');
     expect(installer).not.toContain("@/lib/server/catalog-store");

@@ -1410,7 +1410,7 @@ import { loadChunkWithReloadRecovery } from "@/lib/chunk-load-recovery";
 import { useT } from "@/lib/i18n";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-contract";
 import { cn } from "@/lib/utils";
-import { resolveAssetUrl } from "@/src/catalog-static";
+import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
 
 export function StudioCuttoonEditor({

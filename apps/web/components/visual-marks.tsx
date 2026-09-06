@@ -4,7 +4,7 @@ import type { Platform } from "@/lib/types";
 import type { CSSProperties } from "react";
 
 import { cx } from "@/lib/cx";
-import { resolveAssetUrl } from "@/src/catalog-static";
+import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 
 type MarkSize = "dot" | "xs" | "sm" | "md" | "lg";
 

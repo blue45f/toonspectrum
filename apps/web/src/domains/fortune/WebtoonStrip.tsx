@@ -6,7 +6,7 @@ import { CHAR_HUE } from "./fortune-theme";
 import type { FortuneCharacterInfo, FortunePanel, FortunePanelLine, PlaybackStep } from "./fortune-types";
 
 import { cn } from "@/lib/utils";
-import { resolveAssetUrl } from "@/src/catalog-static";
+import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 
 // 캐릭터별 무드 색상환(hue)은 fortune-theme 단일 출처. 나레이션 기본은 따뜻한 잉크.
 const NARRATION_HUE = 70;

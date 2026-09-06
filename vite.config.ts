@@ -381,6 +381,7 @@ export default defineConfig(({ mode }) => ({
     }),
   },
   root: webRoot,
+  publicDir: path.resolve(webRoot, "public"),
   resolve: {
     alias: {
       "@": webRoot,

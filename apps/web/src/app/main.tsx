@@ -3,7 +3,7 @@ import "../compat/storage-migrate"; // 스토어 hydrate 전에 레거시 키 �
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { installStaticCatalog } from "../catalog-static";
+import { installStaticCatalog } from "../shared/catalog/catalog-static";
 
 import App from "./App";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";

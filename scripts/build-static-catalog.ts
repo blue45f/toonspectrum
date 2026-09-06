@@ -1,10 +1,10 @@
-// 정적 카탈로그 생성기 — 커밋된 gz 스냅샷을 읽어 public/data/*.json 을 만든다.
+// 정적 카탈로그 생성기 — 커밋된 gz 스냅샷을 읽어 apps/web/public/data/*.json 을 만든다.
 //
-//   pnpm catalog:gen                       # apps/api/data/catalog.json.gz → public/data/*
+//   pnpm catalog:gen                       # apps/api/data/catalog.json.gz → apps/web/public/data/*
 //   WEBDEX_CATALOG_GZ=path pnpm catalog:gen
 //
 // 카탈로그 읽기에 Neon/DB 를 전혀 쓰지 않는다(순수 함수만). 리뷰·북마크·인증은 런타임 /api 담당.
-// public/data 는 빌드 산출물(.gitignore) — git 소스는 2.3MB gz 하나만 유지한다.
+// apps/web/public/data 는 빌드 산출물(.gitignore) — git 소스는 2.3MB gz 하나만 유지한다.
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,7 +73,7 @@ function loadRelatedInfoSnapshot(): RelatedSnapshot {
 }
 
 // 상세 전용 필드(시놉시스 원문·보러가기 URL·평점분포·관련 정보)를 해시 버킷 샤드로 분리 —
-// 상세/비교 화면이 작은 샤드 1개만 추가로 받아 병합한다(src/catalog-static-engine.ts).
+// 상세/비교 화면이 작은 샤드 1개만 추가로 받아 병합한다(src/shared/catalog/catalog-static-engine.ts).
 function buildDetailShards(titles: readonly Title[]): { files: DetailShardFile[]; entryCount: number } {
   const files: DetailShardFile[] = Array.from({ length: DETAIL_SHARD_COUNT }, () => ({}));
   const related = loadRelatedInfoSnapshot();
@@ -96,7 +96,7 @@ const SRC_GZ =
   process.env.WEBDEX_CATALOG_FILE ??
   process.env.WEBDEX_CATALOG_GZ ??
   path.join(ROOT, "apps/api/data/catalog.json.gz");
-const OUT = path.join(ROOT, "public", "data");
+const OUT = path.join(ROOT, "apps", "web", "public", "data");
 
 function loadTitles(): Title[] {
   if (!existsSync(SRC_GZ)) {
@@ -242,7 +242,7 @@ function writeSitemap(): void {
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     urls.join("\n") +
     `\n</urlset>\n`;
-  const file = path.join(ROOT, "public", "sitemap.xml");
+  const file = path.join(ROOT, "apps", "web", "public", "sitemap.xml");
   writeFileSync(file, xml);
   console.log(`  sitemap.xml      ${(statSync(file).size / 1024).toFixed(0).padStart(5)} KB (${urls.length} URLs)`);
 }

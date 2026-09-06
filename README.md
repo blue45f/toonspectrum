@@ -383,3 +383,7 @@ apps/api/            NestJS 백엔드 (catalog, ranking, auth, me, community, ad
 ## Repository layout
 
 The browser application lives under `apps/web` and the NestJS backend under `apps/api`. Shared contracts and engines are under `packages`; repository-only verification remains under `scripts`, `tools`, `e2e`, and `tests`. See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries and path conventions.
+
+### Runtime source map
+
+Frontend code is organized as `apps/web/src/app` (bootstrap and routes), `apps/web/src/domains` (feature slices), and `apps/web/src/shared` (cross-feature browser services and compatibility boundaries). Backend features live under `apps/api/src/modules`; infrastructure and persistence stay in their dedicated sibling directories. Root `api/` files are Vercel adapters, not application logic.

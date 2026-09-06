@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Hand, Outcome } from "./rps-logic";
 import type { VRM } from "@pixiv/three-vrm";
 
-import { resolveAssetUrl } from "@/src/catalog-static";
+import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 import {
   applyExpressionWeightsToVrm,
   applyFingerRotations,

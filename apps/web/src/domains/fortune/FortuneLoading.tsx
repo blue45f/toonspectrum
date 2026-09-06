@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 import type { FortuneTab } from "./FortunePage";
 
-import { resolveAssetUrl } from "@/src/catalog-static";
+import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 
 // 탭별 결과 형태에 맞춘 스켈레톤 로딩 — DESIGN.md "스켈레톤 로딩, 스피너 금지" 준수.
 // 캐릭터 아바타 글로우 + 단계별 카피로 'AI가 점치는 중' 의식을 연출한다.

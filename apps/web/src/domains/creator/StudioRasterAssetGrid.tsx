@@ -12,7 +12,7 @@ import {
 import type { StudioRasterAsset } from "./render/studio-raster-assets";
 import type { Dispatch, SetStateAction } from "react";
 
-import { resolveAssetUrl } from "@/src/catalog-static";
+import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 
 const COLLECTION_LABEL: Record<StudioRasterAsset["collection"], string> = {
   daily: "일상",

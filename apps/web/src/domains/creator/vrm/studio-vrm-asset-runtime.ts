@@ -11,7 +11,7 @@ import { isUsableVrmAssetResponse } from "./vrm-library";
 
 import type { VRM } from "@pixiv/three-vrm";
 
-import { resolveAssetUrl } from "@/src/catalog-static";
+import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 
 export const STUDIO_VRM_BASE_ROTATION_Y_KEY = "studioVrmBaseRotationY";
 export const STUDIO_VRM_HTML_FALLBACK_ERROR =

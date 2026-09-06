@@ -11,7 +11,7 @@ import { ShimmerTitle } from "@/components/shimmer-title";
 import { buttonClass } from "@/components/ui/button-utils";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { resolveAssetUrl } from "@/src/catalog-static";
+import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import {
