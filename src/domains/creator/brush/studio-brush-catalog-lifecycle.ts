@@ -74,19 +74,19 @@ export const STUDIO_BRUSH_CORE_SHELF_PRESET_IDS: readonly string[] = Object.free
   "kneaded-eraser",
   // 2026-09-04 quality-first 큐레이션: 서브 툴 팔레트가 계열마다 대표 하나만 남기면서
   // maru-pen·calligraphy·erodible-pencil·ink-brush·gouache·oil·airbrush-fine·web-dot-tone 이
-  // 셸프에서 빠지고 perfect-ink·charcoal--compressed-edge·gouache--matte-body·
-  // oil--filbert-ribbon 이 그 자리를 대신한다. 셸프가 SSOT 이고 이 표는 그 거울이다.
-  // 서브 툴 팔레트 — 펜
-  "perfect-ink",
-  // 서브 툴 팔레트 — 연필 (2026-09-02 feel-cull: 6b·colored-pencil 격리, 남은 연필 레인 유지)
-  "pencil-grain",
+  // 셸프에서 빠지고 charcoal--compressed-edge·gouache--matte-body·oil--filbert-ribbon 이
+  // 그 자리를 대신한다. 셸프가 SSOT 이고 이 표는 그 거울이다.
+  // 2026-09-06 빠른 선택 축소(#771, docs/studio-brush-filter-discovery-2026-09-06.md): 간편
+  // 서브 툴 23→18. perfect-ink·pencil-grain·hard-airbrush 는 팔레트에서 빠져 extended 로
+  // 내려가고, inkwash-pen·inkwash-water-brush·brush 는 팔레트에서만 빠져 스타터 키트로 core 를
+  // 유지한다. 같은 렌더링 판정이 아니라 먼저 보이는 선택지를 줄인 편집 결정이다.
+  // 서브 툴 팔레트 — 연필·목탄 (2026-09-02 feel-cull: 6b·colored-pencil 격리, 남은 연필 레인 유지)
   "pencil--side-shade",
   "charcoal--compressed-edge",
-  // 서브 툴 팔레트 — 붓 (2026-08-22: ink-wash 는 watercolor 와 같은 서명이라 격리 D′로 delist)
+  // 서브 툴 팔레트 — 채색·물감 (2026-08-22: ink-wash 는 watercolor 와 같은 서명이라 격리 D′로 delist)
   "gouache--matte-body",
   "oil--filbert-ribbon",
-  // 서브 툴 팔레트 — 에어브러시
-  "hard-airbrush",
+  // 서브 툴 팔레트 — 분사·입자
   "spray",
   "splatter",
   // 서브 툴 팔레트 — 만화

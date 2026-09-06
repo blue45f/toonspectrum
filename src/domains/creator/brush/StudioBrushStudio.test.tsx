@@ -189,7 +189,7 @@ describe("StudioBrushStudio", () => {
     fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
     fireEvent.click(screen.getByRole("button", { name: "이 브러시 기본값 복원" }));
 
-    expect(await screen.findByText("스프레이 기본값으로 복원할까요?")).toBeTruthy();
+    expect(await screen.findByText("미세 스프레이 기본값으로 복원할까요?")).toBeTruthy();
     const confirm = screen.getByRole("button", { name: /개 설정 복원/ });
     fireEvent.click(confirm);
 
