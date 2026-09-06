@@ -9,10 +9,11 @@ import {
   studio2dDisplayName,
   studio2dResolutionLabel,
 } from "./studio-2d-asset-quality";
-import { studio2dImageSource } from "./studio-2d-image-source";
+import { currentStudio2dPreview, studio2dImageSource, studio2dSceneIdentity } from "./studio-2d-image-source";
+import { Studio2dContentFilters } from "./Studio2dContentFilters";
 import { Studio2dScenePreview } from "./Studio2dScenePreview";
 
-import type { Studio2dOrientation, Studio2dQualityFilter, Studio2dScene, Studio2dSort } from "./studio-2d-asset-quality";
+import type { Studio2dEnvironment, Studio2dOrientation, Studio2dQualityFilter, Studio2dScene, Studio2dSort, Studio2dTimeOfDay } from "./studio-2d-asset-quality";
 
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,10 @@ function SceneCard({ scene, disabled, onPick, onPreview }: {
     <div className="space-y-1.5 p-2">
       <p className="line-clamp-2 min-h-8 text-[0.7rem] font-semibold leading-4 text-fg" title={title}>{title}</p>
       <p className="text-[0.64rem] text-fg-3">{studio2dResolutionLabel(scene)}</p>
+      {asset && <p className="text-[0.64rem] text-fg-3">{asset.environment} · {asset.timeOfDay}</p>}
+      {asset && (asset.containsPeople || asset.containsText) && <p className="text-[0.64rem] leading-relaxed text-fg-3">
+        {[asset.containsPeople ? "인물 포함" : null, asset.containsText ? "문자 형태 포함" : null].filter(Boolean).join(" · ")}
+      </p>}
       {asset && !isLargeStudio2dAsset(asset) && <p className="text-[0.64rem] text-fg-3">소형 컷용 · 확대 주의</p>}
       {status === "error" ? <button type="button" className="w-full rounded-lg border border-bad/40 px-1 py-1.5 text-xs text-bad"
         onClick={() => { setStatus("loading"); setAttempt((value) => value + 1); }}>이미지 다시 불러오기</button>
@@ -71,18 +76,25 @@ export function Studio2dSceneBrowser({ groups, query, onQueryChange, genre, onGe
   const [orientation, setOrientation] = useState<Studio2dOrientation>("all");
   const [sort, setSort] = useState<Studio2dSort>("recommended");
   const [emptySceneOnly, setEmptySceneOnly] = useState(false);
+  const [environment, setEnvironment] = useState<Studio2dEnvironment>("all");
+  const [timeOfDay, setTimeOfDay] = useState<Studio2dTimeOfDay>("all");
+  const [textFreeOnly, setTextFreeOnly] = useState(false);
   const [preview, setPreview] = useState<Studio2dScene | null>(null);
   const [visibleCount, setVisibleCount] = useState(48);
+  const activePreview = useMemo(() => currentStudio2dPreview(groups, preview), [groups, preview]);
+  useEffect(() => {
+    if (preview && !activePreview) setPreview(null);
+  }, [preview, activePreview]);
   const genres = useMemo(() => [...new Set(groups.map((group) => group.genre))], [groups]);
   // Old sessions may retain the obsolete "추천" genre. Quality and genre are now independent.
   const activeGenre = genres.includes(genre) ? genre : "all";
-  const results = useMemo(() => filterStudio2dScenes(groups, { query, genre: activeGenre, quality, orientation, sort, emptySceneOnly }),
-    [groups, query, activeGenre, quality, orientation, sort, emptySceneOnly]);
+  const results = useMemo(() => filterStudio2dScenes(groups, { query, genre: activeGenre, quality, orientation, sort, emptySceneOnly, environment, timeOfDay, textFreeOnly }),
+    [groups, query, activeGenre, quality, orientation, sort, emptySceneOnly, environment, timeOfDay, textFreeOnly]);
   useEffect(() => {
     setVisibleCount(48);
     if (gridRef.current) gridRef.current.scrollTop = 0;
-  }, [query, activeGenre, quality, orientation, sort, emptySceneOnly]);
-  const reset = () => { onQueryChange(""); onGenreChange("all"); setQuality("all"); setOrientation("all"); setEmptySceneOnly(false); setSort("recommended"); };
+  }, [query, activeGenre, quality, orientation, sort, emptySceneOnly, environment, timeOfDay, textFreeOnly]);
+  const reset = () => { onQueryChange(""); onGenreChange("all"); setQuality("all"); setOrientation("all"); setEmptySceneOnly(false); setSort("recommended"); setEnvironment("all"); setTimeOfDay("all"); setTextFreeOnly(false); };
   const field = "min-w-0 rounded-lg border border-line bg-card px-2 py-1.5 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
 
   return <div className="min-w-0 space-y-3" data-studio-2d-browser="true">
@@ -124,6 +136,8 @@ export function Studio2dSceneBrowser({ groups, query, onQueryChange, genre, onGe
         </select>
       </div>
     </div>
+    <Studio2dContentFilters environment={environment} timeOfDay={timeOfDay} textFreeOnly={textFreeOnly}
+      onEnvironmentChange={setEnvironment} onTimeOfDayChange={setTimeOfDay} onTextFreeOnlyChange={setTextFreeOnly} />
     <label htmlFor={`${id}-empty`} className="flex items-center gap-2 text-xs text-fg-2">
       <input id={`${id}-empty`} type="checkbox" checked={emptySceneOnly} onChange={(event) => setEmptySceneOnly(event.target.checked)} />인물 없는 이미지 배경만
     </label>
@@ -137,10 +151,10 @@ export function Studio2dSceneBrowser({ groups, query, onQueryChange, genre, onGe
       조건에 맞는 배경이 없습니다. 검색어나 필터를 바꿔 주세요.
     </div>}
     <div ref={gridRef} data-studio-2d-grid="true" className={cn("grid max-h-[min(52dvh,32rem)] grid-cols-2 gap-2 overflow-y-auto pr-1", loading && "opacity-70")}>
-      {results.slice(0, visibleCount).map((scene) => <SceneCard key={`${scene.id}:${scene.imgSrc ?? "vector"}`} scene={scene} disabled={disabled} onPick={onPick} onPreview={setPreview} />)}
+      {results.slice(0, visibleCount).map((scene) => <SceneCard key={studio2dSceneIdentity(scene)} scene={scene} disabled={disabled} onPick={onPick} onPreview={setPreview} />)}
       {visibleCount < results.length && <button type="button" onClick={() => setVisibleCount((count) => count + 48)}
         className="col-span-2 rounded-lg border border-line p-3 text-xs">장면 더 보기 ({results.length - visibleCount}개 남음)</button>}
     </div>
-    {preview && <Studio2dScenePreview key={`${preview.id}:${preview.imgSrc ?? "vector"}`} scene={preview} disabled={disabled} onPick={onPick} onClose={() => setPreview(null)} />}
+    {activePreview && <Studio2dScenePreview key={studio2dSceneIdentity(activePreview)} scene={activePreview} disabled={disabled} onPick={onPick} onClose={() => setPreview(null)} />}
   </div>;
 }

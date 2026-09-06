@@ -41,7 +41,7 @@ try {
   assert.ok(address && typeof address === "object");
   const url = `http://127.0.0.1:${address.port}/${relative}/index.html`;
   browser = await chromium.launch();
-  for (const viewport of [{ name: "desktop", width: 1280, height: 960 }, { name: "mobile", width: 390, height: 844 }]) {
+  for (const viewport of [{ name: "desktop", width: 1280, height: 960 }, { name: "mobile", width: 390, height: 844 }, { name: "narrow", width: 320, height: 740 }]) {
     const page = await browser.newPage({ viewport, deviceScaleFactor: 1, reducedMotion: "reduce" });
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(url);
@@ -89,9 +89,26 @@ try {
     await page.getByLabel("소재 구분", { exact: true }).selectOption("large");
     await page.getByLabel("원본 비율", { exact: true }).selectOption("portrait");
     await expect(page.getByText(/조건에 맞는 배경이 없습니다/u)).toBeVisible();
+    await page.getByRole("button", { name: "필터 초기화", exact: true }).click();
+    await page.locator("[data-studio-2d-content-filters] summary").click();
+    await page.getByLabel("장소", { exact: true }).selectOption("실내");
+    await page.getByLabel("시간대", { exact: true }).selectOption("밤");
+    await page.getByLabel("문자 형태 없는 이미지 배경만", { exact: true }).check();
+    await page.getByLabel("소재 구분", { exact: true }).selectOption("large");
+    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(2);
+    for (const asset of manifest.assets.filter((item) => ["webtoon-creator-room", "webtoon-palace"].includes(item.id))) {
+      await expect(page.getByRole("button", { name: `${asset.title} 삽입`, exact: true })).toBeEnabled();
+    }
+    await expect(page.locator("[data-studio-2d-content-filters] summary")).toContainText("3개 적용");
+    await page.screenshot({ path: path.join(evidence, `${viewport.name}-content-discovery.png`), fullPage: true });
+    await page.getByRole("button", { name: "장소·시간·문자 조건만 지우기", exact: true }).click();
+    await expect(page.getByLabel("소재 구분", { exact: true })).toHaveValue("large");
+    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(9);
+    await page.getByRole("button", { name: "필터 초기화", exact: true }).click();
+    await expect(page.locator("[data-studio-2d-asset]")).toHaveCount(48);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     assert.equal(overflow, false, "horizontal document overflow");
-    results.push({ viewport: viewport.name, ok: true, originalSize: [rooftop.width, rooftop.height], assertions: "complete 64-scene catalog, pagination, filter scroll reset, filters, native decode, aspect ratio, modal, pixel view, focus trap, escape/restore, insertion, empty state, overflow" });
+    results.push({ viewport: viewport.name, ok: true, originalSize: [rooftop.width, rooftop.height], assertions: "complete 64-scene catalog, pagination, filter scroll reset, filters, native decode, aspect ratio, modal, pixel view, focus trap, escape/restore, insertion, empty state, reviewed environment/time/text filters, partial reset, 320px overflow" });
     await page.close();
   }
   assert.deepEqual(errors, []);
