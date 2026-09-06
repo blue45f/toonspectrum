@@ -92,7 +92,7 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
     return await new Promise<Blob>((resolve, reject) => {
       const chunks: Blob[] = [];
       let raf = 0;
-      let audioStopTimer = 0;
+      let audioStopTimer: ReturnType<typeof setTimeout> | undefined;
       let bytes = 0;
       let settled = false;
       let finished = false;
@@ -101,7 +101,7 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
       const cleanup = () => {
         cancelAnimationFrame(raf);
         clearTimeout(watchdog);
-        clearTimeout(audioStopTimer);
+        if (audioStopTimer !== undefined) clearTimeout(audioStopTimer);
         signal.removeEventListener("abort", abort);
         document.removeEventListener("visibilitychange", visibility);
         activeRecorder.ondataavailable = null;
