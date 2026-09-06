@@ -1,0 +1,98 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/concrete_layers_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "name": "Concrete Layers 02",
+    "categories": [
+      "man made",
+      "concrete",
+      "plaster-concrete"
+    ],
+    "type": 1,
+    "tags": [
+      "worn",
+      "chipped",
+      "rough",
+      "weathered",
+      "cracked",
+      "damaged",
+      "wall",
+      "discolored",
+      "dirty",
+      "dry",
+      "concrete",
+      "grey",
+      "plastered",
+      "plaster"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "info": null,
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "date_published": 1678579200,
+    "max_resolution": [
+      16384,
+      16384
+    ],
+    "files_hash": "bc64b57462d7f4ada82bcda31d30209ea56af2e2",
+    "description": "Free 16K concrete texture showing rough, weathered grey plaster with chipped layers, cracks, stains and dry dirt streaks; board lines and surface pitting.",
+    "category_id": "ebaa964c-b45c-52e2-bd50-892d64616d87",
+    "category": "Concrete/Plaster & Stucco/Bare Plaster",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "cracked",
+        "worn",
+        "damaged"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "download_count": 134098,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/concrete_layers_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_layers_02/concrete_layers_02_diff_2k.jpg",
+      "bytes": 2555097,
+      "sha256": "f70070187573ad05457c65c3efe7fb25fe1e071a5490c760e5b90f845aab9b91",
+      "sourceMd5": "f98d5155e8d298931320879be082d136"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_layers_02/concrete_layers_02_rough_2k.jpg",
+      "bytes": 1920563,
+      "sha256": "d90cfb52d690c4ac843e29e05ffc3d67f510f6a5aa1ef0f0f467d693d7d958b7",
+      "sourceMd5": "7d43a4200b6d7719e9f3278d929f5f5f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_layers_02/concrete_layers_02_nor_gl_2k.jpg",
+      "bytes": 3389363,
+      "sha256": "6985e0782adb226423d81cdd080b0e06012fdfb20eb3952d2459218fdd3977e9",
+      "sourceMd5": "8421eb5b33a8afbf845565676abc7f44"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_layers_02/concrete_layers_02_ao_2k.jpg",
+      "bytes": 1941520,
+      "sha256": "0e974d416b1414aa14bd852cfe4dd1116f5f16c09410e908cf6b5156d351dd3f",
+      "sourceMd5": "243a21706cf63fc7754ffb4ea4fc21b1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_layers_02/concrete_layers_02_disp_2k.jpg",
+      "bytes": 899564,
+      "sha256": "cc3415968ecb936d4d748734cb653d3db3490ae7ad68d6538e2aae98ce6241cf",
+      "sourceMd5": "515fca64e899c620034e392a8b2ca3c7"
+    }
+  ]
+}
