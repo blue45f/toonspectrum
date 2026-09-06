@@ -77,9 +77,15 @@ describe("studio brush catalog lifecycle", () => {
     expect(brushLifecycleStageOf("gpen")).toBe("core");
     expect(brushLifecycleStageOf("standard-eraser")).toBe("core");
     // 2026-08-21 로스터 축소 웨이브에서 glass-pen 은 pen 과 실행 서명이 같아 delist 됐습니다.
-    // 2026-09-04 quality-first 큐레이션이 perfect-ink 를 펜 서브 툴 팔레트 대표로 올리면서
-    // 그 자리는 core 가 됐습니다 — "extended" 대표는 아래 watercolor-salt-bloom 이 지킵니다.
-    expect(brushLifecycleStageOf("perfect-ink")).toBe("core");
+    // 2026-09-04 quality-first 큐레이션이 perfect-ink 를 펜 서브 툴 팔레트 대표로 올렸다가,
+    // 2026-09-06 빠른 선택 축소(#771)가 간편 목록에서 다시 뺐습니다 — 격리가 아니라 노출 편집이라
+    // 검색·전체 라이브러리에는 남는 "extended" 입니다.
+    expect(brushLifecycleStageOf("perfect-ink")).toBe("extended");
+    expect(brushLifecycleStageOf("pencil-grain")).toBe("extended");
+    expect(brushLifecycleStageOf("hard-airbrush")).toBe("extended");
+    // 팔레트에서만 빠진 InkWash 쌍은 스타터 키트가 계속 셸프에 올리므로 core 를 유지합니다.
+    expect(brushLifecycleStageOf("inkwash-pen")).toBe("core");
+    expect(brushLifecycleStageOf("inkwash-water-brush")).toBe("core");
     expect(brushLifecycleStageOf("glass-pen")).toBe("quarantined");
     expect(brushLifecycleStageOf("watercolor-salt-bloom")).toBe("extended");
     expect(brushLifecycleStageOf("gpen--croquis-capsule")).toBe("experimental");
