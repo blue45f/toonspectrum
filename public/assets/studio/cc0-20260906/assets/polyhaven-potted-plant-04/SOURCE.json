@@ -1,0 +1,96 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/potted_plant_04",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "date_published": 1623767629,
+    "name": "Potted Plant 04",
+    "categories": [
+      "decorative",
+      "plants",
+      "potted plants",
+      "succulent",
+      "nature"
+    ],
+    "type": 2,
+    "tags": [
+      "cactus",
+      "aloe",
+      "succulent",
+      "potplant",
+      "small",
+      "pot",
+      "plant",
+      "decor"
+    ],
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "sponsors": [
+      "78546118"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 6097,
+    "texel_density": 13467.404038911603,
+    "dimensions": [
+      170.27407884597778,
+      185.9453096985817,
+      267.5964875961654
+    ],
+    "files_hash": "c71ad499bc2ad1a95b689fc8895447eff788408b",
+    "description": "Free 8K potted succulent model - small zebra haworthia in a weathered ceramic pot. Realistic textures and natural detail; ideal for interior decor scenes.",
+    "category_id": "3dde8a0d-8ee9-5e81-85c4-3251ec4a5d88",
+    "category": "Nature/Plants/Potted Plants",
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "ceramic"
+      ]
+    },
+    "download_count": 86237,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/potted_plant_04.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/potted_plant_04/potted_plant_04_2k.gltf",
+      "bytes": 7081,
+      "sha256": "3f9502718be285a6614622774a6b19fd9014e2d5e05e6a08f822321dd157e6d5",
+      "sourceMd5": "b3c03c7c8200f603029c3540a9995cbd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/potted_plant_04/potted_plant_04_diff_2k.jpg",
+      "bytes": 1804144,
+      "sha256": "088004de42f405aaa5e14b22f9376e066d3b1ba58e957ad7a67a14697f086bcf",
+      "sourceMd5": "5027506c5e268ac90a12c59af29fdd6b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/potted_plant_04/potted_plant_04.bin",
+      "bytes": 241800,
+      "sha256": "158c1d27503d4845eb3573f00c01ae3f4f77f1d6ca8754c67bf1762745946f7f",
+      "sourceMd5": "03774ca8e28e2aa30fb26cb68d5e0093"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/potted_plant_04/potted_plant_04_nor_gl_2k.jpg",
+      "bytes": 2723926,
+      "sha256": "d4ba8dce3a46ab10bf95cf643838222f50778c718fe16acf0f95cba9b599b8a7",
+      "sourceMd5": "2e6ce98447b27e7a28d1c274b46c1448"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/potted_plant_04/potted_plant_04_arm_2k.jpg",
+      "bytes": 1480527,
+      "sha256": "95fed5f61ce04485b9233f81459fa4f2c7e51ed93a96f8e4470a0db75ce16288",
+      "sourceMd5": "f082178308dea1cd23598786603bda6d"
+    }
+  ]
+}

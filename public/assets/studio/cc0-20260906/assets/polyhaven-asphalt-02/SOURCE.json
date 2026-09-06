@@ -1,0 +1,98 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/asphalt_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "date_published": 1596694249,
+    "name": "Asphalt 02",
+    "categories": [
+      "terrain",
+      "road",
+      "man made",
+      "outdoor",
+      "floor"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "sponsors": [
+      "26820710"
+    ],
+    "dimensions": [
+      3000.000238418579,
+      3000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "2839a331f389f6ad1e30a78f24db58369d92f742",
+    "tags": [
+      "asphalt",
+      "cracked",
+      "flat",
+      "road",
+      "asphalt road",
+      "tarmac road",
+      "gritty",
+      "weathered",
+      "grey",
+      "cracking",
+      "tar",
+      "cracks"
+    ],
+    "description": "Free 8K texture of weathered grey asphalt: gritty coarse aggregate, subtle tar cracks, rough matte surface with uneven wear.",
+    "category_id": "ae6df066-2cbf-5772-9092-3cd86ed6394e",
+    "category": "Asphalt & Bitumen/Asphalt/Cracked Asphalt",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "weathered",
+        "cracked"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "download_count": 388988,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/asphalt_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_diff_2k.jpg",
+      "bytes": 3075676,
+      "sha256": "28f5ba8690553f192c0e5e1a5ff40f34765b4b93f4cc7059b1a3e9c795b6c28c",
+      "sourceMd5": "336af399fd98a39ab986d8b3bf73b4ff"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_rough_2k.jpg",
+      "bytes": 2230457,
+      "sha256": "b9a516b61b7040a9245ac206642d5f767ad9589a0169c4a1668221429e8a998c",
+      "sourceMd5": "6fe669ab38640ef2009d6a28d1ad5ee9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_nor_gl_2k.jpg",
+      "bytes": 4943950,
+      "sha256": "ffe49db71a0fd34c1e259625df66a302a237597d6ef655307987ec4e45bc6f21",
+      "sourceMd5": "77ebd1cc0b020ccaa1c6b58f103d1f75"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_ao_2k.jpg",
+      "bytes": 2039487,
+      "sha256": "5fe1737cbbcd55f2fec3632d6170762e5733f24bbc7a7816afb22a23c710b11f",
+      "sourceMd5": "2bf61d77e68da004eea168b88c4c31b5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_02/asphalt_02_disp_2k.jpg",
+      "bytes": 1131595,
+      "sha256": "943f254ed5e1504131547b35afe3798771cdda33842b7fdc6c0288b8312a44b0",
+      "sourceMd5": "d5f850f6c2d283be7482db3b0458a2af"
+    }
+  ]
+}

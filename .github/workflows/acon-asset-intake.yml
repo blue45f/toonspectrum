@@ -1,0 +1,44 @@
+name: ACON authorized asset intake
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/import-acon-assets.mjs'
+      - 'scripts/verify-acon-asset-intake.mjs'
+      - 'docs/acon-authorized-asset-intake.md'
+      - '.github/workflows/acon-asset-intake.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/import-acon-assets.mjs'
+      - 'scripts/verify-acon-asset-intake.mjs'
+      - '.github/workflows/acon-asset-intake.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: acon-intake-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-intake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/import-acon-assets.mjs
+            scripts/verify-acon-asset-intake.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Check syntax
+        run: |
+          node --check scripts/import-acon-assets.mjs
+          node --check scripts/verify-acon-asset-intake.mjs
+      - name: Test synthetic fixtures without credentials or asset downloads
+        run: node --test scripts/verify-acon-asset-intake.mjs

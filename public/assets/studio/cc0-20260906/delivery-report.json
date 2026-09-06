@@ -1,20 +1,21 @@
 {
   "schema": "toonspectrum.asset-delivery.v1",
   "sourceRevision": "90ab3c778d1e66cd0cbc1b5446b343b4507fd5f2",
-  "deliveredOriginals": 1097,
+  "deliveredOriginals": 1143,
   "byKind": {
-    "model": 999,
+    "model": 1015,
     "effect-mask": 96,
-    "surface-texture": 2
+    "surface-texture": 32
   },
   "byCategory": {
     "furniture": 140,
-    "food": 200,
+    "food": 199,
     "effect-mask": 96,
-    "surface-material": 2,
+    "surface-material": 32,
     "nature": 294,
     "architecture": 239,
-    "outdoor-prop": 126
+    "outdoor-prop": 126,
+    "pbr-detailed-prop": 17
   },
   "deduplicatedVariants": 35,
   "excludedCandidates": 16,
@@ -159,8 +160,10 @@
   "notice": "Actual delivered files passed the listed technical checks. These are not claims of visual approval, complete 3D validation, Studio runtime verification, or production publication.",
   "browserRenderedModels": 999,
   "browserRejectedModels": 0,
-  "repositoryBundledOriginals": 1097,
+  "repositoryBundledOriginals": 1143,
   "retiredStarterBackgrounds": 8,
   "retirementMethod": "hidden-from-new-selection; legacy-id-and-package-resolution-preserved",
-  "verifiedDeliveryFiles": 1097
+  "verifiedDeliveryFiles": 1143,
+  "initialDeliveryOriginals": 1097,
+  "activeCatalogCuration": "curation-summary.json"
 }

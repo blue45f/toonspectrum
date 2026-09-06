@@ -1,0 +1,89 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/asphalt_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "name": "Asphalt 01",
+    "categories": [
+      "asphalt",
+      "floor",
+      "outdoor",
+      "road"
+    ],
+    "type": 1,
+    "tags": [
+      "rough",
+      "dirty",
+      "asphalt",
+      "road",
+      "worn"
+    ],
+    "authors": {
+      "Dario Barresi": "Processing ",
+      "Charlotte Baglioni": "Photography"
+    },
+    "info": null,
+    "date_published": 1664841600,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "dimensions": [
+      2079.9994468688965,
+      2079.9996852874756
+    ],
+    "files_hash": "61bdb4dc064585ce3e749a4dcaf13216575ae794",
+    "description": "Free 8K asphalt texture: worn, dirty road surface with a coarse, rough aggregate, compacted bumps and subtle grime discoloration.",
+    "category_id": "8871debe-40cf-5e4d-a5e5-1ddfe979f14f",
+    "category": "Asphalt & Bitumen/Asphalt/Worn Road Surface",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "weathered",
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "download_count": 70264,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/asphalt_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_01/asphalt_01_diff_2k.jpg",
+      "bytes": 3118607,
+      "sha256": "10fe1dafe34fec51397dbe9011f798c68c4e3fc16abfd4d7aea0123122db8993",
+      "sourceMd5": "1a982193e0137381402a60cbd5892474"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_01/asphalt_01_rough_2k.jpg",
+      "bytes": 1599661,
+      "sha256": "c6962037eb41c6f0feafba22353e315d37ae8c8ea472dfd7d4fe28136904ceb5",
+      "sourceMd5": "ee92528bdb30f4f1656a5a665e2c6225"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_01/asphalt_01_nor_gl_2k.jpg",
+      "bytes": 4845665,
+      "sha256": "60fd6af2aae30bb3fd2231227ecbe52d0ced2c761d53a64f50dea59d173307cd",
+      "sourceMd5": "8b513a75b434f95ca268436265742638"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_01/asphalt_01_ao_2k.jpg",
+      "bytes": 4048107,
+      "sha256": "0cbbf5252a632482c9ce15fd53b26a6b468250114b8e3fef20d0393d139d2611",
+      "sourceMd5": "21ee0f8dc9ecc084de45413e0a4b06ce"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/asphalt_01/asphalt_01_disp_2k.jpg",
+      "bytes": 1389676,
+      "sha256": "c5c3e80e20613b1b925dd91da579238564ae3a0a29b8bea58101f3ed87d0fbec",
+      "sourceMd5": "7af1832cc5819aa912419de6e8c343da"
+    }
+  ]
+}

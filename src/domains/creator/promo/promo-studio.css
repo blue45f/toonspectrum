@@ -1,0 +1,54 @@
+.promo-studio { --promo-border: #d9dee9; --promo-text: #182337; --promo-muted: #56647a; max-width: 1440px; margin: 0 auto; padding: 32px 24px 72px; color: var(--promo-text); background: #f5f6fa; border-radius: 20px; }
+.promo-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 0 32px; }
+.promo-back { color: inherit; font-size: 14px; text-decoration: none; }
+.promo-eyebrow { color: #5e49c6; font-size: 12px; font-weight: 800; letter-spacing: .14em; margin: 24px 0 8px; }
+.promo-header h1 { font-size: clamp(24px, 3.2vw, 40px); line-height: 1.25; font-weight: 800; letter-spacing: -.04em; margin: 0 0 12px; }
+.promo-header p:not(.promo-eyebrow) { color: var(--promo-muted); line-height: 1.7; }
+.promo-badge { flex-shrink: 0; padding: 12px 18px; border: 1px solid #cfc8ee; background: #f2eeff; color: #4c36ae; border-radius: 100px; font-size: 14px; font-weight: 700; }
+.promo-workspace { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 24px; align-items: start; }
+.promo-editing, .promo-output { display: grid; gap: 20px; min-width: 0; }
+.promo-card { min-width: 0; margin: 0; border: 1px solid var(--promo-border); border-radius: 18px; padding: 24px; background: #fff; }
+.promo-card legend { font-size: 15px; font-weight: 750; padding: 0 8px; }
+.promo-studio h2 { margin: 0 0 16px; font-size: 17px; font-weight: 750; }
+.promo-studio label { display: block; font-size: 13px; font-weight: 650; line-height: 1.6; margin: 12px 0 6px; }
+.promo-studio input:not([type=range]), .promo-studio textarea, .promo-studio select { display: block; box-sizing: border-box; width: 100%; min-height: 44px; border: 1px solid var(--promo-border); border-radius: 9px; background: #f8f9fc; color: var(--promo-text); padding: 10px 12px; font: inherit; font-size: 14px; }
+.promo-studio textarea { resize: vertical; }
+.promo-studio input[type=file] { font-size: 12px; padding: 10px; }
+.promo-studio input[type=range] { accent-color: #6b50cc; width: 100%; min-height: 32px; }
+.promo-studio button { min-height: 44px; padding: 9px 14px; border: 1px solid var(--promo-border); border-radius: 9px; background: #fff; color: var(--promo-text); font-size: 13px; line-height: 1.5; font-weight: 650; cursor: pointer; }
+.promo-studio button:hover:not(:disabled) { background: #f0edf9; border-color: #a796de; }
+.promo-studio :is(button, input, textarea, select, a):focus-visible { outline: 3px solid #987bec; outline-offset: 3px; }
+.promo-studio :disabled { cursor: not-allowed; opacity: .55; }
+.promo-studio .promo-primary { color: #fff; background: #6446bd; border-color: #6446bd; }
+.promo-studio .promo-primary:hover:not(:disabled) { background: #50379f; }
+.promo-button-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0; }
+.promo-inline-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.promo-muted { color: var(--promo-muted); font-size: 12px; font-weight: 400; line-height: 1.75; margin: 10px 0; }
+.promo-section-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.promo-section-head span { color: var(--promo-muted); font-size: 13px; white-space: nowrap; }
+.promo-empty { padding: 30px 18px; border: 1px dashed #b7accf; border-radius: 12px; background: #f9f7fe; text-align: center; font-size: 14px; line-height: 1.8; }
+.promo-shots { display: grid; gap: 16px; }
+.promo-shot { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 14px; border: 1px solid var(--promo-border); border-radius: 12px; margin: 0; padding: 12px; min-width: 0; }
+.promo-shot legend { font-size: 12px; font-weight: 700; padding: 0 6px; }
+.promo-shot-image { width: 92px; height: 130px; object-fit: contain; background: #edf0f7; border-radius: 8px; }
+.promo-shot-fields { min-width: 0; }
+.promo-shot-fields label:first-child { margin-top: 0; }
+.promo-shot .promo-inline-grid { grid-template-columns: 1fr; gap: 0; }
+.promo-shot-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.promo-shot-actions button { flex: 1; font-size: 12px; }
+.promo-preview { background: #0d1525; color: #ecf0fb; border: 1px solid #25324b; border-radius: 18px; padding: 18px; overflow: hidden; }
+.promo-preview-top { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; margin-bottom: 16px; color: #c9d2e6; }
+.promo-canvas-wrap { display: flex; align-items: center; justify-content: center; min-height: 250px; background: #080f1d; border-radius: 10px; overflow: hidden; }
+.promo-canvas-wrap canvas { display: block; max-width: 100%; max-height: 520px; width: auto; height: auto; object-fit: contain; }
+.promo-playback { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
+.promo-playback input { flex: 1; min-width: 30px; }
+.promo-playback button { flex-shrink: 0; }
+.promo-playback output { font-size: 11px; white-space: nowrap; color: #dbe3f4; }
+.promo-preview .promo-muted { color: #b0bed6; }
+.promo-full { width: 100%; margin-top: 12px; }
+.promo-feedback { border: 1px solid #cec4ee; border-radius: 12px; background: #f4f0ff; color: #49347e; padding: 16px; font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
+.promo-feedback progress { width: 100%; accent-color: #6446bd; }
+.promo-error { border: 1px solid #efb7b7; border-radius: 12px; color: #9b1c1c; background: #fff1f1; padding: 16px; font-size: 13px; line-height: 1.7; }
+.promo-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 900px) { .promo-workspace { grid-template-columns: 1fr; } .promo-output { grid-row: 1; } .promo-header { align-items: start; } .promo-badge { display: none; } .promo-canvas-wrap canvas { max-height: 420px; } }
+@media (max-width: 540px) { .promo-studio { padding: 16px 12px 48px; } .promo-card { padding: 16px; } .promo-inline-grid { grid-template-columns: 1fr; gap: 0; } .promo-shot { grid-template-columns: 64px minmax(0, 1fr); gap: 10px; padding: 10px; } .promo-shot-image { width: 64px; height: 100px; } .promo-button-row button { flex: 1; } .promo-playback { gap: 6px; } .promo-playback output { font-size: 10px; } }
