@@ -91,6 +91,17 @@ jobs:
           path.write_text(source.replace(old, new))
           PY
 
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('/tmp/validate.sh')
+          source = path.read_text()
+          old = " '*.orig' '*.rej'"
+          if source.count(old) != 1:
+              raise SystemExit(f'expected one generated recovery-file glob, found {source.count(old)}')
+          path.write_text(source.replace(old, " '*.rej'"))
+          PY
+
           bash /tmp/refresh.sh
           bash /tmp/validate.sh
 
