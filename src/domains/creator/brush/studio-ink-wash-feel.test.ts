@@ -10,6 +10,7 @@ import {
   planStudioDrawPointerStart,
   type StudioDrawPointerStartInput,
 } from "./studio-draw-pointer-start-plan";
+import { STUDIO_SUB_TOOL_PALETTE_CATEGORIES } from "./studio-sub-tool-palette-data";
 import {
   createStudioInkwashFluidSession,
   depositStudioInkwashFluidStamp,
@@ -231,16 +232,16 @@ describe("InkWash pen/water product start on the shipped wet/fluid path", () => 
     resetStudioInkwashWash();
   });
 
-  it("lists the pen and water brush in the picker and search under their stable IDs", () => {
+  it("lists the pen and water brush in the picker and search while the quick palette stays curated", () => {
     for (const id of ["inkwash-pen", "inkwash-water-brush"] as const) {
       expect(isStudioBrushQuarantinedPresetId(id), id).toBe(false);
       expect(
         filterStudioBrushCatalogItems({ category: "beginner" }).some((item) => item.id === id),
-        `${id}: missing from the default 기본 tab`,
+        `${id}: missing from the default 시작 도구 tab`,
       ).toBe(true);
       expect(
         filterStudioBrushCatalogItems({ category: "watercolor" }).some((item) => item.id === id),
-        `${id}: missing from the 수채 tab`,
+        `${id}: missing from the 수채·수묵 tab`,
       ).toBe(true);
     }
     expect(
@@ -249,6 +250,16 @@ describe("InkWash pen/water product start on the shipped wet/fluid path", () => 
     expect(
       filterStudioBrushCatalogItems({ query: "물붓" }).some((item) => item.id === "inkwash-water-brush"),
     ).toBe(true);
+    // 2026-09-06 빠른 선택 축소(#771, docs/studio-brush-filter-discovery-2026-09-06.md): 간편 서브 툴이
+    // 23→18 로 줄면서 InkWash 쌍은 채색·물감 팔레트에서 빠졌다. 같은 렌더링 판정이 아니라 먼저
+    // 보이는 선택지를 줄인 편집 결정이고, 두 id 는 시작 도구 탭·검색·저장 문서에서 그대로 쓰인다.
+    const brushTab = STUDIO_SUB_TOOL_PALETTE_CATEGORIES.find((category) => category.id === "brush");
+    expect(brushTab?.tools.map((tool) => tool.id)).toEqual([
+      "watercolor",
+      "marker",
+      "gouache--matte-body",
+      "oil--filbert-ribbon",
+    ]);
     // #771 (c9ef0ff7) trimmed the compact 채색·물감 shortcuts to four representatives and moved
     // the InkWash pair out on purpose (studio-shortcut-order.test.ts pins that list). The
     // product promise that survives is the full library: same IDs, found by their former names.

@@ -944,12 +944,12 @@ function torsoShell(
  * 요크가 그 사이를 잇고 소매는 seat만큼 요크 안으로 들어가 팔을 올려도 틈이 생기지 않는다.
  * 골격 폴백에서는 예전처럼 셸이 어깨까지 덮으므로 만들지 않는다.
  */
-function shoulderYoke(cut: GarmentCut, parts: readonly GarmentPart[]): GarmentPart | null {
+function shoulderYokes(cut: GarmentCut, parts: readonly GarmentPart[]): GarmentPart[] {
   const m = cut.m;
   const silhouette = m.torso;
-  if (!silhouette) return null;
+  if (!silhouette) return [];
   const shell = parts.find((part) => part.bone === "spine" && part.shape.kind === "lathe");
-  if (!shell) return null;
+  if (!shell) return [];
 
   let sleeveR = 0;
   for (const part of parts) {
@@ -957,25 +957,40 @@ function shoulderYoke(cut: GarmentCut, parts: readonly GarmentPart[]): GarmentPa
     if (part.shape.kind !== "cylinder") continue;
     sleeveR = Math.max(sleeveR, part.shape.rTop);
   }
-  // 소매가 없는 조끼·갑옷은 이을 것이 없다.
-  if (sleeveR <= 0) return null;
+  if (sleeveR <= 0) return [];
 
   const y = m.spineToNeck * SHOULDER_YOKE_HEIGHT;
   const ring = latheRing(sampleBodySilhouette(silhouette, torsoT(m, y)), cut.clearanceM);
-  // 어깨 폭은 실측 최대 반폭에서 오고, 최소한 어깨 관절까지는 닿아야 소매를 만난다.
   const halfSpan = Math.max(widestHalfWidth(silhouette) + cut.clearanceM, m.shoulderW * 0.5);
-  const radius = sleeveR * SHOULDER_YOKE_OVER_SLEEVE;
-  return {
+  const lateral = lateralAxis(m);
+  // A single cylinder across both shoulders reads as a horizontal tube. Two short,
+  // tapered bridges leave the neck/clavicle silhouette open and only connect the shell
+  // edge to each sleeve seat.
+  const inner = Math.min(halfSpan * 0.7, Math.max(ring.radius * 0.72, sleeveR * 0.95));
+  const outer = halfSpan + sleeveR * 0.12;
+  const span = Math.max(0.03, outer - inner);
+  const innerRadius = sleeveR * SHOULDER_YOKE_OVER_SLEEVE * 1.08;
+  const outerRadius = sleeveR * 1.01;
+
+  return ([-1, 1] as const).map((side) => ({
     bone: "spine",
-    shape: { kind: "cylinder", rTop: radius, rBottom: radius, h: halfSpan * 2 },
-    offset: scaleVec(m.up, y),
-    align: lateralAxis(m),
-    // 어깨도 앞뒤가 얕다. 몸통 위쪽과 같은 실측 깊이비로 눌러 원통 어깨를 막는다.
-    squash: [1, 1, ring.depth],
+    shape: {
+      kind: "lathe",
+      profile: [
+        { radius: innerRadius, y: -span * 0.5 },
+        { radius: innerRadius * 0.96, y: -span * 0.16 },
+        { radius: outerRadius * 1.03, y: span * 0.24 },
+        { radius: outerRadius, y: span * 0.5 },
+      ],
+      segments: 24,
+    },
+    offset: addVec(scaleVec(m.up, y), scaleVec(lateral, side * (inner + outer) * 0.5)),
+    align: scaleVec(lateral, side),
+    squash: [1, 1, Math.min(0.9, Math.max(0.55, ring.depth))],
     color: shell.color,
     roughness: shell.roughness,
     metalness: shell.metalness,
-  };
+  }));
 }
 
 /** 허리(hips 부착)에서 아래로 퍼지는 스커트 파츠. */
@@ -1173,8 +1188,11 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
   const cut = garmentCut(m, def.fitProfile);
   // 실측이 없으면 진동을 덮을 요크도 없다 — 소매는 예전처럼 어깨 관절에서 시작한다.
   const armSeat = m.torso ? ARMHOLE_SEAT_RATIO : 0;
-  const armR = (side: Side, mul = 1) => Math.max(0.03, m.upperArm[side].len * 0.19) * mul * f;
-  const legR = (side: Side, mul = 1) => Math.max(0.045, m.upperLeg[side].len * 0.175) * mul * f;
+  // Keep motion clearance independent from the fit multiplier so a narrower fit cannot
+  // collapse the gap between morphed skin and procedural sleeves/trousers.
+  const limbClearance = m.torso ? cut.clearanceM * (def.fitProfile.layer === "outer" ? 0.58 : 0.46) : 0;
+  const armR = (side: Side, mul = 1) => Math.max(0.03, m.upperArm[side].len * 0.19) * mul * f + limbClearance;
+  const legR = (side: Side, mul = 1) => Math.max(0.045, m.upperLeg[side].len * 0.175) * mul * f + limbClearance;
   const parts: GarmentPart[] = [];
 
   switch (def.id) {
@@ -1550,9 +1568,9 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
       const flare = def.id === "wide" ? 1.55 : 1.02;
       const rMul = def.id === "wide" ? 1.3 : 1.16;
       const rough = def.id === "jeans" ? 0.9 : 0.72;
-      parts.push(skirtCone(cut, { len: m.hipsToSpine * 1.1, rTopMul: f, flare: 1.02 }));
+      parts.push(skirtCone(cut, { len: m.hipsToSpine * 0.82, rTopMul: f, flare: 1.02 }));
       for (const s of SIDES) {
-        parts.push(limbSleeve(s === "left" ? "leftUpperLeg" : "rightUpperLeg", m.upperLeg[s], { start: 0.18, coverage: 0.86, r: legR(s, rMul), roughness: rough }));
+        parts.push(limbSleeve(s === "left" ? "leftUpperLeg" : "rightUpperLeg", m.upperLeg[s], { start: 0.04, seat: 0.06, coverage: 0.96, r: legR(s, rMul), roughness: rough }));
         parts.push(
           limbSleeve(s === "left" ? "leftLowerLeg" : "rightLowerLeg", m.lowerLeg[s], {
             coverage: def.id === "jeans" ? 0.84 : 0.92,
@@ -1658,7 +1676,6 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
       break;
   }
 
-  const yoke = shoulderYoke(cut, parts);
-  if (yoke) parts.push(yoke);
+  parts.push(...shoulderYokes(cut, parts));
   return parts;
 }
