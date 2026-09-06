@@ -43,7 +43,7 @@ jobs:
   # ── core 를 구성하는 병렬 잡 ─────────────────────────────────────────────────────────────
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       # StudioPage.tsx 등 초대형 모듈 ESLint 힙 고갈 방지.
@@ -62,7 +62,7 @@ jobs:
       - run: pnpm run lint
 
   typecheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -80,7 +80,7 @@ jobs:
       - run: pnpm run typecheck:cloudflare-realtime
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -106,7 +106,7 @@ jobs:
 
   test:
     name: test (${{ matrix.shard }}/${{ strategy.job-total }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 한 shard 는 루트 스위트의 1/3(약 5~7분)이다. 이전 단일 잡은 Vitest 앞에 install/lint/typecheck 로
     # 9분을 쓰고도 25분 한도에 걸려 Vitest 가 중간에 잘려 최종 실패 요약이 사라진 적이 있다.
     # 이 한도를 올리는 것은 검사를 건너뛰거나 약화하지 않는다.
@@ -299,7 +299,7 @@ jobs:
     # 머신을 재게 되므로(vitest.perf-budget-files.mjs) 단일 worker 로, 다른 어떤 것과도 겹치지 않게
     # 여기서 한 번만 돈다. 그 뒤에 붙는 두 통합 검사는 각각 몇 초짜리라 별도 러너를 받을 이유가 없다.
     name: test (serial lane)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -332,7 +332,7 @@ jobs:
     name: core
     needs: [lint, typecheck, build, test, test-serial]
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every core gate to succeed
@@ -355,7 +355,7 @@ jobs:
     #
     # 예전에는 `needs: core` 로 core 뒤에 줄을 섰다. 릴리스 체크 `verify` 가 core 실패를 반영해야
     # 한다는 요구는 지금 아래의 `verify` 게이트 잡이 맡으므로, 이 증명은 처음부터 병렬로 돈다.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -418,7 +418,7 @@ jobs:
     name: verify
     needs: [core, studio-3d-runtime]
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require successful core CI and the Studio 3D runtime proof
@@ -456,7 +456,7 @@ jobs:
     # GPU 없는 러너에서도 실제 프레임이 나오게 playwright.config.ts가 ANGLE/SwiftShader로 Chromium을
     # 띄우므로 Xvfb는 필요 없다.
     name: studio-3d-visual (${{ matrix.lane }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -505,7 +505,7 @@ jobs:
     # 둘로 나누면 각각 10분 안팎이다. 예전에는 "빌드를 두 번 지불한다"는 이유로 한 잡에 묶었지만,
     # 그 빌드에서 2분을 차지하던 tsc 는 이제 `typecheck` 잡이 한 번 증명하므로 `build:bundle` 은
     # 2분 남짓이다.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 프로파일 3종 × 라우트 9개 + 세션 프로브 2개 = 29회 페이지 로드. 무거운 Studio 번들이라
     # 스윕만 약 5분이고, 여기에 install 과 프로덕션 빌드가 더 붙는다.
     timeout-minutes: 25
@@ -543,7 +543,7 @@ jobs:
     # 첫 스트로크마다 터지는 React #185 렌더 루프가 모든 폰 프로파일에서 두 에러 바운더리가 조용한
     # 채로 배포됐다. 이 잡은 45개 상호작용을 몰고, 바운더리 catch 를 포함한 모든 오류 채널을
     # 진행 중인 단계에 귀속시킨다.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -585,7 +585,7 @@ jobs:
     # 다이얼로그조차 못 여는 상태로 지나갔다 — createImageBitmap(svgBlob) 이 Chromium·WebKit
     # 모두에서 InvalidStateError 라 선택된 offscreen 벡터 래스터가 항상 실패했는데, 유닛 테스트는
     # 주입된 디코더를 쓰기 때문에 전부 초록이었다. 브라우저만이 그 사실을 말해준다.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
@@ -603,7 +603,7 @@ jobs:
         run: pnpm run verify:studio-filter-dialog
 
   studio-p5-brush-real-runtime:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v6
