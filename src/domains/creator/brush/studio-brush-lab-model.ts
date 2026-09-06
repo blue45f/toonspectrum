@@ -28,6 +28,14 @@ export interface BrushLabSource {
   readonly selection: StudioBrushCatalogSelection;
 }
 
+export type BrushLabSnapshotComposition =
+  | { readonly ok: true; readonly snapshot: StudioBrushSnapshot }
+  | {
+      readonly ok: false;
+      readonly reason: "incompatible-carrier" | "invalid-recipe" | "missing-source" | "load-failed" | "cancelled";
+      readonly sourceIds?: readonly string[];
+    };
+
 export async function loadBrushLabSources(): Promise<{
   readonly sources: readonly BrushLabSource[];
   readonly unavailable: number;
@@ -72,9 +80,9 @@ export async function composeBrushLabSnapshot(
   recipe: BrushLabRecipe,
   sources: readonly BrushLabSource[],
   isCurrent: () => boolean,
-) {
+): Promise<BrushLabSnapshotComposition> {
   if (!brushLabCanCompose(snapshot)) {
-    return { ok: false as const, reason: "incompatible-carrier" as const };
+    return { ok: false, reason: "incompatible-carrier" };
   }
   const byId = new Map(sources.map((source) => [source.id, source]));
   const result = await composeBrushLabRecipe(snapshot.brushDynamics, recipe, {
@@ -82,7 +90,7 @@ export async function composeBrushLabSnapshot(
     merge: mergeStudioBrushMixTraitSection,
   }, isCurrent);
   return result.ok
-    ? { ok: true as const, snapshot: sanitizeBrushSnapshot({ ...snapshot, brushDynamics: result.value }).snapshot }
+    ? { ok: true, snapshot: sanitizeBrushSnapshot({ ...snapshot, brushDynamics: result.value }).snapshot }
     : result;
 }
 
