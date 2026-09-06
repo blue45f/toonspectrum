@@ -1,7 +1,9 @@
 import {
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CircleDot,
   Inbox,
   LoaderCircle,
@@ -315,6 +317,7 @@ export function StudioCommentThreadPopover({
   const [pendingMutation, setPendingMutation] = useState<PopoverMutation>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showAllMessages, setShowAllMessages] = useState(false);
   const [cardSize, setCardSize] = useState({ width: 360, height: 500 });
   const [liveScreenPoint, setLiveScreenPoint] = useState(screenPoint);
   const viewportRef = useRef<StudioCommentThreadPopoverViewport | null>(null);
@@ -351,6 +354,9 @@ export function StudioCommentThreadPopover({
       : restrictionId
     : undefined;
   const recent = recentThreadMessages(thread);
+  const visibleMessages: ThreadMessage[] = showAllMessages
+    ? [thread, ...thread.replies]
+    : recent.messages;
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -492,6 +498,7 @@ export function StudioCommentThreadPopover({
     deferredFocusAttemptedRef.current = false;
     setError(null);
     setNotice(null);
+    setShowAllMessages(false);
     mutationRevisionRef.current += 1;
     pendingMutationRef.current = null;
     setPendingMutation(null);
@@ -751,7 +758,7 @@ export function StudioCommentThreadPopover({
           </header>
 
           <p id={descriptionId} className="sr-only">
-            캔버스 위치에 연결된 댓글 대화입니다. 최근 메시지를 확인하고 빠르게 답글을 남길 수 있습니다.
+            캔버스 위치에 연결된 댓글 대화입니다. 필요하면 전체 대화를 펼치고 빠르게 답글을 남길 수 있습니다.
           </p>
 
           <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:thin]">
@@ -792,19 +799,27 @@ export function StudioCommentThreadPopover({
                 </button>
               </nav>
             ) : null}
-            <section aria-label="최근 댓글" className="px-3 py-2.5">
+            <section aria-label={showAllMessages ? "전체 댓글 대화" : "최근 댓글"} className="px-3 py-2.5">
               {recent.omittedCount > 0 ? (
-                <p className="mb-2 text-center text-[0.65rem] font-semibold text-fg-3">
-                  이전 메시지 {recent.omittedCount.toLocaleString("ko-KR")}개 · 전체 검토함에서 확인
-                </p>
+                <button
+                  type="button"
+                  aria-expanded={showAllMessages}
+                  onClick={() => setShowAllMessages((current) => !current)}
+                  className="mb-2 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-raised/45 px-2.5 text-[0.65rem] font-semibold text-fg-2 transition-colors duration-150 hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none pointer-coarse:min-h-11"
+                >
+                  {showAllMessages ? <ChevronUp size={12} aria-hidden /> : <ChevronDown size={12} aria-hidden />}
+                  {showAllMessages
+                    ? "최근 메시지만 보기"
+                    : `이전 메시지 ${recent.omittedCount.toLocaleString("ko-KR")}개 보기`}
+                </button>
               ) : null}
               <ol className="divide-y divide-line/70">
-                {recent.messages.map((message, index) => (
+                {visibleMessages.map((message, index) => (
                   <li key={message.id} className="flex min-w-0 gap-2 py-2 first:pt-0 last:pb-0">
                     <span
                       aria-hidden
                       className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-[0.65rem] font-bold ${
-                        index === recent.messages.length - 1
+                        index === visibleMessages.length - 1
                           ? "bg-accent-soft text-accent"
                           : "bg-raised text-fg-2"
                       }`}
@@ -827,7 +842,7 @@ export function StudioCommentThreadPopover({
                           <span className="text-[0.6rem] text-fg-3">수정됨</span>
                         ) : null}
                       </div>
-                      <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-5 text-fg-2">
+                      <p className={`mt-0.5 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-5 text-fg-2 ${showAllMessages ? "" : "line-clamp-3"}`}>
                         {message.body}
                       </p>
                     </div>
