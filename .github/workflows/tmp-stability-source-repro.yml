@@ -1,0 +1,33 @@
+name: Pinned stability reproduction sources
+on:
+  push:
+    branches: [fix/studio-brush-filter-stability-20260906]
+    paths: [.github/workflows/tmp-stability-source-repro.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Export tracked source only, without Git metadata or credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/stability-repro
+          git rev-parse HEAD > /tmp/stability-repro/commit.txt
+          python3 - <<'PY'
+          import subprocess
+          roots = subprocess.check_output(['git','ls-tree','--name-only','HEAD'], text=True).splitlines()
+          paths = [p for p in roots if p in ('scripts','src','packages','lib','apps') or p.endswith(('.ts','.mts','.mjs','.json','.yaml'))]
+          subprocess.run(['git','archive','HEAD','--format=tar.gz','--output=/tmp/stability-repro/source.tar.gz','--',*paths,'.github/workflows'],check=True)
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-stability-pinned-source
+          path: /tmp/stability-repro/
+          retention-days: 2
+          if-no-files-found: error
