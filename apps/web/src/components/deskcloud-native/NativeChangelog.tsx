@@ -9,11 +9,11 @@
  * 보안: pk_ publishable 키 표면만 사용(브라우저 노출 안전). `@heejun/deskcloud/server`(sk_)는
  * 절대 import 하지 않는다. env-gate: VITE_CHANGELOGDESK_URL 미설정 시 마운트되지 않는다.
  *
- * 본문은 서버가 새니타이즈해 내려주는 bodyHtml 을 그대로 렌더한다(SDK 계약).
+ * 본문은 서버가 새니타이즈해 내려주지만, 브라우저에서도 허용된 태그만 React 노드로 변환한다.
  */
 import { createChangelogClient, type ChangelogEntry, type ChangelogEntryTag } from "@heejun/deskcloud";
 import { Megaphone, Sparkles, X } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { changelogConfig, getAnonId } from "./config";
 
@@ -37,6 +37,33 @@ function formatDate(iso: string | null): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
+}
+
+const ALLOWED_BODY_TAGS = new Set(["P", "UL", "OL", "LI", "CODE", "STRONG", "EM", "BR", "A"]);
+
+function renderBodyNode(node: Node, key: string): ReactNode {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+  if (!(node instanceof HTMLElement)) return null;
+  const children = Array.from(node.childNodes).map((child, index) => renderBodyNode(child, key + "-" + index));
+  if (!ALLOWED_BODY_TAGS.has(node.tagName)) return children;
+  if (node.tagName === "BR") return <br key={key} />;
+  if (node.tagName === "A") {
+    const href = node.getAttribute("href");
+    if (!href) return children;
+    try {
+      const url = new URL(href, globalThis.location.origin);
+      if (!["http:", "https:", "mailto:"].includes(url.protocol)) return children;
+      return <a key={key} href={url.href} target="_blank" rel="noreferrer">{children}</a>;
+    } catch { return children; }
+  }
+  const Tag = node.tagName.toLowerCase() as "p" | "ul" | "ol" | "li" | "code" | "strong" | "em";
+  return <Tag key={key}>{children}</Tag>;
+}
+
+function renderChangelogBody(bodyHtml: string): ReactNode {
+  if (typeof DOMParser === "undefined") return bodyHtml;
+  const document = new DOMParser().parseFromString(bodyHtml, "text/html");
+  return Array.from(document.body.childNodes).map((node, index) => renderBodyNode(node, "body-" + index));
 }
 
 export function NativeChangelog() {
@@ -245,11 +272,9 @@ export function NativeChangelog() {
                           </time>
                         </div>
                         <h3 className="text-pretty text-sm font-bold text-fg">{entry.title}</h3>
-                        <div
-                          className="changelog-body mt-1.5 text-sm leading-relaxed text-fg-2 [&_a]:text-accent [&_a]:underline [&_code]:rounded [&_code]:bg-raised [&_code]:px-1 [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-2 [&_ul]:my-2"
-                          // SDK 계약: bodyHtml 은 서버가 새니타이즈해 내려준다.
-                          dangerouslySetInnerHTML={{ __html: entry.bodyHtml }}
-                        />
+                        <div className="changelog-body mt-1.5 text-sm leading-relaxed text-fg-2 [&_a]:text-accent [&_a]:underline [&_code]:rounded [&_code]:bg-raised [&_code]:px-1 [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-2 [&_ul]:my-2">
+                          {renderChangelogBody(entry.bodyHtml)}
+                        </div>
                       </li>
                     );
                   })}
