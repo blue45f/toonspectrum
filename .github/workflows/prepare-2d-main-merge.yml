@@ -1,0 +1,126 @@
+name: Prepare 2D main merge
+on:
+  push:
+    branches: [diagnostics/2d-merge-gate-20260906]
+    paths: [.github/workflows/prepare-2d-main-merge.yml]
+permissions:
+  contents: write
+defaults:
+  run:
+    shell: bash
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pr: 783
+            branch: feat/studio-2d-assets-quality-20260906
+            head: 86e7e161748ec20979ebc43ff2c9d81268aa6de9
+          - pr: 798
+            branch: feat/studio-2d-assets-discovery-20260906
+            head: 5f8f3e4d10f991f9c0f8e4dad58463253aa4ece3
+    env:
+      TARGET_BRANCH: ${{ matrix.branch }}
+      EXPECTED_HEAD: ${{ matrix.head }}
+      MAIN_SHA: a81db1dda72a744248dfbdb0a74baf27ab4a4dcd
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ matrix.head }}
+          fetch-depth: 0
+          filter: blob:none
+      - name: Merge inspected main and fix lazy import ownership
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/2d-merge-result
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$EXPECTED_HEAD"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge --no-commit --no-ff "$MAIN_SHA"
+          python3 - <<'PY'
+          from pathlib import Path
+          def once(text,old,new):
+              assert text.count(old)==1, (old,text.count(old))
+              return text.replace(old,new,1)
+          root=Path('src/domains/creator')
+          body=root/'StudioSceneToolPopoverBody.tsx'
+          s=body.read_text()
+          s=once(s,'import { lazy, Suspense } from "react";', 'import { Suspense } from "react";')
+          s=once(s,'import {\n  StudioBackgroundPanel,','import {\n  Studio2dSceneBrowser,\n  StudioBackgroundPanel,')
+          declaration='const Studio2dSceneBrowser = lazy(() => import("./Studio2dSceneBrowser").then((module) => ({ default: module.Studio2dSceneBrowser })));\n'
+          s=once(s,declaration,'')
+          body.write_text(s)
+          registry=root/'studio-page-lazy-ui.ts'
+          s=registry.read_text()
+          assert 'Studio2dSceneBrowser' not in s
+          s+='\n// Keep optional scene loading in the shared registry, never in a popover body.\nexport const Studio2dSceneBrowser = lazyRetry(\n  () => import("./Studio2dSceneBrowser").then((module) => ({ default: module.Studio2dSceneBrowser })),\n  "Studio2dSceneBrowser"\n);\n'
+          registry.write_text(s)
+          test=root/'studio-2d-lazy-boundary.test.ts'
+          assert not test.exists()
+          test.write_text('''import { readFileSync } from "node:fs";
+          
+          import { describe, expect, it } from "vitest";
+          
+          const read = (name: string) => readFileSync(new URL(name, import.meta.url), "utf8");
+          
+          describe("2D scene lazy import ownership", () => {
+            it("keeps the literal scene boundary behind the shared retryable loader", () => {
+              const registry = read("./studio-page-lazy-ui.ts");
+              expect(registry).toContain("export const Studio2dSceneBrowser = lazyRetry(");
+              expect(registry.match(/import\\("\\.\\/Studio2dSceneBrowser"\\)/gu)).toHaveLength(1);
+              expect(registry).not.toMatch(/from ["']\\.\\/Studio2dSceneBrowser["']/u);
+            });
+            it("uses the shared lazy binding inside the scene-only Suspense boundary", () => {
+              const body = read("./StudioSceneToolPopoverBody.tsx");
+              expect(body).not.toContain('import("./Studio2dSceneBrowser")');
+              expect(body).toMatch(/import \\{\\s*Studio2dSceneBrowser,[^}]+\\} from "\\.\\/studio-page-lazy-ui"/u);
+              const start = body.indexOf('{menu === "bgScene"');
+              const end = body.indexOf('{menu === "tone"', start);
+              expect(start).toBeGreaterThan(0);
+              expect(end).toBeGreaterThan(start);
+              const scene = body.slice(start, end);
+              expect(scene.indexOf("<Suspense")).toBeLessThan(scene.indexOf("<Studio2dSceneBrowser"));
+              expect(scene).toContain('onPick={addBgScene}');
+            });
+          });
+          '''.replace('\n          ','\n'))
+          workflow=Path('.github/workflows/studio-2d-asset-quality.yml')
+          s=workflow.read_text()
+          s=once(s,'pnpm exec vitest run ', 'pnpm exec vitest run src/domains/creator/studio-2d-lazy-boundary.test.ts src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts ')
+          s=s.replace("      - 'src/domains/creator/StudioSceneToolPopoverBody.tsx'", "      - 'src/domains/creator/StudioSceneToolPopoverBody.tsx'\n      - 'src/domains/creator/studio-page-lazy-ui.ts'\n      - 'src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts'")
+          workflow.write_text(s)
+          PY
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run unchanged architectural guard and added regression tests
+        run: pnpm exec vitest run src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts src/domains/creator/studio-2d-lazy-boundary.test.ts | tee /tmp/2d-merge-result/tests.txt
+      - name: Lint the repaired loader ownership
+        run: pnpm exec eslint src/domains/creator/StudioSceneToolPopoverBody.tsx src/domains/creator/studio-page-lazy-ui.ts src/domains/creator/studio-2d-lazy-boundary.test.ts | tee /tmp/2d-merge-result/lint.txt
+      - name: Commit only to the inspected feature branch, without force
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$EXPECTED_HEAD"
+          git add src/domains/creator/StudioSceneToolPopoverBody.tsx src/domains/creator/studio-page-lazy-ui.ts src/domains/creator/studio-2d-lazy-boundary.test.ts .github/workflows/studio-2d-asset-quality.yml
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'fix(studio): integrate current main and keep 2D lazy imports in the shared registry'
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          git rev-parse HEAD > /tmp/2d-merge-result/head.txt
+          git rev-parse HEAD^{tree} > /tmp/2d-merge-result/tree.txt
+          git diff "$MAIN_SHA" HEAD --stat > /tmp/2d-merge-result/main-diff-stat.txt
+          git diff "$MAIN_SHA" HEAD -- src/domains/creator/StudioSceneToolPopoverBody.tsx src/domains/creator/studio-page-lazy-ui.ts src/domains/creator/studio-2d-lazy-boundary.test.ts > /tmp/2d-merge-result/repaired-source.diff
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 2d-merge-preparation-${{ matrix.pr }}
+          path: /tmp/2d-merge-result/
+          retention-days: 3
+          if-no-files-found: error
