@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { studioPencilAliasPasses, studioPencilAliasPassPoints, studioPencilRibbonAlphaBucket, STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT } from "../brush/studio-pencil-alias-passes";
 import { studioBrushAliasEffectiveDiameter } from "../brush/studio-brush-alias-profile";
+import { studioPencilAliasPasses, studioPencilAliasPassPoints, studioPencilRibbonAlphaBucket, STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT } from "../brush/studio-pencil-alias-passes";
 import { planStudioRetainedMediaPressureCurve, resolveStudioRetainedMediaPressureProfileId } from "../studio-retained-media-pressure";
 import { planStudioRetainedMediaRibbon } from "../studio-retained-media-ribbon";
+
 import { StudioLiveRetainedMediaOverlayRenderer } from "./studio-live-retained-media-overlay";
 
 import type { DrawEl } from "../studio-element-model";
