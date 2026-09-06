@@ -139,7 +139,9 @@ test("classification keeps existing explicit subtype, override, no-probe and fil
   const bytes = glb({ extensionsUsed: ["VRMC_vrm"] });
   assert.equal(resolveAssetKind(plan(), "auto", bytes, false), "background3d");
   assert.equal(resolveAssetKind(plan(), "image", bytes, true), "image");
-  assert.equal(resolveAssetKind(plan("/a.glb", { subtype: "background3d" }), "vrm", bytes, true), "background3d");
+  // Merged contract (#787): an explicit --type wins over manifest metadata; a manifest subtype applies in auto mode.
+  assert.equal(resolveAssetKind(plan("/a.glb", { subtype: "background3d" }), "vrm", bytes, true), "vrm");
+  assert.equal(resolveAssetKind(plan("/a.glb", { subtype: "image" }), "auto", bytes, true), "image");
   assert.equal(resolveAssetKind(plan("/a.vrm"), "auto", bytes, false), "vrm");
   assert.equal(resolveAssetKind(plan("/a.PNG"), "auto", PNG, true), "image");
 });
