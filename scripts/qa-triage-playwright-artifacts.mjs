@@ -37,6 +37,7 @@ const signalPatterns = [
   /(?:^|\b)(?:mismatch|panic|uncaught|pageerror|requestfailed|offscreen|clipped|overflow|blank screen|WebGL|WebGPU|aria-modal|accessible name|not found|not visible|did not open|outside viewport)(?:\b|:)/iu,
 ];
 const hasSignal = (value) => signalPatterns.some((pattern) => pattern.test(value));
+const ignorablePattern = /$^/u;
 
 function rel(file) {
   return path.relative(inputRoot, file).replaceAll(path.sep, "/");
