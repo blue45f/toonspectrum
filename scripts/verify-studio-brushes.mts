@@ -2432,7 +2432,7 @@ function resolveBuiltAutosaveSqliteModulePath(): string {
     string,
     { file?: unknown }
   >;
-  const entry = manifest["apps/web/src/domains/creator/studio-autosave-sqlite-store.ts"];
+  const entry = manifest["src/domains/creator/studio-autosave-sqlite-store.ts"];
   invariant(
     entry && typeof entry.file === "string" && entry.file.length > 0,
     "production manifest is missing the Studio autosave SQLite module",
