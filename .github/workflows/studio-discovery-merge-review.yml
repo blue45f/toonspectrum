@@ -1,0 +1,80 @@
+name: Studio discovery merge review
+on:
+  push:
+    branches: [fix/studio-brush-filter-discovery-20260906]
+    paths: ['.github/workflows/studio-discovery-merge-review.yml']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: studio-discovery-merge-review-771
+  cancel-in-progress: false
+jobs:
+  inspect:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Read the previously failed regression diagnostics
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import os, re, urllib.request
+          url = 'https://api.github.com/repos/blue45f/toonspectrum/actions/jobs/101369822575/logs'
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'}
+          with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as response:
+              text = response.read().decode('utf-8', errors='replace')
+          text = re.sub(r'\x1b\[[0-9;]*m', '', text)
+          lines = text.splitlines()
+          selected = set()
+          for index, line in enumerate(lines):
+              if any(word in line for word in ['FAIL ', 'AssertionError', 'Failed Tests', 'Failed Suites', 'Unhandled Error', 'Test Files', 'Tests  ', 'Error:']):
+                  selected.update(range(max(0, index - 1), min(len(lines), index + 22)))
+          print('BEGIN_PREVIOUS_TEST_DIAGNOSTICS')
+          print('\n'.join(lines[index] for index in sorted(selected))[-14500:])
+          print('END_PREVIOUS_TEST_DIAGNOSTICS')
+          PY
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 100
+          persist-credentials: false
+      - name: Inspect current main integration without publishing or choosing conflict sides
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main --depth=100
+          printf 'SOURCE_SHA='; git rev-parse HEAD
+          printf 'MAIN_SHA='; git rev-parse origin/main
+          set +e
+          git merge --no-commit --no-ff origin/main > /tmp/discovery-merge.txt 2>&1
+          code=$?
+          set -e
+          cat /tmp/discovery-merge.txt
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          conflicts = subprocess.check_output(['git', 'diff', '--name-only', '--diff-filter=U'], text=True).splitlines()
+          print('CONFLICT_FILES:', conflicts)
+          for name in conflicts:
+              print('BEGIN_CONFLICT:', name)
+              lines = Path(name).read_text(errors='replace').splitlines()
+              selected = set()
+              active = False
+              for index, line in enumerate(lines):
+                  if line.startswith('<<<<<<<'):
+                      active = True
+                      selected.update(range(max(0, index - 6), index))
+                  if active:
+                      selected.add(index)
+                  if line.startswith('>>>>>>>'):
+                      active = False
+                      selected.update(range(index + 1, min(len(lines), index + 7)))
+              print('\n'.join(str(index + 1) + ': ' + lines[index] for index in sorted(selected))[:17000])
+              print('END_CONFLICT:', name)
+          PY
+          if [ "$code" -ne 0 ]; then
+            echo 'Integration is blocked; no resolution or publish was attempted.'
+          fi
+          git merge --abort 2>/dev/null || true
