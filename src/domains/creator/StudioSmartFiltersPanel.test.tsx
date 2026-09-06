@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { StudioSmartFiltersPanel } from "./StudioSmartFiltersPanel";
 
 describe("StudioSmartFiltersPanel", () => {
+  // Catalogue titles are the #771 (c9ef0ff7) vocabulary; the former names remain search keywords.
   it("renders a searchable, grouped catalog with every new local filter", () => {
     const html = renderToStaticMarkup(
       <StudioSmartFiltersPanel stack={undefined} onChange={vi.fn()} />,
@@ -117,7 +118,8 @@ describe("StudioSmartFiltersPanel", () => {
       />,
     );
     expect(html).toContain("렌즈 블러 끄기");
-    expect(html).toContain("필드 아이리스 블러 끄기");
+    // Stack chips read the catalogue title, so the #771 (c9ef0ff7) names match the add-list rows.
+    expect(html).toContain("영역 초점 블러 끄기");
     expect(html).toContain("틸트 시프트 블러 끄기");
     expect(html).toContain("선택적 가우시안 블러 끄기");
     expect(html).toContain("조리개 날");
@@ -209,8 +211,8 @@ describe("StudioSmartFiltersPanel", () => {
       />,
     );
     expect(html).toContain("스크린톤 제거 끄기");
-    expect(html).toContain("JPEG 아티팩트 감소 끄기");
-    expect(html).toContain("엣지 보존 노이즈 감소 끄기");
+    expect(html).toContain("JPEG 압축 깨짐 제거 끄기");
+    expect(html).toContain("윤곽 보존 노이즈 제거 끄기");
     expect(html).toContain("블록 제거");
     expect(html).toContain("링잉 제거");
     expect(html).toContain("색 경계 보호");

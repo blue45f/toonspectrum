@@ -81,6 +81,7 @@ export function resolveStudioVrmInspectionBounds(
     }
     default: return null;
   }
+  if (points.length === 0) return null;
   return {
     min: [0, 1, 2].map((axis) => Math.min(...points.map((point) => point[axis])) - padding) as [number, number, number],
     max: [0, 1, 2].map((axis) => Math.max(...points.map((point) => point[axis])) + padding) as [number, number, number],

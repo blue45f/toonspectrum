@@ -28,6 +28,7 @@ export const STUDIO_CC0_CATEGORY_LABELS: Readonly<Record<string, string>> = Obje
   nature: "나무 · 꽃 · 바위",
   architecture: "건축 · 거리",
   "outdoor-prop": "야외 · 캠핑 소품",
+  "pbr-detailed-prop": "디테일 가구 · 생활 소품",
   "effect-mask": "투명 효과 마스크",
   "surface-material": "표면 재질",
 });

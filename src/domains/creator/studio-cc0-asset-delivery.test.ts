@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_CC0_CATEGORY_LABELS,
   filterStudioCc0Assets,
   parseStudioCc0Catalog,
   studioCc0AssetUrl,
@@ -62,6 +65,19 @@ describe("CC0 delivery catalog boundary", () => {
     expect(filterStudioCc0Assets(items, "가구 CHAIR", "model")).toHaveLength(1);
     expect(filterStudioCc0Assets(items, "chair", "effect-mask")).toHaveLength(0);
     expect(filterStudioCc0Assets(items, "missing")).toHaveLength(0);
+  });
+  it("labels the detailed PBR prop category so text search matches what the library shows", () => {
+    const items = parseStudioCc0Catalog(manifest([{...fixture(), category: "pbr-detailed-prop"}]));
+    expect(STUDIO_CC0_CATEGORY_LABELS["pbr-detailed-prop"]).toBe("디테일 가구 · 생활 소품");
+    expect(filterStudioCc0Assets(items, "디테일 생활 소품", "model")).toHaveLength(1);
+    expect(filterStudioCc0Assets(items, "pbr-detailed-prop")).toHaveLength(1);
+    expect(filterStudioCc0Assets(items, "디테일", "effect-mask")).toHaveLength(0);
+  });
+  it("gives every category shipped in the CC0 manifest a Korean label", () => {
+    const shipped = JSON.parse(readFileSync(new URL("../../../public/assets/studio/cc0-20260906/manifest.json", import.meta.url), "utf8")) as {assets: {category: string}[]};
+    const categories = [...new Set(shipped.assets.map(asset => asset.category))].sort();
+    expect(categories).toContain("pbr-detailed-prop");
+    for (const category of categories) expect(STUDIO_CC0_CATEGORY_LABELS[category], category).toBeTruthy();
   });
 });
 

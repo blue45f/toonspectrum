@@ -971,7 +971,8 @@ function assembleGarmentGroups(
     }
     const material = createGarmentMaterial(part, itemColor, fabricId, weaveTexture);
     const geometry = buildStudioVrmGarmentGeometry(part.shape);
-    geometry.computeVertexNormals();
+    // Preserve analytic seam normals; UV duplicates are not separate cloth surfaces.
+    if (!geometry.hasAttribute("normal")) geometry.computeVertexNormals();
     const mesh = new THREE.Mesh(geometry, material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;

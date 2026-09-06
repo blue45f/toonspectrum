@@ -14,7 +14,11 @@ import path from "node:path";
 import { CommandRegistry } from "@toonspectrum/studio-command-registry";
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_FILTER_PACK_KINDS } from "./filter/studio-filter-pack-registry";
+import {
+  STUDIO_FILTER_ALL_KINDS,
+  STUDIO_FILTER_ALL_LABELS,
+  STUDIO_FILTER_PACK_KINDS,
+} from "./filter/studio-filter-pack-registry";
 import { STUDIO_SHORTCUT_ACTIONS } from "./studio-app-settings";
 import {
   catalogNativeIds,
@@ -325,6 +329,50 @@ describe("studio command catalog — drift guards for the non-importable lists",
     // `menu-item-id-collision`); origins stay qualified for the group provenance.
     const bare = STUDIO_MENU_ITEM_INVENTORY.map((id) => id.split("/")[1]);
     expect(new Set(bare).size).toBe(bare.length);
+  });
+});
+
+describe("studio command catalog — filter vocabulary", () => {
+  const registry = new CommandRegistry();
+  for (const entry of STUDIO_COMMAND_CATALOG) {
+    registry.register(toStudioCommand(entry));
+  }
+  const koLabel = (id: string): string | undefined =>
+    STUDIO_COMMAND_CATALOG.find((entry) => entry.id === id)?.labels.find(
+      (label) => label.locale === "ko",
+    )?.label;
+
+  it("names every filter row exactly as the menu row and the dialog gallery do", () => {
+    // The Filter menu and STUDIO_FILTER_DIALOG_CATALOG both read STUDIO_FILTER_ALL_LABELS, so
+    // a command-search hit must carry the same string or the same filter gets two names.
+    for (const kind of STUDIO_FILTER_ALL_KINDS) {
+      expect(koLabel(`filter.${kind}`), kind).toBe(STUDIO_FILTER_ALL_LABELS[kind]);
+    }
+    // #771 (c9ef0ff7) vocabulary — a hand-written copy here kept the pre-rename names.
+    expect(koLabel("filter.jpeg-artifact-reduction")).toBe("JPEG 압축 깨짐 제거");
+    expect(koLabel("filter.god-rays")).toBe("빛줄기");
+  });
+
+  it("keeps the pre-#771 filter names reachable as our legacy wording", () => {
+    const context = { workspace: "comic", services: new Map() };
+    for (const [former, id] of [
+      ["필드 아이리스 블러", "filter.field-iris-blur"],
+      ["타일러블 블러", "filter.tileable-blur"],
+      ["한계값 (흑백 2값)", "filter.threshold"],
+      ["먹선 임계값", "filter.threshold"],
+      ["JPEG 아티팩트 감소", "filter.jpeg-artifact-reduction"],
+      ["엣지 보존 노이즈 감소", "filter.edge-aware-denoise"],
+      ["사인 웨이브", "filter.wave-warp"],
+      ["원형 리플", "filter.ripple-warp"],
+      ["트월 회전", "filter.twirl"],
+      ["핀치 / 블로트", "filter.pinch-bloat"],
+      ["포인틸리즘", "filter.pointillize"],
+      ["고대비 포토카피", "filter.photocopy"],
+      ["볼류메트릭 광선", "filter.god-rays"],
+    ] as const) {
+      expect(registry.resolveTerminology(former).map((c) => c.id), former).toEqual([id]);
+      expect(registry.search(context, former).map((c) => c.id), former).toContain(id);
+    }
   });
 });
 

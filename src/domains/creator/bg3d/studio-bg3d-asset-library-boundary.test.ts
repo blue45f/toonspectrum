@@ -69,9 +69,15 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     expect(wrapper).toContain("importButton.disabled");
     expect(wrapper).not.toContain("saveVerifiedBg3dModel");
     expect(wrapper).not.toContain("importVerifiedBg3dModelsAtomically");
+    // The presets component owns no browser API itself: the module worker that builds GLB
+    // meshes is constructed by a renderer-free client module (studio-host-architecture-ratchet
+    // keeps `new Worker(` out of creator components).
     const presets = moduleImports("./StudioReferenceRebuildPresets.tsx");
-    expect(presets.valueImports).toEqual(["react"]);
+    expect(presets.valueImports).toEqual(["react", "./studio-reference-rebuild-worker-client"]);
     expect(presets.dynamicImports).toEqual([]);
+    const workerClient = moduleImports("./studio-reference-rebuild-worker-client.ts");
+    expect(workerClient.valueImports).toEqual([]);
+    expect(workerClient.dynamicImports).toEqual([]);
   });
 
   it("keeps persistence, validation, resource disposal, scene, history, and selection in the parent", () => {

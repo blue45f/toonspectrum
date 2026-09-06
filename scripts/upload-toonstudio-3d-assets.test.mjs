@@ -214,7 +214,8 @@ test("real CLI multipart request preserves PNG and GLB bytes against a loopback 
       assert.equal(hash(new Uint8Array(await file.arrayBuffer())), hash(expected));
       assert.equal(form.get("elementType"), file.name === "asset.png" ? "image" : "vrm");
       assert.equal(JSON.parse(form.get("descriptor")).element.type, form.get("elementType"));
-      response.end(JSON.stringify({ verified: true }));
+      const assetId = request.url.slice(request.url.lastIndexOf("/") + 1);
+      response.end(JSON.stringify({ verified: true, assetId }));
     } catch (error) {
       failures.push(error);
       response.statusCode = 400;

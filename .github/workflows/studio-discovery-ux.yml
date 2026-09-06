@@ -16,6 +16,7 @@ on:
       - 'src/domains/creator/studio-creative-ux.ts'
       - 'src/domains/creator/studio-basic-brush-expansion.test.ts'
       - 'src/domains/creator/StudioUnifiedBrushPicker.test.tsx'
+      - 'src/domains/creator/studio-main-menu-items-filter*'
       - 'scripts/verify-studio-discovery-ux.mts'
       - '.github/workflows/studio-discovery-ux.yml'
 
@@ -52,10 +53,10 @@ jobs:
         run: pnpm exec tsc -p tsconfig.json --noEmit
       - name: Strict creator and browser verifier lint
         if: matrix.check == 'lint'
-        run: pnpm exec eslint src/domains/creator/brush src/domains/creator/filter src/domains/creator/studio-tool-search* src/domains/creator/studio-brush.ts src/domains/creator/studio-creative-ux.ts src/domains/creator/studio-basic-brush-expansion.test.ts src/domains/creator/StudioUnifiedBrushPicker.test.tsx scripts/verify-studio-discovery-ux.mts --max-warnings=0
+        run: pnpm exec eslint src/domains/creator/brush src/domains/creator/filter src/domains/creator/studio-tool-search* src/domains/creator/studio-brush.ts src/domains/creator/studio-creative-ux.ts src/domains/creator/studio-basic-brush-expansion.test.ts src/domains/creator/StudioUnifiedBrushPicker.test.tsx src/domains/creator/studio-main-menu-items-filter.ts src/domains/creator/studio-main-menu-items-filter.test.ts scripts/verify-studio-discovery-ux.mts --max-warnings=0
       - name: All brush and filter unit suites plus canonical consumers
         if: matrix.check == 'tests'
-        run: pnpm exec vitest run src/domains/creator/brush src/domains/creator/filter src/domains/creator/studio-tool-search.test.ts src/domains/creator/studio-basic-brush-expansion.test.ts src/domains/creator/StudioUnifiedBrushPicker.test.tsx
+        run: pnpm exec vitest run src/domains/creator/brush src/domains/creator/filter src/domains/creator/studio-tool-search.test.ts src/domains/creator/studio-basic-brush-expansion.test.ts src/domains/creator/StudioUnifiedBrushPicker.test.tsx src/domains/creator/studio-main-menu-items-filter.test.ts
 
   build:
     runs-on: ubuntu-latest

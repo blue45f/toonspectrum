@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { isIP } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -51,7 +52,12 @@ type RawOptions = {
   dryRun: boolean;
   probeVrm: boolean;
   maxItems?: number;
+  requestTimeoutMs: number;
 };
+
+export const DEFAULT_UPLOAD_REQUEST_TIMEOUT_MS = 120_000;
+export const MAX_UPLOAD_RESPONSE_BYTES = 1024 * 1024;
+const MAX_UPLOAD_CONCURRENCY = 8;
 
 const DEFAULT_BASE_URL = (
   process.env.STUDIO_BASE_URL
@@ -65,6 +71,44 @@ const DEFAULT_SESSION_COOKIE = process.env.STUDIO_SESSION_COOKIE;
 const DEFAULT_WORK_TITLE = process.env.STUDIO_WORK_TITLE
   ?? `toonstudio-batch-${new Date().toISOString().replace(/[T:.]/g, "-").slice(0, 19)}`;
 const DEFAULT_DEMO_PROVIDER = process.env.STUDIO_DEMO_PROVIDER ?? "google";
+
+function boundedInteger(value: unknown, minimum: number, maximum: number, label: string): number {
+  const parsed = typeof value === "number" ? value : typeof value === "string" && /^\d+$/u.test(value) ? Number(value) : NaN;
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`${label} must be an integer from ${minimum} to ${maximum}`);
+  }
+  return parsed;
+}
+
+export function normalizeUploadBaseUrl(value: string): string {
+  // Never echo a rejected URL: it can contain credentials or a signed query string.
+  if (typeof value !== "string" || value.length > 2048 || /[\s\\?#]/u.test(value)
+    || Array.from(value).some((character) => character.charCodeAt(0) <= 32 || character.charCodeAt(0) === 127)) {
+    throw new Error("Invalid upload API base URL");
+  }
+  let url: URL;
+  try { url = new URL(value); } catch { throw new Error("Invalid upload API base URL"); }
+  const localHttp = url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "[::1]" || (isIP(url.hostname) === 4 && url.hostname.startsWith("127.")));
+  if ((url.protocol !== "https:" && !localHttp) || url.username || url.password || url.search || url.hash) {
+    throw new Error("Upload API requires HTTPS (HTTP is allowed only for loopback), without URL credentials/query/fragment");
+  }
+  return url.href.replace(/\/+$/u, "");
+}
+
+function uploadApiUrl(baseUrl: string, route: string): string {
+  const base = normalizeUploadBaseUrl(baseUrl);
+  if (!route.startsWith("/") || route.startsWith("//") || /[\s\\#]/u.test(route)) throw new Error("Invalid upload API route");
+  try {
+    for (const segment of route.split("?")[0]!.split("/")) {
+      const decoded = decodeURIComponent(segment);
+      if (decoded === "." || decoded === ".." || decoded.includes("/") || decoded.includes("\\")) throw new Error("unsafe segment");
+    }
+  } catch { throw new Error("Invalid upload API route"); }
+  const url = new URL(base + route);
+  const prefix = new URL(base).pathname.replace(/\/+$/u, "") + "/";
+  if (url.origin !== new URL(base).origin || !url.pathname.startsWith(prefix)) throw new Error("Upload API route leaves configured base");
+  return url.href;
+}
 
 function parsePositiveIntegerOrDefault(rawValue: string | undefined, fallback: number | undefined): number | undefined {
   if (rawValue == null) return fallback;
@@ -101,7 +145,7 @@ function usage(exitCode = 1): never {
     "  pnpm run studio:upload-assets -- [옵션]",
     "",
     "옵션",
-    "  --base-url https://...           API 기본 주소 (기본: " + DEFAULT_BASE_URL + ")",
+    "  --base-url https://...           API 주소 (HTTPS; loopback만 HTTP 허용)",
     "  --manifest ./path/to/manifest.json  업로드 대상 manifest 경로 (기본: " + DEFAULT_MANIFEST + ")",
     "  --session-token <jwt>            x-user-id 로 사용할 session token (권장)",
     "  --session-cookie <cookie>         인증 cookie 값(예: toonsession=...)",
@@ -110,7 +154,8 @@ function usage(exitCode = 1): never {
     "  --work-id <id>                    기존 작품 ID 사용",
     "  --work-title " + '"작품 이름"' + "              새 작품 생성 시 제목 (기본: " + DEFAULT_WORK_TITLE + ")",
     "  --type auto|image|vrm|background3d  업로드 타입(기본: auto)",
-    "  --concurrency N                   동시 업로드 개수 (기본: 2)",
+    "  --concurrency N                   동시 업로드 개수 1~8 (기본: 2)",
+    "  --request-timeout-ms N            응답 본문 포함 요청 제한 100~600000ms (기본: 120000)",
     "  --start-index N                   manifest index 시작 위치 (0-base, 기본: 0)",
     "  --max-items N                     start-index 기준 최대 업로드 개수",
     "  --filter-category cat1,cat2        category 필터(예: character,background,prop)",
@@ -130,6 +175,8 @@ function usage(exitCode = 1): never {
 function parseArgs(): RawOptions {
   const args = process.argv.slice(2);
   let authWasExplicit = DEFAULT_SESSION_TOKEN != null || DEFAULT_SESSION_COOKIE != null;
+  let requestedConcurrency: unknown = process.env.STUDIO_CONCURRENCY ?? 2;
+  let requestedTimeoutMs: unknown = process.env.STUDIO_REQUEST_TIMEOUT_MS ?? DEFAULT_UPLOAD_REQUEST_TIMEOUT_MS;
   const options: RawOptions = {
     baseUrl: DEFAULT_BASE_URL,
     manifestPath: DEFAULT_MANIFEST,
@@ -140,7 +187,8 @@ function parseArgs(): RawOptions {
     filterCategory: parseCategorySet(process.env.STUDIO_FILTER_CATEGORY),
     workTitle: DEFAULT_WORK_TITLE,
     elementType: "auto",
-    concurrency: parsePositiveIntegerOrDefault(process.env.STUDIO_CONCURRENCY, 2) ?? 2,
+    concurrency: 2,
+    requestTimeoutMs: DEFAULT_UPLOAD_REQUEST_TIMEOUT_MS,
     startAt: parseNonNegativeIntegerOrDefault(process.env.STUDIO_START_INDEX, 0),
     skipExisting: parseBooleanFlag(process.env.STUDIO_SKIP_EXISTING, false),
     dryRun: parseBooleanFlag(process.env.STUDIO_DRY_RUN, false),
@@ -217,12 +265,15 @@ function parseArgs(): RawOptions {
       }
       case "--concurrency": {
         if (!next) throw new Error("--concurrency requires a value");
-        const v = Number(next);
-        if (!Number.isFinite(v) || v < 1) throw new Error("--concurrency must be an integer >= 1");
-        options.concurrency = Math.floor(v);
+        requestedConcurrency = next;
         i += 1;
         break;
       }
+      case "--request-timeout-ms":
+        if (!next) throw new Error("--request-timeout-ms requires a value");
+        requestedTimeoutMs = next;
+        i += 1;
+        break;
       case "--start-index":
       case "--start": {
         if (!next) throw new Error(`${arg} requires a value`);
@@ -280,6 +331,9 @@ function parseArgs(): RawOptions {
     throw new Error("--max-items must be greater than 0");
   }
 
+  options.concurrency = boundedInteger(requestedConcurrency, 1, MAX_UPLOAD_CONCURRENCY, "--concurrency");
+  options.requestTimeoutMs = boundedInteger(requestedTimeoutMs, 100, 600_000, "--request-timeout-ms");
+  options.baseUrl = normalizeUploadBaseUrl(options.baseUrl);
   return options;
 }
 
@@ -438,54 +492,100 @@ export function makeFormData(fileBytes: Uint8Array, filename: string, kind: Asse
   return formData;
 }
 
-async function parseApiError(response: Response): Promise<string> {
-  const raw = await response.text().catch(() => "");
-  if (!raw) return `${response.status} ${response.statusText}`;
-  try {
-    const parsed = JSON.parse(raw) as { error?: string; message?: string };
-    if (typeof parsed.error === "string" && parsed.error.length > 0) return parsed.error;
-    if (typeof parsed.message === "string" && parsed.message.length > 0) return parsed.message;
-    return raw;
-  } catch {
-    return raw.slice(0, 1_200);
-  }
+function parseApiError(response: Response): string {
+  // Server diagnostics can echo session tokens/cookies or signed URLs. Do not print verbatim remote diagnostic bodies.
+  return `HTTP ${response.status}`;
 }
 
-async function apiRequest(
+/** Fetch and consume a bounded response under one deadline. Never follow redirects or retry writes. */
+export async function requestUploadApi(
   baseUrl: string,
   route: string,
   options: RequestInit,
   headers: Record<string, string>,
-  useAuthCookie: boolean
+  timeoutMs = DEFAULT_UPLOAD_REQUEST_TIMEOUT_MS
 ): Promise<Response> {
-  const init: RequestInit = {
-    ...options,
-    headers: {
-      ...headers,
-      ...(options.headers as Record<string, string> | undefined),
-      accept: "application/json",
-    },
-  };
-
-  const requestRoute = route.startsWith("http") ? route : `${baseUrl}${route.startsWith("/") ? "" : "/"}${route}`;
-  const response = await fetch(requestRoute, init);
-
-  if (!response.ok && useAuthCookie && response.status === 403 && response.url.includes("/auth/oauth")) {
-    const reason = await parseApiError(response);
-    throw new Error(`auth failed: ${reason}`);
+  boundedInteger(timeoutMs, 100, 600_000, "request-timeout-ms");
+  const url = uploadApiUrl(baseUrl, route);
+  const controller = new AbortController();
+  const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  timer.unref();
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  // Only locally selected diagnostics cross this boundary; fetch errors can contain secrets.
+  let publicFailure = "Upload API transport failed; server outcome may be unknown";
+  try {
+    const requestHeaders = new Headers(options.headers);
+    for (const [name, value] of Object.entries(headers)) {
+      if (/[\r\n]/u.test(name) || /[\r\n]/u.test(value)) throw new Error("Invalid upload authentication header");
+      requestHeaders.set(name, value);
+    }
+    requestHeaders.set("accept", "application/json");
+    const response = await fetch(url, { ...options, headers: requestHeaders, redirect: "manual", signal });
+    reader = response.body?.getReader();
+    if (response.status >= 300 && response.status < 400) {
+      publicFailure = "Upload API redirect refused";
+      throw new Error(publicFailure);
+    }
+    const advertised = response.headers.get("content-length");
+    if (advertised !== null && (!/^\d+$/u.test(advertised) || Number(advertised) > MAX_UPLOAD_RESPONSE_BYTES)) {
+      publicFailure = "Upload API response exceeds byte limit";
+      throw new Error(publicFailure);
+    }
+    // The actual decoded stream is authoritative; Content-Length can be absent or compressed.
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > MAX_UPLOAD_RESPONSE_BYTES) {
+          publicFailure = "Upload API response exceeds byte limit";
+          throw new Error(publicFailure);
+        }
+        chunks.push(value);
+      }
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    // Consumers get only an already-drained snapshot, so even ignored GET bodies release connections.
+    return new Response([204, 205, 304].includes(response.status) ? null : bytes, {
+      status: response.status, statusText: "", headers: response.headers,
+    });
+  } catch {
+    // Deliberately omit the catch binding/cause: even nested causes or message getters from
+    // fetch/Headers/readers may expose authentication values. Preserve only local diagnostics.
+    if (controller.signal.aborted) throw new Error("Upload API request timed out (including response body); server outcome may be unknown");
+    if (options.signal?.aborted) throw new Error("Upload API request cancelled; server outcome may be unknown");
+    throw new Error(publicFailure);
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
+    if (reader) { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
   }
-  return response;
 }
 
-async function loginByDemoProvider(baseUrl: string, provider: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/auth/oauth/${encodeURIComponent(provider)}/demo`, {
+async function apiObject(response: Response): Promise<Record<string, unknown>> {
+  try {
+    const value: unknown = JSON.parse(await response.text());
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("not an object");
+    return value as Record<string, unknown>;
+  } catch {
+    throw new Error("Upload API returned invalid JSON object; server outcome may be unknown");
+  }
+}
+
+async function loginByDemoProvider(baseUrl: string, provider: string, timeoutMs: number): Promise<string> {
+  const res = await requestUploadApi(baseUrl, `/api/auth/oauth/${encodeURIComponent(provider)}/demo`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
-  });
+  }, {}, timeoutMs);
   if (!res.ok) {
-    throw new Error(`demo login failed: ${await parseApiError(res)}`);
+    throw new Error(`demo login failed: ${parseApiError(res)}`);
   }
   const setCookies = typeof (res.headers as Headers).getSetCookie === "function"
     ? res.headers.getSetCookie()
@@ -493,14 +593,12 @@ async function loginByDemoProvider(baseUrl: string, provider: string): Promise<s
   if (setCookies.length === 0) {
     throw new Error("demo login response had no Set-Cookie header");
   }
-  const cookiePairs = setCookies
-    .map((cookie) => cookie.split(";")[0] ?? "")
-    .filter(Boolean)
-    .join("; ");
-  if (!cookiePairs.toLowerCase().includes("toonsession=")) {
-    throw new Error("demo login cookie did not include toonsession token");
+  const sessionCookies = setCookies.map((cookie) => cookie.split(";")[0]?.trim() ?? "")
+    .filter((cookie) => cookie.startsWith("toonsession="));
+  if (sessionCookies.length !== 1 || sessionCookies[0]!.length <= "toonsession=".length) {
+    throw new Error("demo login requires exactly one nonempty toonsession cookie");
   }
-  return cookiePairs;
+  return sessionCookies[0]!;
 }
 
 async function ensureAuth(options: RawOptions): Promise<Record<string, string>> {
@@ -511,7 +609,7 @@ async function ensureAuth(options: RawOptions): Promise<Record<string, string>> 
     return { cookie: options.sessionCookie };
   }
   if (options.autoDemoLogin) {
-    const cookie = await loginByDemoProvider(options.baseUrl, options.demoProvider);
+    const cookie = await loginByDemoProvider(options.baseUrl, options.demoProvider, options.requestTimeoutMs);
     return { cookie };
   }
   throw new Error("인증 정보가 없습니다. --session-token 또는 --session-cookie 또는 --auto-demo-login 필요");
@@ -519,30 +617,30 @@ async function ensureAuth(options: RawOptions): Promise<Record<string, string>> 
 
 async function ensureWork(baseUrl: string, headers: Record<string, string>, options: RawOptions): Promise<string> {
   if (options.workId) {
-    const res = await apiRequest(baseUrl, `/api/creator/works/${encodeURIComponent(options.workId)}`, {
+    const res = await requestUploadApi(baseUrl, `/api/creator/works/${encodeURIComponent(options.workId)}`, {
       method: "GET",
-    }, headers, false);
+    }, headers, options.requestTimeoutMs);
     if (!res.ok) {
       if (res.status === 404) {
         throw new Error(`지정한 작품ID가 없습니다: ${options.workId}`);
       }
-      throw new Error(`작품 조회 실패: ${await parseApiError(res)}`);
+      throw new Error(`작품 조회 실패: ${parseApiError(res)}`);
     }
     return options.workId;
   }
 
-  const res = await apiRequest(baseUrl, "/api/creator/works", {
+  const res = await requestUploadApi(baseUrl, "/api/creator/works", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       title: options.workTitle,
       format: "upload",
     }),
-  }, headers, true);
+  }, headers, options.requestTimeoutMs);
   if (!res.ok) {
-    throw new Error(`작품 생성 실패: ${await parseApiError(res)}`);
+    throw new Error(`작품 생성 실패: ${parseApiError(res)}`);
   }
-  const created = await res.json() as { id?: string; workId?: string };
+  const created = await apiObject(res);
   const workId = created.id || created.workId;
   if (!workId || typeof workId !== "string") {
     throw new Error("작품 생성 응답에 id가 없습니다.");
@@ -555,15 +653,16 @@ export async function hasExistingAsset(
   headers: Record<string, string>,
   workId: string,
   assetId: string,
-  kind: AssetKind
+  kind: AssetKind,
+  timeoutMs = DEFAULT_UPLOAD_REQUEST_TIMEOUT_MS
 ): Promise<boolean> {
-  const res = await apiRequest(baseUrl, `/api/creator/works/${encodeURIComponent(workId)}/assets/${encodeURIComponent(assetId)}?elementType=${encodeURIComponent(kind)}`, {
+  const res = await requestUploadApi(baseUrl, `/api/creator/works/${encodeURIComponent(workId)}/assets/${encodeURIComponent(assetId)}?elementType=${encodeURIComponent(kind)}`, {
     method: "GET",
-  }, headers, true);
+  }, headers, timeoutMs);
   if (res.ok) return true;
   if (res.status === 404) return false;
   // Auth, throttling and server errors are not evidence that an asset is absent.
-  throw new Error(`기존 에셋 조회 실패 (${res.status}): ${await parseApiError(res)}`);
+  throw new Error(`기존 에셋 조회 실패 (${res.status}): ${parseApiError(res)}`);
 }
 
 async function uploadAsset(
@@ -573,17 +672,20 @@ async function uploadAsset(
   item: UploadPlanItem,
   kind: AssetKind,
   assetId: string,
-  fileBytes: Uint8Array
+  fileBytes: Uint8Array,
+  timeoutMs: number
 ): Promise<unknown> {
   const formData = makeFormData(fileBytes, path.basename(item.path), kind, assetId);
-  const res = await apiRequest(baseUrl, `/api/creator/works/${encodeURIComponent(workId)}/assets/${encodeURIComponent(assetId)}`, {
+  const res = await requestUploadApi(baseUrl, `/api/creator/works/${encodeURIComponent(workId)}/assets/${encodeURIComponent(assetId)}`, {
     method: "PUT",
     body: formData,
-  }, headers, true);
+  }, headers, timeoutMs);
   if (!res.ok) {
-    throw new Error(await parseApiError(res));
+    throw new Error(parseApiError(res));
   }
-  return res.json();
+  const receipt = await apiObject(res);
+  if (receipt.assetId !== assetId) throw new Error("Upload receipt asset ID mismatch; server outcome may be unknown");
+  return receipt;
 }
 
 async function main(): Promise<void> {
@@ -614,6 +716,12 @@ async function main(): Promise<void> {
       return;
     }
 
+    if (worklist.length === 0) {
+      console.log("업로드할 항목이 없어 인증·작품 생성·전송을 실행하지 않았습니다.");
+      process.exitCode = 2;
+      return;
+    }
+
     // Allocate against the entire manifest in order, before filtering/resuming or concurrent reads.
     const usedIds = new Set<string>();
     const assetIds = new Map(manifest.map((entry, index) => [entry, buildAssetId(entry, index, usedIds)]));
@@ -637,7 +745,7 @@ async function main(): Promise<void> {
           const assetId = assetIds.get(plan);
           if (!assetId) throw new Error("업로드 에셋 ID 계획이 없습니다.");
 
-          if (options.skipExisting && await hasExistingAsset(options.baseUrl, authHeaders, workId, assetId, assetType)) {
+          if (options.skipExisting && await hasExistingAsset(options.baseUrl, authHeaders, workId, assetId, assetType, options.requestTimeoutMs)) {
             console.log(`[${itemLabel}] skip (exists) ${assetId}`);
             results.push({
               path: plan.sourcePath,
@@ -648,7 +756,7 @@ async function main(): Promise<void> {
             continue;
           }
 
-          const manifest = await uploadAsset(options.baseUrl, authHeaders, workId, plan, assetType, assetId, fileBytes);
+          const manifest = await uploadAsset(options.baseUrl, authHeaders, workId, plan, assetType, assetId, fileBytes, options.requestTimeoutMs);
           console.log(`[${itemLabel}] OK ${plan.name} (${assetType}) -> ${assetId}`);
           results.push({
             path: plan.sourcePath,
