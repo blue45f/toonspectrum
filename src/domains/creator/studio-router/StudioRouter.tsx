@@ -26,13 +26,6 @@ const StudioToolsCompanionPage = lazyRetry(
   "StudioToolsCompanionPage",
 );
 
-const StudioBrushLabPage = lazyRetry(
-  () => import("../brush/StudioBrushLabPage").then((module) => ({
-    default: module.StudioBrushLabPage,
-  })),
-  "StudioBrushLabPage",
-);
-
 export function StudioRouter() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -59,15 +52,9 @@ export function StudioRouter() {
 
   switch (resolution.kind) {
     case "brush-lab":
-      return (
-        <Suspense fallback={<StudioRouteLoading label="브러시 제작실을 여는 중..." />}>
-          <StudioBrushLabPage
-            key={resolution.lifecycleKey}
-            editorHref={resolution.editorHref}
-            lifecycleKey={resolution.lifecycleKey}
-          />
-        </Suspense>
-      );
+      // Brush Lab owns a top-level lazy route. Keep Studio aliases for compatibility without
+      // pulling the independent composition workspace into the Studio editor bundle graph.
+      return <Navigate replace state={location.state} to="/brush-lab" />;
     case "editor":
       return <StudioEditorRoute resolution={resolution} />;
     case "publish":
