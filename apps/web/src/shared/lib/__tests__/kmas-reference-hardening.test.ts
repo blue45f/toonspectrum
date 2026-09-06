@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 
 import { createKmasReferenceSearch } from "../../../../../../apps/api/src/server/kmas-reference";
-import { fetchReferenceResult, validateReferenceResult } from "../../src/domains/catalog/references/reference-api";
+import { fetchReferenceResult, validateReferenceResult } from "../../../domains/catalog/references/reference-api";
 import {
   MAX_REFERENCE_BACKUP_BYTES, mutateReferenceNotes, parseReferenceBackup, parseReferenceNotes,
   reduceReferenceNotes, referenceNotesBackup, REFERENCE_STORAGE_KEY, sameReferenceNote,
-} from "../../src/domains/catalog/references/reference-storage";
+} from "../../../domains/catalog/references/reference-storage";
 import { normalizeReferenceItem, normalizeReferenceResponse, ReferenceError } from "../kmas-reference";
 
-import type { ReferenceNote, ReferenceStoreDependencies } from "../../src/domains/catalog/references/reference-storage";
+import type { ReferenceNote, ReferenceStoreDependencies } from "../../../domains/catalog/references/reference-storage";
 
 const now = "2026-09-06T00:00:00.000Z";
 const query = { field: "title" as const, q: "검증용", page: 1 };

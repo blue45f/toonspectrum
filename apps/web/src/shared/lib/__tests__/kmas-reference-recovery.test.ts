@@ -5,12 +5,12 @@ import { test } from "vitest";
 import {
   clearReferenceDraft, MAX_REFERENCE_DRAFTS, MAX_REFERENCE_DRAFT_BYTES,
   parseReferenceDrafts, persistReferenceDraft, readReferenceDrafts, REFERENCE_DRAFT_STORAGE_KEY,
-} from "../../src/domains/catalog/references/reference-drafts";
-import { previewReferenceImport, reduceReferenceNotes } from "../../src/domains/catalog/references/reference-storage";
+} from "../../../domains/catalog/references/reference-drafts";
+import { previewReferenceImport, reduceReferenceNotes } from "../../../domains/catalog/references/reference-storage";
 import { normalizeReferenceItem } from "../kmas-reference";
 
-import type { ReferenceDraft } from "../../src/domains/catalog/references/reference-drafts";
-import type { ReferenceNote } from "../../src/domains/catalog/references/reference-storage";
+import type { ReferenceDraft } from "../../../domains/catalog/references/reference-drafts";
+import type { ReferenceNote } from "../../../domains/catalog/references/reference-storage";
 
 const now = "2026-09-06T00:00:00.000Z";
 const item = normalizeReferenceItem({ mastrId: 1, title: "검증 자료", outline: "원문", imageDownloadUrl: "https://example.invalid/cover" })!;

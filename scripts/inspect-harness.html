@@ -11,8 +11,8 @@
     import * as THREE from "three";
     import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
     import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
-    import { pickNaturalIdlePose } from "../src/domains/creator/studio-pose-presets.ts";
-    import { applyPoseToVrm, applyExpressionWeightsToVrm } from "../src/domains/creator/vrm/studio-vrm-poser-utils.ts";
+    import { pickNaturalIdlePose } from "../apps/web/src/domains/creator/studio-pose-presets.ts";
+    import { applyPoseToVrm, applyExpressionWeightsToVrm } from "../apps/web/src/domains/creator/vrm/studio-vrm-poser-utils.ts";
 
     const canvas = document.getElementById("render-canvas");
     const downscaleCanvas = document.getElementById("downscale-canvas");

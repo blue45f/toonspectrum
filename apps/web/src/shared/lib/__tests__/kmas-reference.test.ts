@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 
 import { createKmasReferenceSearch, REFERENCE_CACHE_TTL_MS } from "../../../../../../apps/api/src/server/kmas-reference";
-import { parseReferenceNotes, referenceNotesMarkdown, writeReferenceNotes } from "../../src/domains/catalog/references/reference-storage";
+import { parseReferenceNotes, referenceNotesMarkdown, writeReferenceNotes } from "../../../domains/catalog/references/reference-storage";
 import { normalizeReferenceItem, normalizeReferenceResponse, parseReferenceQuery, ReferenceError, REFERENCE_FIELDS } from "../kmas-reference";
 
 import type { ReferenceField } from "../kmas-reference";

@@ -1,1 +1,1 @@
-export * from "../src/domains/creator/contracts/studio-live-jam-scope.test";
+export * from "../../domains/creator/contracts/studio-live-jam-scope.test";

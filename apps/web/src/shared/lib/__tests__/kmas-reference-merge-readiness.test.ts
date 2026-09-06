@@ -4,14 +4,14 @@ import { resolve } from "node:path";
 
 import { test } from "vitest";
 
-import { appRoutes } from "../../src/app/routes/route-manifest";
+import { appRoutes } from "../../../app/routes/route-manifest";
 import {
   mutateReferenceNotes, parseReferenceBackup, parseReferenceNotes, previewReferenceImport,
   REFERENCE_STORAGE_KEY,
-} from "../../src/domains/catalog/references/reference-storage";
+} from "../../../domains/catalog/references/reference-storage";
 import { normalizeReferenceItem } from "../kmas-reference";
 
-import type { ReferenceMutation, ReferenceNote } from "../../src/domains/catalog/references/reference-storage";
+import type { ReferenceMutation, ReferenceNote } from "../../../domains/catalog/references/reference-storage";
 
 const item = normalizeReferenceItem({ mastrId: "merge-fixture", title: "검증용 자료" })!;
 const note: ReferenceNote = { item, note: "원본 메모", savedAt: "2026-09-06T00:00:00.000Z" };

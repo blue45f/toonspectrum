@@ -4,4 +4,4 @@ export {
   CHUNK_RELOAD_FLAG,
   hasAttemptedChunkReload,
   markChunkReloadAttempted,
-} from "../../shared/lib/chunk-load-recovery";
+} from "../shared/lib/chunk-load-recovery";
