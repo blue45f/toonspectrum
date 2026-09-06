@@ -49,6 +49,21 @@ describe("Studio inspector multi-selection scope", () => {
     );
   });
 
+  it("mounts atomic batch rename inside the same mutation gate with canonical document inputs", () => {
+    expect(multiSelectionSource).toContain("<StudioInspectorBatchRenameSection");
+    expect(multiSelectionSource).toContain("elements={elements}");
+    expect(multiSelectionSource).toContain("selectedIds={marqueeIds}");
+    expect(multiSelectionSource).toContain("groups={groups}");
+    // The rename commit honours the same selection gate as every other multi-selection action.
+    expect(multiSelectionSource).toContain(
+      "commit={(next) => !inspectorInteractionPolicy.selection.disabled && commit(next)}",
+    );
+    expect(multiSelectionSource).toContain("announce={announceDrawingShortcut}");
+    expect(multiSelectionSource.indexOf("<StudioInspectorBatchRenameSection")).toBeGreaterThan(
+      multiSelectionSource.indexOf("<fieldset"),
+    );
+  });
+
   it("hides single-image tool tabs while multiple elements are selected", () => {
     expect(shellSource).toContain(
       "marqueeIds.length <= 1 &&\n              (selectedSupportsImageInspectorTabs || unselectedImageToolsVisible)",
@@ -70,16 +85,21 @@ describe("Studio inspector multi-selection scope", () => {
     expect(applyPatchSource).not.toContain("if (!selected) return");
   });
 
-  it("routes multi numeric edits through the exact group transform bridge", () => {
+  it("routes multi numeric edits through one atomic planner and one commit", () => {
     const applyPatchSource = functionBody(
       "applyFigmaSelectionLayoutPatch",
       "reorder",
     );
 
-    expect(applyPatchSource).toContain("planStudioInspectorMultiSelectionLayoutPatch(");
+    // One planner owns the group edit: the precision path is the only one that honours the
+    // resize anchor, aspect lock and stroke-width policy the transform panel now emits.
+    expect(applyPatchSource).toContain("planStudioMultiSelectionLayoutPatch(");
+    expect(applyPatchSource).not.toContain("planStudioFigmaMultiEdit(");
+    expect(applyPatchSource).not.toContain("planStudioInspectorMultiSelectionLayoutPatch(");
+    expect(applyPatchSource).toContain("isEffectivelyHidden(element, groups)");
     expect(applyPatchSource).toContain("isEffectivelyLocked(element, groups)");
-    expect(applyPatchSource).toContain('if (plan.kind === "unchanged")');
-    expect(applyPatchSource).toContain("commit(plan.next)");
-    expect(applyPatchSource).toContain("announceDrawingShortcut(plan.announcement)");
+    expect(applyPatchSource).toContain("if (!commit(next)) return");
+    expect(applyPatchSource).toContain("setError(null)");
+    expect(applyPatchSource.match(/commit\(/gu)?.length).toBe(1);
   });
 });

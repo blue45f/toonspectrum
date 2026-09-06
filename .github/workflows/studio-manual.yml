@@ -1,0 +1,65 @@
+name: Studio manual
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/manual/**'
+      - 'src/domains/creator/studio-help-menu-items*'
+      - 'src/domains/creator/studio-command-catalog*'
+      - 'src/domains/creator/studio-main-menu-group-spec-help.ts'
+      - 'src/app/routes/groups/creator.routes.tsx'
+      - 'src/app/routes/groups/studio-manual.routes.test.tsx'
+      - 'src/app/routes/app-route-title-ownership.ts'
+      - 'scripts/verify-studio-manual.mjs'
+      - '.github/workflows/studio-manual.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: studio-manual-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manual-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      VITE_CATALOG_SOURCE: static
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Manual, route and existing menu/catalog regression tests
+        run: >-
+          pnpm exec vitest run
+          src/domains/creator/manual/studio-manual.test.ts
+          src/app/routes/groups/studio-manual.routes.test.tsx
+          src/domains/creator/studio-help-menu-items.test.ts
+          src/domains/creator/studio-command-catalog.test.ts
+          src/domains/creator/studio-main-menu-groups.test.ts
+          src/domains/creator/studio-main-menu-group-spec.test.ts
+      - name: Lint changed manual surface
+        run: >-
+          pnpm exec eslint src/domains/creator/manual
+          src/app/routes/groups/creator.routes.tsx src/app/routes/groups/studio-manual.routes.test.tsx
+          src/app/routes/app-route-title-ownership.ts src/domains/creator/studio-help-menu-items.ts
+          src/domains/creator/studio-help-menu-items.test.ts src/domains/creator/studio-command-catalog.ts
+          src/domains/creator/studio-command-catalog-base.ts
+          src/domains/creator/studio-main-menu-group-spec-help.ts scripts/verify-studio-manual.mjs
+      - run: pnpm run build:bundle
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Desktop, mobile, search, direct links, clipboard and print
+        run: node scripts/verify-studio-manual.mjs
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: studio-manual-browser
+          path: artifacts/studio-manual
+          if-no-files-found: ignore

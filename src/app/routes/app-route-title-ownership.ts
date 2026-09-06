@@ -15,9 +15,12 @@ export function shouldAppRouterOwnDocumentTitle({
 }: AppRouteTitleLocation): boolean {
   if (pathname.startsWith("/title/")) return false;
   if (pathname.startsWith("/create/")) return false;
+  if (pathname === "/learn" || pathname.startsWith("/learn/")) return false;
   if (pathname.startsWith("/u/")) return false;
   if (pathname.startsWith("/community/cafes/")) return false;
   if (pathname.startsWith("/community/post/")) return false;
+  // The independently lazy-loaded manual supplies the active article's title.
+  if (pathname === "/studio/manual" || pathname.startsWith("/studio/manual/")) return false;
   if (pathname === "/studio" || pathname.startsWith("/studio/")) {
     return !studioRouteOwnsDocumentTitle({ pathname, search });
   }

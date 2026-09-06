@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 type ManifestEntry = {
   name?: unknown;
@@ -281,7 +283,7 @@ function parseArgs(): RawOptions {
   return options;
 }
 
-async function loadManifest(manifestPath: string): Promise<UploadPlanItem[]> {
+export async function loadManifest(manifestPath: string): Promise<UploadPlanItem[]> {
   const manifestDirectory = path.dirname(path.resolve(manifestPath));
   const raw = JSON.parse(await readFile(manifestPath, "utf8"));
   if (!Array.isArray(raw)) {
@@ -321,7 +323,7 @@ function canonicalizeAssetId(input: string): string {
     .slice(0, 150);
 }
 
-function buildAssetId(plan: UploadPlanItem, index: number, used: Set<string>): string {
+export function buildAssetId(plan: UploadPlanItem, index: number, used: Set<string>): string {
   const categoryPart = canonicalizeAssetId(plan.category || "asset").toLowerCase();
   const raw = canonicalizeAssetId(`${plan.name || plan.sourcePath}`).toLowerCase();
   const suffix = plan.seed != null ? `seed-${plan.seed}` : `idx-${index + 1}`;
@@ -331,47 +333,51 @@ function buildAssetId(plan: UploadPlanItem, index: number, used: Set<string>): s
   if (candidate.length > 120) {
     candidate = candidate.slice(0, 120);
   }
+  const baseCandidate = candidate;
+  const hash = createHash("sha256").update(plan.path + index).digest("hex").slice(0, 6);
+  let collision = 0;
   while (used.has(candidate)) {
-    const hash = createHash("sha256").update(plan.path + index).digest("hex").slice(0, 6);
-    const tail = `-${hash}`;
-    candidate = (candidate.slice(0, 120 - tail.length) + tail).replace(/[-._]+$/u, "");
-    if (candidate.length < 4) {
-      candidate = `asset-${hash}`;
-    }
+    collision += 1;
+    // Appending the same hash repeatedly stops making progress at the length cap.
+    const tail = `-${hash}${collision === 1 ? "" : `-${collision}`}`;
+    candidate = baseCandidate.slice(0, 120 - tail.length) + tail;
   }
   used.add(candidate);
   return candidate;
 }
 
-const TEXT_DECODER = new TextDecoder();
+const TEXT_DECODER = new TextDecoder("utf-8", { fatal: true });
+const MAX_VRM_JSON_BYTES = 16 * 1024 * 1024;
 
-function readUInt32LE(bytes: Uint8Array, offset: number): number {
-  return (
-    (bytes[offset] || 0)
-    + ((bytes[offset + 1] || 0) << 8)
-    + ((bytes[offset + 2] || 0) << 16)
-    + ((bytes[offset + 3] || 0) << 24)
-  );
-}
-
-function detectVrmModelFromGlb(bytes: Uint8Array): boolean {
-  if (bytes.length < 32) return false;
-  if (readUInt32LE(bytes, 0) !== 0x46546c67) return false; // glTF magic
-  if (readUInt32LE(bytes, 4) !== 2) return false;
-  const jsonChunkLength = readUInt32LE(bytes, 12);
-  if (readUInt32LE(bytes, 20) !== 0x4e4f534a) return false; // JSON
-  const jsonStart = 28;
-  const jsonEnd = jsonStart + jsonChunkLength;
-  if (!Number.isSafeInteger(jsonEnd) || jsonEnd > bytes.length) return false;
-  const rawJson = TEXT_DECODER.decode(bytes.slice(jsonStart, jsonEnd));
+/** Bounded GLB container probe, not a full glTF/VRM conformance validator. */
+export function detectVrmModelFromGlb(bytes: Uint8Array): boolean {
+  if (bytes.length < 24) return false;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2
+    || view.getUint32(8, true) !== bytes.length) return false;
+  // GLB: 12-byte file header + 8-byte chunk header, JSON type at 16, JSON data at 20.
+  const jsonChunkLength = view.getUint32(12, true);
+  if (!jsonChunkLength || jsonChunkLength % 4 || jsonChunkLength > MAX_VRM_JSON_BYTES
+    || view.getUint32(16, true) !== 0x4e4f534a) return false;
+  const jsonEnd = 20 + jsonChunkLength;
+  if (jsonEnd > bytes.length) return false;
+  let offset = jsonEnd;
+  while (offset < bytes.length) {
+    if (offset + 8 > bytes.length) return false;
+    const length = view.getUint32(offset, true);
+    const type = view.getUint32(offset + 4, true);
+    if (length % 4 || offset + 8 + length > bytes.length || type === 0x4e4f534a) return false;
+    if (type === 0x004e4942 && offset !== jsonEnd) return false;
+    offset += 8 + length;
+  }
 
   let doc: unknown;
   try {
-    doc = JSON.parse(rawJson);
+    doc = JSON.parse(TEXT_DECODER.decode(bytes.subarray(20, jsonEnd)));
   } catch {
     return false;
   }
-  if (!(doc && typeof doc === "object")) return false;
+  if (!(doc && typeof doc === "object") || Array.isArray(doc)) return false;
 
   const asset = (doc as { asset?: unknown }).asset;
   const assetVersion =
@@ -392,23 +398,15 @@ function detectVrmModelFromGlb(bytes: Uint8Array): boolean {
   return hasExtensions;
 }
 
-function resolveAssetKind(plan: UploadPlanItem, override: AssetTypeFlag, bytes: Uint8Array, detect: boolean): AssetKind {
-  const declaredKind = plan.subtype;
-  if (declaredKind === "image" || declaredKind === "vrm" || declaredKind === "background3d") {
-    return declaredKind;
-  }
-
+export function resolveAssetKind(plan: UploadPlanItem, override: AssetTypeFlag, bytes: Uint8Array, detect: boolean): AssetKind {
+  // An explicit CLI override must not be silently defeated by generated manifest metadata.
   if (override !== "auto") return override;
+  const declaredKind = plan.subtype;
+  if (declaredKind === "image" || declaredKind === "vrm") return declaredKind;
   const extension = path.extname(plan.path).toLowerCase();
-  if (extension === ".png" || extension === ".jpg" || extension === ".jpeg" || extension === ".webp" || extension === ".gif" || extension === ".bmp" || extension === ".tif" || extension === ".tiff") {
-    return "image";
-  }
-  if (extension === ".vrm") {
-    return "vrm";
-  }
-  if ((extension === ".glb" || extension === ".gltf") && detect && detectVrmModelFromGlb(bytes)) {
-    return "vrm";
-  }
+  if (extension === ".vrm" || (extension === ".glb" && detect && detectVrmModelFromGlb(bytes))) return "vrm";
+  if (declaredKind === "background3d") return declaredKind;
+  if ([".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"].includes(extension)) return "image";
   return "background3d";
 }
 
@@ -428,11 +426,12 @@ function createDescriptor(assetId: string, kind: AssetKind): string {
   return JSON.stringify(descriptor);
 }
 
-function makeFormData(fileBytes: Uint8Array, filename: string, kind: AssetKind, assetId: string): FormData {
+export function makeFormData(fileBytes: Uint8Array, filename: string, kind: AssetKind, assetId: string): FormData {
   const formData = new FormData();
   const mime = kind === "image" ? "application/octet-stream" : "model/gltf-binary";
-  const blobSource = Buffer.from(fileBytes).buffer;
-  const blob = new Blob([blobSource], { type: mime });
+  // A pooled Buffer's .buffer can contain unrelated bytes before and after the file view.
+  // Copy only the supplied view; Blob then snapshots that exact byte range.
+  const blob = new Blob([Uint8Array.from(fileBytes)], { type: mime });
   formData.append("file", blob, filename);
   formData.append("elementType", kind);
   formData.append("descriptor", createDescriptor(assetId, kind));
@@ -551,7 +550,7 @@ async function ensureWork(baseUrl: string, headers: Record<string, string>, opti
   return workId;
 }
 
-async function hasExistingAsset(
+export async function hasExistingAsset(
   baseUrl: string,
   headers: Record<string, string>,
   workId: string,
@@ -561,7 +560,10 @@ async function hasExistingAsset(
   const res = await apiRequest(baseUrl, `/api/creator/works/${encodeURIComponent(workId)}/assets/${encodeURIComponent(assetId)}?elementType=${encodeURIComponent(kind)}`, {
     method: "GET",
   }, headers, true);
-  return res.ok;
+  if (res.ok) return true;
+  if (res.status === 404) return false;
+  // Auth, throttling and server errors are not evidence that an asset is absent.
+  throw new Error(`기존 에셋 조회 실패 (${res.status}): ${await parseApiError(res)}`);
 }
 
 async function uploadAsset(
@@ -612,12 +614,13 @@ async function main(): Promise<void> {
       return;
     }
 
-    const startId = 0;
+    // Allocate against the entire manifest in order, before filtering/resuming or concurrent reads.
+    const usedIds = new Set<string>();
+    const assetIds = new Map(manifest.map((entry, index) => [entry, buildAssetId(entry, index, usedIds)]));
     const authHeaders = await ensureAuth(options);
     const workId = await ensureWork(options.baseUrl, authHeaders, options);
     console.log(`업로드 대상 작업: ${workId}`);
 
-    const usedIds = new Set<string>();
     const results: UploadResult[] = [];
     let cursor = 0;
 
@@ -631,7 +634,8 @@ async function main(): Promise<void> {
         try {
           const fileBytes = new Uint8Array(await readFile(plan.path));
           const assetType = resolveAssetKind(plan, options.elementType, fileBytes, options.probeVrm);
-          const assetId = buildAssetId(plan, index + startId, usedIds);
+          const assetId = assetIds.get(plan);
+          if (!assetId) throw new Error("업로드 에셋 ID 계획이 없습니다.");
 
           if (options.skipExisting && await hasExistingAsset(options.baseUrl, authHeaders, workId, assetId, assetType)) {
             console.log(`[${itemLabel}] skip (exists) ${assetId}`);
@@ -694,4 +698,14 @@ async function main(): Promise<void> {
   }
 }
 
-void main();
+function isDirectExecution(): boolean {
+  try {
+    const entrypoint = process.argv[1];
+    return entrypoint !== undefined && realpathSync(entrypoint) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+}
+
+// Importing pure helpers in tests must never authenticate or create a work.
+if (isDirectExecution()) void main();

@@ -70,8 +70,17 @@ describe("VRM 소품 카탈로그", () => {
     expect(propsByCategory("body").length).toBeGreaterThan(0);
   });
 
-  it("55개 안정 ID를 번들된 first-party GLB 경로에 정확히 연결한다", () => {
+  it("64개 안정 ID를 번들된 first-party GLB 경로에 정확히 연결한다", () => {
     const expected = {
+      mic: "/assets/3d/atelier_microphone.glb",
+      beret: "/assets/3d/atelier_beret.glb",
+      sunglasses: "/assets/3d/atelier_sunglasses.glb",
+      headphones: "/assets/3d/atelier_headphones.glb",
+      ribbon: "/assets/3d/atelier_ribbon.glb",
+      beanie: "/assets/3d/atelier_beanie.glb",
+      camera: "/assets/3d/atelier_camera.glb",
+      medicalBag: "/assets/3d/atelier_medical_bag.glb",
+      shoulderbag: "/assets/3d/atelier_shoulder_bag.glb",
       smartphone: "/assets/3d/modern_smartphone_prop.glb",
       mug: "/assets/3d/everyday_mug.glb",
       book: "/assets/3d/everyday_book.glb",
@@ -132,7 +141,7 @@ describe("VRM 소품 카탈로그", () => {
     expect(BLENDER_PROP_GLTF_URLS).toEqual(expected);
     const blenderDefs = VRM_PROPS.filter((definition) => definition.id.startsWith("blender_"));
     expect(blenderDefs).toHaveLength(48);
-    expect(Object.keys(BLENDER_PROP_GLTF_URLS)).toHaveLength(55);
+    expect(Object.keys(BLENDER_PROP_GLTF_URLS)).toHaveLength(64);
 
     for (const [id, url] of Object.entries(expected)) {
       expect(propDefById(id)?.geometrySource, id).toEqual({ kind: "gltf", url });
@@ -151,7 +160,7 @@ describe("VRM 소품 카탈로그", () => {
     }
   });
 
-  it("매핑된 first-party GLB 55개가 실제 mesh scene으로 파싱된다", async () => {
+  it("매핑된 first-party GLB 64개가 실제 mesh scene으로 파싱된다", async () => {
     const loader = new GLTFLoader();
     for (const url of Object.values(BLENDER_PROP_GLTF_URLS)) {
       const bytes = readFileSync(new URL(`../../../../public${url}`, import.meta.url));

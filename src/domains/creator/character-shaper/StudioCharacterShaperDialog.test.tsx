@@ -21,7 +21,7 @@ import type { CharacterShaperBinding, CharacterShaperCommitResult } from "./char
 import type { StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
 
 vi.mock("../vrm/StudioVrmPoserViewport", () => ({
-  StudioVrmPoserViewport: () => <section data-testid="viewport">viewport</section>,
+  StudioVrmPoserViewport: ({ presentation }: { presentation?: string }) => <section data-testid="viewport" data-presentation={presentation}>viewport</section>,
 }));
 vi.mock("./character-shaper-preview", () => ({
   CharacterSlotPreview: ({ spec, title }: { spec: { kind: string }; title?: string }) => (
@@ -322,6 +322,31 @@ afterEach(() => {
 });
 
 describe("StudioCharacterShaperDialog shell", () => {
+  it("owns a single viewport chrome and routes contact inspection through the existing camera", () => {
+    const { h } = renderDialog({ width: 390 });
+    expect(screen.getByTestId("viewport").getAttribute("data-presentation")).toBe("shaper");
+    const selector = screen.getByRole("combobox", { name: "부위·방향 확대 검사" });
+    expect(selector.querySelectorAll("option")).toHaveLength(10);
+    fireEvent.change(selector, { target: { value: "inspectRightHand" } });
+    expect(h.setActiveCameraId).toHaveBeenCalledWith("inspectRightHand");
+    expect(h.handleViewReset).not.toHaveBeenCalled();
+    expect(h.onClose).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("button", { name: /^확대$/ })).toHaveLength(1);
+  });
+  it.each([
+    { isCapturing: true }, { isThumbnailCapturing: true }, { isSharingPose: true },
+    { viewportCameraInteractionLocked: true }, { status: "loading" },
+  ])("locks inspection and quick cameras while unavailable: %o", (state) => {
+    renderDialog({ h: makeHost(state) });
+    expect((screen.getByRole("combobox", { name: "부위·방향 확대 검사" }) as HTMLSelectElement).disabled).toBe(true);
+    for (const button of screen.getByRole("group", { name: "카메라 프리셋" }).querySelectorAll("button")) expect(button.disabled).toBe(true);
+  });
+  it("announces the inspection choice without replacing the five quick camera buttons", () => {
+    renderDialog({ h: makeHost({ activeCameraId: "inspectFeet" }) });
+    expect((screen.getByRole("combobox", { name: "부위·방향 확대 검사" }) as HTMLSelectElement).value).toBe("inspectFeet");
+    expect(screen.getByRole("group", { name: "카메라 프리셋" }).querySelectorAll("button")).toHaveLength(5);
+  });
+
   it("renders a labelled modal dialog with the legacy tooling hook and the four desktop regions", () => {
     const { h } = renderDialog();
     const root = dialogRoot();

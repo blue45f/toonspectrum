@@ -173,19 +173,46 @@ function observeDeviceLoss(
   );
 }
 
+const canvasRuntimes = new WeakMap<HTMLCanvasElement, Promise<StudioBg3dThreeWebGpuRuntime>>();
+
 /**
- * Creates an initialized, verified WebGPU renderer bound to `canvas`.
+ * Own one initialized renderer per canvas, including while init is pending. R3F 9.6.1 may invoke
+ * an async gl factory again before its first configure call stores state.gl (upstream #3782).
+ * Two renderers then configure the same GPUCanvasContext with different devices; only one receives
+ * resize updates and the other's depth buffer remains 300x150. Sharing just the final renderer is
+ * too late: publish the promise before construction/import side effects can re-enter the factory.
  *
- * Callers must probe first; this factory does not re-probe, because R3F needs the renderer within
- * one asynchronous `gl` factory call and a second adapter request would double the cold-start cost.
+ * The first invocation owns options and device-loss reporting until disposal. Failed targets stay
+ * failed: a timed-out native init can still touch that canvas later. Explicit retry remounts a new
+ * Canvas in useStudioBg3dEngineRuntime, never races a replacement device on the failed DOM node.
  */
-export async function createStudioBg3dThreeWebGpuRenderer(
+export function createStudioBg3dThreeWebGpuRenderer(
   canvas: HTMLCanvasElement,
   options: CreateStudioBg3dThreeWebGpuRendererOptions = {},
 ): Promise<StudioBg3dThreeWebGpuRuntime> {
   if (!(canvas instanceof HTMLCanvasElement)) {
-    throw new StudioBg3dWebGpuRendererError("invalid-canvas");
+    return Promise.reject(new StudioBg3dWebGpuRendererError("invalid-canvas"));
   }
+  const existing = canvasRuntimes.get(canvas);
+  if (existing) return existing;
+  const initialOptions = { ...options };
+  const pending = Promise.resolve().then(() => initializeStudioBg3dThreeWebGpuRenderer(
+    canvas,
+    initialOptions,
+    () => {
+      if (canvasRuntimes.get(canvas) === pending) canvasRuntimes.delete(canvas);
+    },
+  ));
+  canvasRuntimes.set(canvas, pending);
+  return pending;
+}
+
+/** Callers probe first. Initialization does not re-probe or permit Three's hidden WebGL fallback. */
+async function initializeStudioBg3dThreeWebGpuRenderer(
+  canvas: HTMLCanvasElement,
+  options: CreateStudioBg3dThreeWebGpuRendererOptions,
+  releaseCanvas: () => void,
+): Promise<StudioBg3dThreeWebGpuRuntime> {
   const renderer = new WebGPURenderer({
     canvas,
     antialias: options.antialias ?? true,
@@ -202,8 +229,6 @@ export async function createStudioBg3dThreeWebGpuRenderer(
     disposeRejectedThreeWebGpuInitialization(initializationBackend);
     throw new StudioBg3dWebGpuRendererError("version-contract-unsupported");
   }
-  // A runtime advertised as WebGPU must fail closed instead of quietly becoming WebGL2, so the
-  // engine-selection policy — not Three — owns the unavailable/failed decision.
   lifecycle._getFallback = null;
   try {
     await initializeRendererWithTimeout(
@@ -220,18 +245,20 @@ export async function createStudioBg3dThreeWebGpuRenderer(
     throw new StudioBg3dWebGpuRendererError("backend-unavailable");
   }
   let disposed = false;
-  // React Three Fiber owns the renderer it is handed and disposes it on unmount, so this runtime's
-  // own `dispose()` is not the only teardown path. `GPUDevice.lost` resolves with reason
-  // "destroyed" for a deliberate teardown exactly as it does for a real loss, so without this the
-  // editor would read an ordinary canvas remount as a WebGPU failure and mark the explicit
-  // selection failed. Marking disposal on the renderer's own method covers either teardown owner.
+  // R3F disposes the renderer directly. Cover that path as well as the runtime handle and release
+  // only this ownership entry; an old handle must never erase a newer runtime for the same node.
   const rendererDispose = renderer.dispose.bind(renderer);
   Object.defineProperty(renderer, "dispose", {
     configurable: true,
     writable: true,
     value: (): unknown => {
+      if (disposed) return;
       disposed = true;
-      return rendererDispose();
+      try {
+        return rendererDispose();
+      } finally {
+        releaseCanvas();
+      }
     },
   });
   if (options.onDeviceLost) {

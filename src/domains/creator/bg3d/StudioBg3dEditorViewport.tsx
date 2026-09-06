@@ -7,6 +7,7 @@
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { CaptureBridge } from "./StudioBg3dCaptureBridge";
 import { StudioBg3dCompositionOverlay } from "./StudioBg3dCompositionOverlay";
+import { StudioBg3dEngineRecoveryActions } from "./StudioBg3dEngineRecoveryActions";
 import type { StudioBg3dCompositionGuideMode } from "./studio-bg3d-composition-guide";
 import { StudioBg3dTurntableController } from "./StudioBg3dTurntableController";
 import { StudioBg3dViewFrameClear } from "./StudioBg3dViewFrameClear";
@@ -374,6 +375,10 @@ export function StudioBg3dEditorViewport({ h }) {
                       자동으로 다른 엔진을 실행하지 않습니다. 보기 탭의 3D 렌더 엔진에서
                       WebGPU 또는 WebGL2를 직접 선택해 주세요.
                     </p>
+                    <StudioBg3dEngineRecoveryActions
+                      preference={engineRuntime.preference}
+                      onPreferenceChange={engineRuntime.setPreference}
+                    />
                   </div>
                 ) : (
                   <Canvas
@@ -434,11 +439,9 @@ export function StudioBg3dEditorViewport({ h }) {
                   />
                   <BgAdaptiveDprController
                     targetFps={deviceQuality.targetFps}
-                    // 기즈모 드래그 중에는 해상도 거버너를 멈춘다. 드래그는 frameloop를 "always"로
-                    // 올리므로 프레임 타임이 요동치고, 거버너가 그때마다 dpr을 다시 잡으면 잡고 있는
-                    // 손 밑에서 백버퍼 크기가 계속 바뀐다 — 작가에게는 변형 피드백이 흔들리고,
-                    // 회귀 검증에는 "같은 자세인데 표면이 안 정착하는" 프레임만 남는다.
-                    paused={isCapturing || immersiveSceneActive || !open /* EXPERIMENT: no isTransforming */}
+                    // Freeze resolution beneath a held gizmo, including when a separate animation
+                    // keeps the renderer continuous. Demand-frame idle gaps are not GPU timings.
+                    paused={isTransforming || isCapturing || immersiveSceneActive || !open}
                     onScaleChange={setAdaptiveDprScale}
                     onFrameTimeChange={setEngineFrameTimeMs}
                   />

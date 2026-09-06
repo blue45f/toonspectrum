@@ -5,6 +5,7 @@
  * 전부 순수 함수 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
  */
 
+import { STUDIO_BRUSH_DISCOVERY } from "./brush/studio-brush-discovery";
 import {
   STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS,
   listStudioBrushEngineLanePresets,
@@ -36,7 +37,21 @@ type BrushPresetDefinition = Omit<BrushPreset, "operation"> & {
 function defineBrushPresets(
   presets: readonly BrushPresetDefinition[]
 ): BrushPreset[] {
-  return presets.map((preset) => ({ operation: "paint", ...preset }));
+  return presets.map((preset) => {
+    const discovery = STUDIO_BRUSH_DISCOVERY[preset.id];
+    return {
+      operation: "paint",
+      ...preset,
+      ...(discovery ? {
+        name: discovery.name,
+        searchAliases: [...new Set([
+          preset.name,
+          ...(preset.searchAliases ?? []),
+          ...discovery.aliases,
+        ])],
+      } : {}),
+    };
+  });
 }
 
 /**

@@ -36,6 +36,7 @@ export function readBrushLabRecipe(raw: unknown): BrushLabRecipe | null {
   if (entries.length > BRUSH_LAB_SLOTS.length) return null;
   for (const [key, value] of entries) {
     if (!allowed.has(key) || typeof value !== "string" || value.length > 160) return null;
+    // eslint-disable-next-line no-control-regex -- persisted slot ids must reject ASCII control bytes
     if (value !== value.trim() || /[\u0000-\u001f\u007f]/u.test(value)) return null;
     if (value) result[key as BrushLabSlot] = value;
   }

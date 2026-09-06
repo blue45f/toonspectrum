@@ -34,7 +34,7 @@ describe("StudioActiveBrushSummary", () => {
     expect(summary?.getAttribute("data-studio-brush-runtime-texture")).toBe("none");
     expect(summary?.getAttribute("data-studio-brush-runtime-dynamics")).toBe("causal-pressure");
     expect(summary?.getAttribute("data-studio-brush-semantic-source")).toBe("runtime-contract");
-    expect(screen.getByText("잉크 · 원형 촉")).toBeTruthy();
+    expect(screen.getByText("펜·잉크 · 원형 촉")).toBeTruthy();
     expect(screen.getByText("매끈 · 필압 추종")).toBeTruthy();
   });
 

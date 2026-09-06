@@ -1,0 +1,91 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "wood",
+      "table",
+      "varnished",
+      "clean",
+      "stained",
+      "red",
+      "furniture",
+      "fancy",
+      "fine",
+      "grain",
+      "vinyl"
+    ],
+    "date_published": 1626445026,
+    "name": "Wood Table 001",
+    "categories": [
+      "wood",
+      "clean",
+      "man made"
+    ],
+    "authors": {
+      "Dimitrios Savva": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "dimensions": [
+      1500,
+      1500.0001192092896
+    ],
+    "max_resolution": [
+      16384,
+      16384
+    ],
+    "files_hash": "141bbae9092a1169e3060de60359d9631592e6a4",
+    "description": "Free 16K wood texture: clean, stained red-brown table surface with fine grain and a smooth, varnished glossy finish",
+    "category_id": "a7bb33c4-8575-586e-a502-7094517b10c5",
+    "category": "Wood/Boards & Planks/Finished & Varnished",
+    "attributes": {
+      "surface_use": "object",
+      "condition": [
+        "clean"
+      ],
+      "origin": "man_made"
+    },
+    "download_count": 463310,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wood_table_001.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_diff_2k.jpg",
+      "bytes": 924532,
+      "sha256": "63ae5cd186197b40f18bc020fe2b652bb08df4d9fc6240c6cbf8a7e3bc32c096",
+      "sourceMd5": "a36483628b915dabf82961ab2a62a85c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_rough_2k.jpg",
+      "bytes": 963377,
+      "sha256": "c788876d80e4d96598590631f8de92447fb1b0ba1265a812514ee717d270ac3e",
+      "sourceMd5": "a291ec6bc35b9827175cdd1592c62e03"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_nor_gl_2k.jpg",
+      "bytes": 385020,
+      "sha256": "d56f02c911391267ddc6adc92e8a5bc29b9803196e8d57ad5b9702e6c842dc28",
+      "sourceMd5": "50dbc9fe086df00f6bce819eae6091d1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_ao_2k.jpg",
+      "bytes": 878608,
+      "sha256": "2f3b03a12717af4566b41c67d6f87c430464a2dc295e3267fd82e4104575f77f",
+      "sourceMd5": "81d5ec907b151953918094816e1833fa"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_disp_2k.jpg",
+      "bytes": 1177053,
+      "sha256": "7737780244d392c9ae384343dc92feb381cb3cf703924ac019c5d976a7009636",
+      "sourceMd5": "1535c704973db0eec7edade7f08de64c"
+    }
+  ]
+}

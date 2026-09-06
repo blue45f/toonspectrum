@@ -1125,7 +1125,7 @@ export function StudioFilterDialog({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">다른 필터 둘러보기</span>
                   <span className="block truncate text-[0.62rem] font-normal text-fg-3">
-                    {STUDIO_FILTER_DIALOG_CATALOG.length}개 필터 · 검색, 미리보기, 즐겨찾기
+                    {STUDIO_FILTER_DIALOG_CATALOG.length}개 필터 · 용도별 분류, 검색, 즐겨찾기
                   </span>
                 </span>
                 <ChevronDown
@@ -1154,7 +1154,7 @@ export function StudioFilterDialog({
                       type="search"
                       value={galleryQuery}
                       onChange={(event) => setGalleryQuery(event.target.value)}
-                      placeholder="이름·효과로 검색"
+                      placeholder="이름·효과로 검색 (예: 빛줄기, 선화 정리)"
                       autoComplete="off"
                       className={cn(
                         "min-h-11 w-full min-w-0 rounded-xl border border-line bg-panel pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 hover:border-line-strong focus:border-accent",
@@ -1164,8 +1164,12 @@ export function StudioFilterDialog({
                     />
                   </label>
 
+                  <p className="text-[0.65rem] leading-relaxed text-fg-3">
+                    카드 이미지는 효과 예시입니다. 실제 결과는 선택 후 작업 이미지의 미리보기에서 확인하세요.
+                  </p>
+
                   {/*
-                    A radiogroup, not nine toggle buttons: exactly one category is ever active, and
+                    A radiogroup, not independent toggle buttons: exactly one category is ever active, and
                     aria-pressed on each described nine independent on/off switches. Radio semantics
                     also make the whole strip one tab stop with arrow keys inside it, instead of nine
                     stops the artist tabs through on the way to the filters.

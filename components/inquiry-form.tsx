@@ -84,10 +84,13 @@ export function InquiryForm({ defaultCategory = "contact" }: { defaultCategory?:
       return;
     }
 
-    // 이메일 연락처는 contactEmail로, 그 외(전화번호 등)는 본문 푸터로 합친다.
+    // The body is public: never append a phone number/contact to it.
     const isEmail = SIMPLE_EMAIL_RE.test(trimmedContact);
-    const footer = trimmedContact && !isEmail ? `\n\n— 답변 받을 연락처: ${trimmedContact}` : "";
-    const payloadBody = `${trimmedBody}${footer}`.slice(0, INQUIRY_BODY_MAX);
+    if (trimmedContact && !isEmail) {
+      setError("연락처에는 이메일만 입력해 주세요. 전화번호는 공개 본문에 첨부하지 않습니다.");
+      return;
+    }
+    const payloadBody = trimmedBody;
 
     setSending(true);
     setError(null);
@@ -132,6 +135,7 @@ export function InquiryForm({ defaultCategory = "contact" }: { defaultCategory?:
 
   return (
     <form onSubmit={submit} className="space-y-3" aria-label="인앱 문의 폼">
+      <p className="rounded-lg border border-warn/40 bg-warn/10 p-3 text-xs leading-relaxed text-fg-2">제목과 내용은 공개됩니다. 비밀번호, 연락처, 결제 정보, 비공개 제안서는 본문에 입력하지 마세요.</p>
       <div>
         <label htmlFor={`${formId}-category`} className="mb-1 block text-xs text-fg-3">
           문의 유형
@@ -182,7 +186,7 @@ export function InquiryForm({ defaultCategory = "contact" }: { defaultCategory?:
       </div>
       <div>
         <label htmlFor={`${formId}-contact`} className="mb-1 block text-xs text-fg-3">
-          답변 받을 연락처 <span className="text-fg-3/70">(선택 — 이메일 권장)</span>
+          답변 받을 이메일 <span className="text-fg-3/70">(선택)</span>
         </label>
         <input
           id={`${formId}-contact`}

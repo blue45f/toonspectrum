@@ -74,7 +74,7 @@ export async function composeBrushLabSnapshot(
   isCurrent: () => boolean,
 ) {
   if (!brushLabCanCompose(snapshot)) {
-    return { ok: false, reason: "incompatible-carrier" as const };
+    return { ok: false as const, reason: "incompatible-carrier" as const };
   }
   const byId = new Map(sources.map((source) => [source.id, source]));
   const result = await composeBrushLabRecipe(snapshot.brushDynamics, recipe, {

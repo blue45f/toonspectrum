@@ -1,0 +1,54 @@
+name: Dontdraw intake regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/dontdraw/**"
+      - "scripts/upload-toonstudio-3d-assets.mts"
+      - "docs/studio/dontdraw-authorized-import.md"
+      - "docs/studio/dontdraw-upload-handoff.md"
+      - ".github/workflows/dontdraw-intake.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/dontdraw/**"
+      - "scripts/upload-toonstudio-3d-assets.mts"
+      - "docs/studio/dontdraw-authorized-import.md"
+      - "docs/studio/dontdraw-upload-handoff.md"
+      - ".github/workflows/dontdraw-intake.yml"
+
+permissions:
+  contents: read
+
+# main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
+# cancel-in-progress 가 취소할 대상을 갖지 못한다 (ref 로 묶어야 같은 그룹이 된다). 이 게이트는
+# 브랜치 보호의 필수 체크가 아니므로 최신 main 상태만 검증하면 되고, 커밋별 신호가 필요한
+# ci.yml 은 그대로 SHA 로 묶어 둔다.
+concurrency:
+  group: dontdraw-intake-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  intake-node24:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Check syntax and run real offline intake contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for source in scripts/dontdraw/*.mjs; do node --check "$source"; done
+          node --check scripts/upload-toonstudio-3d-assets.mts
+          node --test scripts/dontdraw/*.test.mjs | tee dontdraw-intake-tests.tap
+      - name: Retain actual test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dontdraw-intake-node24-${{ github.run_id }}
+          path: dontdraw-intake-tests.tap
+          if-no-files-found: warn

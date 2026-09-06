@@ -1,0 +1,245 @@
+{
+  "excluded": [
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-a.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-b.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-c.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-d.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-e.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-f.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-g.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-h.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-i.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-j.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-k.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-l.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-m.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-n.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-wide-a.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    },
+    {
+      "source": "kenney-city-commercial/Models/GLB format/low-detail-building-wide-b.glb",
+      "reason": "low-detail-alternative-not-in-default-delivery"
+    }
+  ],
+  "variants": [
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_blockDiagonal_stone.glb",
+      "canonicalId": "kenney-nature-cliff-block-diagonal-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_blockHalf_stone.glb",
+      "canonicalId": "kenney-nature-cliff-block-half-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_blockQuarter_stone.glb",
+      "canonicalId": "kenney-nature-cliff-block-quarter-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_block_stone.glb",
+      "canonicalId": "kenney-nature-cliff-block-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_cave_stone.glb",
+      "canonicalId": "kenney-nature-cliff-cave-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_cornerInnerTop_stone.glb",
+      "canonicalId": "kenney-nature-cliff-corner-inner-top-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_cornerTop_stone.glb",
+      "canonicalId": "kenney-nature-cliff-corner-top-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_corner_stone.glb",
+      "canonicalId": "kenney-nature-cliff-corner-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_halfCorner_stone.glb",
+      "canonicalId": "kenney-nature-cliff-half-corner-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_half_stone.glb",
+      "canonicalId": "kenney-nature-cliff-half-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_large_stone.glb",
+      "canonicalId": "kenney-nature-cliff-large-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_stepsCornerInner_stone.glb",
+      "canonicalId": "kenney-nature-cliff-steps-corner-inner-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_stepsCorner_stone.glb",
+      "canonicalId": "kenney-nature-cliff-steps-corner-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_steps_stone.glb",
+      "canonicalId": "kenney-nature-cliff-steps-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_stone.glb",
+      "canonicalId": "kenney-nature-cliff-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/cliff_top_stone.glb",
+      "canonicalId": "kenney-nature-cliff-top-rock",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/ground_riverOpen.glb",
+      "canonicalId": "kenney-nature-ground-path-open",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/mushroom_tanGroup.glb",
+      "canonicalId": "kenney-nature-mushroom-red-group",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/mushroom_tanTall.glb",
+      "canonicalId": "kenney-nature-mushroom-red-tall",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_blocks_dark.glb",
+      "canonicalId": "kenney-nature-tree-blocks",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_cone_fall.glb",
+      "canonicalId": "kenney-nature-tree-cone",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_default_dark.glb",
+      "canonicalId": "kenney-nature-tree-default",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_detailed_dark.glb",
+      "canonicalId": "kenney-nature-tree-detailed",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_detailed_fall.glb",
+      "canonicalId": "kenney-nature-tree-detailed",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_fat_darkh.glb",
+      "canonicalId": "kenney-nature-tree-fat",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_fat_fall.glb",
+      "canonicalId": "kenney-nature-tree-fat",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_oak_dark.glb",
+      "canonicalId": "kenney-nature-tree-oak",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_oak_fall.glb",
+      "canonicalId": "kenney-nature-tree-oak",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_plateau_dark.glb",
+      "canonicalId": "kenney-nature-tree-plateau",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_plateau_fall.glb",
+      "canonicalId": "kenney-nature-tree-plateau",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_simple_dark.glb",
+      "canonicalId": "kenney-nature-tree-simple",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_simple_fall.glb",
+      "canonicalId": "kenney-nature-tree-simple",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_small_fall.glb",
+      "canonicalId": "kenney-nature-tree-small",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_tall_dark.glb",
+      "canonicalId": "kenney-nature-tree-tall",
+      "reason": "same-geometry-format-or-color-variant"
+    },
+    {
+      "source": "kenney-nature/Models/GLTF format/tree_thin_fall.glb",
+      "canonicalId": "kenney-nature-tree-thin",
+      "reason": "same-geometry-format-or-color-variant"
+    }
+  ]
+}

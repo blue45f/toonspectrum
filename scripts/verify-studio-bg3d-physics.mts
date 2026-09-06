@@ -231,16 +231,16 @@ async function dismissQuickStartIfPresent(page: Page): Promise<void> {
 }
 
 /** Composite menubar title that absorbed the 3D group (studio-main-menu-presentation.ts). */
-const STUDIO_TOOLS_MENU_TITLE = "도구";
+const STUDIO_INSERT_MENU_TITLE = "삽입";
 
 async function openDesktopBackground3d(page: Page): Promise<Locator> {
   const mainMenu = page.locator('[data-studio-main-menu="true"]');
   await mainMenu.waitFor({ state: "visible", timeout: 20_000 });
   await dismissQuickStartIfPresent(page);
-  // 메뉴바 프레젠테이션(UX 감사 2026-09-02)이 3D 를 도구 복합 타이틀로 접었다. 항목 id·라벨은
+  // 메뉴바 프레젠테이션(UX 감사 2026-09-02)이 3D 를 삽입 메뉴의 3D 구획으로 옮겼다. 항목 id·라벨은
   // 그대로이므로 진입 지점만 바뀐다.
-  await mainMenu.getByRole("menuitem", { name: STUDIO_TOOLS_MENU_TITLE, exact: true }).click();
-  const threeDMenu = page.locator(`[role="menu"][aria-label="${STUDIO_TOOLS_MENU_TITLE}"]`);
+  await mainMenu.getByRole("menuitem", { name: STUDIO_INSERT_MENU_TITLE, exact: true }).click();
+  const threeDMenu = page.locator(`[role="menu"][aria-label="${STUDIO_INSERT_MENU_TITLE}"]`);
   await threeDMenu.waitFor({ state: "visible", timeout: 5_000 });
   await threeDMenu.getByRole("menuitem", { name: "3D 배경", exact: true }).click();
   return waitForBackground3dDialog(page);

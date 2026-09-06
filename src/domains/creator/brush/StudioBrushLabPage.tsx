@@ -24,8 +24,8 @@ import {
   type BrushLabSlot,
 } from "./studio-brush-lab-transaction";
 import { sanitizeBrushSnapshot, type StudioBrushSnapshot, type StudioSavedBrush } from "./studio-brush-library";
-import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
 import { StudioBrushEngineStackPanel, StudioBrushSaveAsCustomControls, StudioBrushWatercolorProgramControls } from "./StudioBrushEngineMixer";
+import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
 import { StudioBrushLabAdvanced } from "./StudioBrushLabAdvanced";
 import { StudioBrushLibraryPanel } from "./StudioBrushLibraryPanel";
 import { StudioBrushDynamicsPreview } from "./StudioBrushStudio";

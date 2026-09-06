@@ -21,6 +21,8 @@ export interface StudioAiProductionLaunchpadProps {
   readonly textConfigured: boolean;
   readonly onOpenScenario?: () => void;
   readonly onOpenSuperSuite?: () => void;
+  /** Warms the super-suite chunk on hover/focus, as the inline launcher used to. */
+  readonly onPreloadSuperSuite?: () => void;
   readonly scenarioDisabled?: boolean;
   readonly scenarioDisabledReason?: string;
 }
@@ -36,6 +38,7 @@ export function StudioAiProductionLaunchpad({
   textConfigured,
   onOpenScenario,
   onOpenSuperSuite,
+  onPreloadSuperSuite,
   scenarioDisabled = false,
   scenarioDisabledReason = "현재 편집 모드에서는 시나리오 제작을 열 수 없어요.",
 }: StudioAiProductionLaunchpadProps): ReactElement | null {
@@ -113,6 +116,9 @@ export function StudioAiProductionLaunchpad({
           <button
             type="button"
             onClick={onOpenSuperSuite}
+            onMouseEnter={onPreloadSuperSuite}
+            onFocus={onPreloadSuperSuite}
+            onPointerDown={onPreloadSuperSuite}
             className={cn(
               "group flex min-h-[5.5rem] items-start gap-2 rounded-xl border border-line bg-card p-2.5 text-left hover:border-accent/45 hover:bg-raised",
               STUDIO_EASE,
@@ -147,6 +153,16 @@ export function StudioAiProductionLaunchpad({
           </button>
         ) : null}
       </div>
+
+      <a
+        href="/create/promo"
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn("mt-2 flex min-h-11 items-center justify-between gap-2 rounded-lg border border-line bg-card px-3 py-2 text-xs font-semibold text-fg hover:bg-raised", STUDIO_FOCUS_RING)}
+      >
+        컷 → 홍보영상·모션툰 만들기 (새 창)
+        <ArrowRight size={14} aria-hidden />
+      </a>
 
       {scenarioDisabled ? (
         <p

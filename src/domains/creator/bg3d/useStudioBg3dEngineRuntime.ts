@@ -193,6 +193,8 @@ export function useStudioBg3dEngineRuntime(
     }
 
     let cancelled = false;
+    let preferenceRestored = false;
+    let latestProbe: StudioBg3dWebGpuProbeResult | undefined;
     const controller = new AbortController();
     const revisionAtStart = preferenceRevisionRef.current;
     void (async () => {
@@ -202,6 +204,16 @@ export function useStudioBg3dEngineRuntime(
         secureContext: typeof window !== "undefined" && window.isSecureContext === true,
         gpu: (navigator as Navigator & { gpu?: Parameters<typeof probeCapability>[0]["gpu"] }).gpu,
         signal: controller.signal,
+        onLateResult: (result) => {
+          if (cancelled) return;
+          latestProbe = result;
+          // A cold GPU request can outlive the UI deadline. Admit its real result without another
+          // request, but never race ahead of the saved preference or revive a closed/old session.
+          if (preferenceRestored) {
+            setProbe(result);
+            setPhase("ready");
+          }
+        },
       }).catch(() => PENDING_PROBE);
       const restored = await restoredPromise;
       if (cancelled) return;
@@ -213,13 +225,16 @@ export function useStudioBg3dEngineRuntime(
         preferenceRef.current = normalized;
         setPreferenceState(normalized);
       }
+      preferenceRestored = true;
       // WebGL2 is an independent explicit engine. It does not wait for a WebGPU adapter probe that
       // is irrelevant to its renderer; the probe may finish later for diagnostics and future choice.
       if (preferenceRef.current === "webgl2") setPhase("ready");
 
       const probed = await probePromise;
       if (cancelled) return;
-      setProbe(probed);
+      // Slow storage may resolve after the late adapter. Do not overwrite newer capability
+      // evidence with the earlier timeout result when this bootstrap continuation resumes.
+      setProbe(latestProbe ?? probed);
       setPhase("ready");
     })();
     return () => {

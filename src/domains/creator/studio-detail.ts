@@ -7,7 +7,7 @@
  *                 엣지에서만 적용해 평탄한 노이즈는 증폭하지 않는다(엣지 인식 샤픈).
  * 이웃/블러 읽기는 전부 원본 스냅샷(src)에서 하고, 샘플 좌표는 [0,w-1]/[0,h-1]로 클램프하며
  *   비유한 좌표는 0으로 고정한다(NaN이 Uint8ClampedArray를 0으로 뭉개는 버그 방지).
- * 결과는 t=amount/100로 원본과 블렌드한다. 고정 톤(128 회색)으로 미는 highPass는 alpha/255로
+ * 결과는 t=amount/100로 원본과 채널별 블렌드한다. 고정 톤(128 회색)으로 미는 highPass는 alpha/255로
  *   기여를 스케일해 완전 투명(alpha 0) 픽셀은 건드리지 않는다(헤일로 방지). 알파(+3)는 절대 쓰지 않는다(보존).
  * Math.random·Date 없음 — 같은 입력은 항상 같은 출력(결정적).
  * Konva/DOM 의존 없음 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
@@ -217,60 +217,85 @@ function applyHighPass(data: Uint8ClampedArray, width: number, height: number, r
   }
 }
 
-// 미디언 이웃 윈도 한 변 상한 — radius가 커도 정렬 비용이 폭발하지 않게(속도) 캡.
+// Keep the existing radius cap and exact channel-wise median semantics.
 const MEDIAN_MAX_RADIUS = 3;
+const MEDIAN_CHANNEL_BINS = 256;
+const MEDIAN_COARSE_BINS = 16;
 
-/**
- * 한 채널 오프셋(off=0/1/2)의 미디언을 (radius) 정사각 이웃에서 구한다.
- * 이웃 표본을 buf에 모아 정렬 후 가운데 값을 반환(홀수 개수라 항상 중앙 1개).
- * 좌표는 가장자리 클램프, off로 r/g/b 채널을 고른다. 알파(off=3)는 절대 읽지 않는다.
- */
-function medianChannel(
-  src: Uint8ClampedArray,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-  r: number,
-  off: number,
-  buf: number[]
+/** Exact order statistic for byte samples; the second tier bounds lookup to 32 bins. */
+function medianHistogramValue(
+  histogram: Uint16Array,
+  coarse: Uint16Array,
+  channel: number,
+  middle: number,
 ): number {
-  let count = 0;
-  for (let dy = -r; dy <= r; dy++) {
-    const sy = clampCoord(y + dy, height);
-    for (let dx = -r; dx <= r; dx++) {
-      const sx = clampCoord(x + dx, width);
-      buf[count++] = src[(sy * width + sx) * 4 + off]!;
-    }
+  const coarseOffset = channel * MEDIAN_COARSE_BINS;
+  let group = 0;
+  while (group < MEDIAN_COARSE_BINS - 1 && middle >= coarse[coarseOffset + group]!) {
+    middle -= coarse[coarseOffset + group]!;
+    group += 1;
   }
-  // 모인 표본만 정렬(오름차순) 후 중앙값.
-  buf.length = count;
-  buf.sort((a, b) => a - b);
-  return buf[count >> 1]!;
+  const offset = channel * MEDIAN_CHANNEL_BINS;
+  let value = group * MEDIAN_COARSE_BINS;
+  const last = value + MEDIAN_COARSE_BINS - 1;
+  while (value < last && middle >= histogram[offset + value]!) {
+    middle -= histogram[offset + value]!;
+    value += 1;
+  }
+  return value;
 }
 
 /**
- * 미디언 — 각 픽셀을 (radius) 정사각 이웃의 채널별 중앙값으로 치환한다(스페클/점 노이즈 제거).
- * 평균과 달리 한두 개의 튀는 핫픽셀은 정렬 중앙에서 밀려나 사라지고, 엣지(다수 톤)는 보존된다.
- * 반경은 min(radius, MEDIAN_MAX_RADIUS)로 캡(정렬 비용). 결과는 t로 원본과 블렌드, 알파(+3)는 보존.
- * 중앙값은 이웃 톤(투명 픽셀이면 다른 RGB)으로 픽셀을 끌고 갈 수 있어, (alpha/255)로 기여를 스케일해
- * 완전 투명(alpha 0) 픽셀은 원본 RGB 그대로 둔다(헤일로 방지).
+ * Exact median with a horizontally sliding histogram. The old implementation sorted three
+ * neighbourhood arrays for every pixel, causing multi-megapixel surface-blur operations to
+ * outlive their Worker deadline. A byte histogram selects the same middle value without sorting.
+ * Clamped edge samples, radius cap, original-source reads and alpha-scaled blending are unchanged.
+ * Auxiliary histogram memory is fixed (1,632 bytes), independent of image size and repeated use.
  */
 function applyMedian(data: Uint8ClampedArray, width: number, height: number, radius: number, t: number): void {
-  const src = new Uint8ClampedArray(data); // 원본 스냅샷(이웃 읽기용)
-  const r = Math.min(MEDIAN_MAX_RADIUS, Math.max(1, radius)); // 이웃 반경(캡)
-  const buf: number[] = []; // 표본 버퍼(픽셀마다 재사용)
+  if (width <= 0 || height <= 0) return;
+  const src = new Uint8ClampedArray(data);
+  const r = Math.min(MEDIAN_MAX_RADIUS, Math.max(1, radius));
+  const middle = ((r * 2 + 1) ** 2) >> 1;
+  const histogram = new Uint16Array(3 * MEDIAN_CHANNEL_BINS);
+  const coarse = new Uint16Array(3 * MEDIAN_COARSE_BINS);
+  const updateSample = (index: number, delta: 1 | -1): void => {
+    for (let channel = 0; channel < 3; channel++) {
+      const value = src[index + channel]!;
+      const bin = channel * MEDIAN_CHANNEL_BINS + value;
+      const group = channel * MEDIAN_COARSE_BINS + (value >> 4);
+      histogram[bin] = histogram[bin]! + delta;
+      coarse[group] = coarse[group]! + delta;
+    }
+  };
   for (let y = 0; y < height; y++) {
+    histogram.fill(0);
+    coarse.fill(0);
+    // Initial x=0 window includes repeated clamped-edge samples, exactly as the sorted reference.
+    for (let dy = -r; dy <= r; dy++) {
+      const row = clampCoord(y + dy, height) * width;
+      for (let dx = -r; dx <= r; dx++) {
+        updateSample((row + clampCoord(dx, width)) * 4, 1);
+      }
+    }
     for (let x = 0; x < width; x++) {
-      const mr = medianChannel(src, width, height, x, y, r, 0, buf);
-      const mg = medianChannel(src, width, height, x, y, r, 1, buf);
-      const mb = medianChannel(src, width, height, x, y, r, 2, buf);
       const i = (y * width + x) * 4;
-      // 투명 픽셀은 이웃 중앙값으로 새지 않도록 알파 비율로 블렌드 강도를 줄인다(헤일로 방지).
       const a = (src[i + 3]! / 255) * t;
-      data[i] = src[i]! + (mr - src[i]!) * a;
-      data[i + 1] = src[i + 1]! + (mg - src[i + 1]!) * a;
-      data[i + 2] = src[i + 2]! + (mb - src[i + 2]!) * a;
+      if (a !== 0) {
+        for (let channel = 0; channel < 3; channel++) {
+          const median = medianHistogramValue(histogram, coarse, channel, middle);
+          data[i + channel] = src[i + channel]! + (median - src[i + channel]!) * a;
+        }
+      }
+      if (x + 1 < width) {
+        const removeX = clampCoord(x - r, width);
+        const addX = clampCoord(x + r + 1, width);
+        for (let dy = -r; dy <= r; dy++) {
+          const row = clampCoord(y + dy, height) * width;
+          updateSample((row + removeX) * 4, -1);
+          updateSample((row + addX) * 4, 1);
+        }
+      }
     }
   }
 }

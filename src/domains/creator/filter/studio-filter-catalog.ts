@@ -1,4 +1,8 @@
 /** Searchable metadata shared by the smart-filter catalog and Motion Coach hints. */
+import { matchesStudioToolSearch, studioToolSearchTerms } from "../studio-tool-search";
+
+import { STUDIO_FILTER_ALL_LABELS } from "./studio-filter-pack-registry";
+
 import type { StudioFilterKind } from "./studio-filter-menu";
 
 export type StudioFilterCatalogGroup =
@@ -6,6 +10,9 @@ export type StudioFilterCatalogGroup =
   | "tone"
   | "color"
   | "detail"
+  | "repair"
+  | "stylize"
+  | "light"
   | "transform"
   | "texture";
 
@@ -96,10 +103,10 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
   },
   {
     engine: "field-iris-blur",
-    title: "필드 아이리스 블러",
+    title: "영역 초점 블러",
     description: "초점 중심과 반경을 유지하고 바깥 영역만 조리개 모양으로 점진적으로 흐립니다.",
     group: "blur",
-    keywords: ["field blur", "iris blur", "focus", "필드 블러", "아이리스", "초점", "심도"],
+    keywords: ["필드 아이리스 블러", "field blur", "iris blur", "focus", "필드 블러", "아이리스", "초점", "심도"],
   },
   {
     engine: "tilt-shift-blur",
@@ -117,10 +124,10 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
   },
   {
     engine: "tileable-blur",
-    title: "타일러블 블러",
+    title: "이음매 없는 블러",
     description: "반대편 가장자리를 이어 샘플링해 배경·패턴 소재의 이음매를 부드럽게 없앱니다.",
     group: "blur",
-    keywords: ["tileable blur", "seamless", "wrap", "타일러블 블러", "이음매", "반복 소재"],
+    keywords: ["타일러블 블러", "tileable blur", "seamless", "wrap", "타일러블 블러", "이음매", "반복 소재"],
   },
   {
     engine: "blur",
@@ -168,14 +175,14 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "posterize",
     title: "포스터화",
     description: "채널 계조 수를 제한해 셀 채색과 그래픽 포스터 같은 색면을 만듭니다.",
-    group: "tone",
+    group: "stylize",
     keywords: ["posterize", "poster", "포스터", "계조", "양자화", "셀 채색"],
   },
   {
     engine: "solarize",
     title: "솔라리제이션",
     description: "밝은 채널을 임계점부터 부분 반전해 초현실적인 필름 톤을 만듭니다.",
-    group: "tone",
+    group: "stylize",
     keywords: ["solarize", "solarization", "솔라리제이션", "부분 반전", "필름"],
   },
   {
@@ -224,7 +231,7 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "chromatic-aberration",
     title: "색수차",
     description: "빨강과 파랑 채널을 반대 방향으로 어긋나게 해 렌즈 왜곡과 속도감을 냅니다.",
-    group: "color",
+    group: "light",
     keywords: ["chromatic aberration", "rgb split", "색수차", "색 왜곡", "채널 분리"],
   },
   {
@@ -252,7 +259,7 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "median-despeckle",
     title: "미디언 잡티 제거",
     description: "주변 픽셀의 중앙값으로 소금·후추 잡티를 줄이면서 경계는 보존합니다.",
-    group: "detail",
+    group: "repair",
     keywords: ["median", "despeckle", "dust", "미디언", "잡티", "노이즈 제거"],
   },
   {
@@ -273,28 +280,28 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "morphology",
     title: "팽창 / 침식",
     description: "밝은 영역 또는 어두운 선을 확장해 선화 굵기와 마스크 경계를 다듬습니다.",
-    group: "detail",
+    group: "repair",
     keywords: ["dilate", "erode", "morphology", "팽창", "침식", "선화", "마스크"],
   },
   {
     engine: "ink-threshold",
-    title: "먹선 임계값",
+    title: "흑백 이진화",
     description: "휘도 임계값을 기준으로 순흑과 순백을 나눠 스캔 선화를 정리합니다.",
-    group: "detail",
-    keywords: ["threshold", "binarize", "ink", "임계값", "이진화", "먹선", "선화"],
+    group: "repair",
+    keywords: ["먹선 임계값", "한계값 (흑백 2값)", "threshold", "binarize", "ink", "임계값", "이진화", "먹선", "선화"],
   },
   {
     engine: "line-extraction",
     title: "선화 추출",
     description: "Sobel 기울기와 고정 임계값으로 명확한 흑백 윤곽선을 추출합니다.",
-    group: "detail",
+    group: "repair",
     keywords: ["line extraction", "sobel", "lineart", "선화 추출", "윤곽", "외곽선"],
   },
   {
     engine: "line-cleanup",
     title: "스케치 선화 정리",
     description: "그레이스케일·자동 대비·선명화·선택적 이진화를 한 번에 적용해 흐린 스케치를 또렷한 먹선으로 정리합니다.",
-    group: "detail",
+    group: "repair",
     keywords: [
       "line cleanup",
       "clean lineart",
@@ -310,7 +317,7 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "screentone-removal",
     title: "스크린톤 제거",
     description: "주기적인 망점과 스캔 톤 자국을 억제하면서 원래 먹선과 실루엣은 보호합니다.",
-    group: "detail",
+    group: "repair",
     keywords: [
       "screentone removal",
       "descreen",
@@ -323,10 +330,10 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
   },
   {
     engine: "jpeg-artifact-reduction",
-    title: "JPEG 아티팩트 감소",
+    title: "JPEG 압축 깨짐 제거",
     description: "8px 블록 경계와 윤곽 주변 링잉을 줄이되 강한 선과 투명도는 보존합니다.",
-    group: "detail",
-    keywords: [
+    group: "repair",
+    keywords: ["JPEG 아티팩트 감소",
       "jpeg artifact reduction",
       "deblock",
       "dering",
@@ -338,10 +345,10 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
   },
   {
     engine: "edge-aware-denoise",
-    title: "엣지 보존 노이즈 감소",
+    title: "윤곽 보존 노이즈 제거",
     description: "색상 차이를 인식하는 이웃 필터로 평탄부 노이즈를 줄이면서 선과 색 경계를 지킵니다.",
-    group: "detail",
-    keywords: [
+    group: "repair",
+    keywords: ["엣지 보존 노이즈 감소",
       "edge aware denoise",
       "bilateral",
       "denoise",
@@ -355,28 +362,28 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "dust-scratches",
     title: "먼지와 스크래치 제거",
     description: "임계값을 넘는 고립된 먼지·스크래치만 주변 중앙값으로 복원하고 원래 선은 유지합니다.",
-    group: "detail",
+    group: "repair",
     keywords: ["dust scratches", "restoration", "먼지", "스크래치", "스캔 복원", "결함 제거"],
   },
   {
     engine: "difference-of-gaussians",
     title: "가우시안 차분 선화",
     description: "서로 다른 두 흐림 반경의 차이를 이용해 사진과 3D 렌더에서 깨끗한 검은 선을 추출합니다.",
-    group: "detail",
+    group: "repair",
     keywords: ["difference of gaussians", "dog", "edge", "가우시안 차분", "선화", "윤곽 추출"],
   },
   {
     engine: "edge-detect",
     title: "외곽선 검출",
     description: "Sobel 경사 강도를 연속 톤으로 계산해 조절 가능한 윤곽 효과를 만듭니다.",
-    group: "detail",
+    group: "repair",
     keywords: ["edge detect", "sobel", "find edges", "외곽선", "엣지", "윤곽 검출"],
   },
   {
     engine: "emboss",
     title: "엠보스",
     description: "방향성 이웃 차이를 중성 회색에 합성해 종이에 눌러 찍은 양각을 표현합니다.",
-    group: "detail",
+    group: "stylize",
     keywords: ["emboss", "relief", "엠보스", "양각", "음각", "릴리프"],
   },
   {
@@ -390,7 +397,7 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "invert",
     title: "반전",
     description: "RGB 색상을 반전해 네거티브·마스크 확인 효과를 만듭니다.",
-    group: "detail",
+    group: "color",
     keywords: ["invert", "negative", "반전", "네거티브"],
   },
   {
@@ -404,7 +411,7 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "pixelate",
     title: "모자이크 / 픽셀화",
     description: "픽셀 블록 크기를 키워 검열 모자이크와 레트로 도트 표현을 만듭니다.",
-    group: "transform",
+    group: "stylize",
     keywords: ["pixelate", "mosaic", "pixel", "픽셀화", "모자이크", "도트"],
   },
   {
@@ -439,7 +446,7 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "oil-paint",
     title: "유화",
     description: "국소 휘도 군집의 대표색으로 면을 평탄화해 두꺼운 물감 질감을 만듭니다.",
-    group: "texture",
+    group: "stylize",
     keywords: ["oil paint", "painterly", "kuwahara", "유화", "회화", "물감"],
   },
   {
@@ -453,21 +460,21 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "crystal-mosaic",
     title: "크리스털 모자이크",
     description: "색상 셀을 양자화하고 국소 회화 처리를 더해 결정 조각 같은 색면을 만듭니다.",
-    group: "transform",
+    group: "stylize",
     keywords: ["crystallize", "crystal", "mosaic", "크리스털", "결정", "모자이크", "색면"],
   },
   {
     engine: "pencil-sketch",
     title: "연필 스케치",
     description: "국소 기울기에서 종이 여백과 어두운 연필선을 추출해 드로잉 초안을 만듭니다.",
-    group: "detail",
+    group: "stylize",
     keywords: ["pencil", "sketch", "photocopy", "연필", "스케치", "밑그림"],
   },
   {
     engine: "crosshatch",
     title: "교차 해칭",
     description: "명암에 따라 두 방향의 결정적 해칭 선을 겹쳐 펜화 질감을 만듭니다.",
-    group: "detail",
+    group: "stylize",
     keywords: ["crosshatch", "hatching", "pen", "교차", "해칭", "펜화"],
   },
   {
@@ -481,14 +488,14 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "glowing-edges",
     title: "빛나는 외곽선",
     description: "색상 경계를 검출한 다음 밝은 선만 제한 반경으로 번지게 해 네온 외곽선을 만듭니다.",
-    group: "detail",
+    group: "light",
     keywords: ["glowing edges", "neon", "edge", "빛나는", "외곽선", "네온"],
   },
   {
     engine: "cutout",
     title: "종이 컷아웃",
     description: "색면을 부드럽게 단순화하고 계조 수를 줄여 겹친 색종이처럼 표현합니다.",
-    group: "texture",
+    group: "stylize",
     keywords: ["cutout", "paper", "collage", "컷아웃", "색종이", "콜라주", "포스터"],
   },
   {
@@ -502,29 +509,29 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "watercolor",
     title: "수채화",
     description: "안료 확산·가장자리 번짐·종이 섬유·과립을 결정적으로 합성합니다.",
-    group: "texture",
+    group: "stylize",
     keywords: ["watercolor", "wash", "paper", "수채", "번짐", "안료", "종이"],
   },
   {
     engine: "diffuse-glow",
     title: "확산 글로우",
     description: "밝은 영역의 부드러운 빛 번짐과 미세한 고정 시드 입자를 결합해 몽환적인 톤을 만듭니다.",
-    group: "blur",
+    group: "light",
     keywords: ["diffuse glow", "soft light", "dreamy", "확산", "글로우", "빛 번짐", "몽환"],
   },
   {
     engine: "wave-warp",
-    title: "사인 웨이브",
+    title: "물결 왜곡",
     description: "가로·세로 위상이 다른 역매핑 파동으로 물결치는 장면과 열기 아지랑이를 만듭니다.",
     group: "transform",
-    keywords: ["wave", "sine", "warp", "웨이브", "파동", "물결", "아지랑이"],
+    keywords: ["사인 웨이브", "wave", "sine", "warp", "웨이브", "파동", "물결", "아지랑이"],
   },
   {
     engine: "ripple-warp",
-    title: "원형 리플",
+    title: "동심원 물결",
     description: "지정한 중심에서 퍼지는 동심원 변위로 수면 충격과 에너지 파장을 표현합니다.",
     group: "transform",
-    keywords: ["ripple", "water", "radial", "리플", "동심원", "수면", "파장"],
+    keywords: ["원형 리플", "ripple", "water", "radial", "리플", "동심원", "수면", "파장"],
   },
   {
     engine: "fisheye",
@@ -535,17 +542,17 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
   },
   {
     engine: "twirl",
-    title: "트월 회전",
+    title: "소용돌이",
     description: "중심에서 가장자리로 감쇠하는 회전장으로 소용돌이와 마법 연출을 만듭니다.",
     group: "transform",
-    keywords: ["twirl", "swirl", "vortex", "트월", "소용돌이", "회전"],
+    keywords: ["트월 회전", "twirl", "swirl", "vortex", "트월", "소용돌이", "회전"],
   },
   {
     engine: "pinch-bloat",
-    title: "핀치 / 블로트",
+    title: "오므리기 / 부풀리기",
     description: "선택 중심을 부드럽게 수축하거나 팽창시켜 표정과 실루엣을 과장합니다.",
     group: "transform",
-    keywords: ["pinch", "bloat", "bulge", "핀치", "블로트", "수축", "팽창"],
+    keywords: ["핀치 / 블로트", "pinch", "bloat", "bulge", "핀치", "블로트", "수축", "팽창"],
   },
   {
     engine: "lens-distortion",
@@ -584,37 +591,37 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
   },
   {
     engine: "pointillize",
-    title: "포인틸리즘",
+    title: "점묘화",
     description: "시드로 흔들린 원형 색점을 종이 여백 위에 찍어 점묘 회화 질감을 만듭니다.",
-    group: "texture",
-    keywords: ["pointillize", "pointillism", "dots", "점묘", "색점", "회화"],
+    group: "stylize",
+    keywords: ["포인틸리즘", "pointillize", "pointillism", "dots", "점묘", "색점", "회화"],
   },
   {
     engine: "stained-glass",
     title: "스테인드글라스",
     description: "결정적 보로노이 색면과 어두운 납선을 합성해 유리 조각 모자이크를 만듭니다.",
-    group: "texture",
+    group: "stylize",
     keywords: ["stained glass", "voronoi", "mosaic", "스테인드글라스", "보로노이", "납선"],
   },
   {
     engine: "poster-edges",
     title: "포스터 엣지",
     description: "색상 단계를 줄이면서 소벨 경계를 선택적으로 눌러 강한 그래픽 외곽을 만듭니다.",
-    group: "detail",
+    group: "stylize",
     keywords: ["poster edges", "sobel", "poster", "포스터 엣지", "윤곽", "색면"],
   },
   {
     engine: "photocopy",
-    title: "고대비 포토카피",
+    title: "복사기 효과",
     description: "국소 평균과 용지 임계값을 결합해 복사기 특유의 뭉친 먹선과 흰 여백을 만듭니다.",
-    group: "detail",
-    keywords: ["photocopy", "xerox", "copy", "포토카피", "복사기", "먹선", "고대비"],
+    group: "stylize",
+    keywords: ["고대비 포토카피", "photocopy", "xerox", "copy", "포토카피", "복사기", "먹선", "고대비"],
   },
   {
     engine: "normal-map",
     title: "노멀 맵 변환",
     description: "휘도 기울기를 정규화된 RGB 표면 방향으로 바꿔 3D 조명용 노멀 소스를 만듭니다.",
-    group: "detail",
+    group: "texture",
     keywords: ["normal map", "surface", "3d", "노멀 맵", "표면", "기울기", "조명"],
   },
   {
@@ -626,20 +633,23 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
   },
   {
     engine: "god-rays",
-    title: "볼류메트릭 광선",
+    title: "빛줄기",
     description: "광원 방향으로 밝은 픽셀을 제한 샘플링해 장면을 가르는 따뜻한 빛줄기를 더합니다.",
-    group: "blur",
-    keywords: ["god rays", "volumetric", "light shafts", "볼류메트릭", "광선", "빛줄기", "역광"],
+    group: "light",
+    keywords: ["볼류메트릭 광선", "god rays", "volumetric", "light shafts", "볼류메트릭", "광선", "빛줄기", "역광"],
   },
 ] as const;
 
 export const STUDIO_FILTER_GROUP_ORDER: readonly StudioFilterCatalogGroup[] = [
-  "blur",
   "tone",
   "color",
+  "blur",
   "detail",
-  "transform",
+  "repair",
+  "light",
+  "stylize",
   "texture",
+  "transform",
 ];
 
 export function studioFilterCatalogEntry(engine: string): StudioFilterCatalogEntry | null {
@@ -649,17 +659,23 @@ export function studioFilterCatalogEntry(engine: string): StudioFilterCatalogEnt
 export function studioFilterGroupLabel(group: StudioFilterCatalogGroup): string {
   switch (group) {
     case "blur":
-      return "블러";
+      return "흐림·초점";
     case "tone":
-      return "톤";
+      return "밝기·명암";
     case "color":
-      return "색";
+      return "색상 보정";
     case "detail":
-      return "디테일";
+      return "선명도";
+    case "repair":
+      return "선화·복원";
+    case "stylize":
+      return "그림체·스타일";
+    case "light":
+      return "빛·렌즈";
     case "transform":
-      return "변형";
+      return "변형·왜곡";
     case "texture":
-      return "텍스처";
+      return "질감·노이즈";
   }
 }
 
@@ -719,7 +735,7 @@ const STUDIO_FILTER_DIALOG_CATALOG_SOURCES: readonly StudioFilterDialogCatalogSo
     fallback: {
       title: "비네트",
       description: "중앙의 시선을 유지하면서 가장자리를 부드럽게 어둡게 만듭니다.",
-      group: "tone",
+      group: "light",
       keywords: ["vignette", "비네트", "가장자리", "집중"],
     },
   },
@@ -729,7 +745,7 @@ const STUDIO_FILTER_DIALOG_CATALOG_SOURCES: readonly StudioFilterDialogCatalogSo
     fallback: {
       title: "렌즈 플레어",
       description: "광원과 렌즈 반사를 더해 역광 장면의 빛 번짐을 표현합니다.",
-      group: "blur",
+      group: "light",
       keywords: ["lens flare", "렌즈 플레어", "광원", "역광", "빛 번짐"],
     },
   },
@@ -799,6 +815,8 @@ export const STUDIO_FILTER_DIALOG_CATALOG: readonly StudioFilterDialogCatalogEnt
       }
       return Object.freeze({
         ...metadata,
+        title: STUDIO_FILTER_ALL_LABELS[source.kind],
+        keywords: [...metadata.keywords, metadata.title],
         engine,
         kind: source.kind,
         preview: source.preview,
@@ -936,12 +954,8 @@ export function studioFilterDialogPreviewStyle(
   }
 }
 
-function normalizedSearchTerms(query: string): string[] {
-  return query
-    .trim()
-    .toLocaleLowerCase("ko-KR")
-    .split(/\s+/)
-    .filter(Boolean);
+function normalizedSearchTerms(query: string): readonly string[] {
+  return studioToolSearchTerms(query);
 }
 
 /** Local-only search; every term must match title, description, engine id, or an alias. */
@@ -954,14 +968,13 @@ export function searchStudioFilterCatalog(
   return STUDIO_FILTER_CATALOG.filter((entry) => {
     if (allowed && !allowed.has(entry.engine)) return false;
     if (terms.length === 0) return true;
-    const haystack = [
+    return matchesStudioToolSearch(terms, [
       entry.engine,
       entry.title,
       entry.description,
       studioFilterGroupLabel(entry.group),
       ...entry.keywords,
-    ].join(" ").toLocaleLowerCase("ko-KR");
-    return terms.every((term) => haystack.includes(term));
+    ]);
   });
 }
 
@@ -972,14 +985,13 @@ export function searchStudioFilterDialogCatalog(
   const terms = normalizedSearchTerms(query);
   if (terms.length === 0) return STUDIO_FILTER_DIALOG_CATALOG;
   return STUDIO_FILTER_DIALOG_CATALOG.filter((entry) => {
-    const haystack = [
+    return matchesStudioToolSearch(terms, [
       entry.kind,
       entry.engine,
       entry.title,
       entry.description,
       studioFilterGroupLabel(entry.group),
       ...entry.keywords,
-    ].join(" ").toLocaleLowerCase("ko-KR");
-    return terms.every((term) => haystack.includes(term));
+    ]);
   });
 }

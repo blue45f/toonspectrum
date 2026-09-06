@@ -49,7 +49,7 @@ const EXPECTED_PRESETS = {
     aliases: ["스쿨 펜", "학생 펜", "school pen", "school nib"],
   },
   "fountain-pen": {
-    name: "만년필(사선 촉)",
+    name: "캘리그래피 펜",
     width: 6.5,
     opacity: 1,
     aliases: ["만년필 펜", "잉크 만년필", "fountain pen", "fountain nib"],
@@ -61,7 +61,7 @@ const EXPECTED_PRESETS = {
     aliases: ["젤 펜", "중성펜", "gel pen", "gel ink pen"],
   },
   "kneaded-eraser": {
-    name: "떡지우개(저농도)",
+    name: "연한 떡지우개",
     width: 26,
     opacity: 0.38,
     aliases: ["말랑 지우개", "찰흙 지우개", "kneaded eraser", "putty eraser"],
@@ -120,7 +120,7 @@ describe("commercial basic brush expansion", () => {
         name: expected.name,
         defaultWidth: expected.width,
         defaultOpacity: expected.opacity,
-        searchAliases: [...expected.aliases],
+        searchAliases: expect.arrayContaining([...expected.aliases]),
       });
     }
 

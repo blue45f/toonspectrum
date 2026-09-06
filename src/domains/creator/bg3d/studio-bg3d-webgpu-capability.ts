@@ -1,18 +1,7 @@
-/**
- * Production WebGPU capability probe for the Studio 3D editor.
- *
- * The probe answers one question — "can this host give us a usable WebGPU device?" — without
- * allocating a `GPUDevice`, importing `three/webgpu`, or touching the renderer. Keeping it in its
- * own module means the engine-selection policy and the editor's status surface can ask about
- * WebGPU on every session while the WebGPU renderer graph stays behind its dynamic boundary.
- *
- * Every failure path is explicit: an unsupported host is reported with the reason it failed, never
- * as a bare `false`, because the editor surfaces that reason to the artist.
- */
-
+/** Production WebGPU admission without allocating a GPUDevice or importing a renderer. */
 export interface StudioBg3dGpuAdapterLike {
   readonly features?: Iterable<string>;
-  /** GPUSupportedLimits exposes WebIDL getters that are not guaranteed to be enumerable. */
+  /** WebIDL getters need not be enumerable. */
   readonly limits?: {
     readonly maxBufferSize?: number;
     readonly maxStorageBufferBindingSize?: number;
@@ -30,6 +19,12 @@ export interface StudioBg3dWebGpuProbeSignals {
   readonly gpu?: StudioBg3dGpuLike;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
+  /**
+   * The response deadline controls how long the UI waits, not whether the browser's pending
+   * request may finish. Observe that SAME request after a timeout; never allocate another adapter.
+   * Notification is suppressed after abort. Consumers must fence their own session/storage state.
+   */
+  readonly onLateResult?: (result: StudioBg3dWebGpuProbeResult) => void;
 }
 
 export type StudioBg3dWebGpuProbeReason =
@@ -49,13 +44,10 @@ export interface StudioBg3dWebGpuProbeResult {
   readonly limits: Readonly<Record<string, number>>;
 }
 
-/** Minimum adapter allocation the editor needs before a WebGPU device is worth creating. */
 export const STUDIO_BG3D_WEBGPU_MIN_BUFFER_SIZE = 128 * 1024 * 1024;
 export const STUDIO_BG3D_WEBGPU_MIN_STORAGE_BINDING_SIZE = 32 * 1024 * 1024;
 const PROBED_LIMIT_NAMES = [
-  "maxBufferSize",
-  "maxStorageBufferBindingSize",
-  "maxComputeWorkgroupSizeX",
+  "maxBufferSize", "maxStorageBufferBindingSize", "maxComputeWorkgroupSizeX",
 ] as const;
 
 function readKnownGpuLimits(
@@ -84,7 +76,19 @@ function probeResult(
   });
 }
 
-/** Probes policy-level WebGPU suitability without allocating a GPUDevice or renderer. */
+function classifyAdapter(adapter: StudioBg3dGpuAdapterLike | null): StudioBg3dWebGpuProbeResult {
+  if (!adapter) return probeResult(false, "adapter-unavailable");
+  const features = new Set(adapter.features ?? []);
+  const limits = readKnownGpuLimits(adapter.limits);
+  if (
+    (limits.maxBufferSize ?? 0) < STUDIO_BG3D_WEBGPU_MIN_BUFFER_SIZE
+    || (limits.maxStorageBufferBindingSize ?? 0) < STUDIO_BG3D_WEBGPU_MIN_STORAGE_BINDING_SIZE
+  ) {
+    return probeResult(false, "insufficient-limits", features, limits);
+  }
+  return probeResult(true, "available", features, limits);
+}
+
 export async function probeStudioBg3dWebGpuCapability(
   signals: StudioBg3dWebGpuProbeSignals,
 ): Promise<StudioBg3dWebGpuProbeResult> {
@@ -105,29 +109,30 @@ export async function probeStudioBg3dWebGpuCapability(
     signals.signal.addEventListener("abort", abortListener, { once: true });
   });
   try {
-    const outcome = await Promise.race([
-      signals.gpu.requestAdapter({ powerPreference: "high-performance" }),
-      timeoutResult,
-      abortResult,
-    ]);
-    if (outcome === "timeout" || outcome === "aborted") return probeResult(false, outcome);
-    if (!outcome) return probeResult(false, "adapter-unavailable");
-    const features = new Set(outcome.features ?? []);
-    const limits = readKnownGpuLimits(outcome.limits);
-    if (
-      (limits.maxBufferSize ?? 0) < STUDIO_BG3D_WEBGPU_MIN_BUFFER_SIZE ||
-      (limits.maxStorageBufferBindingSize ?? 0) < STUDIO_BG3D_WEBGPU_MIN_STORAGE_BINDING_SIZE
-    ) {
-      return probeResult(false, "insufficient-limits", features, limits);
+    // Preserve the native receiver and request options. Classify once, including rejection, so a
+    // late native rejection is observed and never escapes as an unhandled promise rejection.
+    const adapterResult = signals.gpu.requestAdapter({ powerPreference: "high-performance" })
+      .then(classifyAdapter)
+      .catch(() => probeResult(false, "adapter-unavailable"));
+    const outcome = await Promise.race([adapterResult, timeoutResult, abortResult]);
+    if (outcome === "timeout") {
+      if (signals.onLateResult) {
+        void adapterResult.then((result) => {
+          if (!signals.signal?.aborted) signals.onLateResult?.(result);
+        }).catch((error: unknown) => {
+          console.warn("[bg3d-webgpu-probe] Late capability observer failed", error);
+        });
+      }
+      return probeResult(false, "timeout");
     }
-    return probeResult(true, "available", features, limits);
+    if (outcome === "aborted" || signals.signal?.aborted) return probeResult(false, "aborted");
+    return outcome;
   } catch {
     return signals.signal?.aborted
       ? probeResult(false, "aborted")
       : probeResult(false, "adapter-unavailable");
   } finally {
-    if (timeout) clearTimeout(timeout);
+    if (timeout !== undefined) clearTimeout(timeout);
     if (abortListener) signals.signal?.removeEventListener("abort", abortListener);
   }
 }
-

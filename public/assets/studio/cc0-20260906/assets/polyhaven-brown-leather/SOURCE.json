@@ -1,0 +1,88 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brown_leather",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "date_published": 1590367769,
+    "name": "Brown Leather",
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      400.0000059604645,
+      400.00003576278687
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "categories": [
+      "fabric",
+      "leather"
+    ],
+    "tags": [
+      "leather",
+      "brown",
+      "chair",
+      "seat",
+      "upholstery",
+      "vintage",
+      "matte",
+      "wrinkled",
+      "textile ",
+      "creased"
+    ],
+    "files_hash": "b9a9a4129b9cec6e01f3ba38eee9bd342e1bac19",
+    "description": "Free 8K texture of vintage matte brown leather - fine grain with soft wrinkles, creases and subtle wear for upholstery and seat surfaces.",
+    "category_id": "36329517-0f82-5b1e-bf68-aca8b4d1db92",
+    "category": "Textiles & Leather/Leather/Upholstery Leather",
+    "attributes": {
+      "surface_use": "object",
+      "condition": [
+        "worn"
+      ],
+      "origin": "man_made"
+    },
+    "download_count": 208235,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/brown_leather.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_leather/brown_leather_albedo_2k.jpg",
+      "bytes": 2137518,
+      "sha256": "b0de2403a31efa31e501b0028c0bd8e504d5bd6318f4a5ce90c550c3067f96d8",
+      "sourceMd5": "1bd381c43817743a2affdd1ce2d193c7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_leather/brown_leather_rough_2k.jpg",
+      "bytes": 2801956,
+      "sha256": "8a47afca2630310849034fe40ca9497db0956c67c0d933e6efd49d3cd2befe83",
+      "sourceMd5": "95b48a5c95b02d87dadee46c26f1cfb5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_leather/brown_leather_nor_gl_2k.jpg",
+      "bytes": 3030702,
+      "sha256": "3386277290af50b4d464dc9a9f195bbf8dd6f137b9ae0274552397d2f0135c98",
+      "sourceMd5": "6e86bbaf5e995c4154b76a1e4b0f4f1c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_leather/brown_leather_ao_2k.jpg",
+      "bytes": 1541878,
+      "sha256": "0f1f8753775779d4e25512f4d08aec1e7dbb73b1d0dc98df66af2071fe8bfa77",
+      "sourceMd5": "4ff0006acb807b9ddccd387a093d89b8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_leather/brown_leather_disp_2k.jpg",
+      "bytes": 1027529,
+      "sha256": "37ff21737b1ca5ea8cfe88d9a8fe1e2ace0ef190d9ee2d23369307f63c7c3eab",
+      "sourceMd5": "b385c7ec27f2cc9e9b1df077e41dbb01"
+    }
+  ]
+}

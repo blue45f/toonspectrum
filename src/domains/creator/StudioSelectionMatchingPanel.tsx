@@ -28,6 +28,7 @@ export function StudioSelectionMatchingPanel({
   className,
 }: StudioSelectionMatchingPanelProps) {
   const selectId = useId();
+  const descriptionId = useId();
   const [preferredCriterion, setPreferredCriterion] =
     useState<StudioSelectMatchingCriterion | null>(null);
   const activeOption =
@@ -39,6 +40,8 @@ export function StudioSelectionMatchingPanel({
     <section
       aria-label="같은 항목 선택"
       data-studio-selection-matching-panel="true"
+      data-inspector-section="selection.matching"
+      data-inspector-section-open="true"
       className={cn(
         "rounded-xl border border-line/80 bg-panel/50 p-2.5 shadow-[inset_0_1px_0_oklch(0.98_0.01_85/0.04)]",
         className,
@@ -66,6 +69,9 @@ export function StudioSelectionMatchingPanel({
         <select
           id={selectId}
           aria-label="같은 항목 선택 기준"
+          aria-describedby={descriptionId}
+          data-inspector-control-id="selection.matching.criterion"
+          data-inspector-priority="contextual"
           value={activeOption.criterion}
           onChange={(event) =>
             setPreferredCriterion(event.currentTarget.value as StudioSelectMatchingCriterion)
@@ -86,7 +92,10 @@ export function StudioSelectionMatchingPanel({
           type="button"
           onClick={() => onSelect(activeOption.criterion)}
           aria-label={`${activeOption.label} ${activeOption.count}개 전체 선택`}
+          aria-describedby={descriptionId}
           data-studio-select-matching-action={activeOption.criterion}
+          data-inspector-control-id="selection.matching.select"
+          data-inspector-priority="contextual"
           className={buttonClass({
             size: "md",
             variant: "quiet",
@@ -99,6 +108,7 @@ export function StudioSelectionMatchingPanel({
       </div>
 
       <p
+        id={descriptionId}
         aria-live="polite"
         className="mt-1.5 text-[0.6875rem] font-medium leading-relaxed text-fg-3"
       >

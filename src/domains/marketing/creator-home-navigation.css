@@ -1,0 +1,16 @@
+.creator-home .ch-jump-nav{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 0 24px}
+.creator-home .ch-jump-label{font-size:13px;font-weight:650;color:var(--ch-muted);word-break:keep-all}
+.creator-home .ch-jump-links{display:flex;flex-wrap:wrap;gap:8px}
+.creator-home .ch-jump-links a{display:inline-flex;align-items:center;justify-content:space-between;gap:16px;min-height:44px;padding:10px 14px;border:1px solid var(--ch-line);border-radius:8px;background:var(--ch-paper);color:var(--ch-ink);font-size:13px;font-weight:650}
+.creator-home .ch-jump-links a:hover{background:var(--ch-tint);text-decoration:underline;text-underline-offset:4px}
+.creator-home .ch-jump-links a>span{font-size:16px}
+.creator-home .ch-process-options{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.creator-home .ch-process-options button{min-height:44px;padding:10px 14px;border:1px solid var(--ch-line);border-radius:8px;background:var(--ch-paper);color:var(--ch-ink);font-size:12px;line-height:1.5}
+.creator-home .ch-process-options button[aria-pressed=true]{background:var(--ch-ink);color:var(--ch-bg);border-color:var(--ch-ink)}
+.creator-home .ch-preview-options button{min-height:44px}
+.creator-home :is(#creator-process-title,#creator-toolkit-title,#creator-film-title,#creator-faq-title){scroll-margin-top:calc(6rem + env(safe-area-inset-top,0px))}
+.creator-home :is(#creator-process-title,#creator-toolkit-title,#creator-faq-title):focus-visible{outline:3px solid var(--ch-ink);outline-offset:8px;border-radius:2px}
+.creator-home #creator-film-title:focus-visible{outline:3px solid #d1f28a;outline-offset:8px;border-radius:2px}
+@media(max-width:900px){.creator-home .ch-jump-nav{align-items:stretch;flex-direction:column;gap:12px}.creator-home .ch-jump-links{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.creator-home .ch-jump-links a{min-width:0;gap:8px}}
+@media(max-width:600px){.creator-home .ch-jump-links{grid-template-columns:repeat(2,minmax(0,1fr))}.creator-home .ch-jump-label{font-size:12px}.creator-home .ch-process-options button{flex:1 1 95px;font-size:11px;padding:10px 8px}.creator-home .ch-jump-links a{font-size:12px}}
+@media(forced-colors:active){.creator-home .ch-process-options button[aria-pressed=true],.creator-home .ch-preview-options button[aria-pressed=true]{border:2px solid Highlight;text-decoration:underline}.creator-home .ch-jump-links a{border-color:LinkText}.creator-home :is(#creator-process-title,#creator-toolkit-title,#creator-film-title,#creator-faq-title):focus-visible{outline-color:Highlight}}

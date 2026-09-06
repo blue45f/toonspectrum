@@ -59,6 +59,10 @@ const SLIDER_NUDGE_STEPS = 15;
 
 /** Survey mode: TOONSPECTRUM_FILTER_DIALOG_SURVEY=1 drives every menu kind, not just the five representatives. */
 const SURVEY_MODE = process.env.TOONSPECTRUM_FILTER_DIALOG_SURVEY === "1";
+const STABILITY_ROUNDS = Number(process.env.TOONSPECTRUM_FILTER_DIALOG_ROUNDS ?? "1");
+if (!Number.isSafeInteger(STABILITY_ROUNDS) || STABILITY_ROUNDS < 1 || STABILITY_ROUNDS > 20) {
+  throw new RangeError("TOONSPECTRUM_FILTER_DIALOG_ROUNDS must be an integer from 1 to 20");
+}
 
 /**
  * Menu rows that open a different surface than the pixel-filter dialog:
@@ -73,8 +77,8 @@ const NON_DIALOG_MENU_LABELS = new Set([
 ]);
 
 async function collectFilterMenuLabels(page: Page): Promise<string[]> {
-  await openMainMenuGroup(page, "필터");
-  const menu = page.locator('[role="menu"][aria-label="필터"]');
+  await openMainMenuGroup(page, "효과");
+  const menu = page.locator('[role="menu"][aria-label="효과"]');
   const items = menu.getByRole("menuitem");
   const count = await items.count();
   const labels: string[] = [];
@@ -99,6 +103,7 @@ interface PixelDiff {
 
 interface FilterCaseResult {
   label: string;
+  round?: number;
   group: string;
   ok: boolean;
   openMs: number | null;
@@ -112,6 +117,7 @@ interface FilterCaseResult {
 
 interface FilterDialogReport {
   ok: boolean;
+  stabilityRounds: number;
   mode: "representative" | "survey";
   startedAt: string;
   finishedAt: string;
@@ -489,9 +495,12 @@ async function main(): Promise<void> {
         : `representative mode: ${cases.length} cases`,
     );
 
-    for (const filterCase of cases) {
+    // A reload per round would hide retained Worker/cache/listener problems.
+    const repeatedCases = Array.from({ length: STABILITY_ROUNDS }, () => cases).flat();
+    for (const [index, filterCase] of repeatedCases.entries()) {
       const result: FilterCaseResult = {
         label: filterCase.label,
+        round: Math.floor(index / cases.length) + 1,
         group: filterCase.group,
         ok: false,
         openMs: null,
@@ -503,7 +512,7 @@ async function main(): Promise<void> {
       results.push(result);
       try {
         const openStartedAt = Date.now();
-        await openMainMenuGroup(page, "필터");
+        await openMainMenuGroup(page, "효과");
         await menuItemByLabel(page, filterCase.label).click({ timeout: 5_000 });
 
         const dialog = filterDialog(page);
@@ -565,6 +574,8 @@ async function main(): Promise<void> {
       } catch (error) {
         result.failure = String(error instanceof Error ? error.message : error);
         log(`${filterCase.label}: FAILED — ${result.failure}`);
+        await page.screenshot({ path: join(SCRATCH, `studio-filter-failure-${index}.png`) })
+          .catch(() => undefined);
         // Recover to a known state so later cases still run from the baseline document.
         await page.keyboard.press("Escape").catch(() => undefined);
         await page.waitForTimeout(300);
@@ -594,7 +605,7 @@ async function main(): Promise<void> {
         // the dialog exists, and asserted dialog-free after the drag.
         const compareClip = { x: clip.x, y: clip.y, width: clip.width, height: 180 };
         const beforeOpenBand = await screenshotClipped(page, compareClip);
-        await openMainMenuGroup(page, "필터");
+        await openMainMenuGroup(page, "효과");
         await clickEnabledMenuItem(page, "가우시안 블러");
         const dialog = filterDialog(page);
         await dialog.waitFor({ state: "visible", timeout: 45_000 });
@@ -715,7 +726,7 @@ async function main(): Promise<void> {
 
         // 2) The dialog must declare the direct-image (non-destructive) target.
         const openStartedAt = Date.now();
-        await openMainMenuGroup(page, "필터");
+        await openMainMenuGroup(page, "효과");
         await clickEnabledMenuItem(page, "가우시안 블러");
         const dialog = filterDialog(page);
         await dialog.waitFor({ state: "visible", timeout: 45_000 });
@@ -777,7 +788,9 @@ async function main(): Promise<void> {
   }
 
   const report: FilterDialogReport = {
-    ok: results.length > 0 && results.every((result) => result.ok),
+    ok: results.length > 0 && results.every((result) => result.ok)
+      && browserErrors.messages.length === 0 && browserErrors.failedResponses.length === 0,
+    stabilityRounds: STABILITY_ROUNDS,
     mode: SURVEY_MODE ? "survey" : "representative",
     startedAt,
     finishedAt: new Date().toISOString(),

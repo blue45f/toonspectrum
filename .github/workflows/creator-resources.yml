@@ -1,0 +1,60 @@
+name: Creator resources verification
+on:
+  pull_request:
+    paths:
+      - 'lib/creator-resources.ts'
+      - 'lib/creator-resource-workflow.ts'
+      - 'lib/creator-workspace-persistence.ts'
+      - 'src/domains/creator-resources/**'
+      - 'src/app/routes/**'
+      - 'apps/api/src/modules/creator-resources/**'
+      - 'apps/api/src/app.module.ts'
+      - 'tests/creator-resources*'
+      - 'tests/creator-resource-workflow*'
+      - 'tests/creator-workspace-persistence*'
+      - 'scripts/check-creator-resources.mjs'
+      - 'scripts/verify-creator-workspace-browser.mjs'
+      - '.github/workflows/creator-resources.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: creator-resources-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Install isolated TypeScript checker
+        run: npm install --prefix "$RUNNER_TEMP/creator-checker" --ignore-scripts --no-audit --no-fund typescript@5.9.3 playwright@1.62.1
+      - name: Strict types and provider/storage/export regression cases
+        run: NODE_PATH="$RUNNER_TEMP/creator-checker/node_modules" node scripts/check-creator-resources.mjs
+      - name: Install Chromium for real cross-tab persistence checks
+        run: node "$RUNNER_TEMP/creator-checker/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Shared browser cases and real Web Locks persistence scenarios
+        run: NODE_PATH="$RUNNER_TEMP/creator-checker/node_modules" node scripts/verify-creator-workspace-browser.mjs
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Focused lint
+        run: pnpm exec eslint lib/creator-resources.ts lib/creator-resource-workflow.ts lib/creator-workspace-persistence.ts apps/api/src/modules/creator-resources src/domains/creator-resources src/app/routes/groups/creator-resources.routes.tsx src/app/routes/groups/app-routes.tsx src/app/routes/groups/catalog.routes.tsx src/app/routes/route-titles.ts apps/api/src/app.module.ts tests/creator-resources*.ts tests/creator-resource-workflow*.ts tests/creator-workspace-persistence*.ts scripts/check-creator-resources.mjs scripts/verify-creator-workspace-browser.mjs --max-warnings=0
+      - run: pnpm exec vitest run tests/creator-resources.test.ts tests/creator-resource-workflow.test.ts tests/creator-workspace-persistence.test.ts
+      - run: pnpm typecheck
+      - run: pnpm build
