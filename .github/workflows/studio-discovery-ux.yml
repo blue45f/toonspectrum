@@ -1,0 +1,120 @@
+name: Studio discovery UX
+
+on:
+  workflow_call:
+    inputs:
+      source_ref:
+        required: true
+        type: string
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/domains/creator/**'
+      - 'scripts/verify-studio-discovery-ux.mts'
+      - '.github/workflows/studio-discovery-ux.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [types, lint, tests]
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Frontend typecheck
+        if: matrix.check == 'types'
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Strict creator and browser verifier lint
+        if: matrix.check == 'lint'
+        run: pnpm exec eslint src/domains/creator/brush src/domains/creator/filter src/domains/creator/studio-tool-search* src/domains/creator/studio-brush.ts src/domains/creator/studio-creative-ux.ts src/domains/creator/studio-basic-brush-expansion.test.ts src/domains/creator/StudioUnifiedBrushPicker.test.tsx scripts/verify-studio-discovery-ux.mts --max-warnings=0
+      - name: All brush and filter unit suites plus canonical consumers
+        if: matrix.check == 'tests'
+        run: pnpm exec vitest run src/domains/creator/brush src/domains/creator/filter src/domains/creator/studio-tool-search.test.ts src/domains/creator/studio-basic-brush-expansion.test.ts src/domains/creator/StudioUnifiedBrushPicker.test.tsx
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:bundle
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-discovery-dist
+          path: dist
+          retention-days: 2
+
+  browser:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [discovery, representative-brushes]
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      STUDIO_DISCOVERY_QA_DIR: /tmp/studio-discovery-evidence
+      TOONSPECTRUM_BRUSH_VERIFY_DIR: /tmp/studio-discovery-evidence
+      TOONSPECTRUM_VERIFY_DIR: /tmp/studio-discovery-evidence
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/download-artifact@v6
+        with:
+          name: studio-discovery-dist
+          path: dist
+      - name: Real component responsive keyboard and production editor integration
+        if: matrix.suite == 'discovery'
+        run: pnpm exec tsx scripts/verify-studio-discovery-ux.mts
+      - name: Draw every shortcut brush through the existing pixel and undo gates
+        if: matrix.suite == 'representative-brushes'
+        env:
+          TOONSPECTRUM_BRUSH_VERIFY_STAGE: desktop
+          TOONSPECTRUM_BRUSH_SURVEY: '1'
+          TOONSPECTRUM_BRUSH_VERIFY_SETTLED_DUMP: '1'
+          TOONSPECTRUM_BRUSH_VERIFY_IDS: gpen,pen,fountain-pen,pencil,pencil--side-shade,charcoal--compressed-edge,watercolor,marker,gouache--matte-body,oil--filbert-ribbon,airbrush,spray,splatter,standard-eraser,kneaded-eraser,screentone,web-cross-hatch-pen,web-radial-burst
+        run: pnpm exec tsx scripts/verify-studio-brushes.mts
+      - name: Preserve screenshots and receipts on success or failure
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-discovery-${{ matrix.suite }}
+          path: /tmp/studio-discovery-evidence
+          retention-days: 7
+          if-no-files-found: warn

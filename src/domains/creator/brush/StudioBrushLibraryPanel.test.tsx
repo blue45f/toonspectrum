@@ -154,7 +154,7 @@ describe("StudioBrushLibraryPanel", () => {
     expect(html).not.toContain("<details open");
     expect(html).toContain("grid-cols-3");
     expect(html).toContain("sm:grid-cols-6");
-    expect(html).toContain('aria-label="주력 펜 브러시 적용, 펜(매끈), 6px, 100퍼센트"');
+    expect(html).toContain('aria-label="주력 펜 브러시 적용, 매끈한 펜, 6px, 100퍼센트"');
     expect(html).toContain('aria-pressed="true"');
   });
 
@@ -253,7 +253,7 @@ describe("StudioBrushLibraryPanel", () => {
     expect(container.querySelector('span[style*="background"]')).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", {
-      name: "주력 펜 브러시 적용, 펜(매끈), 6px, 100퍼센트",
+      name: "주력 펜 브러시 적용, 매끈한 펜, 6px, 100퍼센트",
     }));
     await waitFor(() => expect(onApplyBrush).toHaveBeenCalledOnce());
     expect(onApplyBrush).toHaveBeenCalledWith(expect.objectContaining({ id: saved.id }));
