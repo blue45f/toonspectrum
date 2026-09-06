@@ -1,0 +1,97 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/laminate_floor_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "date_published": 1669680000,
+    "name": "Laminate Floor 02",
+    "categories": [
+      "floor",
+      "man made",
+      "indoor",
+      "clean",
+      "wood"
+    ],
+    "type": 1,
+    "info": null,
+    "authors": {
+      "Dario Barresi": "Processing",
+      "Charlotte Baglioni": "photography"
+    },
+    "tags": [
+      "even",
+      "flat",
+      "wooden",
+      "floor",
+      "laminate",
+      "smooth",
+      "tiles",
+      "brown",
+      "wood",
+      "planks"
+    ],
+    "dimensions": [
+      1699.9999284744263,
+      1700.0000476837158
+    ],
+    "sponsors": [
+      "78546118"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "c5bf4f78e51905d1dc9c8b408abedc65b1933483",
+    "description": "Free 8K laminate floor texture. Smooth, even brown wood-plank material with subtle grain, light satin sheen and fine seams, clean indoor appearance.",
+    "category_id": "acb42532-cb6a-5b57-9270-286d028f3a4c",
+    "category": "Wood/Engineered Wood/Laminate",
+    "attributes": {
+      "surface_use": "floor",
+      "origin": "man_made",
+      "setting": "indoor",
+      "condition": [
+        "clean"
+      ]
+    },
+    "download_count": 500959,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/laminate_floor_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/laminate_floor_02/laminate_floor_02_diff_2k.jpg",
+      "bytes": 3225117,
+      "sha256": "2a1e6519309b369f749f06aaf241ac67ea762c686b6a848c1a79331b18a30521",
+      "sourceMd5": "e106d121c9abb78f80e72cb5bd003295"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/laminate_floor_02/laminate_floor_02_rough_2k.jpg",
+      "bytes": 2545321,
+      "sha256": "f547988692d1b53274b3023e9ed89d8280087a5ff1018cd64f83e77440ab54c4",
+      "sourceMd5": "06663cee617c49b117e0e9466fd1486d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/laminate_floor_02/laminate_floor_02_nor_gl_2k.jpg",
+      "bytes": 2420220,
+      "sha256": "49aa58c34c6770d209e63f9bdb4d16326f5dab24474cfeb18433e63fc54456de",
+      "sourceMd5": "ef2dc661cf7a24fa1c2577fd10754014"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/laminate_floor_02/laminate_floor_02_ao_2k.jpg",
+      "bytes": 1845680,
+      "sha256": "2c99e8f63e2307d52f93355b6fe93af9b1b74e276848777095aae1adac9660f3",
+      "sourceMd5": "0d3d97745fa659cce852caf5e3a3046b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/laminate_floor_02/laminate_floor_02_disp_2k.jpg",
+      "bytes": 2051856,
+      "sha256": "9e0abd8ebb3b536bcfaab65c71ebbe62cef0616088210858ccc62875ad9afc1e",
+      "sourceMd5": "d811c6bf43f6f9887a1175deeabd157a"
+    }
+  ]
+}

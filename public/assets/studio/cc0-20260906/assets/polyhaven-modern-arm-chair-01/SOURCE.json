@@ -1,0 +1,115 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/modern_arm_chair_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "donated": true,
+    "date_published": 1667174400,
+    "name": "Modern Arm Chair 01",
+    "categories": [
+      "furniture",
+      "seating",
+      "office"
+    ],
+    "type": 2,
+    "tags": [
+      "wood",
+      "leather",
+      "fancy",
+      "modern",
+      "chair",
+      "contemporary",
+      "wooden",
+      "lounge"
+    ],
+    "info": null,
+    "authors": {
+      "Vibrant Nordic": "All"
+    },
+    "sponsors": [
+      "3267566"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 8916,
+    "texel_density": 2929.070490134976,
+    "dimensions": [
+      820.3444182872772,
+      986.5616858005524,
+      1022.8520567470696
+    ],
+    "files_hash": "6893f36e58dddba95bd0ae1f1ef38537c1852a0b",
+    "description": "Free 8K model, modern wooden armchair with warm oak frame and plush black leather cushions - contemporary lounge styling with clean lines and wear detailing.",
+    "category_id": "11261ec6-df2b-5150-9904-684d2558070d",
+    "category": "Furniture/Seating/Chairs",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "leather"
+      ]
+    },
+    "download_count": 51407,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/modern_arm_chair_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/modern_arm_chair_01/modern_arm_chair_01_2k.gltf",
+      "bytes": 5121,
+      "sha256": "eb971ed98af1ce3d4cc93a058ceee5c31dbd185f99aa3d86938d366820943414",
+      "sourceMd5": "1fec9694d156cbed5dc8757576cd16a5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_arm_chair_01/modern_arm_chair_01_pillow_diff_2k.jpg",
+      "bytes": 843013,
+      "sha256": "20a8b41bd14552643c1355587ec1198cb8c5f1f7dea50dc71dbb0f6a826adfc1",
+      "sourceMd5": "c3def4cb2bcef8ee07c90c55c20a637e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_arm_chair_01/modern_arm_chair_01_pillow_nor_gl_2k.jpg",
+      "bytes": 1074878,
+      "sha256": "dfd11d444ba0a6c1a16304f91c10ef2a2a525180f6a46ca57c2d55c196ff39de",
+      "sourceMd5": "2549b1d93eb4ec13e8ad9edd1327d2f0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modern_arm_chair_01/modern_arm_chair_01.bin",
+      "bytes": 240728,
+      "sha256": "8755f2f498c0bb165660379d1b045465751c16bbeaf553c8dd76bb14c16d1ff6",
+      "sourceMd5": "5a8f2ea1c79ea484140e484b2a621670"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_arm_chair_01/modern_arm_chair_01_legs_diff_2k.jpg",
+      "bytes": 1660925,
+      "sha256": "a3a289f3265d77e120e81aebdd9107b612609b077190e842389b5cd32bbf9a3d",
+      "sourceMd5": "cfed247a17cafd9f59a7f01ed01fdbf4"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_arm_chair_01/modern_arm_chair_01_legs_arm_2k.jpg",
+      "bytes": 2144468,
+      "sha256": "38a2b11cdfb18aeed9804fee38de93d8fd856f53ad9448ee877833ba25643f15",
+      "sourceMd5": "a62c231c4f42be2f85f6b42a7cc1fc8e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_arm_chair_01/modern_arm_chair_01_legs_nor_gl_2k.jpg",
+      "bytes": 2076117,
+      "sha256": "5a57c6b8de10b79d7d2b5540bcb864f4c3c0b4f81c6ef2c5f61470e88620c4a7",
+      "sourceMd5": "52c08726e839e2c1c87863e6f5a87411"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_arm_chair_01/modern_arm_chair_01_pillow_arm_2k.jpg",
+      "bytes": 1176399,
+      "sha256": "3c98a68f8d4d9045082d1af97994ff564dc4f8378814bea717d9862edf5dae22",
+      "sourceMd5": "1984906adcaef79cefe2d20cb5be4c7e"
+    }
+  ]
+}

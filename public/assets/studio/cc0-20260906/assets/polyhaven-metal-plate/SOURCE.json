@@ -1,0 +1,94 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/metal_plate",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "bare",
+      "painted",
+      "rusty",
+      "pattern",
+      "iron",
+      "factory",
+      "industrial",
+      "steel"
+    ],
+    "date_published": 1529475787,
+    "name": "Metal Plate",
+    "categories": [
+      "metal",
+      "floor",
+      "man made",
+      "indoor",
+      "outdoor",
+      "dirty"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      500,
+      500
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "1046b39bf68d65eeb80dab84a99186a453ee94e0",
+    "description": "Free 8K texture of worn diamond-plate steel with chipped green paint, rust, pitting and dark oily highlights. Rough, dirty industrial metal surface.",
+    "category_id": "73ed1247-6414-5a28-9bea-f5a74162136a",
+    "category": "Metal/Plate & Grating/Diamond & Checker Plate",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "damaged",
+        "rusted",
+        "worn",
+        "painted"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "download_count": 304228,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/metal_plate.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_diff_2k.jpg",
+      "bytes": 2670774,
+      "sha256": "864c9a653acd1f5034c9bbe7f955b18cc9687a81bbdfa805e7a2319939676910",
+      "sourceMd5": "91b841e7e619e55588f0183a703fb644"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_rough_2k.jpg",
+      "bytes": 3045988,
+      "sha256": "3cdc139df4ec5b304dd986278c1fb026c67c42e6623f0ee5caa7f373d51c7bef",
+      "sourceMd5": "b2c2bfc0a5e46c1a8bdfddd236daa200"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_nor_gl_2k.jpg",
+      "bytes": 2516654,
+      "sha256": "146f8c00874a584bcc4a184643e72f160da2a7568d469198e02b26c9ff93cf43",
+      "sourceMd5": "797c3f3de91da0c03f44f493576e158e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_ao_2k.jpg",
+      "bytes": 2392031,
+      "sha256": "31e586f0bde9f28331077b30495f0f324aa9f91a9d656205d03242d1d3e2e439",
+      "sourceMd5": "00a18906f3bebaa10813d3d0e2356047"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate/metal_plate_disp_2k.jpg",
+      "bytes": 1067841,
+      "sha256": "c4ba1bc602d25bdd4725d856bbe5713373fa08456543d4d0168d9ff4e37c5f52",
+      "sourceMd5": "272c182e76937fa352c55f92e7e565b0"
+    }
+  ]
+}

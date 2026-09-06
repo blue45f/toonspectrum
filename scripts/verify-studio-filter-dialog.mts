@@ -59,6 +59,10 @@ const SLIDER_NUDGE_STEPS = 15;
 
 /** Survey mode: TOONSPECTRUM_FILTER_DIALOG_SURVEY=1 drives every menu kind, not just the five representatives. */
 const SURVEY_MODE = process.env.TOONSPECTRUM_FILTER_DIALOG_SURVEY === "1";
+const STABILITY_ROUNDS = Number(process.env.TOONSPECTRUM_FILTER_DIALOG_ROUNDS ?? "1");
+if (!Number.isSafeInteger(STABILITY_ROUNDS) || STABILITY_ROUNDS < 1 || STABILITY_ROUNDS > 20) {
+  throw new RangeError("TOONSPECTRUM_FILTER_DIALOG_ROUNDS must be an integer from 1 to 20");
+}
 
 /**
  * Menu rows that open a different surface than the pixel-filter dialog:
@@ -99,6 +103,7 @@ interface PixelDiff {
 
 interface FilterCaseResult {
   label: string;
+  round?: number;
   group: string;
   ok: boolean;
   openMs: number | null;
@@ -112,6 +117,7 @@ interface FilterCaseResult {
 
 interface FilterDialogReport {
   ok: boolean;
+  stabilityRounds: number;
   mode: "representative" | "survey";
   startedAt: string;
   finishedAt: string;
@@ -489,9 +495,12 @@ async function main(): Promise<void> {
         : `representative mode: ${cases.length} cases`,
     );
 
-    for (const filterCase of cases) {
+    // A reload per round would hide retained Worker/cache/listener problems.
+    const repeatedCases = Array.from({ length: STABILITY_ROUNDS }, () => cases).flat();
+    for (const [index, filterCase] of repeatedCases.entries()) {
       const result: FilterCaseResult = {
         label: filterCase.label,
+        round: Math.floor(index / cases.length) + 1,
         group: filterCase.group,
         ok: false,
         openMs: null,
@@ -565,6 +574,8 @@ async function main(): Promise<void> {
       } catch (error) {
         result.failure = String(error instanceof Error ? error.message : error);
         log(`${filterCase.label}: FAILED — ${result.failure}`);
+        await page.screenshot({ path: join(SCRATCH, `studio-filter-failure-${index}.png`) })
+          .catch(() => undefined);
         // Recover to a known state so later cases still run from the baseline document.
         await page.keyboard.press("Escape").catch(() => undefined);
         await page.waitForTimeout(300);
@@ -777,7 +788,9 @@ async function main(): Promise<void> {
   }
 
   const report: FilterDialogReport = {
-    ok: results.length > 0 && results.every((result) => result.ok),
+    ok: results.length > 0 && results.every((result) => result.ok)
+      && browserErrors.messages.length === 0 && browserErrors.failedResponses.length === 0,
+    stabilityRounds: STABILITY_ROUNDS,
     mode: SURVEY_MODE ? "survey" : "representative",
     startedAt,
     finishedAt: new Date().toISOString(),

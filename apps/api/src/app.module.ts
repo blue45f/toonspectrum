@@ -20,6 +20,7 @@ import { HealthModule } from "./modules/health/health.module";
 import { LegalModule } from "./modules/legal/legal.module";
 import { MeModule } from "./modules/me/me.module";
 import { StudioAiModule } from "./modules/studio-ai/studio-ai.module";
+import { StudioMusicModule } from "./modules/studio-music/studio-music.module";
 import { createStudioRealtimeTicketDynamicModule } from "./modules/studio-realtime-ticket/studio-realtime-ticket.integration";
 import { TrafficAnalyticsModule } from "./modules/traffic-analytics/traffic-analytics.module";
 
@@ -57,6 +58,7 @@ const studioRealtimeTicketModule =
     LegalModule,
     FortuneModule,
     StudioAiModule,
+    StudioMusicModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })

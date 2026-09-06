@@ -4,7 +4,9 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { StudioRouteLoading } from "../StudioLazySurfaceFallback";
 
 import { StudioEditorRoute } from "./routes/StudioEditorRoute";
+import { StudioProductionRoute } from "./routes/StudioProductionRoute";
 import { StudioPublishRoute } from "./routes/StudioPublishRoute";
+import { StudioStoryworldRoute } from "./routes/StudioStoryworldRoute";
 import { resolveStudioRoute } from "./studio-route-manifest";
 import { StudioRouteFailure, StudioRoutePlaceholder } from "./StudioRouteFallbacks";
 
@@ -22,13 +24,6 @@ const StudioToolsCompanionPage = lazyRetry(
     default: module.StudioToolsCompanionPage,
   })),
   "StudioToolsCompanionPage",
-);
-
-const StudioProductionHubPage = lazyRetry(
-  () => import("../studio-production/StudioProductionHubPage").then((module) => ({
-    default: module.StudioProductionHubPage,
-  })),
-  "StudioProductionHubPage",
 );
 
 export function StudioRouter() {
@@ -74,12 +69,18 @@ export function StudioRouter() {
       );
     case "production":
       return (
-        <Suspense fallback={<StudioRouteLoading label="제작 운영 허브를 여는 중..." />}>
-          <StudioProductionHubPage
-            surface={resolution.surface}
-            onOpenStudio={() => navigate("/studio")}
-          />
-        </Suspense>
+        <StudioProductionRoute
+          surface={resolution.surface}
+          onOpenStudio={() => navigate(resolution.editorHref)}
+        />
+      );
+    case "storyworld":
+      return (
+        <StudioStoryworldRoute
+          key={resolution.lifecycleKey}
+          remixSourceWorkId={resolution.remixSourceWorkId}
+          workId={resolution.workId}
+        />
       );
     case "placeholder":
       return (

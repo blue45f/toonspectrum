@@ -1,0 +1,126 @@
+name: Admin hardening regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/domains/admin/**'
+      - 'apps/api/src/modules/admin/**'
+      - 'scripts/seed/admin-qa*'
+      - 'scripts/verify-admin-qa-live.mjs'
+      - '.github/workflows/admin-hardening-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/domains/admin/**'
+      - 'apps/api/src/modules/admin/**'
+      - 'scripts/seed/admin-qa*'
+      - 'scripts/verify-admin-qa-live.mjs'
+      - '.github/workflows/admin-hardening-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-hardening-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admin-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: webdex
+          POSTGRES_PASSWORD: webdex
+          POSTGRES_DB: toonspectrum_admin_qa
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U webdex -d toonspectrum_admin_qa"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://webdex:webdex@127.0.0.1:5432/toonspectrum_admin_qa
+      TEST_DATABASE_URL: postgresql://webdex:webdex@127.0.0.1:5432/toonspectrum_admin_qa
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        id: install
+      - name: Prepare evidence directory
+        run: mkdir -p test-results/admin-hardening
+      - name: Strict admin source lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          src/domains/admin apps/api/src/modules/admin
+          scripts/seed/admin-qa-seed.mjs scripts/verify-admin-qa-live.mjs
+      - name: Full frontend and API type checks
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm run typecheck
+      - name: Bootstrap disposable loopback QA database
+        id: bootstrap
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MIGRATION_DATABASE_URL: postgresql://webdex:webdex@127.0.0.1:5432/toonspectrum_admin_qa
+        run: |
+          set -euo pipefail
+          export BOOTSTRAP_RUNTIME_DATABASE_PASSWORD="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')"
+          node scripts/bootstrap-empty-production-database.mjs --execute --allow-loopback \
+            --runtime-database-role webdex_runtime --release-sha "$GITHUB_SHA" \
+            --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE
+      - name: Actual repository admin regression suite
+        if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
+        run: >-
+          pnpm exec vitest run src/domains/admin apps/api/src/modules/admin
+          lib/__tests__/admin-emails.test.ts lib/__tests__/admin-security.test.ts
+          --maxWorkers=2 --reporter=default --reporter=json
+          --outputFile=test-results/admin-hardening/vitest.json
+      - name: Verify isolated accounts and real session APIs
+        if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
+        env:
+          NODE_ENV: test
+          TOONSPECTRUM_ADMIN_QA_SEED: '1'
+        run: node --import tsx scripts/verify-admin-qa-live.mjs
+      - name: Production build and CSP
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm run build
+      - name: Verify complete unit and real API evidence
+        if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
+        env:
+          ADMIN_VERIFIED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const checkedOutCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (checkedOutCommit !== process.env.GITHUB_SHA) {
+            throw new Error('Regression evidence does not match the workflow checkout.');
+          }
+          const report = JSON.parse(readFileSync('test-results/admin-hardening/vitest.json', 'utf8'));
+          if (report.success !== true || report.numFailedTests !== 0 || report.numPendingTests !== 0 || report.numTodoTests !== 0 || !Number.isSafeInteger(report.numTotalTests) || report.numTotalTests < 132 || report.numPassedTests !== report.numTotalTests) {
+            throw new Error('Admin regression evidence must contain the complete passing, unskipped baseline.');
+          }
+          const live = JSON.parse(readFileSync('test-results/admin-hardening/live-qa.json', 'utf8'));
+          if (live.success !== true || live.fixtureAccounts !== 13 || live.realSuccessfulLogins !== 5 || live.blockedLoginChecks !== 5 || !Array.isArray(live.checks) || live.checks.length < 127 || live.assertionCount !== live.checks.length || live.checks.some((check) => check.passed !== true)) {
+            throw new Error('Real QA database, account and API verification evidence is incomplete.');
+          }
+          const summary = { commit: checkedOutCommit, headCommit: process.env.ADMIN_VERIFIED_HEAD_SHA, passed: report.numPassedTests, failed: report.numFailedTests, skipped: report.numPendingTests, liveAssertions: live.assertionCount, fixtureAccounts: live.fixtureAccounts, successfulLogins: live.realSuccessfulLogins, blockedLogins: live.blockedLoginChecks };
+          writeFileSync('test-results/admin-hardening/summary.json', JSON.stringify(summary, null, 2));
+          console.log(JSON.stringify(summary));
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: admin-hardening-evidence-${{ github.run_id }}
+          path: test-results/admin-hardening/
+          if-no-files-found: warn

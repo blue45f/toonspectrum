@@ -58,7 +58,7 @@ describe("Studio brush browser harness catalogue boundary", () => {
       "assertUiEraserQuickPickerMatchesProductCatalog(eraserCatalog)",
     );
     expect(harness).toContain(
-      'firstCatalog.locator(\'[data-studio-brush-library-close="true"]\')',
+      "closeDesktopCatalog(page, firstCatalog)",
     );
     expect(harness).toContain(
       'drawSheet.locator(\'[data-studio-open-brush-library="true"]\')',
@@ -72,10 +72,10 @@ describe("Studio brush browser harness catalogue boundary", () => {
       "coreCatalogIds.every((id) => presetById.has(id))",
     );
     expect(harness).toContain(
-      "for (const [index, preset] of BRUSH_MATRIX_CATALOG_ITEMS.entries())",
+      "for (const [index, preset] of DESKTOP_STABILITY_CASES.entries())",
     );
     expect(harness).toContain(
-      "evidence.length === BRUSH_MATRIX_CATALOG_COUNT",
+      "evidence.length === DESKTOP_STABILITY_CASES.length",
     );
     expect(harness).toContain(
       "post-redo cleanup left perceptible stroke pixels behind",
@@ -130,6 +130,16 @@ describe("Studio brush browser harness catalogue boundary", () => {
     expect(harness).not.toContain("BRUSH_PRESETS.length === 37");
     expect(harness).not.toContain("evidence.length === 37");
     expect(harness).not.toContain("/37 long strokes");
+  });
+
+  it("uses the shipped floating library and closes it only after the selected profile is active", () => {
+    expect(harness).toContain('[role="dialog"][data-studio-brush-floating]');
+    expect(harness).toContain('await catalog.getAttribute("role") === "region"');
+    expect(harness).toContain("await closeDesktopCatalog(page, catalog)");
+    expect(harness).toContain(":not([data-studio-primary-action])");
+    expect(harness).toContain("TOONSPECTRUM_BRUSH_STABILITY_ROUNDS");
+    expect(harness).toContain("captureBrushStageFailure(page, \"durability\", error, errors)");
+    expect(harness).not.toContain('catalog.waitFor({ state: "detached" }).catch(() => {})');
   });
 
   it("treats named erasers as destructive operations with a real paint baseline", () => {
