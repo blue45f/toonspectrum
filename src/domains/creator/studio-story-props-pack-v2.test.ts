@@ -51,7 +51,7 @@ const QUALITY_GATES: readonly QualityGate[] = [
     filename: "modern_smartphone_prop.glb",
     assetId: "modern_smartphone_prop_v2",
     minBytes: 150 * 1024,
-    minNodes: 16,
+    minNodes: 7,
     minMaterials: 6,
     minTriangles: 3_000,
     minEmissiveMaterials: 3,

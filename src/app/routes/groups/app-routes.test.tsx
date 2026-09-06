@@ -28,10 +28,18 @@ describe("application route registry", () => {
     );
   });
 
-  it("keeps Studio behind one canonical wildcard entry", () => {
+  it("keeps the standalone Studio manual ahead of the canonical editor wildcard", () => {
     expect(
       appRoutes.filter((route) => route.path.startsWith("/studio")),
     ).toEqual([
+      expect.objectContaining({
+        id: "creator-studio-manual",
+        path: "/studio/manual",
+      }),
+      expect.objectContaining({
+        id: "creator-studio-manual-article",
+        path: "/studio/manual/:articleId",
+      }),
       expect.objectContaining({
         id: "creator-studio",
         path: "/studio/*",
