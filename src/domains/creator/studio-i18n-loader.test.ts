@@ -41,7 +41,10 @@ describe("Studio lazy i18n assets", () => {
       // 통합 검색 라벨(studio.commandSearch.label), 도구 복합 메뉴 제목(studio.mainMenu.group.tools.label)
       // — UX 감사 2026-09-02 반영분. 이 숫자는 래칫이므로 키를 늘리거나 줄이는 변경은 여기서 한 번 더
       // 눈에 띄어야 한다.
-      expect(Object.keys(dictionary ?? {})).toHaveLength(1_333);
+      // 1_333 → 1_334: 필터 메뉴 polar-coordinates 행(studio.mainMenu.item.filter.polar-coordinates).
+      // 유니온 웨이브의 마지막 행만 75개 팩 어디에도 키가 없어 `en` 메뉴바에 "극좌표 변환"이 남아
+      // 있었다(2026-09-06). 미번역 팩은 위 관례대로 영어 카탈로그 라벨을 든다.
+      expect(Object.keys(dictionary ?? {})).toHaveLength(1_334);
     }
     // The mobile dock used to hardcode Korean labels; every pack must now carry the keys that
     // replaced them, so an `en` viewport cannot fall back to Korean chrome.
@@ -87,7 +90,7 @@ describe("Studio lazy i18n assets", () => {
     }
     expect(resolveI18nValue("en", "studio.mainMenu.item.filter.lens-blur")).toBe("Lens blur");
     expect(resolveI18nValue("ko", "studio.mainMenu.item.filter.lens-blur")).toBe("렌즈 블러");
-    expect(resolveI18nValue("ko", "studio.mainMenu.item.filter.god-rays")).toBe("볼류메트릭 광선");
+    expect(resolveI18nValue("ko", "studio.mainMenu.item.filter.god-rays")).toBe("빛줄기");
     expect(resolveI18nValue("ko", "studio.canvas.wheelMode.zoom")).toBe(
       "휠: 캔버스 확대·축소",
     );
