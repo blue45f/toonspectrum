@@ -296,10 +296,13 @@ describe("studio impasto relief shading v1 (dli/paint MIT port)", () => {
     };
 
     // Two tile sizes pin the per-pixel slope AND the constant separately — one size alone could
-    // be satisfied by a wrong split between them.
+    // be satisfied by a wrong split between them. Since 7748106f the light's half vector and
+    // Schlick term are resolved once per tile (they are constant for one light, eye and
+    // material), so a cell costs three square roots — normalize, half-vector length, GGX — and
+    // the constant absorbs the per-tile resolve.
     for (const [width, height] of [[16, 12], [32, 24]] as const) {
       const ggx = census(width, height, "ggx");
-      expect(ggx.sqrt, `ggx ${width}x${height}`).toBe(4 * width * height + 4);
+      expect(ggx.sqrt, `ggx ${width}x${height}`).toBe(3 * width * height + 4);
       const emboss = census(width, height, "emboss-2tap");
       expect(emboss.sqrt, `emboss ${width}x${height}`).toBe(4);
       expect(emboss.hypot, `emboss ${width}x${height}`).toBe(1);
