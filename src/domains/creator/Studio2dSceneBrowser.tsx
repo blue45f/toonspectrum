@@ -12,6 +12,7 @@ import {
 import { currentStudio2dPreview, studio2dImageSource, studio2dSceneIdentity } from "./studio-2d-image-source";
 import { Studio2dContentFilters } from "./Studio2dContentFilters";
 import { Studio2dScenePreview } from "./Studio2dScenePreview";
+import { useStudio2dImageReadiness } from "./useStudio2dImageReadiness";
 
 import type { Studio2dEnvironment, Studio2dOrientation, Studio2dQualityFilter, Studio2dScene, Studio2dSort, Studio2dTimeOfDay } from "./studio-2d-asset-quality";
 
@@ -35,21 +36,16 @@ function SceneCard({ scene, disabled, onPick, onPreview }: {
   readonly onPick: (scene: Studio2dScene) => void;
   readonly onPreview: (scene: Studio2dScene) => void;
 }) {
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [attempt, setAttempt] = useState(0);
   const asset = getStudio2dAssetMetadata(scene);
   const title = studio2dDisplayName(scene);
   const source = studio2dImageSource(scene);
+  const { imageRef, imageKey, state, retry } = useStudio2dImageReadiness(source, asset);
+  const status = state.status;
   return <article className="min-w-0 overflow-hidden rounded-xl border border-line bg-card" data-studio-2d-asset={scene.id}>
     <button type="button" onClick={() => onPreview(scene)} aria-label={`${title} 확대 미리보기`}
       className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-      <img key={`${source}:${attempt}`} src={source} alt={title} loading="lazy" decoding="async"
-        className="h-full w-full object-contain" onError={() => setStatus("error")}
-        onLoad={(event) => {
-          const image = event.currentTarget;
-          setStatus(image.naturalWidth > 0 && image.naturalHeight > 0
-            && (!asset || (image.naturalWidth === asset.width && image.naturalHeight === asset.height)) ? "ready" : "error");
-        }} />
+      <img key={imageKey} ref={imageRef} src={source} alt={title} loading="lazy" decoding="async"
+        className="h-full w-full object-contain" />
       {isRecommendedStudio2dScene(scene) && <span className="absolute left-1.5 top-1.5 rounded bg-card px-1.5 py-0.5 text-[0.65rem] font-semibold text-accent">검수 추천</span>}
     </button>
     <div className="space-y-1.5 p-2">
@@ -60,8 +56,10 @@ function SceneCard({ scene, disabled, onPick, onPreview }: {
         {[asset.containsPeople ? "인물 포함" : null, asset.containsText ? "문자 형태 포함" : null].filter(Boolean).join(" · ")}
       </p>}
       {asset && !isLargeStudio2dAsset(asset) && <p className="text-[0.64rem] text-fg-3">소형 컷용 · 확대 주의</p>}
-      {status === "error" ? <button type="button" className="w-full rounded-lg border border-bad/40 px-1 py-1.5 text-xs text-bad"
-        onClick={() => { setStatus("loading"); setAttempt((value) => value + 1); }}>이미지 다시 불러오기</button>
+      {state.reason === "timeout" && <p className="text-[0.64rem] text-bad">연결이 지연되었습니다. 다시 불러와 주세요.</p>}
+      {status === "mismatch" && <p className="text-[0.64rem] text-bad">원본 크기가 검수 기록과 다릅니다.</p>}
+      {(status === "error" || status === "mismatch") ? <button type="button" className="w-full rounded-lg border border-bad/40 px-1 py-1.5 text-xs text-bad"
+        onClick={retry}>이미지 다시 불러오기</button>
         : <button type="button" aria-label={`${title} 삽입`} disabled={disabled || status !== "ready"}
           onClick={() => { if (!disabled && status === "ready") onPick(scene); }}
           className="w-full rounded-lg border border-line px-2 py-1.5 text-xs font-medium hover:border-accent disabled:cursor-not-allowed disabled:opacity-40">삽입</button>}
