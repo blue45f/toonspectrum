@@ -17,10 +17,12 @@ const { outputText, diagnostics } = ts.transpileModule(source, {
 });
 assert.equal(diagnostics?.filter((item) => item.category === ts.DiagnosticCategory.Error).length, 0);
 
-async function recording({ preAborted = false, stopThrows = false, failFinalProgress = false } = {}) {
+async function recording({ preAborted = false, stopThrows = false, failFinalProgress = false, manualCapture = true, supportedMimes } = {}) {
   let clock = 0;
   let nextId = 0;
   let trackStops = 0;
+  let frameRequests = 0;
+  const contextOptions = [];
   const frames = new Map();
   const timers = new Map();
   const listeners = new Map();
@@ -29,21 +31,22 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
   const progress = [];
   const controller = new AbortController();
   if (preAborted) controller.abort();
-  const stream = { getTracks: () => [{ stop: () => { trackStops += 1; } }] };
+  const track = { stop: () => { trackStops += 1; }, ...(manualCapture ? { requestFrame: () => { frameRequests += 1; } } : {}) };
+  const stream = { getTracks: () => [track], getVideoTracks: () => [track] };
   class Canvas {
     width = 0;
     height = 0;
-    getContext() { return {}; }
+    getContext(_kind, options) { contextOptions.push(options); return {}; }
     captureStream() { return stream; }
   }
   class Recorder {
-    static isTypeSupported() { return true; }
+    static isTypeSupported(mime) { return supportedMimes ? supportedMimes.includes(mime) : true; }
     state = "inactive";
     mimeType = "video/webm;codecs=vp9,opus";
     ondataavailable = null;
     onstop = null;
     onerror = null;
-    constructor() { recorders.push(this); }
+    constructor(_stream, options) { this.mimeType = options.mimeType; recorders.push(this); }
     start() { this.state = "recording"; }
     stop() {
       if (stopThrows) throw new Error("codec stop failed");
@@ -85,13 +88,19 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
   await new Promise((resolve) => setImmediate(resolve));
   const recorder = recorders[0];
   const data = (size) => recorder.ondataavailable?.({ data: size === undefined ? new Blob(["encoded-frame"]) : { size } });
+  const tick = (now) => {
+    clock = now;
+    const callbacks = [...frames.values()]; frames.clear();
+    callbacks.forEach((callback) => callback(clock));
+  };
   return {
-    recorder, document, canvases, controller, progress, data,
+    recorder, document, canvases, controller, progress, data, tick, contextOptions,
+    frameRequests: () => frameRequests,
     end() {
       data();
-      clock = 15_000;
-      const callbacks = [...frames.values()]; frames.clear();
-      callbacks.forEach((callback) => callback(clock));
+      tick(15_000);
+      tick(15_020);
+      tick(15_040);
     },
     stopEvent() { recorder.onstop?.(); },
     hide() { document.hidden = true; listeners.get("visibilitychange")?.(); },
@@ -162,4 +171,42 @@ test("throwing encoder stop still settles and releases media tracks", async () =
 test("failing final progress callback rejects instead of hanging", async () => {
   const context = await recording({ failFinalProgress: true }); context.end(); context.stopEvent();
   await rejectsRecording(context, /마무리/u);
+});
+
+
+test("default recording uses opaque canvas and lower-latency VP8", async () => {
+  const context = await recording(); context.end(); context.stopEvent();
+  const { blob } = await context.result();
+  assert.equal(blob.type, "video/webm;codecs=vp8,opus");
+  assert.equal(context.contextOptions[0].alpha, false);
+  assert.equal(context.frameRequests(), 1);
+  context.cleaned();
+});
+test("the final canvas frame gets a paint opportunity before native stop", async () => {
+  const context = await recording(); context.data(); context.tick(15_000);
+  assert.equal(context.recorder.state, "recording");
+  assert.equal(context.frameRequests(), 1);
+  context.tick(15_020);
+  assert.equal(context.recorder.state, "recording");
+  context.tick(15_040);
+  assert.equal(context.recorder.state, "inactive");
+  context.stopEvent();
+  assert.ok((await context.result()).blob.size > 0);
+  context.cleaned();
+});
+test("cancellation while the final canvas frame is being painted still rejects", async () => {
+  const context = await recording(); context.data(); context.tick(15_000);
+  context.controller.abort(); context.stopEvent();
+  await rejectsRecording(context, /취소/u);
+});
+test("automatic canvas capture remains usable without requestFrame", async () => {
+  const context = await recording({ manualCapture: false }); context.end(); context.stopEvent();
+  assert.ok((await context.result()).blob.size > 0);
+  context.cleaned();
+});
+test("VP9-only environments retain their correctly labeled supported fallback", async () => {
+  const context = await recording({ supportedMimes: ["video/webm;codecs=vp9,opus"] });
+  context.end(); context.stopEvent();
+  assert.equal((await context.result()).blob.type, "video/webm;codecs=vp9,opus");
+  context.cleaned();
 });
