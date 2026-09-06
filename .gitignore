@@ -121,3 +121,9 @@ crates/*/target/
 *.swp
 *.swo
 *~
+
+# local package content-addressable store (never commit)
+.pnpm-store/
+
+# isolated feedback UI review build output
+/dist-feedback-review/
