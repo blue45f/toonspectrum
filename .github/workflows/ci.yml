@@ -12,13 +12,19 @@ name: CI
 #   - `concurrency`: 같은 PR 의 진행 중 실행은 새 커밋이 오면 취소한다. main 푸시는 취소하지 않는다.
 #   - `core`: lint / typecheck / build / test(3 shard) / test-serial 이 병렬로 돌고, `core` 는 그 결과를
 #     합치는 게이트 잡이다. 브랜치 보호의 필수 체크 이름 `core` 는 그대로다(DEPLOY.md).
-#   - `verify`: `core` 와 `studio-3d-runtime` 을 합치는 릴리스 게이트. 3D 오라클은 core 뒤에 줄 서지
-#     않고 처음부터 병렬로 돈다. core 가 빨간불이면 verify 도 빨간불이다(hard gate 유지).
+#   - `verify`: core 의 다섯 잡과 `studio-3d-runtime` 을 직접 합치는 릴리스 게이트(판정은 core ∧ 3D
+#     증명). 3D 오라클은 core 뒤에 줄 서지 않고 처음부터 병렬로 돌고, 게이트 잡도 `core` 잡의 러너
+#     배정을 한 번 더 기다리지 않는다. core 가 빨간불이면 verify 도 빨간불이다(hard gate 유지).
 #   - 루트 Vitest 스위트는 3 shard 로 나눈다(`--shard`: 파일 경로 해시로 분배하므로 모든 파일이
 #     정확히 한 shard 에서 한 번 돈다). 벽시계 예산 테스트(`test:perf`)는 조용한 러너가 필요하므로
 #     별도 잡(`test-serial`)에서 한 번만 돈다.
 #   - 브라우저 게이트는 프로덕션 dist 만 필요하므로 `build:bundle`(vite build 만)을 쓴다. tsc 는
 #     `typecheck` 잡이 한 번 증명한다. 같은 tsc 를 잡마다 2분씩 다시 지불할 이유가 없다.
+#     `prebuild:bundle`/`postbuild:bundle` 훅이 `build` 와 같은 카탈로그 생성·라이선스 고지·CSP 검증을
+#     돌리므로 dist 는 프로덕션 빌드와 같다.
+#   - `pnpm run <script> -- <args>` 형태를 쓰지 않는다. pnpm 11 은 독립된 `--` 를 스크립트에 그대로
+#     넘기고 vitest·Playwright 모두 그 뒤를 옵션으로 읽지 않는다(shard·레인 필터가 통째로 무시됐다).
+#     `scripts/integration-test-runner-ci-policy.test.mjs` 가 이를 고정한다.
 #
 # 임계 경로는 35분 → 약 11분이다(3D 시각 검증의 7.5분짜리 단일 케이스와 in-app 기능 스윕이 하한).
 
@@ -413,29 +419,32 @@ jobs:
           if-no-files-found: ignore
 
   verify:
-    # 릴리스 체크 "CI / verify" = core 전체 + 3D 런타임 오라클. core 가 실패·취소되면 이 체크도
-    # 실패한다 — 병합 중립적인 "skipped" 로 끝나는 일이 없도록 언제나 실행해 결과를 직접 읽는다.
+    # 릴리스 체크 "CI / verify" = core 가 모으는 다섯 잡 + 3D 런타임 오라클. 판정은 `core` ∧
+    # `studio-3d-runtime` 과 같지만 `core` 잡을 거치지 않고 다섯 잡을 직접 `needs` 한다. 게이트 잡도
+    # 러너 하나를 배정받아야 하는데, 대기열이 찼을 때는 그 배정에만 30분씩 걸렸다(run 2643: core 는
+    # 07:44 에 대기 시작해 08:16 에 돌았고, 그 뒤에 줄 선 verify 는 08:47 에야 돌았다). 두 게이트가
+    # 같은 순간에 줄을 서면 그 홉 하나가 사라진다.
+    #
+    # 상류 잡이 실패·취소돼도 이 체크는 실패로 보고돼야 한다 — 병합 중립적인 "skipped" 로 끝나는
+    # 일이 없도록 언제나 실행해 결과를 직접 읽는다.
     name: verify
-    needs: [core, studio-3d-runtime]
+    needs: [lint, typecheck, build, test, test-serial, studio-3d-runtime]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require successful core CI and the Studio 3D runtime proof
+      - name: Require every core gate and the Studio 3D runtime proof to succeed
         env:
-          CORE_RESULT: ${{ needs.core.result }}
-          PARITY_RESULT: ${{ needs.studio-3d-runtime.result }}
+          GATE_RESULTS: ${{ toJSON(needs) }}
         run: |
           set -euo pipefail
-          if [[ "$CORE_RESULT" != "success" ]]; then
-            echo "::error::Core CI gate ended with result '$CORE_RESULT'."
+          failed="$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key): \(.value.result)"' <<< "$GATE_RESULTS")"
+          if [[ -n "$failed" ]]; then
+            echo "::error::Core CI gates and the Studio 3D runtime proof did not all succeed."
+            printf '%s\n' "$failed"
             exit 1
           fi
-          if [[ "$PARITY_RESULT" != "success" ]]; then
-            echo "::error::Studio 3D runtime proof ended with result '$PARITY_RESULT'."
-            exit 1
-          fi
-          echo "Core CI and the Studio 3D runtime proof both succeeded."
+          echo "Every core gate and the Studio 3D runtime proof succeeded."
 
   # ── core 와 병렬로 도는 브라우저 게이트 ──────────────────────────────────────────────────
   # 아래 잡들은 자체적으로 dist 를 만들거나 vite dev 서버를 띄우므로 core 에 의존하지 않는다.
@@ -463,9 +472,9 @@ jobs:
       matrix:
         include:
           - lane: slow lane
-            filter: --grep @slow
+            filter: --grep=@slow
           - lane: fast lane
-            filter: --grep-invert @slow
+            filter: --grep-invert=@slow
     env:
       NODE_OPTIONS: --max-old-space-size=8192
       # Empty selects Playwright's own bundled Chromium — the build `playwright install chromium`
@@ -483,7 +492,10 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Verify Studio 3D surfaces against rendered frames
-        run: pnpm run verify:studio-3d-visual -- ${{ matrix.filter }}
+        # `--` 를 끼워 넣지 않는다. pnpm 11 은 독립된 `--` 토큰을 스크립트에 그대로 넘기고, Playwright
+        # 는 그 뒤의 인자를 옵션으로 읽지 않는다. 2026-09-05 run 2643 에서 두 레인이 각각 전체 스위트를
+        # 돌린 원인이 이것이었다(fast lane 16분, slow lane 20분 — 나누기 전과 같은 시간).
+        run: pnpm run verify:studio-3d-visual ${{ matrix.filter }}
       # A CI-only e2e failure is undiagnosable without the page state that produced it: the run
       # log keeps the call log but not the DOM. Playwright writes an accessibility snapshot to
       # `test-results/**/error-context.md` for every failed test, so publish that directory.
