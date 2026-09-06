@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useParams } from "react-router-dom";
 
 import { normalizeStudioBrushDynamicsSettings } from "../brush/studio-brush-dynamics";
 import { STUDIO_BRUSH_MIX_TRAIT_SECTIONS, stabilizeStudioBrushMixQuality } from "../brush/studio-brush-engine-mix";
@@ -22,9 +23,22 @@ import type { StudioBrushSnapshot } from "../brush/studio-brush-library";
 const BUTTON = `min-h-11 rounded-xl border border-line bg-card px-3 py-2 text-sm font-semibold text-fg transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50 ${STUDIO_FOCUS_RING}`;
 const INPUT = `min-h-11 w-full min-w-0 rounded-xl border border-line bg-card px-3 text-sm text-fg ${STUDIO_FOCUS_RING}`;
 const CARD = "min-w-0 rounded-2xl border border-line bg-card/45 p-4";
+const SESSION_DRAFT_PREFIX = "toonstudio-brush-lab:session:";
 interface CatalogItem { id: string; name: string }
 interface Candidate { recipe: BrushLabRecipe; document: BrushLabDocument }
+interface BrushLabSessionDraft { document: BrushLabDocument; reference: BrushLabDocument; recipe: BrushLabRecipe }
 const CORE_ITEMS: CatalogItem[] = BRUSH_PRESETS.filter((item) => item.operation === "paint").map(({ id, name }) => ({ id, name }));
+
+function readSessionDraft(key: string): BrushLabSessionDraft | null {
+  try {
+    const raw = globalThis.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const result = readBrushLabAuthoringFile(raw);
+    return { document: result.document, reference: result.reference, recipe: result.recipe };
+  } catch {
+    return null;
+  }
+}
 
 function TraitPreview({ document }: { document: BrushLabDocument }) {
   if (!canComposeBrushLabTraits(document)) return <p className="rounded-xl border border-line p-4 text-xs leading-relaxed text-fg-3">이 매체의 물성은 공통 입자 미리보기로 재현하지 않습니다. 저장 후 실제 캔버스에서 확인하세요.</p>;
@@ -32,11 +46,16 @@ function TraitPreview({ document }: { document: BrushLabDocument }) {
 }
 
 export function StudioBrushLabPage() {
-  const [history, setHistory] = useState<BrushLabHistory<BrushLabDocument>>(() => ({ past: [], present: createInitialBrushLabDocument(), future: [] }));
+  const params = useParams<{ workId?: string; sourceWorkId?: string }>();
+  const scope = params.workId ? `work:${params.workId}` : params.sourceWorkId ? `remix:${params.sourceWorkId}` : "draft";
+  const sessionDraftKey = `${SESSION_DRAFT_PREFIX}${encodeURIComponent(scope)}`;
+  const [initialDraft] = useState(() => readSessionDraft(sessionDraftKey));
+  const initialDocument = initialDraft?.document ?? createInitialBrushLabDocument();
+  const [history, setHistory] = useState<BrushLabHistory<BrushLabDocument>>(() => ({ past: [], present: initialDocument, future: [] }));
   const document = history.present;
   const snapshot = document.snapshot;
-  const [reference, setReference] = useState(document);
-  const [recipe, setRecipe] = useState(() => createBrushLabRecipe(document.carrierId));
+  const [reference, setReference] = useState(initialDraft?.reference ?? initialDocument);
+  const [recipe, setRecipe] = useState(() => initialDraft?.recipe ?? createBrushLabRecipe(initialDocument.carrierId));
   const [items, setItems] = useState(CORE_ITEMS);
   const [query, setQuery] = useState("");
   const [catalogError, setCatalogError] = useState("");
@@ -47,8 +66,9 @@ export function StudioBrushLabPage() {
   const [candidateCount, setCandidateCount] = useState(8);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
-  const [message, setMessage] = useState("소스를 선택하지 않은 속성은 현재 설정을 유지합니다.");
+  const [message, setMessage] = useState(initialDraft ? "이전 세션의 브러시 제작 초안을 복구했습니다." : "소스를 선택하지 않은 속성은 현재 설정을 유지합니다.");
   const [error, setError] = useState("");
+  const [draftStatus, setDraftStatus] = useState(initialDraft ? "자동 복구된 초안입니다. 작업 파일로도 백업할 수 있습니다." : "");
   const [dirty, setDirty] = useState(false);
   const request = useRef(0);
   const epoch = useRef(0);
@@ -61,6 +81,11 @@ export function StudioBrushLabPage() {
   const portable = canComposeBrushLabTraits(document);
   const family = resolveStudioBrushRenderFamily(snapshot.brushId);
   const filtered = items.filter((item) => `${item.name} ${item.id}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+  const editorHref = params.workId
+    ? `/studio/work/${encodeURIComponent(params.workId)}/canvas`
+    : params.sourceWorkId
+      ? `/studio/remix/${encodeURIComponent(params.sourceWorkId)}/canvas`
+      : "/studio";
 
   useEffect(() => {
     mounted.current = true;
@@ -95,6 +120,18 @@ export function StudioBrushLabPage() {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+  useEffect(() => {
+    if (!dirty) return;
+    const timer = window.setTimeout(() => {
+      try {
+        globalThis.sessionStorage.setItem(sessionDraftKey, writeBrushLabAuthoringFile(document, reference, recipe));
+        setDraftStatus("이 세션의 브러시 제작 초안을 자동 저장했습니다.");
+      } catch {
+        setDraftStatus("자동 초안 저장을 사용할 수 없습니다. 작업 파일 저장을 이용해 주세요.");
+      }
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [dirty, document, reference, recipe, sessionDraftKey]);
 
   function invalidate() {
     request.current++; controller.current?.abort(); controller.current = null;
@@ -107,7 +144,6 @@ export function StudioBrushLabPage() {
     setDirty(true);
   }
   function patch(values: Partial<StudioBrushSnapshot>) {
-    // A portal callback from a replaced carrier/history state cannot rewrite the new brush.
     if (editingEpoch !== epoch.current) return;
     invalidate();
     setHistory((current) => commitBrushLabHistory(current, { ...current.present, snapshot: sanitizeBrushSnapshot({ ...current.present.snapshot, ...values }).snapshot }));
@@ -199,7 +235,6 @@ export function StudioBrushLabPage() {
       anchor.href = url; anchor.download = workspace ? "toonstudio-brush-workspace.brushlab.json" : "toonstudio-custom-brush.json";
       window.document.body.append(anchor); anchor.click(); anchor.remove();
       const timer = setTimeout(() => { URL.revokeObjectURL(url); urls.current.delete(url); timers.current.delete(timer); }, 10000); timers.current.add(timer);
-      // Download requests are not proof that the user saved the file. Keep the unload warning.
       setMessage(workspace ? "작업 파일 다운로드를 요청했습니다. 소스·잠금·시드·A/B 기준을 포함합니다. 브라우저에서 저장을 확인하세요." : "완성 브러시 JSON 다운로드를 요청했습니다. 엔진 프로그램을 포함하며, 소스·잠금은 작업 파일로 보관하세요.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "내보내기에 실패했습니다."); }
   }
@@ -212,11 +247,13 @@ export function StudioBrushLabPage() {
           <button type="button" className={BUTTON} disabled={busy} onClick={() => fileInput.current?.click()}>파일 가져오기</button>
           <button type="button" className={BUTTON} disabled={busy} onClick={() => exportFile(true)}>작업 파일 저장</button>
           <button type="button" className={BUTTON} disabled={busy} onClick={() => exportFile(false)}>브러시 내보내기</button>
-          <a className={BUTTON} href="/studio" target="_blank" rel="noopener noreferrer">캔버스 열기 ↗</a>
+          <a className={BUTTON} href="/studio/brushes" target="_blank" rel="noopener noreferrer">내 브러시 ↗</a>
+          <a className={BUTTON} href={editorHref} target="_blank" rel="noopener noreferrer">캔버스 열기 ↗</a>
           <input ref={fileInput} type="file" accept=".json,application/json" className="sr-only" aria-label="브러시 또는 제작 작업 JSON 파일" onChange={(event) => void importFile(event)} />
         </div>
       </header>
-      <p className="mb-4 text-xs leading-relaxed text-fg-3">독립 제작실 /studio/brush-lab · 기존 /studio/brushes 작업 화면은 유지됩니다. 내 브러시 저장은 제품 라이브러리, 작업 파일은 제작 상태 백업입니다.</p>
+      <p className="mb-2 text-xs leading-relaxed text-fg-3">독립 제작실 /studio/brush-lab · 기존 /studio/brushes 작업 화면은 유지됩니다. 내 브러시 저장은 제품 라이브러리, 작업 파일은 제작 상태 백업입니다.</p>
+      {draftStatus ? <p className="mb-4 text-xs leading-relaxed text-fg-3" role="status">{draftStatus}</p> : <div className="mb-4" />}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-card p-3 text-sm">
         <p role="status" aria-live="polite">{busy ? progress || "조합을 확인하고 있습니다…" : message}</p>
         {busy ? <button type="button" className={BUTTON} onClick={() => { invalidate(); setMessage("작업을 취소했습니다. 현재 브러시는 유지됩니다."); }}>작업 취소</button> : null}
