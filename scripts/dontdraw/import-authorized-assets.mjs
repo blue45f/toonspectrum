@@ -1,10 +1,10 @@
 /** Offline intake for owner-supplied Dontdraw originals. Never scrapes/downloads products. */
 import { createHash } from "node:crypto";
-import { lstat, mkdir, mkdtemp, realpath, rename, rm, rmdir, writeFile } from "node:fs/promises";
+import { lstat, mkdir, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { readBoundedFile } from "./bounded-file.mjs";
+import { readStableFile, stagePrivateBundle } from "./authorized-intake-io.mjs";
 import { buildIntakeReviewQueue, intakeExitCode } from "./intake-review-queue.mjs";
 
 export const SOURCE_SCHEMA = "toonstudio.dontdraw-source.v1";
@@ -89,8 +89,20 @@ async function sourceFile(root, relativePath) {
 }
 
 async function inspectFile(filename, maximumBytes = MAX_FILE_BYTES) {
-  const bytes = await readBoundedFile(filename, maximumBytes);
+  const bytes = await readStableFile(filename, maximumBytes);
   return { bytes, sha256: createHash("sha256").update(bytes).digest("hex"), size: bytes.length };
+}
+
+async function readSourceManifest(filename) {
+  let bytes;
+  try {
+    // The bounded descriptor reader rejects pipes/devices/symlinks before opening and enforces the byte limit.
+    bytes = await readStableFile(filename, MAX_MANIFEST_BYTES);
+  } catch (error) {
+    throw new Error(`Source manifest must be a regular file of at most 8 MiB: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
+  // Invalid UTF-8 is an error, never silently replaced with U+FFFD before validation.
+  return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
 }
 
 function inspectReadyFormat(extension, bytes) {
@@ -150,12 +162,7 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
   const root = await realpath(sourceDir);
   if (!(await lstat(root)).isDirectory()) throw new Error("sourceDir must be a directory");
   const sourceManifest = await sourceFile(root, manifestPath);
-  const manifestStat = await lstat(sourceManifest);
-  if (!manifestStat.isFile()) throw new Error("Only regular files are accepted; devices, pipes and directories are rejected");
-  if (manifestStat.size > MAX_MANIFEST_BYTES) throw new Error(`Source manifest exceeds 8 MiB (${MAX_MANIFEST_BYTES} bytes)`);
-  const manifestBytes = await readBoundedFile(sourceManifest, MAX_MANIFEST_BYTES);
-  // A manifest with invalid UTF-8 is rejected outright, never decoded with replacement characters.
-  const input = validateSourceManifest(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(manifestBytes)));
+  const input = validateSourceManifest(await readSourceManifest(sourceManifest));
   const destination = outputDir ? path.resolve(outputDir) : undefined;
   if (write && !destination) throw new Error("--output is required with --write");
   if (destination && (within(root, destination) || within(destination, root))) throw new Error("Output and source must not overlap");
@@ -210,44 +217,34 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
     await mkdir(path.dirname(destination), { recursive: true });
     const actualDestination = path.join(await realpath(path.dirname(destination)), path.basename(destination));
     if (within(root, actualDestination) || within(actualDestination, root)) throw new Error("Output and source must not overlap through symlinks");
-    // mkdir is an exclusive reservation; never replace an existing output or follow its symlink.
-    await mkdir(destination, { mode: 0o700 });
-    let temporary;
-    try {
-      temporary = await mkdtemp(path.join(destination, ".staging-"));
+    // Exclusive reservation, staging directory, atomic /ready exposure and scoped cleanup live in stagePrivateBundle.
+    await stagePrivateBundle(actualDestination, async (temporary) => {
       await mkdir(path.join(temporary, "files"), { mode: 0o700 });
       for (const item of entries) {
-        // Re-resolve and re-hash before staging to detect changes after the first inspection.
+        // Re-read bounded, stable bytes and validate BEFORE writing; never copy a moving source.
         const originalPath = await sourceFile(root, item.entry.provenance.sourcePath);
         if (originalPath !== item.absolutePath) throw new Error("Source path changed before staging");
-        const outputPath = path.join(temporary, item.entry.path);
         const inspected = await inspectFile(originalPath);
         if (inspected.sha256 !== item.sha256) throw new Error("Source changed before staging");
+        const outputPath = path.join(temporary, item.entry.path);
         await writeFile(outputPath, inspected.bytes, { flag: "wx", mode: 0o600 });
+        if ((await inspectFile(outputPath)).sha256 !== item.sha256) throw new Error("Staged file hash mismatch");
       }
       await writeFile(path.join(temporary, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx", mode: 0o600 });
       await writeFile(path.join(temporary, "intake-report.json"), `${JSON.stringify(report, null, 2)}\n`, { flag: "wx", mode: 0o600 });
       await writeFile(path.join(temporary, "review-queue.json"), `${JSON.stringify(reviewQueue, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-      // A complete bundle appears at /ready only after every source and output has passed.
-      await rename(temporary, path.join(destination, "ready"));
-    } catch (error) {
-      // Remove only this operation's staging directory, never unrelated concurrent files.
-      if (temporary) await rm(temporary, { recursive: true, force: true });
-      await rmdir(destination).catch(() => {});
-      throw error;
-    }
+    });
   }
   return { report, manifest, reviewQueue };
 }
 
 export function parseCliOptions(argv) {
   const options = { manifestPath: "source.json", write: false };
-  // A Map, not a plain object: a positional "toString" must not resolve to Object.prototype.
   const names = new Map([["--source-dir", "sourceDir"], ["--manifest", "manifestPath"], ["--output", "outputDir"]]);
   const seen = new Set();
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
-    if (flag === "--") continue;
+    if (flag === "--") continue; // pnpm/npm argument separator
     if (seen.has(flag)) throw new Error(`Duplicate option: ${flag}`);
     seen.add(flag);
     if (flag === "--write") { options.write = true; continue; }
@@ -261,7 +258,7 @@ export function parseCliOptions(argv) {
 }
 
 export async function runCli(argv) {
-  // Only a bare --help is help; "--write --help" is a broken write command and must fail.
+  // Help is honoured only on its own so it can never mask a malformed write command.
   if (argv.length === 1 && argv[0] === "--help") {
     console.log("node scripts/dontdraw/import-authorized-assets.mjs --source-dir /originals --manifest source.json [--output /new-batch --write]\nDefault is read-only inspection. --write stages an offline bundle under /new-batch/ready, not a public upload. Exit: 0=structurally ready, 1=invalid/error, 2=conversion/unsupported/empty batch.");
     return 0;

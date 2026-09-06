@@ -96,8 +96,10 @@ match the inspected SHA-256 hashes, a complete `ready/` directory appears contai
 - `files/`: only compatible, unique original/export bytes. Native sources and previews stay private.
 
 Any invalid supported file prevents staging the batch. Zero compatible files cannot produce an
-empty "successful asset pack". Existing output is never replaced. A failed copy/hash check removes
-only the new output reserved by this operation. This is not a source-directory mutation.
+empty "successful asset pack". Existing output is never replaced. A failed write/hash check removes
+only this operation's staging directory, then removes the new output only if it is empty.
+Independently added files are preserved. If the output directory identity changes, automatic
+cleanup stops instead of traversing the replacement. This is not a source-directory mutation.
 
 ### Existing upload pipeline hand-off
 
@@ -153,6 +155,10 @@ The same contracts register with Node's runner locally and Vitest in the existin
 collection. Coverage includes dry-run, hand-off paths, hashing, deduplication, preview/source
 exclusion, conversion status, missing/empty/corrupt files, symlinks, traversal, existing-output
 preservation, source/output overlap, authorization validation and embedded/external-resource GLB.
+The I/O hardening contracts additionally cover real named-pipe rejection in isolated child
+processes, failing CLI exit status with intact JSON, command-option validation, partial reads,
+growing/truncated files, inode/timestamp changes, size limits, invalid UTF-8, private permissions
+and rollback that preserves independent data.
 No synthetic fixture is represented as a Dontdraw acquisition.
 
 ## Automation and review workflow hardening
@@ -171,6 +177,11 @@ have precedence over pending conversions. `--write` can stage compatible files a
 when other files require conversion; exit 2 does not mean that no output was written. JSON stdout
 includes `reviewQueue` so even read-only inspection exposes pending tasks. CLI errors go to stderr.
 
+Command options are validated before any I/O: duplicate options, unknown or prototype-named
+positional arguments, blank path values and `--write` without `--output` exit 1. Help is accepted
+only as a standalone `--help`, never as a way to mask an invalid write command. The pnpm/npm `--`
+argument separator is ignored, so `pnpm ... -- --source-dir "/path with spaces"` works.
+
 The review queue has schema `toonstudio.dontdraw-review-queue.v1`. Each task has a deterministic
 `reviewId` derived from product ID, source path and declared role. Fixing a damaged file does not
 lose its review identity. Exact duplicate path/role declarations within a product are rejected;
@@ -185,19 +196,29 @@ catalogue permission system. Editing task status does not grant access or publis
 The existing uploader still does not persist provenance on the server; the integration boundary
 above remains in force.
 
-File reads allocate no more than the inspected file size and use bounded positional reads rather
-than reading to a moving EOF. A one-byte end probe plus size/inode/device and nanosecond timestamps
-detect growth, truncation and ordinary concurrent changes. Manifests use the same reader with an
-8 MiB limit. Directory, symlink and special-file inputs are rejected; nonblocking opens prevent a
-replacement FIFO from hanging the command. Before staging, source bytes are re-read, re-hashed,
-and those exact checked bytes are written, rather than reopening a path for an unchecked copy.
+Both manifests and original files use the same bounded descriptor reader
+(`scripts/dontdraw/authorized-intake-io.mjs`). It rejects devices, directories, symlinks and named
+pipes before opening; where the OS supports them, no-follow and nonblocking flags additionally
+guard the open operation so a replacement FIFO cannot hang the command. Reads allocate no more than
+the inspected file size and are positional, in chunks of at most 64 KiB, plus a one-byte end probe
+to detect growth. Descriptor and path identity, size, modification time and change time are
+compared before, during and after the read to detect concurrent mutations. Manifests are limited
+to 8 MiB by the reader itself (the error names the 8388608-byte limit), and invalid UTF-8 is
+rejected rather than silently altered. The remaining batch budget is checked before reading an
+additional payload, not after an oversized allocation. Before staging, source bytes are re-read,
+re-hashed, and those exact checked bytes are written; each staged file is then read back and its
+hash compared again, rather than reopening a path for an unchecked copy.
 
-New output directories are owner-only (`0700`); files/reports use `0600` on POSIX systems, subject
-to the process umask. Windows permissions must be managed with filesystem ACLs. Error cleanup
-removes only the operation's temporary directory and then the reserved output directory if empty,
-rather than recursively deleting unrelated files that appeared in the output directory.
-These checks are not an OS sandbox: use a private, trusted source/output parent, not a directory
-concurrently controlled by an untrusted process with the same account permissions.
+New output directories are owner-only (`0700`) and original files/reports/manifests use `0600` on
+POSIX systems, including under a permissive umask (a stricter umask only removes further bits).
+Windows permissions must be managed with filesystem ACLs. The output directory is an exclusive
+reservation and an existing `ready/` is never replaced. Error cleanup removes only the operation's
+temporary directory and then the reserved output directory if empty, rather than recursively
+deleting unrelated files that appeared in the output directory; if the output directory identity
+changes mid-operation, cleanup stops and the error reports that it needs review. These checks are
+not an OS sandbox or a timeout for a stalled network filesystem: use a private, trusted
+source/output parent, not a directory concurrently controlled by an untrusted process with the
+same account permissions.
 
 The additional contracts execute through the same Node/Vitest registration as the original tests.
 The focused `Dontdraw intake regression` workflow executes them under Node 24, in addition to—not

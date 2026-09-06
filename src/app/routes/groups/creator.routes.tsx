@@ -43,16 +43,16 @@ const StudioBrushLabPage = lazyRetry(
   },
   "StudioBrushLabPage",
 );
+const LearnPage = lazyRetry(
+  () => import("@/src/domains/learn/LearnPage").then((module) => ({ default: module.LearnPage })),
+  "LearnPage",
+);
 // Public reference pages must not initialize the editor or its dictionaries/GPU engines.
 const StudioManualPage = lazyRetry(
   () => import("@/src/domains/creator/manual/StudioManualPage").then((module) => ({
     default: module.StudioManualPage,
   })),
   "StudioManualPage",
-);
-const LearnPage = lazyRetry(
-  () => import("@/src/domains/learn/LearnPage").then((module) => ({ default: module.LearnPage })),
-  "LearnPage",
 );
 const StudioRouter = lazyRetry(
   async () => {
@@ -74,8 +74,11 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-work", path: "/create/:id", element: <CreateWorkPage /> },
   { id: "creator-character-shaper", path: "/shaper", element: <CharacterShaperLandingPage /> },
   { id: "creator-brush-lab", path: "/brush-lab", element: <StudioBrushLabPage /> },
+  { id: "creator-studio-brush-lab", path: "/studio/brush-lab", element: <StudioBrushLabPage /> },
+  { id: "creator-studio-work-brush-lab", path: "/studio/work/:workId/brush-lab", element: <StudioBrushLabPage /> },
+  { id: "creator-studio-remix-brush-lab", path: "/studio/remix/:sourceWorkId/brush-lab", element: <StudioBrushLabPage /> },
+  { id: "creator-learning", path: "/learn/*", element: <LearnPage /> },
   { id: "creator-studio-manual", path: "/studio/manual", element: <StudioManualPage /> },
   { id: "creator-studio-manual-article", path: "/studio/manual/:articleId", element: <StudioManualPage /> },
-  { id: "creator-learning", path: "/learn/*", element: <LearnPage /> },
   { id: "creator-studio", path: "/studio/*", element: <StudioRouter /> },
 ]);

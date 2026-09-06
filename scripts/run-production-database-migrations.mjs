@@ -69,6 +69,7 @@ const HISTORICAL_BASELINE_RELATIONS = Object.freeze([
   "fan_post_reply",
   "feedback_post",
   "feedback_reply",
+  "feedback_vote",
   "monetization_plan",
   "rating",
   "read",

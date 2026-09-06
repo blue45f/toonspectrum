@@ -41,7 +41,6 @@ export const STUDIO_MENU_HELP_GROUP_SPEC: StudioMenuGroupSpec = {
   ],
   extras: [
     ours("help/shortcuts", "단축키 · 기본 조작."),
-    // #794: the independently lazy-loaded /studio/manual page, registered through the menu origin.
-    ours("help/user-manual", "기능별 사용자 매뉴얼 · 검색."),
+    ours("help/user-manual", "별도 사용자 매뉴얼 · 새 탭에서 연다 (#794)."),
   ],
 };

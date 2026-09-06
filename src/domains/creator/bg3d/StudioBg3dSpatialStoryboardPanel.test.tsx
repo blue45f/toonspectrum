@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+
 import { strict as assert } from "node:assert";
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

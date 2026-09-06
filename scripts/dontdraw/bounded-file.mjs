@@ -27,7 +27,7 @@ export async function readBoundedHandle(handle, maximumBytes) {
 export async function readBoundedFile(filename, maximumBytes) {
   // Reject FIFOs/devices before opening. NONBLOCK also prevents a replacement FIFO from hanging.
   const stat = await lstat(filename, { bigint: true });
-  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("Only regular files are accepted; devices, pipes and directories are rejected");
+  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("Expected a regular file, not a symlink or special file");
   const flags = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
   const handle = await open(filename, flags);
   try {
