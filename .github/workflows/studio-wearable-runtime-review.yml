@@ -44,7 +44,7 @@ jobs:
           EOF
           mkdir -p wearable-runtime-review/vrm wearable-runtime-review/browser-harnesses
           cp apps/web/public/vrm/sample.vrm apps/web/public/vrm/AvatarSample_B.vrm apps/web/public/vrm/LICENSES.md wearable-runtime-review/vrm/
-          cp tools/browser-harnesses/props-compare-main.ts tools/browser-harnesses/props-compare.html wearable-runtime-review/browser-harnesses/
+          cp apps/web/tools/browser-harnesses/props-compare-main.ts apps/web/tools/browser-harnesses/props-compare.html wearable-runtime-review/browser-harnesses/
           git rev-parse HEAD > wearable-runtime-review/commit.txt
       - uses: actions/upload-artifact@v4
         with:

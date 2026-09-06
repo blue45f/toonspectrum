@@ -7,7 +7,7 @@ on:
       - 'apps/web/src/app/routes/groups/creator.routes.tsx'
       - 'apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx'
       - 'e2e/studio-promo.spec.ts'
-      - 'tools/browser-harnesses/promo-e2e.html'
+      - 'apps/web/tools/browser-harnesses/promo-e2e.html'
       - 'tools/verify-studio-promo-recording.mjs'
       - 'tools/verify-studio-promo-preview.mjs'
       - 'tools/verify-studio-promo-output.py'

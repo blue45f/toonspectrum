@@ -11,7 +11,7 @@ on:
       - scripts/verify-studio-catalog-browser.mjs
       - scripts/pack_studio_curated_gltf.py
       - scripts/tests/test_studio_*.py
-      - tests/browser-fixtures/studio-catalog/**
+      - apps/web/tests/browser-fixtures/studio-catalog/**
       - .github/workflows/studio-asset-browser.yml
   pull_request:
     paths:
@@ -23,7 +23,7 @@ on:
       - scripts/verify-studio-catalog-browser.mjs
       - scripts/pack_studio_curated_gltf.py
       - scripts/tests/test_studio_*.py
-      - tests/browser-fixtures/studio-catalog/**
+      - apps/web/tests/browser-fixtures/studio-catalog/**
       - .github/workflows/studio-asset-browser.yml
   workflow_dispatch:
 permissions:
