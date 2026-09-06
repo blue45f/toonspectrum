@@ -354,7 +354,7 @@ function main() {
   const htmlPath = resolve(repositoryRoot, process.argv[2] ?? "index.html");
   const vercelPath = resolve(repositoryRoot, "vercel.json");
   const builtBootstrapPath = resolve(dirname(htmlPath), "bootstrap-compat.js");
-  const sourceBootstrapPath = resolve(repositoryRoot, "public/bootstrap-compat.js");
+  const sourceBootstrapPath = resolve(repositoryRoot, "apps/web/public/bootstrap-compat.js");
   const bootstrapCompatPath = existsSync(builtBootstrapPath)
     ? builtBootstrapPath
     : sourceBootstrapPath;

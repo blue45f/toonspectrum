@@ -65,7 +65,7 @@ describe("database integration runner CI policy", () => {
       "NODE_OPTIONS='--max-old-space-size=8192' vite build",
     );
     // pnpm runs `pre<script>`/`post<script>` around any script name. `build` gets the catalog
-    // generation (public/data/ is gitignored, so without it the bundle ships no catalog) and the
+    // generation (apps/web/public/data/ is gitignored, so without it the bundle ships no catalog) and the
     // third-party notices plus CSP verification; the bundle-only build must get the same, or the
     // dist the browser gates drive is not the dist production serves.
     expect(packageManifest.scripts?.prebuild).toBe("pnpm catalog:gen");

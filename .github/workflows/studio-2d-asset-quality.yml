@@ -12,7 +12,7 @@ on:
       - 'apps/web/src/domains/creator/StudioToolBeltContent.tsx'
       - 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
       - 'scripts/studio-2d*'
-      - 'public/assets/studio/backgrounds/**'
+      - 'apps/web/public/assets/studio/backgrounds/**'
       - '.github/workflows/studio-2d-asset-quality.yml'
   pull_request:
     branches: [main]
@@ -26,7 +26,7 @@ on:
       - 'apps/web/src/domains/creator/StudioToolBeltContent.tsx'
       - 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
       - 'scripts/studio-2d*'
-      - 'public/assets/studio/backgrounds/**'
+      - 'apps/web/public/assets/studio/backgrounds/**'
       - '.github/workflows/studio-2d-asset-quality.yml'
 permissions:
   contents: read

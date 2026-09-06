@@ -348,8 +348,8 @@ describe("translation dictionary completeness", () => {
   it("keeps every t() key covered by its shell or lazy route dictionaries", () => {
     const usedKeys = collectSourceI18nKeys();
     const shellKeys = new Set([...Object.keys(i18nDict.ko), ...Object.keys(i18nDict.en)]);
-    const adminEn = readRouteDictionary("public/i18n/admin/en.json");
-    const adminKo = readRouteDictionary("public/i18n/admin/ko.json");
+    const adminEn = readRouteDictionary("apps/web/public/i18n/admin/en.json");
+    const adminKo = readRouteDictionary("apps/web/public/i18n/admin/ko.json");
     const adminKeys = [...usedKeys].filter((key) => key.startsWith("admin."));
     const shellMissing = [...usedKeys]
       .filter((key) => !key.startsWith("admin.") && !shellKeys.has(key))

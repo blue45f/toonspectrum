@@ -283,5 +283,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     destination = args.output.resolve()
     if destination == ROOT or destination.is_relative_to(ROOT / 'public'):
-        parser.error('Use an empty staging directory outside public/')
+        parser.error('Use an empty staging directory outside apps/web/public/')
     acquire(destination)

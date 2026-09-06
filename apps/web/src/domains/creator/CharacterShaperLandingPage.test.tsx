@@ -154,8 +154,8 @@ describe("/shaper registration", () => {
   });
 
   it("publishes the new app-shell keys in the built-in locales", () => {
-    const ko = JSON.parse(readRepoFile("public/i18n/app/ko.json")) as Record<string, string>;
-    const en = JSON.parse(readRepoFile("public/i18n/app/en.json")) as Record<string, string>;
+    const ko = JSON.parse(readRepoFile("apps/web/public/i18n/app/ko.json")) as Record<string, string>;
+    const en = JSON.parse(readRepoFile("apps/web/public/i18n/app/en.json")) as Record<string, string>;
 
     expect(ko["route.shaper"]).toBe("캐릭터 셰이퍼");
     expect(en["route.shaper"]).toBe("Character Shaper");

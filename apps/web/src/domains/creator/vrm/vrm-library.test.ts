@@ -166,7 +166,7 @@ describe("VRM library helpers", () => {
   });
 
   it("documents all newly bundled models in public/vrm/LICENSES.md", () => {
-    const licensesPath = join(process.cwd(), "public", "vrm", "LICENSES.md");
+    const licensesPath = join(process.cwd(), "apps/web/public", "vrm", "LICENSES.md");
     expect(existsSync(licensesPath)).toBe(true);
 
     const licenses = readFileSync(licensesPath, "utf8");
@@ -195,7 +195,7 @@ describe("VRM library helpers", () => {
   // 모든 SAMPLE_VRMS url이 public/vrm/ 실파일(>100KB)로 뒷받침되는지 검사한다.
   it("backs every bundled character with a real local VRM asset larger than 100KB", () => {
     const problems = SAMPLE_VRMS.flatMap((sample) => {
-      const filePath = join(process.cwd(), "public", sample.url.replace(/^\//, ""));
+      const filePath = join(process.cwd(), "apps/web/public", sample.url.replace(/^\//, ""));
       if (!existsSync(filePath)) return [`${sample.id}: missing file for ${sample.url}`];
       const { size } = statSync(filePath);
       if (size <= MIN_BUNDLE_FILE_BYTES) return [`${sample.id}: file too small (${size}B) for ${sample.url}`];
@@ -213,7 +213,7 @@ describe("VRM library helpers", () => {
       expect(sample.thumbnailUrl, `${sample.id} thumbnailUrl should be defined`).toBeTruthy();
       expect(sample.thumbnailUrl).toMatch(/^\/assets\/3d\/characters\/thumbnails\/[a-z0-9_.-]+\.png$/);
 
-      const filePath = join(process.cwd(), "public", sample.thumbnailUrl!.replace(/^\//, ""));
+      const filePath = join(process.cwd(), "apps/web/public", sample.thumbnailUrl!.replace(/^\//, ""));
       expect(existsSync(filePath), `thumbnail file exists for ${sample.id} at ${filePath}`).toBe(true);
 
       const { size } = statSync(filePath);
@@ -238,7 +238,7 @@ describe("VRM library helpers", () => {
   // 남으면 아무도 못 여는 수백 MB가 조용히 배포에 실린다 — 고아 파일을 여기서 막는다.
   // 의도적으로 남기는 파일은 BUNDLED_VRM_RIGHTS_BLOCKS 에 사유와 함께 등록해야 한다.
   it("ships no orphan .vrm file that the catalog cannot reach", () => {
-    const vrmDir = join(process.cwd(), "public", "vrm");
+    const vrmDir = join(process.cwd(), "apps/web/public", "vrm");
     const catalogFileNames = new Set(SAMPLE_VRMS.map((sample) => sample.url.replace("/vrm/", "")));
     const documentedFileNames = new Set(
       BUNDLED_VRM_RIGHTS_BLOCKS.map((block) => block.url.replace("/vrm/", "")),
@@ -279,7 +279,7 @@ describe("VRM library helpers", () => {
     expect(SAMPLE_VRMS.some((sample) => sample.id === "meebit")).toBe(false);
     expect(SAMPLE_VRM_ENTRIES.some((entry) => entry.id === "meebit")).toBe(false);
     expect(
-      existsSync(join(process.cwd(), "public", "vrm", "meebit_09842.vrm")),
+      existsSync(join(process.cwd(), "apps/web/public", "vrm", "meebit_09842.vrm")),
     ).toBe(false);
   });
 

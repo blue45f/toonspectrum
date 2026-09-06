@@ -15,7 +15,7 @@ function fixture() {
       readFileSync(fileURLToPath(new URL("vercel.json", ROOT)), "utf8"),
     ),
     bootstrapCompatSource: readFileSync(
-      fileURLToPath(new URL("public/bootstrap-compat.js", ROOT)),
+      fileURLToPath(new URL("apps/web/public/bootstrap-compat.js", ROOT)),
       "utf8",
     ),
   };

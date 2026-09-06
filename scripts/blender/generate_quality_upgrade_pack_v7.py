@@ -1,6 +1,6 @@
 """Rebuild the seven remaining low-density live GLB assets at pack-peer quality.
 
-An August 2026 triangle census of every GLB under ``public/assets/3d`` found
+An August 2026 triangle census of every GLB under ``apps/web/public/assets/3d`` found
 seven assets still in the live graph below 2k triangles while their own
 generation-wave peers sit between 20k and 130k:
 
@@ -33,7 +33,7 @@ import os
 
 import bpy
 
-OUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../public/assets/3d"))
+OUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../apps/web/public/assets/3d"))
 GENERATOR = "scripts/blender/generate_quality_upgrade_pack_v7.py"
 
 os.makedirs(OUT_DIR, exist_ok=True)

@@ -33,7 +33,7 @@ describe("header width budget", () => {
   it("keeps EN nav labels within the measured width budget", () => {
     // The English dictionary moved out of lib/i18n.ts into the published locale asset when the
     // 75 inlined dictionaries were split off the app shell.
-    const en = JSON.parse(read("public/i18n/app/en.json")) as Record<string, string>;
+    const en = JSON.parse(read("apps/web/public/i18n/app/en.json")) as Record<string, string>;
     const labels = [
       "home",
       "ranking",

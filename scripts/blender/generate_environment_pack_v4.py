@@ -10,7 +10,7 @@ provenance on their root nodes.
 Example:
   /Applications/Blender.app/Contents/MacOS/Blender --background \
     --python scripts/blender/generate_environment_pack_v4.py -- \
-    --output-dir public/assets/3d/environments
+    --output-dir apps/web/public/assets/3d/environments
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ ASSETS = (
 def parse_arguments():
     script_args = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", default="public/assets/3d/environments")
+    parser.add_argument("--output-dir", default="apps/web/public/assets/3d/environments")
     parser.add_argument("--thumbnail-dir", default=None)
     parser.add_argument("--only", choices=ASSETS, action="append")
     parser.add_argument("--skip-thumbnails", action="store_true")

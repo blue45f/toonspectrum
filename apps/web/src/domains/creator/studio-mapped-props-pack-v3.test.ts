@@ -104,7 +104,7 @@ const GENERATOR = "scripts/blender/generate_mapped_props_pack_v3.py";
 const CC0_LICENSE_URL = "https://creativecommons.org/publicdomain/zero/1.0/";
 
 function bundledBytes(filename: string): Uint8Array {
-  return readFileSync(join(process.cwd(), "public", "assets", "3d", filename));
+  return readFileSync(join(process.cwd(), "apps/web/public", "assets", "3d", filename));
 }
 
 function embeddedJson(bytes: Uint8Array): JsonRecord {
@@ -198,7 +198,7 @@ describe("ToonSpectrum mapped Blender prop pack v3", () => {
 
   it("documents every stable filename and its reproducible CC0 source", () => {
     const license = readFileSync(
-      join(process.cwd(), "public", "assets", "3d", "LICENSES.md"),
+      join(process.cwd(), "apps/web/public", "assets", "3d", "LICENSES.md"),
       "utf8",
     );
     expect(license).toContain(GENERATOR);

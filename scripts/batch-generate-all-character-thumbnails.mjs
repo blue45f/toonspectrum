@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 
 const SAMPLES_FILE = "scripts/sample-vrms-list.json";
-const OUT_DIR = "public/assets/3d/characters/thumbnails";
+const OUT_DIR = "apps/web/public/assets/3d/characters/thumbnails";
 
 async function main() {
   const characters = JSON.parse(fs.readFileSync(SAMPLES_FILE, "utf8"));

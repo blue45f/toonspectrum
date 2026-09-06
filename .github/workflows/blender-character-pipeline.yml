@@ -172,7 +172,7 @@ jobs:
           --project-root "$GITHUB_WORKSPACE"
 
       - name: Record the exact Orion source digest
-        run: sha256sum public/vrm/Avatar_Orion.vrm
+        run: sha256sum apps/web/public/vrm/Avatar_Orion.vrm
 
       - name: Upgrade the audited Orion source to authored hair and semantic face controls
         run: >-

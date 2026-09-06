@@ -25,10 +25,10 @@ describe("toonstudio.cloud production domain", () => {
     expect(html).toContain(`<meta property="og:url" content="${CANONICAL_ORIGIN}/"`);
     expect(html).toContain(`"@id": "${CANONICAL_ORIGIN}/#website"`);
     expect(html).toContain(`"urlTemplate": "${CANONICAL_ORIGIN}/search?q={search_term_string}"`);
-    expect(read("public/robots.txt")).toContain(
+    expect(read("apps/web/public/robots.txt")).toContain(
       `Sitemap: ${CANONICAL_ORIGIN}/sitemap.xml`
     );
-    expect(read("public/llms.txt")).toContain(`${CANONICAL_ORIGIN}/studio`);
+    expect(read("apps/web/public/llms.txt")).toContain(`${CANONICAL_ORIGIN}/studio`);
   });
 
   it("keeps host-scoped permanent redirects for apex and the legacy Vercel hostname", () => {

@@ -28,7 +28,7 @@ import {
   readAppLocaleDictionaries,
 } from "@/scripts/generate-app-i18n-catalog.mjs";
 
-const ASSET_DIRECTORY = path.resolve(process.cwd(), "public", "i18n", "app");
+const ASSET_DIRECTORY = path.resolve(process.cwd(), "apps/web/public", "i18n", "app");
 const REFERENCE_LOCALE = "en";
 /** The app-shell key surface every published dictionary was authored against. */
 const BASELINE_APP_KEY_COUNT = 525;

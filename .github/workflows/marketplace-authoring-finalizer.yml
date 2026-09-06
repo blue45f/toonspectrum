@@ -219,7 +219,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git restore --worktree -- public/data 2>/dev/null || true
+          git restore --worktree -- apps/web/public/data 2>/dev/null || true
           rm -rf playwright-report test-results coverage dist
           mkdir -p marketplace-benchmark
           cat > marketplace-benchmark/creator-authoring-verification.json <<JSON

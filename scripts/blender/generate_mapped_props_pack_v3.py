@@ -18,7 +18,7 @@ from mathutils import Vector
 
 OUTPUT_DIRECTORY = (
     bpy.context.scene.get("toonspectrum_mapped_props_output_dir")
-    or bpy.path.abspath("//public/assets/3d")
+    or bpy.path.abspath("//apps/web/public/assets/3d")
 )
 GENERATOR = "scripts/blender/generate_mapped_props_pack_v3.py"
 CC0_LICENSE_URL = "https://creativecommons.org/publicdomain/zero/1.0/"

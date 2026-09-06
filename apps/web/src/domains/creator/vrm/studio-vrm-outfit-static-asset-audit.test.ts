@@ -59,7 +59,7 @@ function productionSources(directory: string): string[] {
 
 describe("legacy static outfit GLB authority audit", () => {
   it("records all 18 rigid, unskinned reference shells instead of pretending they are wearable", () => {
-    const outfitDir = join(process.cwd(), "public", "assets", "3d", "outfits");
+    const outfitDir = join(process.cwd(), "apps/web/public", "assets", "3d", "outfits");
     expect(readdirSync(outfitDir).filter((name) => name.endsWith(".glb")).sort())
       .toEqual([...LEGACY_OUTFIT_FILES].sort());
 
@@ -87,7 +87,7 @@ describe("legacy static outfit GLB authority audit", () => {
     expect(source).not.toContain("/assets/3d/outfits/");
     for (const fileName of LEGACY_OUTFIT_FILES) expect(source).not.toContain(fileName);
 
-    const auditPath = join(process.cwd(), "public", "assets", "3d", "outfits", "README.md");
+    const auditPath = join(process.cwd(), "apps/web/public", "assets", "3d", "outfits", "README.md");
     expect(existsSync(auditPath)).toBe(true);
     const audit = readFileSync(auditPath, "utf8");
     expect(audit).toContain("not** the wardrobe assets shown");

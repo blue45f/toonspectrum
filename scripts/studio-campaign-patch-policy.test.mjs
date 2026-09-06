@@ -113,7 +113,7 @@ test("rejects patches that exceed changed-file or changed-line budgets", () => {
 test("rejects file deletion and binary payload mutations", () => {
   const result = evaluateStudioCampaignPatch(config, [
     change("apps/web/src/domains/creator/legacy.ts", 0, 40, { status: "D", newMode: "000000" }),
-    change("public/assets/external-model.glb", 0, 0, { status: "A", binary: true }),
+    change("apps/web/public/assets/external-model.glb", 0, 0, { status: "A", binary: true }),
   ]);
 
   assert.equal(result.ok, false);

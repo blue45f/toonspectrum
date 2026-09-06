@@ -929,7 +929,7 @@ if (!fs.existsSync(manifestPath)) {
     }
 
     // --- no locale mega-dictionary in the shell ---------------------------
-    // Every locale but ko/en ships as a lazy public/i18n/app/<locale>.json asset. If the whole
+    // Every locale but ko/en ships as a lazy apps/web/public/i18n/app/<locale>.json asset. If the whole
     // DICT is ever inlined back into a shell chunk, the i18n chunk balloons past this cap long
     // before anyone notices the extra megabyte of parse work on the critical path.
     const i18nShellChunkCeilingBytes = 256 * 1024;
@@ -941,7 +941,7 @@ if (!fs.existsSync(manifestPath)) {
       if (rawBytes > i18nShellChunkCeilingBytes) {
         fail(
           `app shell i18n chunk ${fileName} is ${formatKiB(rawBytes)} raw (cap ${formatKiB(i18nShellChunkCeilingBytes)}); `
-            + "locale dictionaries belong in public/i18n/app/<locale>.json, not the shell",
+            + "locale dictionaries belong in apps/web/public/i18n/app/<locale>.json, not the shell",
         );
       }
     }

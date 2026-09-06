@@ -27,10 +27,10 @@ jobs:
           import fs from 'node:fs';
           import {createHash} from 'node:crypto';
           import validator from 'gltf-validator';
-          const assets=JSON.parse(fs.readFileSync('public/assets/3d/wearable-v5-manifest.json','utf8')).assets;
+          const assets=JSON.parse(fs.readFileSync('apps/web/public/assets/3d/wearable-v5-manifest.json','utf8')).assets;
           const reports=[];
           for(const asset of assets){
-            const bytes=fs.readFileSync('public/assets/3d/'+asset.file);
+            const bytes=fs.readFileSync('apps/web/public/assets/3d/'+asset.file);
             if(createHash('sha256').update(bytes).digest('hex')!==asset.sha256)throw new Error('Committed asset hash mismatch: '+asset.id);
             const result=await validator.validateBytes(new Uint8Array(bytes),{uri:asset.file,maxIssues:30});
             reports.push({id:asset.id,issues:result.issues,info:result.info});

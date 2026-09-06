@@ -66,14 +66,14 @@ describe("StudioMultiObjectLayoutManager", () => {
 
     for (const url of urls) {
       expect(url).toMatch(/^\/assets\/3d\/[a-z_]+\.glb$/);
-      const file = statSync(join(process.cwd(), "public", url));
+      const file = statSync(join(process.cwd(), "apps/web/public", url));
       expect(file.isFile(), url).toBe(true);
       expect(file.size, url).toBeGreaterThan(10 * 1024);
     }
   });
 
   it("documents first-party source and redistribution rights for every bundled GLB", () => {
-    const licensePath = join(process.cwd(), "public", "assets", "3d", "LICENSES.md");
+    const licensePath = join(process.cwd(), "apps/web/public", "assets", "3d", "LICENSES.md");
     const license = readFileSync(licensePath, "utf8");
 
     expect(license).toContain("generate_core_furniture_pack.py");

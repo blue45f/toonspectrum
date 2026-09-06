@@ -28,7 +28,7 @@ SOURCE_PATH = bpy.context.scene.get(
 )
 OUTPUT_PATH = bpy.context.scene.get(
     "toonspectrum_orion_output_path",
-    bpy.path.abspath("//public/vrm/Avatar_Orion.vrm"),
+    bpy.path.abspath("//apps/web/public/vrm/Avatar_Orion.vrm"),
 )
 
 

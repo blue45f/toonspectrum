@@ -10,7 +10,7 @@ on:
       - 'apps/web/src/domains/creator/useStudioModalSheet.ts'
       - 'scripts/studio-cc0-lifecycle-checks.mjs'
       - 'scripts/verify-studio-cc0-curated-ui.mjs'
-      - 'public/assets/studio/cc0-20260906/**'
+      - 'apps/web/public/assets/studio/cc0-20260906/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
   workflow_dispatch:

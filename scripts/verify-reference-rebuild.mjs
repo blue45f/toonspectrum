@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { inflateSync } from 'node:zlib';
 import vm from 'node:vm';
 import test from 'node:test';
-import { ASSETS, createAsset } from '../public/assets/reference-rebuild/generator.mjs';
+import { ASSETS, createAsset } from '../apps/web/public/assets/reference-rebuild/generator.mjs';
 
 const hash = b => createHash('sha256').update(b).digest('hex');
 function parse(bytes) {
@@ -136,7 +136,7 @@ test('unknown IDs cannot generate files',()=>{
 });
 test('worker rejects invalid requests and transfers actual GLB bytes',()=>{
   const messages=[]; const self={postMessage:(message,transfer)=>messages.push({message,transfer})};
-  const source=readFileSync(new URL('../public/assets/reference-rebuild/worker.mjs',import.meta.url),'utf8').replace(/^import[^\n]+\n/u,'');
+  const source=readFileSync(new URL('../apps/web/public/assets/reference-rebuild/worker.mjs',import.meta.url),'utf8').replace(/^import[^\n]+\n/u,'');
   vm.runInNewContext(source,{self,ASSETS,createAsset});
   for(const data of [null,{}, {version:2,type:'build',id:'bookcase'},{version:1,type:'build',id:'constructor'}])self.onmessage({data});
   assert.ok(messages.every(({message})=>message.type==='error'));

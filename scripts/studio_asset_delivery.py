@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Acquire actual CC0 files, not thumbnail URLs or quantity-only catalog records.
 
-Runs outside public/ by default. A technical pass is NOT a visual/runtime approval.
+Runs outside apps/web/public/ by default. A technical pass is NOT a visual/runtime approval.
 No user library, production data, payment, credentials, or existing asset is changed.
 """
 from __future__ import annotations
@@ -164,7 +164,7 @@ def geometry_key(doc: dict, binary: bytes) -> str:
 
 
 def audit_existing(output: Path) -> None:
-    files = sorted(p for folder in ('public/assets/3d', 'public/assets/studio') for p in (ROOT / folder).rglob('*') if p.is_file())
+    files = sorted(p for folder in ('apps/web/public/assets/3d', 'apps/web/public/assets/studio') for p in (ROOT / folder).rglob('*') if p.is_file())
     records, seen = [], {}
     for path in files:
         row = {'path': str(path.relative_to(ROOT)), 'bytes': path.stat().st_size, 'findings': []}

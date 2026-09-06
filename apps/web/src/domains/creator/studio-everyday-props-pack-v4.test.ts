@@ -100,7 +100,7 @@ const GENERATOR = "scripts/blender/generate_everyday_props_pack_v4.py";
 const CC0_LICENSE_URL = "https://creativecommons.org/publicdomain/zero/1.0/";
 
 function bundledBytes(filename: string): Uint8Array {
-  return readFileSync(join(process.cwd(), "public", "assets", "3d", filename));
+  return readFileSync(join(process.cwd(), "apps/web/public", "assets", "3d", filename));
 }
 
 function embeddedJson(bytes: Uint8Array): JsonRecord {
@@ -149,7 +149,7 @@ const REFERENCE_HEAD_DEPTH_PER_HEAD_METRIC = 1.075; // 0.199859 / 0.185916
 const REFERENCE_PALM_WIDTH_PER_HAND_METRIC = 0.95; // 0.0959 / 0.1010
 
 async function parseReferenceVrm(): Promise<VRM> {
-  const bytes = readFileSync(join(process.cwd(), "public", "vrm", REFERENCE_VRM_FILE));
+  const bytes = readFileSync(join(process.cwd(), "apps/web/public", "vrm", REFERENCE_VRM_FILE));
   const arrayBuffer = bytes.buffer.slice(
     bytes.byteOffset,
     bytes.byteOffset + bytes.byteLength,
@@ -402,7 +402,7 @@ describe("ToonSpectrum everyday prop pack v4", () => {
   });
 
   it("documents the reproducible generator and all six CC0 outputs", () => {
-    const license = readFileSync(join(process.cwd(), "public", "assets", "3d", "LICENSES.md"), "utf8");
+    const license = readFileSync(join(process.cwd(), "apps/web/public", "assets", "3d", "LICENSES.md"), "utf8");
     expect(license).toContain(GENERATOR);
     expect(license).toContain("CC0 1.0");
     for (const gate of EVERYDAY_PROPS) expect(license).toContain(`\`${gate.filename}\``);

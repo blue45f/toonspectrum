@@ -4,7 +4,7 @@ import math
 import bpy
 
 # Ensure output directories exist
-OUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../public/assets/3d"))
+OUT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../apps/web/public/assets/3d"))
 OUTFIT_DIR = os.path.join(OUT_DIR, "outfits")
 os.makedirs(OUT_DIR, exist_ok=True)
 os.makedirs(OUTFIT_DIR, exist_ok=True)

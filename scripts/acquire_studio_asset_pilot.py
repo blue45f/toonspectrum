@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download explicitly selected CC0 pilot packs into quarantine, never into public/.
+"""Download explicitly selected CC0 pilot packs into quarantine, never into apps/web/public/.
 
 No crawling, payment, account credentials, font files, executable assets, automatic
 quality approval or production upload. Python 3.11+, standard library only.

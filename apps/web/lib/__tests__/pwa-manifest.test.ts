@@ -61,7 +61,7 @@ describe("PWA manifest", () => {
     expect(maskable.map((icon) => icon.sizes).sort()).toEqual(["192x192", "512x512"]);
     for (const icon of maskable) {
       expect(icon.type).toBe("image/png");
-      expect(existsSync(join(process.cwd(), "public", icon.src))).toBe(true);
+      expect(existsSync(join(process.cwd(), "apps/web/public", icon.src))).toBe(true);
     }
   });
 
@@ -87,7 +87,7 @@ describe("PWA manifest", () => {
       expect(shot.type).toBe("image/png");
       expect(shot.label).not.toBe("");
 
-      const file = join(process.cwd(), "public", shot.src);
+      const file = join(process.cwd(), "apps/web/public", shot.src);
       expect(existsSync(file)).toBe(true);
 
       // PNG IHDR: width/height live at byte offsets 16/20, big-endian.

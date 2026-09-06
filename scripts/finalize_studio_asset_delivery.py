@@ -13,7 +13,7 @@ from pathlib import Path
 import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLIC = ROOT / 'public/assets/studio/cc0-20260906'
+PUBLIC = ROOT / 'apps/web/public/assets/studio/cc0-20260906'
 
 
 def replace_once(path: Path, before: str, after: str) -> None:

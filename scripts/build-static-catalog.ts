@@ -213,8 +213,8 @@ async function main(): Promise<void> {
   console.log("완료.");
 }
 
-// SEO 사이트맵 — 정적 라우트 + 품질 작품 상세 URL. public/ 루트에 써서 /sitemap.xml 로 서빙.
-// (public/sitemap.xml 은 빌드 산출물이라 .gitignore. robots.txt 가 이 위치를 가리킨다.)
+// SEO 사이트맵 — 정적 라우트 + 품질 작품 상세 URL. apps/web/public/ 루트에 써서 /sitemap.xml 로 서빙.
+// (apps/web/public/sitemap.xml 은 빌드 산출물이라 .gitignore. robots.txt 가 이 위치를 가리킨다.)
 function writeSitemap(): void {
   const BASE = "https://www.toonstudio.cloud";
   const STATIC_ROUTES = [

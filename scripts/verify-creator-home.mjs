@@ -9,7 +9,7 @@ const origin = process.env.CREATOR_HOME_ORIGIN || "http://127.0.0.1:4173";
 const output = "artifacts/creator-home";
 mkdirSync(output, { recursive: true });
 const results = [];
-const manifest = JSON.parse(readFileSync("public/brand/film-manifest.json", "utf8"));
+const manifest = JSON.parse(readFileSync("apps/web/public/brand/film-manifest.json", "utf8"));
 for (const [format, entry] of Object.entries(manifest.assets)) {
   const path = `public${entry.src}`;
   assert.equal(createHash("sha256").update(readFileSync(path)).digest("hex"), entry.sha256);

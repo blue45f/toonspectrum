@@ -76,7 +76,7 @@ describe("Avatar Forge reference catalogue generator", () => {
     );
     expect(generator).not.toContain("AvatarSample_A");
     // The procedural source pack was retired; the committed artifact is the runtime authority.
-    expect(existsSync(resolve(STUDIO_VRM_AVATAR_REFERENCE_ROOT, "public/vrm/TS_Minseo_Campus.vrm")))
+    expect(existsSync(resolve(STUDIO_VRM_AVATAR_REFERENCE_ROOT, "apps/web/public/vrm/TS_Minseo_Campus.vrm")))
       .toBe(false);
   });
 

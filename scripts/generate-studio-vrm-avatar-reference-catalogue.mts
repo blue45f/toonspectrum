@@ -51,7 +51,7 @@ const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 export const STUDIO_VRM_AVATAR_REFERENCE_ROOT = resolve(SCRIPT_DIRECTORY, "..");
 export const STUDIO_VRM_AVATAR_REFERENCE_ARTIFACT_PATH = resolve(
   STUDIO_VRM_AVATAR_REFERENCE_ROOT,
-  "public/catalog/studio-vrm-avatar-reference-catalogue-v1.json",
+  "apps/web/public/catalog/studio-vrm-avatar-reference-catalogue-v1.json",
 );
 export const STUDIO_VRM_AVATAR_REFERENCE_ARTIFACT_URL =
   "/catalog/studio-vrm-avatar-reference-catalogue-v1.json" as const;
@@ -66,11 +66,11 @@ export const STUDIO_VRM_AVATAR_REFERENCE_RGBA_BYTE_LENGTH =
   * STUDIO_VRM_AVATAR_REFERENCE_BROWSER_HEIGHT
   * 4;
 
-// The pinned source was retired from public/vrm on 2026-09-02; the committed artifact stays the
+// The pinned source was retired from apps/web/public/vrm on 2026-09-02; the committed artifact stays the
 // authority. --write/--check need a new CC0 base that passes the gates below before they can run.
 const SOURCE_PATH = resolve(
   STUDIO_VRM_AVATAR_REFERENCE_ROOT,
-  "public/vrm/TS_Minseo_Campus.vrm",
+  "apps/web/public/vrm/TS_Minseo_Campus.vrm",
 );
 const SOURCE_URL = "/vrm/TS_Minseo_Campus.vrm";
 const SOURCE_BYTE_LENGTH = 1_325_288;

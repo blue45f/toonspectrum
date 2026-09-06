@@ -31,7 +31,7 @@ const EXPECTED_ASSETS = {
 } as const;
 
 function readPublicAsset(src: string): Buffer {
-  return readFileSync(join(process.cwd(), "public", src.replace(/^\//, "")));
+  return readFileSync(join(process.cwd(), "apps/web/public", src.replace(/^\//, "")));
 }
 
 function uint24Le(bytes: Buffer, offset: number): number {

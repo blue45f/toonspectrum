@@ -18,7 +18,7 @@ import shutil
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLIC = ROOT / 'public/assets/studio/cc0-20260906'
+PUBLIC = ROOT / 'apps/web/public/assets/studio/cc0-20260906'
 REVIEW = ROOT / 'docs/reports/asset-visual-review-20260906'
 REVIEW_SHA = '0c99edac76dc728f8ba3a58b887a3ce35bcfab7b'
 QUARANTINE_ID = 'kenney-food-glass-wine'

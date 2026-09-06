@@ -17,7 +17,7 @@ import os
 import bpy
 from mathutils import Vector
 
-OUT_DIR = bpy.path.abspath("//public/assets/3d")
+OUT_DIR = bpy.path.abspath("//apps/web/public/assets/3d")
 GENERATOR = "scripts/blender/generate_diverse_props_pack_v6.py"
 
 
