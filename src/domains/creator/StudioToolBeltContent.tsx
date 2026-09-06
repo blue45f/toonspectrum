@@ -303,6 +303,8 @@ export type StudioBgScene = {
   genre: string;
   svg?: string;
   imgSrc?: string;
+  width?: number;
+  height?: number;
 };
 
 export type StudioFxAsset = {
