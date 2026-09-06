@@ -44,6 +44,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(root, "apps/web"),
+      "@/shared": path.resolve(root, "apps/web/src/shared"),
+      "@/domains": path.resolve(root, "apps/web/src/domains"),
     },
   },
   test: {

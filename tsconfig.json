@@ -16,6 +16,8 @@
     "incremental": true,
     "paths": {
       "@/*": ["./apps/web/*"],
+      "@/shared/*": ["./apps/web/src/shared/*"],
+      "@/domains/*": ["./apps/web/src/domains/*"],
       "canvaskit-wasm": ["./apps/web/src/types/canvaskit-wasm-shim.d.ts"],
       "canvaskit-wasm/bin/canvaskit.wasm?url": ["./apps/web/src/types/canvaskit-wasm-url-shim.d.ts"],
       "@toonspectrum/studio-engine-skia": ["./apps/web/src/types/studio-engine-skia-shim.d.ts"]
