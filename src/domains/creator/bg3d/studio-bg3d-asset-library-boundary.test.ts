@@ -42,9 +42,8 @@ function moduleImports(fileName: string) {
 }
 
 describe("Studio BG3D asset-library ownership boundary", () => {
-  it("keeps the leaf panel renderer-free and prevents a reverse editor import", () => {
-    const imports = moduleImports("./StudioBg3dAssetLibraryPanelBase.tsx");
-
+  it("keeps the canonical leaf panel renderer-free and prevents a reverse editor import", () => {
+    const imports = moduleImports("./StudioBg3dAssetLibraryPanel.tsx");
     expect(imports.valueImports).toEqual([
       "lucide-react",
       "react",
@@ -57,13 +56,14 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     expect(imports.valueImports.some((source) => source.startsWith("@react-three/"))).toBe(false);
   });
 
-  it("keeps the reference-rebuild wrapper renderer-free and delegates to the real file input", () => {
-    const imports = moduleImports("./StudioBg3dAssetLibraryPanel.tsx");
+  it("keeps the reference-rebuild wrapper renderer-free and delegates to the canonical file input", () => {
+    const imports = moduleImports("./StudioBg3dAssetLibraryPanelWithPresets.tsx");
     expect(imports.valueImports).toEqual([
-      "react", "./StudioBg3dAssetLibraryPanelBase", "./StudioReferenceRebuildPresets",
+      "react", "./StudioBg3dAssetLibraryPanel", "./StudioReferenceRebuildPresets",
     ]);
     expect(imports.dynamicImports).toEqual([]);
-    const wrapper = moduleSource("./StudioBg3dAssetLibraryPanel.tsx");
+    const wrapper = moduleSource("./StudioBg3dAssetLibraryPanelWithPresets.tsx");
+    expect(wrapper).toContain("<ExistingAssetLibraryPanel {...props} />");
     expect(wrapper).toContain("input.files = transfer.files");
     expect(wrapper).toContain('input.dispatchEvent(new Event("change", { bubbles: true }))');
     expect(wrapper).toContain("importButton.disabled");
@@ -81,7 +81,7 @@ describe("Studio BG3D asset-library ownership boundary", () => {
       moduleSource("./StudioBg3dEditorSidebarExtras.tsx"),
     ].join("\n");
     const editorImports = moduleImports("./StudioBackground3D.tsx");
-    const panelSource = moduleSource("./StudioBg3dAssetLibraryPanelBase.tsx");
+    const panelSource = moduleSource("./StudioBg3dAssetLibraryPanel.tsx");
     const editorOwnedSource = `${editorSource}\n${
       moduleSource("./studio-bg3d-editor-model-import-actions.ts")
     }\n${moduleSource("./useStudioBg3dEditor.ts")}\n${
@@ -89,7 +89,8 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     }\n${moduleSource("./useStudioBg3dEditorState.ts")}`;
 
     expect(editorImports.valueImports).not.toContain("./StudioBg3dAssetLibraryPanel");
-    expect(editorImports.dynamicImports).toContain("./StudioBg3dAssetLibraryPanel");
+    expect(editorImports.valueImports).not.toContain("./StudioBg3dAssetLibraryPanelWithPresets");
+    expect(editorImports.dynamicImports).toContain("./StudioBg3dAssetLibraryPanelWithPresets");
     expect(editorSource).toContain("<LazyStudioBg3dAssetLibraryPanel");
     expect(editorSource).toContain('if (tab === "models") setModelsPanelActivated(true)');
     expect(editorSource).toContain("modelsPanelActivated ? (");
