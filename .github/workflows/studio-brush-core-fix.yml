@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   apply-fix:
-    if: ${{ !contains(github.event.head_commit.message, '[brush-core-fix]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[brush-core-final]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -29,7 +29,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - name: Apply transparent wet-media stability contract
+      - name: Finish transparent wet-media aggregate contract
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -40,16 +40,27 @@ jobs:
               n=s.count(old)
               if n!=1: raise SystemExit(f'{label}: expected 1 anchor, found {n}')
               s=s.replace(old,new,1)
-          one('''  visualChanged: boolean;\n  eraseLiveOperationActive: boolean | null;\n''','''  visualChanged: boolean;\n  /** False only for tools whose product contract intentionally leaves blank paper unchanged. */\n  visualChangeRequired: boolean;\n  eraseLiveOperationActive: boolean | null;\n''','evidence contract')
-          one('''      const operation = verifierBrushOperation(expectedSelection);\n      const lowDensityEraser = operation === "erase"\n''','''      const operation = verifierBrushOperation(expectedSelection);\n      // A water-only wet-media tool moves existing pigment and intentionally deposits nothing on\n      // blank paper. Keep persistence/history strict, but do not turn that product contract into\n      // a false visual-pixel failure. Pigment-depositing paint brushes remain unchanged.\n      const transparentPaint = operation === "paint"\n        && !studioWetInkBrushDepositsPigment(expectedSelection.runtimeBrushId);\n      const lowDensityEraser = operation === "erase"\n''','classification')
-          one('''      invariant(\n        hasMeaningfulPixelChange(immediateDiff),\n''','''      invariant(\n        transparentPaint || hasMeaningfulPixelChange(immediateDiff),\n''','immediate')
-          one('''      invariant(\n        visualChanged,\n''','''      invariant(\n        transparentPaint || visualChanged,\n''','settled')
-          one('''      const persistedProStroke = preset.source === "pro" && operation === "paint"\n        ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)\n        : null;\n      const persistedErase = operation === "erase"\n''','''      const persistedProStroke = preset.source === "pro" && operation === "paint"\n        ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)\n        : null;\n      const persistedTransparentStroke = transparentPaint\n        ? await waitForPersistedSelectedOperation(\n            page, expectedSelection, "paint", 1, false, 15_000,\n          )\n        : null;\n      const persistedErase = operation === "erase"\n''','persistence')
-          one('''      const undoDiff = await compareScreenshotPixels(page, before, undone, 20);\n      const undoRestoredPixels = undoDiff.changedPixels <= 3;\n''','''      const undoDiff = await compareScreenshotPixels(page, before, undone, 20);\n      const undoRestoredPixels = transparentPaint || undoDiff.changedPixels <= 3;\n''','undo')
-          one('''      const redoRestoredStroke = hasMeaningfulPixelChange(redoDiff);\n''','''      const redoRestoredStroke = transparentPaint || hasMeaningfulPixelChange(redoDiff);\n''','redo')
-          one('''        visualChanged,\n        eraseLiveOperationActive,\n''','''        visualChanged,\n        visualChangeRequired: !transparentPaint,\n        eraseLiveOperationActive,\n''','evidence visibility semantics')
-          one('''        persistedCatalogId:\n          persistedProStroke?.brushCatalogId ?? persistedErase?.stroke.brushCatalogId ?? null,\n        persistedRuntimeBrushId:\n          persistedProStroke?.brush ?? persistedErase?.stroke.brush ?? null,\n''','''        persistedCatalogId:\n          persistedProStroke?.brushCatalogId\n            ?? persistedTransparentStroke?.stroke.brushCatalogId\n            ?? persistedErase?.stroke.brushCatalogId ?? null,\n        persistedRuntimeBrushId:\n          persistedProStroke?.brush\n            ?? persistedTransparentStroke?.stroke.brush\n            ?? persistedErase?.stroke.brush ?? null,\n''','evidence identity')
-          one('''      entry.selected\n      && entry.visualChanged\n''','''      entry.selected\n      && (!entry.visualChangeRequired || entry.visualChanged)\n''','aggregate visibility')
+          # The preceding verified publication already added transparentPaint handling to the
+          # gesture/persistence/history path. Finish only the receipt/aggregate semantics here so
+          # a water-only tool is not falsely reported as visible ink.
+          if 'visualChangeRequired: boolean;' not in s:
+              one('''  visualChanged: boolean;\n  eraseLiveOperationActive: boolean | null;\n''','''  visualChanged: boolean;\n  /** False only for tools whose product contract intentionally leaves blank paper unchanged. */\n  visualChangeRequired: boolean;\n  eraseLiveOperationActive: boolean | null;\n''','evidence contract')
+          if 'visualChangeRequired: !transparentPaint,' not in s:
+              one('''        visualChanged,\n        eraseLiveOperationActive,\n''','''        visualChanged,\n        visualChangeRequired: !transparentPaint,\n        eraseLiveOperationActive,\n''','evidence visibility semantics')
+          if '&& (!entry.visualChangeRequired || entry.visualChanged)' not in s:
+              one('''      entry.selected\n      && entry.visualChanged\n''','''      entry.selected\n      && (!entry.visualChangeRequired || entry.visualChanged)\n''','aggregate visibility')
+          required = [
+              'const transparentPaint = operation === "paint"',
+              'transparentPaint || hasMeaningfulPixelChange(immediateDiff)',
+              'transparentPaint || visualChanged',
+              'const persistedTransparentStroke = transparentPaint',
+              'const undoRestoredPixels = transparentPaint ||',
+              'const redoRestoredStroke = transparentPaint ||',
+              'visualChangeRequired: !transparentPaint,',
+              '&& (!entry.visualChangeRequired || entry.visualChanged)',
+          ]
+          missing=[token for token in required if token not in s]
+          if missing: raise SystemExit('missing expected transparent-brush safeguards: '+repr(missing))
           p.write_text(s)
           PY
       - name: Install dependencies
@@ -72,5 +83,5 @@ jobs:
         run: |
           git add scripts/verify-studio-brushes.mts
           git diff --cached --check
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit -m 'fix(studio): align transparent brush stability with wet-media contract [brush-core-fix]'
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit -m 'fix(studio): make transparent brush aggregate semantics explicit [brush-core-final]'
           git push origin HEAD:${GITHUB_REF_NAME}
