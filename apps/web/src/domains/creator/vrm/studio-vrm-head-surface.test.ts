@@ -16,7 +16,7 @@ function fixture(name: string): Promise<VRM> {
   const existing = fixtures.get(name);
   if (existing) return existing;
   const pending = (async () => {
-    const bytes = readFileSync(join(process.cwd(), "public/vrm", name));
+    const bytes = readFileSync(join(process.cwd(), "apps/web/public/vrm", name));
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
     const gltf = await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, "");

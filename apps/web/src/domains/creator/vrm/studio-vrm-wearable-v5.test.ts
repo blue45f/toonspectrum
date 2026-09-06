@@ -25,7 +25,7 @@ interface WearableAsset {
   bytes: number;
   sha256: string;
 }
-const root = join(process.cwd(), "public/assets/3d");
+const root = join(process.cwd(), "apps/web/public/assets/3d");
 const manifest = JSON.parse(readFileSync(join(root, "wearable-v5-manifest.json"), "utf8")) as {
   version: number;
   assets: WearableAsset[];

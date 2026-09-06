@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { appRoutes } from "../../src/app/routes/route-manifest";
+import { appRoutes } from "../../../app/routes/route-manifest";
 
 interface ManifestIcon {
   src: string;
@@ -37,7 +37,7 @@ interface WebManifest {
 }
 
 const manifest = JSON.parse(
-  readFileSync(join(process.cwd(), "public/manifest.webmanifest"), "utf8")
+  readFileSync(join(process.cwd(), "apps/web/public/manifest.webmanifest"), "utf8")
 ) as WebManifest;
 
 describe("PWA manifest", () => {
@@ -105,6 +105,6 @@ describe("PWA manifest", () => {
     const href = html.match(/<link rel="apple-touch-icon"[^>]*href="([^"]+)"/)?.[1];
 
     expect(href).toBe("/apple-touch-icon.png");
-    expect(existsSync(join(process.cwd(), "public/apple-touch-icon.png"))).toBe(true);
+    expect(existsSync(join(process.cwd(), "apps/web/public/apple-touch-icon.png"))).toBe(true);
   });
 });

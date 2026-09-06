@@ -1,1 +1,1 @@
-export * from "../src/domains/creator/contracts/studio-crdt-binary-envelope.test";
+export * from "../../domains/creator/contracts/studio-crdt-binary-envelope.test";

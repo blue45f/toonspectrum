@@ -184,10 +184,10 @@ describe("gpu-bristle shader tunable gate (L2)", () => {
 describe("gpu-bristle parity browser boundary (G5)", () => {
   it("loads the real runtime through an isolated literal browser entry", () => {
     expect(BROWSER_ENTRY).toContain(
-      'from "../src/domains/creator/render/studio-gpu-bristle-runtime"',
+      'from "../apps/web/src/domains/creator/render/studio-gpu-bristle-runtime"',
     );
     expect(BROWSER_ENTRY).toContain(
-      'from "../src/domains/creator/render/studio-gpu-bristle-reference"',
+      'from "../apps/web/src/domains/creator/render/studio-gpu-bristle-reference"',
     );
     expect(VERIFIER).toContain(
       'const HARNESS_ENTRY = "/scripts/studio-gpu-bristle-parity-browser.ts";',

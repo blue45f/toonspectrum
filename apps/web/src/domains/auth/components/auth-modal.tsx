@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 
-import { ToonSpectrumMark } from "../visual-marks";
+import { ToonSpectrumMark } from "../../../shared/components/visual-marks";
 
 import {
   parseAuthProviderDiscovery,

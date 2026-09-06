@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import appEnDictionary from "../public/i18n/app/en.json";
-import appKoDictionary from "../public/i18n/app/ko.json";
+import appEnDictionary from "../../public/i18n/app/en.json";
+import appKoDictionary from "../../public/i18n/app/ko.json";
 
 import {
   normalizeLocaleCode,

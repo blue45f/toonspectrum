@@ -1,8 +1,8 @@
 import { AlertTriangle, Download, Monitor, RefreshCw, WifiOff } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-import { allowStudioProgrammaticReload } from "../../shared/lib/programmatic-reload";
-import { announceStudioRenderFailure } from "../../shared/lib/render-failure-event";
+import { allowStudioProgrammaticReload } from "../shared/lib/programmatic-reload";
+import { announceStudioRenderFailure } from "../shared/lib/render-failure-event";
 import { classifyError, type ErrorAnalysis } from "../compat/browser-check";
 
 import { BrowserCompatModal } from "./browser-compat-modal";

@@ -386,7 +386,7 @@ describe("DOC-007 selective undo + real VRM import still works", () => {
     session = hybridDccSelectiveUndo(session, "local");
     expect(session.state.geometry.records["m1"]).toBeUndefined();
 
-    const vrmPath = resolve(process.cwd(), "public/vrm/AvatarSample_A.vrm");
+    const vrmPath = resolve(process.cwd(), "apps/web/public/vrm/AvatarSample_A.vrm");
     if (existsSync(vrmPath)) {
       const bytes = new Uint8Array(readFileSync(vrmPath));
       const imported = importStudioGlbDocument(bytes, { asVrm: true });

@@ -206,7 +206,7 @@ describe("FBX ASCII + grade-A import pipeline", () => {
     expect(pngR.format).toBe("png");
     expect(pngR.report.counts.textures).toBe(1);
 
-    const vrmPath = resolve(process.cwd(), "public/vrm/AvatarSample_A.vrm");
+    const vrmPath = resolve(process.cwd(), "apps/web/public/vrm/AvatarSample_A.vrm");
     if (existsSync(vrmPath)) {
       const bytes = new Uint8Array(readFileSync(vrmPath));
       const vrmR = importStudioGradeAAsset({ fileName: "a.vrm", bytes, format: "vrm" });

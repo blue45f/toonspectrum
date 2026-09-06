@@ -760,8 +760,8 @@ f 5 1 4 8
     expect(objCommit.documentKind).toBe("toonspectrum.scene-ir");
     expect(objCommit.report.committed).toBe(true);
 
-    const vrmPath = existsSync(resolve(process.cwd(), "public/vrm/AvatarSample_A.vrm"))
-      ? resolve(process.cwd(), "public/vrm/AvatarSample_A.vrm")
+    const vrmPath = existsSync(resolve(process.cwd(), "apps/web/public/vrm/AvatarSample_A.vrm"))
+      ? resolve(process.cwd(), "apps/web/public/vrm/AvatarSample_A.vrm")
       : resolve(process.cwd(), "dist/vrm/AvatarSample_A.vrm");
     expect(existsSync(vrmPath)).toBe(true);
     const glbBytes = new Uint8Array(readFileSync(vrmPath));

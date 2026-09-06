@@ -16,10 +16,10 @@ const verifier = readFileSync(
 describe("Studio Engine real WebGPU filter parity browser boundary", () => {
   it("loads only the canonical CPU oracle and RGBA16F WebGPU runtime", () => {
     expect(browserEntry).toContain(
-      'from "../src/domains/creator/render/studio-engine-canonical-filter-plan"',
+      'from "../apps/web/src/domains/creator/render/studio-engine-canonical-filter-plan"',
     );
     expect(browserEntry).toContain(
-      'from "../src/domains/creator/render/studio-engine-webgpu-filter-runtime"',
+      'from "../apps/web/src/domains/creator/render/studio-engine-webgpu-filter-runtime"',
     );
     expect(browserEntry).toContain("applyStudioCanonicalFilterRecipeCpu");
     expect(browserEntry).toContain("new StudioEngineWebGpuFilterRuntime");

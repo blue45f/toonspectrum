@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { sha256HexPortable } from "../src/domains/creator/studio-sha256";
+import { sha256HexPortable } from "../../domains/creator/studio-sha256";
 
 import {
   ConfirmCreatorMarketplaceStudioInstallSchema,

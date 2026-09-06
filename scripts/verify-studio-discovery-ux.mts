@@ -28,8 +28,8 @@ writeFileSync(entry, `
 import {useState} from "react";
 import {createRoot} from "react-dom/client";
 import "./src/styles/globals.css";
-import {StudioSubToolPalette} from "./src/domains/creator/brush/StudioSubToolPalette";
-import {studioSubToolPaletteCategoryIdForBrushId} from "./src/domains/creator/brush/studio-sub-tool-palette-data";
+import {StudioSubToolPalette} from "../apps/web/src/domains/creator/brush/StudioSubToolPalette";
+import {studioSubToolPaletteCategoryIdForBrushId} from "../apps/web/src/domains/creator/brush/studio-sub-tool-palette-data";
 function App(){
   const [category,setCategory]=useState("pen");
   const [selected,setSelected]=useState("gpen");

@@ -1,1 +1,1 @@
-export * from "../src/domains/creator/contracts/studio-team-comment-live-event";
+export * from "../../domains/creator/contracts/studio-team-comment-live-event";

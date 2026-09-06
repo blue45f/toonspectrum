@@ -10,7 +10,7 @@ import { createStudioVrmPropAssetRuntime, studioVrmPropAssetRequestUrl } from ".
 import { propDefById, type PropGltfGeometrySource } from "./studio-vrm-props";
 
 interface ManifestAsset { id: string; file: string; sha256: string }
-const manifest = JSON.parse(readFileSync(join(process.cwd(), "public/assets/3d/wearable-v5-manifest.json"), "utf8")) as { assets: ManifestAsset[] };
+const manifest = JSON.parse(readFileSync(join(process.cwd(), "apps/web/public/assets/3d/wearable-v5-manifest.json"), "utf8")) as { assets: ManifestAsset[] };
 
 describe("content-addressed wearable requests", () => {
   it("versions every revised request with the hash of its committed GLB bytes", () => {
@@ -19,7 +19,7 @@ describe("content-addressed wearable requests", () => {
     expect(Object.isFrozen(STUDIO_VRM_PROP_ASSET_REVISIONS)).toBe(true);
     for (const asset of manifest.assets) {
       const canonical = `/assets/3d/${asset.file}`;
-      const bytes = readFileSync(join(process.cwd(), "public/assets/3d", asset.file));
+      const bytes = readFileSync(join(process.cwd(), "apps/web/public/assets/3d", asset.file));
       const digest = createHash("sha256").update(bytes).digest("hex");
       expect(digest).toBe(asset.sha256);
       expect(STUDIO_VRM_PROP_ASSET_REVISIONS[canonical]).toBe(digest);

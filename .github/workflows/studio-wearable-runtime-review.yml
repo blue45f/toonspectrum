@@ -29,14 +29,14 @@ jobs:
           export * as React from 'react';
           export { createRoot } from 'react-dom/client';
           export { Canvas, useFrame, useThree } from '@react-three/fiber';
-          export * from '../src/domains/creator/vrm/studio-vrm-wardrobe';
-          export * from '../src/domains/creator/vrm/studio-vrm-props';
-          export * from '../src/domains/creator/vrm/studio-vrm-prop-rig';
-          export * from '../src/domains/creator/vrm/studio-vrm-skinned-garment';
-          export * from '../src/domains/creator/vrm/studio-vrm-poser-utils';
-          export * from '../src/domains/creator/vrm/studio-vrm-costume-runtime';
-          export * from '../src/domains/creator/vrm/StudioVrmWardrobePropsProjection';
-          export * from '../src/domains/creator/studio-pose-presets';
+          export * from '../apps/web/src/domains/creator/vrm/studio-vrm-wardrobe';
+          export * from '../apps/web/src/domains/creator/vrm/studio-vrm-props';
+          export * from '../apps/web/src/domains/creator/vrm/studio-vrm-prop-rig';
+          export * from '../apps/web/src/domains/creator/vrm/studio-vrm-skinned-garment';
+          export * from '../apps/web/src/domains/creator/vrm/studio-vrm-poser-utils';
+          export * from '../apps/web/src/domains/creator/vrm/studio-vrm-costume-runtime';
+          export * from '../apps/web/src/domains/creator/vrm/StudioVrmWardrobePropsProjection';
+          export * from '../apps/web/src/domains/creator/studio-pose-presets';
           EOF
           node --input-type=module <<'EOF'
           import {build} from 'vite';
