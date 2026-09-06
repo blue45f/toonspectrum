@@ -147,8 +147,12 @@ def _create_embedded_image(name, pattern, base, accent, *, normal=False):
                     or (pattern == "platform" and (x % 32 in (0, 1) or y % 24 in (0, 1)))
                     or (pattern == "stone" and (x % 32 in (0, 1, 2) or y % 20 in (0, 1)))
                 )
-                nx = 0.44 if boundary and x % 2 == 0 else 0.56 if boundary else 0.5
-                ny = 0.44 if boundary and y % 2 == 0 else 0.56 if boundary else 0.5
+                nx = 0.5
+                if boundary:
+                    nx = 0.44 if x % 2 == 0 else 0.56
+                ny = 0.5
+                if boundary:
+                    ny = 0.44 if y % 2 == 0 else 0.56
                 rgb = (nx, ny, 0.985)
             else:
                 rgb = _pattern_color(pattern, x, y, base, accent)

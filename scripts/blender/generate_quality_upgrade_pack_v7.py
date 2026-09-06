@@ -207,7 +207,7 @@ def bolt_ring(prefix, count, radius, z, material, head_r=0.008, head_h=0.006, ce
         )
 
 
-def export(name, filename):
+def export(filename):
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.export_scene.gltf(
         filepath=os.path.join(OUT_DIR, filename),
@@ -273,7 +273,7 @@ def build_hanging_sign():
                 ring=10,
             )
             stud.scale = (1, 0.55, 1)
-    export("hanging_sign", "hanging_sign.glb")
+    export("hanging_sign.glb")
 
 
 def build_traffic_light():
@@ -324,7 +324,7 @@ def build_traffic_light():
                      rot=(math.pi / 2, 0, 0))
         hard(visor, width=0.003, segments=2)
         torus(f"Signal_VisorLip{name}", 0.096, 0.005, (0.36, -0.212, z + 0.012), visor_m, rot=(math.pi / 2, 0, 0))
-    export("traffic_light", "traffic_light.glb")
+    export("traffic_light.glb")
 
 
 def build_mailbox():
@@ -377,7 +377,7 @@ def build_mailbox():
     for i, dx in enumerate((-0.055, -0.01, 0.035)):
         n = box(f"Mailbox_Numeral_{i}", (0.026, 0.004, 0.04), (dx, -0.085, 0.9), steel_m)
         hard(n, width=0.0015, segments=2)
-    export("mailbox", "mailbox.glb")
+    export("mailbox.glb")
 
 
 def build_blackboard():
@@ -436,7 +436,7 @@ def build_blackboard():
             cyl(f"Blackboard_CasterHub_{x:.2f}_{sy}", 0.008, 0.018, (x, sy * 0.075, 0.030), leg_m, verts=14,
                 rot=(0, math.pi / 2, 0))
     crossbar = tube("Blackboard_CrossBar", 0.018, 1.4, (0, 0, 0.42), leg_m, verts=20, rot=(0, math.pi / 2, 0))
-    export("blackboard", "blackboard.glb")
+    export("blackboard.glb")
 
 
 def build_desk():
@@ -485,7 +485,7 @@ def build_desk():
         for sx in (-1, 1):
             post = cyl(f"Desk_PullPost_{i}_{sx}", 0.006, 0.024, (0.37 + sx * 0.07, -0.272, z), handle_m, verts=12,
                        rot=(math.pi / 2, 0, 0))
-    export("desk", "desk.glb")
+    export("desk.glb")
 
 
 def build_chair():
@@ -531,7 +531,7 @@ def build_chair():
     for sx in (-1, 1):
         blk = box(f"Chair_CornerBlock_{sx}", (0.05, 0.05, 0.03), (sx * 0.145, 0.14, 0.4), frame_m, rot=(0, 0, sx * 0.78))
         hard(blk, width=0.005, segments=2)
-    export("chair", "chair.glb")
+    export("chair.glb")
 
 
 def build_sofa():
@@ -583,7 +583,7 @@ def build_sofa():
             cyl(f"Sofa_LegCollar_{x:.2f}_{y:.2f}", 0.032, 0.016, (x, y, 0.135), leg_m, verts=20)
             glide = cyl(f"Sofa_Glide_{x:.2f}_{y:.2f}", 0.015, 0.008, (x, y, 0.004), glide_m, verts=14)
             hard(glide, width=0.002, segments=2)
-    export("sofa", "sofa.glb")
+    export("sofa.glb")
 
 
 
@@ -645,7 +645,7 @@ def build_bubble_tea():
     hard(straw, width=0.0015, segments=2)
     band = cyl("Boba_Band", 0.0305, 0.030, (0, 0, 0.070), band_m, verts=48)
     hard(band, width=0.002, segments=2)
-    export("bubble_tea", "bubble_tea.glb")
+    export("bubble_tea.glb")
 
 
 def build_ice_cream_cone():
@@ -680,7 +680,7 @@ def build_ice_cream_cone():
     drip = cone("Cone_Drip", 0.010, 0.002, 0.030, (0.020, 0.012, 0.108), s_m, verts=16, rot=(math.pi, 0, 0))
     sphere("Cone_Cherry", 0.0092, (0, 0, 0.231), cherry_m, seg=20, ring=12)
     stem = cyl("Cone_CherryStem", 0.0018, 0.016, (0.002, 0, 0.240), stem_m, verts=8, rot=(0.3, 0.2, 0))
-    export("ice_cream_cone", "ice_cream_cone.glb")
+    export("ice_cream_cone.glb")
 
 
 def build_fox_mask():
@@ -729,7 +729,7 @@ def build_fox_mask():
         tube_pts = cyl(f"FoxMask_Cord_{sx}", 0.004, 0.135, (sx * 0.086, 0.030, -0.052), cord_m, verts=12,
                        rot=(0.18, sx * 0.18, 0))
         knot = sphere(f"FoxMask_CordKnot_{sx}", 0.009, (sx * 0.082, 0.026, 0.012), cord_m, seg=16, ring=10)
-    export("fox_mask", "fox_mask.glb")
+    export("fox_mask.glb")
 
 
 def build_robot_pet():
@@ -792,7 +792,7 @@ def build_robot_pet():
     sphere("Pet_TailTip", 0.012, (0, 0.182, 0.424), accent_m, seg=18, ring=12)
     ant = cyl("Pet_Antenna", 0.003, 0.052, (0.030, -0.104, 0.410), joint_m, verts=10, rot=(0.2, 0.18, 0))
     sphere("Pet_AntennaBead", 0.008, (0.036, -0.098, 0.434), accent_m, seg=14, ring=10)
-    export("robot_pet", "robot_pet.glb")
+    export("robot_pet.glb")
 
 
 BUILDERS = {

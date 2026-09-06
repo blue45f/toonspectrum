@@ -9,7 +9,9 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path("/Users/hjunkim/WebstormProjects/toonspectrum")
-CREATOR = ROOT / "apps/web/src/domains/creator"
+CREATOR_ROOT = 'apps/web/src/domains/creator/'
+CREATOR_ALIAS = '@/src/domains/creator/'
+CREATOR = ROOT / CREATOR_ROOT
 SKIP_TOP_DIRS = {"studio-router", "kernel", "components"}
 
 RULES: list[tuple[str, str]] = [
@@ -105,9 +107,8 @@ SKIP_WALK = {
 }
 
 SPEC_RE = re.compile(
-    r"""(?P<prefix>(?:from|import\s*\(|export\s+(?:\*|[A-Za-z_{][\w{},\s*]*?)\s+from|require\s*\(|new URL\s*\())\s*(?P<quote>['"])(?P<spec>[^'"]+)(?P=quote)"""
+    r"""(?P<prefix>from|import|export|require|new\s+URL)[^'"\n]*?(?P<quote>['"])(?P<spec>[^'"]+)(?P=quote)"""
 )
-ALIAS_RE = re.compile(r"@/src/domains/creator/([^'\"]+)")
 ENDS_RE = re.compile(r"(/src/domains/creator/)([^'\"]+)")
 
 
@@ -152,44 +153,6 @@ def git_mv(src: Path, dst: Path) -> None:
         src.replace(dst)
 
 
-def posix_rel(from_file: Path, to_file: Path) -> str:
-    rel = Path(to_file).relative_to(from_file.parent, walk_up=True).as_posix()
-    if not rel.startswith("."):
-        rel = f"./{rel}"
-    return rel
-
-
-def resolve_import(importer: Path, spec: str) -> Path | None:
-    if spec.startswith("@/src/domains/creator/"):
-        rest = spec[len("@/src/domains/creator/") :]
-        return CREATOR / rest
-    if spec.startswith("/src/domains/creator/"):
-        return CREATOR / spec[len("/src/domains/creator/") :]
-    if "apps/web/src/domains/creator/" in spec and not spec.startswith("."):
-        rest = spec.split("apps/web/src/domains/creator/", 1)[1]
-        return CREATOR / rest
-    if spec.startswith("."):
-        try:
-            return (importer.parent / spec).resolve()
-        except OSError:
-            return None
-    return None
-
-
-def strip_known_suffix(path: Path) -> Path:
-    name = path.name
-    for suffix in (".js", ".ts", ".tsx", ".mts", ".mjs"):
-        if name.endswith(suffix) and not name.endswith(".d.ts"):
-            return path.with_name(name[: -len(suffix)])
-    return path
-
-
-def rewrite_spec(importer_new: Path, spec: str, moved: dict[Path, Path], old_to_new_file: dict[Path, Path]) -> str | None:
-    resolve_import(importer_new, spec)
-    # importer_new may not exist yet during planning; resolve from old location instead.
-    return None
-
-
 def main() -> None:
     plan = build_plan()
     print(f"planned moves: {len(plan)}")
@@ -224,10 +187,6 @@ def main() -> None:
     changed_files = 0
     replacements = 0
 
-    def new_location(old: Path) -> Path:
-        resolved = old.resolve() if old.exists() else old
-        return old_to_new.get(resolved, resolved)
-
     # Rebuild old_to_new using names because sources are gone
     name_to_new: dict[str, Path] = {src.name: dst.resolve() for src, dst in plan.items()}
     stem_to_new: dict[str, Path] = {stem_key(src): dst.resolve() for src, dst in plan.items()}
@@ -259,29 +218,27 @@ def main() -> None:
 
         def repl_spec(spec: str) -> str:
             nonlocal replacements
-            if spec.startswith("@/src/domains/creator/"):
-                rest = spec[len("@/src/domains/creator/") :]
+            if spec.startswith(CREATOR_ALIAS):
+                rest = spec[len(CREATOR_ALIAS) :]
                 target = locate_target(rest)
                 if target is None:
                     return spec
                 rel = target.relative_to(CREATOR).as_posix()
-                new = f"@/src/domains/creator/{rel}"
+                new = f"{CREATOR_ALIAS}{rel}"
                 # preserve missing extension style
                 if not Path(rest).suffix and Path(rel).suffix:
                     new = new[: -len(Path(rel).suffix)]
                 if new != spec:
                     replacements += 1
                 return new
-            if "apps/web/src/domains/creator/" in spec:
-                head, rest = spec.split("apps/web/src/domains/creator/", 1)
+            if CREATOR_ROOT in spec:
+                head, rest = spec.split(CREATOR_ROOT, 1)
                 target = locate_target(rest)
                 if target is None:
                     return spec
                 rel = target.relative_to(CREATOR).as_posix()
                 suffix = ""
-                if rest.endswith(".ts") or rest.endswith(".tsx"):
-                    pass
-                elif Path(rel).suffix:
+                if not (rest.endswith(".ts") or rest.endswith(".tsx")) and Path(rel).suffix:
                     rel = rel[: -len(Path(rel).suffix)]
                 new = f"{head}src/domains/creator/{rel}{suffix}"
                 if new != spec:
@@ -340,18 +297,15 @@ def main() -> None:
             # also rewrite vite-style endsWith literals not caught? SPEC_RE should get quoted strings in call position;
             # endsWith("/src/...") is a string literal without from/import — handle separately.
             def repl_ends(match: re.Match[str]) -> str:
+                nonlocal replacements
                 rest = match.group(2)
                 target = locate_target(rest)
                 if target is None:
                     return match.group(0)
                 rel = target.relative_to(CREATOR).as_posix()
                 if rest != rel:
-                    nonlocal_count()
+                    replacements += 1
                 return f"{match.group(1)}{rel}"
-
-            def nonlocal_count() -> None:
-                nonlocal replacements
-                replacements += 1
 
             updated2 = ENDS_RE.sub(repl_ends, updated)
             if updated2 != original:

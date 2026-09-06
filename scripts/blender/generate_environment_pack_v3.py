@@ -308,27 +308,33 @@ def text_mesh(name, body, location, size, depth, mat, *, align="CENTER", rotatio
 
 def chair(prefix, origin, seat_mat, frame_mat, *, yaw=0.0, upholstered=True):
     x, y, z = origin
-    seat = sphere(
-        f"{prefix}_SeatCushion" if upholstered else f"{prefix}_Seat",
-        0.34,
-        (x, y, z + 0.48),
-        seat_mat,
-        scale=(1.0, 0.86, 0.20),
-    ) if upholstered else box(f"{prefix}_Seat", (0.62, 0.54, 0.09), (x, y, z + 0.48), seat_mat)
+    if upholstered:
+        seat = sphere(
+            f"{prefix}_SeatCushion",
+            0.34,
+            (x, y, z + 0.48),
+            seat_mat,
+            scale=(1.0, 0.86, 0.20),
+        )
+    else:
+        seat = box(f"{prefix}_Seat", (0.62, 0.54, 0.09), (x, y, z + 0.48), seat_mat)
     seat.rotation_euler[2] = yaw
     back_offset = Vector((-sin(yaw) * 0.28, cos(yaw) * 0.28, 0.88))
-    back = sphere(
-        f"{prefix}_BackCushion",
-        0.35,
-        (x + back_offset.x, y + back_offset.y, z + back_offset.z),
-        seat_mat,
-        scale=(0.95, 0.16, 1.15),
-    ) if upholstered else box(
-        f"{prefix}_Back",
-        (0.58, 0.08, 0.70),
-        (x + back_offset.x, y + back_offset.y, z + back_offset.z),
-        seat_mat,
-    )
+    if upholstered:
+        back = sphere(
+            f"{prefix}_BackCushion",
+            0.35,
+            (x + back_offset.x, y + back_offset.y, z + back_offset.z),
+            seat_mat,
+            scale=(0.95, 0.16, 1.15),
+        )
+    else:
+        back = box(
+            f"{prefix}_Back",
+            (0.58, 0.08, 0.70),
+            (x + back_offset.x, y + back_offset.y, z + back_offset.z),
+            seat_mat,
+        )
     back.rotation_euler[2] = yaw
     for index, (lx, ly) in enumerate(((-0.25, -0.20), (0.25, -0.20), (-0.25, 0.20), (0.25, 0.20)), 1):
         rotated = Vector((lx * cos(yaw) - ly * sin(yaw), lx * sin(yaw) + ly * cos(yaw), 0.0))

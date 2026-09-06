@@ -38,6 +38,8 @@ from .quality import QualityAudit, audit_character
 from .render import RenderResult, render_quality_views
 from .vrm import VrmExpressionBindingResult, bind_semantic_vrm1_expressions
 
+QUALITY_REPORT_FILENAME = "quality-report.json"
+
 
 @dataclass(frozen=True)
 class PipelineExecution:
@@ -467,7 +469,7 @@ def _build_manifest(
             "score": report.score,
             "passed": report.passed,
             "minimumScore": config.quality.minimum_score,
-            "report": "quality-report.json",
+            "report": QUALITY_REPORT_FILENAME,
         },
         "files": files,
         "provenance": {
@@ -609,7 +611,7 @@ def run_pipeline(
     # Declare stable sibling paths before serialising the report.  The report can
     # reference its manifest without hashing itself; the manifest is written only
     # after the final report bytes exist, so its qualityReport receipt is immutable.
-    outputs["qualityReport"] = "quality-report.json"
+    outputs["qualityReport"] = QUALITY_REPORT_FILENAME
     outputs["manifest"] = "character-package.json"
 
     score = calculate_score(issues)
@@ -638,7 +640,7 @@ def run_pipeline(
         issues=tuple(issues),
         outputs=dict(outputs),
     )
-    write_json(output_dir / "quality-report.json", report.to_mapping())
+    write_json(output_dir / QUALITY_REPORT_FILENAME, report.to_mapping())
     manifest = _build_manifest(
         config,
         report,
