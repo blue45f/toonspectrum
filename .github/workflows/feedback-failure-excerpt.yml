@@ -1,0 +1,41 @@
+name: Feedback failed-shard diagnostics
+on:
+  push:
+    branches: [chore/feedback-ci-recovery-20260906]
+    paths: [.github/workflows/feedback-failure-excerpt.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Extract actual test failures from completed job
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('node:fs');
+            const owner = 'blue45f', repo = 'toonspectrum', job_id = 101374029178;
+            const { data: job } = await github.rest.actions.getJobForWorkflowRun({ owner, repo, job_id });
+            if (job.run_id !== 33991213682 || job.conclusion !== 'failure') throw new Error('Unexpected diagnostic target');
+            const result = await github.rest.actions.downloadJobLogsForWorkflowRun({ owner, repo, job_id });
+            const text = typeof result.data === 'string' ? result.data : Buffer.from(result.data).toString('utf8');
+            const lines = text.replace(/\x1b\[[0-9;]*m/g, '').split('\n');
+            const selected = new Set();
+            const start = lines.findIndex(line => /Failed Tests|FAIL\s+|AssertionError/.test(line));
+            if (start >= 0) {
+              for (let i = Math.max(0,start - 8); i < Math.min(lines.length,start + 200); i++) selected.add(i);
+            }
+            for (let i = Math.max(0,lines.length - 90); i < lines.length; i++) selected.add(i);
+            const excerpt = [...selected].sort((a,b) => a-b).map(i => `${i+1}: ${lines[i]}`).join('\n').slice(0,22000);
+            fs.mkdirSync('diagnostics', {recursive:true});
+            fs.writeFileSync('diagnostics/failure-excerpt.txt', excerpt);
+            fs.writeFileSync('diagnostics/source.json', JSON.stringify({job_id,run_id:job.run_id,head_sha:job.head_sha,conclusion:job.conclusion,totalLines:lines.length},null,2));
+            core.info(excerpt);
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feedback-failed-shard-diagnostics
+          path: diagnostics
+          retention-days: 3
