@@ -18,14 +18,14 @@ jobs:
   finalize:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 45
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
           ref: chore/architecture-sonar-cleanup
-          fetch-depth: 0
+          fetch-depth: 1
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -54,7 +54,7 @@ jobs:
           test -f apps/web/tests/browser-fixtures/studio-catalog/main.tsx
           git rm -r tests/browser-fixtures/studio-catalog
 
-      - name: Apply architecture and CI hardening
+      - name: Apply architecture, readability, and CI hardening
         shell: bash
         run: |
           set -euo pipefail
@@ -69,13 +69,26 @@ jobs:
             fs.writeFileSync(file, content.endsWith('\n') ? content : `${content}\n`);
           }
 
-          function replaceOnce(file, before, after) {
+          function replaceExact(file, before, after, expectedCount = 1) {
             const source = read(file);
             const count = source.split(before).length - 1;
-            if (count !== 1) {
-              throw new Error(`${file}: expected one replacement target, found ${count}`);
+            if (count !== expectedCount) {
+              throw new Error(`${file}: expected ${expectedCount} replacement target(s), found ${count}`);
             }
-            write(file, source.replace(before, after));
+            write(file, source.split(before).join(after));
+          }
+
+          function dedentOverIndentedFunction(file, startMarker, endMarker) {
+            const lines = read(file).split('\n');
+            const start = lines.findIndex((line) => line.startsWith(startMarker));
+            const end = lines.findIndex((line, index) => index > start && line.startsWith(endMarker));
+            if (start < 0 || end < 0) {
+              throw new Error(`${file}: could not locate ${startMarker} .. ${endMarker}`);
+            }
+            for (let index = start + 1; index < end; index += 1) {
+              if (lines[index].startsWith('    ')) lines[index] = lines[index].slice(2);
+            }
+            write(file, lines.join('\n'));
           }
 
           const packageJson = JSON.parse(read('package.json'));
@@ -89,13 +102,15 @@ jobs:
           write('package.json', JSON.stringify(packageJson, null, 2));
 
           const tsconfig = JSON.parse(read('tsconfig.json'));
-          const redundantIncludes = new Set([
+          const obsoleteIncludes = new Set([
             'apps/web/src/shared/components/**/*.ts',
             'apps/web/src/shared/components/**/*.tsx',
             'apps/web/src/shared/lib/**/*.ts',
             'apps/web/src/shared/lib/**/*.tsx',
+            'tools/**/*.ts',
+            'tools/**/*.tsx',
           ]);
-          tsconfig.include = tsconfig.include.filter((entry) => !redundantIncludes.has(entry));
+          tsconfig.include = tsconfig.include.filter((entry) => !obsoleteIncludes.has(entry));
           for (const entry of [
             'apps/web/tests/**/*.ts',
             'apps/web/tests/**/*.tsx',
@@ -106,67 +121,120 @@ jobs:
           }
           write('tsconfig.json', JSON.stringify(tsconfig, null, 2));
 
-          replaceOnce(
+          replaceExact(
+            '.github/workflows/studio-asset-browser.yml',
+            '      - tests/browser-fixtures/studio-catalog/**',
+            '      - apps/web/tests/browser-fixtures/studio-catalog/**',
+            2,
+          );
+          replaceExact(
+            '.github/workflows/studio-promo-video.yml',
+            "      - 'tools/browser-harnesses/promo-e2e.html'",
+            "      - 'apps/web/tools/browser-harnesses/promo-e2e.html'",
+          );
+          replaceExact(
+            '.github/workflows/studio-wearable-runtime-review.yml',
+            '          cp tools/browser-harnesses/props-compare-main.ts tools/browser-harnesses/props-compare.html wearable-runtime-review/browser-harnesses/',
+            '          cp apps/web/tools/browser-harnesses/props-compare-main.ts apps/web/tools/browser-harnesses/props-compare.html wearable-runtime-review/browser-harnesses/',
+          );
+
+          replaceExact(
             'scripts/validate-architecture.mjs',
             'const requiredPaths = [\n  "README.md",',
             'const requiredPaths = [\n  "README.md",\n  "ARCHITECTURE.md",',
           );
-          replaceOnce(
+          replaceExact(
             'scripts/validate-architecture.mjs',
             'const requiredEntries = ["apps/web/index.html", "apps/web/src/app/main.tsx", "vite.config.ts"];',
-            'const requiredEntries = [\n  "apps/web/index.html",\n  "apps/web/public",\n  "apps/web/src/app/main.tsx",\n  "apps/web/config/vite-manual-chunks.ts",\n  "vite.config.ts",\n];',
+            'const requiredEntries = [\n  "apps/web/index.html",\n  "apps/web/public",\n  "apps/web/src/app/main.tsx",\n  "apps/web/config/vite-manual-chunks.ts",\n  "apps/web/tests/browser-fixtures/studio-catalog/index.html",\n  "apps/web/tools/browser-harnesses/hybrid-dcc-e2e.html",\n  "vite.config.ts",\n];',
           );
-          replaceOnce(
+          replaceExact(
+            'scripts/validate-architecture.mjs',
+            '// "일회성 실험"이 같은 트리에서 구분되지 않는다. 하네스의 집은 tools/browser-harnesses/ 다.',
+            '// "일회성 실험"이 같은 트리에서 구분되지 않는다. 하네스의 집은 apps/web/tools/browser-harnesses/다.',
+          );
+          replaceExact(
+            'scripts/validate-architecture.mjs',
+            ' (the app entry is apps/web/src/app/main.tsx; browser harnesses belong in tools/browser-harnesses/)',
+            ' (the app entry is apps/web/src/app/main.tsx; browser harnesses belong in apps/web/tools/browser-harnesses/)',
+          );
+          replaceExact(
             'scripts/validate-architecture.mjs',
             '  if (entry.name === "index.html") continue;\n',
             '',
           );
-          replaceOnce(
+          replaceExact(
+            'scripts/validate-architecture.mjs',
+            ' (only apps/web/index.html is the application entry; harness pages belong in tools/browser-harnesses/)',
+            ' (only apps/web/index.html is the application entry; harness pages belong in apps/web/tools/browser-harnesses/)',
+          );
+          replaceExact(
             'scripts/validate-architecture.mjs',
             'if (!exists("tools/browser-harnesses")) {\n  issues.push("missing harness home: tools/browser-harnesses/");\n}',
             'if (!exists("apps/web/tools/browser-harnesses")) {\n  issues.push("missing harness home: apps/web/tools/browser-harnesses/");\n}\nif (exists("tools/browser-harnesses")) {\n  issues.push("legacy browser harness directory at repository root: tools/browser-harnesses/");\n}\nif (exists("tests/browser-fixtures/studio-catalog")) {\n  issues.push("duplicate Studio catalog fixture at repository root: tests/browser-fixtures/studio-catalog/");\n}',
           );
-          replaceOnce(
+          replaceExact(
             'scripts/validate-architecture.mjs',
             'for (const legacyRoot of ["components", "lib", "src", "public"]) {',
             'for (const legacyRoot of ["components", "hooks", "lib", "public", "shared", "src", "styles"]) {',
           );
-          replaceOnce(
+          replaceExact(
             'scripts/validate-architecture.mjs',
             'for (const receiptDir of [".github/qa", "scripts/qa/runs"]) {',
             'for (const receiptDir of [".github/qa", "qa-results", "scripts/qa/runs"]) {',
           );
-          replaceOnce(
+          replaceExact(
             'scripts/validate-architecture.mjs',
             '  "validate:architecture",\n  "verify:studio-menus",',
             '  "validate:architecture",\n  "verify:csp",\n  "verify:toolchain-coverage",\n  "verify:studio-menus",',
           );
-          replaceOnce(
+          replaceExact(
             'scripts/validate-architecture.mjs',
             'for (const script of requiredScripts) {\n  if (!scripts[script]) issues.push(`missing script: ${script}`);\n}\n',
-            'for (const script of requiredScripts) {\n  if (!scripts[script]) issues.push(`missing script: ${script}`);\n}\n\nconst expectedCspCommand = "node scripts/verify-vercel-csp.mjs apps/web/index.html";\nif (scripts["verify:csp"] !== expectedCspCommand) {\n  issues.push(`verify:csp must target the canonical entry: ${expectedCspCommand}`);\n}\n',
+            'for (const script of requiredScripts) {\n  if (!scripts[script]) issues.push(`missing script: ${script}`);\n}\n\nconst expectedCspCommand = "node scripts/verify-vercel-csp.mjs apps/web/index.html";\nif (scripts["verify:csp"] !== expectedCspCommand) {\n  issues.push(`verify:csp must target the canonical entry: ${expectedCspCommand}`);\n}\n\nconst canonicalWorkflowReferences = [\n  {\n    file: ".github/workflows/studio-asset-browser.yml",\n    required: "      - apps/web/tests/browser-fixtures/studio-catalog/**",\n    forbidden: "\\n      - tests/browser-fixtures/studio-catalog/**",\n  },\n  {\n    file: ".github/workflows/studio-promo-video.yml",\n    required: "apps/web/tools/browser-harnesses/promo-e2e.html",\n    forbidden: "\\'tools/browser-harnesses/promo-e2e.html\\'",\n  },\n  {\n    file: ".github/workflows/studio-wearable-runtime-review.yml",\n    required: "cp apps/web/tools/browser-harnesses/props-compare-main.ts",\n    forbidden: "cp tools/browser-harnesses/props-compare-main.ts",\n  },\n];\nfor (const { file, required, forbidden } of canonicalWorkflowReferences) {\n  const source = read(file);\n  if (!source.includes(required)) issues.push(`${file}: missing canonical web path ${required.trim()}`);\n  if (source.includes(forbidden)) issues.push(`${file}: stale root path ${forbidden.trim()}`);\n}\n',
           );
 
-          replaceOnce(
+          replaceExact(
             '.github/workflows/ci.yml',
             '      - run: pnpm run validate:architecture\n      - run: pnpm run lint',
             '      - run: pnpm run validate:architecture\n      - run: pnpm run verify:csp\n      - run: pnpm run verify:toolchain-coverage\n      - run: pnpm run lint',
           );
 
-          replaceOnce(
+          replaceExact(
             'eslint.config.mjs',
             '// 루트 Vite 앱(apps/web/src/·components/·lib/) — React 19 + RC + jsx-a11y.\n  // ToonSpectrum Vite 앱은 apps/web 에 있고, NestJS API 만 apps/api 에 있다.',
             '// apps/web/src 아래의 Vite 브라우저 앱 — React 19 + RC + jsx-a11y.\n  // 루트 package.json이 프런트엔드 툴체인을 소유하고, NestJS API만 별도 workspace package다.',
           );
-          replaceOnce(
+          replaceExact(
             'eslint.config.mjs',
             '      { type: \'domains\', pattern: \'apps/web/src/domains/*/**/*\', mode: \'full\' },\n      {\n        type: \'shared\',',
             '      { type: \'domains\', pattern: \'apps/web/src/domains/*/**/*\', mode: \'full\' },\n      { type: \'shared\', pattern: \'apps/web/src/shared/**/*\', mode: \'full\' },\n      { type: \'shared\', pattern: \'apps/web/src/types/**/*\', mode: \'full\' },\n      {\n        type: \'shared\',',
           );
-          replaceOnce(
+          replaceExact(
             'eslint.config.mjs',
             "    files: ['lib/db/**/*.ts', 'lib/server/**/*.ts', 'scripts/**/*.{ts,tsx,mts,cts}'],",
             "    files: ['scripts/**/*.{ts,tsx,mts,cts}'],",
+          );
+
+          replaceExact(
+            'scripts/verify-toolchain-coverage.mjs',
+            'import { existsSync, readFileSync, writeFileSync } from "node:fs";\nimport { join, relative } from "node:path";',
+            'import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";\nimport { isAbsolute, join, relative, resolve, sep } from "node:path";',
+          );
+          replaceExact(
+            'scripts/verify-toolchain-coverage.mjs',
+            '["exec", "tsc", "-p", project, "--listFilesOnly"],',
+            '["exec", "tsc", "-p", project, "--listFilesOnly", "--incremental", "false", "--pretty", "false"],',
+          );
+          replaceExact(
+            'scripts/verify-toolchain-coverage.mjs',
+            '  let count = 0;\n  for (const line of stdout.split("\\n")) {\n    const file = line.trim();\n    if (!file || file.endsWith(".d.ts") || file.includes("/node_modules/")) continue;\n    count += 1;\n  }\n  return count;',
+            '  const files = new Set();\n  for (const line of stdout.split("\\n")) {\n    const candidate = line.trim();\n    if (!candidate || candidate.endsWith(".d.ts")) continue;\n    const file = isAbsolute(candidate) ? candidate : resolve(REPO_ROOT, candidate);\n    if (!existsSync(file) || !statSync(file).isFile()) continue;\n    const repoRelative = relative(REPO_ROOT, file);\n    if (\n      repoRelative === ".."\n      || repoRelative.startsWith(`..${sep}`)\n      || isAbsolute(repoRelative)\n      || repoRelative.split(sep).includes("node_modules")\n    ) {\n      continue;\n    }\n    files.add(repoRelative);\n  }\n  return files.size;',
+          );
+          replaceExact(
+            'scripts/verify-toolchain-coverage.mjs',
+            ' * node_modules are excluded so the number tracks first-party source.',
+            ' * node_modules are excluded so the number tracks first-party source. Only existing files inside\n * the repository are counted, and a Set removes duplicate compiler output or package-manager chatter.',
           );
 
           const chunksPath = 'apps/web/config/vite-manual-chunks.ts';
@@ -180,6 +248,18 @@ jobs:
             if (chunkLines[index].startsWith('        ')) chunkLines[index] = chunkLines[index].slice(8);
           }
           write(chunksPath, chunkLines.join('\n'));
+
+          replaceExact('api/og.js', '\n\n\nfunction handleMarketLanding', '\n\nfunction handleMarketLanding');
+          replaceExact('api/og.js', '\n\n\nfunction buildTitleStructuredData', '\n\nfunction buildTitleStructuredData');
+          dedentOverIndentedFunction('api/og.js', 'function handleMarketLanding', 'const MARKET_RESOURCE_ID_RE');
+          dedentOverIndentedFunction('api/og.js', 'async function handleMarketResource', 'async function fetchTitle');
+          dedentOverIndentedFunction('api/og.js', 'function buildTitleStructuredData', 'async function handleTitleRequest');
+          replaceExact(
+            'api/og.js',
+            'const MARKET_RESOURCE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])/iu;',
+            'const MARKET_RESOURCE_ID_RE =\n  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\\s\\S])/iu;',
+          );
+          replaceExact('api/og.js', '  return handleTitleRequest(res, { host, proto, slug });\n\n}', '  return handleTitleRequest(res, { host, proto, slug });\n}');
           NODE
 
           cat > ARCHITECTURE.md <<'EOF'
@@ -245,29 +325,38 @@ jobs:
 
           ## 검증과 생성물 정책
 
-          `pnpm run validate:architecture`는 canonical 엔트리, 필수 문서·스크립트, 레거시 루트 디렉터리 재등장과 중복 하네스를 검사합니다. 기본 CI의 lint job은 CSP 원본 검증과 테스트 수 래칫(`verify:toolchain-coverage`)까지 실행하므로 경로 이동이 검증 범위를 조용히 줄일 수 없습니다.
+          `pnpm run validate:architecture`는 canonical 엔트리, 필수 문서·스크립트, 워크플로 경로, 레거시 루트 디렉터리 재등장과 중복 하네스를 검사합니다. 기본 CI의 lint job은 CSP 원본 검증과 테스트·타입 입력 수 래칫(`verify:toolchain-coverage`)까지 실행하므로 경로 이동이 검증 범위를 조용히 줄일 수 없습니다.
 
           `dist`, `coverage`, `qa-results`, Playwright screenshot과 임시 진단 파일은 소스가 아닙니다. 재현 가능한 명령이나 Actions artifact로 생성하고 Git에는 커밋하지 않습니다.
           EOF
-
-          # YAML heredoc indentation is stripped by the shell only when the content starts at column 1.
           sed -i 's/^          //' ARCHITECTURE.md
 
-      - name: Refresh the test-discovery ratchet
-        run: node scripts/verify-toolchain-coverage.mjs --update
+      - name: Refresh deterministic toolchain floors
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/verify-toolchain-coverage.mjs --update
+          node scripts/verify-toolchain-coverage.mjs
+          node scripts/verify-toolchain-coverage.mjs
 
-      - name: Validate architecture, lint, types, and production bundle
+      - name: Validate architecture, code quality, types, and production bundle
         shell: bash
         run: |
           set -euo pipefail
           pnpm run validate:architecture
           pnpm run verify:csp
-          pnpm run verify:toolchain-coverage
+          node --check api/og.js
           pnpm run lint
           pnpm run typecheck
           pnpm run build
           pnpm run check:studio-bundle
           git diff --check
+
+          tracked_junk=$(git ls-files 'dist/**' 'coverage/**' 'qa-results/**' 'playwright-report/**' 'test-results/**' '*.orig' '*.rej' '.DS_Store')
+          if [[ -n "$tracked_junk" ]]; then
+            printf 'Tracked generated or recovery files remain:\n%s\n' "$tracked_junk" >&2
+            exit 1
+          fi
 
       - name: Commit verified cleanup and remove this one-shot workflow
         shell: bash
