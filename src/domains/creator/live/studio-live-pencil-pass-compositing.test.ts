@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { studioBrushAliasEffectiveDiameter } from "../brush/studio-brush-alias-profile";
 import { studioPencilAliasPasses, studioPencilAliasPassPoints, studioPencilRibbonAlphaBucket, STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT } from "../brush/studio-pencil-alias-passes";
-import { planStudioRetainedMediaPressureCurve, resolveStudioRetainedMediaPressureProfileId } from "../studio-retained-media-pressure";
+import { planStudioRetainedMediaPressureCurve, planStudioRetainedMediaTapDab, resolveStudioRetainedMediaPressureProfileId } from "../studio-retained-media-pressure";
 import { planStudioRetainedMediaRibbon } from "../studio-retained-media-ribbon";
 
 import { StudioLiveRetainedMediaOverlayRenderer } from "./studio-live-retained-media-overlay";
@@ -75,6 +75,45 @@ describe("live pencil pigment-pass composition", () => {
       }
     }
     expect(expected.length).toBeGreaterThan(0);
+    expect(renderer.begin(element).status).toBe("started");
+    expect(active.fills).toEqual(expected);
+    expect(active.saved).toHaveLength(0);
+    renderer.clear();
+    expect(renderer.retainedPencilCommandCount).toBe(0);
+  });
+});
+
+describe("live pencil tap composition", () => {
+  const TAP_POINT = [40, 50];
+  const FULL_PRESSURE = [1];
+
+  it("drives the plain pencil's full-pressure response past the clamp, so the order is observable", () => {
+    const tap = planStudioRetainedMediaTapDab(TAP_POINT, FULL_PRESSURE, "pencil");
+    expect(tap).not.toBeNull();
+    expect(Math.sqrt(tap!.opacityScale * tap!.flowScale)).toBeGreaterThan(1);
+  });
+
+  it.each(brushes)("applies the whole-element opacity outside the material clamp on a %s tap", (brush) => {
+    const renderer = new StudioLiveRetainedMediaOverlayRenderer();
+    const active = canvasWithFillRecorder();
+    const settled = canvasWithFillRecorder();
+    renderer.attach({ activeCanvas: active.canvas, settledCanvas: settled.canvas });
+    renderer.setSurface({ left: 0, top: 0, width: 250, height: 100, documentScale: 1, documentWidth: 250, flipX: false });
+    const opacity = 0.68;
+    const element: DrawEl = {
+      id: "heavy-tap", type: "draw", kind: "freehand", mode: "pen", brush,
+      points: TAP_POINT, pressures: FULL_PRESSURE,
+      stroke: "#563cc7", strokeWidth: 10, opacity,
+      materialPressureModel: "canonical-material-v1",
+    };
+    const profile = resolveStudioRetainedMediaPressureProfileId(brush) ?? "pencil";
+    const tap = planStudioRetainedMediaTapDab(element.points, element.pressures, profile);
+    expect(tap).not.toBeNull();
+    // Committed: <Group opacity={element}> over one <KCircle opacity={min(1, pass × response)}>
+    // per pass, and Konva multiplies the two — the element opacity never enters the clamp.
+    const response = Math.sqrt(tap!.opacityScale * tap!.flowScale);
+    const expected = studioPencilAliasPasses(brush)
+      .map((pass) => opacity * Math.min(1, pass.opacityScale * response));
     expect(renderer.begin(element).status).toBe("started");
     expect(active.fills).toEqual(expected);
     expect(active.saved).toHaveLength(0);
