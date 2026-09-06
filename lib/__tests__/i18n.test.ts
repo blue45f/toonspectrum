@@ -196,7 +196,7 @@ describe("runtime translation bundles", () => {
     await ensureRuntimeLocaleBundle("eo");
 
     expect(fetchSpy).toHaveBeenCalled();
-    expect(resolveI18nValue("eo", "app.name")).toBe("ToonSpectrum-translated");
+    expect(resolveI18nValue("eo", "app.name")).toBe(`${i18nDict.en["app.name"]}-translated`);
 
     fetchSpy.mockRestore();
   });
@@ -221,7 +221,7 @@ describe("runtime translation bundles", () => {
     await ensureRuntimeLocaleBundle("tlh");
 
     expect(fetchSpy).toHaveBeenCalled();
-    expect(resolveI18nValue("tlh", "app.name")).toBe("ToonSpectrum-translated");
+    expect(resolveI18nValue("tlh", "app.name")).toBe(`${i18nDict.en["app.name"]}-translated`);
 
     fetchSpy.mockRestore();
   });
@@ -281,7 +281,7 @@ describe("runtime translation bundles", () => {
 
     expect(calls.some((value) => value.includes("|xx-YY"))).toBe(true);
     expect(calls.some((value) => value.includes("|xx"))).toBe(true);
-    expect(resolveI18nValue("xx-YY", "app.name")).toBe("ToonSpectrum-base-lang");
+    expect(resolveI18nValue("xx-YY", "app.name")).toBe(`${i18nDict.en["app.name"]}-base-lang`);
 
     fetchSpy.mockRestore();
   });
