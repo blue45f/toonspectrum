@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 
 import { test } from "vitest";
 
-import { appRoutes } from "../../src/app/routes/route-manifest";
+import { appRoutes } from "../../../app/routes/route-manifest";
 import {
   mutateReferenceNotes, parseReferenceBackup, parseReferenceNotes, previewReferenceImport,
   REFERENCE_STORAGE_KEY,

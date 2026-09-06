@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { appRoutes } from "../../src/app/routes/route-manifest";
-import { apiPath } from "../../src/infrastructure/api";
-import { setRuntimeApiBase } from "../../src/infrastructure/runtime-api-base";
+import { appRoutes } from "../../../app/routes/route-manifest";
+import { apiPath } from "../../../infrastructure/api";
+import { setRuntimeApiBase } from "../../../infrastructure/runtime-api-base";
 
 describe("vite migration", () => {
   it("declares the primary product routes in the Vite router manifest", () => {

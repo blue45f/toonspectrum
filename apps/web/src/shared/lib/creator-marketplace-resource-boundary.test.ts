@@ -15,7 +15,7 @@ const drizzleConfig = readFileSync(
   "utf8"
 );
 const client = readFileSync(
-  new URL("../src/infrastructure/creator-marketplace-client.ts", import.meta.url),
+  new URL("../../infrastructure/creator-marketplace-client.ts", import.meta.url),
   "utf8"
 );
 
