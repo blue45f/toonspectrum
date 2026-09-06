@@ -1,0 +1,44 @@
+name: Diagnose 2D merge gate
+on:
+  push:
+    branches: [diagnostics/2d-merge-gate-20260906]
+    paths: [.github/workflows/diagnose-2d-merge.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    steps:
+      - name: Read the failed test job without altering code or checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          curl --fail --silent --show-error --location \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            https://api.github.com/repos/blue45f/toonspectrum/actions/jobs/101378408967/logs \
+            -o /tmp/failed-job.log
+          python3 - <<'PY'
+          import pathlib,re,json
+          text=pathlib.Path('/tmp/failed-job.log').read_text(errors='replace')
+          text=re.sub(r'\x1b\[[0-9;]*[A-Za-z]','',text)
+          lines=text.splitlines(); indices=set()
+          for i,line in enumerate(lines):
+              if re.search(r'FAIL |Failed Tests|AssertionError|Error:|Unhandled Error|Test Files|Tests  |Process completed',line):
+                  indices.update(range(max(0,i-3), min(len(lines),i+16)))
+          selected='\n'.join(f'{i+1}: {lines[i]}' for i in sorted(indices))
+          pathlib.Path('evidence/failure-excerpt.txt').write_text(selected[-40000:])
+          pathlib.Path('evidence/log-summary.json').write_text(json.dumps({'jobId':101378408967,'runId':33988723867,'totalLines':len(lines),'excerptLines':len(indices)},indent=2))
+          print(selected[-14000:])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 2d-merge-failure-diagnostic
+          path: evidence/
+          retention-days: 3
+          if-no-files-found: error
