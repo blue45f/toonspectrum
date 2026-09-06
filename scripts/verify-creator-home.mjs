@@ -11,7 +11,7 @@ mkdirSync(output, { recursive: true });
 const results = [];
 const manifest = JSON.parse(readFileSync("apps/web/public/brand/film-manifest.json", "utf8"));
 for (const [format, entry] of Object.entries(manifest.assets)) {
-  const path = `public${entry.src}`;
+  const path = `apps/web/public${entry.src}`;
   assert.equal(createHash("sha256").update(readFileSync(path)).digest("hex"), entry.sha256);
   const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", path], { encoding: "utf8" }));
   const video = probe.streams.find((stream) => stream.codec_type === "video");
