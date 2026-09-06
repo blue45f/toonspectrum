@@ -47,6 +47,13 @@ const LearnPage = lazyRetry(
   () => import("@/src/domains/learn/LearnPage").then((module) => ({ default: module.LearnPage })),
   "LearnPage",
 );
+// Public reference pages must not initialize the editor or its dictionaries/GPU engines.
+const StudioManualPage = lazyRetry(
+  () => import("@/src/domains/creator/manual/StudioManualPage").then((module) => ({
+    default: module.StudioManualPage,
+  })),
+  "StudioManualPage",
+);
 const StudioRouter = lazyRetry(
   async () => {
     const [module] = await Promise.all([
@@ -68,5 +75,7 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-character-shaper", path: "/shaper", element: <CharacterShaperLandingPage /> },
   { id: "creator-brush-lab", path: "/brush-lab", element: <StudioBrushLabPage /> },
   { id: "creator-learning", path: "/learn/*", element: <LearnPage /> },
+  { id: "creator-studio-manual", path: "/studio/manual", element: <StudioManualPage /> },
+  { id: "creator-studio-manual-article", path: "/studio/manual/:articleId", element: <StudioManualPage /> },
   { id: "creator-studio", path: "/studio/*", element: <StudioRouter /> },
 ]);
