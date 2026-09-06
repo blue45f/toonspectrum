@@ -283,8 +283,10 @@ describe("database integration runner CI policy", () => {
     expect(packageManifest.devDependencies?.["@playwright/test"]).toBe(playwrightVersion);
 
     // The proof runs parallel to core on its own VM: no `needs`, no services, nothing shared.
+    // 9a8f9f67 pinned every ci.yml job to ubuntu-24.04 so the runner image cannot drift under
+    // the merge checks; a pinned image is still a fresh VM of its own.
     expect(parityJob).toMatchObject({
-      "runs-on": "ubuntu-latest",
+      "runs-on": "ubuntu-24.04",
       "timeout-minutes": 20,
       env: {
         NODE_OPTIONS: "--max-old-space-size=8192",
