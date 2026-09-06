@@ -74,7 +74,10 @@ const CREATOR_BROWSER_API_BASELINE: Readonly<Record<string, number>> = {
   "navigator.storage": 2,
   indexedDB: 0,
   showOpenFilePicker: 0,
-  "new Worker(": 0,
+  // StudioReferenceRebuildPresets.tsx opens the /assets/reference-rebuild worker itself: its
+  // boundary test pins the component to a "react"-only import list, so no adapter module can
+  // host the construction. Counted since 2026-09-06; move it when that boundary changes.
+  "new Worker(": 1,
   "new OffscreenCanvas(": 0,
   "new WebSocket(": 0,
 };

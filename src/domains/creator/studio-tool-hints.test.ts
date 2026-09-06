@@ -207,7 +207,7 @@ describe("studio tool hints (rich hover copy)", () => {
     expect(studioFilterCatalogEntry("curves")?.group).toBe("tone");
     expect(studioFilterCatalogEntry("channel-mixer")?.group).toBe("color");
     expect(studioFilterCatalogEntry("gradient-map")?.group).toBe("color");
-    expect(studioFilterGroupLabel("blur")).toBe("블러");
+    expect(studioFilterGroupLabel("blur")).toBe("흐림·초점");
     expect(STUDIO_FILTER_CATALOG.some((e) => e.engine === "gaussian-blur")).toBe(true);
     expect(STUDIO_FILTER_CATALOG.some((e) => e.engine === "motion-blur")).toBe(true);
   });
