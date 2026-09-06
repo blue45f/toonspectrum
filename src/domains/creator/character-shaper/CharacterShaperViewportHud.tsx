@@ -9,6 +9,7 @@ import { Eye, EyeOff, LoaderCircle, Maximize2, RotateCw, SunMedium, ZoomIn, Zoom
 
 import { StudioHudPill } from "../studio-chrome-ui";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import { STUDIO_VRM_INSPECTION_VIEWS } from "../vrm/studio-vrm-inspection-framing";
 import { CAMERA_PRESETS } from "../vrm/studio-vrm-poser-catalogs";
 
 import {
@@ -56,7 +57,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
   const turntable = Boolean(h.turntable);
   const transparent = Boolean(h.transparentBackground);
   const paintMode = Boolean(h.texturePaintModeSelected);
-  const cameraLocked = Boolean(h.isCapturing || h.isSharingPose || h.isThumbnailCapturing);
+  const cameraLocked = Boolean(h.viewportCameraInteractionLocked || h.isCapturing || h.isSharingPose || h.isThumbnailCapturing);
   const lightingTone: string | undefined = typeof h.lightingTone === "string" ? h.lightingTone : undefined;
   const modelReady = status === "ready";
   const presets = CHARACTER_SHAPER_CAMERA_PRESET_IDS
@@ -96,7 +97,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
               key={preset.id}
               type="button"
               aria-pressed={active}
-              disabled={cameraLocked}
+              disabled={cameraLocked || !modelReady}
               title={`카메라: ${preset.label}`}
               onClick={() => h.setActiveCameraId(preset.id)}
               className={cn(
@@ -111,6 +112,22 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
           );
         })}
       </div>
+
+      <select
+        aria-label="부위·방향 확대 검사"
+        title="측면·후면과 착장 접점을 확대합니다. 드래그로 자유롭게 회전할 수 있습니다."
+        disabled={cameraLocked || !modelReady}
+        value={STUDIO_VRM_INSPECTION_VIEWS.some((view) => view.id === activeCameraId) ? activeCameraId : ""}
+        onChange={(event) => { if (event.target.value) h.setActiveCameraId(event.target.value); }}
+        className={cn(
+          "pointer-events-auto absolute left-2 top-16 min-h-11 max-w-[calc(100%-5rem)] rounded-xl border border-line/70 bg-panel/90 px-3 text-xs font-semibold text-fg shadow-sm backdrop-blur",
+          "disabled:cursor-not-allowed disabled:opacity-40",
+          STUDIO_FOCUS_RING,
+        )}
+      >
+        <option value="" disabled>부위·방향 확대 검사</option>
+        {STUDIO_VRM_INSPECTION_VIEWS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
+      </select>
 
       <div
         role="group"

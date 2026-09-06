@@ -8,6 +8,7 @@ import {
   type BodySilhouette,
   type BodySilhouetteSample,
 } from "./studio-vrm-body-silhouette";
+import { sampleStudioVrmGarmentWeave, studioVrmGarmentBumpScaleM } from "./studio-vrm-garment-weave";
 import { PHYSICS_PREVIEW_MAX_DELTA } from "./studio-vrm-physics";
 import { refineVrmGripFingerWrap } from "./studio-vrm-poser-utils";
 import {
@@ -38,6 +39,7 @@ import {
   type StudioVrmGarmentSkinBone,
   type StudioVrmSkinnedGarmentReceipt,
 } from "./studio-vrm-skinned-garment";
+import { createStudioVrmSurfaceVertexSampler } from "./studio-vrm-surface-vertex-sampler";
 import {
   WARDROBE_FABRICS,
   buildGarmentParts,
@@ -635,9 +637,9 @@ export function torsoVertexStride(vertexCount: number, budget: number): number {
  * 가슴은 넓고 얕게, 허리는 좁게 나온다. 재료가 모자라면 null을 돌려 골격 폴백에 맡긴다 —
  * 없는 측정을 지어내는 것보다 예전 재단이 그대로 도는 편이 정직하다.
  *
- * 좌표계는 나머지 치수와 같은 spine 로컬 rest 공간이다. 정점은 지배 본 하나로만 스킨해
- * 월드로 보낸 뒤 spine 로컬로 들어오므로, Avatar Forge가 raw 리그를 바꾼 뒤에도 옷과 몸이
- * 같은 공간에 남는다. 모프타깃은 적용하지 않는다 — 재단 기준은 기본 형상이다.
+ * 좌표계는 나머지 치수와 같은 spine 로컬 rest 공간이다. 지배 본은 몸통 분류에만 사용한다.
+ * 위치는 렌더러와 동일한 전체 스킨 가중치와 활성 모프를 적용해 화면에 보이는 표면을 잰다.
+ * Avatar Forge가 리그를 바꾼 뒤에도 몸과 옷이 같은 공간과 형상을 기준으로 재단된다.
  */
 function measureTorsoSilhouette(vrm: VRM, anchors: {
   spine: THREE.Object3D | null;
@@ -682,7 +684,6 @@ function measureTorsoSilhouette(vrm: VRM, anchors: {
   if (torsoNodes.size === 0) return null;
 
   const worldToSpine = new THREE.Matrix4().copy(spine.matrixWorld).invert();
-  const boneToSpine = new THREE.Matrix4();
   const vertex = new THREE.Vector3();
   const influenceIndices = [0, 0, 0, 0];
   const influenceWeights = [0, 0, 0, 0];
@@ -715,24 +716,14 @@ function measureTorsoSilhouette(vrm: VRM, anchors: {
     if (skinIndex.itemSize < 4 || skinWeight.itemSize < 4) return;
     if (skinIndex.count < position.count || skinWeight.count < position.count) return;
 
-    // 몸통 본은 이름이 아니라 노드 동일성으로 고른다 — 본 이름은 모델마다 제각각이다.
-    const torsoTransforms = new Map<number, THREE.Matrix4>();
-    for (let boneIndex = 0; boneIndex < skeleton.bones.length; boneIndex += 1) {
-      const bone = skeleton.bones[boneIndex];
-      const boneInverse = skeleton.boneInverses[boneIndex];
-      if (!bone || !boneInverse || !torsoNodes.has(bone)) continue;
-      // three 스키닝과 같은 식(지배 본 하나, 가중치 1)으로 월드에 놓고 spine 로컬까지 한 번에 옮긴다.
-      boneToSpine
-        .copy(worldToSpine)
-        .multiply(mesh.matrixWorld)
-        .multiply(mesh.bindMatrixInverse)
-        .multiply(bone.matrixWorld)
-        .multiply(boneInverse)
-        .multiply(mesh.bindMatrix);
-      if (!matrixIsFinite(boneToSpine)) continue;
-      torsoTransforms.set(boneIndex, boneToSpine.clone());
-    }
-    if (torsoTransforms.size === 0) return;
+    // Dominant bones select the torso region only. Actual shape uses every skin weight and morph.
+    const torsoBoneIndices = new Set<number>();
+    skeleton.bones.forEach((bone, index) => {
+      if (torsoNodes.has(bone)) torsoBoneIndices.add(index);
+    });
+    if (torsoBoneIndices.size === 0) return;
+    const sampleVertex = createStudioVrmSurfaceVertexSampler(mesh, worldToSpine);
+    if (!sampleVertex) return;
 
     const stride = torsoVertexStride(position.count, TORSO_MESH_VERTEX_BUDGET);
     for (let index = 0; index < position.count; index += stride) {
@@ -749,9 +740,8 @@ function measureTorsoSilhouette(vrm: VRM, anchors: {
       influenceWeights[3] = skinWeight.getW(index);
       const dominant = pickDominantSkinInfluence(influenceIndices, influenceWeights);
       if (!dominant) continue;
-      const transform = torsoTransforms.get(dominant.boneIndex);
-      if (!transform) continue;
-      vertex.fromBufferAttribute(position, index).applyMatrix4(transform);
+      if (!torsoBoneIndices.has(dominant.boneIndex)) continue;
+      if (!sampleVertex(index, vertex)) continue;
       const sample = projectTorsoSample(frame, vertex.x, vertex.y, vertex.z);
       if (sample) samples.push(sample);
     }
@@ -893,25 +883,13 @@ const GARMENT_Z = new THREE.Vector3(0, 0, 1);
 function createGarmentWeaveTexture(fabricId: WardrobeEquip["fabricId"]): THREE.DataTexture | null {
   const fabric = wardrobeFabricById(fabricId);
   if (!fabric || fabric.weaveStrength <= 0) return null;
-  const size = 48;
+  const size = 128;
   const data = new Uint8Array(size * size);
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       const u = x / size;
       const v = y / size;
-      const warp = Math.sin(u * Math.PI * 2 * fabric.weaveFrequency);
-      const weft = Math.sin(v * Math.PI * 2 * fabric.weaveFrequency * 0.92);
-      const diagonal = fabricId === "denim"
-        ? Math.sin((u + v) * Math.PI * fabric.weaveFrequency * 1.35) * 0.55
-        : 0;
-      const knit = fabricId === "knit"
-        ? Math.cos((u - v) * Math.PI * fabric.weaveFrequency) * 0.38
-        : 0;
-      data[y * size + x] = Math.round(THREE.MathUtils.clamp(
-        128 + warp * 34 + weft * 26 + diagonal * 28 + knit * 28,
-        0,
-        255,
-      ));
+      data[y * size + x] = sampleStudioVrmGarmentWeave(fabric, u, v);
     }
   }
   const texture = new THREE.DataTexture(data, size, size, THREE.RedFormat, THREE.UnsignedByteType);
@@ -959,7 +937,7 @@ function applyGarmentMaterialStyle(
   material.clearcoat = fabric.clearcoat;
   material.clearcoatRoughness = fabric.clearcoatRoughness;
   material.bumpMap = fabricSurface ? weaveTexture : null;
-  material.bumpScale = fabricSurface ? fabric.weaveStrength : 0;
+  material.bumpScale = fabricSurface ? studioVrmGarmentBumpScaleM(fabric) : 0;
   material.userData.studioVrmGarmentPart = part;
   material.userData.studioVrmGarmentFabricId = fabricId;
   material.needsUpdate = true;

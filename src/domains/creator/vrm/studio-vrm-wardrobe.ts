@@ -870,9 +870,9 @@ function limbSleeve(
   const center = scaleVec(limb.axis, limb.len * start + h / 2);
   return {
     bone,
-    shape: { kind: "cylinder", rTop: opts.r, rBottom: opts.r * (opts.flare ?? 1), h, open: true },
+    shape: { kind: "cylinder", rTop: opts.r * (opts.flare ?? 1), rBottom: opts.r, h, open: true },
     offset: center,
-    // 실린더 +Y를 관절→자식 방향으로 정렬(아래로 갈수록 rBottom).
+    // +Y/rTop은 자식 관절(손목·발목), -Y/rBottom은 몸쪽이다. 플레어는 끝단에 적용한다.
     align: limb.axis,
     color: opts.color,
     roughness: opts.roughness,

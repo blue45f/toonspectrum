@@ -52,15 +52,8 @@ const DIALOG_ROOT_CLASS = cn(
   "pointer-coarse:[&_input:not([type=range]):not([type=checkbox]):not([type=color])]:min-h-11 pointer-coarse:[&_input[type=range]]:h-11 pointer-coarse:[&_select]:min-h-11 pointer-coarse:[&_summary]:min-h-11",
 );
 
-/**
- * The legacy viewport draws its own undo/redo + zoom/turntable groups (`absolute z-10 flex-col`)
- * and an empty-model overlay with buttons (`absolute inset-0 grid` containing a button). The
- * Shaper HUD and shelf replace both, so the wrapper hides them via structural selectors.
- */
-const VIEWPORT_WRAPPER_CLASS = cn(
-  "relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] bg-card",
-  "[&_.absolute.z-10.flex-col]:hidden [&_.absolute.inset-0.grid:has(button)]:hidden",
-);
+/** The shared viewport explicitly yields navigation chrome to this shell. */
+const VIEWPORT_WRAPPER_CLASS = "relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] bg-card";
 
 const TAB_BUTTON = cn(
   "min-h-11 flex-1 rounded-lg text-[0.75rem] font-semibold transition-colors motion-reduce:transition-none",
@@ -401,7 +394,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
 
   const renderViewport = (className?: string) => (
     <div data-character-shaper-viewport="true" className={cn(VIEWPORT_WRAPPER_CLASS, className)}>
-      <StudioVrmPoserViewport h={h} />
+      <StudioVrmPoserViewport h={h} presentation="shaper" />
       <CharacterShaperViewportHud h={h} binding={binding} compact={layout === "mobile"} />
       {paintActive ? (
         <div className="pointer-events-none absolute inset-x-2 bottom-2 z-30 flex justify-center [&>*]:pointer-events-auto">
