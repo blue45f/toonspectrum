@@ -30,18 +30,24 @@ export async function loadAdminI18nLocale(
   if (existing) return existing;
 
   const job = (async () => {
-    if (typeof fetch !== "function") return;
-    const merged: Record<string, string> = {};
-    for (const namespace of ADMIN_I18N_NAMESPACES) {
-      const response = await fetch(adminI18nAssetUrl(assetLocale, baseUrl, namespace), {
-        cache: "force-cache",
-        credentials: "same-origin",
-      });
-      if (!response.ok) continue;
-      const dictionary = await response.clone().json();
-      if (dictionary && typeof dictionary === "object" && !Array.isArray(dictionary)) {
-        Object.assign(merged, dictionary);
+    const dictionaries = await Promise.all(ADMIN_I18N_NAMESPACES.map(async (namespace) => {
+      try {
+        const response = await fetch(adminI18nAssetUrl(assetLocale, baseUrl, namespace), {
+          cache: "force-cache",
+          credentials: "same-origin",
+        });
+        if (!response?.ok) return null;
+        const dictionary = await response.clone().json();
+        return dictionary && typeof dictionary === "object" && !Array.isArray(dictionary)
+          ? dictionary as Record<string, string>
+          : null;
+      } catch {
+        return null;
       }
+    }));
+    const merged: Record<string, string> = {};
+    for (const dictionary of dictionaries) {
+      if (dictionary) Object.assign(merged, dictionary);
     }
     if (Object.keys(merged).length > 0) {
       registerI18nLocaleEntries(assetLocale, merged);
