@@ -212,8 +212,7 @@ function diagnosticClass(diagnostic: CreatorMarketplaceAuthoringDiagnostic): str
 
 export function MarketplaceAuthoringWorkshop(): ReactElement {
   const [draft, setDraft] = useState<CreatorMarketplaceAuthoringDraft>(() =>
-    consumeCreatorMarketplaceAuthoringHandoff()
-      ?? loadCreatorMarketplaceAuthoringDraft()
+    loadCreatorMarketplaceAuthoringDraft()
       ?? createCreatorMarketplaceAuthoringDraft(),
   );
   const [step, setStep] = useState<StepId>("source");
@@ -229,6 +228,11 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
   ]);
   const fileRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const handoff = consumeCreatorMarketplaceAuthoringHandoff();
+    if (handoff) setDraft(handoff);
+  }, []);
 
   const normalized = useMemo(
     () => normalizeCreatorMarketplaceAuthoringDraft(draft),
