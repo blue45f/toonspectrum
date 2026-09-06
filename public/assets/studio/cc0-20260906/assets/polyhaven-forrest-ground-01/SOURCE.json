@@ -1,0 +1,97 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/forrest_ground_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "date_published": 1552956906,
+    "sponsors": [
+      "59361351"
+    ],
+    "categories": [
+      "terrain",
+      "outdoor",
+      "natural"
+    ],
+    "type": 1,
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      2000,
+      2000
+    ],
+    "name": "Forest Ground 01",
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "ea3ef3539e362d9a9ffa409ecd467d08028569d5",
+    "tags": [
+      "grass",
+      "twigs",
+      "forest",
+      "leaves",
+      "sticks",
+      "foliage",
+      "dead grass",
+      "plant litter",
+      "underbrush",
+      "underbrush",
+      "organic",
+      "dry grass",
+      "dry leaves"
+    ],
+    "description": "Free 8K texture of forest floor with dry grass, leaf litter, scattered twigs and mossy soil, detailed surface relief and natural earthy tones.",
+    "category_id": "b9a51c27-1499-5f4d-b28f-0d96ef8e0319",
+    "category": "Ground & Terrain/Forest Floor/Leaf Litter",
+    "attributes": {
+      "surface_use": "ground",
+      "origin": "natural",
+      "setting": "outdoor",
+      "condition": [
+        "dirty",
+        "mossy"
+      ]
+    },
+    "download_count": 317493,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/forrest_ground_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forrest_ground_01/forrest_ground_01_diff_2k.jpg",
+      "bytes": 3077552,
+      "sha256": "e4d557ff61a0b42712a58e8a2e91c6010738977d4e172b7af47abd7d406ae735",
+      "sourceMd5": "18fa30c294be21805159ca6e73a5e5fa"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forrest_ground_01/forrest_ground_01_rough_2k.jpg",
+      "bytes": 920422,
+      "sha256": "e09258c7f055156a7607f1b21dccf38c7efd847e7d030271d5ffcc4a722df37d",
+      "sourceMd5": "a4c7ecc9cef47f5d097d4553e421ed6a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forrest_ground_01/forrest_ground_01_nor_gl_2k.jpg",
+      "bytes": 5551101,
+      "sha256": "aa23fa930c6303490f842f7c016c19d838263e8e4538d42508a9332e3fd76b69",
+      "sourceMd5": "7bb5186bd63bef99f6d21316718896f2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forrest_ground_01/forrest_ground_01_ao_2k.jpg",
+      "bytes": 2493578,
+      "sha256": "3da52f2f2182f2cf0a7b417e10764ee1ff446df0bc9fb12d49c4e3570ea3effe",
+      "sourceMd5": "be730523a039ab1171da81d43f1681c3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/forrest_ground_01/forrest_ground_01_disp_2k.jpg",
+      "bytes": 1036491,
+      "sha256": "1d5c63d39e67af44e96cc9d5752273982bc5c82c9855695dada4abc2fc20575d",
+      "sourceMd5": "50750c4535f53817d141412e819f7aea"
+    }
+  ]
+}

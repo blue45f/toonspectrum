@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/beige_wall_001",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "beige",
+      "painted",
+      "smooth",
+      "suburb",
+      "house",
+      "home"
+    ],
+    "date_published": 1626792811,
+    "name": "Beige Wall 001",
+    "categories": [
+      "man made",
+      "wall",
+      "plaster",
+      "outdoor",
+      "indoor",
+      "plaster-concrete"
+    ],
+    "authors": {
+      "Dimitrios Savva": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "dimensions": [
+      3000,
+      3000.000238418579
+    ],
+    "max_resolution": [
+      16384,
+      16384
+    ],
+    "sponsors": [
+      "76058381"
+    ],
+    "files_hash": "66328da3fac4865f84ac4bb6f296fe282e734ea5",
+    "description": "Free 16K texture of smooth beige painted plaster with subtle grain and a matte finish, showing soft color variation and surface blemishes.",
+    "category_id": "9d3c7da3-4959-5d42-8abc-5c31017a2fd4",
+    "category": "Concrete/Plaster & Stucco/Painted Plaster",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "painted"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "download_count": 423313,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/beige_wall_001.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/beige_wall_001/beige_wall_001_diff_2k.jpg",
+      "bytes": 235868,
+      "sha256": "222d4d2e7d5c425c97e5a66790852388cec7706714d773f769fba6bfe08cea4e",
+      "sourceMd5": "c927ac1136767f1df758ae064f50a2d1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/beige_wall_001/beige_wall_001_rough_2k.jpg",
+      "bytes": 656368,
+      "sha256": "a76e2307d8ec47d1be1d4710851fc4545db7aecfa176333738a6756358b64767",
+      "sourceMd5": "6c2a7eb786d436459c231e9d230fb3cc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/beige_wall_001/beige_wall_001_nor_gl_2k.jpg",
+      "bytes": 815507,
+      "sha256": "7f5cbecd6766f44034f3b78b4addb1559e12bdd5a77501bd418a736609e7cedc",
+      "sourceMd5": "127b2f5f2f8c2e57b1f08b263c0690bd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/beige_wall_001/beige_wall_001_ao_2k.jpg",
+      "bytes": 514646,
+      "sha256": "371d80c90b63a478093581d4f61ab9b439f233ae6fe970cb62a71d95d64e2ccf",
+      "sourceMd5": "beeb4280bc428c31ba962c406c1efe5a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/beige_wall_001/beige_wall_001_disp_2k.jpg",
+      "bytes": 569866,
+      "sha256": "680a346a91bee95e98d01621161ef56fe3bbc18170f9ae33da238ecdfc7cb93f",
+      "sourceMd5": "2bc0b051a7eacf17eb17a4c77453e8ec"
+    }
+  ]
+}

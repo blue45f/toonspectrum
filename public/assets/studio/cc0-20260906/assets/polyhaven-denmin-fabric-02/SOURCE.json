@@ -1,0 +1,89 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "date_published": 1592866700,
+    "sponsors": [
+      "44302755"
+    ],
+    "name": "Denim Fabric 02",
+    "type": 1,
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "dimensions": [
+      100.00000149011612,
+      99.99999403953552
+    ],
+    "categories": [
+      "fabric",
+      "denim"
+    ],
+    "files_hash": "414e6d5d95efbd5f4215418985a6a0c63c1bf3ad",
+    "tags": [
+      "jeans",
+      "pants",
+      "cloth",
+      "clothing",
+      "denim",
+      "textile ",
+      "creased",
+      "folds"
+    ],
+    "description": "Free 8K denim texture with fine woven grain, subtle faded highlights and soft worn surface, showing realistic creases and folds.",
+    "category_id": "14f36823-af15-5f03-824e-e31a2eadaedc",
+    "category": "Textiles & Leather/Denim",
+    "attributes": {
+      "surface_use": "object",
+      "condition": [
+        "worn"
+      ],
+      "origin": "man_made"
+    },
+    "download_count": 193750,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/denmin_fabric_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/denmin_fabric_02/denmin_fabric_02_diff_2k.jpg",
+      "bytes": 4732095,
+      "sha256": "735c5845b8618ee88ca1b5b2aa9e859cead29a657c3f8c7c4498a2b9919587dc",
+      "sourceMd5": "31c2f1bba041ea5609524c25ff30820e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/denmin_fabric_02/denmin_fabric_02_rough_2k.png",
+      "bytes": 3079063,
+      "sha256": "fd6a8cb23635f3dc68b531ea1453dd541a34b9bbeb29db20e751991085c25530",
+      "sourceMd5": "9e8f7bd1df1173cc9ea4f54a89ef5f51"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/denmin_fabric_02/denmin_fabric_02_nor_gl_2k.jpg",
+      "bytes": 3799091,
+      "sha256": "b97267814817ece4b4b16571f710e84f862630ab107dde9e95c4d52978f21c52",
+      "sourceMd5": "f8ceaea5a21900e1d77657b49fae11f7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/denmin_fabric_02/denmin_fabric_02_ao_2k.png",
+      "bytes": 3158136,
+      "sha256": "c043449ea6c3af636de6b297968c788b4a09ff9a41da05ee676dc254f51838ef",
+      "sourceMd5": "0550e86df4325c45ed0248854ba8a5ee"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/denmin_fabric_02/denmin_fabric_02_disp_2k.jpg",
+      "bytes": 1923529,
+      "sha256": "e95e3dfa21693cd9652be1f2532b8ac940a5c8a1bda8359f7227ba3a8a78bb18",
+      "sourceMd5": "7234781b8f4a99fde8a974399ac900dd"
+    }
+  ]
+}
