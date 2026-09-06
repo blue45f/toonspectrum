@@ -1,0 +1,50 @@
+name: Learning quality
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['src/domains/learn/**', 'e2e/learn*.spec.ts', 'tsconfig.learning.json', '.github/workflows/learning-quality.yml', 'src/domains/creator/studio-impasto-relief-shading-v1*.ts']
+  push:
+    branches: [main]
+    paths: ['src/domains/learn/**', 'e2e/learn*.spec.ts', 'tsconfig.learning.json', '.github/workflows/learning-quality.yml', 'src/domains/creator/studio-impasto-relief-shading-v1*.ts']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: learning-quality-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  learning-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      VITE_CATALOG_SOURCE: static
+      PLAYWRIGHT_CHANNEL: ''
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc -p tsconfig.learning.json
+      - run: pnpm exec eslint src/domains/learn e2e/learn.spec.ts e2e/learn-resilience.spec.ts src/domains/creator/studio-impasto-relief-shading-v1.ts src/domains/creator/studio-impasto-relief-shading-v1.light-constants.test.ts --max-warnings=0
+      # Directory discovery includes the accessibility suite instead of silently omitting it.
+      - name: Learning and shading output regressions
+        run: pnpm exec vitest run src/domains/learn src/domains/creator/studio-impasto-relief-shading-v1.light-constants.test.ts
+      # Re-run the actual previously failing budget, without changing its threshold or fixtures.
+      # This is additional evidence; the required core/verify gates remain unchanged.
+      - name: Existing full performance budgets
+        run: pnpm run test:perf
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test e2e/learn.spec.ts e2e/learn-resilience.spec.ts
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: learning-browser-evidence
+          path: test-results/
+          if-no-files-found: ignore

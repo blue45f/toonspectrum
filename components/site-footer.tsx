@@ -8,7 +8,7 @@ import Link from "@/src/compat/router-link";
 // 약관·개인정보처리방침은 내부 페이지(/terms·/privacy)가 TermsDesk 게시 정본을 렌더한다.
 // 문의는 내부 /support(desk-platform 공개 게시판)로 통합 — 외부 지원 보드 링크는 제거했다.
 
-const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
+const COLS: { titleKey: string; links: { key: string; href: string; label?: string }[] }[] = [
   {
     titleKey: "footer.section.browse",
     links: [
@@ -40,6 +40,8 @@ const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
       { key: "footer.link.create", href: "/create" },
       { key: "footer.link.studio", href: "/studio" },
       { key: "footer.link.references", href: "/references" },
+      { key: "learn", href: "/learn", label: "웹툰 제작 강좌 (한국어)" },
+      { key: "glossary", href: "/learn/glossary", label: "웹툰 용어 사전 (한국어)" },
       { key: "footer.link.shaper", href: "/shaper" },
       { key: "footer.link.market", href: "/market" },
     ],
@@ -112,8 +114,8 @@ export function SiteFooter() {
                   aria-hidden
                   className="h-px w-0 origin-left rounded-full bg-accent/70 transition-all duration-200 ease-out-expo group-hover/link:w-3"
                 />
-                <span className="transition-transform duration-200 ease-out-expo group-hover/link:translate-x-0.5">
-                  {t(l.key)}
+                <span lang={l.label ? "ko" : undefined} className="transition-transform duration-200 ease-out-expo group-hover/link:translate-x-0.5">
+                  {l.label ?? t(l.key)}
                 </span>
               </Link>
             ))}

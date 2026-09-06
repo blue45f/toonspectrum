@@ -265,16 +265,21 @@ function schlickFresnel(f0: number, lDotH: number): number {
   return (1 - f0) * f + f0;
 }
 
+interface ReliefLightTerms {
+  readonly halfX: number;
+  readonly halfY: number;
+  readonly halfZ: number;
+  readonly fresnel: number;
+}
+
 /**
- * painting.frag `specularBRDF` + wrapped diffuse for one normal, with the
- * eye fixed at (0, 0, 1) exactly as upstream.
+ * The light, eye and material are constant for one tile (including a dirty-region update).
+ * Resolve their half vector and Schlick term once, not once per non-flat cell. Keep the
+ * original arithmetic order: reassociating the specular products can change Float32 output.
+ * This is call-local rather than cached across tiles, so changing lights/materials cannot
+ * reuse stale values. It changes neither the Sobel stencil nor the relief work budget.
  */
-function shadeNormal(
-  normalX: number,
-  normalY: number,
-  normalZ: number,
-  resolved: ResolvedReliefOptions,
-): number {
+function resolveLightTerms(resolved: ResolvedReliefOptions): ReliefLightTerms {
   const halfLength = Math.sqrt(
     resolved.lightX * resolved.lightX
     + resolved.lightY * resolved.lightY
@@ -284,20 +289,31 @@ function shadeNormal(
   const halfY = resolved.lightY / halfLength;
   const halfZ = (resolved.lightZ + 1) / halfLength;
 
-  const nDotL = saturate(
-    normalX * resolved.lightX + normalY * resolved.lightY + normalZ * resolved.lightZ,
-  );
-  const nDotH = saturate(normalX * halfX + normalY * halfY + normalZ * halfZ);
-  const nDotV = saturate(normalZ);
   const lDotH = saturate(
     resolved.lightX * halfX + resolved.lightY * halfY + resolved.lightZ * halfZ,
   );
+  return { halfX, halfY, halfZ, fresnel: schlickFresnel(resolved.f0, lDotH) };
+}
+
+/** painting.frag `specularBRDF` + wrapped diffuse, with the eye fixed at (0, 0, 1). */
+function shadeNormal(
+  normalX: number,
+  normalY: number,
+  normalZ: number,
+  resolved: ResolvedReliefOptions,
+  light: ReliefLightTerms,
+): number {
+  const nDotL = saturate(
+    normalX * resolved.lightX + normalY * resolved.lightY + normalZ * resolved.lightZ,
+  );
+  const nDotH = saturate(normalX * light.halfX + normalY * light.halfY + normalZ * light.halfZ);
+  const nDotV = saturate(normalZ);
 
   const diffuse = nDotL * resolved.diffuseScale + (1 - resolved.diffuseScale);
   const specular =
     ggxDistribution(resolved.roughness, nDotH)
     * gggxVisibility(resolved.roughness, nDotL, nDotV)
-    * schlickFresnel(resolved.f0, lDotH)
+    * light.fresnel
     * resolved.specularScale;
   return diffuse + specular;
 }
@@ -359,7 +375,8 @@ export function computeStudioImpastoReliefShading(
 
   // Flat reference: normal (0, 0, 1). Normalizing by it pins flat paint at 1.0
   // so the multiplier is identity outside relief instead of a global dim.
-  const flatShade = shadeNormal(0, 0, 1, resolved);
+  const light = resolveLightTerms(resolved);
+  const flatShade = shadeNormal(0, 0, 1, resolved, light);
   const maxMultiplier = resolved.maxShadingMultiplier;
 
   if (resolved.quality === "emboss-2tap") {
@@ -452,6 +469,7 @@ export function computeStudioImpastoReliefShading(
         gradientY / normalLength,
         resolved.normalScale / normalLength,
         resolved,
+        light,
       );
       const value = shade / flatShade;
       out[middleRow + x] =
