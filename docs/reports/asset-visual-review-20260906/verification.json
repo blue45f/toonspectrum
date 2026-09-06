@@ -1,0 +1,14 @@
+{
+  "actualComponentBrowserTest": "passed",
+  "catalogAdmission": "passed",
+  "pythonRotationTests": "passed",
+  "focusedUnitTests": "passed",
+  "frontendLint": "passed-zero-warnings",
+  "frontendTypes": "passed",
+  "frontendBundleBuild": "passed",
+  "studioBundleBudgets": "passed",
+  "allAngleArtReview": false,
+  "allAssetsEditorSaveRestore": false,
+  "productionDeployment": false,
+  "checkedParent": "c03ef9cac4413f354bea9b2264b6d9c62fc2e38e"
+}

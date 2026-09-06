@@ -1,0 +1,106 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/coast_sand_rocks_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "date_published": 1646352000,
+    "name": "Coast Sand Rocks 02",
+    "type": 1,
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      15000,
+      15000
+    ],
+    "sponsors": [
+      "540619",
+      "7937391",
+      "7934315",
+      "77433244"
+    ],
+    "categories": [
+      "outdoor",
+      "natural",
+      "terrain",
+      "aerial",
+      "rock",
+      "collection: smugglers_cove"
+    ],
+    "tags": [
+      "grass",
+      "rock face",
+      "rock",
+      "moss",
+      "rough",
+      "uneven",
+      "weathered",
+      "stones",
+      "cliff",
+      "ground",
+      "seaside",
+      "coastal"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "579892253d0d73a45eaee485135c35666bceb237",
+    "description": "Free 8K texture of weathered coastal sand-rock: rough, uneven rock faces with scattered stones, brown sandy soil and patchy green moss coverage.",
+    "category_id": "6f927474-95dd-5ec5-b756-e9299996aeee",
+    "category": "Stone/Rock & Cliffs/Coastal Rock",
+    "collections": [
+      "smugglers_cove"
+    ],
+    "attributes": {
+      "surface_use": "ground",
+      "condition": [
+        "weathered",
+        "mossy"
+      ],
+      "origin": "natural",
+      "setting": "outdoor",
+      "aerial": true
+    },
+    "download_count": 543346,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/coast_sand_rocks_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coast_sand_rocks_02/coast_sand_rocks_02_diff_2k.jpg",
+      "bytes": 2905160,
+      "sha256": "98a8850f24cba18e4c99e46c56f5675f910809ee7f75df3e8587ec9e27088ed6",
+      "sourceMd5": "5c6d2fe8e40a733b078212cd6286bcb3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coast_sand_rocks_02/coast_sand_rocks_02_rough_2k.jpg",
+      "bytes": 2218518,
+      "sha256": "1751909cb470fb6cb2a7e01b2dfb9e009088a0dafa5ea6fba43fb5a1215ec6fa",
+      "sourceMd5": "1f04443f447f5eea8eda6bcbd57d3993"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coast_sand_rocks_02/coast_sand_rocks_02_nor_gl_2k.jpg",
+      "bytes": 4810192,
+      "sha256": "e75cd105d218aae5bf669630635e6753a78f6325bc799be3d0ee8b974853a84d",
+      "sourceMd5": "20c06634ac6d350c7baa0f18a24fb272"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coast_sand_rocks_02/coast_sand_rocks_02_ao_2k.jpg",
+      "bytes": 3125761,
+      "sha256": "8551ee1edd1257b99b2972ec0fc086e2ecfa98ece85a296d4500e8a6ea064498",
+      "sourceMd5": "85a6518fa4d1db883d9139d586da89b5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/coast_sand_rocks_02/coast_sand_rocks_02_disp_2k.jpg",
+      "bytes": 1044275,
+      "sha256": "109dfa81b1085e1b1d32ba740c0efb04b06e0b497925ef8e58e9c3c0e6753617",
+      "sourceMd5": "2b36922488b52a8248f464557a4a8c66"
+    }
+  ]
+}

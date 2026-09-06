@@ -7,11 +7,12 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 
 import { CANVAS_W } from "./studio-assets";
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "./studio-chrome-ui";
 import {
+  Studio2dSceneBrowser,
   StudioBackgroundPanel,
   StudioCanvasResizer,
   StudioTonePanel,
@@ -22,7 +23,6 @@ import type { StudioMenu } from "./studio-editor-tool-model";
 import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
 
 
-const Studio2dSceneBrowser = lazy(() => import("./Studio2dSceneBrowser").then((module) => ({ default: module.Studio2dSceneBrowser })));
 
 export interface StudioSceneToolPopoverBodyProps {
   readonly toolBelt: StudioToolBeltContentProps;

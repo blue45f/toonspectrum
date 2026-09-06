@@ -1,0 +1,72 @@
+name: Studio promo video quality
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/promo/**'
+      - 'src/app/routes/groups/creator.routes.tsx'
+      - 'src/domains/creator/ai/StudioAiProductionLaunchpad.tsx'
+      - 'e2e/studio-promo.spec.ts'
+      - 'tools/browser-harnesses/promo-e2e.html'
+      - '.github/workflows/studio-promo-video.yml'
+permissions:
+  contents: read
+concurrency:
+  group: studio-promo-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  promo-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PLAYWRIGHT_CHANNEL: ''
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run src/domains/creator/promo/promo-model.test.ts
+      - run: pnpm exec eslint src/domains/creator/promo src/app/routes/groups/creator.routes.tsx src/domains/creator/ai/StudioAiProductionLaunchpad.tsx e2e/studio-promo.spec.ts --max-warnings=0
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk ffmpeg
+      - run: pnpm exec playwright test e2e/studio-promo.spec.ts --project=chromium
+      - name: Extract actual browser-exported Remotion kit
+        run: |
+          python3 - <<'PY'
+          import glob, os, zipfile
+          path = glob.glob('test-results/**/render-kit.zip', recursive=True)[0]
+          target = os.path.join(os.environ['RUNNER_TEMP'], 'promo-render')
+          with zipfile.ZipFile(path) as archive:
+              assert archive.testzip() is None
+              assert all(not name.startswith('/') and '..' not in name.split('/') for name in archive.namelist())
+              archive.extractall(target)
+          PY
+      - name: Render H.264 from exported composition
+        working-directory: ${{ runner.temp }}/promo-render
+        run: |
+          npm install --no-audit --no-fund
+          npm run render -- --scale=0.25 --concurrency=2
+          ffprobe -v error -show_streams -show_format -of json out/promo.mp4 > out/probe.json
+          python3 - <<'PY'
+          import json
+          data = json.load(open('out/probe.json'))
+          video = next(s for s in data['streams'] if s['codec_type'] == 'video')
+          assert video['codec_name'] == 'h264'
+          assert int(video['nb_frames']) == 450
+          assert video['r_frame_rate'] == '30/1'
+          assert abs(float(video['duration']) - 15) < 0.05
+          assert any(s['codec_type'] == 'audio' for s in data['streams'])
+          print('Validated 450 frames, 30 fps, 15 seconds, H.264 + audio')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-promo-video-evidence
+          retention-days: 7
+          path: |
+            test-results/
+            ${{ runner.temp }}/promo-render/out/
