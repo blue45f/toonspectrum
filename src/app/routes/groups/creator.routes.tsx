@@ -67,6 +67,9 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-work", path: "/create/:id", element: <CreateWorkPage /> },
   { id: "creator-character-shaper", path: "/shaper", element: <CharacterShaperLandingPage /> },
   { id: "creator-brush-lab", path: "/brush-lab", element: <StudioBrushLabPage /> },
+  { id: "creator-studio-brush-lab", path: "/studio/brush-lab", element: <StudioBrushLabPage /> },
+  { id: "creator-studio-work-brush-lab", path: "/studio/work/:workId/brush-lab", element: <StudioBrushLabPage /> },
+  { id: "creator-studio-remix-brush-lab", path: "/studio/remix/:sourceWorkId/brush-lab", element: <StudioBrushLabPage /> },
   { id: "creator-learning", path: "/learn/*", element: <LearnPage /> },
   { id: "creator-studio", path: "/studio/*", element: <StudioRouter /> },
 ]);
