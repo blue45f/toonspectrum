@@ -1702,6 +1702,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         `${preset.id}: pro catalogue selection has no runtime dynamics`,
       );
       const operation = verifierBrushOperation(expectedSelection);
+      const transparentPaint = operation === "paint"
+        && !studioWetInkBrushDepositsPigment(expectedSelection.runtimeBrushId);
       const lowDensityEraser = operation === "erase"
         && isStudioBrushEraserAliasId(expectedSelection.runtimeBrushId);
       await selectDesktopBrush(page, preset, expectedSelection);
@@ -2096,7 +2098,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         writeFileSync(join(SCRATCH, `release-diag-${preset.id}-late.png`), late);
       }
       invariant(
-        hasMeaningfulPixelChange(immediateDiff),
+        transparentPaint || hasMeaningfulPixelChange(immediateDiff),
         operation === "erase"
           ? `${preset.id}: released eraser did not visibly remove baseline paint`
           : `${preset.id}: fast short stroke produced no visible pixels`,
@@ -2133,7 +2135,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         }
       }
       invariant(
-        visualChanged,
+        transparentPaint || visualChanged,
         operation === "erase"
           ? `${preset.id}: erased baseline reappeared before commit`
           : `${preset.id}: released stroke disappeared before becoming durable`,
@@ -2175,6 +2177,9 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // the same persistence audit in the long-route matrix below.
       const persistedProStroke = preset.source === "pro" && operation === "paint"
         ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)
+        : null;
+      const persistedTransparentStroke = transparentPaint
+        ? await waitForPersistedSelectedOperation(page, expectedSelection, "paint", 1, false, 15_000)
         : null;
       const persistedErase = operation === "erase"
         ? await waitForPersistedSelectedOperation(
@@ -2230,7 +2235,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // Konva may re-rasterize the untouched paper by a few channel values after a history jump.
       // Ignore imperceptible antialias noise while still rejecting any residual ink above Δ20.
       const undoDiff = await compareScreenshotPixels(page, before, undone, 20);
-      const undoRestoredPixels = undoDiff.changedPixels <= 3;
+      const undoRestoredPixels = transparentPaint || undoDiff.changedPixels <= 3;
       if (!undoRestoredPixels) {
         writeFileSync(join(SCRATCH, `studio-brush-diagnostic-${preset.id}-before.png`), before);
         writeFileSync(join(SCRATCH, `studio-brush-diagnostic-${preset.id}-stroke.png`), after);
@@ -2245,7 +2250,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       await page.waitForTimeout(60);
       const redone = await page.screenshot({ animations: "disabled", clip: usedClip });
       const redoDiff = await compareScreenshotPixels(page, before, redone);
-      const redoRestoredStroke = hasMeaningfulPixelChange(redoDiff);
+      const redoRestoredStroke = transparentPaint || hasMeaningfulPixelChange(redoDiff);
       invariant(redoRestoredStroke, `${preset.id}: Redo did not restore visible stroke pixels`);
 
       evidence.push({
@@ -2261,9 +2266,13 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         redoRestoredStroke,
         persistedOperationMatched,
         persistedCatalogId:
-          persistedProStroke?.brushCatalogId ?? persistedErase?.stroke.brushCatalogId ?? null,
+          persistedProStroke?.brushCatalogId
+            ?? persistedTransparentStroke?.stroke.brushCatalogId
+            ?? persistedErase?.stroke.brushCatalogId ?? null,
         persistedRuntimeBrushId:
-          persistedProStroke?.brush ?? persistedErase?.stroke.brush ?? null,
+          persistedProStroke?.brush
+            ?? persistedTransparentStroke?.stroke.brush
+            ?? persistedErase?.stroke.brush ?? null,
         persistedDynamicsMatched,
       });
       // Keep every catalogue entry isolated. Broad texture/pro brushes must not cover the next
