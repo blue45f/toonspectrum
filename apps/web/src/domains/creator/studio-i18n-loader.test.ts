@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { resolveI18nValue } from "@/shared/lib/i18n";
 import { STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
 
 import {

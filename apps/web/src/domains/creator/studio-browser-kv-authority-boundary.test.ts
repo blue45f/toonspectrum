@@ -686,7 +686,7 @@ describe("Studio browser-KV authority boundary", () => {
   it("keeps every allowance narrow, justified, and reviewable", () => {
     const ids = new Set<string>();
     for (const allowance of ALLOWANCES) {
-      expect(allowance.file).toMatch(/^(?:src\/domains\/creator|packages\/studio-[^/]+\/src)\//u);
+      expect(allowance.file).toMatch(/^(?:apps\/web\/src\/domains\/creator|src\/domains\/creator|packages\/studio-[^/]+\/src)\//u);
       expect(allowance.file).not.toMatch(/[?*{}[\]]/u);
       expect(allowance.key.length).toBeGreaterThan(0);
       expect(allowance.key).not.toBe("*");
