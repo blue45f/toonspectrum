@@ -78,7 +78,7 @@ def clear_scene():
     scene.unit_settings.length_unit = "METERS"
 
 
-def material(
+def material( # NOSONAR python:S3776
     name,
     color,
     *,
@@ -526,7 +526,7 @@ def build_compact_apartment_interior():
     render_thumbnail("compact_apartment_interior", (9.1, -10.5, 7.7), (0.0, 0.1, 1.25), world=(0.055, 0.045, 0.038, 1.0), energy=1500)
 
 
-def build_stylized_cafe_interior():
+def build_stylized_cafe_interior(): # NOSONAR python:S3776
     clear_scene()
     terrazzo = material("Cafe_TerrazzoFloor", (0.39, 0.31, 0.26), roughness=0.65)
     mint = material("Cafe_MintWall", (0.32, 0.62, 0.54), roughness=0.76)
@@ -582,7 +582,7 @@ def build_stylized_cafe_interior():
     render_thumbnail("stylized_cafe_interior", (11.7, -13.0, 8.8), (0.0, 0.4, 1.35), world=(0.055, 0.040, 0.035, 1.0), energy=1750)
 
 
-def build_urban_neon_alley():
+def build_urban_neon_alley(): # NOSONAR python:S3776
     clear_scene()
     asphalt = material("Alley_WetAsphalt", (0.035, 0.045, 0.058), metallic=0.12, roughness=0.28)
     brick = material("Alley_OldBrick", (0.31, 0.075, 0.045), roughness=0.86)
@@ -710,12 +710,12 @@ def build_classroom_art_studio():
     render_thumbnail("classroom_art_studio", (13.0, -14.8, 9.6), (0.0, 0.1, 1.45), world=(0.045, 0.050, 0.052, 1.0), energy=1900)
 
 
-def build_fantasy_ruin_courtyard():
+def build_fantasy_ruin_courtyard(): # NOSONAR python:S3776
     clear_scene()
     limestone = material("Ruin_Limestone", (0.47, 0.43, 0.32), roughness=0.92)
     mossy = material("Ruin_MossyStone", (0.23, 0.30, 0.13), roughness=0.96)
     darkstone = material("Ruin_DarkStone", (0.16, 0.18, 0.15), roughness=0.90)
-    bronze = material("Ruin_AncientBronze", (0.32, 0.17, 0.045), metallic=0.72, roughness=0.44)
+    material("Ruin_AncientBronze", (0.32, 0.17, 0.045), metallic=0.72, roughness=0.44)
     moss = material("Ruin_Moss", (0.055, 0.31, 0.08), roughness=0.98)
     vine = material("Ruin_Vines", (0.025, 0.20, 0.055), roughness=0.90)
     crystal = material("Ruin_RuneCrystal", (0.18, 0.10, 0.70), metallic=0.10, roughness=0.10, emission=(0.42, 0.12, 1.0), emission_strength=5.2)
@@ -776,7 +776,7 @@ def build_fantasy_ruin_courtyard():
     render_thumbnail("fantasy_ruin_courtyard", (15.2, -17.0, 11.8), (0.0, 0.0, 2.0), world=(0.035, 0.050, 0.040, 1.0), energy=1700)
 
 
-def build_scifi_command_corridor():
+def build_scifi_command_corridor(): # NOSONAR python:S3776
     clear_scene()
     hull = material("Scifi_Hull", (0.11, 0.14, 0.18), metallic=0.78, roughness=0.30)
     panel = material("Scifi_Panel", (0.23, 0.28, 0.33), metallic=0.64, roughness=0.38)

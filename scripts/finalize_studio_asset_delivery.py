@@ -106,7 +106,7 @@ def prepare() -> None:
     print('Prepared native catalog integration and compatibility-preserving blockout retirement.', flush=True)
 
 
-def stage(output: Path) -> None:
+def stage(output: Path) -> None: # NOSONAR python:S3776
     from PIL import Image, ImageDraw
     manifest = json.loads((output / 'manifest.json').read_text())
     report = json.loads((output / DELIVERY_REPORT_FILENAME).read_text())

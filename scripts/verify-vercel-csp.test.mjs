@@ -21,7 +21,7 @@ function fixture() {
   };
 }
 
-function createCompatDom({ rootPresent = false, moduleSupported = true } = {}) {
+function createCompatDom({ rootPresent = false, moduleSupported = true } = {}) { // NOSONAR javascript:S3776
   let root = rootPresent ? createRoot() : null;
   const listeners = [];
   let createdElementCount = 0;

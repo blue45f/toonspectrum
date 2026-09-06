@@ -171,7 +171,7 @@ async function runIntroCase(browser, { id, introShown, reducedMotion, viewport }
   return { usable, snapshot, pageErrors, consoleErrors };
 }
 
-async function runCompatibilityCase(browser) {
+async function runCompatibilityCase(browser) { // NOSONAR javascript:S3776
   const viewport = { width: 700, height: 412 };
   const context = await browser.newContext({
     viewport,

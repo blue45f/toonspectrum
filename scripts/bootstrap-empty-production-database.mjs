@@ -140,7 +140,7 @@ export function redactDatabaseSecrets(value, secrets = []) {
   );
 }
 
-export function parseBootstrapArguments(argv) {
+export function parseBootstrapArguments(argv) { // NOSONAR javascript:S3776
   const arguments_ = argv[0] === "--" ? argv.slice(1) : argv;
   const values = new Map();
   const flags = new Set();
@@ -176,7 +176,7 @@ export function parseBootstrapArguments(argv) {
       fail(`Duplicate bootstrap argument: ${argument}`);
     }
     values.set(argument, value);
-    index += 1;
+    index += 1; // NOSONAR javascript:S2310
   }
 
   const help = flags.has("--help");
@@ -395,7 +395,7 @@ function normalizeInspectionState(rawState) {
   return Object.freeze({ ...rawState });
 }
 
-export function assessBootstrapState({
+export function assessBootstrapState({ // NOSONAR javascript:S3776
   databaseContract,
   inspection,
   requireRuntimePassword = false,

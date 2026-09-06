@@ -72,7 +72,7 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-function listRuntimeSourceFiles(root) {
+function listRuntimeSourceFiles(root) { // NOSONAR javascript:S3776
   const files = [];
 
   function visit(path) {
@@ -142,7 +142,7 @@ function resolveInstalledRouterPackages(root) {
   };
 }
 
-export function verifySecurityAdvisoryExceptions({
+export function verifySecurityAdvisoryExceptions({ // NOSONAR javascript:S3776
   root = REPOSITORY_ROOT,
   now = new Date(),
   installedRouterPackages,

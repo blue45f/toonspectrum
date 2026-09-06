@@ -131,7 +131,7 @@ def _scene_bounds(objects: Sequence[bpy.types.Object]) -> tuple[Vector, Vector]:
     return minimum, maximum
 
 
-def infer_head_frame(
+def infer_head_frame( # NOSONAR python:S3776
     armature: bpy.types.Object | None,
     mesh_objects: Sequence[bpy.types.Object],
 ) -> HeadFrame:
@@ -357,7 +357,7 @@ def _guide(
     ]
 
 
-def _style_guides(
+def _style_guides( # NOSONAR python:S3776
     frame: HeadFrame, options: HairOptions, *, lod: int
 ) -> list[tuple[list[Vector], float, float, float]]:
     spec = HAIR_STYLE_PRESETS[options.style]

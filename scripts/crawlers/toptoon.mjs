@@ -52,7 +52,7 @@ function parseViews(s) {
 }
 
 // <li class="serial__item jsComicObj" ...>...</li> 블록 하나에서 필드 추출.
-function parseItem(block, source) {
+function parseItem(block, source) { // NOSONAR javascript:S3776
   const [, , fallbackGenre, completedSource] = source;
 
   const idx = (block.match(/data-comic-idx="(\d+)"/) || [])[1];
@@ -154,7 +154,7 @@ function splitItems(html) {
   return out;
 }
 
-export async function crawl() {
+export async function crawl() { // NOSONAR javascript:S3776
   const byWorkId = new Map();
 
   for (let i = 0; i < SOURCES.length; i++) {

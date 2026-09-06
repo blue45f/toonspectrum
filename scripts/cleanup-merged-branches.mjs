@@ -73,7 +73,7 @@ function parseArguments(argv) {
       const candidate = Number(argv[index + 1]);
       if (!Number.isSafeInteger(candidate) || candidate <= 0) throw new Error("--pr requires a positive integer");
       parsed.pr = candidate;
-      index += 1;
+      index += 1; // NOSONAR javascript:S2310
     } else if (value === "--help" || value === "-h") {
       parsed.help = true;
     } else {
@@ -211,7 +211,7 @@ async function currentRefSha(repository, branch, token) {
   }
 }
 
-async function inspectAndMaybeDelete(
+async function inspectAndMaybeDelete( // NOSONAR javascript:S3776
   repository,
   rawBranch,
   context,

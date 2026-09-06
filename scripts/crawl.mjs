@@ -869,21 +869,21 @@ function clean(t) {
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 function normalizeStats(t, idx) {
   const s = t.stats || (t.stats = {});
-  if (!(num(s.views) > 0)) {
+  if (num(s.views) <= 0) {
     const jitter = hashInt(t.id || t.slug || t.title || String(idx));
     const ratingAvg = num(s.ratingAvg) > 0 ? num(s.ratingAvg) : 4.0;
     // 별점·해시 기반 결정적 추정(평점 높을수록 ↑). 50k~약 3.5M 범위.
     s.views = Math.max(50_000, Math.round((ratingAvg - 2.8) * 900_000 + (jitter % 1_800_000)));
     t.statsEstimated = true;
   }
-  if (!(num(s.likes) > 0)) s.likes = Math.max(50, Math.round(s.views * 0.04));
-  if (!(num(s.bookmarks) > 0)) s.bookmarks = s.likes;
-  if (!(num(s.ratingAvg) > 0)) s.ratingAvg = 4.2;
-  if (!(num(s.ratingCount) > 0)) s.ratingCount = Math.max(50, Math.round(s.likes * 0.3));
+  if (num(s.likes) <= 0) s.likes = Math.max(50, Math.round(s.views * 0.04));
+  if (num(s.bookmarks) <= 0) s.bookmarks = s.likes;
+  if (num(s.ratingAvg) <= 0) s.ratingAvg = 4.2;
+  if (num(s.ratingCount) <= 0) s.ratingCount = Math.max(50, Math.round(s.likes * 0.3));
   if (!Array.isArray(s.ratingDist) || s.ratingDist.length !== 5) s.ratingDist = synthDist(s.ratingAvg, s.ratingCount);
-  if (!(num(s.trendingScore) > 0)) s.trendingScore = Math.max(35, Math.min(99, 90 - (idx % 60)));
-  if (!(num(s.completionRate) > 0)) s.completionRate = t.status === "completed" ? 88 : 72;
-  if (!(num(s.bingeIndex) > 0)) s.bingeIndex = Math.min(96, Math.round(60 + s.ratingAvg * 7));
+  if (num(s.trendingScore) <= 0) s.trendingScore = Math.max(35, Math.min(99, 90 - (idx % 60)));
+  if (num(s.completionRate) <= 0) s.completionRate = t.status === "completed" ? 88 : 72;
+  if (num(s.bingeIndex) <= 0) s.bingeIndex = Math.min(96, Math.round(60 + s.ratingAvg * 7));
   if (typeof s.rankDelta !== "number") s.rankDelta = 0;
   return t;
 }

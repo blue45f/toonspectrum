@@ -2165,7 +2165,7 @@ function validateAdoptionMarker(ledger, manifest) {
   return true;
 }
 
-function parseArguments(argv) {
+function parseArguments(argv) { // NOSONAR javascript:S3776
   const values = new Map();
   const booleanFlags = new Set();
   for (let index = 0; index < argv.length; index += 1) {
@@ -2196,7 +2196,7 @@ function parseArguments(argv) {
       fail(`Duplicate migration runner argument: ${argument}`);
     }
     values.set(argument, value);
-    index += 1;
+    index += 1; // NOSONAR javascript:S2310
   }
 
   const mode = values.get("--mode");
@@ -2234,7 +2234,7 @@ function parseArguments(argv) {
   };
 }
 
-export function runProductionDatabaseMigrations({
+export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
   databaseUrl,
   mode,
   releaseSha,

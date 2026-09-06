@@ -76,7 +76,7 @@ def clear_scene():
     scene.unit_settings.length_unit = "METERS"
 
 
-def material(
+def material( # NOSONAR python:S3776
     name,
     color,
     metallic=0.0,

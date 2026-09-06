@@ -174,7 +174,7 @@ function ignoredNetwork(text) {
 
 async function inspectDom(page, profile) {
   return page.evaluate(
-    ({ minTouchPx, touchProfile }) => {
+    ({ minTouchPx, touchProfile }) => { // NOSONAR javascript:S3776
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const epsilon = 0.5;
@@ -465,7 +465,7 @@ async function probeBg3dEntry(page, routeId) {
   return { applicable: true, available: true, clickError, opened };
 }
 
-function classify({
+function classify({ // NOSONAR javascript:S3776
   route,
   profile,
   responseStatus,

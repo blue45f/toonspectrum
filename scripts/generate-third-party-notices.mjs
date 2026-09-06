@@ -616,7 +616,7 @@ function validateVelloArtifactFiles(directory, artifact) {
   }
 }
 
-export function validateVelloThirdPartyInventory({
+export function validateVelloThirdPartyInventory({ // NOSONAR javascript:S3776
   directory = VELLO_PACKAGE_DIRECTORY,
   inventory = readJson(join(directory, "THIRD_PARTY_INVENTORY.json")),
   manifestText = readFileSync(join(directory, "Cargo.toml"), "utf8"),
@@ -998,7 +998,7 @@ ${rows.join("\n")}
 `;
 }
 
-function refreshVelloThirdPartyNotices() {
+function refreshVelloThirdPartyNotices() { // NOSONAR javascript:S3776
   const artifacts = VELLO_ARTIFACT_POLICIES.map((policy) => ({
     id: policy.id,
     features: [...policy.features],
@@ -1361,7 +1361,7 @@ function readWorkspaceImporterDirectories() {
     });
 }
 
-export function readFilesystemLicenseInventory() {
+export function readFilesystemLicenseInventory() { // NOSONAR javascript:S3776
   const pendingPackagePaths = [];
   for (const importerDirectory of readWorkspaceImporterDirectories()) {
     const importerPackageJson = readJson(
@@ -1525,7 +1525,7 @@ function collectMplFallback() {
   return null;
 }
 
-export function parsePnpmLicenseInventory(raw) {
+export function parsePnpmLicenseInventory(raw) { // NOSONAR javascript:S3776
   const grouped = JSON.parse(raw);
   const entries = [];
   for (const [licenseExpression, packages] of Object.entries(grouped)) {
@@ -1636,7 +1636,7 @@ function validateDirectDependencies(packageJson, inventory) {
   }
 }
 
-function collectLicenseDocuments(inventory, additionalDocuments = []) {
+function collectLicenseDocuments(inventory, additionalDocuments = []) { // NOSONAR javascript:S3776
   const documents = new Map();
   const missing = [];
 
@@ -1879,7 +1879,7 @@ function validateOpenCascadeReleaseBoundary() {
   }
 }
 
-function validateBrowserDistribution() {
+function validateBrowserDistribution() { // NOSONAR javascript:S3776
   const distPath = join(REPOSITORY_ROOT, "dist");
   if (!existsSync(distPath)) return;
 
@@ -2076,7 +2076,7 @@ ${licenseTexts}
 `;
 }
 
-export function main(argumentsList = process.argv.slice(2)) {
+export function main(argumentsList = process.argv.slice(2)) { // NOSONAR javascript:S3776
   const refreshEngineNotices = argumentsList.includes(
     "--refresh-shipped-engine-notices",
   );

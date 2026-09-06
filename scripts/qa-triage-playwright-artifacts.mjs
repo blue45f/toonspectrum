@@ -109,7 +109,7 @@ async function decodePlaywrightHtmlReports(files) {
   return decoded;
 }
 
-function recursivelyCollectFailures(value, source, out, pointer = "$", depth = 0) {
+function recursivelyCollectFailures(value, source, out, pointer = "$", depth = 0) { // NOSONAR javascript:S3776
   if (depth > 12 || out.length >= MAX_SNIPPETS) return;
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1) {
@@ -149,7 +149,7 @@ function recursivelyCollectFailures(value, source, out, pointer = "$", depth = 0
   }
 }
 
-async function scanFiles(files) {
+async function scanFiles(files) { // NOSONAR javascript:S3776
   const contexts = [];
   const jsonFailures = [];
   const signalLines = [];

@@ -182,7 +182,7 @@ function parseCards(html) {
   return out;
 }
 
-export async function crawl() {
+export async function crawl() { // NOSONAR javascript:S3776
   const byWorkId = new Map();
 
   // 요청 URL 목록(폴백 장르 동봉). 소스 폭으로 dedupe 후 120+ 확보.

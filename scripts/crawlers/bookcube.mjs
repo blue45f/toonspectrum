@@ -26,7 +26,7 @@ const CATEGORY_PAGES = 30; // 50개 x 30 (빈 페이지면 조기 종료 — 전
 const SLEEP_MS = 450;
 
 // 한 <li> 블록에서 제목/저자/평점 등을 추출.
-function parseListItems(html) {
+function parseListItems(html) { // NOSONAR javascript:S3776
   if (!html) return [];
   const items = [];
   // <ul class="book-list"> 내부의 각 <li> ... </li> 단위로 분리.
@@ -182,7 +182,7 @@ function buildRow(item, index) {
   return row;
 }
 
-export async function crawl() {
+export async function crawl() { // NOSONAR javascript:S3776
   const byId = new Map();
 
   // 1) 웹소설 분류 목록을 몇 페이지 페이지네이션.

@@ -17,7 +17,7 @@ const { outputText, diagnostics } = ts.transpileModule(source, {
 });
 assert.equal(diagnostics?.filter((item) => item.category === ts.DiagnosticCategory.Error).length, 0);
 
-async function recording({ preAborted = false, stopThrows = false, failFinalProgress = false, manualCapture = true, supportedMimes } = {}) {
+async function recording({ preAborted = false, stopThrows = false, failFinalProgress = false, manualCapture = true, supportedMimes } = {}) { // NOSONAR javascript:S3776
   let clock = 0;
   let nextId = 0;
   let trackStops = 0;

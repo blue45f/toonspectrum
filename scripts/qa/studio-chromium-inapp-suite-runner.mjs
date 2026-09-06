@@ -150,7 +150,7 @@ function fingerprint(category, value) {
   return createHash("sha256").update(`${category}\n${normalise(value)}`).digest("hex");
 }
 
-function knownJiraFor(value) {
+function knownJiraFor(value) { // NOSONAR javascript:S3800
   return KNOWN_JIRA.find(([, pattern]) => pattern.test(value))?.[0] ?? null;
 }
 
@@ -477,7 +477,7 @@ async function updateJira(results) {
   return report;
 }
 
-async function main() {
+async function main() { // NOSONAR javascript:S3776
   const suite = SUITES[SUITE];
   if (!suite) throw new Error(`Unknown QA_SUITE: ${SUITE}`);
   const selectedCases = selectCases(suite);

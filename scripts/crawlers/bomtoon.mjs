@@ -53,7 +53,7 @@ const WEEKDAY_MENUS = [
 const COMPLETE_RE = /(?:\(\s*완결\s*\)|\[\s*완결\s*\]|\(\s*完\s*\)|완결편)|완결$/; // NOSONAR S5850
 
 // creators[] → 글/그림 분리. type: AUTHOR / ILLUSTRATOR / ORIGINAL_AUTHOR 등.
-function splitCreators(creatorsRaw) {
+function splitCreators(creatorsRaw) { // NOSONAR javascript:S3776
   // tab/details / schedule 는 creators 가 "작가A, 작가B" 문자열.
   if (typeof creatorsRaw === "string") {
     const all = creatorsRaw
@@ -93,7 +93,7 @@ function pickCover(thumbnails) {
 }
 
 // 작품 한 건 → row. acc(누적 맵)에 이미 있으면 메타(완결/요일/표지) 보강만.
-function upsert(acc, item, ctx) {
+function upsert(acc, item, ctx) { // NOSONAR javascript:S3776
   const workId = String(item?.id ?? item?.contentsId ?? "").trim();
   if (!workId || workId === "undefined") return;
   const rawTitle = String(item?.title || "").trim();

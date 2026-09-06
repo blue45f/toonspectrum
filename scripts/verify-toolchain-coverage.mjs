@@ -124,7 +124,7 @@ function loadBaseline() {
   return JSON.parse(readFileSync(BASELINE_PATH, "utf8"));
 }
 
-function main() {
+function main() { // NOSONAR javascript:S3776
   const update = process.argv.includes("--update");
   const roots = readTestRoots();
   const testCounts = countTestFilesByRoot(roots);

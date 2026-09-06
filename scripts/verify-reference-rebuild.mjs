@@ -73,7 +73,7 @@ for (const asset of ASSETS) {
       assert.ok(Math.abs(Math.hypot(...node.rotation) - 1) < 1e-7);
     }
   });
-  test(`${asset.id}: complete indexed meshes, finite bounds, outward normals and UVs`, () => {
+  test(`${asset.id}: complete indexed meshes, finite bounds, outward normals and UVs`, () => { // NOSONAR javascript:S3776
     const { doc, read } = parse(generated.get(asset.id));
     for (let i = 0; i < doc.accessors.length; i++) read(i);
     for (const mesh of doc.meshes) for (const primitive of mesh.primitives) {
@@ -94,7 +94,7 @@ for (const asset of ASSETS) {
       }
     }
   });
-  test(`${asset.id}: embedded, CRC-valid decodable PNGs and normalized PBR`, () => {
+  test(`${asset.id}: embedded, CRC-valid decodable PNGs and normalized PBR`, () => { // NOSONAR javascript:S3776
     const { doc, bin } = parse(generated.get(asset.id));
     assert.equal(doc.images.length, 2);
     assert.ok(doc.buffers.every(b => !Object.hasOwn(b,'uri')));

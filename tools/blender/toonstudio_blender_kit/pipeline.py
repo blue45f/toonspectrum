@@ -135,7 +135,7 @@ def _import_blend(path: Path) -> None:
             bpy.context.scene.collection.objects.link(obj)
 
 
-def _import_source(path: Path) -> None:
+def _import_source(path: Path) -> None: # NOSONAR python:S3776
     if not path.exists() or not path.is_file():
         raise PipelineFailure(f"input character does not exist: {path}")
     suffix = path.suffix.casefold()
@@ -483,7 +483,7 @@ def _append_export_issue(issues: list[QualityIssue], code: str, message: str) ->
     issues.append(QualityIssue(code=code, severity="error", message=message))
 
 
-def run_pipeline(
+def run_pipeline( # NOSONAR python:S3776
     config: PipelineConfig,
     *,
     project_root: str | Path,

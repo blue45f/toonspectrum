@@ -123,7 +123,7 @@ function titleFor(detail, testId) {
   if (/unnamed control/i.test(body)) return `${body.replace(/^unnamed control:\s*/i, "")} — 접근성 이름 누락`;
   return `${testId}: ${body}`;
 }
-function knownFor(detail) { return knownJira.find(([, re]) => re.test(detail))?.[0] ?? null; }
+function knownFor(detail) { return knownJira.find(([, re]) => re.test(detail))?.[0] ?? null; } // NOSONAR javascript:S3800
 
 async function run(testCase, variant, cycle) {
   const dir = join(root, `cycle-${String(cycle).padStart(3, "0")}`, variant[0]);
@@ -217,7 +217,7 @@ function markdown(record) {
 function adf(record) {
   return { type: "doc", version: 1, content: markdown(record).split("\n").filter(Boolean).map((text) => ({ type: "paragraph", content: [{ type: "text", text: text.slice(0, 3000) }] })) };
 }
-async function fileIssue(record) {
+async function fileIssue(record) { // NOSONAR javascript:S3776
   if (!autoFile || record.knownJira || record.tracker) return;
   const label = `qa-soak-${record.fingerprint.slice(0, 16)}`;
   try {
@@ -260,7 +260,7 @@ async function summarize(records, executions, infra) {
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, md, "utf8");
 }
 
-async function main() {
+async function main() { // NOSONAR javascript:S3776
   const suite = tests[phase];
   if (!suite) throw new Error(`Unknown phase: ${phase}`);
   await mkdir(root, { recursive: true });

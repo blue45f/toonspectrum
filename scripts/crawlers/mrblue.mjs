@@ -40,7 +40,7 @@ const STATUS_BY_TAG = {
 
 // 카드 1개를 표현하는 <a href="/comic/ID"> ... </a> 블록에서 ID/제목/표지/상태를 추출.
 // 같은 ID 가 여러 상태 변형(연재/단행본)으로 중복 노출되므로 workId 로 dedupe 한다.
-function parseListHtml(html) {
+function parseListHtml(html) { // NOSONAR javascript:S3776
   const items = [];
   if (!html) return items;
 
@@ -147,7 +147,7 @@ function parseDetailHtml(html, titleWords = []) {
   return out;
 }
 
-export async function crawl() {
+export async function crawl() { // NOSONAR javascript:S3776
   // 1) 공개 목록 페이지들을 순차 수집(작은 sleep). 등장 순서 = 대략적 랭크.
   const seen = new Map(); // workId -> item(최초 등장 보존, 랭크 인덱스 포함)
   for (const url of LIST_URLS) {

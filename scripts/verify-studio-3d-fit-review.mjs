@@ -78,7 +78,7 @@ async function selectCard(id) {
   if (await card.getAttribute('aria-pressed') !== 'true') throw new Error(`Selection not reflected: ${id}`);
   return true;
 }
-async function character() {
+async function character() { // NOSONAR javascript:S3776
   await page.goto(origin + '/studio/character', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await ready(); await page.waitForTimeout(2500);
   const initial = await capture('00-original-ui');

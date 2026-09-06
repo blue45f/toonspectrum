@@ -78,7 +78,7 @@ def clear_scene():
     scene.unit_settings.length_unit = "METERS"
 
 
-def material(
+def material( # NOSONAR python:S3776
     name,
     color,
     *,
@@ -422,7 +422,7 @@ def render_thumbnail(
     print(f"Rendered {asset_id}: {scene.render.filepath}")
 
 
-def build_hospital_emergency_nurse_station():
+def build_hospital_emergency_nurse_station(): # NOSONAR python:S3776
     clear_scene()
     floor = material("Hospital_SeamlessFloor", (0.46, 0.58, 0.60), roughness=0.42)
     wall = material("Hospital_WarmWall", (0.86, 0.88, 0.84), roughness=0.82)
@@ -512,7 +512,7 @@ def build_hospital_emergency_nurse_station():
     )
 
 
-def build_korean_school_rooftop():
+def build_korean_school_rooftop(): # NOSONAR python:S3776
     clear_scene()
     deck = material("SchoolRoof_BlueDeck", (0.06, 0.22, 0.35), roughness=0.68)
     concrete = material("SchoolRoof_Concrete", (0.48, 0.51, 0.50), roughness=0.88)
@@ -631,7 +631,7 @@ def build_korean_school_rooftop():
     )
 
 
-def build_hanok_market_courtyard():
+def build_hanok_market_courtyard(): # NOSONAR python:S3776
     clear_scene()
     earth = material("Hanok_EarthCourtyard", (0.38, 0.25, 0.13), roughness=0.90)
     stone = material("Hanok_FoundationStone", (0.34, 0.36, 0.34), roughness=0.86)

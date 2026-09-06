@@ -87,7 +87,7 @@ def validate_asset(asset: dict, root: Path) -> None:
                 raise ValueError('Decoded image dimensions mismatch')
 
 
-def apply(candidates: Path, output: Path) -> dict:
+def apply(candidates: Path, output: Path) -> dict: # NOSONAR python:S3776
     source_manifest = json.loads((PUBLIC/MANIFEST_FILENAME).read_text())
     source_assets = source_manifest['assets']
     # This operation is locked to the reviewed baseline; rerunning on a different

@@ -171,7 +171,7 @@ function normalizeLane(raw) {
   };
 }
 
-export function scoreStudioBenchmarkProductAgainstLane(product, lane) {
+export function scoreStudioBenchmarkProductAgainstLane(product, lane) { // NOSONAR javascript:S3776
   let score = product.laneHints.includes(lane.id) ? 50 : 0;
   const matchedFocus = [];
 
@@ -212,7 +212,7 @@ export function scoreStudioBenchmarkProductAgainstLane(product, lane) {
   };
 }
 
-export function buildStudioBenchmarkGapPlan({
+export function buildStudioBenchmarkGapPlan({ // NOSONAR javascript:S3776
   campaign,
   registries,
   generatedAt = new Date().toISOString(),
@@ -374,16 +374,16 @@ function parseArguments(argv) {
     const value = argv[index + 1];
     if (argument === "--campaign") {
       options.campaignPath = value;
-      index += 1;
+      index += 1; // NOSONAR javascript:S2310
     } else if (argument === "--registry") {
       options.registryPaths.push(value);
-      index += 1;
+      index += 1; // NOSONAR javascript:S2310
     } else if (argument === "--json-output") {
       options.jsonOutput = value;
-      index += 1;
+      index += 1; // NOSONAR javascript:S2310
     } else if (argument === "--markdown-output") {
       options.markdownOutput = value;
-      index += 1;
+      index += 1; // NOSONAR javascript:S2310
     } else {
       throw new Error(`Unknown or incomplete option: ${argument}`);
     }

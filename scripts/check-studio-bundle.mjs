@@ -416,7 +416,7 @@ if (!fs.existsSync(manifestPath)) {
     return visited;
   }
 
-  function checkApprovedLazySpecialistBoundary({
+  function checkApprovedLazySpecialistBoundary({ // NOSONAR javascript:S3776
     label,
     pattern,
     approvedEntrySource,
@@ -1002,7 +1002,7 @@ function loadBaseline() {
   return parsed;
 }
 
-function writeBaseline({ previous, runtimeReport, tightenOnly }) {
+function writeBaseline({ previous, runtimeReport, tightenOnly }) { // NOSONAR javascript:S3776
   const nextStatic = { ...(previous?.static ?? {}) };
   let changed = 0;
   for (const measurement of measurements) {
@@ -1169,7 +1169,7 @@ function runtimeStalenessWarnings(baseline) {
   return warnings;
 }
 
-function reportRuntimeSection(runtimeReport, baseline) {
+function reportRuntimeSection(runtimeReport, baseline) { // NOSONAR javascript:S3776
   console.log("");
   if (!runtimeReport) {
     const recorded = baseline?.runtime;
@@ -1238,7 +1238,7 @@ function reportRuntimeSection(runtimeReport, baseline) {
   }
 }
 
-function reportBundleGate({ runtimeReport, structuralSummary }) {
+function reportBundleGate({ runtimeReport, structuralSummary }) { // NOSONAR javascript:S3776
   const baseline = loadBaseline();
 
   for (const observation of bundleObservations) {

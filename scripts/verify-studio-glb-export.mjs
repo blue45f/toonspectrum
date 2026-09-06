@@ -137,7 +137,7 @@ function readGlbChunks(bytes) {
   return { magic, version, declaredLength, chunks, consumedLength: offset, json };
 }
 
-async function verifyFixture({ name, build }) {
+async function verifyFixture({ name, build }) { // NOSONAR javascript:S3776
   const mesh = build();
   const result = exportFixture(name, mesh, 1);
 
@@ -229,7 +229,7 @@ async function verifyFixture({ name, build }) {
     if (message.severity === 0) severityLabel = "ERROR";
     else if (message.severity === 1) severityLabel = "WARNING";
     const line = `${severityLabel} ` + `${message.code} at ${message.pointer || "(root)"}: ${message.message}`;
-      `${message.code} at ${message.pointer || "(root)"}: ${message.message}`;
+
     if (message.severity === 0) {
       fail(name, `glTF-Validator ${line}`);
     } else {

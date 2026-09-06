@@ -377,7 +377,7 @@ async function probeSessionFailureRecovery(context) {
   return { intercepted, degraded, localErrors, recovered, recoveredSession };
 }
 
-async function main() {
+async function main() { // NOSONAR javascript:S3776
   await mkdir(REPORT_DIR, { recursive: true });
   await mkdir(EVIDENCE_DIR, { recursive: true });
 

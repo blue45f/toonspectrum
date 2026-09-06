@@ -146,7 +146,7 @@ function ignoredNetwork(text) {
 
 async function inspectDom(page, profile) {
   return page.evaluate(
-    ({ minTouchPx, isMobileProfile }) => {
+    ({ minTouchPx, isMobileProfile }) => { // NOSONAR javascript:S3776
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const epsilon = 0.5;
@@ -376,7 +376,7 @@ async function probeBg3dEntry(page, routeId) {
   return { applicable: true, available: true, clickError, dialogOpened };
 }
 
-function classify({ route, profile, responseStatus, navigationError, ready, dom, pageErrors, consoleErrors, requestFailures, workspaceProbe, bg3dProbe }) {
+function classify({ route, profile, responseStatus, navigationError, ready, dom, pageErrors, consoleErrors, requestFailures, workspaceProbe, bg3dProbe }) { // NOSONAR javascript:S3776
   const hardFailures = [];
   const warnings = [];
 

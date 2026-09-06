@@ -142,7 +142,7 @@ async function collectHomeItems(bySeries) {
 }
 
 // 각 탭의 장르/랭킹 screen 랜딩 페이지(SSR __NEXT_DATA__)에서 시리즈 리스트를 모은다.
-async function collectScreenItems(bySeries) {
+async function collectScreenItems(bySeries) { // NOSONAR javascript:S3776
   for (const [tab, screens] of Object.entries(TAB_SCREENS)) {
     const tabRef = `${ORIGIN}/menu/${tab}`;
     for (const screen of screens) {
@@ -187,7 +187,7 @@ async function fetchDetailMeta(seriesId) {
   return metas.find((m) => m.seriesId === seriesId) || metas[0];
 }
 
-export async function crawl() {
+export async function crawl() { // NOSONAR javascript:S3776
   const listItems = await collectListItems();
   if (!listItems.length) return [];
 

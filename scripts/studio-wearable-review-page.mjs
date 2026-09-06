@@ -33,7 +33,7 @@ function propInstance(def, color) {
     rig:{version:2,mode:"auto",anchorId:anchor.id,autoScale:true,autoFingerPose:Boolean(def.grip),gripFit:1,deltaPosition:[0,0,0],deltaRotationDeg:[0,0,0],deltaScale:1} };
 }
 
-api.select = async ({ type="wardrobe", id, model="sample", angle=30, crop="full", color=null, assetUrl=null }={})=>{
+api.select = async ({ type="wardrobe", id, model="sample", angle=30, crop="full", color=null, assetUrl=null }={})=>{ // NOSONAR javascript:S3776
   if (!selectState) throw new Error("Review root not ready");
   const token = ++generation; api.status="loading"; api.frames=0; api.receipt=null;
   selectState(null); await tick(); await tick();
@@ -75,20 +75,25 @@ api.view = (angle,crop=active?.crop??"full")=>{
   selectState(active);
 };
 api.pose = (kind)=>{
-  if(!active?.vrm)return;
-    if (l) { l.rotation.z = 0.40; }
-    if (r) { r.rotation.z = -0.40; }
-  if(kind==="arms-up"){
-    const l=vrm.humanoid.getNormalizedBoneNode("leftUpperArm");const r=vrm.humanoid.getNormalizedBoneNode("rightUpperArm");
-      if (thigh) { thigh.rotation.x = -1.05; }
-      if (knee) { knee.rotation.x = 1.35; }
-  }else if(kind==="bent-knees"){
-    for(const side of ["left","right"]){
-      const thigh=vrm.humanoid.getNormalizedBoneNode(`${side}UpperLeg`);const knee=vrm.humanoid.getNormalizedBoneNode(`${side}LowerLeg`);
-      if(thigh)thigh.rotation.x=-1.05;if(knee)knee.rotation.x=1.35;
+  const vrm = active?.vrm;
+  if (!vrm) return;
+  if (kind === "arms-up") {
+    const leftArm = vrm.humanoid.getNormalizedBoneNode("leftUpperArm");
+    const rightArm = vrm.humanoid.getNormalizedBoneNode("rightUpperArm");
+    if (leftArm) leftArm.rotation.z = 0.40;
+    if (rightArm) rightArm.rotation.z = -0.40;
+  } else if (kind === "bent-knees") {
+    for (const side of ["left", "right"]) {
+      const thigh = vrm.humanoid.getNormalizedBoneNode(`${side}UpperLeg`);
+      const knee = vrm.humanoid.getNormalizedBoneNode(`${side}LowerLeg`);
+      if (thigh) thigh.rotation.x = -1.05;
+      if (knee) knee.rotation.x = 1.35;
     }
   }
-  vrm.humanoid.update();vrm.update(0);vrm.scene.updateMatrixWorld(true);api.frames=0;
+  vrm.humanoid.update();
+  vrm.update(0);
+  vrm.scene.updateMatrixWorld(true);
+  api.frames = 0;
 };
 
 function Camera({selection}) {

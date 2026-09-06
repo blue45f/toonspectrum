@@ -60,6 +60,8 @@ jobs:
     env:
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_SCANNER_OPTS: -Xmx6144m
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - name: Check SonarQube secrets
         id: secrets

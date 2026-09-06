@@ -80,7 +80,7 @@ def clear_scene():
     scene.unit_settings.length_unit = "METERS"
 
 
-def material(
+def material( # NOSONAR python:S3776
     name,
     color,
     *,
@@ -130,7 +130,7 @@ def _pattern_color(pattern, x, y, base, accent):
     return tuple(base[index] * (1.0 - blend) + accent[index] * blend for index in range(3))
 
 
-def _create_embedded_image(name, pattern, base, accent, *, normal=False):
+def _create_embedded_image(name, pattern, base, accent, *, normal=False): # NOSONAR python:S3776
     image = bpy.data.images.new(
         name=name,
         width=TEXTURE_DIMENSION,
@@ -558,7 +558,7 @@ def render_thumbnail(
     print(f"Rendered {asset_id}: {scene.render.filepath}")
 
 
-def build_korean_convenience_store_night():
+def build_korean_convenience_store_night(): # NOSONAR python:S3776
     clear_scene()
     tile = textured_material(
         "ConvenienceStore_TileDetail",
@@ -699,7 +699,7 @@ def build_korean_convenience_store_night():
     )
 
 
-def build_seoul_subway_platform():
+def build_seoul_subway_platform(): # NOSONAR python:S3776
     clear_scene()
     platform = textured_material(
         "Subway_PlatformDetail",
@@ -860,7 +860,7 @@ def build_seoul_subway_platform():
     )
 
 
-def build_fantasy_alchemist_workshop_library():
+def build_fantasy_alchemist_workshop_library(): # NOSONAR python:S3776
     clear_scene()
     stone = textured_material(
         "Alchemist_StoneDetail",

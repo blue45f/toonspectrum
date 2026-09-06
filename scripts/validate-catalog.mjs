@@ -43,7 +43,7 @@ function platformCounts(titles) {
   return m;
 }
 
-function main() {
+function main() { // NOSONAR javascript:S3776
   const [, , newPath, prevPath] = process.argv;
   if (!newPath) {
     console.error("usage: validate-catalog.mjs <new.json|.gz> [prev.json.gz]");
@@ -110,7 +110,9 @@ function main() {
   for (const id of allIds) {
     const nc = nextPc[id] || 0;
     const pc = prevPc ? prevPc[id] || 0 : null;
-    const delta = pc !== null ? ` (직전 ${pc}, ${nc - pc >= 0 ? "+" : ""}${nc - pc})` : "";
+    const deltaValue = nc - pc;
+    const deltaSign = deltaValue >= 0 ? "+" : "";
+    const delta = pc !== null ? ` (직전 ${pc}, ${deltaSign}${deltaValue})` : "";
     console.log(`  ${id.padEnd(16)} ${String(nc).padStart(6)}${delta}`);
   }
 

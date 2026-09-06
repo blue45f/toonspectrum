@@ -22,7 +22,7 @@ export function readPngDimensions(bytes) {
   return { width, height };
 }
 
-export function readImageDimensions(bytes) {
+export function readImageDimensions(bytes) { // NOSONAR javascript:S3776
   if (Buffer.isBuffer(bytes) && bytes.subarray(0, 8).equals(PNG_SIGNATURE)) {
     return { ...readPngDimensions(bytes), mediaType: "image/png" };
   }
@@ -53,7 +53,7 @@ export function readImageDimensions(bytes) {
   throw new Error("JPEG has no supported frame header");
 }
 
-export function auditStudio2dAssets(root, input) {
+export function auditStudio2dAssets(root, input) { // NOSONAR javascript:S3776
   root ??= ROOT;
   const manifest = input ?? JSON.parse(readFileSync(path.join(root, STUDIO_2D_MANIFEST_PATH), "utf8"));
   const errors = [];

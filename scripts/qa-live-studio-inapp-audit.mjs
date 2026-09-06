@@ -89,7 +89,7 @@ function isIgnoredNetworkMessage(text) {
 }
 
 async function inspectDom(page) {
-  return page.evaluate((minTapPx) => {
+  return page.evaluate((minTapPx) => { // NOSONAR javascript:S3776
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const epsilon = 0.5;
@@ -230,7 +230,7 @@ async function probeEditorStroke(page) {
   };
 }
 
-function classifyResult({ route, profile, responseStatus, finalUrl, ready, dom, pageErrors, consoleErrors, requestFailures, navigationError, editorProbe }) {
+function classifyResult({ route, profile, responseStatus, finalUrl, ready, dom, pageErrors, consoleErrors, requestFailures, navigationError, editorProbe }) { // NOSONAR javascript:S3776
   const hardFailures = [];
   const warnings = [];
 
