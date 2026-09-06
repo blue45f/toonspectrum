@@ -68,7 +68,7 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
     const images = await loadPromoImages(project, signal);
     if (signal.aborted) throw new DOMException("취소했어요.", "AbortError");
     drawPromoFrame(ctx, project, images, 0, size.width, size.height);
-    stream = canvas.captureStream(Math.min(PROMO_FPS, 1));
+    stream = canvas.captureStream(Math.min(PROMO_FPS, 5));
     const videoTrack = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined;
     if (!videoTrack) throw new Error("영상 캡처 트랙을 만들지 못했어요.");
     if (project.audio && audioContext) {
@@ -149,10 +149,10 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
             // Canvas capture happens when the canvas is painted, after this callback.
             // Let the ending frame reach the track before stopping the recorder.
             videoTrack.requestFrame?.();
-            raf = requestAnimationFrame(() => {
+            setTimeout(() => {
               if (finished) return;
-              raf = requestAnimationFrame(() => finish());
-            });
+              finish();
+            }, 500);
             return;
           }
           raf = requestAnimationFrame(tick);
