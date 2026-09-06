@@ -222,6 +222,10 @@ export function registerStudioServiceWorker(): void {
   publishStatus("registering");
   navigator.serviceWorker.register(SERVICE_WORKER_URL, { scope: "/" }).then(
     (registration) => {
+      if (!registration) {
+        publishStatus("failed");
+        return;
+      }
       publishStatus(
         navigator.serviceWorker.controller ? "active" : "registering",
       );
