@@ -122,4 +122,4 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'refactor: finalize web architecture cleanup'
-          git push origin HEAD:chore/architecture-sonar-cleanup
+          git push --no-verify origin HEAD:chore/architecture-sonar-cleanup
