@@ -33,7 +33,7 @@ const results = [];
 let server;
 let browser;
 try {
-  server = await createServer({ configFile: false, root, plugins: [react()], resolve: { alias: { "@": root } },
+  server = await createServer({ configFile: false, root, plugins: [react()], resolve: { alias: { "@/src": path.join(root, "apps", "web", "src"), "@/shared": path.join(root, "apps", "web", "src", "shared"), "@/domains": path.join(root, "apps", "web", "src", "domains"), "@": path.join(root, "apps", "web", "src") } },
     server: { host: "127.0.0.1", port: 0 }, publicDir: path.join(root, "apps", "web", "public"),
     optimizeDeps: { entries: [path.join(fixture, "index.html")] } });
   await server.listen();
