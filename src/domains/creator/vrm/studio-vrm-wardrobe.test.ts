@@ -499,44 +499,51 @@ describe("실측 몸통 재단", () => {
       .toBeGreaterThan(Math.max(...slim.profile.map((point) => point.radius)) * 1.2);
   });
 
-  it("어깨 요크가 목에서 어깨 관절까지 이어지고 소매는 진동 안으로 들어간다", () => {
-    const m = measured();
-    const parts = buildGarmentParts("tshirt", m, 1);
-    const yoke = parts.find((part) => (
-      part.bone === "spine" && part.shape.kind === "cylinder" && part.align?.[0] === 1
+  it("어깨 브리지가 몸통 셸에서 양쪽 어깨 관절까지 이어지고 소매는 진동 안으로 들어간다", () => {
+  const m = measured();
+  const parts = buildGarmentParts("tshirt", m, 1);
+  const bridges = parts.filter((part) => (
+    part.bone === "spine" && part.shape.kind === "lathe" && part.align && Math.abs(part.align[0]) > 0.9
+  ));
+  const leftBridge = bridges.find((part) => (part.align?.[0] ?? 0) > 0);
+  const sleeve = parts.find((part) => part.bone === "leftUpperArm");
+  if (leftBridge?.shape.kind !== "lathe" || sleeve?.shape.kind !== "cylinder" || !leftBridge.align) {
+    throw new Error("shoulder bridge or sleeve missing");
+  }
+
+  expect(bridges).toHaveLength(2);
+  const bridgeYs = leftBridge.shape.profile.map((point) => point.y);
+  const outerEdge = leftBridge.offset[0] + Math.max(...bridgeYs);
+  expect(outerEdge).toBeGreaterThanOrEqual(m.shoulderW * 0.5);
+  expect(Math.max(...leftBridge.shape.profile.map((point) => point.radius))).toBeGreaterThanOrEqual(sleeve.shape.rTop);
+  expect(leftBridge.squash?.[2]).toBeLessThan(1);
+
+  const measuredStart = sleeve.offset[0] - sleeve.shape.h / 2;
+  const measuredEnd = sleeve.offset[0] + sleeve.shape.h / 2;
+  const fallback = buildGarmentParts("tshirt", FALLBACK_WARDROBE_METRICS, 1)
+    .find((part) => part.bone === "leftUpperArm");
+  if (fallback?.shape.kind !== "cylinder") throw new Error("fallback sleeve missing");
+  expect(measuredStart).toBeLessThan(0);
+  expect(fallback.offset[0] - fallback.shape.h / 2).toBeCloseTo(0, 10);
+  expect(measuredEnd).toBeCloseTo(fallback.offset[0] + fallback.shape.h / 2, 10);
+});
+
+it("양쪽 어깨 브리지의 전체 폭은 실측 어깨에서 나온다", () => {
+  const wider = BODY_RINGS.map((ring) => ({ ...ring, halfWidth: ring.halfWidth * 1.4 }));
+  const spanOf = (m: WardrobeMetrics): number => {
+    const bridges = buildGarmentParts("tshirt", m, 1).filter((part) => (
+      part.bone === "spine" && part.shape.kind === "lathe" && part.align && Math.abs(part.align[0]) > 0.9
     ));
-    const sleeve = parts.find((part) => part.bone === "leftUpperArm");
-    if (yoke?.shape.kind !== "cylinder" || sleeve?.shape.kind !== "cylinder") {
-      throw new Error("shoulder yoke or sleeve missing");
+    if (bridges.length !== 2) throw new Error("shoulder bridges missing");
+    const xs: number[] = [];
+    for (const bridge of bridges) {
+      if (bridge.shape.kind !== "lathe" || !bridge.align) throw new Error("invalid shoulder bridge");
+      for (const point of bridge.shape.profile) xs.push(bridge.offset[0] + bridge.align[0] * point.y);
     }
-
-    // 요크는 좌우 어깨 관절까지는 반드시 닿아야 소매를 만난다.
-    expect(yoke.shape.h).toBeGreaterThanOrEqual(m.shoulderW);
-    expect(yoke.shape.rTop).toBeGreaterThanOrEqual(sleeve.shape.rTop);
-    expect(yoke.squash?.[2]).toBeLessThan(1);
-
-    // 소매는 어깨 관절보다 몸쪽에서 시작하고(음수 start) 끝단은 그대로다.
-    const measuredStart = sleeve.offset[0] - sleeve.shape.h / 2;
-    const measuredEnd = sleeve.offset[0] + sleeve.shape.h / 2;
-    const fallback = buildGarmentParts("tshirt", FALLBACK_WARDROBE_METRICS, 1)
-      .find((part) => part.bone === "leftUpperArm");
-    if (fallback?.shape.kind !== "cylinder") throw new Error("fallback sleeve missing");
-    expect(measuredStart).toBeLessThan(0);
-    expect(fallback.offset[0] - fallback.shape.h / 2).toBeCloseTo(0, 10);
-    expect(measuredEnd).toBeCloseTo(fallback.offset[0] + fallback.shape.h / 2, 10);
-  });
-
-  it("요크 폭은 실측 어깨에서 나온다", () => {
-    const wider = BODY_RINGS.map((ring) => ({ ...ring, halfWidth: ring.halfWidth * 1.4 }));
-    const spanOf = (m: WardrobeMetrics): number => {
-      const yoke = buildGarmentParts("tshirt", m, 1).find((part) => (
-        part.bone === "spine" && part.shape.kind === "cylinder" && part.align?.[0] === 1
-      ));
-      if (yoke?.shape.kind !== "cylinder") throw new Error("shoulder yoke missing");
-      return yoke.shape.h;
-    };
-    expect(spanOf(measured(wider))).toBeGreaterThan(spanOf(measured()));
-  });
+    return Math.max(...xs) - Math.min(...xs);
+  };
+  expect(spanOf(measured(wider))).toBeGreaterThan(spanOf(measured()));
+});
 
   it("스커트 허리는 실측 골반 링에서 나오고 밑단은 그대로 완만하다", () => {
     const m = measured();
