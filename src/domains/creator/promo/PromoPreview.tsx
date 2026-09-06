@@ -54,8 +54,21 @@ export function PromoPreview({ project, disabled }: { project: PromoProject; dis
       if (next >= total - 1 || document.hidden) { setPlaying(false); return; }
       raf = requestAnimationFrame(tick);
     };
+    // Hidden tabs may suspend animation frames while audio keeps playing.
+    const visibility = () => {
+      if (!document.hidden) return;
+      cancelAnimationFrame(raf);
+      audio?.pause();
+      setPlaying(false);
+    };
     raf = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(raf); audio?.pause(); };
+    document.addEventListener("visibilitychange", visibility);
+    visibility();
+    return () => {
+      document.removeEventListener("visibilitychange", visibility);
+      cancelAnimationFrame(raf);
+      audio?.pause();
+    };
   }, [playing, total, project.audio]);
   const play = () => {
     if (playing) { setPlaying(false); return; }
