@@ -1,9 +1,12 @@
+// @vitest-environment jsdom
+
 import { strict as assert } from "node:assert";
+
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, test, vi } from "vitest";
 
-import SpatialStoryboardPanel from "./StudioBg3dSpatialStoryboardPanel";
 import { SPATIAL_STORYBOARD_DEFAULTS } from "./studio-bg3d-spatial-storyboard";
+import SpatialStoryboardPanel from "./StudioBg3dSpatialStoryboardPanel";
 
 const commands = vi.hoisted(() => ({
   disabled: false,

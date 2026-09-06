@@ -39,5 +39,8 @@ export const STUDIO_MENU_HELP_GROUP_SPEC: StudioMenuGroupSpec = {
     has("License/Attribution", "help/licenses"),
     has("Bug Report Package", "help/bug-report"),
   ],
-  extras: [ours("help/shortcuts", "단축키 · 기본 조작.")],
+  extras: [
+    ours("help/shortcuts", "단축키 · 기본 조작."),
+    ours("help/user-manual", "별도 사용자 매뉴얼 · 새 탭에서 연다 (#794)."),
+  ],
 };
