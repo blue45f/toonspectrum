@@ -54,7 +54,7 @@ describe("vite migration", () => {
     // 커맨드 팔레트 호스트는 공용 셸(AppShell)에서 마운트한다(App.tsx 는 라우터+크롬만 조립).
     const app = readFileSync(join(process.cwd(), "apps/web/src/app/App.tsx"), "utf8");
     const shell = readFileSync(join(process.cwd(), "apps/web/src/app/AppShell.tsx"), "utf8");
-    const host = readFileSync(join(process.cwd(), "components/command-palette-host.tsx"), "utf8");
+    const host = readFileSync(join(process.cwd(), "apps/web/src/shared/components/command-palette-host.tsx"), "utf8");
 
     expect(shell).toContain("@/shared/components/command-palette-host");
     expect(app).not.toMatch(/from\s+["']@\/components\/command-palette["']/);
@@ -79,7 +79,7 @@ describe("vite migration", () => {
   });
 
   it("keeps studio-only Google Fonts out of the global render-blocking stylesheet", () => {
-    const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
+    const html = readFileSync(join(process.cwd(), "apps/web/index.html"), "utf8");
     // Ownership moved out of StudioPage: the studio no longer injects all eight families on idle,
     // it loads the families a document actually uses and defers the rest to the preset list. The
     // css2 URL is assembled from these declarations at runtime, so the source carries plain names

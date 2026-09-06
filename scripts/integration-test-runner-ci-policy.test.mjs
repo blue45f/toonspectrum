@@ -256,6 +256,8 @@ describe("database integration runner CI policy", () => {
     expect(runCommands(workflow.jobs?.lint)).toEqual([
       "pnpm install --frozen-lockfile",
       "pnpm run validate:architecture",
+      "pnpm run verify:csp",
+      "pnpm run verify:toolchain-coverage",
       "pnpm run lint",
     ]);
     expect(runCommands(workflow.jobs?.typecheck)).toEqual([

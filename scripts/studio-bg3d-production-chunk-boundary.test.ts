@@ -30,7 +30,7 @@ describe("BG3D production UI contract chunk boundary", () => {
   it("co-locates exactly the production models and their shared context, not panels or engines", () => {
     const matchedPaths: string[] = [];
     let matchingGroups = 0;
-    visitTree(parseFile("vite.config.ts"), (node) => {
+    visitTree(parseFile("apps/web/config/vite-manual-chunks.ts"), (node) => {
       if (!ts.isIfStatement(node) || !ts.isBlock(node.thenStatement)) return;
       const returnsModelChunk = node.thenStatement.statements.some((statement) =>
         ts.isReturnStatement(statement) &&
@@ -45,7 +45,12 @@ describe("BG3D production UI contract chunk boundary", () => {
       });
     });
     expect(matchingGroups).toBe(1);
-    expect(matchedPaths.toSorted()).toEqual(GROUP_PATHS.map((file) => `/${file}`).toSorted());
+    expect(matchedPaths.toSorted()).toEqual([
+      "/src/domains/creator/bg3d/studio-bg3d-production-workflow.ts",
+      "/src/domains/creator/bg3d/studio-bg3d-production-pass-readiness.ts",
+      "/src/domains/creator/bg3d/studio-bg3d-production-multipass.ts",
+      "/src/domains/creator/bg3d/studio-bg3d-pro-suite-runtime-context.tsx",
+    ].toSorted());
   });
 
   it.each(GROUP_PATHS)("keeps %s within its explicit runtime dependency boundary", (file) => {
@@ -78,7 +83,7 @@ describe("Studio startup capability chunk boundary", () => {
   it("co-locates the initial tool leaf with existing tiny capability contracts", () => {
     const matchedPaths: string[] = [];
     let matchingGroups = 0;
-    visitTree(parseFile("vite.config.ts"), (node) => {
+    visitTree(parseFile("apps/web/config/vite-manual-chunks.ts"), (node) => {
       if (!ts.isIfStatement(node) || !ts.isBlock(node.thenStatement)) return;
       const returnsCapabilityChunk = node.thenStatement.statements.some((statement) =>
         ts.isReturnStatement(statement) &&

@@ -9,14 +9,14 @@ const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 // 한 번 정리한 일탈(raw white 텍스트, 쿨 무채색 shadow-black, 하드코딩 스킵링크 색)의 재발을 막는다.
 describe("design token discipline", () => {
   it("keeps recommend view accent CTAs on the on-accent token instead of raw white", () => {
-    const view = read("components/recommend-view.tsx");
+    const view = read("apps/web/src/shared/components/recommend-view.tsx");
 
     expect(view).not.toContain("text-white");
     expect(view).toContain("text-on-accent");
   });
 
   it("keeps floating switcher and share menu shadows on the warm-ink axis", () => {
-    const paths = ["components/share-button.tsx"];
+    const paths = ["apps/web/src/shared/components/share-button.tsx"];
 
     for (const path of paths) {
       const source = read(path);

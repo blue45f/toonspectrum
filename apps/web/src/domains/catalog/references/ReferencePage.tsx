@@ -44,6 +44,11 @@ function SearchForm({ field, q, onSearch }: { field: ReferenceField; q: string; 
   const t = useT();
   const [draftField, setDraftField] = useState(field);
   const [draft, setDraft] = useState(q);
+  // Keep the controlled draft in sync when popstate / setSearchParams restores q from the URL.
+  useEffect(() => {
+    setDraftField(field);
+    setDraft(q);
+  }, [field, q]);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSearch(draftField, draft);

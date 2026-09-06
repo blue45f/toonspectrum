@@ -60,7 +60,7 @@ describe("published app locale assets", () => {
   it("keeps the generated catalog in sync with the assets on disk", () => {
     const regenerated = buildCatalogSource(readAppLocaleDictionaries());
     const committed = readFileSync(
-      path.resolve(process.cwd(), "lib", "i18n-locale-catalog.ts"),
+      path.resolve(process.cwd(), "apps/web/src/shared/lib/i18n-locale-catalog.ts"),
       "utf8",
     );
 

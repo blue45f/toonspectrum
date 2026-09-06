@@ -23,10 +23,11 @@ setAppI18nAssetSource(async (assetLocale) => {
   const merged: Record<string, string> = {};
   for (const namespace of APP_I18N_NAMESPACES) {
     const assetPath = path.join(WEB_PUBLIC, "i18n", "app", namespace, `${assetLocale}.json`);
-    if (!existsSync(assetPath)) return null;
+    // contact/fortune/play ship only for a subset of locales (orphan key surfaces).
+    if (!existsSync(assetPath)) continue;
     Object.assign(merged, JSON.parse(readFileSync(assetPath, "utf8")));
   }
-  return JSON.stringify(merged);
+  return Object.keys(merged).length > 0 ? JSON.stringify(merged) : null;
 });
 //
 // The timer is captured here, at setup time, because a test file that installs fake timers and

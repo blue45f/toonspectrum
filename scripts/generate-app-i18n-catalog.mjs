@@ -14,7 +14,7 @@ import path from "node:path";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const assetDirectory = path.join(repoRoot, "apps", "web", "public", "i18n", "app");
-const catalogPath = path.join(repoRoot, "apps", "web", "lib", "i18n-locale-catalog.ts");
+const catalogPath = path.join(repoRoot, "apps", "web", "src", "shared", "lib", "i18n-locale-catalog.ts");
 
 /** Locales compiled into the app shell so the fallback chain never awaits I/O. */
 const BUILT_IN_LOCALES = ["ko", "en"];

@@ -1,21 +1,21 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { planStudioGpuFilterChain } from "../../../../src/domains/creator/render/studio-gpu-filter-apply";
+import { planStudioGpuFilterChain } from "../../../../apps/web/src/domains/creator/render/studio-gpu-filter-apply";
 import {
   STUDIO_GPU_FILTER_BINDINGS,
   STUDIO_GPU_FILTER_DISPATCH_ROW_THREADS,
   STUDIO_GPU_FILTER_KERNELS,
   STUDIO_GPU_FILTER_WORKGROUP_SIZE,
-} from "../../../../src/domains/creator/render/studio-gpu-filter-kernels";
+} from "../../../../apps/web/src/domains/creator/render/studio-gpu-filter-kernels";
 import {
   applyImageFilters,
   buildImageFilters,
   registerStudioKonvaFilters,
   type KonvaLike,
-} from "../../../../src/domains/creator/render/studio-konva-filters";
+} from "../../../../apps/web/src/domains/creator/render/studio-konva-filters";
 
-import type { StudioGpuFilterPlan } from "../../../../src/domains/creator/render/studio-gpu-filter-apply";
-import type { ImageFilterFields } from "../../../../src/domains/creator/render/studio-konva-filter-fields";
+import type { StudioGpuFilterPlan } from "../../../../apps/web/src/domains/creator/render/studio-gpu-filter-apply";
+import type { ImageFilterFields } from "../../../../apps/web/src/domains/creator/render/studio-konva-filter-fields";
 import type { Browser, Page } from "playwright";
 
 /**

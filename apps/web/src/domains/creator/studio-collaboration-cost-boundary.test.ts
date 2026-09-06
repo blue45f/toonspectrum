@@ -21,7 +21,7 @@ describe("studio collaboration cost boundary", () => {
 
   it("exposes only the screen-share ICE credential route", () => {
     const controllerSource = source(
-      "../../../apps/api/src/modules/creator/studio-voice-ice-policy.controller.ts"
+      "../../../../../apps/api/src/modules/creator/studio-voice-ice-policy.controller.ts"
     );
 
     expect(controllerSource).toContain("/creator/works/:id/screen-share/ice");

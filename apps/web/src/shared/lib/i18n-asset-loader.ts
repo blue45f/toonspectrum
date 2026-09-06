@@ -279,18 +279,31 @@ export async function loadAppI18nLocale(
           throw new Error("The Fetch API is unavailable in this runtime.");
         }
         const merged: Record<string, string> = {};
+        let missingNamespaceCount = 0;
         for (const namespace of APP_I18N_NAMESPACES) {
           const url = appI18nAssetUrl(assetLocale, options.baseUrl, namespace);
           const response = await resolvedFetch(url, {
             cache: "force-cache",
             credentials: "same-origin",
           });
+          // Optional orphan namespaces (contact/fortune/play) are absent for many locales.
+          if (response.status === 404) {
+            missingNamespaceCount += 1;
+            continue;
+          }
           if (!response.ok) {
             throw new Error(`HTTP ${response.status} for ${url}`);
           }
           const part = parseAppI18nDictionary(await response.text());
           if (!part) throw new Error(`Malformed app dictionary asset for "${assetLocale}/${namespace}".`);
           Object.assign(merged, part);
+        }
+        if (Object.keys(merged).length === 0) {
+          throw new Error(
+            missingNamespaceCount > 0
+              ? `HTTP 404 for app dictionary namespaces of "${assetLocale}".`
+              : `No app dictionary namespaces published for "${assetLocale}".`,
+          );
         }
         source = JSON.stringify(merged);
       }

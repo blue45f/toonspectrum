@@ -196,38 +196,19 @@ describe("Studio lazy i18n assets", () => {
 
   it("keeps Studio strings out of the eagerly loaded global dictionary source", () => {
     const i18nSource = readFileSync(
-      path.resolve(process.cwd(), "lib", "i18n.ts"),
+      path.resolve(process.cwd(), "apps/web/src/shared/lib/i18n.ts"),
       "utf8",
     );
     const studioPageSource = readFileSync(
-      path.resolve(
-        process.cwd(),
-        "src",
-        "domains",
-        "creator",
-        "StudioPage.tsx",
-      ),
+      path.resolve(process.cwd(), "apps/web/src/domains/creator/StudioPage.tsx"),
       "utf8",
     );
     const companionSource = readFileSync(
-      path.resolve(
-        process.cwd(),
-        "src",
-        "domains",
-        "creator",
-        "StudioToolsCompanionPage.tsx",
-      ),
+      path.resolve(process.cwd(), "apps/web/src/domains/creator/StudioToolsCompanionPage.tsx"),
       "utf8",
     );
     const creatorRoutesSource = readFileSync(
-      path.resolve(
-        process.cwd(),
-        "src",
-        "app",
-        "routes",
-        "groups",
-        "creator.routes.tsx",
-      ),
+      path.resolve(process.cwd(), "apps/web/src/app/routes/groups/creator.routes.tsx"),
       "utf8",
     );
 

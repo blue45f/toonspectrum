@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 
 import { STUDIO_FILTER_DIALOG_CATALOG } from "../apps/web/src/domains/creator/filter/studio-filter-catalog";
 
-import { WEB_ROOT } from "./lib/repo-paths.mjs";
+import { REPO_ROOT, WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 import { findFreePort, spawnVitePreview, stopChildProcess, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 import type { Page } from "playwright";
@@ -45,7 +45,7 @@ function App(){
 }
 createRoot(document.getElementById("root")!).render(<App/>);
 `);
-const dev = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", String(devPort), "--strictPort"], { stdio: "ignore" });
+const dev = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--config", WEB_VITE_CONFIG, "--host", "127.0.0.1", "--port", String(devPort), "--strictPort"], { cwd: REPO_ROOT, stdio: "ignore" });
 const preview = spawnVitePreview({ port: previewPort, runner: "node-vite-bin", logPath: join(output, "preview.log") });
 
 function watch(page: Page) {
@@ -66,7 +66,7 @@ try {
     const context = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 1 });
     const page = await context.newPage();
     watch(page);
-    await page.goto(`${devOrigin}/${htmlName}`, { waitUntil: "networkidle" });
+    await page.goto(`${devOrigin}/${htmlName}`, { waitUntil: "load" });
     const palette = page.locator('[data-studio-subtool-palette="true"]');
     await palette.waitFor({ state: "visible" });
     assert.equal(await palette.getByRole("tab").count(), 6);
