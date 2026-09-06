@@ -25,6 +25,8 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 
+import { REPO_ROOT } from "./lib/repo-paths.mjs";
+
 const SCRATCH =
   process.env.TOONSPECTRUM_BG3D_WEBGPU_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
@@ -400,6 +402,13 @@ async function main() { // NOSONAR javascript:S3776
   mkdirSync(SCRATCH, { recursive: true });
   const port = await findFreePort();
   const viteServer = await createViteServer({
+    // HARNESS_ENTRY lives under repository-root scripts/, while the product Vite
+    // config roots at apps/web. Keep this isolated verifier at the repository root
+    // with configFile disabled so /scripts/*.ts harness modules resolve after the
+    // frontend directory migration.
+    root: REPO_ROOT,
+    configFile: false,
+    envFile: false,
     appType: "custom",
     logLevel: "error",
     server: { host: "127.0.0.1", port, strictPort: true },
