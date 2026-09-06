@@ -5,20 +5,24 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { fetchReferenceResult } from "./reference-api";
 import { clearReferenceDraft, readReferenceDrafts } from "./reference-drafts";
+import {
+  REFERENCE_ERROR_MESSAGE_KEYS, REFERENCE_FIELD_LABEL_KEYS, REFERENCE_GUIDE_SECTIONS, REFERENCE_JOURNEY_STEPS,
+  REFERENCE_METADATA_FIELDS, REFERENCE_METADATA_LABEL_KEYS, REFERENCE_NOTICE_KEYS, REFERENCE_VIEW_TAB_KEYS, REFERENCE_VIEWS,
+} from "./reference-i18n";
+import { mutateReferenceNotes, readReferenceNotes, referenceCitation, referenceNotesBackup, referenceNotesMarkdown, REFERENCE_STORAGE_KEY } from "./reference-storage";
 import { ReferenceImport } from "./ReferenceImport";
 import { ReferenceNoteEditor } from "./ReferenceNoteEditor";
-import { mutateReferenceNotes, readReferenceNotes, referenceCitation, referenceNotesBackup, referenceNotesMarkdown, REFERENCE_STORAGE_KEY } from "./reference-storage";
+
+import type { ReferenceNotice, ReferenceView } from "./reference-i18n";
+import type { ReferenceMutation, ReferenceMutationFailure, ReferenceMutationResult, ReferenceNote } from "./reference-storage";
+import type { CommitReference } from "./ReferenceNoteEditor";
+import type { ReferenceField, ReferenceItem, ReferenceQuery, ReferenceResult, ReferenceErrorCode } from "@/lib/kmas-reference";
+import type { FormEvent } from "react";
 
 import { useT } from "@/lib/i18n";
 import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchParams } from "@/lib/kmas-reference";
 import { apiPath } from "@/src/infrastructure/api";
 
-import type { CommitReference } from "./ReferenceNoteEditor";
-import type { ReferenceMutation, ReferenceMutationResult, ReferenceNote } from "./reference-storage";
-import type { ReferenceField, ReferenceItem, ReferenceQuery, ReferenceResult, ReferenceErrorCode } from "@/lib/kmas-reference";
-import type { FormEvent } from "react";
-
-import "./reference-i18n";
 import "./reference.css";
 
 const FIELDS: ReferenceField[] = ["title", "illustrator", "writer", "publisher", "platform", "isbn"];
@@ -28,7 +32,7 @@ type OpenReference = (item: ReferenceItem, trigger: HTMLButtonElement, fromNotes
 function ErrorNotice({ code, retry }: { code: ReferenceErrorCode; retry?: () => void }) {
   const t = useT();
   return <div className="ref-notice ref-error" role="alert">
-    <h3>{t("ref.errorTitle")}</h3><p>{t(`ref.${code}`)}</p>
+    <h3>{t("ref.errorTitle")}</h3><p>{t(REFERENCE_ERROR_MESSAGE_KEYS[code])}</p>
     <div className="ref-actions">
       {retry && code !== "KMAS_NOT_CONFIGURED" && <button type="button" className="ref-button" onClick={retry}>{t("ref.retry")}</button>}
       <a className="ref-text-link" href={GUIDE_URL} target="_blank" rel="noopener noreferrer">{t("ref.officialGuide")} <ExternalLink size={14} /></a>
@@ -49,7 +53,7 @@ function SearchForm({ field, q, onSearch }: { field: ReferenceField; q: string; 
     <form className="ref-search-form" onSubmit={submit}>
       <label className="ref-field-select"><span>{t("ref.field")}</span>
         <select value={draftField} onChange={(event) => { if (isReferenceField(event.target.value)) setDraftField(event.target.value); }}>
-          {FIELDS.map((value) => <option key={value} value={value}>{t(`ref.${value}Field`)}</option>)}
+          {FIELDS.map((value) => <option key={value} value={value}>{t(REFERENCE_FIELD_LABEL_KEYS[value])}</option>)}
         </select>
       </label>
       <label className="ref-search-input"><span>{t("ref.query")}</span>
@@ -143,9 +147,9 @@ function ReferenceGuide() {
   const t = useT();
   return <section className="ref-guide" aria-labelledby="ref-guide-heading"><p className="ref-eyebrow">SOURCE & METHOD</p>
     <h2 id="ref-guide-heading">{t("ref.guideTitle")}</h2>
-    {["guideData", "guideRights", "guideConnection", "guideNotes"].map((key, index) => <article key={key}>
+    {REFERENCE_GUIDE_SECTIONS.map(({ title, body }, index) => <article key={title}>
       <span className="ref-guide-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-      <div><h3>{t(`ref.${key}`)}</h3><p>{t(`ref.${key}Body`)}</p></div>
+      <div><h3>{t(title)}</h3><p>{t(body)}</p></div>
     </article>)}
     <a href={GUIDE_URL} target="_blank" rel="noopener noreferrer" className="ref-text-link">{t("ref.officialGuide")}<ExternalLink size={15} /></a>
   </section>;
@@ -153,7 +157,7 @@ function ReferenceGuide() {
 
 function ReferenceDetails({ item, fromNotes, note, onCommit, onRemove, onNotice, onDirty, onDraftChange, saving }: {
   item: ReferenceItem; fromNotes: boolean; note?: ReferenceNote; onCommit: CommitReference;
-  onRemove: (expected: ReferenceNote) => Promise<void>; onNotice: (key: string) => void;
+  onRemove: (expected: ReferenceNote) => Promise<void>; onNotice: (notice: ReferenceNotice) => void;
   onDirty: (dirty: boolean) => void; onDraftChange: () => void; saving: boolean;
 }) {
   const t = useT();
@@ -163,12 +167,10 @@ function ReferenceDetails({ item, fromNotes, note, onCommit, onRemove, onNotice,
     try { await navigator.clipboard.writeText(citation); onNotice("copied"); }
     catch { onNotice("copyFailed"); }
   };
-  const fields = [["subtitle", item.subtitle], ["writerField", item.writer], ["illustratorField", item.illustrator],
-    ["publisherField", item.publisher], ["platformField", item.platform], ["genre", item.genre], ["age", item.age], ["isbnField", item.isbn]];
   return <>
     <p className="ref-eyebrow">KMAS / REFERENCE</p><Dialog.Title className="ref-dialog-title">{item.title}</Dialog.Title>
     <Dialog.Description className="ref-small">{t("ref.detailsDescription")}</Dialog.Description>
-    <dl className="ref-metadata">{fields.map(([key, value]) => <div key={key}><dt>{t(`ref.${key}`)}</dt><dd>{value || t("ref.missing")}</dd></div>)}</dl>
+    <dl className="ref-metadata">{REFERENCE_METADATA_FIELDS.map((key) => <div key={key}><dt>{t(REFERENCE_METADATA_LABEL_KEYS[key])}</dt><dd>{item[key] || t("ref.missing")}</dd></div>)}</dl>
     <section className="ref-synopsis"><h3>{t("ref.outline")}</h3><p>{item.outline || t(fromNotes ? "ref.noStoredOutline" : "ref.noOutline")}</p></section>
     <ReferenceNoteEditor key={item.id} item={item} note={note} onCommit={onCommit} onDirty={onDirty} onDraftChange={onDraftChange} saving={saving} />
     <div className="ref-actions"><button type="button" className="ref-button" onClick={() => { void copy(); }}><Copy size={16} />{t("ref.copy")}</button>
@@ -185,7 +187,7 @@ export function ReferencePage() {
   const [storage, setStorage] = useState(readReferenceNotes);
   const [draftStorage, setDraftStorage] = useState(readReferenceDrafts);
   const refreshDrafts = useCallback(() => setDraftStorage(readReferenceDrafts()), []);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<ReferenceNotice | null>(null);
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<{ item: ReferenceItem; fromNotes: boolean } | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -215,7 +217,7 @@ export function ReferencePage() {
   const search = (nextField: ReferenceField, nextQ: string) => {
     setParams({ field: nextField, q: nextQ.trim(), page: "1" });
   };
-  const switchView = (nextView: string) => {
+  const switchView = (nextView: ReferenceView) => {
     const next = new URLSearchParams(params);
     if (nextView === "search") next.delete("view"); else next.set("view", nextView);
     setParams(next);
@@ -227,7 +229,7 @@ export function ReferencePage() {
     return () => window.removeEventListener("beforeunload", preventLoss);
   }, [dirty]);
 
-  const runMutation = async (mutation: ReferenceMutation, success: string): Promise<ReferenceMutationResult> => {
+  const runMutation = async (mutation: ReferenceMutation, success: ReferenceNotice): Promise<ReferenceMutationResult> => {
     setPendingWrites((count) => count + 1);
     const result = await mutateReferenceNotes(mutation);
     setPendingWrites((count) => count - 1);
@@ -238,7 +240,9 @@ export function ReferencePage() {
     } else {
       if (result.notes) setStorage({ notes: result.notes, unavailable: false });
       else if (result.reason === "storage") setStorage((previous) => ({ ...previous, unavailable: true }));
-      const message = { conflict: "noteConflict", storage: "storageWriteWarning", limit: "limit", unsupported: "lockUnavailable", invalid: "invalidBackup" };
+      const message: Record<ReferenceMutationFailure, ReferenceNotice> = {
+        conflict: "noteConflict", storage: "storageWriteWarning", limit: "limit", unsupported: "lockUnavailable", invalid: "invalidBackup",
+      };
       setNotice(message[result.reason]);
     }
     return result;
@@ -258,7 +262,7 @@ export function ReferencePage() {
   };
   const open: OpenReference = (item, trigger, fromNotes = false) => {
     triggerRef.current = trigger;
-    setNotice("");
+    setNotice(null);
     setSelected({ item, fromNotes });
   };
   const exportNotes = (format: "markdown" | "json" = "markdown") => {
@@ -286,15 +290,15 @@ export function ReferencePage() {
       <Link to="/studio" className="ref-text-link">{t("ref.studio")}<ArrowRight size={17} aria-hidden="true" /></Link>
     </div><aside className="ref-journey" aria-label={t("ref.journeyTitle")}>
       <p className="ref-eyebrow">FIELD NOTES / 01—03</p>
-      {["step1", "step2", "step3"].map((key, index) => <div key={key}><span className="ref-step-number" aria-hidden="true">0{index + 1}</span><div><h2>{t(`ref.${key}`)}</h2><p>{t(`ref.${key}Body`)}</p></div></div>)}
+      {REFERENCE_JOURNEY_STEPS.map(({ title, body }, index) => <div key={title}><span className="ref-step-number" aria-hidden="true">0{index + 1}</span><div><h2>{t(title)}</h2><p>{t(body)}</p></div></div>)}
     </aside></header>
     <nav className="ref-tabs" aria-label={t("ref.nav")}>
-      {["search", "notes", "guide"].map((key) => <button key={key} type="button" aria-current={view === key ? "page" : undefined} onClick={() => switchView(key)}>
-        {t(`ref.${key}Tab`)}{key === "notes" && <span className="ref-tab-count">{storage.notes.length}</span>}
+      {REFERENCE_VIEWS.map((key) => <button key={key} type="button" aria-current={view === key ? "page" : undefined} onClick={() => switchView(key)}>
+        {t(REFERENCE_VIEW_TAB_KEYS[key])}{key === "notes" && <span className="ref-tab-count">{storage.notes.length}</span>}
       </button>)}
     </nav>
     {storage.unavailable && <p className="ref-notice" role="alert">{t("ref.storageWarning")}</p>}
-    {notice && !selected && <p className="ref-notice" role="status">{t(`ref.${notice}`)}</p>}
+    {notice && !selected && <p className="ref-notice" role="status">{t(REFERENCE_NOTICE_KEYS[notice])}</p>}
     {view === "search" && <>
       <SearchForm key={`${field}:${q}`} field={field} q={q} onSearch={search} />
       {invalid ? <ErrorNotice code="INVALID_QUERY" /> : query ? <SearchResults key={referenceSearchParams(query).toString()} query={query} notes={storage.notes}
@@ -334,7 +338,7 @@ export function ReferencePage() {
         {selected && <ReferenceDetails key={selected.item.id} item={selected.item} fromNotes={selected.fromNotes}
           note={storage.notes.find((entry) => entry.item.id === selected.item.id)} onCommit={commit} onNotice={setNotice} onDirty={setDirty} onDraftChange={refreshDrafts} saving={saving}
           onRemove={remove} />}
-        {notice && <p className="ref-notice" role="status" data-reference-status>{t(`ref.${notice}`)}</p>}
+        {notice && <p className="ref-notice" role="status" data-reference-status>{t(REFERENCE_NOTICE_KEYS[notice])}</p>}
       </Dialog.Content></Dialog.Portal>
     </Dialog.Root>
   </div>;

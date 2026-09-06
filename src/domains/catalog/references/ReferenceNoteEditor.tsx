@@ -2,12 +2,14 @@ import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { clearReferenceDraft, persistReferenceDraft, readReferenceDrafts } from "./reference-drafts";
+import { REFERENCE_NOTICE_KEYS } from "./reference-i18n";
 import { sameReferenceNote } from "./reference-storage";
 
-import { useT } from "@/lib/i18n";
-
-import type { ReferenceItem } from "@/lib/kmas-reference";
+import type { ReferenceNotice } from "./reference-i18n";
 import type { ReferenceNote } from "./reference-storage";
+import type { ReferenceItem } from "@/lib/kmas-reference";
+
+import { useT } from "@/lib/i18n";
 
 export type CommitReference = (item: ReferenceItem, text: string, expected: ReferenceNote | null) => Promise<ReferenceNote | null>;
 
@@ -20,7 +22,9 @@ export function ReferenceNoteEditor({ item, note, onCommit, onDirty, onDraftChan
   const recovered = recovery.drafts.find((entry) => entry.item.id === item.id);
   const [draft, setDraft] = useState(recovered?.note ?? note?.note ?? "");
   const [baseline, setBaseline] = useState<ReferenceNote | null>(recovered ? recovered.baseline : note ?? null);
-  const [draftNotice, setDraftNotice] = useState(recovery.unavailable ? "draftUnavailable" : recovered ? "draftRecovered" : "");
+  const [draftNotice, setDraftNotice] = useState<ReferenceNotice | null>(
+    recovery.unavailable ? "draftUnavailable" : recovered ? "draftRecovered" : null,
+  );
   const dirty = draft !== (baseline?.note ?? "");
   const changedElsewhere = !sameReferenceNote(baseline, note ?? null);
   useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
@@ -29,7 +33,7 @@ export function ReferenceNoteEditor({ item, note, onCommit, onDirty, onDraftChan
     setDraft(text);
     const result = text === (baseline?.note ?? "") ? clearReferenceDraft(item.id)
       : persistReferenceDraft({ item, note: text, baseline, updatedAt: new Date().toISOString() });
-    setDraftNotice(result.ok ? text === (baseline?.note ?? "") ? "" : "draftRetained" : "draftUnavailable");
+    setDraftNotice(result.ok ? text === (baseline?.note ?? "") ? null : "draftRetained" : "draftUnavailable");
     onDraftChange();
   };
   const save = async () => {
@@ -38,7 +42,7 @@ export function ReferenceNoteEditor({ item, note, onCommit, onDirty, onDraftChan
     if (stored) {
       setBaseline(stored);
       const result = clearReferenceDraft(item.id, submitted);
-      setDraftNotice(result.ok ? "" : "draftCleanupFailed");
+      setDraftNotice(result.ok ? null : "draftCleanupFailed");
       onDraftChange();
     }
   };
@@ -46,13 +50,13 @@ export function ReferenceNoteEditor({ item, note, onCommit, onDirty, onDraftChan
     if (dirty && !window.confirm(t("ref.replaceDraftConfirm"))) return;
     const result = clearReferenceDraft(item.id);
     setDraft(note?.note ?? ""); setBaseline(note ?? null);
-    setDraftNotice(result.ok ? "" : "draftCleanupFailed"); onDraftChange();
+    setDraftNotice(result.ok ? null : "draftCleanupFailed"); onDraftChange();
   };
   return <section className="ref-note-editor"><label htmlFor="ref-personal-note">{t("ref.noteTitle")}</label>
     <textarea id="ref-personal-note" value={draft} disabled={saving} maxLength={4000} rows={5}
       onChange={(event) => remember(event.target.value)} placeholder={t("ref.notePlaceholder")} aria-describedby="ref-note-help" />
     <p className="ref-small" id="ref-note-help">{t("ref.noteHelp")}</p>
-    {draftNotice && <p className="ref-small" role="status">{t(`ref.${draftNotice}`)}</p>}
+    {draftNotice && <p className="ref-small" role="status">{t(REFERENCE_NOTICE_KEYS[draftNotice])}</p>}
     {changedElsewhere && <div className="ref-notice" role="alert"><p>{t("ref.noteChangedElsewhere")}</p>
       <p className="ref-note-preview">{note?.note || t("ref.noNote")}</p>
       <button type="button" className="ref-button" disabled={saving} onClick={reloadLatest}>{t("ref.reloadLatest")}</button>

@@ -3,9 +3,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { MAX_REFERENCE_BACKUP_BYTES, parseReferenceBackup, previewReferenceImport } from "./reference-storage";
 
+import type { ReferenceMutationResult, ReferenceNote } from "./reference-storage";
+
 import { useT } from "@/lib/i18n";
 
-import type { ReferenceMutationResult, ReferenceNote } from "./reference-storage";
 
 export function ReferenceImport({ current, busy, unavailable, onImport }: {
   current: ReferenceNote[]; busy: boolean; unavailable: boolean;

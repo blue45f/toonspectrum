@@ -1,3 +1,5 @@
+import type { ReferenceErrorCode, ReferenceField, ReferenceItem } from "@/lib/kmas-reference";
+
 import { registerI18nLocaleEntries } from "@/lib/i18n";
 
 const ko = {
@@ -94,7 +96,6 @@ registerI18nLocaleEntries("ko", {
   "ref.noteChangedElsewhere": "저장된 메모가 편집을 시작한 이후 변경되었습니다. 아래는 최신 메모이며, 입력 중인 초안은 유지됩니다.",
   "ref.reloadLatest": "최신 메모 불러오기",
   "ref.replaceDraftConfirm": "현재 저장하지 않은 초안을 버리고 최신 메모로 바꿀까요?",
-  "ref.unsavedClose": "저장하지 않은 메모가 있습니다. 초안을 버리고 닫을까요?",
   "ref.lockUnavailable": "이 브라우저에서는 탭 간 안전한 저장을 지원하지 않습니다. 읽기와 내보내기는 가능하며, 저장에는 HTTPS 환경의 최신 브라우저가 필요합니다.",
   "ref.saving": "저장 중…",
   "ref.backup": "JSON 백업",
@@ -110,7 +111,6 @@ registerI18nLocaleEntries("en", {
   "ref.noteChangedElsewhere": "The stored note changed after you started editing. The latest note is shown below; your draft is preserved.",
   "ref.reloadLatest": "Load latest note",
   "ref.replaceDraftConfirm": "Discard your unsaved draft and load the latest note?",
-  "ref.unsavedClose": "You have unsaved changes. Discard your draft and close?",
   "ref.lockUnavailable": "Safe cross-tab saving is not supported in this browser. Reading and export still work. Use a current browser over HTTPS to save.",
   "ref.saving": "Saving…",
   "ref.backup": "JSON backup",
@@ -146,3 +146,56 @@ registerI18nLocaleEntries("en", {
   "ref.draftsTitle": "Unsaved drafts in this tab", "ref.draftsHelp": "Temporary recovery only. Drafts do not sync to an account and may disappear when this tab closes.", "ref.recoverDraft": "Recover draft",
   "ref.unsavedClose": "This note is not permanently saved. Have you checked its temporary draft status before closing?",
 });
+
+// Keys the UI picks at runtime. They stay literal strings inside closed maps — never template
+// literals at the call site — so the dictionary above remains the single source of truth and
+// reference-i18n.test.ts can prove each value resolves in both shell locales.
+export const REFERENCE_ERROR_MESSAGE_KEYS = {
+  INVALID_QUERY: "ref.INVALID_QUERY",
+  KMAS_NOT_CONFIGURED: "ref.KMAS_NOT_CONFIGURED",
+  KMAS_RATE_LIMITED: "ref.KMAS_RATE_LIMITED",
+  KMAS_TIMEOUT: "ref.KMAS_TIMEOUT",
+  KMAS_UNAVAILABLE: "ref.KMAS_UNAVAILABLE",
+} as const satisfies Record<ReferenceErrorCode, string>;
+
+export const REFERENCE_FIELD_LABEL_KEYS = {
+  title: "ref.titleField", illustrator: "ref.illustratorField", writer: "ref.writerField",
+  publisher: "ref.publisherField", platform: "ref.platformField", isbn: "ref.isbnField",
+} as const satisfies Record<ReferenceField, string>;
+
+export const REFERENCE_METADATA_FIELDS = [
+  "subtitle", "writer", "illustrator", "publisher", "platform", "genre", "age", "isbn",
+] as const satisfies readonly (keyof ReferenceItem)[];
+export type ReferenceMetadataField = (typeof REFERENCE_METADATA_FIELDS)[number];
+export const REFERENCE_METADATA_LABEL_KEYS = {
+  subtitle: "ref.subtitle", writer: "ref.writerField", illustrator: "ref.illustratorField", publisher: "ref.publisherField",
+  platform: "ref.platformField", genre: "ref.genre", age: "ref.age", isbn: "ref.isbnField",
+} as const satisfies Record<ReferenceMetadataField, string>;
+
+export const REFERENCE_VIEWS = ["search", "notes", "guide"] as const;
+export type ReferenceView = (typeof REFERENCE_VIEWS)[number];
+export const REFERENCE_VIEW_TAB_KEYS = {
+  search: "ref.searchTab", notes: "ref.notesTab", guide: "ref.guideTab",
+} as const satisfies Record<ReferenceView, string>;
+
+export const REFERENCE_JOURNEY_STEPS = [
+  { title: "ref.step1", body: "ref.step1Body" },
+  { title: "ref.step2", body: "ref.step2Body" },
+  { title: "ref.step3", body: "ref.step3Body" },
+] as const;
+
+export const REFERENCE_GUIDE_SECTIONS = [
+  { title: "ref.guideData", body: "ref.guideDataBody" },
+  { title: "ref.guideRights", body: "ref.guideRightsBody" },
+  { title: "ref.guideConnection", body: "ref.guideConnectionBody" },
+  { title: "ref.guideNotes", body: "ref.guideNotesBody" },
+] as const;
+
+export const REFERENCE_NOTICE_KEYS = {
+  savedNotice: "ref.savedNotice", removedNotice: "ref.removedNotice", noteSavedNotice: "ref.noteSavedNotice", importedNotice: "ref.importedNotice",
+  copied: "ref.copied", copyFailed: "ref.copyFailed", exportFailed: "ref.exportFailed",
+  noteConflict: "ref.noteConflict", storageWriteWarning: "ref.storageWriteWarning", limit: "ref.limit",
+  lockUnavailable: "ref.lockUnavailable", invalidBackup: "ref.invalidBackup",
+  draftRetained: "ref.draftRetained", draftRecovered: "ref.draftRecovered", draftUnavailable: "ref.draftUnavailable", draftCleanupFailed: "ref.draftCleanupFailed",
+} as const;
+export type ReferenceNotice = keyof typeof REFERENCE_NOTICE_KEYS;
