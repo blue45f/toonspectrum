@@ -512,6 +512,8 @@ export async function requestUploadApi(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   timer.unref();
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  // Only locally selected diagnostics cross this boundary; fetch errors can contain secrets.
+  let publicFailure = "Upload API transport failed; server outcome may be unknown";
   try {
     const requestHeaders = new Headers(options.headers);
     for (const [name, value] of Object.entries(headers)) {
@@ -521,10 +523,14 @@ export async function requestUploadApi(
     requestHeaders.set("accept", "application/json");
     const response = await fetch(url, { ...options, headers: requestHeaders, redirect: "manual", signal });
     reader = response.body?.getReader();
-    if (response.status >= 300 && response.status < 400) throw new Error("Upload API redirect refused");
+    if (response.status >= 300 && response.status < 400) {
+      publicFailure = "Upload API redirect refused";
+      throw new Error(publicFailure);
+    }
     const advertised = response.headers.get("content-length");
     if (advertised !== null && (!/^\d+$/u.test(advertised) || Number(advertised) > MAX_UPLOAD_RESPONSE_BYTES)) {
-      throw new Error("Upload API response exceeds byte limit");
+      publicFailure = "Upload API response exceeds byte limit";
+      throw new Error(publicFailure);
     }
     // The actual decoded stream is authoritative; Content-Length can be absent or compressed.
     const chunks: Uint8Array[] = [];
@@ -534,7 +540,10 @@ export async function requestUploadApi(
         const { done, value } = await reader.read();
         if (done) break;
         total += value.byteLength;
-        if (total > MAX_UPLOAD_RESPONSE_BYTES) throw new Error("Upload API response exceeds byte limit");
+        if (total > MAX_UPLOAD_RESPONSE_BYTES) {
+          publicFailure = "Upload API response exceeds byte limit";
+          throw new Error(publicFailure);
+        }
         chunks.push(value);
       }
     }
@@ -545,13 +554,12 @@ export async function requestUploadApi(
     return new Response([204, 205, 304].includes(response.status) ? null : bytes, {
       status: response.status, statusText: "", headers: response.headers,
     });
-  } catch (error) {
+  } catch {
+    // Deliberately omit the catch binding/cause: even nested causes or message getters from
+    // fetch/Headers/readers may expose authentication values. Preserve only local diagnostics.
     if (controller.signal.aborted) throw new Error("Upload API request timed out (including response body); server outcome may be unknown");
     if (options.signal?.aborted) throw new Error("Upload API request cancelled; server outcome may be unknown");
-    const message = error instanceof Error ? error.message : "";
-    if (message === "Upload API redirect refused" || message === "Upload API response exceeds byte limit") throw new Error(message);
-    // fetch/Headers/JSON exceptions may contain user-supplied authentication values. Do not relay them.
-    throw new Error("Upload API transport failed; server outcome may be unknown");
+    throw new Error(publicFailure);
   } finally {
     clearTimeout(timer);
     controller.abort();

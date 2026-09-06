@@ -1,0 +1,90 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/green_metal_rust",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "painted",
+      "ship",
+      "tank",
+      "industrial",
+      "canister"
+    ],
+    "date_published": 1529548100,
+    "name": "Green Metal Rust",
+    "categories": [
+      "metal",
+      "outdoor",
+      "indoor",
+      "man made",
+      "dirty"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      1000,
+      1000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "fd6cc162a0eb0eb8e0e2fb4d7f1b977dda4626b3",
+    "description": "Free 8K texture of painted green metal with worn, scratched surface, subtle rust streaks around fasteners and peeling, low-sheen, weathered industrial finish.",
+    "category_id": "733fc0a1-302e-50f0-bd83-79d7fd8f3f1e",
+    "category": "Metal/Sheet & Corrugated/Flat Sheet",
+    "attributes": {
+      "surface_use": "object",
+      "condition": [
+        "painted",
+        "weathered",
+        "rusted",
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "download_count": 289813,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/green_metal_rust.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/green_metal_rust/green_metal_rust_diff_2k.jpg",
+      "bytes": 787402,
+      "sha256": "727515554ffb6410be82d3625a2837fe46612cb186ec391f77c50bd52c4d7ab2",
+      "sourceMd5": "fed1afb0e3b6f5a5710cee229fd54897"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/green_metal_rust/green_metal_rust_rough_2k.jpg",
+      "bytes": 690649,
+      "sha256": "0a691b35df773ab86dbbc86b787f8efaa81497780820abec0832b1e7aac309a6",
+      "sourceMd5": "eb6e02797c6edc1d99683ccc145e3521"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/green_metal_rust/green_metal_rust_nor_gl_2k.jpg",
+      "bytes": 357436,
+      "sha256": "45ec5d256c91ccf4a87dd4c4a90f6c58b460f3862287f014bfde432055ece239",
+      "sourceMd5": "379dfb43f495a44569674717e974b920"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/green_metal_rust/green_metal_rust_ao_2k.jpg",
+      "bytes": 1488796,
+      "sha256": "3d33ff3a82c9b52080b0ee8667b019f388f2f14d7ecc3d06f4826d1a62103378",
+      "sourceMd5": "f3f14a7a739220d6e1185bcdcd82b773"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/green_metal_rust/green_metal_rust_disp_2k.jpg",
+      "bytes": 1013126,
+      "sha256": "5bc582398111393bcf470e870c666db1439118825978dc5b1b075a478066dfca",
+      "sourceMd5": "5f4f70b5034c82d4c1ff8b7b2adbb654"
+    }
+  ]
+}

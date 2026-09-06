@@ -1,0 +1,89 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/aerial_asphalt_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "road",
+      "flat",
+      "cracked"
+    ],
+    "date_published": 1597061145,
+    "name": "Aerial Asphalt 01",
+    "categories": [
+      "asphalt",
+      "outdoor",
+      "floor",
+      "road",
+      "man made",
+      "aerial"
+    ],
+    "dimensions": [
+      30000,
+      30000
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "cdf3c8f091b3589407bdf0697a2deb2c6b40650d",
+    "description": "Free 8K asphalt texture of a flat, worn road with subtle cracks, faint tire marks and gritty surface - ideal for aerial, outdoor, road and floor scenes.",
+    "category_id": "8871debe-40cf-5e4d-a5e5-1ddfe979f14f",
+    "category": "Asphalt & Bitumen/Asphalt/Worn Road Surface",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "weathered",
+        "cracked",
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor",
+      "aerial": true
+    },
+    "download_count": 146040,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/aerial_asphalt_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/aerial_asphalt_01/aerial_asphalt_01_diff_2k.jpg",
+      "bytes": 2802005,
+      "sha256": "a85ce28b8e6ed90acb0234832969b27f5b73fe055a0d5b94f34fc2943d319fb5",
+      "sourceMd5": "4cb311fc7638c0b1d5e9641ca9c6ea78"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/aerial_asphalt_01/aerial_asphalt_01_rough_2k.jpg",
+      "bytes": 1392536,
+      "sha256": "20fdcdc9fc2a3efef83fd8a3453d2bc0a8543ee3ebb2badf148e4c142704eeff",
+      "sourceMd5": "f46f34b5509cec4b7fccdff8dfe4dc59"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/aerial_asphalt_01/aerial_asphalt_01_nor_gl_2k.jpg",
+      "bytes": 2751902,
+      "sha256": "cb7e5b75ff47ad672ab820f71b77566419b612e52e7791c5ed90a7fa27b71807",
+      "sourceMd5": "2b2d543f7c6567030f11a6070f586e05"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/aerial_asphalt_01/aerial_asphalt_01_ao_2k.jpg",
+      "bytes": 1929805,
+      "sha256": "fb9da6e73cbfca310032ee113389be2f084c4d28cd688f663952e4747d5532d0",
+      "sourceMd5": "7cfb6128237130aefdaa831374c8619e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/aerial_asphalt_01/aerial_asphalt_01_disp_2k.jpg",
+      "bytes": 542594,
+      "sha256": "33b633f9325fd444f00caeaa8755873f7d0e1013f04b719e8b25f32c36749ea6",
+      "sourceMd5": "ca71ac35fa7452bce25041a7f9c18d63"
+    }
+  ]
+}

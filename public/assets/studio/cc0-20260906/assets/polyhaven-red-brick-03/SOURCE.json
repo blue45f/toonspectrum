@@ -1,0 +1,89 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/red_brick_03",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "date_published": 1530171674,
+    "sponsors": [
+      "25436656"
+    ],
+    "name": "Red Brick 03",
+    "categories": [
+      "outdoor",
+      "wall",
+      "clean",
+      "man made",
+      "brick"
+    ],
+    "type": 1,
+    "tags": [
+      "red",
+      "industrial",
+      "factory",
+      "brown"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      1000,
+      1000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "aafb7cb55b993b0d363fcc53cf5597ad25f38ef6",
+    "description": "Free 8K red brick texture with weathered industrial bricks, rough matte surface, defined mortar joints, slight soot and brownish color variation.",
+    "category_id": "9ef0955b-87fa-5826-aa87-98b047ad9143",
+    "category": "Brick & Block/Clay Brick/Running-Bond",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "download_count": 144864,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/red_brick_03.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_brick_03/red_brick_03_diff_2k.jpg",
+      "bytes": 2969950,
+      "sha256": "c37ef11bb94a533d1c758c5c7d7199264e90f19b23946766c7c59aa189c11ff6",
+      "sourceMd5": "df521ebe6c4eb72c3329832acfecd95d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_brick_03/red_brick_03_rough_2k.jpg",
+      "bytes": 1329161,
+      "sha256": "54cbcc8acdbdfbc0a38407509ef72058ef5847b5713e689fa37ce9cc504c41c1",
+      "sourceMd5": "18815a721bf7cb485955359204484608"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_brick_03/red_brick_03_nor_gl_2k.jpg",
+      "bytes": 3684630,
+      "sha256": "3bcb8714c450369915a9608a9e5318433a5e5df932184519bdbfd993dec16a9f",
+      "sourceMd5": "fd2d01b5e0f4de51ca4d7c2b4bcbc22c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_brick_03/red_brick_03_ao_2k.jpg",
+      "bytes": 1666638,
+      "sha256": "3891e9f879575b70fef2abc854ececd813c906f26bb6e333b9d91f3ff39615ab",
+      "sourceMd5": "536a233c6f3ae264efc567c96c1a417c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/red_brick_03/red_brick_03_disp_2k.jpg",
+      "bytes": 595929,
+      "sha256": "f48b733ec52e43ef35fd9285a9fd4592356cf25ec86e29d711a0ad33ef3dfc7a",
+      "sourceMd5": "6a451cd31000fbb8786c4538d562d0bd"
+    }
+  ]
+}

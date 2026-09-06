@@ -1,0 +1,1572 @@
+[
+  {
+    "path": "public/assets/3d/ENVIRONMENT_LICENSES.md",
+    "bytes": 4365,
+    "sha256": "6b068a9d4ccc6606bda0180b3a2bbd921746070c727856a3f9e9abc6906d86d5"
+  },
+  {
+    "path": "public/assets/3d/LICENSES.md",
+    "bytes": 7128,
+    "sha256": "5e0cd56b288f178205f88f02f99ddbb3e5eca9440aee0209bef4bbb7899b82c4"
+  },
+  {
+    "path": "public/assets/3d/adaptive_power_wheelchair.glb",
+    "bytes": 518864,
+    "sha256": "7b3b0fea2f3db4fe494fb85875e812a8624f21f616a980566f5d9e49608f69b2"
+  },
+  {
+    "path": "public/assets/3d/ancient_rune_shield.glb",
+    "bytes": 258136,
+    "sha256": "72069021f850eecda8f95e0f871e2b5404593167a29e7eb317f7fb9429f51d34"
+  },
+  {
+    "path": "public/assets/3d/arcade_game_cabinet.glb",
+    "bytes": 309860,
+    "sha256": "3a97b349620b8e4651d0a7c6e482492582c9932c42b562cbbfec4bb72d13c279"
+  },
+  {
+    "path": "public/assets/3d/bathtub.glb",
+    "bytes": 270628,
+    "sha256": "e81760111949a3bd112ad86273d86defd836173e3cb58ab68a7f77418854b8ab"
+  },
+  {
+    "path": "public/assets/3d/blackboard.glb",
+    "bytes": 264324,
+    "sha256": "81fa48d2b27f6d3a0025cbc48797b6634312d236faf303ceb43bfc3d818683e5"
+  },
+  {
+    "path": "public/assets/3d/bonsai_tree.glb",
+    "bytes": 729424,
+    "sha256": "c620eb13c1c26b7c9fb3968877dbe87181a7088f69ce118ad550c814f5a14043"
+  },
+  {
+    "path": "public/assets/3d/bubble_tea.glb",
+    "bytes": 199852,
+    "sha256": "a8adbe131888d4d5a748fdf5a44b52a49f31ba63c0e5448859059b1574025b8d"
+  },
+  {
+    "path": "public/assets/3d/campfire.glb",
+    "bytes": 579776,
+    "sha256": "182d020801b3b6bfa5724af2869e2bca4c1696c8dbc3bad106eb5f9cf1d11697"
+  },
+  {
+    "path": "public/assets/3d/chair.glb",
+    "bytes": 253940,
+    "sha256": "73fb41337652e33711c770494b44e31195fa8c9ea25473a92d8ed4cfd3cd49fa"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/alicia.png",
+    "bytes": 38370,
+    "sha256": "a345ec4f45626cbcea9645e5b0dfc960a44c2539e954a0dfba7d4380195286a6"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/anna.png",
+    "bytes": 39097,
+    "sha256": "da6769b2613bcf3ce0b88efe55678f1347c5dbad42dbdbe4e608e503228bde81"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/astronaut.png",
+    "bytes": 27686,
+    "sha256": "c12b6f22dda9df418e0504582f389c253bc5981b44ca7275c3433f0e7cc4df13"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/avatar-a.png",
+    "bytes": 35875,
+    "sha256": "4dd1b22a262278d38a8e3d89d90c8284857680bb4078bb70ca91c6a14a0cd876"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/avatar-b.png",
+    "bytes": 49459,
+    "sha256": "b5ae014e068e5a2af9eb62307d5413ee7d10c7dfa2d8bed35d34ae3ab3f3b77c"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/avatar-c.png",
+    "bytes": 40817,
+    "sha256": "19c38ee05ca6a8b706cb31cb68c923a12d242b5c8032e0f00ea14b9a5038e6b3"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/avocado.png",
+    "bytes": 11233,
+    "sha256": "9ca629b3903d8ccf1856b6fc75e08e8a1f478d8c0ec12d14aa89c1049e513b95"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/bad-bot.png",
+    "bytes": 28139,
+    "sha256": "43b3c44073c030d6034795cac15aa53f28eaf3fd4b96a27d74f9e41da9953fa5"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/bao-samurai.png",
+    "bytes": 49537,
+    "sha256": "846da9df31d322d916a0b0a22955a732c522f6b17420b230c6de27791944b3ed"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/bloody.png",
+    "bytes": 27521,
+    "sha256": "2ac63f8514097458340de24c30d56f71a8ad24efa1564b79d68c64741faacdf3"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/blue-pixie.png",
+    "bytes": 44891,
+    "sha256": "927af4578dd985739e962485e7354d74524505134d35cd17b3e9e022ea224ba2"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/bot-bunny.png",
+    "bytes": 24982,
+    "sha256": "07014355da6d017972c9321b0e199de37100c70d85c592e4687035fc99a798f6"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/chill-palm.png",
+    "bytes": 24869,
+    "sha256": "858097743aba9787a14b9d1afce512fc48cd0688e11101540a19f75a96619e0a"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/chill-penguin.png",
+    "bytes": 25422,
+    "sha256": "e382653e081244e991f414de4b4f0dab04012386035341d961ac5569e476401c"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/clown.png",
+    "bytes": 28333,
+    "sha256": "b6dc9f77d35c799adda228c10d32c0c72f17880a00a4fa4db0274b63f1914298"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cool-alien.png",
+    "bytes": 36225,
+    "sha256": "f656e0944442186353ac9b1585ff9062f36408a5f124b49c549d9e997b9c8822"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cool-pirate.png",
+    "bytes": 22578,
+    "sha256": "4b5cca22fd50c2b9a968947c8048ee0b4ef004898ae070f35e46526a046cbe20"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cool-pizza.png",
+    "bytes": 24109,
+    "sha256": "e80976dc21db2fd288060a08488736c6f1caa5deca658e62f2a26d64952ed178"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cool-ramen.png",
+    "bytes": 28995,
+    "sha256": "f5e5caec350cd785a3b22a3b3e1f33dc0a42b341bfa08406c80e3a0e4fb49b08"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cool-taco.png",
+    "bytes": 13733,
+    "sha256": "a6c4d4e5f7ffb4039e8e56d8c422b8821435b43b4e1a0f7307f73d7b61b205dd"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cool-tiger.png",
+    "bytes": 63424,
+    "sha256": "617cb1b924e1097944978335dae62e48f07b7f054557b57bf0d3415de51d1c68"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cool-turtle.png",
+    "bytes": 27432,
+    "sha256": "be4f2c9199c0d3540c017f3a6300b6143bc46d137bcc3e5837a8185ce04df04c"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/coolbanana.png",
+    "bytes": 17343,
+    "sha256": "8574c0ea75905026f7bd8f38fd62c09b4cbec175b7e2dd1c1884f2afdf2c3259"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cosmic-bot.png",
+    "bytes": 33891,
+    "sha256": "687a51ca6367b9c04acff2918fe19baebffc33774d52c820798be9490f322088"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cosmic-dweller.png",
+    "bytes": 24123,
+    "sha256": "0c6930bf1df3a1dd2b1623d628a9d931ea40a4d5467a24a1111547300f409cb6"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/crowley.png",
+    "bytes": 39250,
+    "sha256": "a416a54f2270a82b7b5c5b8a3dae10614e8ad54045cac67e5962500d29c0df98"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cryptovoxel.png",
+    "bytes": 22995,
+    "sha256": "8364e3f22e18da217a5d8232359578168f16e3970f756b1a36712cc0aeb765d0"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cute-saurus.png",
+    "bytes": 44049,
+    "sha256": "9fbe525c5996d949994e27ca8046140b343b0e35f04503e32844eabb311e7780"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/cyberpal.png",
+    "bytes": 34474,
+    "sha256": "9ab45aa62d4732f7cefa0285120d5d8cb45c06e8686a587bb87150526e6a2a8e"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/devil.png",
+    "bytes": 17465,
+    "sha256": "5a542d1a65e29d1b361cb03fa8f383be62b855d48cd6fef29087bece22664302"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/dino-kid.png",
+    "bytes": 31242,
+    "sha256": "4503479db8a36652432e59780c28b27dc2d0143e518cff7cd9c198c84d5d4f4f"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/dracula.png",
+    "bytes": 26110,
+    "sha256": "85d5a7cce14a262404bf0b4ceec26f4f5dfe83fb64dbe83c66bffefb940ed99e"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/eggplant.png",
+    "bytes": 9107,
+    "sha256": "0cb562d5318b25e2d1f76e7df74845518a25e103874b92f1bcae770622ad32c0"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/erika.png",
+    "bytes": 28810,
+    "sha256": "77f8b782c0224c67b5cad7a2d0fa1ee5c397a89e5eb7c439f10790d046f735a7"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/eugenia.png",
+    "bytes": 25566,
+    "sha256": "7b662cfdf95ee388b243110438577cfc765452e09ec24a61a3ca54ab463d5bde"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/eye-wizard.png",
+    "bytes": 26398,
+    "sha256": "bb6d29f4e6f5da4082b01b29783d3b14103c5919e03fe244d052ff5dea3777f6"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/froggy.png",
+    "bytes": 57739,
+    "sha256": "6405fe2da6d6d636d0f0e9024a6884c709c4945ee8ed73f33fc23324ad4bea1e"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/fumi.png",
+    "bytes": 41749,
+    "sha256": "c71787068036dc1f8f4474cce0d8c7842e8d49e222cec067c154b61e9f6c79db"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/good-knight.png",
+    "bytes": 47159,
+    "sha256": "61966fa251f78036b8cc7315a2ab18474d9086596101728c59a941aa7afe2d1a"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/ice-cream.png",
+    "bytes": 14481,
+    "sha256": "559668dda0b13c92115b4d1e52148f2c2ed42a6c0d131e76a94d8e5b996fb296"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/jennifer.png",
+    "bytes": 21985,
+    "sha256": "28030359235fc92ff69239627b451483a4bb98ce370619a9ae8d60084275f37c"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/jimmy.png",
+    "bytes": 20405,
+    "sha256": "dea25aa26155cd9096a20863920c7b737114bb96c107843f3c0befb61132b5f0"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/kage.png",
+    "bytes": 59589,
+    "sha256": "fb21ce3c57666042803d613e6874f1c866763ab0605648c9b22b204a4937ed59"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/kate.png",
+    "bytes": 17343,
+    "sha256": "db1e05da23dc3be01310de441513a1f6355802dff888f8ba9e76e2a1c0efa937"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/kiba.png",
+    "bytes": 32134,
+    "sha256": "70bace4a776de0a4805f1c44e3a9174da929342d88351094fc911eb0bec4da5c"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/lady-fawn.png",
+    "bytes": 37633,
+    "sha256": "61664d2acb5018191c3bed834b0a898a74f4f60d7882f1d81dc2ff43c3b42851"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/lady-koi.png",
+    "bytes": 42682,
+    "sha256": "3839805a5475637ff684105150ee19b2a3d96aa927d116774bfaaac11a6d3069"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/lalo-bot.png",
+    "bytes": 25735,
+    "sha256": "29ba3e05d1c2e43ec87abdfb6d23a69158f3fc63cce21dff454c42413feca3f8"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/lil-ram.png",
+    "bytes": 41183,
+    "sha256": "28bab8a49abbb98e6d2bf2b3cf447303701fb508d5f2f8d7cccc65f50ef90520"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/mega-angel.png",
+    "bytes": 37545,
+    "sha256": "dafe15221ffc1d346e7ce87b62bb62550ffe6e6b27381d8ccbdeed0c19cba43f"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/megan-the-fox.png",
+    "bytes": 66715,
+    "sha256": "3ebf812b5dfabf9f215da008a8a478c54988317baeab0674b996cfe4f1fa92f7"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/mio.png",
+    "bytes": 19665,
+    "sha256": "032398b8c191fd5309befee60161930381c69a1a88f43fe2649ab28289d66573"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/moon-girl.png",
+    "bytes": 35922,
+    "sha256": "10033cc1e4f47b30c2c3c3c779f5add8a70ab2a8ae6003c12f8dd0472ff4a59a"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/mummy.png",
+    "bytes": 45582,
+    "sha256": "485228bb36a85b73ee78bf1014b8665dd6b5dee0df00569119cd9c7b79f61d29"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/mushroom-fairy.png",
+    "bytes": 56112,
+    "sha256": "168a583f53c336e502091a0c2a1d01b8bf3f925ffa850047900cb2db6a1f6000"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/nightmare.png",
+    "bytes": 55036,
+    "sha256": "d5833356c1cb94e5ff76dd47103afc91800157d9376c632150169ff44dcd13bc"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/noa.png",
+    "bytes": 19994,
+    "sha256": "18efcf3405bb3a3efef6208d356210bbb6adc54627d46eadf3f3fe635c77756e"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/old-moustache.png",
+    "bytes": 24435,
+    "sha256": "7c198cdc252135c83721237a9e76fb4f408a309c3f32d59eacd7ba38582a8f0a"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/olivia.png",
+    "bytes": 23956,
+    "sha256": "166fd5e684bf86df9d355c789cd0c966fa24b089dcdce1fe18aed7aa42a6df13"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/orion.png",
+    "bytes": 51828,
+    "sha256": "b4831cba55ef4a4d62ef4d337a3b9ec12e8d55eddf5d4686a319f19c005680a2"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/pirate-bot.png",
+    "bytes": 56368,
+    "sha256": "c8e344cbc698fd864e5a6ad0fd30236920b790da8c03bc816bb82cf89cda5a7b"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/polybot.png",
+    "bytes": 34794,
+    "sha256": "368d08d13a640d30fb2fe9b53420d5d33e5076d609d1908647d14282afb553ff"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/polydancer.png",
+    "bytes": 31144,
+    "sha256": "ca80e26d1dc78dd77c0137907f99b63eaa396cc423be3cd4bded9293a7a5c2e1"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/pumpkin.png",
+    "bytes": 26068,
+    "sha256": "66de9cf412cbc924ee109ffa77048e1b7c7e9e712719a9820d959d0881fb63f8"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/pyre-sorcerer.png",
+    "bytes": 26835,
+    "sha256": "2dafe0ac229e987ee0e7915ffc033618638ecf09d9d665ff8f316cd34164505b"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/rabbit.png",
+    "bytes": 23243,
+    "sha256": "d254e6c7acbebd7ada0af33f098e6a7169db5f61359c2b83ef215487c229ef42"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/robert.png",
+    "bytes": 25723,
+    "sha256": "a31e303100a3a701fa732263eaeb603f7d0007e5d5b6f7b6d9854cdb289d04b8"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/rose.png",
+    "bytes": 27777,
+    "sha256": "ec8a5677547809e1bb29d5593d8ad0fe9214ff4ba91ec60ac8325e8008b11506"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/rubin.png",
+    "bytes": 35014,
+    "sha256": "7803a82a3096b54e96e34b00f4bd408d592814ec6507709f1dbe750b8dcf6592"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/sample-vrm.png",
+    "bytes": 26593,
+    "sha256": "62d50c9d23a3f62a835e1d8523524978725cfe2a5a3faae3d0a1a0d8232d66b7"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/seedsan.png",
+    "bytes": 48630,
+    "sha256": "d88e236f1642324214c1b467cfff6118166ab0c9aa8ee2b1377b8ec1111b403a"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/shark-person.png",
+    "bytes": 19646,
+    "sha256": "b2a0cb6048415d7af848fcfda25399ac214a6498fb56d7ffcc5b2cf129e92503"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/shino.png",
+    "bytes": 43526,
+    "sha256": "cdbd1032b2cdbcc2de8e23594601f3863971a96e410300bff3d1c315db404318"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/shion.png",
+    "bytes": 42003,
+    "sha256": "a384fddd6e57942bdfe0239ea308e63ed095dd1600007c01676c9cbb2d55f2e9"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/skull.png",
+    "bytes": 21259,
+    "sha256": "0dec2f6f1b81c5820f291d17c68c3cc0b2c00f9e3a865d0aea8a2e92f0f7e553"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/sport-mecha.png",
+    "bytes": 57895,
+    "sha256": "dd4f30e827cce4438dc346104237d3139288f8d45a03bfecb9744face4fafdbe"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/stitch-witch.png",
+    "bytes": 41210,
+    "sha256": "986ca13f7c71c91c36e33d4bc6b6b2baa696ef5b709c74919e439ffb2b78cf03"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/strawberry-princess.png",
+    "bytes": 34065,
+    "sha256": "db27f1a916d0e8af8856e3645c8e5ba347af26ae87fc561cf08b0fdc27c0ccb2"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/teddy.png",
+    "bytes": 52124,
+    "sha256": "f753c7bab30e51ff6fb78860070469d92750cbf07b35eacf9973eda050356a10"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/unicorn-person.png",
+    "bytes": 14247,
+    "sha256": "26b70014585cba5ded9ef7d0773bc0a7e77ad15e45cc78996538ada5f752ed81"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/vita.png",
+    "bytes": 39504,
+    "sha256": "8e46442227c6c5ec1c4e5b0f777dc059b09b2d4b2f94034a32a6c2815e94cc8b"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/vivi.png",
+    "bytes": 24863,
+    "sha256": "0f9878f16a9600bddf9677ea15876971468ad473e1ab3bb7ebaa6b16512ba99b"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/weird-cat.png",
+    "bytes": 38927,
+    "sha256": "3f2689bbe5bea263f50ad9e1eab63d72c66731bce47e6cb85a7fc3f8d7e21d9c"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/witch.png",
+    "bytes": 29577,
+    "sha256": "9f13024b49db952d13f2ddd1c163e4adfb64d6137808af61c2af367f3dacef80"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/wizzir.png",
+    "bytes": 28035,
+    "sha256": "b5844dc90d04b766d3290612bef421c2f7256efec99c1fe16699aa88a021d4ea"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/wolfman.png",
+    "bytes": 26196,
+    "sha256": "14671c903971e03b26c08155b39252b5f2d8b6984323a26b06c5cac673b4ea9f"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/yeti-dude.png",
+    "bytes": 43869,
+    "sha256": "9ad7bf60b636917b04918dbe99e31e7efad63c0ac5fdfd721a70adb446979641"
+  },
+  {
+    "path": "public/assets/3d/characters/thumbnails/zombie.png",
+    "bytes": 34894,
+    "sha256": "1eca7a378408366170318395dcbaba29d8ef9d50a8e66347e6092145cf702fff"
+  },
+  {
+    "path": "public/assets/3d/crystal_orb.glb",
+    "bytes": 206168,
+    "sha256": "dd1f7998d915c7b9d4ab1f5f20d26c7c2ba4b4fbf0bef50c032cf9abaf208079"
+  },
+  {
+    "path": "public/assets/3d/cyber_glasses.glb",
+    "bytes": 190560,
+    "sha256": "3cf0e365c999aec93df63f5575f13e0e010d5c543ca20fe29ca9381dcfc005de"
+  },
+  {
+    "path": "public/assets/3d/cyber_helmet_visor.glb",
+    "bytes": 232108,
+    "sha256": "8ee41b113475f3f0e0e8a274e701b388757f6de622dca81727ea9d88ae1b4361"
+  },
+  {
+    "path": "public/assets/3d/cyber_katana.glb",
+    "bytes": 180308,
+    "sha256": "6b77de76d9a33010215f37edc0f22a0f848e91667af93282b8ed80aa1c2631f0"
+  },
+  {
+    "path": "public/assets/3d/cyber_sniper_rifle.glb",
+    "bytes": 338836,
+    "sha256": "de4c443652d7326cd24201cb81622faa8cc94c67c7a9337594bda658196fc2ff"
+  },
+  {
+    "path": "public/assets/3d/cyberpunk_hoverbike.glb",
+    "bytes": 391888,
+    "sha256": "ed8348bb03a360c2aaa7b8ef024e3dc4c4049912826e604f6aa23a2e385bd080"
+  },
+  {
+    "path": "public/assets/3d/cyberpunk_motorcycle.glb",
+    "bytes": 389248,
+    "sha256": "b16a1173acecdc0aee8502e878c22f5102043d5d7369ed39f23e33ecb1c2d5bb"
+  },
+  {
+    "path": "public/assets/3d/desk.glb",
+    "bytes": 189712,
+    "sha256": "2b00b2c99e2cfbd4fa41e516eb8b50f201d7f7b918cde6f99e77769a127991de"
+  },
+  {
+    "path": "public/assets/3d/environments/classroom_art_studio.glb",
+    "bytes": 2167224,
+    "sha256": "b0e14d9e45b8181798a09fc675d6c3aadf46bae5a2b24200fe751518c55016d8"
+  },
+  {
+    "path": "public/assets/3d/environments/compact_apartment_interior.glb",
+    "bytes": 1520948,
+    "sha256": "c5409d3c3050725fa14afc67f5d63168ead262d352bcd7294018dd8cf11cdde9"
+  },
+  {
+    "path": "public/assets/3d/environments/fantasy_alchemist_workshop_library.glb",
+    "bytes": 3610428,
+    "sha256": "c8aa1be5f39a09b369f21fef47455f1070117947973fdee73c4b24c7e6bf675c"
+  },
+  {
+    "path": "public/assets/3d/environments/fantasy_ruin_courtyard.glb",
+    "bytes": 2081960,
+    "sha256": "cd7b7aaa142c473b8373c9d666edc2d130ee0735a2290502489d721f1d87cb22"
+  },
+  {
+    "path": "public/assets/3d/environments/hanok_market_courtyard.glb",
+    "bytes": 2335872,
+    "sha256": "64540cd8540a6e8768152ae78bb908b97853aea064a263b9c43cd9b2373fe766"
+  },
+  {
+    "path": "public/assets/3d/environments/hospital_emergency_nurse_station.glb",
+    "bytes": 2263556,
+    "sha256": "7c08f38b2dfdeb418fadfca4ee24f0e73b92f9b20abcde11f29a67d5dae9a8e6"
+  },
+  {
+    "path": "public/assets/3d/environments/korean_convenience_store_night.glb",
+    "bytes": 3748664,
+    "sha256": "e31665694ca5ab05e09736d24623a4bfe14cc07b9f60bec261445f7dcf6f476e"
+  },
+  {
+    "path": "public/assets/3d/environments/korean_school_rooftop.glb",
+    "bytes": 1871832,
+    "sha256": "00a2ca9dd79b1e4957e94df7e2e9824e7c404e85f98bc45dc4691934d3e18115"
+  },
+  {
+    "path": "public/assets/3d/environments/scifi_command_corridor.glb",
+    "bytes": 3486400,
+    "sha256": "a2eff1b6d07f8e09ef2f1deebc240dd5ccb591384bce59d5f092cc4dd0d59821"
+  },
+  {
+    "path": "public/assets/3d/environments/seoul_subway_platform.glb",
+    "bytes": 3734156,
+    "sha256": "d5670f9e0240402fbf69308bbbdfb936775c6a3c30420bd693f5747b71598669"
+  },
+  {
+    "path": "public/assets/3d/environments/stylized_cafe_interior.glb",
+    "bytes": 2476104,
+    "sha256": "f0e038d48f6906c1316e3cbb633cb92c72a0053091acdb28a83d11b74e9cee2a"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/classroom_art_studio.png",
+    "bytes": 307367,
+    "sha256": "fcbef32f2f20061856592d46cd23178433263281a91d3011b9e6ee6271cd26f5"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/compact_apartment_interior.png",
+    "bytes": 304312,
+    "sha256": "fb36d71eab3adfc70de26631be2a5bfd759f19f1bf833ea573f7c476875189da"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/fantasy_alchemist_workshop_library.png",
+    "bytes": 341340,
+    "sha256": "26601996d1a49762bfed8b35c5d481ff314a045b1e232bd2eb944b33acf2844e"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/fantasy_ruin_courtyard.png",
+    "bytes": 310153,
+    "sha256": "7fc08d71df3bf8f2c4f59699b16eeb305aaaf64c5af404f5bca5eb49b5e51243"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/hanok_market_courtyard.png",
+    "bytes": 339403,
+    "sha256": "1701190ccdf547d17f3b9d205f8771285299b78248f28106b5510378d176f5b9"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/hospital_emergency_nurse_station.png",
+    "bytes": 317971,
+    "sha256": "c975b71d653bbe654309a1cceac974c3694620aecd745d72bfec73c8ea6414d8"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/korean_convenience_store_night.png",
+    "bytes": 349838,
+    "sha256": "7b41fe38f5503fe5248bbb0aa5a1ff10fd1fdcc022d9a0fbdc7b382de22b0291"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/korean_school_rooftop.png",
+    "bytes": 341565,
+    "sha256": "51d306149f78ac6eba9be158ae1c583630a8a2c5518023a591860cb90dd4e959"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/scifi_command_corridor.png",
+    "bytes": 286160,
+    "sha256": "33d15c152e6e441dee8b6181ba91c61d489d5f6882f6e6e6ec7a95937ff60ce2"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/seoul_subway_platform.png",
+    "bytes": 344585,
+    "sha256": "260ac02cb7ddcbaed1ee0416d17eb4223e5ec251f9da2a2d4cf4dd0e3ae7cfc4"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/stylized_cafe_interior.png",
+    "bytes": 324163,
+    "sha256": "43fce1280243cbda5487dd6d12ba0194b68281fe5f2af24bf3410cfcc99d3015"
+  },
+  {
+    "path": "public/assets/3d/environments/thumbnails/urban_neon_alley.png",
+    "bytes": 362381,
+    "sha256": "faded921fd5c89c91a1d7ce9e285d65e9c10dc895dee76f88ad4fb4d34b5c6a0"
+  },
+  {
+    "path": "public/assets/3d/environments/urban_neon_alley.glb",
+    "bytes": 2971100,
+    "sha256": "4506e1d3fe34bfcd2dd754f237047c33d5a749218cdf7fb71266b98374e358e3"
+  },
+  {
+    "path": "public/assets/3d/everyday_backpack.glb",
+    "bytes": 266132,
+    "sha256": "f0551b688e841011251c76d536d204d1b0b08363abb8a1f495aa3b422a2419e8"
+  },
+  {
+    "path": "public/assets/3d/everyday_book.glb",
+    "bytes": 294248,
+    "sha256": "d048a4a04a173f2ef09e2ed28ae467eb2f4acd6511c7ec088a2d8530aa4edb50"
+  },
+  {
+    "path": "public/assets/3d/everyday_cap.glb",
+    "bytes": 363236,
+    "sha256": "d8ea6d264ebdff4b8f03d586a09cde5d756e20b5da00291e991427cbc15482e0"
+  },
+  {
+    "path": "public/assets/3d/everyday_glasses.glb",
+    "bytes": 258224,
+    "sha256": "15eb4bf2b50780e94c7028d723059e69e77a4571dda3be367357e0681228d76f"
+  },
+  {
+    "path": "public/assets/3d/everyday_mug.glb",
+    "bytes": 210756,
+    "sha256": "6e42a8af4b2b7488a444ad611781c07805c317a46a13a7b1f3841f4c7b21aef6"
+  },
+  {
+    "path": "public/assets/3d/fantasy_magic_chest.glb",
+    "bytes": 238000,
+    "sha256": "75eb0c927b105bac622be752e627fddcaf202cfc9689ff02f04746fc77b5ec26"
+  },
+  {
+    "path": "public/assets/3d/fantasy_magic_wand_staff.glb",
+    "bytes": 159776,
+    "sha256": "37d102cf461164d2d9ecd975c2300adc09ea81e479fb24ca50fcd89dd8d8927a"
+  },
+  {
+    "path": "public/assets/3d/fireplace.glb",
+    "bytes": 339152,
+    "sha256": "ba789566ab1538baabe71ed231922d2d0ed82a0bdfd1e2fc530b642b9f6e25c5"
+  },
+  {
+    "path": "public/assets/3d/fox_mask.glb",
+    "bytes": 187336,
+    "sha256": "3388ce7058882d4f68dc242c1a91d053a7e79642e021b2b1a4f67797d7e4deb4"
+  },
+  {
+    "path": "public/assets/3d/grandfather_clock.glb",
+    "bytes": 457964,
+    "sha256": "d90487081c82f309396e118dd8f36b22a95e9735e12d745cb299ef5d1a9157f9"
+  },
+  {
+    "path": "public/assets/3d/hanging_sign.glb",
+    "bytes": 331028,
+    "sha256": "c7b324301f4e53588b26ec899697c9630f79953cae9dc7bbc96da044d3fede97"
+  },
+  {
+    "path": "public/assets/3d/hologram_tablet.glb",
+    "bytes": 211568,
+    "sha256": "70d9f1f2eaf4e338f196de025112d639785521a1fdf774dc4c6cbb04e6386a52"
+  },
+  {
+    "path": "public/assets/3d/ice_cream_cone.glb",
+    "bytes": 324608,
+    "sha256": "d1474466eab24a534f4c89ce93d24a3dadda41dd783bdf268b130c3a65e1d45e"
+  },
+  {
+    "path": "public/assets/3d/kitchen_stove.glb",
+    "bytes": 1419448,
+    "sha256": "4baa2c7a2fa5cc76e5db33a2e3f0eccb36c78744d93c2e11807dfe71d1469d24"
+  },
+  {
+    "path": "public/assets/3d/magic_grimoire.glb",
+    "bytes": 269280,
+    "sha256": "ef5563dca0f938fd13cb37e55eee87e666147360a41d089ca9f4548843043c29"
+  },
+  {
+    "path": "public/assets/3d/magic_staff_crystal.glb",
+    "bytes": 205260,
+    "sha256": "840c080614968662c7f9509852dea3eda4c5e0ccf112d21acbb39b547fb05a29"
+  },
+  {
+    "path": "public/assets/3d/mailbox.glb",
+    "bytes": 151660,
+    "sha256": "586b2a648aa840e923292085a204d0f14063640ce904c7f266dfbb6b349ed1ac"
+  },
+  {
+    "path": "public/assets/3d/mech_turret.glb",
+    "bytes": 483564,
+    "sha256": "ea048d88b630f575dfa117ad051df7647d4618307c99538a71a5221e1a0a6ad4"
+  },
+  {
+    "path": "public/assets/3d/medical_stethoscope.glb",
+    "bytes": 225324,
+    "sha256": "752f0efd9b2d74adea026a179edc9457099111f32ff179f3ae66c369d3ee5c7b"
+  },
+  {
+    "path": "public/assets/3d/medieval_greatsword.glb",
+    "bytes": 225076,
+    "sha256": "8753c948addf17f74e4a861f8dac59e32b76ce225a5e0492b519e07a5313faba"
+  },
+  {
+    "path": "public/assets/3d/medieval_shield.glb",
+    "bytes": 236600,
+    "sha256": "df6551a53f0a196079ccff3d22551533104fa2b3d70756a0f877e26fcdf9b89b"
+  },
+  {
+    "path": "public/assets/3d/modern_smartphone_prop.glb",
+    "bytes": 201972,
+    "sha256": "c1529cf76b6f621dd8d90697383fbc9eae03f6692904a79b8ecffdb9456e9815"
+  },
+  {
+    "path": "public/assets/3d/neom_bench_prop.glb",
+    "bytes": 338756,
+    "sha256": "2d004cf2058df473b6dae11a35009cad4d904d1b736599bdcdf5ec2c711bd281"
+  },
+  {
+    "path": "public/assets/3d/outfits/README.md",
+    "bytes": 2104,
+    "sha256": "a4a5db6111edddcc9a9ffbe8941de56c0062ee4eac1316063147ac4ecbd598c3"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_cardigan.glb",
+    "bytes": 45616,
+    "sha256": "f43f7d005bcced6bd13fb96c0a4f57c107ea4018634c39f3cfad5aefda574ba8"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_cyber_suit_v2.glb",
+    "bytes": 45604,
+    "sha256": "8fdc562fe3016e4b0b864f3b190621fee555cadac3cdbb975c08e89ece4503ed"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_cyberpunk_suit.glb",
+    "bytes": 46056,
+    "sha256": "c4bbf41dcda144331e93570d7f58665b9eaab5d5612d751526bf71c469090cb4"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_dress.glb",
+    "bytes": 45856,
+    "sha256": "8f4d0286eae26095f6ca485d341ca90039a7b5ed231343c4972e3b313f314323"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_hanbok_modern.glb",
+    "bytes": 45736,
+    "sha256": "4001d9f52501b4af107f34bd4e34082e1b6a20692bcbb7c823e1494d3fc124b8"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_kimono_traditional.glb",
+    "bytes": 45672,
+    "sha256": "3d0410d04517d5ab1a4f3c142fe75db73c0558f191b162b1e961f6c52826e266"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_pants.glb",
+    "bytes": 81472,
+    "sha256": "66ac4d34c3aee9281354dc16428f7b194812664845f81aeed76c3153183cff75"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_punk_jacket.glb",
+    "bytes": 45636,
+    "sha256": "82c509926d4f089d72e2a9f6c6b21e4a6df401a21e1bcc4a0cc26db2828a2224"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_sailor.glb",
+    "bytes": 46020,
+    "sha256": "74a517a7293eed1443b437b50fdb59df29c5c9def2200d881ab299d43759d37d"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_scrubpants.glb",
+    "bytes": 82320,
+    "sha256": "44e7cbf7ec9ec6a182f57027277458a2396ef89ada175826a18eb6b5f0830f1b"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_scrubs.glb",
+    "bytes": 45776,
+    "sha256": "0010d15af511d8ad88ba5f8314534d04d8bbd615496cc3f58a982fe1dfc32672"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_shorts.glb",
+    "bytes": 81480,
+    "sha256": "a799e4881044816cfa354c92d3e4f1068684f847450b8c53c336bb351c04152b"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_space_suit.glb",
+    "bytes": 45612,
+    "sha256": "520494cb87e01dbf319fa3f3956d44891455fe11716fbcad84a07c9b965dd8fe"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_tactical_vest.glb",
+    "bytes": 6484,
+    "sha256": "6a1afcf946eb5dcc0a6531a17d927f8aa4aad00b481b3e78b502aa24d7427065"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_tank.glb",
+    "bytes": 45616,
+    "sha256": "69fe780f761ab8592bd8f89e56095721e116ab4f9de36770cd638118e279a9bd"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_trenchcoat.glb",
+    "bytes": 45792,
+    "sha256": "c6cf5cffedea7704a61d8414d2079a26c2e132b3b549ea57ac2bac93d8678d3a"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_tshirt.glb",
+    "bytes": 46020,
+    "sha256": "327b56e946a1e32a874d09d748365412fb1acedf5c37b52bd4f5bb27b42ce50d"
+  },
+  {
+    "path": "public/assets/3d/outfits/outfit_wide.glb",
+    "bytes": 81596,
+    "sha256": "5166a1f049103d0caf1d18ce8eefb291df1423266cc329afaa47c529ba2687fa"
+  },
+  {
+    "path": "public/assets/3d/paper_lantern.glb",
+    "bytes": 2487140,
+    "sha256": "bd6888b6b84496c7f0768ccf0560f80e40bd4d8de5a6cae15562c0a59e95c237"
+  },
+  {
+    "path": "public/assets/3d/potted_monstera.glb",
+    "bytes": 887920,
+    "sha256": "e9661547646c95b248182e72fab0176ef91d50584369cbf0f14e74bf93fa2c5b"
+  },
+  {
+    "path": "public/assets/3d/ramen_bowl.glb",
+    "bytes": 891940,
+    "sha256": "718f099e8074cdeda9dbb8e37cda42fea80a8d72a06e6c39b7720bb45112738f"
+  },
+  {
+    "path": "public/assets/3d/robot_pet.glb",
+    "bytes": 323972,
+    "sha256": "dfe78e1cd18aa4b893c49cf69039b253907ce4500f8f5f62d6dea39eebca2b0e"
+  },
+  {
+    "path": "public/assets/3d/round_table.glb",
+    "bytes": 145004,
+    "sha256": "b47bcd5b756c43872841249d0b40c7f3ba575ca408693cc6f832cc151acd3d56"
+  },
+  {
+    "path": "public/assets/3d/royal_throne.glb",
+    "bytes": 366648,
+    "sha256": "4e6238efd4049e2072c29b0dff0c1abf68a093561e2b40a65df5815ec55a46ae"
+  },
+  {
+    "path": "public/assets/3d/school_desk.glb",
+    "bytes": 240652,
+    "sha256": "cda558038b0a6517c1d4601b885e5addd9fe594cde27a5e505a620f8bdbfa103"
+  },
+  {
+    "path": "public/assets/3d/scifi_drone_bot.glb",
+    "bytes": 374188,
+    "sha256": "ca3498de7414a1c3f06734bb592aee58e02db258549f1ad226d71f305cd8d90d"
+  },
+  {
+    "path": "public/assets/3d/scifi_laser_gun.glb",
+    "bytes": 266780,
+    "sha256": "121044d6a3fdda5a7673a6ee491f3f830ebc4f9e14ee8092d193ea190c93aab7"
+  },
+  {
+    "path": "public/assets/3d/sofa.glb",
+    "bytes": 702512,
+    "sha256": "c3486a5830525c32a8ed68c83a0432f900c0f71ec0c44babf56ac09aa126d3b3"
+  },
+  {
+    "path": "public/assets/3d/steampunk_airship.glb",
+    "bytes": 391812,
+    "sha256": "227a383fd8bfe16bcdddb9b0dee575d9d76e16a54009f10470c8fc341cb89251"
+  },
+  {
+    "path": "public/assets/3d/street_food_cart.glb",
+    "bytes": 406908,
+    "sha256": "bf9e7a6c8d2ca9a1c485e8d30bf2093b8397c268434a1573322425bea7ff35c2"
+  },
+  {
+    "path": "public/assets/3d/street_lamp.glb",
+    "bytes": 403532,
+    "sha256": "6cc67354c4fd0b9bba249a6e17a5bbae6d35748f8d32963f233fc4f9eb9b9ec8"
+  },
+  {
+    "path": "public/assets/3d/tactical_helmet.glb",
+    "bytes": 380976,
+    "sha256": "0d6c18ac2094615dc5019ea682dcf8e227062fa468269810a447702e08d4513b"
+  },
+  {
+    "path": "public/assets/3d/tea_set.glb",
+    "bytes": 1005524,
+    "sha256": "b4985242409103ae7ce3d8b396c086afa2c2dc746cb5f8f872fe3b6bcb7902a3"
+  },
+  {
+    "path": "public/assets/3d/traffic_light.glb",
+    "bytes": 297892,
+    "sha256": "2bd83cc4dab2e0ec074d3ab3b68f7ea383f16b3b5c75c708bbd768be95c082f7"
+  },
+  {
+    "path": "public/assets/3d/vending_machine.glb",
+    "bytes": 597336,
+    "sha256": "c260eec10e331561a48dd49163d3d3f8f6e6a3235e485009b86e76a07f178a9e"
+  },
+  {
+    "path": "public/assets/3d/wishing_well.glb",
+    "bytes": 469540,
+    "sha256": "164a2261fe50cb708bb7edcca5bf4c418653953be59df4ffc9ff9e421420bb65"
+  },
+  {
+    "path": "public/assets/3d/wizard_hat.glb",
+    "bytes": 722700,
+    "sha256": "bd1435bddd4da7495d377f3a490c44eb064df21bfda607f3418b02ac571f729e"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_action_highway_chase.png",
+    "bytes": 100336,
+    "sha256": "17e76664cb80b650ca84b30c62ca79969fab8af70fc433a8f2ad7e1836b69f0a"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_action_jungle_temple.png",
+    "bytes": 86895,
+    "sha256": "93335cdac9369989f4ed0cee69ef359b82a53be5aa9ae464caf9bc0de83116ee"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_action_ruined_city.png",
+    "bytes": 125315,
+    "sha256": "33da2857ce17b664869a17cdc299381ad0cd8b89ce96af762f95d0fbbd9477af"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_bedroom.png",
+    "bytes": 109213,
+    "sha256": "de4746edec3511a72f7b0601823b5556bd5e06ce973da0a7e801adf7b3af2391"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_cafe.png",
+    "bytes": 1062684,
+    "sha256": "a309307df821baf1a529d19bf513c8f69b97e028603919e444fcd16338b0ed3a"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_classroom.png",
+    "bytes": 930622,
+    "sha256": "b22ff827fe7a6c600efaca44b4e6a14701109e9de8dc2ce0b6e846f35320c2f5"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_convenience.png",
+    "bytes": 110576,
+    "sha256": "303b8fad551833e26d8e46cedaabb15f2f4d505e8500d9161f874e3f33be93f3"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_corridor.png",
+    "bytes": 819161,
+    "sha256": "83db66a04fdc7c28e6e8afd716e11bbd74104ba16d2eba410ca02ae3b248b22a"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_creator_room.png",
+    "bytes": 2241188,
+    "sha256": "d5ac7988107f160589d83af47bac9e8156afe645025200a882ff817f78d0e9c0"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_drama_boardroom.png",
+    "bytes": 96324,
+    "sha256": "4060436b63be9af0a9aebe63169f2a29788cef8a75e2145cff3f79fd71dec94b"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_drama_courtroom.png",
+    "bytes": 98938,
+    "sha256": "8360f3a9283fe1c809d8e75a980b478b7cb6bd05523d46961cc314b4beeb1e3c"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_drama_hospital_corridor.png",
+    "bytes": 72598,
+    "sha256": "0ee1e696fbb89f20246b86a0a7da207484a992183da819f6a7367b9fc958d163"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_fantasy_dragon_peak.png",
+    "bytes": 104569,
+    "sha256": "5a9201baba4503b082123235828e45fa2c713abbbaec76552d2894a40665974f"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_horror_abandoned_hospital.png",
+    "bytes": 83957,
+    "sha256": "bcb4ddc647fd1b5631850eaf64f208f0d32747340b48a713781f06d276ec971d"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_horror_dark_tunnel.png",
+    "bytes": 90892,
+    "sha256": "7062df2a1a7869b3b44a6541cb41398692042b6f97f0fa0229352ef102c3ab52"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_horror_foggy_cabin.png",
+    "bytes": 54219,
+    "sha256": "9c78c26df3b28b8ec26d77142afdf9a49a7d4555788fe25cbff658314e2e1e7a"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_moonlit_forest.png",
+    "bytes": 3173171,
+    "sha256": "d83a84ecea2f2628a12eba53a1dfaba3ddbb57fc0af07a744806f32e33749ad0"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_neon_alley.png",
+    "bytes": 2847526,
+    "sha256": "c4a938e70a9c8b5af244ddfc4eb7a1e07aee816b3aac294e0283a8ef4b84521a"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_palace.png",
+    "bytes": 1160792,
+    "sha256": "aa1e0df0d20e7e8c812737131cbfd40cd91049ac1d9bd6d33117cdec121d93f5"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_romance_carnival.png",
+    "bytes": 102617,
+    "sha256": "03ac486752ca4c9a7c9215298a532820c372a501212b19600d85575e7a9561e3"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_romance_cherry_blossom.png",
+    "bytes": 131067,
+    "sha256": "53c0c53a0d71bc65a2efab24176a6218249a55e6f6d24727cf3bcd28e5290347"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_rooftop_sunset.png",
+    "bytes": 2251327,
+    "sha256": "6da3a1994bd8b46edaa4ec028f29bc1324df8867cb7f68bae6d7630b0f696031"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_sf_cyberpunk_street.png",
+    "bytes": 132308,
+    "sha256": "0f10dc01377669f625691ae6ea91e424674b99277aea191342432e5c2e552354"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_sf_research_lab.png",
+    "bytes": 111338,
+    "sha256": "98cdbca5df58fdd6d4564b529f15c3a9a152c55f0b3599f2c12c7d6a0184d033"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_sf_space_station.png",
+    "bytes": 121077,
+    "sha256": "e02424dd6f5671e272c7d71f1e2bf7b60f8dd9a064f500680f3b9c6168e8a929"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_street.png",
+    "bytes": 996231,
+    "sha256": "4153eb6ebea4422301ec4884c2d00d55e558025169809e29601a0a3e3c750e04"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_wuxia_cliff_duel.png",
+    "bytes": 97180,
+    "sha256": "3aaa75371f8046a784f4b3e080453d3e6877abb19619f8d8b33ade52e6ebe596"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_wuxia_market_street.png",
+    "bytes": 114532,
+    "sha256": "ef199a8200b9f871305d43e0f3d3565daa834306d06f2b9c1de692be1683b45e"
+  },
+  {
+    "path": "public/assets/studio/backgrounds/webtoon_wuxia_palace_courtyard.png",
+    "bytes": 132610,
+    "sha256": "8db5fa70c769186048a2b09999f8640ef5db9b3bc6548ad22f627e42ca7a6fa6"
+  },
+  {
+    "path": "public/assets/studio/props/daily/webtoon_cafe_table_for_two.webp",
+    "bytes": 101064,
+    "sha256": "847ad80ba3f4e207b5eb70d569e01287cd2fe45ec519e7f2df8182d5e7efbf99"
+  },
+  {
+    "path": "public/assets/studio/props/fantasy/webtoon_royal_letter_seal_cluster.webp",
+    "bytes": 132722,
+    "sha256": "909d4be1e50c0b484fe13ed3baf0510b7894623c12b0ea177643c698ad147e8b"
+  },
+  {
+    "path": "public/assets/studio/props/school/webtoon_school_desk_study_cluster.webp",
+    "bytes": 71102,
+    "sha256": "b974bcc785913690afc00afaa94fcabe52251f9741271d95e3501943ed9598cf"
+  },
+  {
+    "path": "public/assets/studio/props/urban/webtoon_street_fixture_cluster.webp",
+    "bytes": 99144,
+    "sha256": "ff06a2e0fd5a5bae570a03a1a98c23f6c948ca3c0647a588fc6ad36fda3d56f7"
+  },
+  {
+    "path": "public/vrm/AliciaSolid.vrm",
+    "bytes": 7878712,
+    "sha256": "237bb02efadf8c13a114af91dd8e860173081457dee87017e51011c448d05dc2"
+  },
+  {
+    "path": "public/vrm/Anna.vrm",
+    "bytes": 7744412,
+    "sha256": "8694d2a0c09014524d5bc7fdf870f55b6efb8dbd5b399d91bde353b779502779"
+  },
+  {
+    "path": "public/vrm/Astronaut.vrm",
+    "bytes": 1679188,
+    "sha256": "1cb8218610deafc0fd4608507fc52cf3303de84b0f641b9a452efb5e8a0e6f23"
+  },
+  {
+    "path": "public/vrm/AvatarSample_A.vrm",
+    "bytes": 15096320,
+    "sha256": "b86b0b8a66d48911431d6f920a5211a974226f83aa672eca3f3dfade58ac346e"
+  },
+  {
+    "path": "public/vrm/AvatarSample_B.vrm",
+    "bytes": 15433736,
+    "sha256": "4a271bd3b5a3d19e054fd113ee154635b72e7141f4a8ccbcdba3c7f9cea6ee8d"
+  },
+  {
+    "path": "public/vrm/AvatarSample_C.vrm",
+    "bytes": 13132268,
+    "sha256": "395d5b04696e888f07bc856ae01bf72a974b7e773132c7443dc59d1688045b8a"
+  },
+  {
+    "path": "public/vrm/Avatar_Orion.vrm",
+    "bytes": 2893304,
+    "sha256": "32712a4aad9e83c0b2f86840ce54f1235fb9d133c5a6e7d6c5b653badc62fbb7"
+  },
+  {
+    "path": "public/vrm/Avocado.vrm",
+    "bytes": 1253352,
+    "sha256": "4f8a44907bb2232178514f230aedfc4d344600287e236724a0b660420f2d995e"
+  },
+  {
+    "path": "public/vrm/BadBot.vrm",
+    "bytes": 2847584,
+    "sha256": "f3af4ebdcf83c2980c4397ee7511edb7e646d0ea5abaac32c12a63fa8d5adb80"
+  },
+  {
+    "path": "public/vrm/BaoSamurai.vrm",
+    "bytes": 6331323,
+    "sha256": "9c46e1266f044395dc82b6fe64e241b93c91b91c0bf0fbc878fba384b7dcb67f"
+  },
+  {
+    "path": "public/vrm/Bloody.vrm",
+    "bytes": 1571436,
+    "sha256": "c421a4e33ecbaedb29c5059a67eadfabccef7b95e814d8ad56d225a333bb6c3d"
+  },
+  {
+    "path": "public/vrm/BluePixie.vrm",
+    "bytes": 4736502,
+    "sha256": "6560fcb630f19ceca6a7647728a9b6fd693fa5a29e7c6095a4ef20f746bef677"
+  },
+  {
+    "path": "public/vrm/BotBunny.vrm",
+    "bytes": 4452486,
+    "sha256": "511fc242cbf5b202a97961deedebb3caeb28de81c1cd23eb5ae307be9f3cd77f"
+  },
+  {
+    "path": "public/vrm/ChillPalm.vrm",
+    "bytes": 2183132,
+    "sha256": "608b8a086a00f4210f1fb6802eb7f88e4050100c779134ee1acbfe495bc29f0b"
+  },
+  {
+    "path": "public/vrm/ChillPenguin.vrm",
+    "bytes": 1670412,
+    "sha256": "52b235d5a36c17798f6ce145d1d56965a17b3be81c143d0b301e7ae881660b14"
+  },
+  {
+    "path": "public/vrm/Clown.vrm",
+    "bytes": 1487104,
+    "sha256": "b90b76548f50fcac3512e1da153e311281434f720d5642f937a5703b59bb150d"
+  },
+  {
+    "path": "public/vrm/CoolAlien.vrm",
+    "bytes": 1752508,
+    "sha256": "4ef6749ac4dcf3fa6d7c35f676774bf2f79c1876b8db3a42fc68f2bb01d96acf"
+  },
+  {
+    "path": "public/vrm/CoolBanana.vrm",
+    "bytes": 1491040,
+    "sha256": "4d316549404d52bb0f4f60ae91a6c7bd234e001987840df04e1e73379941aa4c"
+  },
+  {
+    "path": "public/vrm/CoolPirate.vrm",
+    "bytes": 1649636,
+    "sha256": "2193b911fe1e1bf3c38b0efb3d09d173aa1c69a1092b73ef4ee1b1e6c29119ea"
+  },
+  {
+    "path": "public/vrm/CoolPizza.vrm",
+    "bytes": 2302040,
+    "sha256": "03b8e03afca704acb7aea825f36e4e791446e3a0596f25c79f8164beb9efd06d"
+  },
+  {
+    "path": "public/vrm/CoolRamen.vrm",
+    "bytes": 1531384,
+    "sha256": "376d268dacf34c575c32938ed99a055957b5674c236b2c595b85ea9066480569"
+  },
+  {
+    "path": "public/vrm/CoolTaco.vrm",
+    "bytes": 1669772,
+    "sha256": "3beecadf0d2dd291e14cc644ade61c9151bae3e925c0acd024d5d1d1e356dd01"
+  },
+  {
+    "path": "public/vrm/CoolTiger.vrm",
+    "bytes": 8239828,
+    "sha256": "4b471b59517733b2f3804acc80e8ea485260efb956a5c950221e4e1ff30860e2"
+  },
+  {
+    "path": "public/vrm/CoolTurtle.vrm",
+    "bytes": 1555616,
+    "sha256": "c6d27e78b5753044e51d2cae9df528a2e702a97f2659cbfa1986d61f9bd4e2bd"
+  },
+  {
+    "path": "public/vrm/CosmicBot.vrm",
+    "bytes": 3482579,
+    "sha256": "1ad61e3cda6b58b2d0780e42c6310083fbba7ae40585231cbdd855c9f039179e"
+  },
+  {
+    "path": "public/vrm/CosmicDweller.vrm",
+    "bytes": 1968360,
+    "sha256": "bc3ad91852dbf3c2db76b9a65f01ca41a887c5c33df3ce7ff802f7c16819ece4"
+  },
+  {
+    "path": "public/vrm/Crowley.vrm",
+    "bytes": 5856486,
+    "sha256": "371f0d06d1a06df1294da498e00db654693d78cb6b40b6ddd40f839f4d242fae"
+  },
+  {
+    "path": "public/vrm/CuteSaurus.vrm",
+    "bytes": 3937453,
+    "sha256": "a5a48a0660ac7d879a4589a88ab6a50a623c712db648fa0d5fe66dfe5bbd5dbb"
+  },
+  {
+    "path": "public/vrm/Cyberpal.vrm",
+    "bytes": 5194392,
+    "sha256": "2c6b9f8f417e2cfe9770cdd279bfadaca34fd54f68de39192aca86bbfd886c30"
+  },
+  {
+    "path": "public/vrm/Darkness_Shibu.vrm",
+    "bytes": 20423112,
+    "sha256": "0b50573d2d054d98c0a6fc5a5ce872e1b2c8bff8718476ff72a9a68c48674fd8"
+  },
+  {
+    "path": "public/vrm/Devil.vrm",
+    "bytes": 1393048,
+    "sha256": "2e428dd1846504a77f3936259f489a899cc92aa6179b769a1aee230f875a9b4d"
+  },
+  {
+    "path": "public/vrm/DinoKid.vrm",
+    "bytes": 1730484,
+    "sha256": "ec7770601b1e060e5710e5e7bfb3c597d395fffc90e3c60ef32fcd60f85afc48"
+  },
+  {
+    "path": "public/vrm/Dracula.vrm",
+    "bytes": 1584796,
+    "sha256": "4e6442065696c1058b99a54b1ddda3457126492e69a8a92e8cd9f92d0bea165c"
+  },
+  {
+    "path": "public/vrm/Eggplant.vrm",
+    "bytes": 1724320,
+    "sha256": "d19c5a40c4cce814878f5bd08b20781662ab13a809fa699c98ed435dbb706919"
+  },
+  {
+    "path": "public/vrm/Erika.vrm",
+    "bytes": 1548672,
+    "sha256": "ac2030d23c791065e5cd596e251257269bc55b8c76b29a6ebf183bcfe8c7c1f7"
+  },
+  {
+    "path": "public/vrm/Eugenia.vrm",
+    "bytes": 8117705,
+    "sha256": "48fbb80dfd25e488371f85175ac5ea1821785f710355a7cc82f4ae273cd4c150"
+  },
+  {
+    "path": "public/vrm/EyeWizard.vrm",
+    "bytes": 1888392,
+    "sha256": "c64c91ecbe86b7be41d54f1765306a23bc5786032af756a917a37511c66ddc9a"
+  },
+  {
+    "path": "public/vrm/Froggy.vrm",
+    "bytes": 1828632,
+    "sha256": "f3d2f2810868618e28e44de10d513b4a4a4f0045a52b47114ad01e068055f159"
+  },
+  {
+    "path": "public/vrm/GoodKnight.vrm",
+    "bytes": 6089718,
+    "sha256": "a64f91db1754e02bc419e7adee494f14174d9e99f54f6afc6d6b5beca388c12c"
+  },
+  {
+    "path": "public/vrm/IceCream.vrm",
+    "bytes": 1244096,
+    "sha256": "d8bc8601147df5628d0c200ea7450417fdf851e4c42716b3a43a856ce7f13b07"
+  },
+  {
+    "path": "public/vrm/Jennifer.vrm",
+    "bytes": 2124360,
+    "sha256": "59d7d7e79d4ad24d097dfade6ca067dd99ecc885ec5545b4d61aeda357505a92"
+  },
+  {
+    "path": "public/vrm/Jimmy.vrm",
+    "bytes": 1576200,
+    "sha256": "312131992e561cb37be8d816520715ab997ceb2aa2b43de9feb5523409db22be"
+  },
+  {
+    "path": "public/vrm/Kate.vrm",
+    "bytes": 1402180,
+    "sha256": "d857bca56a26730b4f78872ffa322d11b6f427580e3224d1b1cd43368b50f9de"
+  },
+  {
+    "path": "public/vrm/Kiba.vrm",
+    "bytes": 3786144,
+    "sha256": "0d1169442836b3a348f8d9c17672bec1d7501d92b83e040ca1d0c5eb3cee225c"
+  },
+  {
+    "path": "public/vrm/LICENSES.md",
+    "bytes": 16163,
+    "sha256": "8264b7b6c1f9d58661a904dbf8f423194c324450088be1d109a0705298a3dfd8"
+  },
+  {
+    "path": "public/vrm/LadyFawn.vrm",
+    "bytes": 4296043,
+    "sha256": "404e6549cfff0734ac0279af55ce9b262747c1a78430516a23f8a01ba7879283"
+  },
+  {
+    "path": "public/vrm/LadyKoi.vrm",
+    "bytes": 5093563,
+    "sha256": "a20e3db072640b96f7d9089c1f7efd9962ce603d4a6f42d1cebe74c0e84fc9e7"
+  },
+  {
+    "path": "public/vrm/LaloBot.vrm",
+    "bytes": 2108476,
+    "sha256": "a0494f75257134f50ee64dbed0f70a07870f275928040d267b278db32dfd79ea"
+  },
+  {
+    "path": "public/vrm/LilRam.vrm",
+    "bytes": 6031826,
+    "sha256": "e863f0b89e3ce6d5be835da960101b6c1065146aa4f3bf83dcb6d2d8368e84cd"
+  },
+  {
+    "path": "public/vrm/MegaAngel.vrm",
+    "bytes": 5060181,
+    "sha256": "f72f70c013c14589125527490f97fcff8caaa74c462ea5e0ddfceb7254110ef1"
+  },
+  {
+    "path": "public/vrm/MeganTheFox.vrm",
+    "bytes": 5777896,
+    "sha256": "7167d50eb9fae3d3e0453ab6ab2e26b777452b5e0dc41108dfa162a3a061efd2"
+  },
+  {
+    "path": "public/vrm/MoonGirl.vrm",
+    "bytes": 1882036,
+    "sha256": "4f37152f0f419aac10f50affe65fd4add03747dbf0f4b3fb00d63716a586b360"
+  },
+  {
+    "path": "public/vrm/Mummy.vrm",
+    "bytes": 1714636,
+    "sha256": "0af3d581fbf1c1493dc7528e8b593d0a19d6b637dee64c496cecfd0533618211"
+  },
+  {
+    "path": "public/vrm/MushroomFairy.vrm",
+    "bytes": 4564369,
+    "sha256": "e54a2a760f1c6f1d4c8b3d2ecd98728117fdb003fc9949994bb1f6af16a57702"
+  },
+  {
+    "path": "public/vrm/Nightmare.vrm",
+    "bytes": 1645548,
+    "sha256": "4a03be6e76814eeeaf8e901d91ad03d6415297701c2b209ec8747e2a9d10ba52"
+  },
+  {
+    "path": "public/vrm/OldMoustache.vrm",
+    "bytes": 1264888,
+    "sha256": "2c04e1567bfe0e864e38bbfcb09056c276e74d5540c4ea71d5e4bb0a5e74b35e"
+  },
+  {
+    "path": "public/vrm/Olivia.vrm",
+    "bytes": 1699736,
+    "sha256": "d2597a8e0f6fbfc6c1e77886b737cea9cd9d2640474dc5cb5eafc847376a2473"
+  },
+  {
+    "path": "public/vrm/PirateBot.vrm",
+    "bytes": 11636104,
+    "sha256": "5e58d13c0ceaa3421c95fb5858e2d43a3748e7a695051168bfed965e1f72c2c3"
+  },
+  {
+    "path": "public/vrm/Polybot.vrm",
+    "bytes": 997048,
+    "sha256": "e255bace0d7de8b5fc90756efc83e167080e6db97692f23623fec5f1c67c423d"
+  },
+  {
+    "path": "public/vrm/Polydancer.vrm",
+    "bytes": 1242088,
+    "sha256": "9bc28f2f2ab9d20aaa0da6c7b272a3f2363058414362bbfc176713c4585e4244"
+  },
+  {
+    "path": "public/vrm/Pumpkin.vrm",
+    "bytes": 1361364,
+    "sha256": "926f0107c78a475501b8919fceb29a8ac7f8de830691bc1f6f7b304fc82727f1"
+  },
+  {
+    "path": "public/vrm/PyreSorcerer.vrm",
+    "bytes": 2406280,
+    "sha256": "77a4d9ab15556b009bb1b8976e24e8aac31ec7539f4993ee2e2f97d958fd6293"
+  },
+  {
+    "path": "public/vrm/Rabbit.vrm",
+    "bytes": 2633752,
+    "sha256": "ea5453d2d74a9bd23a1fb27159e40e8a0d402f3d42a538b28118c1639bc9eae9"
+  },
+  {
+    "path": "public/vrm/Robert.vrm",
+    "bytes": 1656464,
+    "sha256": "5e3edaf330577ee4c3f6440b8989af3722e7c800bb90eb037f1c05cdfe61fd7c"
+  },
+  {
+    "path": "public/vrm/Rose.vrm",
+    "bytes": 2400964,
+    "sha256": "8e44e5638ffdf935e5d6fa990aa6cba428269f342f2db024c2961ee286a41e5f"
+  },
+  {
+    "path": "public/vrm/Sakurada_Fumiriya.vrm",
+    "bytes": 19342280,
+    "sha256": "d8fb05f33e377df028cb6b9d58c441ce68326c41fa23f6c735d40c65ae3dc710"
+  },
+  {
+    "path": "public/vrm/Seed_san.vrm",
+    "bytes": 10745680,
+    "sha256": "d24a5473a53f5ab76228da7c49a3f6fc2e1a0561566123859311df1e40b26490"
+  },
+  {
+    "path": "public/vrm/Sendagaya_Shibu.vrm",
+    "bytes": 17049284,
+    "sha256": "b7bcad5e5890abc4d7c65f9afc31da2445db03197d44f1ec10447f9db5abeaff"
+  },
+  {
+    "path": "public/vrm/Sendagaya_Shino.vrm",
+    "bytes": 15074328,
+    "sha256": "1e177c1a7b14f783a9c48395831db8616260d3bddd4154cb2784b779adca49b5"
+  },
+  {
+    "path": "public/vrm/SharkPerson.vrm",
+    "bytes": 1741456,
+    "sha256": "0b6931d30e5cb6615225f65531256039f43259d37a7067efb110d36a3e20760e"
+  },
+  {
+    "path": "public/vrm/Skull.vrm",
+    "bytes": 1319524,
+    "sha256": "9aafbe79901873e822f68f9c9f4b004964dbdae05b275584e10649ac8b5ef4ca"
+  },
+  {
+    "path": "public/vrm/SportMecha.vrm",
+    "bytes": 8525072,
+    "sha256": "c53c38a6ccb305281e1b3e820d8b5c69baa69a2c7dd0b726d87c4c6992a9fe39"
+  },
+  {
+    "path": "public/vrm/StitchWitch.vrm",
+    "bytes": 7692809,
+    "sha256": "0f4a29f09f2288d37eac5d5eb5dceced6b59e3585941e751e82aa8472c162a2d"
+  },
+  {
+    "path": "public/vrm/StrawberryPrincess.vrm",
+    "bytes": 2543551,
+    "sha256": "5d68db0ff969a158fa9c76f0cef523010051fa3be9565bf6e101989aa0fc5a83"
+  },
+  {
+    "path": "public/vrm/Teddy.vrm",
+    "bytes": 1657132,
+    "sha256": "68e0f644a8d6d250b741337b25dff188ed45a425b9658d6f42106931157e9bc8"
+  },
+  {
+    "path": "public/vrm/UnicornPerson.vrm",
+    "bytes": 1784788,
+    "sha256": "bd82c6bf345ff829b4ddafe49ac750f1eee3d5b92f36cd4b5b84097610c97a77"
+  },
+  {
+    "path": "public/vrm/Victoria_Rubin.vrm",
+    "bytes": 15479480,
+    "sha256": "b1372131bdbf233f46320146d565f342a7e4f6f4b8f2aefb301f1a283ec07e1e"
+  },
+  {
+    "path": "public/vrm/Vita.vrm",
+    "bytes": 14359044,
+    "sha256": "f2bf78f28a24e2f75f5ca0b6c3b646654c394e4b03592dfaa0d0633ef0972b4d"
+  },
+  {
+    "path": "public/vrm/Vivi.vrm",
+    "bytes": 18089136,
+    "sha256": "eaf902e041a7a810f1423599ae75682f61184ab6ef0206da9a8ed9caa8ec3a9d"
+  },
+  {
+    "path": "public/vrm/WeirdCat.vrm",
+    "bytes": 6380931,
+    "sha256": "8ab0d32531ca53e6dfe6be58e16f5d7aff1173a65adf447c8b4aa92f8d250495"
+  },
+  {
+    "path": "public/vrm/Witch.vrm",
+    "bytes": 1488388,
+    "sha256": "33fa9a9c4c10d0ba0ab22a051809afddb9b53e7f51cbb69df91e1bf9e1653652"
+  },
+  {
+    "path": "public/vrm/Wizzir.vrm",
+    "bytes": 1700172,
+    "sha256": "30da69949258cae5885cfe7f739cd4a5903a874ae7d615996c13489ce19c298e"
+  },
+  {
+    "path": "public/vrm/Wolfman.vrm",
+    "bytes": 2322788,
+    "sha256": "b63f699f36d5db203a6029add68982148f4c3868f2ed1c9df0d404b5123a3d40"
+  },
+  {
+    "path": "public/vrm/YetiDude.vrm",
+    "bytes": 3205037,
+    "sha256": "a040e30edbee0df971d5da24136dde6b72873515d7333dcab6c522e0d06871c5"
+  },
+  {
+    "path": "public/vrm/Zombie.vrm",
+    "bytes": 2048872,
+    "sha256": "4d17e44cd4d1e11f860aedc5952ef16266ab6775d69a8cbe096f7d423d8cbb58"
+  },
+  {
+    "path": "public/vrm/cryptovoxels.vrm",
+    "bytes": 238284,
+    "sha256": "c5b3ae99adb04138f757b26e836c9e7d763377e7dd7b0c646c2515e818e0cad3"
+  },
+  {
+    "path": "public/vrm/fem_vroid.vrm",
+    "bytes": 12041088,
+    "sha256": "983631034570b7a70e2f158e48f12fe7f0fe3ebcba763363efd6e85a2fbbacb8"
+  },
+  {
+    "path": "public/vrm/masc_vroid.vrm",
+    "bytes": 11844156,
+    "sha256": "ac5e30b9f875b54b13cddbe86d6351b4a8d2d418c2f885d89199281ad5c937cb"
+  },
+  {
+    "path": "public/vrm/sample.vrm",
+    "bytes": 10776032,
+    "sha256": "12c2b97e95e700783a6a550dc0eee2d7880aeedccef9ae67bc4c5a2f0f2631a2"
+  }
+]
