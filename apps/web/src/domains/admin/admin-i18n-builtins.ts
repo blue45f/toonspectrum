@@ -102,4 +102,5 @@ export const adminI18nBuiltins = { en: {
   ...adminKotitle,
   ...adminKotraffic,
   ...adminKoui,
+},
 } as const;

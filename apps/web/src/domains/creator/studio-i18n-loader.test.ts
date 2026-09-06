@@ -2,14 +2,15 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
+
 import { STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
+
 import {
   loadStudioI18nDictionaries,
   parseStudioI18nDictionary,
   STUDIO_I18N_ASSET_LOCALES,
   studioI18nAssetUrl,
 } from "./studio-i18n-loader";
-import { resolveI18nValue } from "@/shared/lib/i18n";
 
 function readAsset(locale: string): string {
   const merged: Record<string, string> = {};
@@ -20,6 +21,12 @@ function readAsset(locale: string): string {
   return JSON.stringify(merged);
 }
 
+describe("Studio lazy i18n assets", () => {
+  it("keeps complete, validated Korean and English dictionaries", () => {
+    for (const locale of STUDIO_I18N_ASSET_LOCALES) {
+      const dictionary = parseStudioI18nDictionary(readAsset(locale));
+      expect(dictionary).not.toBeNull();
+      // 1_323 → 1_325: 컴패니언 창의 막다른 상태에 붙인 탈출구 두 줄
       // (studio.toolsCompanion.exit.disconnected / .editor).
       // 1_325 → 1_328: 모바일 도크 "페이지" 버튼의 라벨·열기·닫기 aria 세 키
       // (studio.mobileDock.tool.pages / .pagesOpen / .pagesClose) — 하드코딩 한국어가 `en` 도구막대에

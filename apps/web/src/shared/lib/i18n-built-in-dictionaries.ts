@@ -23,8 +23,6 @@ import appEncommand from "../../../public/i18n/app/command/en.json";
 import appKocommand from "../../../public/i18n/app/command/ko.json";
 import appEncommon from "../../../public/i18n/app/common/en.json";
 import appKocommon from "../../../public/i18n/app/common/ko.json";
-import appEncontact from "../../../public/i18n/app/contact/en.json";
-import appKocontact from "../../../public/i18n/app/contact/ko.json";
 import appEncontrol from "../../../public/i18n/app/control/en.json";
 import appKocontrol from "../../../public/i18n/app/control/ko.json";
 import appEncopyright from "../../../public/i18n/app/copyright/en.json";
@@ -35,8 +33,6 @@ import appEnfeedback from "../../../public/i18n/app/feedback/en.json";
 import appKofeedback from "../../../public/i18n/app/feedback/ko.json";
 import appEnfooter from "../../../public/i18n/app/footer/en.json";
 import appKofooter from "../../../public/i18n/app/footer/ko.json";
-import appEnfortune from "../../../public/i18n/app/fortune/en.json";
-import appKofortune from "../../../public/i18n/app/fortune/ko.json";
 import appEnhome from "../../../public/i18n/app/home/en.json";
 import appKohome from "../../../public/i18n/app/home/ko.json";
 import appEnlang from "../../../public/i18n/app/lang/en.json";
@@ -47,8 +43,6 @@ import appEnnotify from "../../../public/i18n/app/notify/en.json";
 import appKonotify from "../../../public/i18n/app/notify/ko.json";
 import appEnpage from "../../../public/i18n/app/page/en.json";
 import appKopage from "../../../public/i18n/app/page/ko.json";
-import appEnplay from "../../../public/i18n/app/play/en.json";
-import appKoplay from "../../../public/i18n/app/play/ko.json";
 import appEnranking from "../../../public/i18n/app/ranking/en.json";
 import appKoranking from "../../../public/i18n/app/ranking/ko.json";
 import appEnreview from "../../../public/i18n/app/review/en.json";
@@ -82,19 +76,16 @@ export const builtinAppDictionaries = {
     ...appEnchangelog,
     ...appEncommand,
     ...appEncommon,
-    ...appEncontact,
     ...appEncontrol,
     ...appEncopyright,
     ...appEnerror,
     ...appEnfeedback,
     ...appEnfooter,
-    ...appEnfortune,
     ...appEnhome,
     ...appEnlang,
     ...appEnnav,
     ...appEnnotify,
     ...appEnpage,
-    ...appEnplay,
     ...appEnranking,
     ...appEnreview,
     ...appEnroute,
@@ -118,19 +109,16 @@ export const builtinAppDictionaries = {
     ...appKochangelog,
     ...appKocommand,
     ...appKocommon,
-    ...appKocontact,
     ...appKocontrol,
     ...appKocopyright,
     ...appKoerror,
     ...appKofeedback,
     ...appKofooter,
-    ...appKofortune,
     ...appKohome,
     ...appKolang,
     ...appKonav,
     ...appKonotify,
     ...appKopage,
-    ...appKoplay,
     ...appKoranking,
     ...appKoreview,
     ...appKoroute,
