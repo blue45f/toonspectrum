@@ -105,21 +105,20 @@ jobs:
           bash /tmp/refresh.sh
           bash /tmp/validate.sh
 
-      - name: Commit the verified cleanup
+      - name: Commit the verified non-workflow cleanup
         shell: bash
         run: |
           set -euo pipefail
-          rm .github/workflows/architecture-cleanup-finalize.yml
-          rm .github/workflows/architecture-cleanup-resume.yml
-          git restore --source=HEAD --staged --worktree .github/workflows/ci.yml
-          while IFS= read -r file; do
-            case "$file" in
-              .github/workflows/architecture-cleanup-finalize.yml|.github/workflows/architecture-cleanup-resume.yml) ;;
-              *) git restore --source=HEAD --staged --worktree "$file" ;;
-            esac
-          done < <(git diff --name-only -- .github/workflows)
+          # The Actions token may push ordinary repository changes but cannot create,
+          # update, or delete workflow files. Those reviewed workflow changes are
+          # committed separately through the authenticated GitHub contents API.
+          git restore --source=HEAD --staged --worktree .github/workflows
           git add -A
           git diff --cached --stat
+          if git diff --cached --quiet; then
+            echo 'No non-workflow cleanup changes to commit.'
+            exit 0
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'refactor: finalize web architecture cleanup'
