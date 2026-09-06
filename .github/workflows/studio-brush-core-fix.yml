@@ -4,15 +4,31 @@ on:
     branches: [fix/studio-brush-stability-core-20260906]
 permissions:
   contents: write
+concurrency:
+  group: studio-brush-core-fix-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   apply-fix:
     if: ${{ !contains(github.event.head_commit.message, '[brush-core-fix]') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.ref_name }}
           persist-credentials: true
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
       - name: Apply transparent wet-media stability contract
         run: |
           python3 - <<'PY'
@@ -24,16 +40,35 @@ jobs:
               n=s.count(old)
               if n!=1: raise SystemExit(f'{label}: expected 1 anchor, found {n}')
               s=s.replace(old,new,1)
-          one('''      const operation = verifierBrushOperation(expectedSelection);\n      const lowDensityEraser = operation === "erase"\n''','''      const operation = verifierBrushOperation(expectedSelection);\n      const transparentPaint = operation === "paint"\n        && !studioWetInkBrushDepositsPigment(expectedSelection.runtimeBrushId);\n      const lowDensityEraser = operation === "erase"\n''','classification')
+          one('''  visualChanged: boolean;\n  eraseLiveOperationActive: boolean | null;\n''','''  visualChanged: boolean;\n  /** False only for tools whose product contract intentionally leaves blank paper unchanged. */\n  visualChangeRequired: boolean;\n  eraseLiveOperationActive: boolean | null;\n''','evidence contract')
+          one('''      const operation = verifierBrushOperation(expectedSelection);\n      const lowDensityEraser = operation === "erase"\n''','''      const operation = verifierBrushOperation(expectedSelection);\n      // A water-only wet-media tool moves existing pigment and intentionally deposits nothing on\n      // blank paper. Keep persistence/history strict, but do not turn that product contract into\n      // a false visual-pixel failure. Pigment-depositing paint brushes remain unchanged.\n      const transparentPaint = operation === "paint"\n        && !studioWetInkBrushDepositsPigment(expectedSelection.runtimeBrushId);\n      const lowDensityEraser = operation === "erase"\n''','classification')
           one('''      invariant(\n        hasMeaningfulPixelChange(immediateDiff),\n''','''      invariant(\n        transparentPaint || hasMeaningfulPixelChange(immediateDiff),\n''','immediate')
           one('''      invariant(\n        visualChanged,\n''','''      invariant(\n        transparentPaint || visualChanged,\n''','settled')
-          one('''      const persistedProStroke = preset.source === "pro" && operation === "paint"\n        ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)\n        : null;\n      const persistedErase = operation === "erase"\n''','''      const persistedProStroke = preset.source === "pro" && operation === "paint"\n        ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)\n        : null;\n      const persistedTransparentStroke = transparentPaint\n        ? await waitForPersistedSelectedOperation(page, expectedSelection, "paint", 1, false, 15_000)\n        : null;\n      const persistedErase = operation === "erase"\n''','persistence')
+          one('''      const persistedProStroke = preset.source === "pro" && operation === "paint"\n        ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)\n        : null;\n      const persistedErase = operation === "erase"\n''','''      const persistedProStroke = preset.source === "pro" && operation === "paint"\n        ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)\n        : null;\n      const persistedTransparentStroke = transparentPaint\n        ? await waitForPersistedSelectedOperation(\n            page, expectedSelection, "paint", 1, false, 15_000,\n          )\n        : null;\n      const persistedErase = operation === "erase"\n''','persistence')
           one('''      const undoDiff = await compareScreenshotPixels(page, before, undone, 20);\n      const undoRestoredPixels = undoDiff.changedPixels <= 3;\n''','''      const undoDiff = await compareScreenshotPixels(page, before, undone, 20);\n      const undoRestoredPixels = transparentPaint || undoDiff.changedPixels <= 3;\n''','undo')
           one('''      const redoRestoredStroke = hasMeaningfulPixelChange(redoDiff);\n''','''      const redoRestoredStroke = transparentPaint || hasMeaningfulPixelChange(redoDiff);\n''','redo')
-          one('''        persistedCatalogId:\n          persistedProStroke?.brushCatalogId ?? persistedErase?.stroke.brushCatalogId ?? null,\n        persistedRuntimeBrushId:\n          persistedProStroke?.brush ?? persistedErase?.stroke.brush ?? null,\n''','''        persistedCatalogId:\n          persistedProStroke?.brushCatalogId\n            ?? persistedTransparentStroke?.stroke.brushCatalogId\n            ?? persistedErase?.stroke.brushCatalogId ?? null,\n        persistedRuntimeBrushId:\n          persistedProStroke?.brush\n            ?? persistedTransparentStroke?.stroke.brush\n            ?? persistedErase?.stroke.brush ?? null,\n''','evidence')
+          one('''        visualChanged,\n        eraseLiveOperationActive,\n''','''        visualChanged,\n        visualChangeRequired: !transparentPaint,\n        eraseLiveOperationActive,\n''','evidence visibility semantics')
+          one('''        persistedCatalogId:\n          persistedProStroke?.brushCatalogId ?? persistedErase?.stroke.brushCatalogId ?? null,\n        persistedRuntimeBrushId:\n          persistedProStroke?.brush ?? persistedErase?.stroke.brush ?? null,\n''','''        persistedCatalogId:\n          persistedProStroke?.brushCatalogId\n            ?? persistedTransparentStroke?.stroke.brushCatalogId\n            ?? persistedErase?.stroke.brushCatalogId ?? null,\n        persistedRuntimeBrushId:\n          persistedProStroke?.brush\n            ?? persistedTransparentStroke?.stroke.brush\n            ?? persistedErase?.stroke.brush ?? null,\n''','evidence identity')
+          one('''      entry.selected\n      && entry.visualChanged\n''','''      entry.selected\n      && (!entry.visualChangeRequired || entry.visualChanged)\n''','aggregate visibility')
           p.write_text(s)
           PY
-      - name: Commit source fix
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Source regression, lint and typecheck
+        run: |
+          pnpm exec vitest run src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts
+          pnpm exec eslint --max-warnings=0 scripts/verify-studio-brushes.mts
+          pnpm exec tsc -p tsconfig.json --pretty false --noEmit
+      - name: Build production bundle
+        run: pnpm run build
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify water-only and ordinary pigment brush in shipped UI
+        env:
+          TOONSPECTRUM_BRUSH_VERIFY_STAGE: desktop
+          TOONSPECTRUM_BRUSH_VERIFY_IDS: inkwash-water-brush,core-round
+        run: pnpm run verify:studio-brushes
+      - name: Commit verified source fix
         run: |
           git add scripts/verify-studio-brushes.mts
           git diff --cached --check
