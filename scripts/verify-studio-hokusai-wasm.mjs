@@ -47,7 +47,7 @@ const BUILD_INPUT_FILES = Object.freeze([
   "LICENSE-MIT",
   "LICENSE-UNICODE",
   "README.md",
-  "apps/web/src/lib.rs",
+  "src/lib.rs",
 ]);
 
 /*
