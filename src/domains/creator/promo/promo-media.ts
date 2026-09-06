@@ -43,6 +43,7 @@ export function promoRecorderMime(): string | null {
 export interface PromoRecordingOptions { signal: AbortSignal; onProgress: (progress: number) => void; shortSide?: 720 | 1080 }
 /** Real-time browser recording, not a fake MP4/renamed WebM or a server render job. */
 export async function recordPromoVideo(project: PromoProject, { signal, onProgress, shortSide = 720 }: PromoRecordingOptions): Promise<Blob> {
+  if (signal.aborted) throw new DOMException("취소했어요.", "AbortError");
   const mimeType = promoRecorderMime();
   if (!mimeType) throw new Error("이 브라우저는 영상 저장을 지원하지 않아요. Remotion 프로젝트로 내보내 주세요.");
   if (!project.panels.length || document.hidden) throw new Error("컷을 추가하고 이 탭을 화면에 표시한 상태에서 저장해 주세요.");
@@ -98,14 +99,24 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
         clearTimeout(watchdog);
         signal.removeEventListener("abort", abort);
         document.removeEventListener("visibilitychange", visibility);
+        activeRecorder.ondataavailable = null;
+        activeRecorder.onstop = null;
+        activeRecorder.onerror = null;
       };
       const finish = (error?: Error) => {
+        if (settled) return;
+        // stop() flushes data asynchronously. Preserve failures arriving before onstop.
+        if (error) failure ??= error;
         if (finished) return;
         finished = true;
-        failure = error ?? null;
         cancelAnimationFrame(raf);
-        if (activeRecorder.state !== "inactive") activeRecorder.stop();
-        else settle();
+        try {
+          if (activeRecorder.state !== "inactive") activeRecorder.stop();
+          else settle();
+        } catch {
+          failure ??= new Error("영상 녹화를 안전하게 종료하지 못했어요.");
+          settle();
+        }
       };
       const settle = () => {
         if (settled) return;
@@ -113,13 +124,15 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
         cleanup();
         if (failure) reject(failure);
         else if (!finished || !chunks.length) reject(new Error("영상 녹화가 예상보다 일찍 종료되었어요. 다시 시도해 주세요."));
-        else { onProgress(1); resolve(new Blob(chunks, { type: activeRecorder.mimeType || mimeType })); }
+        else {
+          try { onProgress(1); resolve(new Blob(chunks, { type: activeRecorder.mimeType || mimeType })); }
+          catch { reject(new Error("영상 파일을 마무리하지 못했어요.")); }
+        }
       };
       const abort = () => finish(new DOMException("취소했어요.", "AbortError"));
-      const visibility = () => { if (document.hidden) finish(new Error("다른 탭으로 이동해 녹화를취소했어요. 정확한 영상 저장을 위해 이 탭을 유지해 주세요.")); };
+      const visibility = () => { if (document.hidden) finish(new Error("다른 탭으로 이동해 녹화를 취소했어요. 정확한 영상 저장을 위해 이 탭을 유지해 주세요.")); };
       const watchdog = setTimeout(() => {
-        failure = new Error("영상 저장 제한 시간을 초과했어요.");
-        finish(failure);
+        finish(new Error("영상 저장 제한 시간을 초과했어요."));
         settle();
       }, (project.seconds + 15) * 1000);
       const tick = () => {
@@ -151,7 +164,8 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
       } catch { finish(new Error("영상 녹화를 시작하지 못했어요.")); }
     });
   } finally {
-    if (recorder && recorder.state !== "inactive") recorder.stop();
+    try { if (recorder && recorder.state !== "inactive") recorder.stop(); }
+    catch { /* Still release the underlying media tracks when the encoder cannot stop. */ }
     stream?.getTracks().forEach((track) => track.stop());
     if (audioSource) { try { audioSource.stop(); } catch { /* A cancelled setup may not have started it. */ } audioSource.disconnect(); }
     audioGain?.disconnect();
