@@ -76,7 +76,6 @@ jobs:
       - name: Verify transparent water brush and pro persistence
         env:
           TOONSPECTRUM_BRUSH_VERIFY_STAGE: desktop
-          TOONSPECTRUM_BRUSH_SURVEY: '1'
           TOONSPECTRUM_BRUSH_VERIFY_IDS: inkwash-water-brush,core-round
         run: pnpm run verify:studio-brushes
       - name: Recheck pencil live-release quality on current main descendant
