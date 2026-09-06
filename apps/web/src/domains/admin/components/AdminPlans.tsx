@@ -16,7 +16,7 @@ import {
 import { AdminNotice, AdminSpinner, Field, adminInputClass } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 const planFormSchema = z.object({
   code: z.string().trim().min(1, "Code & name are required."),

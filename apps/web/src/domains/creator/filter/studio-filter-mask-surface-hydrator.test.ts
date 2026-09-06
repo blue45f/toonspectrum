@@ -8,7 +8,7 @@ import {
   STUDIO_RASTER_CRDT_VERSION,
   STUDIO_RASTER_KERNEL,
   type StudioRasterOperationLog,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 const SURFACE_ID = "filter-mask:v1:11111111-1111-4111-8111-111111111111";
 const OPERATION_ID = "22222222-2222-4222-8222-222222222222";

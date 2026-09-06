@@ -18,7 +18,7 @@ import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 
 import type { BubbleEl } from "./studio-element-model";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type BubbleAppearancePatch = Partial<
   Pick<

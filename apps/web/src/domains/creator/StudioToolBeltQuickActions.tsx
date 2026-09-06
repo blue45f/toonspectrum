@@ -12,7 +12,7 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { PageState } from "./studio-page-state";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 type StudioToolBeltHintTargetProps = Omit<ComponentProps<typeof StudioToolHintTarget>, "preferredSide">;
 

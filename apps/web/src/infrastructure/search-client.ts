@@ -1,4 +1,4 @@
-import type { PlatformId, Title } from "@/lib/types";
+import type { PlatformId, Title } from "@/shared/lib/types";
 
 import { apiPath } from "@/src/infrastructure/api";
 

@@ -69,7 +69,7 @@ import type { StudioBrushCatalogItem } from "./studio-brush-catalog";
 import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
 import type { StudioBrushTrayItem } from "../studio-creative-ux";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioBrushLibrarySheetProps {
   open: boolean;

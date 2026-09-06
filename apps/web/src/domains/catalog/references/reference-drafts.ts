@@ -1,7 +1,7 @@
 import { parseReferenceNotes } from "./reference-storage";
 
 import type { ReferenceNote } from "./reference-storage";
-import type { ReferenceItem } from "../../../../lib/kmas-reference";
+import type { ReferenceItem } from "../../../shared/lib/kmas-reference";
 
 /** Tab-scoped recovery only: never syncs drafts to an account or another tab. */
 export const REFERENCE_DRAFT_STORAGE_KEY = "toonstudio:kmas-reference-drafts:v1";

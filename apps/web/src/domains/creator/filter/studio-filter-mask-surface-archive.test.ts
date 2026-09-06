@@ -16,11 +16,11 @@ import {
   STUDIO_RASTER_CRDT_VERSION,
   STUDIO_RASTER_KERNEL,
   type StudioRasterOperationLog,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 import {
   createStudioFilterMaskSurfaceSpec,
   type StudioFilterMaskSurfaceId,
-} from "@/lib/studio-filter-mask-surface-contract";
+} from "@/shared/lib/studio-filter-mask-surface-contract";
 
 function buildStudioProjectArchive(
   input: Parameters<typeof buildStudioProjectArchiveWithBackend>[0],

@@ -1,12 +1,12 @@
 import { EyeOff, MessageCircle, Send, AlertTriangle, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import type { ReviewReply } from "@/lib/types";
+import type { ReviewReply } from "@/shared/lib/types";
 
-import { withCsrfProtection } from "@/lib/csrf";
-import { ensureArray, resolveApiError, safeParseJson } from "@/lib/http-safe";
-import { useApp } from "@/lib/store";
-import { cn, relativeDate } from "@/lib/utils";
+import { withCsrfProtection } from "@/shared/lib/csrf";
+import { ensureArray, resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
+import { useApp } from "@/shared/lib/store";
+import { cn, relativeDate } from "@/shared/lib/utils";
 
 const ROOT_REPLY = "__root__";
 const MAX_REPLY_DEPTH = 4;

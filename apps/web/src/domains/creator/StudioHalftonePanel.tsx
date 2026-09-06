@@ -17,7 +17,7 @@ import {
 } from "./studio-halftone";
 import { PANEL_LABEL_ROW, StudioPanelChip, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 // 모드 토글 정의 — CMYK 4채널 컬러 망점 / 휘도 단일 흑색 망점.

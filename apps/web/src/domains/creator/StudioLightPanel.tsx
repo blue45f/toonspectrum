@@ -20,7 +20,7 @@ import {
 } from "./studio-light";
 import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 // 세기·X·Y·색상 슬라이더 정의 — 표시 순서·한글 라벨·범위(세기는 intensity, 위치는 x·y, 광색은 hue).

@@ -34,7 +34,7 @@ import { StudioPageThumbnail } from "./StudioPageThumbnails";
 
 import type { ThumbPageLike } from "./studio-page-thumbs";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /** ThumbPageLike + 표시용 메타(이름) — StudioStoryboardGridPanel의 StoryboardGridPage와 동일한
  *  성격의 위스닝(widening)이다. composeThumbPage 결과(PageState 기반)는 실제로 name 을 그대로

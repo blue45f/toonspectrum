@@ -136,7 +136,7 @@ async function main() {
     throw new Error('Credential output must be outside the repository checkout.');
   }
   // Import only after isolation checks; neither module loads an application DB singleton.
-  const [{default:pg},{hashPassword}]=await Promise.all([import('pg'),import('../../apps/web/lib/auth-crypto.ts')]);
+  const [{default:pg},{hashPassword}]=await Promise.all([import('pg'),import('../../apps/web/src/shared/lib/auth-crypto.ts')]);
   const client=new pg.Client({connectionString:target.connectionString,connectionTimeoutMillis:5_000,statement_timeout:10_000});
   await client.connect();
   try {

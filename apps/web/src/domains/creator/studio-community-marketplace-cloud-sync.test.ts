@@ -8,8 +8,8 @@ import {
 import type { StudioCreatorPackDefinition } from "./studio-creator-pack-catalog";
 import type {
   CreatorMarketplaceStudioInstallConfirmationReceipt,
-} from "@/lib/creator-marketplace-cloud-library-contract";
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-cloud-library-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 const releaseId = "123e4567-e89b-42d3-a456-426614174000";
 const libraryItemId = "223e4567-e89b-42d3-a456-426614174000";

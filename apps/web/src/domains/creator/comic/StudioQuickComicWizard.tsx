@@ -10,7 +10,7 @@ import {
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { cn } from "../../../../lib/utils";
+import { cn } from "../../../shared/lib/utils";
 import { PANEL_LAYOUTS, type PanelLayoutPreset } from "../studio-panel-layouts";
 import {
   SCENE_TEMPLATE_CATEGORIES,

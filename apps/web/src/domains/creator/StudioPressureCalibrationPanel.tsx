@@ -13,7 +13,7 @@ import {
   studioPressurePreviewDiameter,
 } from "./studio-pressure-curve-graph";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const TEST_W = 320;
 const TEST_H = 78;

@@ -7,8 +7,8 @@ import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 
 import type { StudioToolBeltContentProps } from "../StudioToolBeltContent";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioBubbleToolPopoverBodyProps {
   readonly toolBelt: StudioToolBeltContentProps;

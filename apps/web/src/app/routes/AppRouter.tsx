@@ -6,7 +6,7 @@ import { RouteFallback } from "./route-fallback";
 import { RouteStage } from "./route-stage";
 import { useRouteTitle } from "./route-titles";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 import { isStudioRoutePathname } from "@/src/domains/creator/studio-workspace-route";
 

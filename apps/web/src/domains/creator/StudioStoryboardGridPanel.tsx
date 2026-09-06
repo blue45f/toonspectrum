@@ -32,7 +32,7 @@ import { StudioPanelShotTagFields } from "./StudioPanelShotTagFields";
 import type { ThumbPageLike } from "./studio-page-thumbs";
 import type { ShotTagPatch } from "./studio-panel-shot-tags";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /** 그리드 패널이 받는 페이지 최소 형태 — StudioPageThumbnail과 동일 계약(ThumbPageLike) +
  * 이름/메모(스트립과 동일하게 표시용으로만 사용, 여기서는 편집하지 않는다 — 이름 편집은 목록 뷰의

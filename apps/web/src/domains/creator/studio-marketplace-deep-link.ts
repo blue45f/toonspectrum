@@ -1,4 +1,4 @@
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 export type StudioMarketplaceDeepLinkAccountSync = Readonly<{
   status: "synchronized" | "skipped" | "retry-required";

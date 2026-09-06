@@ -22,7 +22,7 @@ import type {
   CreatorMarketplaceArchiveReceipt,
   CreatorMarketplaceCloudLibraryPage,
   CreatorMarketplaceStudioInstallConfirmationReceipt,
-} from "@/lib/creator-marketplace-cloud-library-contract";
+} from "@/shared/lib/creator-marketplace-cloud-library-contract";
 import type {
   CreatorMarketplaceResourceModerationQueuePage,
   CreatorMarketplaceResourceModerationReceipt,
@@ -36,7 +36,7 @@ import type {
   CreatorMarketplaceResourceIdentity,
   CreatorMarketplaceResourceRelistReceipt,
   CreatorMarketplaceResourceReportReceipt,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 import {
   CREATOR_MARKETPLACE_CLOUD_LIBRARY_CURSOR_MAX_CHARACTERS,
@@ -50,7 +50,7 @@ import {
   CreatorMarketplaceStudioInstallConfirmationReceiptSchema,
   ConfirmCreatorMarketplaceStudioInstallSchema,
   SetCreatorMarketplaceLibraryArchiveSchema,
-} from "@/lib/creator-marketplace-cloud-library-contract";
+} from "@/shared/lib/creator-marketplace-cloud-library-contract";
 import {
   CREATOR_MARKETPLACE_RESOURCE_MODERATION_MAX_PAGE_SIZE,
   CREATOR_MARKETPLACE_RESOURCE_MODERATION_NOTE_MAX_CHARACTERS,
@@ -79,7 +79,7 @@ import {
   CreatorMarketplaceResourceReportReasonSchema,
   CreatorMarketplaceResourceReportReceiptSchema,
   CreatorMarketplaceResourceReportStatusSchema,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 import { api, getApiErrorMessage, toApiError } from "@/src/infrastructure/api";
 import { NotFoundError } from "@/src/infrastructure/use-api-resource";
 

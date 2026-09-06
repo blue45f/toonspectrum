@@ -70,7 +70,7 @@ import { WebtoonSfxLexiconEngine, type SfxCategory } from "./webtoon-sfx-lexicon
 
 import type { ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type AssistantActiveTab =
   | "spec-slicer"

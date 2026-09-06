@@ -3,7 +3,7 @@
  * verified renderer handoff. An environment token alone can never turn a parallel, non-visible log
  * into production authority.
  */
-import { STUDIO_RASTER_ASSET_ADMISSION_OPT_IN_TOKEN } from "@/lib/studio-raster-asset-admission";
+import { STUDIO_RASTER_ASSET_ADMISSION_OPT_IN_TOKEN } from "@/shared/lib/studio-raster-asset-admission";
 
 export const STUDIO_RASTER_PUBLICATION_EXPERIMENT_TOKEN =
   STUDIO_RASTER_ASSET_ADMISSION_OPT_IN_TOKEN;

@@ -18,10 +18,10 @@ import type {
   CreatorMarketplaceSocialAuthorBadge,
   CreatorMarketplaceSocialReview,
   CreatorMarketplaceSocialReviewQualification,
-} from "@/lib/creator-marketplace-social-contract";
+} from "@/shared/lib/creator-marketplace-social-contract";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 import { useSession } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
 

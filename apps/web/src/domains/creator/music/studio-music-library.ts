@@ -1,9 +1,9 @@
 /** Device-local music uses the shared SQLite/OPFS authority, never a second browser database. */
 import type { StudioLocalDatabase } from "../studio-local-database";
 import type { LocalMusicTrack } from "./studio-music-client";
-import type { MusicTrackMetadata } from "@/lib/studio-music";
+import type { MusicTrackMetadata } from "@/shared/lib/studio-music";
 
-import { isMp3, MUSIC_MAX_BYTES, MUSIC_TERMS_URL, parseMusicBrief } from "@/lib/studio-music";
+import { isMp3, MUSIC_MAX_BYTES, MUSIC_TERMS_URL, parseMusicBrief } from "@/shared/lib/studio-music";
 
 export const MUSIC_LIBRARY_NAMESPACE = "studio-music-library-v1";
 const MAX_TRACKS = 20;

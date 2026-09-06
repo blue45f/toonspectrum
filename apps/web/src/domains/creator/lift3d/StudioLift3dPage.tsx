@@ -31,7 +31,7 @@ import type {
   StudioLift3dRightsDeclaration,
 } from "./studio-lift3d-library-handoff";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
 

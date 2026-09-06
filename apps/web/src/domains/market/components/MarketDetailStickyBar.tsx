@@ -10,10 +10,10 @@ import { useMarketLibrary } from "../hooks/use-market-library";
 import { useMarketWishlist } from "../hooks/use-market-wishlist";
 import { marketKindMeta } from "../models/market-kind";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 
 interface MarketDetailStickyBarProps {

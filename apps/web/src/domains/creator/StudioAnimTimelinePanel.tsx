@@ -37,8 +37,8 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { ReactElement } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 // 그리드 셀 치수(px) — CSS 변수가 아니라 상수로 고정한 이유: 재생헤드 세로선을
 // 그리드 스크롤 컨테이너 안에서 grid-column 배치로만 계산하므로(레이아웃 흔들림 방지)

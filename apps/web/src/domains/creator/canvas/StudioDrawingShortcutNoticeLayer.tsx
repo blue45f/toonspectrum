@@ -6,7 +6,7 @@ import { localizeText } from "./studio-canvas-viewport-primitives";
 import type { StudioDrawingShortcutNoticeStore } from "../brush/studio-drawing-shortcut-notice-store";
 import type { DrawMode, Tool } from "../studio-editor-tool-model";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 export function StudioDrawingShortcutNoticeLayer({
   canvasOnlyMode,

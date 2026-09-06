@@ -11,8 +11,8 @@ import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "../
 import { StudioHelpCenterHost } from "../StudioHelpCenterHost";
 import { StudioToolHintPreferencesProvider } from "../StudioToolHint";
 import { StudioWorkspaceNavigator } from "../StudioWorkspaceNavigator";
-import { Container } from "@/components/container";
-import { cn } from "@/lib/utils";
+import { Container } from "@/shared/components/container";
+import { cn } from "@/shared/lib/utils";
 import { StudioCuttoonEditorChrome } from "./StudioCuttoonEditorChrome";
 import { StudioCuttoonEditorContextMenu } from "./StudioCuttoonEditorContextMenu";
 import { StudioCuttoonEditorDialogs } from "./StudioCuttoonEditorDialogs";

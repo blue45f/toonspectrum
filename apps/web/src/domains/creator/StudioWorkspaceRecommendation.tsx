@@ -3,7 +3,7 @@ import { useId, type MouseEventHandler, type ReactElement } from "react";
 
 import type { ResolvedStudioWorkspaceRecommendation } from "./studio-workspace-recommendation";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const focusClass =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-panel";

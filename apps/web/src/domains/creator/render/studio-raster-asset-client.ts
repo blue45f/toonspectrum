@@ -1,4 +1,4 @@
-import type { StudioRasterAssetReference } from "@/lib/studio-crdt-raster-ops";
+import type { StudioRasterAssetReference } from "@/shared/lib/studio-crdt-raster-ops";
 
 import {
   STUDIO_RASTER_ASSET_MAX_BYTES,
@@ -6,7 +6,7 @@ import {
   isStudioRasterAssetReferenceStoredExactly,
   parseStudioRasterStoredReference,
   type StudioRasterAssetManifest,
-} from "@/lib/studio-raster-asset-contract";
+} from "@/shared/lib/studio-raster-asset-contract";
 import { api, apiPath, isHttpError, toApiError } from "@/src/infrastructure/api";
 
 export interface DownloadedStudioRasterAsset {

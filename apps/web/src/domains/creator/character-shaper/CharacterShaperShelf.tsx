@@ -26,7 +26,7 @@ import type { CharacterShelfCollection } from "./character-shaper-discovery";
 import type { CharacterShaperShelfProps } from "./character-shaper-ui-contract";
 import type { CharacterGridDirection } from "./character-shaper-ui-model";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const SEARCH_DEBOUNCE_MS = 120;
 const COLLECTIONS: readonly { readonly id: CharacterShelfCollection; readonly label: string }[] = [

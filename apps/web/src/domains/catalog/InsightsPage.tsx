@@ -6,15 +6,15 @@ import { Panel } from "./insights-components/panel";
 import { TagCloud } from "./insights-components/tag-cloud";
 
 
-import type { getInsightsData } from "@/lib/server/insights";
+import type { getInsightsData } from "@/shared/lib/server/insights";
 
-import { CountUp } from "@/components/count-up";
-import { Container } from "@/components/section";
-import { Badge } from "@/components/ui/chip";
-import { DistributionBars, GenreSpectrum, MeterBar } from "@/components/ui/spectrum-bar";
-import { genreColor } from "@/lib/genre-color";
-import { TYPE_LABEL } from "@/lib/taxonomy";
-import { formatCount, formatFull } from "@/lib/utils";
+import { CountUp } from "@/shared/components/count-up";
+import { Container } from "@/shared/components/section";
+import { Badge } from "@/shared/components/ui/chip";
+import { DistributionBars, GenreSpectrum, MeterBar } from "@/shared/components/ui/spectrum-bar";
+import { genreColor } from "@/shared/lib/genre-color";
+import { TYPE_LABEL } from "@/shared/lib/taxonomy";
+import { formatCount, formatFull } from "@/shared/lib/utils";
 import { ErrorState } from "@/src/components/error-state";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";
 

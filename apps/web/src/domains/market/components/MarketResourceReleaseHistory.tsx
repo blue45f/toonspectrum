@@ -5,10 +5,10 @@ import { formatMarketDate } from "../models/market-kind";
 import type {
   CreatorMarketplaceResourceHistoryItem,
   CreatorMarketplaceResourceHistoryPage,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { findStarterMarketplaceResourceById } from "@/lib/creator-marketplace-starter-catalog";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { findStarterMarketplaceResourceById } from "@/shared/lib/creator-marketplace-starter-catalog";
 import Link from "@/src/compat/router-link";
 import { getCreatorMarketplaceResourceHistory } from "@/src/infrastructure/creator-marketplace-client";
 

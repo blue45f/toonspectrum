@@ -1,4 +1,4 @@
-import type { FanCafeReply } from "@/lib/types";
+import type { FanCafeReply } from "@/shared/lib/types";
 
 // 소프트 삭제 마스킹(서버 maskDeletedReply와 동일 형태) — 하위 답글 자리 보존.
 export function maskReplyNode(tree: FanCafeReply[], replyId: string): FanCafeReply[] {

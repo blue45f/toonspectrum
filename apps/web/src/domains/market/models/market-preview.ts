@@ -1,4 +1,4 @@
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/u;
 

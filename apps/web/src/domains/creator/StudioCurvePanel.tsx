@@ -33,8 +33,8 @@ import { StudioHistogramSection } from "./StudioHistogramGraph";
 
 import type { StudioImageDataLike } from "./studio-filters";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 // SVG 기하 — 정사각 플롯. PAD만큼 안쪽 여백을 두고 150x150 영역에 0..255 도메인을 매핑한다.
 const SIZE = 170;

@@ -5,7 +5,7 @@ import {
 import { studioToolHintFromLabel } from "./studio-tool-hints";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /* eslint-disable react-refresh/only-export-components -- typed hint contracts share this lazy UI boundary */
 

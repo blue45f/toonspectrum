@@ -26,7 +26,7 @@ import type {
   StudioCompanionReferenceProjection,
 } from "./studio-companion-reference-projection";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 8;

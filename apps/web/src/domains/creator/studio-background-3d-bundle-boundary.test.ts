@@ -109,7 +109,7 @@ describe("Studio background 3D bundle boundary", () => {
       "utf8",
     );
     const bundleCheck = readFileSync(
-      new URL("../../../scripts/check-studio-bundle.mjs", import.meta.url),
+      new URL("../../../../../scripts/check-studio-bundle.mjs", import.meta.url),
       "utf8",
     );
 

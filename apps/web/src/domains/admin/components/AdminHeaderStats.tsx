@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 
 import { adminFetch } from "./admin-client";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 interface SystemHealthRes {
   status: string;

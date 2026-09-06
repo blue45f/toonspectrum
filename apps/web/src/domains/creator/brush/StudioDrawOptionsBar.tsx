@@ -67,7 +67,7 @@ import { StudioBrushTray } from "./StudioBrushTray";
 import type { StudioBrushSlot } from "./studio-brush-slots";
 import type { StudioBrushTrayItem } from "../studio-creative-ux";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioDrawModeUi = "pen" | "pixel" | "eraser" | "shape";
 export type StudioSymmetryUi = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";

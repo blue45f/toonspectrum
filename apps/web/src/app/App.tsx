@@ -9,13 +9,13 @@ import { AppShell } from "./AppShell";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
 
-import { FloatingControls } from "@/components/FloatingControls";
-import { SiteHeader } from "@/components/site-header";
-import { withCsrfProtection } from "@/lib/csrf";
-import { useUi } from "@/lib/ui-store";
+import { FloatingControls } from "@/shared/components/FloatingControls";
+import { SiteHeader } from "@/shared/components/site-header";
+import { withCsrfProtection } from "@/shared/lib/csrf";
+import { useUi } from "@/shared/lib/ui-store";
 
 const BackToTop = lazy(() =>
-  import("@/components/back-to-top").then((mod) => ({
+  import("@/shared/components/back-to-top").then((mod) => ({
     default: mod.BackToTop,
   })),
 );
@@ -25,7 +25,7 @@ const DeskCloudMounts = lazy(() =>
   })),
 );
 const SiteFooter = lazy(() =>
-  import("@/components/site-footer").then((mod) => ({
+  import("@/shared/components/site-footer").then((mod) => ({
     default: mod.SiteFooter,
   })),
 );

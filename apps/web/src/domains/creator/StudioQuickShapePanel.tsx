@@ -10,8 +10,8 @@ import { StudioToggleChip } from "./studio-panel-ui";
 
 import type { ReactElement } from "react";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioQuickShapePanelProps = {
   /** 퀵셰이프 on/off. */

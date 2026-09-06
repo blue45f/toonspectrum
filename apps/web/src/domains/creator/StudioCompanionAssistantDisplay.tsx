@@ -65,7 +65,7 @@ import {
 } from "./studio-workbench-tabs";
 import { useStudioCopyFeedback } from "./use-studio-copy-feedback";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type AssistantDisplayTab =
   | "spec-slicer"

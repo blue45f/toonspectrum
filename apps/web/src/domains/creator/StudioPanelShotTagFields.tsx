@@ -17,7 +17,7 @@ import { CAMERA_ANGLES, SHOT_TYPES } from "./studio-panel-shot-tags";
 
 import type { ChangeEvent, ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioPanelShotTagFieldsProps {
   /** studio-panel-shot-tags.SHOT_TYPES 의 id. 미설정/미카탈로그 값은 "선택 안 함" 표시. */

@@ -13,7 +13,7 @@ import { CONTACT_SHEET_COLUMN_CHOICES, CONTACT_SHEET_PAGE_PRESETS, CONTACT_SHEET
 
 import type { ReactElement } from "react";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export interface StudioContactSheetPanelProps {
   columns: number;

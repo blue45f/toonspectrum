@@ -18,7 +18,7 @@ import {
 } from "./studio-detail";
 import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 // 세기·반경 슬라이더 정의 — 표시 순서·한글 라벨·범위(세기는 amount, 반경은 radius).

@@ -722,7 +722,7 @@ import {
   NODE_EDIT_DEFAULT_MIN_SPACING_PX,
   type NodeEditHandle,
 } from "./studio-node-edit";
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 import {
   parseStudioObjectInsertDragPayload,
   resolveStudioObjectInsertOpenSeed,
@@ -1393,7 +1393,7 @@ import type {
 import type { StudioPageListPaneHandlers } from "./StudioPageListPane";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
-import type { CreatorAssetReportReason } from "@/lib/creator-asset-contract";
+import type { CreatorAssetReportReason } from "@/shared/lib/creator-asset-contract";
 import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,
@@ -1403,13 +1403,13 @@ import type {
 } from "@/src/infrastructure/creator-client";
 import type Konva from "konva";
 
-import { scheduleIdle } from "@/components/auth/schedule-idle";
+import { scheduleIdle } from "@/shared/components/auth/schedule-idle";
 import { useIsMobile } from "@/src/hooks/use-media-query";
 import { useResizable } from "@/src/hooks/use-resizable";
-import { loadChunkWithReloadRecovery } from "@/lib/chunk-load-recovery";
-import { useT } from "@/lib/i18n";
-import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-contract";
-import { cn } from "@/lib/utils";
+import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
+import { useT } from "@/shared/lib/i18n";
+import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-asset-contract";
+import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
 

@@ -24,9 +24,9 @@ import {
 } from "./studio-app-settings";
 import { studioDialogFocusAnchor } from "./studio-dialog-focus-return";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { useI18n, useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 function localizeText(
   t: (key: string) => string,

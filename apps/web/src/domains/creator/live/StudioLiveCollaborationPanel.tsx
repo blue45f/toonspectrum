@@ -67,8 +67,8 @@ import type {
 } from "../studio-screen-ice-policy";
 import type { StudioTeamRole } from "../studio-team-client";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { cn } from "@/shared/lib/utils";
 
 const ROLE_LABEL: Record<StudioTeamRole, string> = {
   owner: "소유자",

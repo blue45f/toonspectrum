@@ -17,14 +17,14 @@ import {
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { AuthModal } from "@/components/auth/auth-modal";
-import { AvatarUploader } from "@/components/avatar-uploader";
-import { CoverImage } from "@/components/cover-image";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
-import { useT } from "@/lib/i18n";
-import { useApp, useHydrated } from "@/lib/store";
-import { cn, formatCount, relativeDate } from "@/lib/utils";
+import { AuthModal } from "@/shared/components/auth/auth-modal";
+import { AvatarUploader } from "@/shared/components/avatar-uploader";
+import { CoverImage } from "@/shared/components/cover-image";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useT } from "@/shared/lib/i18n";
+import { useApp, useHydrated } from "@/shared/lib/store";
+import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import { useSession, signOut } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";

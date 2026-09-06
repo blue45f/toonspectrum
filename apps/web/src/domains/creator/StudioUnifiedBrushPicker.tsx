@@ -18,7 +18,7 @@ import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioUnifiedBrushPickerProps {
   activeBrushId: string;

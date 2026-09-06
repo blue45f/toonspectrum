@@ -34,7 +34,7 @@ import type { StudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 import type { StudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export function StudioInspectorSelectionSection({
   model,

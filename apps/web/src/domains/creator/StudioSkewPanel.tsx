@@ -11,7 +11,7 @@ import { RotateCcw } from "lucide-react";
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 import { SKEW_RANGE, SKEW_SNAP_ANGLES, isIdentitySkew, type SkewFields } from "./studio-skew";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 // 축 슬라이더 정의 — 표시 순서·한글 라벨·기울임 방향 설명(title 툴팁).
 const SKEW_AXES: { key: "skewX" | "skewY"; label: string; tip: string }[] = [

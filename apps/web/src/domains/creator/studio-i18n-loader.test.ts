@@ -12,7 +12,7 @@ import {
 
 import {
   resolveI18nValue,
-} from "@/lib/i18n";
+} from "@/shared/lib/i18n";
 
 function readAsset(locale: string): string {
   return readFileSync(

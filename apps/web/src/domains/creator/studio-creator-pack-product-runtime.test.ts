@@ -41,7 +41,7 @@ import {
 import {
   CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
   type CreatorMarketplaceInstallReceiptStorage,
-} from "@/lib/creator-marketplace-install-receipt";
+} from "@/shared/lib/creator-marketplace-install-receipt";
 
 let sqlite3: StudioSqliteApiHandle;
 const opened: StudioLocalDatabase[] = [];

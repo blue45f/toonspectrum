@@ -14,8 +14,8 @@ import { StudioToggleChip } from "./studio-panel-ui";
 
 import type { ReactElement } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioCropPanelProps = {
   /** 크롭 모드 on/off — on 이면 캔버스 위 크롭 rect 오버레이가 조작 가능하다. */

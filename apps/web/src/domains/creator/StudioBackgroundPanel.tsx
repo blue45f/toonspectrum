@@ -35,8 +35,8 @@ import {
   type StudioUiPreferencesRepository,
 } from "./studio-ui-preferences-sqlite";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioBackgroundEditorTab = "fill" | "size";
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { adminFetch, formatDate } from "./admin-client";
 import { LiveAutoRefresh } from "./LiveAutoRefresh";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 export interface AuditLogItem {
   id: string;

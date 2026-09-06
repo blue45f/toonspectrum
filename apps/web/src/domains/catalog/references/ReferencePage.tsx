@@ -16,11 +16,11 @@ import { ReferenceNoteEditor } from "./ReferenceNoteEditor";
 import type { ReferenceNotice, ReferenceView } from "./reference-i18n";
 import type { ReferenceMutation, ReferenceMutationFailure, ReferenceMutationResult, ReferenceNote } from "./reference-storage";
 import type { CommitReference } from "./ReferenceNoteEditor";
-import type { ReferenceField, ReferenceItem, ReferenceQuery, ReferenceResult, ReferenceErrorCode } from "@/lib/kmas-reference";
+import type { ReferenceField, ReferenceItem, ReferenceQuery, ReferenceResult, ReferenceErrorCode } from "@/shared/lib/kmas-reference";
 import type { FormEvent } from "react";
 
-import { useT } from "@/lib/i18n";
-import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchParams } from "@/lib/kmas-reference";
+import { useT } from "@/shared/lib/i18n";
+import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchParams } from "@/shared/lib/kmas-reference";
 import { apiPath } from "@/src/infrastructure/api";
 
 import "./reference.css";

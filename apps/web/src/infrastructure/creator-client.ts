@@ -7,15 +7,15 @@ import type {
   CreatorAssetLicenseId,
   CreatorAssetModerationStatus,
   CreatorAssetReportReason,
-} from "@/lib/creator-asset-contract";
+} from "@/shared/lib/creator-asset-contract";
 
 import {
   CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE,
   CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES,
   assertCreatorAssetListResponseBudget,
-} from "@/lib/creator-asset-contract";
-import { ensureArray } from "@/lib/http-safe";
-import { projectRevisionComparisonValue } from "@/lib/revision-comparison-projection";
+} from "@/shared/lib/creator-asset-contract";
+import { ensureArray } from "@/shared/lib/http-safe";
+import { projectRevisionComparisonValue } from "@/shared/lib/revision-comparison-projection";
 import { getAuthUserId } from "@/src/compat/auth-session-store";
 import { api, isHttpError, toApiError } from "@/src/infrastructure/api";
 import {

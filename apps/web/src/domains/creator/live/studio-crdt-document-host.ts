@@ -8,7 +8,7 @@ import type {
   StudioCrdtStrokeQuery,
   StudioCrdtStrokeRecord,
 } from "./studio-crdt-document-types";
-import type { StudioCrdtRasterDocumentSnapshot } from "@/lib/studio-crdt-raster-document-contract";
+import type { StudioCrdtRasterDocumentSnapshot } from "@/shared/lib/studio-crdt-raster-document-contract";
 import type * as Y from "yjs";
 
 export interface StudioCrdtDocumentHost {

@@ -40,7 +40,7 @@ import {
   type StudioAutoColorHintPlanSummary,
 } from "./studio-auto-color-hints-summary";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export interface StudioAutoColorCanvasSeedHit {
   readonly x: number;

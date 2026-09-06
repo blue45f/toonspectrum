@@ -4,7 +4,7 @@ import {
   creatorAssetLicenseOf,
   isCreatorAssetLicenseId,
   type CreatorAssetLicenseId,
-} from "@/lib/creator-asset-contract";
+} from "@/shared/lib/creator-asset-contract";
 
 export const STUDIO_ASSET_RIGHTS_MANIFEST_SCHEMA =
   "toonspectrum.studio-asset-rights-manifest" as const;

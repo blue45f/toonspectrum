@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { resolveStudioCommunityMarketplaceInitialView } from "./studio-community-marketplace-view";
 import { StudioCommunityMarketplacePanel } from "./StudioCommunityMarketplacePanel";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 const source = readFileSync(
   new URL("./StudioCommunityMarketplacePanel.tsx", import.meta.url),

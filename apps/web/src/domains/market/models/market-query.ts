@@ -2,7 +2,7 @@ import type {
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceLicense,
   CreatorMarketplaceResourceSort,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 import {
   CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS,
@@ -13,7 +13,7 @@ import {
   CreatorMarketplaceResourceSearchQuerySchema,
   CreatorMarketplaceResourceSortSchema,
   CreatorMarketplaceResourceTagQuerySchema,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 export type MarketBrowseQueryParam =
   | "q"

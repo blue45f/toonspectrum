@@ -31,16 +31,16 @@ import type { StudioPaletteSqliteRepository } from "./studio-palette-sqlite-repo
 import {
   writeCreatorMarketplaceInstallReceipt,
   type CreatorMarketplaceInstallReceiptStorage,
-} from "@/lib/creator-marketplace-install-receipt";
-import { creatorMarketplaceStudioPackId } from "@/lib/creator-marketplace-package-identity";
+} from "@/shared/lib/creator-marketplace-install-receipt";
+import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
 import {
   canonicalizeCreatorMarketplaceJson,
   CreatorMarketplaceResourceIdentitySchema,
   CreatorMarketplaceResourceRecordSchema,
   type CreatorMarketplaceResourceIdentity,
   type CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
-import { normalizeCreatorMarketplaceLegacySemver } from "@/lib/creator-marketplace-semver";
+} from "@/shared/lib/creator-marketplace-resource-contract";
+import { normalizeCreatorMarketplaceLegacySemver } from "@/shared/lib/creator-marketplace-semver";
 import {
   getCreatorMarketplaceResource,
   getCreatorMarketplaceResourceIdentity,

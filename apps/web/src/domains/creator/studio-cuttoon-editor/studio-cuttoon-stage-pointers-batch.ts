@@ -231,7 +231,7 @@ import type { DrawEl, El, FrameEl, ImageEl } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";
 import type Konva from "konva";
 
-import { isStudioInkInputContractV2 } from "@/lib/studio-ink-input-contract";
+import { isStudioInkInputContractV2 } from "@/shared/lib/studio-ink-input-contract";
 
 import type { StudioCuttoonStagePointersHost } from "./studio-cuttoon-stage-pointers-types";
 import type { StudioCuttoonStagePointersApi } from "./studio-cuttoon-stage-pointers-api";

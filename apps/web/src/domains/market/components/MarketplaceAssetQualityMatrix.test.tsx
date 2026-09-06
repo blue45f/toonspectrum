@@ -9,7 +9,7 @@ import { MarketplaceAssetQualityMatrix } from "./MarketplaceAssetQualityMatrix";
 import {
   createCreatorMarketplaceAuthoringDraft,
   type CreatorMarketplaceAuthoringDraft,
-} from "@/lib/creator-marketplace-authoring-workshop";
+} from "@/shared/lib/creator-marketplace-authoring-workshop";
 
 
 function Harness({ initial }: { initial: CreatorMarketplaceAuthoringDraft }): ReactElement {

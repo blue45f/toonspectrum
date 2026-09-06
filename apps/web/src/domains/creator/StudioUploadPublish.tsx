@@ -65,9 +65,9 @@ import {
 import { resolveStudioUploadWorkId } from "./studio-upload-route";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 import { useSession } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";

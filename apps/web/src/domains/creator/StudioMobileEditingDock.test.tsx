@@ -27,7 +27,7 @@ import type { StudioBrushSnapshot } from "./brush/studio-brush-library";
 import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
 import type { StudioWorkspaceState } from "./studio-workspaces";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 interface MockDockButtonProps {
   readonly "aria-controls"?: string;

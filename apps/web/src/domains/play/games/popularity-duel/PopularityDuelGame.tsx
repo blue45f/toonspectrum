@@ -15,7 +15,7 @@ import { usePlayTitles } from "../../use-play-catalog";
 
 import type { PlayGameProps, PlayTitle  } from "../../play-types";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/components/ui/button";
 
 function seededRng(seed: number): () => number {
   let a = seed >>> 0;

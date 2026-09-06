@@ -21,7 +21,7 @@ import {
   type StudioCrdtJsonValue,
 } from "./studio-crdt-scene-schema";
 
-import { STUDIO_WORK_ASSET_MAX_CURVE_POINTS } from "@/lib/studio-work-asset-contract";
+import { STUDIO_WORK_ASSET_MAX_CURVE_POINTS } from "@/shared/lib/studio-work-asset-contract";
 
 const FILTER_MASK_SURFACE_ID =
   "filter-mask:v1:10000000-0000-4000-8000-000000000001";

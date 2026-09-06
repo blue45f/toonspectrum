@@ -1,13 +1,13 @@
 /** Exact account-library synchronization after a durable local Creator Market install. */
 
 import type { StudioCreatorPackDefinition } from "./studio-creator-pack-catalog";
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import {
   CREATOR_MARKETPLACE_STUDIO_CONFIRMABLE_KINDS,
   type ConfirmCreatorMarketplaceStudioInstall,
   type CreatorMarketplaceStudioInstallConfirmationReceipt,
-} from "@/lib/creator-marketplace-cloud-library-contract";
+} from "@/shared/lib/creator-marketplace-cloud-library-contract";
 import {
   confirmCreatorMarketplaceStudioInstall,
 } from "@/src/infrastructure/creator-marketplace-client";

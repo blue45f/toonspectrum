@@ -6,8 +6,8 @@ on:
       - 'apps/api/src/**'
       - 'packages/core/src/**'
       - 'apps/web/src/domains/legal/**'
-      - 'apps/web/components/inquiry-form.tsx'
-      - 'apps/web/components/site-header*.tsx'
+      - 'apps/web/src/shared/components/inquiry-form.tsx'
+      - 'apps/web/src/shared/components/site-header*.tsx'
       - 'e2e/feedback-community*'
       - 'scripts/verify-feedback-community-db.mts'
       - '*feedback*.ts'
@@ -54,9 +54,9 @@ jobs:
           apps/api/src/modules/feedback/feedback.controller.ts
           apps/api/src/modules/feedback/feedback.service.ts
           apps/api/src/server/feedback.ts
-          apps/web/components/inquiry-form.tsx
-          apps/web/components/site-header-mobile-nav.tsx
-          apps/web/components/site-header.tsx
+          apps/web/src/shared/components/inquiry-form.tsx
+          apps/web/src/shared/components/site-header-mobile-nav.tsx
+          apps/web/src/shared/components/site-header.tsx
           e2e/feedback-community-harness.tsx
           e2e/feedback-community.spec.ts
           e2e/feedback-community-contract.spec.ts

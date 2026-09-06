@@ -33,8 +33,8 @@ import type {
   StudioCustomFontRepository,
 } from "./studio-custom-font-sqlite-opfs-repository";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 function localizeText(
   t: (key: string) => string,

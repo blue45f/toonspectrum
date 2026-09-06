@@ -45,7 +45,7 @@ import type { StudioToolHintBubbleProps } from "./components/StudioToolHintBubbl
 import type { StudioToolHintSide } from "./studio-tool-hint-position";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const SHOW_DELAY_MS = 280;
 const EXPAND_DELAY_MS = 620;

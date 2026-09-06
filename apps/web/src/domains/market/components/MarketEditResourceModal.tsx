@@ -10,9 +10,9 @@ import { MARKET_LICENSES } from "../models/market-kind";
 import type {
   CreatorMarketplaceResourceLicense,
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 interface MarketEditResourceModalProps {
   open: boolean;

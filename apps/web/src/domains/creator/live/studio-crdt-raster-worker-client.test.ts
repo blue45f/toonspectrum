@@ -4,7 +4,7 @@ import {
   parseStudioCrdtRasterDocumentRoots,
   type StudioCrdtRasterDocumentSnapshot,
   type StudioCrdtRasterRawRoots,
-} from "../../../../lib/studio-crdt-raster-document-contract";
+} from "../../../shared/lib/studio-crdt-raster-document-contract";
 
 import {
   runStudioCrdtRasterWorker,

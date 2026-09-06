@@ -13,7 +13,7 @@ import type {
   StudioShared3dCharacterTransformCommitHandler,
 } from "../studio-shared-3d-scene-bridge";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioBg3dSharedCharacterPlacementPanelProps {
   readonly characters: readonly StudioShared3dCharacterSource[];

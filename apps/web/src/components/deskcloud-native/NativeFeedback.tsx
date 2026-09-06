@@ -18,9 +18,9 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import { surveyConfig } from "./config";
 
-import { Button } from "@/components/ui/button";
-import { useApp } from "@/lib/store";
-import { cn } from "@/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { useApp } from "@/shared/lib/store";
+import { cn } from "@/shared/lib/utils";
 
 const APP_ID = "toonspectrum";
 const NPS_MIN = 0;

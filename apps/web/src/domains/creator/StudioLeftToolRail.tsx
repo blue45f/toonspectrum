@@ -88,8 +88,8 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { DrawMode, DrawShapeKind } from "./studio-editor-tool-model";
 
-import { useI18n, useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 const REVIEW_LOCK_REASON = "현재 작업면의 검토 잠금을 먼저 해제하세요.";
 const IMAGE_EDIT_LOCK_REASON = "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.";

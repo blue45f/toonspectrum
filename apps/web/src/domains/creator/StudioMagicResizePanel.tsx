@@ -24,7 +24,7 @@ import { STUDIO_EASE, STUDIO_FOCUS_RING, StudioToggleChip } from "./studio-panel
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const PRESET_ICONS: Record<string, LucideIcon> = {
   square: Square,

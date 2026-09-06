@@ -8,7 +8,7 @@ import type {
   CreateCreatorMarketplaceSocialComment,
   CreatorMarketplaceSocialPage,
   UpsertCreatorMarketplaceSocialReview,
-} from "@/lib/creator-marketplace-social-contract";
+} from "@/shared/lib/creator-marketplace-social-contract";
 
 import {
   createCreatorMarketplaceComment,

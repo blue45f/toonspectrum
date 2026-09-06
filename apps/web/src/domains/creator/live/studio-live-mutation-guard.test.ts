@@ -17,7 +17,7 @@ import { replaceStudioLiveMutationLocks } from "./studio-live-mutation-lock-coor
 
 import type { StudioLiveLockAcquireResult } from "./studio-live-collaboration-protocol";
 
-import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
+import { studioLiveLockResourcesConflict } from "@/shared/lib/studio-live-lock-resource";
 
 
 const now = 1_000_000;

@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 
 import { pageDisplayName } from "./studio-page-meta";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /** 패널이 필요로 하는 최소 페이지 형태 — StudioPage 의 PageState 가 구조적으로 만족한다. */
 export type MasterPanelPageLike = {

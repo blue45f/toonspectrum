@@ -1,7 +1,7 @@
 import { CheckCircle2, Inbox, MessageSquarePlus, RefreshCw, Send } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { Container } from "@/components/section";
+import { Container } from "@/shared/components/section";
 import {
   INQUIRY_BODY_MAX,
   INQUIRY_CATEGORIES,
@@ -15,7 +15,7 @@ import {
   type Inquiry,
   type InquiryCategory,
   type InquiryStatus,
-} from "@/lib/inquiry-api";
+} from "@/shared/lib/inquiry-api";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
 
 // 문의(Inquiry) 게시판 (/support) — desk-platform 공개 API 연동.

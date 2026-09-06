@@ -1,7 +1,7 @@
 import {
   allowStudioProgrammaticReload,
   consumeStudioProgrammaticReloadAllowance,
-} from "../../../lib/programmatic-reload";
+} from "../../shared/lib/programmatic-reload";
 
 /**
  * 탭 종료 경고 — "닫기 전에 물어보기"가 없던 마지막 조용한 실패를 막는다.

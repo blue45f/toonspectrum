@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { MarketResourceCard } from "./MarketResourceCard";
 
-import type { CreatorMarketplaceResourceManifest } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceManifest } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { createCreatorMarketplacePortableDelivery } from "@/src/infrastructure/creator-marketplace-client";
 

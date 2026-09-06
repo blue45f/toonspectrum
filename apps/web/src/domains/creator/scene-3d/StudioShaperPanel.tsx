@@ -21,7 +21,7 @@ import {
   type ShaperPresetSelection,
 } from "./studio-shaper-model";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioShaperPanelProps {
   readonly selection?: Partial<ShaperPresetSelection>;

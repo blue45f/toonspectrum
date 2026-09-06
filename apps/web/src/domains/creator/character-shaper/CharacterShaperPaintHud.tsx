@@ -20,7 +20,7 @@ import { isCharacterShaperTypingTarget, pushCharacterShaperKeyLayer } from "./ch
 import type { CharacterShaperPaintHudProps } from "./character-shaper-ui-contract";
 import type { StudioVrmTexturePaintPanelSettings } from "../vrm/StudioVrmTexturePaintPanel";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 type PaintTool = "brush" | "eraser" | "eyedropper" | "fill";
 

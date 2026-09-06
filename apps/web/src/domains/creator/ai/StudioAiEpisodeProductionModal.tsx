@@ -41,7 +41,7 @@ import {
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const DEFAULT_SCRIPT = `장면 1: 무너진 성벽 · 석양
 주인공이 푸른 보석을 쥔 채 성벽 위로 올라선다.

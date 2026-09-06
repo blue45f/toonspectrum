@@ -9,8 +9,8 @@ import {
   type StudioFilterMaskSurfacePublicationInput,
 } from "./studio-filter-mask-surface-publisher";
 
-import type { StudioRasterAssetReference } from "@/lib/studio-crdt-raster-ops";
-import type { StudioFilterMaskSurfaceId } from "@/lib/studio-filter-mask-surface-contract";
+import type { StudioRasterAssetReference } from "@/shared/lib/studio-crdt-raster-ops";
+import type { StudioFilterMaskSurfaceId } from "@/shared/lib/studio-filter-mask-surface-contract";
 
 const SURFACE_ID =
   "filter-mask:v1:00000000-0000-4000-8000-000000000001" as StudioFilterMaskSurfaceId;

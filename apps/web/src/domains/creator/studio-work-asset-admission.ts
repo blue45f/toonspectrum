@@ -14,7 +14,7 @@ import {
   studioWorkAssetSourceUri,
   type StudioWorkAssetDescriptor,
   type StudioWorkAssetManifest,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 export interface StudioWorkAssetAdmissionImageLike {
   id: string;

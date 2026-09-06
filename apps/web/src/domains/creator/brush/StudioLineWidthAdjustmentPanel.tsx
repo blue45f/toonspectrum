@@ -16,7 +16,7 @@ import {
   type LineWidthAdjustmentOptions,
 } from "./studio-line-width-adjust";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioLineWidthAdjustmentPanelProps {
   readonly currentWidth?: number;

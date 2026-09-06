@@ -1,5 +1,5 @@
-import { LoadingState } from "@/components/LoadingState";
-import { useT } from "@/lib/i18n";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { useT } from "@/shared/lib/i18n";
 
 /**
  * 라우트 로딩 폴백 — 공용 LoadingState의 카드 스켈레톤.

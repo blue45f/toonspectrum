@@ -13,7 +13,7 @@ import type {
   CreatorMarketplaceOwnedHistoryPage,
   CreatorMarketplaceOwnedRelease,
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 const mocks = vi.hoisted(() => ({
   listHistory: vi.fn(),

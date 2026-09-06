@@ -1,7 +1,7 @@
 import { Bug, Megaphone, Handshake, Database, MessagesSquare, ExternalLink } from "lucide-react";
 
-import { InquiryForm } from "@/components/inquiry-form";
-import { Container } from "@/components/section";
+import { InquiryForm } from "@/shared/components/inquiry-form";
+import { Container } from "@/shared/components/section";
 
 const SUPPORT_URL = "https://termsdesk.vercel.app/support/toonspectrum";
 

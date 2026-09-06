@@ -24,22 +24,22 @@ import {
 import FanPostCard from "./fan-cafe-post-card";
 
 import type { FanCafeComposeLock, FanCafeKindFilter } from "./fan-cafe-constants";
-import type { FanCafePost, FanCafePostKind, FanCafeScopeFilter } from "@/lib/types";
+import type { FanCafePost, FanCafePostKind, FanCafeScopeFilter } from "@/shared/lib/types";
 
 import {
   COMMUNITY_SORT_OPTIONS,
   COMMUNITY_SORT_LABEL,
   COMMUNITY_SCOPE_LABEL_WITH_ALL,
   FAN_CAFE_SCOPE_COPY,
-} from "@/lib/community-ui";
-import { withCsrfProtection } from "@/lib/csrf";
-import { ensureArray, resolveApiError, safeParseJson } from "@/lib/http-safe";
+} from "@/shared/lib/community-ui";
+import { withCsrfProtection } from "@/shared/lib/csrf";
+import { ensureArray, resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
 import {
   ATTACHMENT_MAX_COUNT,
   fileToAttachmentDataUrl,
-} from "@/lib/image-attach";
-import { useApp } from "@/lib/store";
-import { cn } from "@/lib/utils";
+} from "@/shared/lib/image-attach";
+import { useApp } from "@/shared/lib/store";
+import { cn } from "@/shared/lib/utils";
 import { useCelebrate } from "@/src/hooks/use-celebrate";
 
 export { FanPostImages } from "./fan-cafe-images";

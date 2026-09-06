@@ -52,14 +52,14 @@ import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
   isStudioFilterMaskReferenceProps,
   isStudioFilterMaskSurfaceId,
-} from "@/lib/studio-filter-mask-surface-contract";
-import { normalizeStudioInkInputContract } from "@/lib/studio-ink-input-contract";
+} from "@/shared/lib/studio-filter-mask-surface-contract";
+import { normalizeStudioInkInputContract } from "@/shared/lib/studio-ink-input-contract";
 import {
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
   STUDIO_WORK_ASSET_TYPES,
   parseStudioWorkAssetSourceUri,
   studioWorkAssetSourceUri,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 export {
   isStudioCrdtPayloadSceneElementType,

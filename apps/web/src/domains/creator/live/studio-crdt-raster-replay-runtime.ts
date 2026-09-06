@@ -2,7 +2,7 @@ import {
   createStudioRasterCompactionCheckpoint,
   type StudioRasterCompactionCheckpoint,
   type StudioRasterCompactionOrderKey,
-} from "@/lib/studio-crdt-raster-compaction";
+} from "@/shared/lib/studio-crdt-raster-compaction";
 import {
   STUDIO_RASTER_MAX_ASSET_BYTES,
   STUDIO_RASTER_MAX_TILE_SIZE,
@@ -15,7 +15,7 @@ import {
   type StudioRasterOperationLog,
   type StudioRasterSurfaceSpec,
   type StudioRasterTilePatch,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 export const STUDIO_RASTER_REPLAY_DEFAULT_CONCURRENCY = 4;
 export const STUDIO_RASTER_REPLAY_MAX_CONCURRENCY = 8;

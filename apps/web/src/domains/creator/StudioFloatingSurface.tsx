@@ -65,7 +65,7 @@ import {
   STUDIO_TOUCH_TARGET,
 } from "./studio-panel-ui";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const KEYBOARD_MOVE_STEP = 10;
 const KEYBOARD_LARGE_STEP = 40;

@@ -1,7 +1,7 @@
 import {
   STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION,
   STUDIO_INK_INPUT_V2_MAX_TIME_OFFSET_MS,
-} from "@/lib/studio-ink-input-contract";
+} from "@/shared/lib/studio-ink-input-contract";
 
 const HALF_PI = Math.PI / 2;
 const TWO_PI = Math.PI * 2;

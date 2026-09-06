@@ -20,7 +20,7 @@ import type {
   CreatorMarketplaceJsonValue,
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 function record(
   kind: CreatorMarketplaceResourceKind,

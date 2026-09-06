@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 describe("StudioShortcutsHelp search and familiar operations", () => {
   beforeEach(() => {

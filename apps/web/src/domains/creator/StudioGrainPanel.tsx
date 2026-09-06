@@ -20,7 +20,7 @@ import {
 } from "./studio-grain";
 import { PANEL_LABEL_ROW, PANEL_READOUT_CLASS, StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 // 세기·크기 슬라이더 정의 — 표시 순서·한글 라벨·범위(세기는 amount, 크기는 size).

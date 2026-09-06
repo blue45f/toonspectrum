@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CreatorMarketplaceResourceRecordSchema,
   type CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 export const MARKET_COMPARE_STORAGE_KEY = "toonspectrum:market:compare:v1";
 export const MARKET_COMPARE_EVENT = "toonspectrum:market:compare-changed";

@@ -38,7 +38,7 @@
 import {
   isStudioFilterMaskSurfaceId,
   type StudioFilterMaskSurfaceId,
-} from "@/lib/studio-filter-mask-surface-contract";
+} from "@/shared/lib/studio-filter-mask-surface-contract";
 
 // ---------------------------------------------------------------------------
 // (A) 타입 · 술어(predicate) — studio-layer-mask.ts 의 can/has/shouldApply 3종 세트와 동일 관례.

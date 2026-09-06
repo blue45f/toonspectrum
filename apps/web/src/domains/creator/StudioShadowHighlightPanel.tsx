@@ -17,7 +17,7 @@ import {
   type ShadowHighlight,
 } from "./studio-shadow-highlight";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 // 슬라이더 정의 — 표시 순서·한글 라벨·범위. 키마다 범위가 달라(양 0..100, 폭 0..100,

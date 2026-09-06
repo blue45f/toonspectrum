@@ -5,7 +5,7 @@ import { MAX_REFERENCE_BACKUP_BYTES, parseReferenceBackup, previewReferenceImpor
 
 import type { ReferenceMutationResult, ReferenceNote } from "./reference-storage";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 
 export function ReferenceImport({ current, busy, unavailable, onImport }: {

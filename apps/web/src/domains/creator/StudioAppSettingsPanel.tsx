@@ -61,9 +61,9 @@ import {
 import { StudioPressureCurveGraph } from "./StudioPressureCurveGraph";
 import { activateStudioModalSheet } from "./useStudioModalSheet";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioAppSettingsPanelProps = {
   open: boolean;

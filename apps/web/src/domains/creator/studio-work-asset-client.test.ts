@@ -14,7 +14,7 @@ import type {
   StudioWorkAssetDescriptor,
   StudioWorkAssetLayerLiftBatchReceipt,
   StudioWorkAssetManifest,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 
 const { del, get, put } = vi.hoisted(() => ({

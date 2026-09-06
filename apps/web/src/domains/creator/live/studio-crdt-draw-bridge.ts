@@ -50,7 +50,7 @@ import {
   isStudioInkInputContractV2,
   normalizeStudioInkInputContract,
   type StudioInkInputContract,
-} from "@/lib/studio-ink-input-contract";
+} from "@/shared/lib/studio-ink-input-contract";
 
 export interface StudioCrdtCompatibleDrawElement {
   id: string;

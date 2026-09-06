@@ -12,7 +12,7 @@ import type {
   StudioVrmProjectArchiveUseContextInput,
 } from "./studio-vrm-license-product-gate";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 type ReadyArchiveAttestationPlan = Extract<
   StudioVrmProjectArchiveAttestationPlan,

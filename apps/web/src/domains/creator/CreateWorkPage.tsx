@@ -26,11 +26,11 @@ import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 import { WebtoonFxPlayer } from "./WebtoonFxPlayer";
 import { WorkFxPanel } from "./WorkFxPanel";
 
-import { CoverImage } from "@/components/cover-image";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
-import { useApp } from "@/lib/store";
-import { cn, formatCount, relativeDate } from "@/lib/utils";
+import { CoverImage } from "@/shared/components/cover-image";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useApp } from "@/shared/lib/store";
+import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { NotFoundPage } from "@/src/components/NotFoundPage";

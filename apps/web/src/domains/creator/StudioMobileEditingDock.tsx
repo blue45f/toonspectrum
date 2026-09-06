@@ -121,8 +121,8 @@ import type { PageState } from "./studio-page-state";
 import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
 import type { StudioWorkspaceState } from "./studio-workspaces";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 5;

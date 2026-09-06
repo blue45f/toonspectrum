@@ -64,7 +64,7 @@ import {
   STUDIO_INK_INPUT_V2_MAX_TIME_OFFSET_MS,
   isStudioInkInputContractV2,
   normalizeStudioInkInputContract,
-} from "@/lib/studio-ink-input-contract";
+} from "@/shared/lib/studio-ink-input-contract";
 
 export function payloadMetadataByteLength(payload: StudioCrdtDrawStrokePayload): number {
   const metadata: Record<string, unknown> = {

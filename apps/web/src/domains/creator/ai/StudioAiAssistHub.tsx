@@ -35,7 +35,7 @@ import { StudioAiProductionLaunchpad } from "./StudioAiProductionLaunchpad";
 
 import type { KeyboardEvent as ReactKeyboardEvent, ReactElement, ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const TOOL_ICONS: Record<StudioAiAssistToolId, LucideIcon> = {
   background: ImageIcon,

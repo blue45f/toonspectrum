@@ -19,8 +19,8 @@ import { MAX_PUPPET_PINS, type PuppetPin } from "./studio-puppet-warp";
 
 import type { ReactElement } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioPuppetWarpPanelProps = {
   /** 퍼펫 워프 모드 on/off — on 이면 캔버스 클릭으로 핀을 추가하고 드래그로 옮길 수 있다. */

@@ -4,8 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { WorkCard, WorkGridSkeleton } from "./creator-community-ui";
 import { buildStudioHref } from "./creator-studio-links";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import {
   challengeDday,

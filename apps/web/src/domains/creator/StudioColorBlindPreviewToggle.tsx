@@ -6,7 +6,7 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { CvdMode } from "./studio-color-vision-model";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const CVD_OPTIONS = [
   {

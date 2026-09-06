@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 
 import { defineAppRoutes } from "../app-route-definition";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const CreatorHubPage = lazyRetry(() => import("@/src/domains/creator-resources/CreatorHubPage").then((module) => ({ default: module.CreatorHubPage })), "CreatorHubPage");
 const OpportunitiesPage = lazyRetry(() => import("@/src/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.OpportunitiesPage })), "OpportunitiesPage");

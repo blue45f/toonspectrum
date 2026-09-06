@@ -1,15 +1,15 @@
 import { Compass, MessageCircle, UsersRound } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 
-import type { FanCafeScopeFilter } from "@/lib/types";
+import type { FanCafeScopeFilter } from "@/shared/lib/types";
 
-import { FanCafePanel } from "@/components/fan-cafe-panel";
-import { Container } from "@/components/section";
+import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
+import { Container } from "@/shared/components/section";
 import {
   COMMUNITY_SCOPE_DESCRIPTION,
   COMMUNITY_SCOPE_DIRECTORIES,
   COMMUNITY_SCOPE_LABEL,
-} from "@/lib/community-ui";
+} from "@/shared/lib/community-ui";
 import Link from "@/src/compat/router-link";
 
 

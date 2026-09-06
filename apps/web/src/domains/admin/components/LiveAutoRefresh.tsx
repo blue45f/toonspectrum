@@ -1,7 +1,7 @@
 import { RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 interface LiveAutoRefreshProps {
   onRefresh: () => void;

@@ -1,7 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 
-import { CompareView } from "@/components/compare-view";
-import { Container } from "@/components/section";
+import { CompareView } from "@/shared/components/compare-view";
+import { Container } from "@/shared/components/section";
 
 export function ComparePage() {
   const [searchParams] = useSearchParams();

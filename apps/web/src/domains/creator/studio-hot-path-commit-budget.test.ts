@@ -9,7 +9,7 @@ import {
 } from "./studio-hot-path-commit-budget";
 
 const gateSource = readFileSync(
-  new URL("../../../tests/benchmarks/harness/studio-runtime-commit-gate.ts", import.meta.url),
+  new URL("../../../../../tests/benchmarks/harness/studio-runtime-commit-gate.ts", import.meta.url),
   "utf8",
 );
 const sharedRuntimeSource = readFileSync(

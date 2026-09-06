@@ -37,7 +37,7 @@ describe("scene catalog lazy-loading boundary", () => {
       .filter(ts.isImportDeclaration)
       .map((statement) => statement.moduleSpecifier.getText(file));
 
-    expect(imports).toEqual(['"@/lib/lazy-retry"']);
+    expect(imports).toEqual(['"@/shared/lib/lazy-retry"']);
     expect(dynamicImports(file)).toEqual(["./StudioSceneTemplateBrowser"]);
     expect(file.getFullText()).toContain("export const StudioSceneTemplateBrowser = lazyRetry(");
     expect(file.getFullText()).toContain("default: module.StudioSceneTemplateBrowser");

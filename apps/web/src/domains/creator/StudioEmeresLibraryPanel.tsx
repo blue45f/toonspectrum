@@ -29,7 +29,7 @@ import { getProductStudioEmeresSqliteRepository } from "./studio-emeres-sqlite-r
 import { EMERES_CATEGORIES, type EmeresCategory } from "./studio-emeres-templates";
 import { downscaleImageFile } from "./studio-image-utils";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB — StudioBrandKitPanel의 로고 업로드 가드(MAX_LOGO_UPLOAD_BYTES)와 동일한, 다운스케일 전 원본 파일에 대한 저비용 가드.
 const UPLOAD_MAX_DIM = 960; // 참고 이미지는 로고보다 커야 트레이싱에 쓸만하지만, MAX_EMERES_LIBRARY_ITEMS(30) 예산을 고려해 과하게 키우지 않는다.

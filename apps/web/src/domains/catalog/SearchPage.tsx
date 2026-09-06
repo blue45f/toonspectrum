@@ -1,13 +1,13 @@
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import type { PlatformId } from "@/lib/types";
+import type { PlatformId } from "@/shared/lib/types";
 
-import { SearchExplorer } from "@/components/search-explorer";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
-import { useT } from "@/lib/i18n";
-import { PLATFORM_LIST } from "@/lib/platforms";
+import { SearchExplorer } from "@/shared/components/search-explorer";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useT } from "@/shared/lib/i18n";
+import { PLATFORM_LIST } from "@/shared/lib/platforms";
 import Link from "@/src/compat/router-link";
 
 export function SearchPage() {

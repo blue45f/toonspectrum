@@ -40,7 +40,7 @@ import {
   type StudioLocalizationQaDimensionSection,
 } from "./StudioLocalizationQaReport";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 /**
  * 호스트가 들고 있는 이 패널의 표시 상태. `false`면 닫힘, 아니면 처음 보여 줄 화면이다 —

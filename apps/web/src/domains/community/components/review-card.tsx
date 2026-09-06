@@ -3,14 +3,14 @@ import { useState } from "react";
 
 import { ReviewReplies } from "./review-replies";
 
-import type { SeedReview, Title } from "@/lib/types";
+import type { SeedReview, Title } from "@/shared/lib/types";
 
-import { Card3D } from "@/components/ui/card-3d";
-import { Badge } from "@/components/ui/chip";
-import { Stars } from "@/components/ui/stars";
-import { useT } from "@/lib/i18n";
-import { useApp, useHydrated } from "@/lib/store";
-import { cn, relativeDate } from "@/lib/utils";
+import { Card3D } from "@/shared/components/ui/card-3d";
+import { Badge } from "@/shared/components/ui/chip";
+import { Stars } from "@/shared/components/ui/stars";
+import { useT } from "@/shared/lib/i18n";
+import { useApp, useHydrated } from "@/shared/lib/store";
+import { cn, relativeDate } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 
 const PROGRESS_TONE: Record<string, "good" | "accent" | "neutral" | "bad"> = {

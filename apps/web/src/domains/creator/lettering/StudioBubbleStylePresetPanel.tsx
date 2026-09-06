@@ -4,7 +4,7 @@ import { BUBBLE_STYLE_PRESETS, type BubbleStylePreset } from "./studio-bubble-st
 
 import type { BubbleVariant } from "../studio-assets";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export type BubbleStylePresetTarget = {
   fill: string;

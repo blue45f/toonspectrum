@@ -2,7 +2,7 @@ import { Eraser, Grid3X3, Pencil, Shapes } from "lucide-react";
 
 import type { DrawMode, DrawShapeKind } from "./studio-editor-tool-model";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 type InspectorDrawMode = Exclude<DrawMode, "lasso-fill">;
 type InspectorSymmetryMode = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";

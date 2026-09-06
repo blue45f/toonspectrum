@@ -14,7 +14,7 @@ import { StudioCommentThreadPopover, StudioPointCommentComposer, StudioCanvasRul
 import { STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED } from "../studio-page-shell-runtime";
 import { StudioScrollViewportSubscriber } from "../StudioScrollViewportSubscriber";
 import { StudioSelectionContextBar } from "../StudioSelectionContextBar";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
 export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSession) {

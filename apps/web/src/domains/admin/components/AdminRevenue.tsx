@@ -12,8 +12,8 @@ import {
 import { AdminNotice, AdminSpinner, Stat, StatGroup, StatusBadge } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 const shortId = (id: string) => (id.length > 10 ? `${id.slice(0, 8)}…` : id);
 

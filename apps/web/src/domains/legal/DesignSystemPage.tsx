@@ -2,17 +2,17 @@
 import { Command, MapPin, Search, Sparkles, Sun, Moon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { CountUp } from "@/components/count-up";
-import { Container } from "@/components/section";
-import { Button } from "@/components/ui/button";
-import { buttonClass } from "@/components/ui/button-utils";
-import { Badge, GenreChip, TagChip } from "@/components/ui/chip";
-import { Segmented, UnderlineTabs } from "@/components/ui/segmented";
-import { Select } from "@/components/ui/select";
-import { DistributionBars, GenreSpectrum, MeterBar } from "@/components/ui/spectrum-bar";
-import { RatingInline, Stars } from "@/components/ui/stars";
-import { useTheme } from "@/lib/theme";
-import { cn } from "@/lib/utils";
+import { CountUp } from "@/shared/components/count-up";
+import { Container } from "@/shared/components/section";
+import { Button } from "@/shared/components/ui/button";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { Badge, GenreChip, TagChip } from "@/shared/components/ui/chip";
+import { Segmented, UnderlineTabs } from "@/shared/components/ui/segmented";
+import { Select } from "@/shared/components/ui/select";
+import { DistributionBars, GenreSpectrum, MeterBar } from "@/shared/components/ui/spectrum-bar";
+import { RatingInline, Stars } from "@/shared/components/ui/stars";
+import { useTheme } from "@/shared/lib/theme";
+import { cn } from "@/shared/lib/utils";
 
 // 살아있는 디자인 시스템 — /design.
 // 이 프로젝트의 실제 토큰(globals.css)과 실제 컴포넌트(components/*)만 보여준다.

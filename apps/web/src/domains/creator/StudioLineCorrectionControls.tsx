@@ -7,7 +7,7 @@ import {
 } from "./brush/studio-stroke-stabilizer";
 import { STABILIZER_MAX } from "./studio-brush";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export interface StudioLineCorrectionControlsProps {
   stabilizer: number;

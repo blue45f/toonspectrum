@@ -29,7 +29,7 @@ import type { StudioWorkAssetReference } from "./studio-work-asset-client";
 import type {
   StudioWorkAssetDescriptor,
   StudioWorkAssetManifest,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 const ONE_BY_ONE_PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zcy8AAAAASUVORK5CYII=";

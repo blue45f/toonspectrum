@@ -14,8 +14,8 @@ import {
 } from "./studio-effect-favorites";
 import { STUDIO_LOOKS, type StudioLook, type StudioLookCategory } from "./studio-looks";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 const CHIP_CLASS =
   "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";

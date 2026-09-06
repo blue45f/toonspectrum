@@ -15,8 +15,8 @@ import {
   type TextPathShape,
 } from "./studio-text-path";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 
 // 프리셋 칩 — StudioLevelsPanel/StudioCurvePanel과 동일 idiom(활성 시 accent 보더 + raised 배경).

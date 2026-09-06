@@ -3,7 +3,7 @@ import { useId } from "react";
 
 import type { Resizable } from "@/src/hooks/use-resizable";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioPanelResizeHandleProps {
   readonly dragging: boolean;

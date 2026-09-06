@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import { subscribeStudioAiEpisodeProductionOpenRequest } from "./studio-ai-episode-production-intent";
 import { studioAiEpisodeProductionModalLoader } from "./studio-ai-episode-production-loader";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const StudioAiEpisodeProductionModal = lazyRetry(
   studioAiEpisodeProductionModalLoader.load,

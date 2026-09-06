@@ -7,7 +7,7 @@
 //
 //   node scripts/generate-app-i18n-catalog.mjs
 //
-// apps/web/lib/__tests__/i18n-locale-assets.test.ts fails when the committed catalog drifts from disk.
+// apps/web/src/shared/lib/__tests__/i18n-locale-assets.test.ts fails when the committed catalog drifts from disk.
 
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -71,7 +71,7 @@ export function buildCatalogSource(dictionaries) {
     "//",
     "// Source of truth: apps/web/public/i18n/app/<locale>.json.",
     "// Regenerate with `node scripts/generate-app-i18n-catalog.mjs`.",
-    "// apps/web/lib/__tests__/i18n-locale-assets.test.ts fails when this catalog drifts from the assets.",
+    "// apps/web/src/shared/lib/__tests__/i18n-locale-assets.test.ts fails when this catalog drifts from the assets.",
     "",
     "/** Locales compiled into the app shell so the fallback chain never awaits I/O. */",
     `export const APP_I18N_BUILT_IN_LOCALES = [${BUILT_IN_LOCALES.map((locale) => JSON.stringify(locale)).join(", ")}] as const;`,

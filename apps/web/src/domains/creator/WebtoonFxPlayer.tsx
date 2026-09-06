@@ -41,8 +41,8 @@ import {
   type WorkFxSettings,
 } from "./studio-motion-fx";
 
-import { CoverImage } from "@/components/cover-image";
-import { cn } from "@/lib/utils";
+import { CoverImage } from "@/shared/components/cover-image";
+import { cn } from "@/shared/lib/utils";
 
 // 컷 진입 오디오 디렉터 — FxControlBar(플레이어 소유)가 채워 넣고, RevealPage의
 // IntersectionObserver가 컷 진입 시점에 호출한다. 상태를 ref로 건네 컷 수만큼 있는

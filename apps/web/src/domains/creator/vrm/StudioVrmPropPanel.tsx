@@ -44,7 +44,7 @@ import {
 } from "./studio-vrm-props";
 
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const SELECTABLE_PROP_COUNT = VRM_PROPS.filter(({ id }) => isStudioVrmPropSelectable(id)).length;
 

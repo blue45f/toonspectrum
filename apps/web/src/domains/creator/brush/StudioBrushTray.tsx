@@ -35,7 +35,7 @@ import type {
   StudioQuickBrushSource,
 } from "../studio-creative-ux";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioBrushTrayProps {
   activeBrushId: string;

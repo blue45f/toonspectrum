@@ -17,7 +17,7 @@ import type {
   StudioLivingInkStudioState,
 } from "./studio-living-ink-studio-coordinator";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const WASH = STUDIO_WASH_INK_PRODUCT_LABEL_KO;
 

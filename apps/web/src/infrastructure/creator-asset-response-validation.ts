@@ -1,7 +1,7 @@
 import {
   inspectStrictJpegDimensions,
   inspectStrictStaticWebpDimensions,
-} from "@/lib/strict-raster-image-inspector";
+} from "@/shared/lib/strict-raster-image-inspector";
 
 const CONTENT_MAX_BYTES = 2_250_000;
 const CONTENT_MAX_DIMENSION = 4096;

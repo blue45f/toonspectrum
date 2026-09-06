@@ -16,7 +16,7 @@ import {
 } from "./studio-outline";
 import { StudioSliderRow, StudioSwatchChip } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 export function StudioOutlinePanel({

@@ -27,7 +27,7 @@ import type {
   StudioDrawingPaletteLockKind,
 } from "./studio-drawing-palettes";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioDrawingPalettePresentation = "full" | "icon-popup";
 

@@ -15,7 +15,7 @@ import type { StudioBrushCatalogItem } from "./brush/studio-brush-catalog-core";
 import type { StudioStabilizerMode } from "./brush/studio-stroke-stabilizer";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 function studioBrushTipLabel(item: StudioBrushTrayItem | null): string {
   switch (item?.previewStyle) {

@@ -11,7 +11,7 @@ import { useId, useState } from "react";
 
 import { StudioThreeDToggleControl } from "../StudioThreeDToggle";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const STUDIO_HYBRID_DCC_MODIFIER_KINDS = [
   "mirror",

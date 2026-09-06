@@ -7,8 +7,8 @@ import {
   uploadStudioRasterAsset,
 } from "./studio-raster-asset-client";
 
-import type { StudioRasterAssetReference } from "@/lib/studio-crdt-raster-ops";
-import type { StudioRasterAssetManifest } from "@/lib/studio-raster-asset-contract";
+import type { StudioRasterAssetReference } from "@/shared/lib/studio-crdt-raster-ops";
+import type { StudioRasterAssetManifest } from "@/shared/lib/studio-raster-asset-contract";
 
 const { deleteRequest, get, put } = vi.hoisted(() => ({
   deleteRequest: vi.fn(),

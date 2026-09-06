@@ -2,14 +2,14 @@ import { ArrowLeft, MessageCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import type { FanCafePost } from "@/lib/types";
+import type { FanCafePost } from "@/shared/lib/types";
 
-import { FanPostImages, FanPostReplySection } from "@/components/fan-cafe-panel";
-import { KIND_LABEL } from "@/components/fan-cafe-utils";
-import { Container } from "@/components/section";
-import { COMMUNITY_SCOPE_LABEL, getCommunityScopeTargetLink } from "@/lib/community-ui";
-import { useApp } from "@/lib/store";
-import { relativeDate } from "@/lib/utils";
+import { FanPostImages, FanPostReplySection } from "@/shared/components/fan-cafe-panel";
+import { KIND_LABEL } from "@/shared/components/fan-cafe-utils";
+import { Container } from "@/shared/components/section";
+import { COMMUNITY_SCOPE_LABEL, getCommunityScopeTargetLink } from "@/shared/lib/community-ui";
+import { useApp } from "@/shared/lib/store";
+import { relativeDate } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
 import { api } from "@/src/infrastructure/api";

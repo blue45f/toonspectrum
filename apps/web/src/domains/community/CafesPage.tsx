@@ -2,12 +2,12 @@ import { Coffee, Plus, Search, Sparkles, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import type { CommunityCafe } from "@/lib/types";
+import type { CommunityCafe } from "@/shared/lib/types";
 
-import { Container } from "@/components/section";
-import { useApp, useHydrated } from "@/lib/store";
-import { GENRES } from "@/lib/taxonomy";
-import { cn, relativeDate } from "@/lib/utils";
+import { Container } from "@/shared/components/section";
+import { useApp, useHydrated } from "@/shared/lib/store";
+import { GENRES } from "@/shared/lib/taxonomy";
+import { cn, relativeDate } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
 import { api, getApiErrorMessage } from "@/src/infrastructure/api";

@@ -4,8 +4,8 @@ import { localizeText } from "./studio-canvas-viewport-primitives";
 
 import type { StudioAppSettings } from "../studio-app-settings";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export function StudioViewInputModeControls({
   compact = false,

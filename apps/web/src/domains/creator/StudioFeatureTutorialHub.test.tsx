@@ -8,7 +8,7 @@ import { StudioFeatureTutorialHub } from "./StudioFeatureTutorialHub";
 
 import type { StudioTutorialProgressRepository } from "./studio-tutorial-progress-sqlite";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 beforeEach(() => {
   useI18n.getState().setLang("ko");

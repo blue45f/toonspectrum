@@ -16,7 +16,7 @@ import type { ToneChannel } from "./studio-curves";
 import type { StudioImageDataLike } from "./studio-filters";
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 // SVG 기하 — 빈 하나가 viewBox 1 단위. preserveAspectRatio="none"으로 폭에 맞춰 늘어난다.
 const GRAPH_W = 256;

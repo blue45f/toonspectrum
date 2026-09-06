@@ -10,7 +10,7 @@ import type {
   StudioWorkAssetLayerLiftBatchReceipt,
   StudioWorkAssetManifest,
   StudioWorkAssetType,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 import {
   parseStudioWorkAssetDescriptor,
@@ -19,7 +19,7 @@ import {
   StudioWorkAssetLayerLiftBatchReceiptSchema,
   StudioWorkAssetManifestSchema,
   serializeStudioWorkAssetDescriptorCanonical,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 import { api, apiPath, isHttpError, toApiError } from "@/src/infrastructure/api";
 
 export { readBoundedStudioAssetResponse as readBoundedStudioWorkAssetResponse } from "./studio-bounded-asset-response";

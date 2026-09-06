@@ -60,7 +60,7 @@ import { STUDIO_CRDT_ORIGIN_LOCAL } from "./studio-crdt-protocol";
 import {
   isStudioInkInputContractV2,
   normalizeStudioInkInputContract,
-} from "@/lib/studio-ink-input-contract";
+} from "@/shared/lib/studio-ink-input-contract";
 
 export function beginStroke(host: StudioCrdtDocumentHost, input: StudioCrdtStrokeInput, beforeStrokeId: string | null = null): StudioCrdtStrokeRecord {
     assertAlive(host);

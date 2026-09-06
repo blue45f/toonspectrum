@@ -30,7 +30,7 @@ import {
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const PAINT_MODES: { id: LayerMaskPaintMode; label: string; tip: string }[] = [
   { id: "reveal", label: "보이기", tip: "흰색으로 칠해 이 영역을 드러냅니다." },

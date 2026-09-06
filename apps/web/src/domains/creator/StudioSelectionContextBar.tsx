@@ -26,7 +26,7 @@ import {
 
 import type { StudioQuickActionId } from "./studio-quick-actions";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioSelectionAlignMode =
   | "left"

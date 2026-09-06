@@ -23,7 +23,7 @@ import type { StudioLiveRetainedMediaOverlayRenderer } from "./studio-live-retai
 import type { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
 import type { StudioLiveWetInkOverlayRenderer } from "./studio-live-wet-ink-overlay";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const StudioPressureHudMeter = lazyRetry(
   () => import("../studio-creative-visuals").then((mod) => ({ default: mod.StudioPressureHudMeter })),

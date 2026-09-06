@@ -1,6 +1,6 @@
 import { FlipHorizontal2, FlipVertical2, ScanSearch } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 export interface StudioTransformQuickActionsProps {
   readonly disabled: boolean;

@@ -33,8 +33,8 @@ import type {
 
 import type { El, ImageEl } from "../studio-element-model";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioCanvasModalsOverlayProps {
   tutorialHubOpen: boolean;

@@ -36,8 +36,8 @@ import {
 
 import type { ReactElement } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioGradientEnginePanelProps = {
   /** 현재 요소의 그라데이션 스펙 — null이면 미적용(단색). */

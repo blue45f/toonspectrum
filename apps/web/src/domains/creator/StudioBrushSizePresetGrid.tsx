@@ -1,6 +1,6 @@
 import { adjustStudioBrushSize } from "./brush/studio-draw-ux";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /** CSP식 크기 프리셋 후보 — 렌더 시 STUDIO_BRUSH_SIZE_RANGE로 클램프한 뒤 중복은 하나로 합친다. */
 const STUDIO_BRUSH_SIZE_PRESETS = [1, 2, 3, 5, 8, 10, 15, 20, 30, 50, 80, 100] as const;

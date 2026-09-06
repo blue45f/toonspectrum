@@ -2,8 +2,8 @@ import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Container } from "@/components/section";
-import { useT } from "@/lib/i18n";
+import { Container } from "@/shared/components/section";
+import { useT } from "@/shared/lib/i18n";
 import { completeOAuthLogin } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
 import { api, apiPath } from "@/src/infrastructure/api";

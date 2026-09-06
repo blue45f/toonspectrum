@@ -41,7 +41,7 @@ import type { AssetMetadataIR } from "@toonspectrum/studio-project-model";
 function corpusBytes(relative: string): Uint8Array {
   return new Uint8Array(
     readFileSync(
-      fileURLToPath(new URL(`../../../tests/corpus/${relative}`, import.meta.url)),
+      fileURLToPath(new URL(`../../../../../tests/corpus/${relative}`, import.meta.url)),
     ),
   );
 }

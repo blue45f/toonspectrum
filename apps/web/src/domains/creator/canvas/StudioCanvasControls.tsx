@@ -10,8 +10,8 @@ import { StudioViewInputModeControls } from "./StudioCanvasViewInputModeControls
 
 import type { StudioAppSettings } from "../studio-app-settings";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioCanvasControlsProps {
   canvasOnlyMode: boolean;

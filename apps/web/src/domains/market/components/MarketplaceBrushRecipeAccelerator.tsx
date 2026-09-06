@@ -9,7 +9,7 @@ import {
   type CreatorMarketplaceBrushInputChannel,
   type CreatorMarketplaceBrushTarget,
   type CreatorMarketplaceBrushTipLayer,
-} from "@/lib/creator-marketplace-authoring-workshop";
+} from "@/shared/lib/creator-marketplace-authoring-workshop";
 
 interface RecipeTemplate {
   id: string;

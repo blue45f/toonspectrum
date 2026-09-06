@@ -6,7 +6,7 @@ import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
 import { STUDIO_AI_COLORIZE_PRESETS } from "./studio-ai-assist-ux";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export function StudioAiColorizePanel({
   configured,

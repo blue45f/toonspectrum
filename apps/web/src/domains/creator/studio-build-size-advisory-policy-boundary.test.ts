@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const bundleCheckSource = readFileSync(
-  new URL("../../../scripts/check-studio-bundle.mjs", import.meta.url),
+  new URL("../../../../../scripts/check-studio-bundle.mjs", import.meta.url),
   "utf8",
 );
 const pageOrchestrationBoundarySource = readFileSync(

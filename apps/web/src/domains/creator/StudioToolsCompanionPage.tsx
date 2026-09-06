@@ -88,9 +88,9 @@ import {
 } from "./StudioCompanionWorkspacePresets";
 import { useStudioCompanionWindowLayout } from "./use-studio-companion-window-layout";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 import { studioCanOpenAuxiliaryWindow } from "@/src/compat/in-app-browser";
 import Link from "@/src/compat/router-link";
 

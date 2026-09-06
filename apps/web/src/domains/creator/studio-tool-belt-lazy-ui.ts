@@ -1,6 +1,6 @@
 import { createStudioIntentLazyLoader } from "./studio-intent-lazy-loader";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 function warmStudioToolPopoverChunk(importer: () => Promise<unknown>): void {
   void importer().catch(() => undefined);

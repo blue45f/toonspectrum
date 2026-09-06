@@ -12,7 +12,7 @@ function replaceOnce(before, after, label) {
 }
 
 if (!source.includes("creator-marketplace-package-builder")) {
-  source = `import { buildCreatorMarketplaceSourcePackage } from "@/lib/creator-marketplace-package-builder";\n\n${source}`;
+  source = `import { buildCreatorMarketplaceSourcePackage } from "@/shared/lib/creator-marketplace-package-builder";\n\n${source}`;
 }
 source = source.replace("  buildCreatorMarketplaceAuthoringManifest,\n", "");
 

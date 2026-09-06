@@ -1,6 +1,6 @@
 import { defineAppRoutes } from "../app-route-definition";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { loadStudioI18nDictionaries } from "@/src/domains/creator/studio-i18n-loader";
 
 const StudioMusicPage = lazyRetry(

@@ -6,7 +6,7 @@ import {
   parseStudioWorkAssetSourceUri,
   STUDIO_WORK_ASSET_TYPES,
   studioWorkAssetReferenceKey,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 const WORK_ASSET_TYPES = new Set<string>(STUDIO_WORK_ASSET_TYPES);
 

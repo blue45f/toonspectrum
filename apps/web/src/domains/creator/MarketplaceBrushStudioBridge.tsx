@@ -9,7 +9,7 @@ import {
 import {
   loadCreatorMarketplaceAuthoringDraft,
   type CreatorMarketplaceAuthoringDraft,
-} from "@/lib/creator-marketplace-authoring-workshop";
+} from "@/shared/lib/creator-marketplace-authoring-workshop";
 
 
 export const MARKETPLACE_BRUSH_STUDIO_IMPORT_EVENT =

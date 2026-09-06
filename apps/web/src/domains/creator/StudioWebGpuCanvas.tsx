@@ -31,7 +31,7 @@ import type {
 import type { StudioWebGpuSurfaceBounds } from "./render/studio-webgpu-viewport";
 import type { StudioGpuViewTransform } from "./render/studio-webgpu-viewport-contract";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const EMPTY_STROKES: readonly StudioGpuStroke[] = Object.freeze([]);
 const EMPTY_PERFORMANCE_METRICS: StudioGpuPerformanceMetrics = Object.freeze({

@@ -107,9 +107,9 @@ import type {
 import type { StudioWriterRoomDocument } from "./studio-writer-room";
 import type { WorkDetail } from "@/src/infrastructure/creator-client";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 /**
  * 로케일 팩이 아직 그 키를 싣지 않았으면 저자 한글 문구를 그대로 쓴다.

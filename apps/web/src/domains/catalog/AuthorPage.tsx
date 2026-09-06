@@ -2,14 +2,14 @@ import { PenLine } from "lucide-react";
 import { useParams } from "react-router-dom";
 
 
-import type { Title } from "@/lib/types";
+import type { Title } from "@/shared/lib/types";
 
-import { FanCafePanel } from "@/components/fan-cafe-panel";
-import { Container } from "@/components/section";
-import { TitleCard } from "@/components/title-card";
-import { GenreChip } from "@/components/ui/chip";
-import { Stars } from "@/components/ui/stars";
-import { formatCount } from "@/lib/utils";
+import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
+import { Container } from "@/shared/components/section";
+import { TitleCard } from "@/shared/components/title-card";
+import { GenreChip } from "@/shared/components/ui/chip";
+import { Stars } from "@/shared/components/ui/stars";
+import { formatCount } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { NotFoundPage } from "@/src/components/NotFoundPage";

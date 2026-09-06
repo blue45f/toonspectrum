@@ -26,8 +26,8 @@ import type { StudioStabilizerMode } from "./brush/studio-stroke-stabilizer";
 import type { StudioInspectorInteractionGate } from "./studio-inspector-interaction-policy";
 import type { PageGrade } from "./studio-page-grade";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 export function StudioInspectorDisabledReasons({
   reasons,

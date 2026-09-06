@@ -8,7 +8,7 @@ import {
 import {
   STUDIO_REMOTE_REFERENCE_IMAGE_MAX_JSON_BYTES,
   type StudioRemoteReferenceImageResponse,
-} from "@/lib/studio-remote-reference-image-contract";
+} from "@/shared/lib/studio-remote-reference-image-contract";
 
 const { apiPost, isHttpError, toApiError } = vi.hoisted(() => ({
   apiPost: vi.fn(),

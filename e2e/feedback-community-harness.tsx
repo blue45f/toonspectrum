@@ -1,7 +1,7 @@
 // Test-only entry: not referenced by the production app or build. All API responses are fixture-routed by Playwright.
 import { createRoot } from "react-dom/client";
 
-import { useApp } from "../apps/web/lib/store";
+import { useApp } from "../apps/web/src/shared/lib/store";
 import { FeedbackPage } from "../apps/web/src/domains/legal/FeedbackPage";
 import "../apps/web/src/styles/globals.css";
 

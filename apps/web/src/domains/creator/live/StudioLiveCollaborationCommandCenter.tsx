@@ -31,7 +31,7 @@ import type {
 } from "./studio-live-sync-safety";
 import type { StudioScreenShareState } from "../studio-screen-share";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioLiveCollaborationSection =
   | "people"

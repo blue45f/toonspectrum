@@ -16,9 +16,9 @@ import {
   type PolicySlug,
 } from "./policy-content";
 
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 import { ErrorState } from "@/src/components/error-state";
 
 

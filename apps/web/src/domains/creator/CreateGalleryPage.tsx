@@ -6,11 +6,11 @@ import { CreateFeaturedSections } from "./CreateFeaturedSections";
 import { SeriesCard, SeriesForm, WorkCard, WorkGridSkeleton } from "./creator-community-ui";
 import { buildStudioHref } from "./creator-studio-links";
 
-import { Container } from "@/components/section";
-import { ShimmerTitle } from "@/components/shimmer-title";
-import { buttonClass } from "@/components/ui/button-utils";
-import { useApp } from "@/lib/store";
-import { cn } from "@/lib/utils";
+import { Container } from "@/shared/components/section";
+import { ShimmerTitle } from "@/shared/components/shimmer-title";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useApp } from "@/shared/lib/store";
+import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";

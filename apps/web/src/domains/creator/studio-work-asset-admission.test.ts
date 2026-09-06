@@ -11,7 +11,7 @@ import {
   STUDIO_WORK_ASSET_IMAGE_ADMISSION_OPT_IN_TOKEN,
   STUDIO_WORK_ASSET_MAX_CURVE_POINTS,
   type StudioWorkAssetManifest,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 function image(id: string, src: string, x = 10) {
   return {

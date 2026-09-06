@@ -40,7 +40,7 @@ import {
 import type { StudioInspectorFocusTarget } from "./studio-inspector-focus";
 import type { ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioInspectorSectionProps {
   /** Must exist in `STUDIO_INSPECTOR_DENSITY` as an advanced-tier group id. */

@@ -27,7 +27,7 @@ import type { StudioProceduralArtisticBrushTechnique } from "./studio-procedural
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioProceduralArtisticBrushUiTechnique = Extract<
   StudioProceduralArtisticBrushTechnique,

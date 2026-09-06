@@ -19,7 +19,7 @@ import {
   type StudioBg3dRoomWallId,
 } from "./studio-bg3d-room-builder";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export interface StudioBg3dRoomBuilderPanelProps {
   readonly spec: StudioBg3dRoomSpec;

@@ -22,7 +22,7 @@ import { pushCharacterShaperKeyLayer } from "./character-shaper-ui-model";
 import type { CharacterPrecisionEdit } from "./character-shaper-precision";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const ACTION_BUTTON = cn(
   "grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-panel text-fg-3",

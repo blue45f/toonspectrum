@@ -11,7 +11,7 @@ import {
 import type {
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceLicense,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 import type { LucideIcon } from "lucide-react";
 
 

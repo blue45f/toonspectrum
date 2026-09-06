@@ -7,7 +7,7 @@ import {
   type StudioTransformPercentMode,
 } from "./studio-transform-field-math";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export const STUDIO_TRANSFORM_FIELD_SYNTAX_HINT = "숫자 · +=10 · *=2 · 150% · Shift/Alt + ↑↓";
 

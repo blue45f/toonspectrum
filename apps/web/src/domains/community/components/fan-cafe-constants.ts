@@ -1,6 +1,6 @@
 import { KIND_LABEL } from "./fan-cafe-utils";
 
-import type { FanCafePostKind } from "@/lib/types";
+import type { FanCafePostKind } from "@/shared/lib/types";
 
 export const TAG_CHIP_LIMIT = 10;
 export const FAN_CAFE_REPLY_MAX_LENGTH = 700;

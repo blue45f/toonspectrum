@@ -21,7 +21,7 @@ import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document"
 import type { El } from "./studio-element-model";
 import type { ReactNode } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 export type StudioInspectorAlignMode =
   | "left"

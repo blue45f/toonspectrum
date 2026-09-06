@@ -6,4 +6,4 @@ export {
   createSha256Portable,
   sha256HexPortable,
   type StudioPortableSha256,
-} from "../../../lib/sha256-portable";
+} from "../../shared/lib/sha256-portable";

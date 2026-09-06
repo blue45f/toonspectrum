@@ -49,7 +49,7 @@ test("WebGPU renderer changes always inherit the canvas risk contract", () => {
 test("OPFS and recovery-journal changes trigger storage and browser gates", () => {
   const classification = classifyStudioChanges([
     "apps/web/src/domains/creator/persistence/studio-recovery-journal.ts",
-    "apps/web/components/studio/runtime/studio-autosave-opfs-worker.ts",
+    "apps/web/src/shared/components/studio/runtime/studio-autosave-opfs-worker.ts",
   ]);
 
   assert.equal(classification.categories.storage, true);
@@ -118,7 +118,7 @@ test("paths are normalized, deduplicated, and sorted deterministically", () => {
   ]);
 
   assert.deepEqual(classification.paths, [
-    "apps/web/components/studio/brush/studio-brush-runtime.ts",
+    "apps/web/src/shared/components/studio/brush/studio-brush-runtime.ts",
     "apps/web/src/domains/creator/canvas/StudioCanvas.tsx",
   ]);
   assert.equal(classification.changedCount, 2);

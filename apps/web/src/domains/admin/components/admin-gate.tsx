@@ -2,7 +2,7 @@ import { AdminNotice, AdminSpinner } from "./admin-ui";
 
 import type { AdminGate } from "./admin-gate-state";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 // 게이트 통과 전(로딩·비로그인·권한 없음·오류) 공용 안내 — 통과 시 null을 반환한다.
 export function AdminGateFallback({ gate }: { gate: AdminGate }) {

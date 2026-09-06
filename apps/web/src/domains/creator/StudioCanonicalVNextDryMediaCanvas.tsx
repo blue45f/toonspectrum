@@ -20,7 +20,7 @@ import { resolveStudioLiveSurfaceDevicePixelRatio } from "./studio-low-latency-c
 import type { StudioWebGpuSurfaceBounds } from "./render/studio-webgpu-viewport";
 import type { DrawEl } from "./studio-element-model";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export const STUDIO_CANONICAL_VNEXT_DRY_MEDIA_CANVAS_VERSION = 1 as const;
 

@@ -5,9 +5,9 @@ import type {
   CreatorMarketplaceOwnedHistoryPage,
   CreatorMarketplaceOwnedRelease,
   CreatorMarketplaceResourceRelistReceipt,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 import {
   listCreatorMarketplaceOwnedHistory,
   relistCreatorMarketplaceResource,

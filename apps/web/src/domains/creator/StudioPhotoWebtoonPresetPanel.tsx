@@ -11,7 +11,7 @@ import { RotateCcw } from "lucide-react";
 import { StudioSwatchChip } from "./studio-panel-ui";
 import { PHOTO_WEBTOON_PRESETS, type PhotoWebtoonPreset } from "./studio-photo-webtoon-preset";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 export function StudioPhotoWebtoonPresetPanel({
   onApplyPreset,

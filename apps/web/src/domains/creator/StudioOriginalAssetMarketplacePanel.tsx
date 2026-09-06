@@ -56,7 +56,7 @@ import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { StudioAsset } from "./studio-asset-library";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 const CONTROL_FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-panel";

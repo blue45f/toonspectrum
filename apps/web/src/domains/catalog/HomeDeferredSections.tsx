@@ -1,18 +1,18 @@
 import { ArrowRight, Layers, LayoutTemplate, MessageCircle, Palette, PersonStanding } from "lucide-react";
 
-import type { Title } from "@/lib/types";
+import type { Title } from "@/shared/lib/types";
 
-import { AdSlot } from "@/components/ad-slot";
-import { AdaptationGraph } from "@/components/adaptation-graph";
-import { Container } from "@/components/container";
-import { HomePersonal } from "@/components/home-personal";
-import { RevealOnScroll } from "@/components/reveal-on-scroll";
-import { Rail, Section } from "@/components/section";
-import { TitleCard } from "@/components/title-card";
-import { buttonClass } from "@/components/ui/button-utils";
-import { GenreSpectrum } from "@/components/ui/spectrum-bar";
-import { genreColor, genreTextColor } from "@/lib/genre-color";
-import { GENRES } from "@/lib/taxonomy";
+import { AdSlot } from "@/shared/components/ad-slot";
+import { AdaptationGraph } from "@/shared/components/adaptation-graph";
+import { Container } from "@/shared/components/container";
+import { HomePersonal } from "@/shared/components/home-personal";
+import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
+import { Rail, Section } from "@/shared/components/section";
+import { TitleCard } from "@/shared/components/title-card";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { GenreSpectrum } from "@/shared/components/ui/spectrum-bar";
+import { genreColor, genreTextColor } from "@/shared/lib/genre-color";
+import { GENRES } from "@/shared/lib/taxonomy";
 import Link from "@/src/compat/router-link";
 
 interface HomeDeferredSectionsProps {

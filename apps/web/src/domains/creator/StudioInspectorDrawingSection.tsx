@@ -46,7 +46,7 @@ import type { DrawShapeKind } from "./studio-editor-tool-model";
 import type { DrawEl, El } from "./studio-element-model";
 import type { StudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export function StudioInspectorDrawingSection({
   model,

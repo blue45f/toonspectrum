@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { afterAll } from "vitest";
 
-import { registerI18nLocaleEntries, setAppI18nAssetSource } from "@/lib/i18n";
+import { registerI18nLocaleEntries, setAppI18nAssetSource } from "@/shared/lib/i18n";
 import {
   parseStudioI18nDictionary,
   STUDIO_I18N_ASSET_LOCALES,

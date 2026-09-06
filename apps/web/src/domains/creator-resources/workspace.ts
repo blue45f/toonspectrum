@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { CreatorWorkspace } from "@/lib/creator-resources";
-import type { StoryDraft } from "@/lib/creator-workspace-persistence";
+import type { CreatorWorkspace } from "@/shared/lib/creator-resources";
+import type { StoryDraft } from "@/shared/lib/creator-workspace-persistence";
 
-import { emptyWorkspace } from "@/lib/creator-resources";
+import { emptyWorkspace } from "@/shared/lib/creator-resources";
 import {
   browserWorkspaceLock, createCreatorWorkspaceStorage, CREATOR_WORKSPACE_EVENT,
   CREATOR_WORKSPACE_KEY, workspaceWriteError,
-} from "@/lib/creator-workspace-persistence";
+} from "@/shared/lib/creator-workspace-persistence";
 
 function browserStore() {
   return createCreatorWorkspaceStorage({

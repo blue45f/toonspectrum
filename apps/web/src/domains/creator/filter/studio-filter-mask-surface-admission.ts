@@ -1,7 +1,7 @@
 import {
   isStudioFilterMaskSurfaceId,
   type StudioFilterMaskSurfaceId,
-} from "@/lib/studio-filter-mask-surface-contract";
+} from "@/shared/lib/studio-filter-mask-surface-contract";
 
 export interface StudioFilterMaskSurfaceAdmissionElement {
   readonly id: string;

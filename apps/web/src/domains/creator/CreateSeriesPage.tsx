@@ -22,10 +22,10 @@ import { confirmStudioDestructiveAction } from "./studio-destructive-action-prev
 import { studioDeleteSeriesRequest } from "./studio-destructive-command-catalog";
 import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 
-import { CoverImage } from "@/components/cover-image";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn, formatCount, relativeDate } from "@/lib/utils";
+import { CoverImage } from "@/shared/components/cover-image";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { NotFoundPage } from "@/src/components/NotFoundPage";

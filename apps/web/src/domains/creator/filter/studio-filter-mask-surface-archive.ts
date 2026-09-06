@@ -11,13 +11,13 @@ import { parseStudioProjectFile, type StudioProjectFile } from "../studio-projec
 
 import { materializeStudioFilterMaskReplayPng } from "./studio-filter-mask-surface-hydrator";
 
-import type { StudioRasterOperationLog } from "@/lib/studio-crdt-raster-ops";
+import type { StudioRasterOperationLog } from "@/shared/lib/studio-crdt-raster-ops";
 
 import {
   isStudioFilterMaskSurfaceId,
   isStudioFilterMaskSurfaceSpec,
   type StudioFilterMaskSurfaceId,
-} from "@/lib/studio-filter-mask-surface-contract";
+} from "@/shared/lib/studio-filter-mask-surface-contract";
 
 const FILTER_MASK_ARCHIVE_DEFAULT_CONCURRENCY = 2;
 const FILTER_MASK_ARCHIVE_MAX_CONCURRENCY = 4;

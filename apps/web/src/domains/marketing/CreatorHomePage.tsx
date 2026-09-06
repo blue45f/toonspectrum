@@ -8,7 +8,7 @@ import { CreatorWorkflowPicker } from "./CreatorWorkflowPicker";
 import "./creator-home.css";
 import "./creator-film.css";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 import Link from "@/src/compat/router-link";
 
 const FEATURE_ICONS = [Brush, LayoutGrid, Box, Layers] as const;

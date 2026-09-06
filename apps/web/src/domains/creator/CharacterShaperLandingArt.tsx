@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 // 캐릭터 셰이퍼 랜딩(/shaper) 전용 인라인 SVG 일러스트.
 // 외부 이미지 없이 warm-ink 토큰(var(--color-*))과 currentColor 만 쓴다 — 테마·다크 표면과 항상 맞물리고,

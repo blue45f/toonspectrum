@@ -1,7 +1,7 @@
 import { Layers3, Loader2, Scissors, ShieldCheck } from "lucide-react";
 import { useId, useState } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 interface StudioBgRemoveButtonProps {
   readonly src: string;

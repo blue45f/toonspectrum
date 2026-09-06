@@ -1,6 +1,6 @@
 import { defineAppRoutes } from "../app-route-definition";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const FortunePage = lazyRetry(
   () => import("@/src/domains/fortune/FortunePage").then((module) => ({

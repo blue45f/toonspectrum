@@ -79,8 +79,8 @@ import type { ImageFilterFields } from "../render/studio-konva-filter-fields";
 import type { CurvePoint, CurveRgbChannels } from "../studio-curves";
 import type { StudioSelectionFilterMaskScope } from "../studio-selection-filter-mask-transaction";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 type FilterPatch = Partial<ImageFilterFields>;
 

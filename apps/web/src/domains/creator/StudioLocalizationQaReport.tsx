@@ -19,7 +19,7 @@ import type {
   StudioLocalizationQaCue,
 } from "./lettering/studio-localization-qa";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /** 심각도 → 한글 라벨 + 토큰 클래스. 라벨이 먼저고 색은 보조다. */
 const SEVERITY_META: Readonly<

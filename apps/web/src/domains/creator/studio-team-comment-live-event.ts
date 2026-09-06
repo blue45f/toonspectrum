@@ -1,1 +1,1 @@
-export * from "../../../lib/studio-team-comment-live-event";
+export * from "../../shared/lib/studio-team-comment-live-event";

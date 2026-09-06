@@ -23,7 +23,7 @@ import { StudioColorVisionHintPreview } from "./StudioColorVisionHintPreview";
 
 import type { StudioToolHintSpec } from "../studio-tool-hints";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const COMPACT_WIDTH = 240;
 const COMPACT_HEIGHT = 112;

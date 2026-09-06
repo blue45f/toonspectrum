@@ -21,7 +21,7 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioToolBeltContentProps, StudioToolBeltHintMap } from "./StudioToolBeltContent";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioToolBeltCreateModeInsertToolsProps {
   hints: StudioToolBeltHintMap;

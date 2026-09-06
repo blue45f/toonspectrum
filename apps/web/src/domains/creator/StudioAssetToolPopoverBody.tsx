@@ -42,7 +42,7 @@ import type {
   StudioToolBeltContentProps,
 } from "./StudioToolBeltContent";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const TEMPLATE_GROUPS = groupTemplates(TEMPLATES);
 

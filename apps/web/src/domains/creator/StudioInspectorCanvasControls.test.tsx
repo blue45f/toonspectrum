@@ -13,7 +13,7 @@ import {
 
 import type { MagicResizePreset, MagicResizeStrategy } from "./studio-magic-resize";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 const MAGIC_PRESET: MagicResizePreset = {
   id: "test-preset",

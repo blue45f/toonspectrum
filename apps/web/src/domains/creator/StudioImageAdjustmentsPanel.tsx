@@ -17,7 +17,7 @@ import type { LayerStylePatch } from "./layer/studio-layer-styles";
 import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type { El, ImageEl } from "./studio-element-model";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 function createLookEffectId(lookId: string): StudioEffectId {
   return createStudioEffectId("look", lookId);

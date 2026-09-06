@@ -13,7 +13,7 @@ import {
 import {
   captureStudioInkInputContractV1,
   captureStudioInkInputContractV2,
-} from "@/lib/studio-ink-input-contract";
+} from "@/shared/lib/studio-ink-input-contract";
 
 function finalizedRecord(
   input: ReturnType<typeof studioDrawElementToCrdtStroke>,

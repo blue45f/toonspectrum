@@ -18,7 +18,7 @@ import type {
   StudioBrushDynamicsSource,
 } from "./studio-brush-dynamics";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 interface StudioBrushDynamicsControlsProps {
   settings: NormalizedStudioBrushDynamicsSettings;

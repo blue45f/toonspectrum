@@ -2,10 +2,10 @@ import { PenLine, Search } from "lucide-react";
 import { useState } from "react";
 
 
-import { Container } from "@/components/section";
-import { genreTint, genreBorder, genreTextColor } from "@/lib/genre-color";
-import { useI18n, useT } from "@/lib/i18n";
-import { formatCount } from "@/lib/utils";
+import { Container } from "@/shared/components/section";
+import { genreTint, genreBorder, genreTextColor } from "@/shared/lib/genre-color";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { formatCount } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";

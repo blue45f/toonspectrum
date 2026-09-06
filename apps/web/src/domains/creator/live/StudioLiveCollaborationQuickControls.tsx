@@ -24,7 +24,7 @@ import {
 
 import type { StudioLivePeer } from "./studio-live-collaboration-room";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioLiveCollaborationQuickControlsProps {
   readonly followingSessionId: string | null;

@@ -39,7 +39,7 @@ import {
   type StudioTranslationMemoryPersistence,
 } from "./studio-translation-memory-sqlite-persistence";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export interface StudioDialogueTranslationMemoryPanelProps {
   readonly workScope: string;

@@ -58,8 +58,8 @@ import { StudioSharedWorksPanel } from "./StudioSharedWorksPanel";
 
 import type { StudioDraftCollaborationReadiness } from "./studio-draft-collaboration";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioTeamPanelProps {
   open: boolean;

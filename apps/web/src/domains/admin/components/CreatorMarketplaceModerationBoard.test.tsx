@@ -9,7 +9,7 @@ import { CreatorMarketplaceModerationBoard } from "./CreatorMarketplaceModeratio
 import type {
   CreatorMarketplaceResourceModerationQueueItem,
   CreatorMarketplaceResourceModerationQueuePage,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 const mocks = vi.hoisted(() => ({
   dismissOrphan: vi.fn(),

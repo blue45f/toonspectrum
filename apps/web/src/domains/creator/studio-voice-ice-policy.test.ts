@@ -5,7 +5,7 @@ import {
   type StudioVoiceIcePolicyLeaseDependencies,
 } from "./studio-voice-ice-policy";
 
-import type { StudioVoiceIcePolicyResponse } from "@/lib/studio-voice-ice-policy-contract";
+import type { StudioVoiceIcePolicyResponse } from "@/shared/lib/studio-voice-ice-policy-contract";
 
 function directPolicy(): StudioVoiceIcePolicyResponse {
   return {

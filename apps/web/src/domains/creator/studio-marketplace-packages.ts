@@ -1,7 +1,7 @@
 import {
   compareCreatorMarketplaceSemver,
   isCreatorMarketplaceSemver,
-} from "@/lib/creator-marketplace-semver";
+} from "@/shared/lib/creator-marketplace-semver";
 
 /**
  * Local-first package contract shared by Studio assets, brushes, filters, palettes,

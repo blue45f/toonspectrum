@@ -22,7 +22,7 @@ import {
 
 import type { ReactElement } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 export interface StudioHandPosePanelProps {
   /** 현재 손 포즈 데이터. */

@@ -34,14 +34,14 @@ import { NotFoundError } from "./use-api-resource";
 import type {
   CreatorMarketplaceResourceManifest,
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 import {
   CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS,
   CREATOR_MARKETPLACE_RESOURCE_QUERY_TAG_MAX_CHARACTERS,
   canonicalizeCreatorMarketplaceJson,
   creatorMarketplaceJsonByteSize,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 const { apiDelete, apiGet, apiPatch, apiPost, getApiErrorMessage, toApiError } = vi.hoisted(() => ({
   apiDelete: vi.fn(),

@@ -16,7 +16,7 @@ import { characterGridDirectionForKey, describeAvailabilityBadge } from "./chara
 import type { CharacterSlotCardProps } from "./character-shaper-ui-contract";
 import type { KeyboardEvent } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const BADGE_TONE_CLASS = {
   good: "border-good/40 bg-good/10 text-good",

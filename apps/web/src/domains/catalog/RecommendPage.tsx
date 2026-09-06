@@ -1,8 +1,8 @@
 import { useSearchParams } from "react-router-dom";
 
-import { RecommendView } from "@/components/recommend-view";
-import { Container } from "@/components/section";
-import { GENRES } from "@/lib/taxonomy";
+import { RecommendView } from "@/shared/components/recommend-view";
+import { Container } from "@/shared/components/section";
+import { GENRES } from "@/shared/lib/taxonomy";
 
 export function RecommendPage() {
   const [searchParams] = useSearchParams();

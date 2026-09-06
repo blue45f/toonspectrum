@@ -15,7 +15,7 @@ import {
 } from "./studio-color-to-alpha";
 import { StudioSliderRow, StudioSwatchChip } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 // EyeDropper는 일부 브라우저에만 있는 실험적 API — 타입 정의가 없어 좁은 형태만 선언한다.
 // StudioColorPopover.tsx의 getEyeDropperCtor와 동일한 패턴을 이 패널 안에 독립적으로 둔다 —

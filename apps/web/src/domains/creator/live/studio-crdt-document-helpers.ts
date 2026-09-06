@@ -34,7 +34,7 @@ import type {
 import {
   canonicalStudioRasterJson,
   type StudioRasterAssetReference,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 export function defaultSetTimeout(handler: () => void, delay: number): unknown {
   return globalThis.setTimeout(handler, delay);

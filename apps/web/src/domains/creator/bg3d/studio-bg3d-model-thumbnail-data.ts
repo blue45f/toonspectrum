@@ -1,7 +1,7 @@
 import {
   inspectStrictJpegDimensions,
   inspectStrictStaticWebpDimensions,
-} from "@/lib/strict-raster-image-inspector";
+} from "@/shared/lib/strict-raster-image-inspector";
 
 export const STUDIO_BG3D_MODEL_THUMBNAIL_MAX_DIMENSION = 512;
 export const STUDIO_BG3D_MODEL_THUMBNAIL_MAX_PIXELS = 512 * 512;

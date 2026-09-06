@@ -35,7 +35,7 @@ import type { StudioMenu } from "../studio-editor-tool-model";
 import type { StudioServerAiProviderPreference } from "../studio-server-ai-client";
 import type { StudioToolBeltContentProps } from "../StudioToolBeltContent";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 
 

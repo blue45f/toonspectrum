@@ -7,7 +7,7 @@ import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { SavedBoard } from "./SavedBoard";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
-import { attributionMarkdown, parseWorkspace } from "@/lib/creator-resources";
+import { attributionMarkdown, parseWorkspace } from "@/shared/lib/creator-resources";
 
 export function CreatorHubPage() {
   const { workspace, update, restore, readSnapshot, ready, writable, saving, error } = useCreatorWorkspace();

@@ -35,7 +35,7 @@ import type { DrawEl, El } from "./studio-element-model";
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioHokusaiNaturalMediaInspectorSectionProps {
   readonly selected: El | null;

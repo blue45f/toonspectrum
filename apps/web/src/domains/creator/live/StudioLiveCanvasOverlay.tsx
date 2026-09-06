@@ -78,7 +78,7 @@ import type {
 import type { StudioCommentAnchor } from "../studio-comments";
 import type { StudioLivePeer } from "./studio-live-collaboration-room";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import { studioCanOpenAuxiliaryWindow } from "@/src/compat/in-app-browser";
 
 export interface StudioLiveCanvasCursor {

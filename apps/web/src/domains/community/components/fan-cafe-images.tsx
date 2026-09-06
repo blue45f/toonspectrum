@@ -1,5 +1,5 @@
-import { isAllowedImageDataUrl } from "@/lib/image-attach";
-import { cn } from "@/lib/utils";
+import { isAllowedImageDataUrl } from "@/shared/lib/image-attach";
+import { cn } from "@/shared/lib/utils";
 
 // 첨부 이미지 그리드 — 서버 검증을 거치지만 레거시/손상 행도 방어적으로 다시 거른다.
 export function FanPostImages({ title, images }: { title: string; images?: string[] }) {

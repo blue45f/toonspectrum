@@ -53,19 +53,19 @@ import { MarketWebtoon3dViewerModal } from "./MarketWebtoon3dViewerModal";
 import { MarketWebtoonSpecBadge } from "./MarketWebtoonSpecBadge";
 import { StaleNoticeBar } from "./StaleNoticeBar";
 
-import type { CreatorMarketplaceInstallReceipt } from "@/lib/creator-marketplace-install-receipt";
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceInstallReceipt } from "@/shared/lib/creator-marketplace-install-receipt";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   CREATOR_MARKETPLACE_INSTALL_RECEIPT_EVENT,
   CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
   isCreatorMarketplaceInstallReceiptKind,
   readCreatorMarketplaceInstallReceipt,
   resolveCreatorMarketplaceInstallReceiptState,
-} from "@/lib/creator-marketplace-install-receipt";
-import { creatorMarketplaceStudioPackId } from "@/lib/creator-marketplace-package-identity";
-import { cn } from "@/lib/utils";
+} from "@/shared/lib/creator-marketplace-install-receipt";
+import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 
 const ENGINE_LABELS: Record<string, string> = {

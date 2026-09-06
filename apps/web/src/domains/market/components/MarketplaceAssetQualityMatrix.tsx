@@ -4,7 +4,7 @@ import {
   normalizeCreatorMarketplaceAuthoringDraft,
   type CreatorMarketplaceAuthoringDraft,
   type CreatorMarketplaceAuthoringKind,
-} from "@/lib/creator-marketplace-authoring-workshop";
+} from "@/shared/lib/creator-marketplace-authoring-workshop";
 
 interface QualityScenario {
   id: string;

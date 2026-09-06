@@ -8,7 +8,7 @@ import { MarketplaceBrushRecipeAccelerator } from "./MarketplaceBrushRecipeAccel
 import {
   createCreatorMarketplaceAuthoringDraft,
   type CreatorMarketplaceAuthoringDraft,
-} from "@/lib/creator-marketplace-authoring-workshop";
+} from "@/shared/lib/creator-marketplace-authoring-workshop";
 
 
 afterEach(() => {

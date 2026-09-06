@@ -43,7 +43,7 @@ import { StudioSvgAssetPreview } from "./StudioSvgAssetPreview";
 import type { StudioCatalogPreferencesRepository } from "./catalog/studio-catalog-preferences";
 import type { StudioSvgProductTournament } from "./studio-svg-vello-product-router";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioElementsObjectInsertRequest {
   readonly item: StudioObjectInsertItem;

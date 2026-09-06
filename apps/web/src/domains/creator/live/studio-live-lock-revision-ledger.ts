@@ -2,7 +2,7 @@ import { STUDIO_LIVE_LOCK_REVISION_VERSION } from "./studio-live-collaboration-p
 
 import type { ServerLock, StudioLiveLockRevision } from "./studio-live-socket-wire";
 
-import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
+import { studioLiveLockResourcesConflict } from "@/shared/lib/studio-live-lock-resource";
 
 const MAX_LOCK_REVISION_WATERMARKS = 1_024;
 

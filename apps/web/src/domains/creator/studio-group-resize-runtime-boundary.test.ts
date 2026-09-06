@@ -45,7 +45,7 @@ const commitPlanSource = readFileSync(
   "utf8",
 );
 const browserVerifierSource = readFileSync(
-  new URL("../../../scripts/verify-studio-groups.mts", import.meta.url),
+  new URL("../../../../../scripts/verify-studio-groups.mts", import.meta.url),
   "utf8",
 );
 

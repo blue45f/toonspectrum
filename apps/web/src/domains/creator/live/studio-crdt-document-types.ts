@@ -5,8 +5,8 @@ import type {
   StudioCrdtPagePayload,
   StudioCrdtSceneElementPayload,
 } from "./studio-crdt-scene-schema";
-import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
-import type { StudioRasterOperationLog } from "@/lib/studio-crdt-raster-ops";
+import type { StudioRasterCompactionCheckpoint } from "@/shared/lib/studio-crdt-raster-compaction";
+import type { StudioRasterOperationLog } from "@/shared/lib/studio-crdt-raster-ops";
 import type { StudioShared3dStageCollectionDocument } from "../studio-shared-3d-stage-collection";
 
 export const SAMPLE_ARRAY_KEYS = [

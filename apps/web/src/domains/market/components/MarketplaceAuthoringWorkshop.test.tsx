@@ -9,7 +9,7 @@ import {
   CREATOR_MARKETPLACE_AUTHORING_HANDOFF_KEY,
   createCreatorMarketplaceDraftFromBrushStudio,
   serializeCreatorMarketplaceAuthoringDraft,
-} from "@/lib/creator-marketplace-authoring-workshop";
+} from "@/shared/lib/creator-marketplace-authoring-workshop";
 
 
 describe("MarketplaceAuthoringWorkshop", () => {

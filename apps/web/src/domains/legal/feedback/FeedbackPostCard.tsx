@@ -5,7 +5,7 @@ import { FeedbackThread } from "./FeedbackThread";
 
 import type { FeedbackEntry, FeedbackProgress } from "@toonspectrum/core/feedback";
 
-import { useApp } from "@/lib/store";
+import { useApp } from "@/shared/lib/store";
 import {
   FEEDBACK_AREA_LABELS, FEEDBACK_KIND_LABELS, FEEDBACK_PROGRESS, FEEDBACK_PROGRESS_LABELS, feedbackTimeLabel,
 } from "@toonspectrum/core/feedback";

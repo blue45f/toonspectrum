@@ -1,7 +1,7 @@
 import { Shuffle } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { Container } from "@/components/section";
+import { Container } from "@/shared/components/section";
 import { useRouter, useSearchParams } from "@/src/compat/navigation";
 import { api } from "@/src/infrastructure/api";
 

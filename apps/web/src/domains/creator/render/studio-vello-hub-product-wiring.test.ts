@@ -16,7 +16,7 @@ const hubSource = readFileSync(
   "utf8",
 );
 const verifierSource = readFileSync(
-  new URL("../../../../scripts/verify-studio-vello-candidate.mts", import.meta.url),
+  new URL("../../../../../../scripts/verify-studio-vello-candidate.mts", import.meta.url),
   "utf8",
 );
 

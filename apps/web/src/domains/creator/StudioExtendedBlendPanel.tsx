@@ -21,7 +21,7 @@ import { PANEL_CHIP_CLASS, StudioSliderRow, StudioToggleChip } from "./studio-pa
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioExtendedBlendPanelProps = {
   /** 현재 선택된 확장 블렌드 모드. */

@@ -50,8 +50,8 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { ReactElement } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 // El의 구조 호환 최소 서브셋 — StudioPage.tsx의 ImageEl을 직접 import하지 않아 순환 의존을 피한다.
 export interface StudioFrameAnimAnchorEl {

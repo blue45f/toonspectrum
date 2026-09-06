@@ -22,7 +22,7 @@ import {
 
 import type { ReactElement } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 export interface StudioLightShadowPanelProps {
   /** 현재 광원 방향(Azimuth + Elevation). */

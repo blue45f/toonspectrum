@@ -8,9 +8,9 @@
 
 import type {
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/lib/creator-marketplace-starter-catalog";
+import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-starter-catalog";
 
 const CUSTOM_REGISTRY_STORAGE_KEY = "toonspectrum:market:custom-published";
 export const MARKET_CUSTOM_REGISTRY_EVENT = "toonspectrum:market:custom-registry-updated";

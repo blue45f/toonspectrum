@@ -9,9 +9,9 @@ import type {
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceRecord,
   CreatorMarketplaceResourceSort,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { filterStarterMarketplaceResources } from "@/lib/creator-marketplace-starter-catalog";
+import { filterStarterMarketplaceResources } from "@/shared/lib/creator-marketplace-starter-catalog";
 
 
 

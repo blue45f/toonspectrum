@@ -26,8 +26,8 @@ import {
 } from "./studio-page-thumbs";
 import { useStudioRasterSourcePresentation } from "./use-studio-raster-source-presentation";
 
-import { parseStudioWorkAssetSourceUri } from "@/lib/studio-work-asset-contract";
-import { cn } from "@/lib/utils";
+import { parseStudioWorkAssetSourceUri } from "@/shared/lib/studio-work-asset-contract";
+import { cn } from "@/shared/lib/utils";
 
 export type { StudioPageDnd, StudioPageDndItemProps } from "./studio-page-dnd";
 

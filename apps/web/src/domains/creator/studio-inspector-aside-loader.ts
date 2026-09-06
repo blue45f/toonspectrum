@@ -1,7 +1,7 @@
 import { createStudioIntentLazyLoader } from "./studio-intent-lazy-loader";
 import { preloadStudioDrawingPaletteStack } from "./studio-page-lazy-ui";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const studioInspectorAsideLoader = createStudioIntentLazyLoader(() =>
   import("./StudioInspectorAside")

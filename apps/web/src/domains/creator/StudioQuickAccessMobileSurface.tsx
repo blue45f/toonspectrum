@@ -10,7 +10,7 @@ import { StudioQuickAccessPalette } from "./StudioQuickAccessPalette";
 import type { StudioQuickAccessSurfaceLeafProps } from "./studio-quick-access-surface-types";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /** Bounded modal presentation retained for touch viewports. */
 export function StudioQuickAccessMobileSurface({

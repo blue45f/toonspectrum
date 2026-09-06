@@ -23,7 +23,7 @@ import { PANEL_CHIP_CLASS, StudioSliderRow, StudioToggleChip } from "./studio-pa
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const MODE_ICONS: Record<HealCloneMode, typeof Bandage> = {
   heal: Bandage,

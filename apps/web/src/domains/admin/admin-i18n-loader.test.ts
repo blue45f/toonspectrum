@@ -5,7 +5,7 @@ import {
   loadAdminI18nLocale,
 } from "./admin-i18n-loader";
 
-import { resolveI18nValue, useI18n } from "@/lib/i18n";
+import { resolveI18nValue, useI18n } from "@/shared/lib/i18n";
 
 afterEach(() => {
   vi.restoreAllMocks();

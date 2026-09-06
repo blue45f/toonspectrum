@@ -20,7 +20,7 @@ import type {
   BgSceneTemplateCategory,
 } from "../studio-background-3d-scene-templates";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 // 템플릿마다 손으로 아이콘을 지정하는 대신 카테고리 단위로만 아이콘을 준다(교실/카페처럼 실내형
 // 템플릿이 늘어도 카테고리에 맞는 아이콘을 그대로 재사용할 수 있도록 — COMPOSITE_CATEGORY 칩이

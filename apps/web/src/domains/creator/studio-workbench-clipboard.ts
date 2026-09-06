@@ -3,4 +3,4 @@
  * `src/components/browser-compat-modal.tsx` 에 있고, 그 레이어는 `src/domains` 를 import 하지
  * 않기 때문이다. 스튜디오 쪽 호출부를 위해 이름만 다시 내보낸다.
  */
-export { copyStudioText } from "../../../lib/copy-text";
+export { copyStudioText } from "../../shared/lib/copy-text";

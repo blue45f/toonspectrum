@@ -9,9 +9,9 @@ import { MARKET_COMPARE_STORAGE_KEY } from "../hooks/use-market-compare";
 import { MarketResourceDetailArticle } from "./MarketResourceDetailArticle";
 import { MarketWebtoon3dViewerModal } from "./MarketWebtoon3dViewerModal";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/lib/creator-marketplace-starter-catalog";
+import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-starter-catalog";
 
 vi.mock("./MarketResourceReleaseHistory", () => ({ MarketResourceReleaseHistory: () => null }));
 vi.mock("./MarketCommentsSection", () => ({ MarketCommentsSection: () => null }));

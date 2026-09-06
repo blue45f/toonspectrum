@@ -23,7 +23,7 @@ import type { CharacterShaperDrawerMode, CharacterShaperOutputDockProps } from "
 import type { VrmLibraryEntry } from "../vrm/vrm-library";
 import type { ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 type DrawerMode = Exclude<CharacterShaperDrawerMode, null>;
 type ExportKind = "png" | "psd";

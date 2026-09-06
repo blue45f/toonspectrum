@@ -10,7 +10,7 @@ import {
 
 import { StudioSurfaceState } from "./StudioSurfaceState";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 function normalizeProjectQuery(value: string): string {
   return value.normalize("NFKC").trim().toLocaleLowerCase();

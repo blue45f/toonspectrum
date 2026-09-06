@@ -19,7 +19,7 @@ import {
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioNodeEditPanelProps = {
   /** 노드 편집 모드 on/off. */

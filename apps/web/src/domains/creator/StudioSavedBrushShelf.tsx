@@ -4,7 +4,7 @@ import { selectQuickBrushes, type StudioSavedBrush } from "./brush/studio-brush-
 
 import type { MouseEventHandler } from "react";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export interface StudioSavedBrushShelfProps {
   brushes: readonly StudioSavedBrush[];

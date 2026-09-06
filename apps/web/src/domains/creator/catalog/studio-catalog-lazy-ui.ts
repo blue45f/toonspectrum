@@ -1,4 +1,4 @@
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 // Keep the optional catalog chunk behind user intent without making a
 // ToolBelt body own its loader or importing the editor orchestration layer.

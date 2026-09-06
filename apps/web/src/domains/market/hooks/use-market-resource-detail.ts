@@ -8,9 +8,9 @@ import {
 } from "../models/market-resource-cache";
 import { getCreatorMarketplaceResource } from "../remotes/market-resource-remote";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { findStarterMarketplaceResourceById } from "@/lib/creator-marketplace-starter-catalog";
+import { findStarterMarketplaceResourceById } from "@/shared/lib/creator-marketplace-starter-catalog";
 import { NotFoundError } from "@/src/infrastructure/use-api-resource";
 
 export interface MarketResourceDetail {

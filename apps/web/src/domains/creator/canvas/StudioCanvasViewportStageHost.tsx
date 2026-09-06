@@ -58,7 +58,7 @@ import type {
   StudioCanvasViewportProps,
 } from "./StudioCanvasViewportTypes";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export function StudioCanvasViewportStageHost({
   viewport,

@@ -31,7 +31,7 @@ import type { TrackingOptions } from "../vrm/studio-vrm-webcam-tracking";
 import type { StudioVrmPhotoPoseApplyPayload, StudioVrmPhotoPoseHandoff } from "../vrm/StudioVrmPhotoPoseScanner";
 import type { DragEvent as ReactDragEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 type DrawerMode = CharacterShaperReferenceDrawerProps["mode"];
 

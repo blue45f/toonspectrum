@@ -1,6 +1,6 @@
 import { defineAppRoutes } from "../app-route-definition";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const ReviewsPage = lazyRetry(
   () => import("@/src/domains/community/ReviewsPage").then((module) => ({ default: module.ReviewsPage })),

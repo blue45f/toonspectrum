@@ -5,8 +5,8 @@ on:
     branches: [main]
     paths:
       - "apps/web/src/domains/creator/music/**"
-      - "apps/web/lib/studio-music*"
-      - "apps/web/lib/server/studio-music*"
+      - "apps/web/src/shared/lib/studio-music*"
+      - "apps/web/src/shared/lib/server/studio-music*"
       - "apps/api/src/modules/studio-music/**"
       - ".github/workflows/studio-music-regression.yml"
 
@@ -40,8 +40,8 @@ jobs:
           mkdir -p artifacts
           git rev-parse HEAD > artifacts/music-tested-sha.txt
           pnpm exec vitest run \
-            apps/web/lib/studio-music.test.ts \
-            apps/web/lib/server/studio-music-core.test.ts \
+            apps/web/src/shared/lib/studio-music.test.ts \
+            apps/web/src/shared/lib/server/studio-music-core.test.ts \
             apps/web/src/domains/creator/music/studio-music-library.test.ts \
             apps/web/src/domains/creator/music/studio-music-recovery.test.ts \
             apps/web/src/domains/creator/music/studio-music-work-scope.test.ts \

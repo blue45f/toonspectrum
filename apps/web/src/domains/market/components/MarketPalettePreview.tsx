@@ -1,7 +1,7 @@
 import { Check, Copy, Download, Palette } from "lucide-react";
 import { useState } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 interface MarketPalettePreviewProps {
   readonly colors: readonly string[];

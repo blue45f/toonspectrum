@@ -3,7 +3,7 @@ import { useId } from "react";
 
 import type { StudioCompanionWindowLayoutSurface } from "./studio-companion-window-layout";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioCompanionWindowSurface = StudioCompanionWindowLayoutSurface;
 export type StudioCompanionWindowLayoutPersistenceStatus =

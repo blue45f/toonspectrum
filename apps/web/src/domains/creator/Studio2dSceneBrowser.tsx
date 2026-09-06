@@ -16,7 +16,7 @@ import { useStudio2dImageReadiness } from "./useStudio2dImageReadiness";
 
 import type { Studio2dEnvironment, Studio2dOrientation, Studio2dQualityFilter, Studio2dScene, Studio2dSort, Studio2dTimeOfDay } from "./studio-2d-asset-quality";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface Studio2dSceneBrowserProps {
   readonly groups: readonly { readonly genre: string; readonly scenes: readonly Studio2dScene[] }[];

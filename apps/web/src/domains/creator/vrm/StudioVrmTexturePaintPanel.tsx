@@ -16,7 +16,7 @@ import type {
   StudioStampBrushTuning,
 } from "../brush/studio-brush-stamp-engine";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioVrmTexturePaintPanelSettings {
   readonly tool: "surface-brush" | "brush" | "fill";

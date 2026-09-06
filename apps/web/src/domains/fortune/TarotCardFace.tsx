@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 
 import { getTarotVisual, tarotAccent, tarotFaceGradient } from "./tarot-visuals";
 
-import { Card3D } from "@/components/ui/card-3d";
+import { Card3D } from "@/shared/components/ui/card-3d";
 
 interface TarotCardFaceProps {
   card: {

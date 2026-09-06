@@ -9,7 +9,7 @@ import type {
   StudioMarketplacePackage,
   StudioMarketplacePackageKind,
 } from "./studio-marketplace-packages";
-import type { CreatorMarketplaceResourceKind } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceKind } from "@/shared/lib/creator-marketplace-resource-contract";
 
 export type StudioCreatorPackKind = Extract<
   StudioMarketplacePackageKind,

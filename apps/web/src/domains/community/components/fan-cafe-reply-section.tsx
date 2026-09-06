@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { FAN_CAFE_REPLY_MAX_LENGTH, MAX_REPLY_DEPTH } from "./fan-cafe-constants";
 import { countReplies, maskReplyNode, removeReplyNode } from "./fan-cafe-tree-utils";
 
-import type { FanCafeReply } from "@/lib/types";
+import type { FanCafeReply } from "@/shared/lib/types";
 
-import { withCsrfProtection } from "@/lib/csrf";
-import { ensureArray, resolveApiError, safeParseJson } from "@/lib/http-safe";
-import { useApp } from "@/lib/store";
-import { cn, relativeDate } from "@/lib/utils";
+import { withCsrfProtection } from "@/shared/lib/csrf";
+import { ensureArray, resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
+import { useApp } from "@/shared/lib/store";
+import { cn, relativeDate } from "@/shared/lib/utils";
 import { useCelebrate } from "@/src/hooks/use-celebrate";
 
 export function FanPostReplySection({

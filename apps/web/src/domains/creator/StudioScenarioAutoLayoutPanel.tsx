@@ -50,7 +50,7 @@ import type { StudioTextAiProvenance } from "./ai/studio-ai-client";
 import type { StudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import type { ScenarioPreviewItem } from "./studio-scenario-layout";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const SCENE_COUNT_OPTIONS = Array.from(
   { length: SCENARIO_SCENE_COUNT_MAX - SCENARIO_SCENE_COUNT_MIN + 1 },

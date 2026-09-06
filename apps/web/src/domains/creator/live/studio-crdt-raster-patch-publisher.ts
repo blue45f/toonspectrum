@@ -13,7 +13,7 @@ import {
   type StudioRasterOperationLog,
   type StudioRasterSurfaceSpec,
   type StudioRasterTilePatch,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 export const STUDIO_RASTER_PATCH_PUBLISH_MAX_CONCURRENCY = 16;
 export const STUDIO_RASTER_PATCH_PUBLISH_DEFAULT_CONCURRENCY = 4;

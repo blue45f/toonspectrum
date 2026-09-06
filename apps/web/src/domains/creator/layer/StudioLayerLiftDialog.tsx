@@ -52,7 +52,7 @@ import {
   type StudioLayerLiftCorrectionStroke,
 } from "./studio-layer-lift-correction";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioLayerLiftDialogPhase =
   | "analyzing"

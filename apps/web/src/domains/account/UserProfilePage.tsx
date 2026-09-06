@@ -3,15 +3,15 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 
-import type { SeedReview, Title } from "@/lib/types";
+import type { SeedReview, Title } from "@/shared/lib/types";
 
-import { ReviewCard } from "@/components/review-card";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
-import { Stars } from "@/components/ui/stars";
-import { useT } from "@/lib/i18n";
-import { useApp } from "@/lib/store";
-import { cn, formatCount } from "@/lib/utils";
+import { ReviewCard } from "@/shared/components/review-card";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { Stars } from "@/shared/components/ui/stars";
+import { useT } from "@/shared/lib/i18n";
+import { useApp } from "@/shared/lib/store";
+import { cn, formatCount } from "@/shared/lib/utils";
 import { ErrorState } from "@/src/components/error-state";
 import { SeriesCard, WorkCard, WorkGridSkeleton } from "@/src/domains/creator/creator-community-ui";
 import { useDocumentTitle, useMetaDescription } from "@/src/hooks/use-document-title";

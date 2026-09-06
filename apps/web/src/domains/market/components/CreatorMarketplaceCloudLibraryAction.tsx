@@ -5,11 +5,11 @@ import type {
   CreatorMarketplaceAcquisitionTarget,
   CreatorMarketplaceCloudLibraryItem,
   CreatorMarketplaceCloudLibraryMembership,
-} from "@/lib/creator-marketplace-cloud-library-contract";
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-cloud-library-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { creatorMarketplaceStudioPackId } from "@/lib/creator-marketplace-package-identity";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
 import { useSession } from "@/src/compat/auth-session-store";
 import {
   acquireCreatorMarketplaceCloudLibraryRelease,

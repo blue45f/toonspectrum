@@ -48,9 +48,9 @@ import { AdminDialog } from "./components/AdminDialog";
 import { AdminToastProvider } from "./components/AdminToast";
 import { useAdminToast } from "./components/use-admin-toast";
 
-import { Container } from "@/components/section";
-import { useI18n, useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { Container } from "@/shared/components/section";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
 

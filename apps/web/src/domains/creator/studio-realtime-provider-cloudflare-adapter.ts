@@ -10,7 +10,7 @@ import {
   type ServerPresenceSnapshotMessage,
   type ServerReplayMessage,
   type ServerWelcomeMessage,
-} from "../../../deploy/cloudflare-realtime/src/protocol";
+} from "../../../../../deploy/cloudflare-realtime/src/protocol";
 
 import {
   STUDIO_REALTIME_PROVIDER_LIMITS,

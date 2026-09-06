@@ -12,7 +12,7 @@ import {
 import {
   CREATOR_MARKETPLACE_RESOURCE_KINDS,
   CREATOR_MARKETPLACE_RESOURCE_LICENSES,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 
 describe("market kind metadata", () => {

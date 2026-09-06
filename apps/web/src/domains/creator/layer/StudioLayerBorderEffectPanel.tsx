@@ -16,7 +16,7 @@ import {
   type StudioLayerBorderEffectType,
 } from "./studio-layer-border-effect";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
 const RANGE_CLASS = "w-24 accent-accent cursor-pointer";

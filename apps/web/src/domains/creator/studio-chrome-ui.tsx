@@ -40,8 +40,8 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 import type { StudioToolHintConsumerPreviewFields } from "./studio-tool-hint-preview-kind";
 import type { LucideIcon } from "lucide-react";
 
-import { useI18n, useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 /* eslint-disable react-refresh/only-export-components -- chrome tokens shared with StudioPage toolbar shell */
 export const STUDIO_ICON_SIZE = {

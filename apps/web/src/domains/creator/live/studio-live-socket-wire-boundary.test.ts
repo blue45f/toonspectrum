@@ -31,7 +31,7 @@ describe("studio live socket wire ownership boundary", () => {
     expect(wire.specifiers).toEqual([
       "./studio-crdt-binary-wire",
       "./studio-live-collaboration-protocol",
-      "@/lib/studio-live-lock-resource",
+      "@/shared/lib/studio-live-lock-resource",
     ]);
     expect(wire.source).not.toMatch(/socket\.io-client|studio-live-socket-endpoint|runtime-api-base/);
     expect(wire.source).not.toMatch(

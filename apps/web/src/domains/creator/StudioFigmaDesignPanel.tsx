@@ -29,7 +29,7 @@ import type {
   StudioSelectionResizeAnchor,
 } from "./studio-selection-transform-advanced";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioFigmaDesignPanelProps {
   readonly metrics: StudioFigmaSelectionLayoutMetrics | null;

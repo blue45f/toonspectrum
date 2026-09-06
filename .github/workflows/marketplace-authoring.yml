@@ -3,7 +3,7 @@ name: Marketplace authoring
 on:
   pull_request:
     paths:
-      - "apps/web/lib/creator-marketplace-authoring-workshop*"
+      - "apps/web/src/shared/lib/creator-marketplace-authoring-workshop*"
       - "apps/web/src/domains/market/**"
       - "apps/web/src/domains/creator/MarketplaceBrush*"
       - "apps/web/src/domains/creator/**/StudioBrushStudio.tsx"
@@ -14,7 +14,7 @@ on:
     branches:
       - main
     paths:
-      - "apps/web/lib/creator-marketplace-authoring-workshop*"
+      - "apps/web/src/shared/lib/creator-marketplace-authoring-workshop*"
       - "apps/web/src/domains/market/**"
       - "apps/web/src/domains/creator/MarketplaceBrush*"
       - "apps/web/src/domains/creator/**/StudioBrushStudio.tsx"
@@ -49,7 +49,7 @@ jobs:
       - name: Authoring contract and component tests
         run: >-
           pnpm exec vitest run
-          apps/web/lib/creator-marketplace-authoring-workshop.test.ts
+          apps/web/src/shared/lib/creator-marketplace-authoring-workshop.test.ts
           apps/web/src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx
           apps/web/src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx
           --reporter=verbose

@@ -18,7 +18,7 @@ import {
 } from "./brush/studio-ink-wash";
 import { PANEL_LABEL_ROW, PANEL_READOUT_CLASS, StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 const INK_WASH_SLIDERS: Array<{
   key: "strength" | "spread" | "edgeBleed" | "granulation" | "paper";

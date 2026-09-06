@@ -17,10 +17,10 @@ import type {
   CreatorMarketplaceResourceModerationQueueItem,
   CreatorMarketplaceResourceModerationQueuePage,
   CreatorMarketplaceResourceReportReason,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { CREATOR_MARKETPLACE_RESOURCE_MODERATION_NOTE_MAX_CHARACTERS } from "@/lib/creator-marketplace-resource-contract";
-import { cn } from "@/lib/utils";
+import { CREATOR_MARKETPLACE_RESOURCE_MODERATION_NOTE_MAX_CHARACTERS } from "@/shared/lib/creator-marketplace-resource-contract";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import {
   dismissOrphanedReport,

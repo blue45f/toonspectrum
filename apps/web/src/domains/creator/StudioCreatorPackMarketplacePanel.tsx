@@ -34,7 +34,7 @@ import {
 } from "./studio-creator-pack-runtime";
 import { filterStudioMarketplacePackages } from "./studio-marketplace-packages";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-panel";

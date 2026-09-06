@@ -8,7 +8,7 @@ import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsS
 import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
 import type { ComponentType } from "react";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 /**
  * Optional Studio surfaces and user-triggered runtimes live in this explicit registry so

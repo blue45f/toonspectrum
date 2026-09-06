@@ -20,7 +20,7 @@ import {
   studioPressureCurveSliderMeta,
 } from "./studio-pressure-curve-graph";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const CHART_W = 160;
 const CHART_H = 88;

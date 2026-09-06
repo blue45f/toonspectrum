@@ -83,7 +83,7 @@ import type {
 import {
   parseStudioLiveLockResourceScope,
   studioLiveLockResourcesConflict,
-} from "@/lib/studio-live-lock-resource";
+} from "@/shared/lib/studio-live-lock-resource";
 
 const DEFAULT_HEARTBEAT_MS = 10_000;
 const DEFAULT_PRESENCE_TTL_MS = 30_000;

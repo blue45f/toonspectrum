@@ -22,7 +22,7 @@ import {
   CreatorMarketplaceResourceRecordSchema,
   canonicalizeCreatorMarketplaceJson,
   creatorMarketplaceJsonByteSize,
-} from "../../apps/web/lib/creator-marketplace-resource-contract";
+} from "../../apps/web/src/shared/lib/creator-marketplace-resource-contract";
 import {
   STUDIO_BG3D_PROCEDURAL_STARTER_PACK,
   STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID,
@@ -59,7 +59,7 @@ import type {
   CreatorMarketplaceResourceListPage,
   CreatorMarketplaceResourceManifest,
   CreatorMarketplaceResourceRecord,
-} from "../../apps/web/lib/creator-marketplace-resource-contract";
+} from "../../apps/web/src/shared/lib/creator-marketplace-resource-contract";
 import type { ChildProcess } from "node:child_process";
 
 const MEDIA_TYPE_BY_KIND = {

@@ -19,7 +19,7 @@ import {
 } from "./studio-blur";
 import { StudioPanelChip } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 // 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(세기 0..100·반경 1..40·각도 0..360 정수 수용).

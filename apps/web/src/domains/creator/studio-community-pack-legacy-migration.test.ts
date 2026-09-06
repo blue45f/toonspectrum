@@ -35,13 +35,13 @@ import type {
   CreatorMarketplaceJsonValue,
   CreatorMarketplaceResourceIdentity,
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 import {
   CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
   type CreatorMarketplaceInstallReceiptStorage,
-} from "@/lib/creator-marketplace-install-receipt";
-import { creatorMarketplaceJsonByteSize } from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-install-receipt";
+import { creatorMarketplaceJsonByteSize } from "@/shared/lib/creator-marketplace-resource-contract";
 
 type Kind = "brush" | "filter" | "palette";
 

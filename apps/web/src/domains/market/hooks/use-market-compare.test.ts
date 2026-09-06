@@ -9,7 +9,7 @@ import {
   useMarketCompare,
 } from "./use-market-compare";
 
-import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/lib/creator-marketplace-starter-catalog";
+import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-starter-catalog";
 
 describe("useMarketCompare", () => {
   beforeEach(() => {

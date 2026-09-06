@@ -20,9 +20,9 @@ import {
 import type { ComponentType } from "react";
 
 
-import { RevealOnScroll } from "@/components/reveal-on-scroll";
-import { Container, Section } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
+import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
+import { Container, Section } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import Link from "@/src/compat/router-link";
 import {
   useDocumentTitle,

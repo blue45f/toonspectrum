@@ -39,7 +39,7 @@ export default defineConfig(
 
   // 루트 Vite 앱(apps/web/src/·components/·lib/) — React 19 + RC + jsx-a11y.
   // ToonSpectrum Vite 앱은 apps/web 에 있고, NestJS API 만 apps/api 에 있다.
-  react({ files: ['apps/web/{src,components,lib}/**/*.{ts,tsx}'] }),
+  react({ files: ['apps/web/src/**/*.{ts,tsx}'] }),
 
   // heejun 개인 테스트/목 컨벤션 규칙은 비활성 — 횡단 일관성 대상이 아니라
   // ToonSpectrum 자체 테스트 스타일과 충돌한다(shared base 의 일반 규칙만 채택).
@@ -62,7 +62,7 @@ export default defineConfig(
   //   대량 오탐을 낸다. 공유 config 채택이 8000줄 스튜디오에 동작 변경 리스크를 끌고 오지 않도록,
   //   OLD 의 react-hooks 적용 범위와 동일하게 비활성한다(스코프 크립 방지).
   {
-    files: ['apps/web/{src,components,lib}/**/*.{ts,tsx}'],
+    files: ['apps/web/src/**/*.{ts,tsx}'],
     rules: {
       'react-hooks/exhaustive-deps': 'error',
       'react-hooks/set-state-in-effect': 'off',

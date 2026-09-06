@@ -18,7 +18,7 @@ import {
   type StudioRevisionPublicationImpact,
 } from "./studio-server-revision-comparison";
 
-import { projectRevisionComparisonValue } from "@/lib/revision-comparison-projection";
+import { projectRevisionComparisonValue } from "@/shared/lib/revision-comparison-projection";
 
 const STUDIO_REVISION_COMPARE_WORKER_VERSION = 1 as const;
 const STUDIO_REVISION_COMPARE_RUNTIME_MODULE_URL_TOKEN =

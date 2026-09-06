@@ -2,8 +2,8 @@ import { BookOpen, ExternalLink, Newspaper, Search } from "lucide-react";
 import { useState } from "react";
 
 
-import { Container } from "@/components/section";
-import { cn, relativeDate } from "@/lib/utils";
+import { Container } from "@/shared/components/section";
+import { cn, relativeDate } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";

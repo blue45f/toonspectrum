@@ -4,7 +4,7 @@ import { CSP_TOOL_FILE_LIMITS } from "../../../../../packages/studio-format-gate
 import {
   buildAuthoredSutFixture,
   readAuthoredSutWithNodeSqlite,
-} from "../../../tests/corpus/formats/csp-sut-fixtures";
+} from "../../../../../tests/corpus/formats/csp-sut-fixtures";
 
 import {
   StudioCspSutSqliteReaderError,

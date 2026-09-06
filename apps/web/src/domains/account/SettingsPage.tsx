@@ -3,16 +3,16 @@ import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, D
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
-import { Container } from "@/components/section";
-import { getLanguageOptions, useI18n, useT } from "@/lib/i18n";
-import { useApp, useHydrated, type RatingScale } from "@/lib/store";
+import { Container } from "@/shared/components/section";
+import { getLanguageOptions, useI18n, useT } from "@/shared/lib/i18n";
+import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
 import {
   getRememberFlag,
   setRememberFlag,
   clearAllRememberedFilters,
-} from "@/lib/use-remembered-filters";
-import { formatCount } from "@/lib/utils";
-import { fetchVisitStats, type VisitStats } from "@/lib/visits-api";
+} from "@/shared/lib/use-remembered-filters";
+import { formatCount } from "@/shared/lib/utils";
+import { fetchVisitStats, type VisitStats } from "@/shared/lib/visits-api";
 
 function Choice<T extends string>({
   options,

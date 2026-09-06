@@ -22,7 +22,7 @@ import type { CharacterShaperViewportHudProps } from "./character-shaper-ui-cont
 import type { LoadStatus } from "../vrm/StudioVrmPoserTypes";
 import type { VrmLibraryEntry } from "../vrm/vrm-library";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const HUD_BUTTON = cn(
   "grid size-11 shrink-0 place-items-center rounded-xl border border-line/70 bg-panel/85 text-fg-2 shadow-sm backdrop-blur",

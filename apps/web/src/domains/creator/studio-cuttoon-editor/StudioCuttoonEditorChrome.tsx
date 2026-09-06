@@ -25,8 +25,8 @@ import { LazyStudioMenubarContent } from "../studio-page-modal-lazy-boundaries";
 import { StudioOptionsBars } from "../StudioOptionsBars";
 import { StudioToolBeltContent } from "../StudioToolBeltContent";
 import { StudioToolHintTarget } from "../StudioToolHint";
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
 export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {

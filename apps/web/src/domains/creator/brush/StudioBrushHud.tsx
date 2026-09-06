@@ -20,7 +20,7 @@ import { StudioInlineScrubber } from "../StudioInlineScrubber";
 
 import { STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /** Popovers, docks and dialogs the HUD refuses to sit under. */
 const OBSTACLE_SELECTOR = [

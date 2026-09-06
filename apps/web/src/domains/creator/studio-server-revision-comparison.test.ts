@@ -7,7 +7,7 @@ import { buildStudioServerRevisionComparison } from "./studio-server-revision-co
 import {
   REVISION_COMPARISON_AI_PROMPT_DIGEST_SENTINEL,
   projectRevisionComparisonValue,
-} from "@/lib/revision-comparison-projection";
+} from "@/shared/lib/revision-comparison-projection";
 
 function page(text: string) {
   return {

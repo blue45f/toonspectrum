@@ -8,7 +8,7 @@ import {
   type StudioServerRevisionState,
 } from "./studio-production-server-revisions";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "medium",

@@ -11,7 +11,7 @@ import {
 
 import type { StudioLiveTransportFactory } from "./studio-live-collaboration-transport";
 import type { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
-import type { StudioLiveAuthTicketResponse } from "../../../../lib/studio-live-auth-ticket";
+import type { StudioLiveAuthTicketResponse } from "../../../shared/lib/studio-live-auth-ticket";
 
 // The Socket.IO transport is deliberately not part of the eager Studio graph. This mock stands in
 // for the chunk the hook fetches on demand; it is only reached by the tests that leave

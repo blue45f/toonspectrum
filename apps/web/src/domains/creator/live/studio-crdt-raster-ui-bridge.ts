@@ -34,7 +34,7 @@ import {
   type StudioRasterSurfaceSpec,
   type StudioRasterUndoAcknowledgement,
   type StudioRasterUndoOperation,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 const MAX_UINT64_DECIMAL = "18446744073709551615";
 const ZERO_SHA256 = "0".repeat(64);

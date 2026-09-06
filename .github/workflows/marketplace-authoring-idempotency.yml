@@ -62,7 +62,7 @@ jobs:
       - name: Focused tests
         run: >-
           pnpm exec vitest run
-          apps/web/lib/creator-marketplace-authoring-workshop.test.ts
+          apps/web/src/shared/lib/creator-marketplace-authoring-workshop.test.ts
           apps/web/src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx
           apps/web/src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx
           --reporter=verbose

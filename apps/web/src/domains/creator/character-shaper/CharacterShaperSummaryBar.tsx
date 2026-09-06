@@ -16,7 +16,7 @@ import type { CharacterShaperSummaryBarProps } from "./character-shaper-ui-contr
 import type { VrmLibraryEntry } from "../vrm/vrm-library";
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import { useMediaQuery } from "@/src/hooks/use-media-query";
 
 type SummaryPopover = "reset" | "save" | "more";

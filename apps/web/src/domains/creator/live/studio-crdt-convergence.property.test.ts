@@ -57,7 +57,7 @@ import {
   decodeStudioCrdtBinaryEnvelope,
   encodeStudioCrdtBinaryEnvelope,
   fragmentStudioCrdtBinarySyncEnvelope,
-} from "@/lib/studio-crdt-binary-envelope";
+} from "@/shared/lib/studio-crdt-binary-envelope";
 
 const WORK_ID = "work-f754";
 const OUTBOX_SCOPE = "f754-user";

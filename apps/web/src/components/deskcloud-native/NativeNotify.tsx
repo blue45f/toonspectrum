@@ -16,10 +16,10 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import { getAnonId, notifyConfig } from "./config";
 
-import { Button } from "@/components/ui/button";
-import { useT } from "@/lib/i18n";
-import { useApp } from "@/lib/store";
-import { cn } from "@/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { useT } from "@/shared/lib/i18n";
+import { useApp } from "@/shared/lib/store";
+import { cn } from "@/shared/lib/utils";
 
 type Phase = "idle" | "loading" | "ready" | "error" | "empty";
 

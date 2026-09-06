@@ -30,12 +30,12 @@ import { WebtoonStrip } from "./WebtoonStrip";
 
 import type { SavedFortune } from "./fortune-store";
 import type { FortunePanel } from "./fortune-types";
-import type { Title } from "@/lib/types";
+import type { Title } from "@/shared/lib/types";
 
-import { TitleCard } from "@/components/title-card";
+import { TitleCard } from "@/shared/components/title-card";
 // 배포 환경에서도 root-relative 이미지 경로가 올바른 오리진을 가리키도록 정규화한다.
-import { withCsrfProtection } from "@/lib/csrf";
-import { cn } from "@/lib/utils";
+import { withCsrfProtection } from "@/shared/lib/csrf";
+import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 
 interface Character {

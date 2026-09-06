@@ -1,8 +1,8 @@
-import { ReferenceError, referenceSearchParams } from "../../../../lib/kmas-reference";
+import { ReferenceError, referenceSearchParams } from "../../../shared/lib/kmas-reference";
 
 import { isReferenceItem } from "./reference-storage";
 
-import type { ReferenceQuery, ReferenceResult, ReferenceErrorCode } from "../../../../lib/kmas-reference";
+import type { ReferenceQuery, ReferenceResult, ReferenceErrorCode } from "../../../shared/lib/kmas-reference";
 
 const ERROR_CODES: readonly ReferenceErrorCode[] = ["INVALID_QUERY", "KMAS_NOT_CONFIGURED", "KMAS_RATE_LIMITED", "KMAS_TIMEOUT", "KMAS_UNAVAILABLE"];
 

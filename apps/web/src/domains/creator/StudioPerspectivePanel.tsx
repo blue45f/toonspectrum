@@ -16,7 +16,7 @@ import {
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /**
  * X/Y 좌표 입력 한 칸 — 완전히 controlled(부모 value가 유일한 진실)로 만들면 "-"만 입력한 순간

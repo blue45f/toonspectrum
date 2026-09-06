@@ -6,9 +6,9 @@ import { ProviderStatus } from "./ProviderStatus";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
-import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@/lib/creator-resources";
+import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@/shared/lib/creator-resources";
 
-import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/lib/creator-resources";
+import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
 import { apiPath } from "@/src/infrastructure/api";
 
 const CONFIG = {

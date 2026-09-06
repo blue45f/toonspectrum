@@ -4,7 +4,7 @@ import { studioMobileSheetSizeStyle } from "./studio-mobile-sheet-snap";
 
 import type { StudioMobileSheetSnap } from "./studio-mobile-sheet-snap";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const LazyStudioMobileSheetHandle = lazy(() =>
   import("./StudioMobileSheetHandle").then(({ StudioMobileSheetHandle }) => ({

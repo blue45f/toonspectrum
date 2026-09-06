@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_RASTER_CRDT_VERSION } from "../../../../lib/studio-crdt-raster-ops";
+import { STUDIO_RASTER_CRDT_VERSION } from "../../../shared/lib/studio-crdt-raster-ops";
 
 import { STUDIO_RASTER_CRDT_VERSION as liveFacadeVersion } from "./studio-crdt-raster-ops";
 
@@ -53,7 +53,7 @@ describe("studio production raster-ops import hygiene", () => {
       fileURLToPath(new URL("./studio-crdt-raster-ops.ts", import.meta.url)),
       "utf8",
     );
-    expect(facade).toContain('export * from "../../../../lib/studio-crdt-raster-ops"');
+    expect(facade).toContain('export * from "../../../shared/lib/studio-crdt-raster-ops"');
     expect(facade).not.toMatch(/studio-crdt-raster-ops\.test/);
   });
 

@@ -56,7 +56,7 @@ import type * as THREE from "three";
 import {
   inspectStrictJpegDimensions,
   inspectStrictStaticWebpDimensions,
-} from "@/lib/strict-raster-image-inspector";
+} from "@/shared/lib/strict-raster-image-inspector";
 
 export const STUDIO_BG3D_IMPORT_MAX_FILES = 256;
 export const STUDIO_BG3D_IMPORT_MAX_MODELS = 32;

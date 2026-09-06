@@ -6,7 +6,7 @@ import type {
   CreatorMarketplaceCloudLibraryPage,
   CreatorMarketplaceCloudLibraryView,
   CreatorMarketplaceStudioInstallConfirmationReceipt,
-} from "@/lib/creator-marketplace-cloud-library-contract";
+} from "@/shared/lib/creator-marketplace-cloud-library-contract";
 import type {
   CreatorMarketplaceJsonValue,
   CreatorMarketplaceOrphanReportDismissReceipt,
@@ -27,9 +27,9 @@ import type {
   CreatorMarketplaceResourceIdentity,
   CreatorMarketplaceResourceRelistReceipt,
   CreatorMarketplaceResourceSort,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { loadChunkWithReloadRecovery } from "@/lib/chunk-load-recovery";
+import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
 import {
   CREATOR_MARKETPLACE_BUILTIN_PREFIX_BY_KIND,
   CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS,
@@ -44,7 +44,7 @@ import {
   CreatorMarketplaceResourceTagQuerySchema,
   canonicalizeCreatorMarketplaceJson,
   creatorMarketplaceJsonByteSize,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 const MEDIA_TYPE_BY_KIND = {
   asset: "application/vnd.toonspectrum.asset+json",

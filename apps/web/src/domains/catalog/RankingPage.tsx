@@ -1,17 +1,17 @@
 import { ChevronRight, ListFilter } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import type { PlatformId } from "@/lib/types";
+import type { PlatformId } from "@/shared/lib/types";
 import type { MouseEvent } from "react";
 
-import { RankingBoard } from "@/components/ranking-board";
-import { RankingMethod } from "@/components/ranking-method";
-import { Container } from "@/components/section";
-import { SharePageButton } from "@/components/share-page-button";
-import { spectrumGradient } from "@/lib/genre-color";
-import { PLATFORM_LIST } from "@/lib/platforms";
-import { RANK_AXES, type RankAxis } from "@/lib/ranking";
-import { GENRES } from "@/lib/taxonomy";
+import { RankingBoard } from "@/shared/components/ranking-board";
+import { RankingMethod } from "@/shared/components/ranking-method";
+import { Container } from "@/shared/components/section";
+import { SharePageButton } from "@/shared/components/share-page-button";
+import { spectrumGradient } from "@/shared/lib/genre-color";
+import { PLATFORM_LIST } from "@/shared/lib/platforms";
+import { RANK_AXES, type RankAxis } from "@/shared/lib/ranking";
+import { GENRES } from "@/shared/lib/taxonomy";
 
 export function RankingPage() {
   const [searchParams] = useSearchParams();

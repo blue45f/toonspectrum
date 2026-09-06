@@ -43,7 +43,7 @@ import type {
 } from "./studio-asset-favorites";
 import type { StudioAsset } from "./studio-asset-library";
 import type { StudioCommunityMarketplaceView } from "./studio-community-marketplace-view";
-import type { CreatorAssetReportReason } from "@/lib/creator-asset-contract";
+import type { CreatorAssetReportReason } from "@/shared/lib/creator-asset-contract";
 import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,
@@ -56,10 +56,10 @@ import {
   CREATOR_ASSET_LICENSES,
   CREATOR_ASSET_REPORT_REASONS,
   creatorAssetLicenseOf,
-} from "@/lib/creator-asset-contract";
-import { cx } from "@/lib/cx";
-import { useT } from "@/lib/i18n";
-import { lazyRetry } from "@/lib/lazy-retry";
+} from "@/shared/lib/creator-asset-contract";
+import { cx } from "@/shared/lib/cx";
+import { useT } from "@/shared/lib/i18n";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 export type StudioAssetTab = "mine" | "community";
 export type StudioAssetSortOrder = "newest" | "recent" | "frequency" | "popular" | "name" | "size";

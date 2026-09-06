@@ -1,4 +1,4 @@
-import { parseStudioWorkAssetSourceUri } from "@/lib/studio-work-asset-contract";
+import { parseStudioWorkAssetSourceUri } from "@/shared/lib/studio-work-asset-contract";
 
 export const STUDIO_WORK_ASSET_DESTRUCTIVE_EDIT_REASON =
   "팀 에셋 원본은 안전한 버전 교체가 준비될 때까지 픽셀을 직접 굽는 편집을 사용할 수 없어요. 배치·필터 같은 비파괴 편집을 이용해 주세요.";

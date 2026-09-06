@@ -29,7 +29,7 @@ import type { StudioViewRotation } from "./studio-view-controls";
 import type { LucideIcon } from "lucide-react";
 import type { KeyboardEvent, ReactElement, ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioViewToolMode = "zoom" | "rotate" | null;
 

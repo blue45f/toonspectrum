@@ -16,7 +16,7 @@ const inspectorColumnSource = readFileSync(
 );
 
 const walkthroughSource = readFileSync(
-  new URL("../../../scripts/verify-studio-inspector-walkthrough.mts", import.meta.url),
+  new URL("../../../../../scripts/verify-studio-inspector-walkthrough.mts", import.meta.url),
   "utf8",
 );
 

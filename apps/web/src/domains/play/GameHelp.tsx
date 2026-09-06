@@ -4,8 +4,8 @@
 import { HelpCircle } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { cn } from "@/shared/lib/utils";
 
 export interface HelpStep {
   /** 앞에 붙는 이모지(예: "🎯"). */

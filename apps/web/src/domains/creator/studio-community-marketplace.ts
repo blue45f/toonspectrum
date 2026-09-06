@@ -37,13 +37,13 @@ import type {
   CreatorMarketplaceResourceLicense,
   CreatorMarketplaceResourceManifest,
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { creatorMarketplaceStudioPackId } from "@/lib/creator-marketplace-package-identity";
+import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
 import {
   isCreatorMarketplaceSemver,
   normalizeCreatorMarketplaceLegacySemver,
-} from "@/lib/creator-marketplace-semver";
+} from "@/shared/lib/creator-marketplace-semver";
 import {
   createCreatorMarketplacePortableDelivery,
 } from "@/src/infrastructure/creator-marketplace-client";

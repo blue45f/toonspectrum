@@ -52,7 +52,7 @@ import { materializeStudioBrushCatalogSelection } from "./studio-brush-selection
 
 import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 function MixerCard({
   title,

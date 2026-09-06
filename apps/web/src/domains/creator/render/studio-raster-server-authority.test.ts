@@ -14,7 +14,7 @@ import {
   STUDIO_RASTER_KERNEL,
   createStudioRasterOperationLog,
   type StudioRasterOperationLog,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 function rasterLog(input: {
   readonly surfaceId: string;

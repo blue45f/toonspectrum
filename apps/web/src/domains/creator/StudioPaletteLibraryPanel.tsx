@@ -28,7 +28,7 @@ import {
   StudioPaletteSqliteRepositoryError,
 } from "./studio-palette-sqlite-repository";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 type StudioPaletteInterchangeModule = typeof import("./studio-palette-interchange");
 type StudioPaletteInterchangeFormat = Parameters<

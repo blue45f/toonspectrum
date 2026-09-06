@@ -63,7 +63,7 @@ import {
   type DialogueRubySpan,
 } from "./lettering/studio-dialogue-ruby";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export type StudioDialogueBatchPanelProps = {
   /** 전체 페이지(요소·그룹 포함) — StudioPage 의 pages 를 그대로 받는다. */

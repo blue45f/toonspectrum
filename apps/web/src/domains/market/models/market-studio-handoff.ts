@@ -1,7 +1,7 @@
 import type {
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 export type MarketStudioHandoffMode =
   | "insert-current-canvas"

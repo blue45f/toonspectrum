@@ -34,7 +34,7 @@ import { StudioWebtoonCelShadePanel } from "./StudioWebtoonCelShadePanel";
 
 import type { StudioPalette } from "./studio-color-palettes";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 type EyeDropperResult = { sRGBHex: string };
 type EyeDropperLike = { open: () => Promise<EyeDropperResult> };

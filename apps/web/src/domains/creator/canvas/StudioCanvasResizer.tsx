@@ -35,7 +35,7 @@ import {
   studioCanvasSizeSummary,
 } from "./studio-canvas-size";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioCanvasResizeMode = "height-only" | "reflow";
 

@@ -21,7 +21,7 @@ import {
 } from "./studio-brush-engine-program-set";
 import { studioBrushPresetById } from "./studio-draw-ux";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /** Paint order is the carrier's actual execution order. */
 const OIL_PROGRAM_ROWS: readonly {

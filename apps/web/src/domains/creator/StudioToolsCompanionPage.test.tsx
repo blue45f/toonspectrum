@@ -21,7 +21,7 @@ import {
 } from "./studio-tools-companion";
 import { StudioToolsCompanionPage } from "./StudioToolsCompanionPage";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 class FakeBroadcastChannel {
   static readonly instances: FakeBroadcastChannel[] = [];

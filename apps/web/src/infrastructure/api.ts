@@ -7,8 +7,8 @@ import {
   TOONSPECTRUM_CSRF_HEADER,
   TOONSPECTRUM_CSRF_HEADER_VALUE,
   isCsrfProtectedMethod,
-} from "@/lib/csrf";
-import { resolveApiError, safeParseJson } from "@/lib/http-safe";
+} from "@/shared/lib/csrf";
+import { resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
 import { handleUnauthorizedSession } from "@/src/compat/auth-session-state";
 import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
 

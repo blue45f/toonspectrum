@@ -9,7 +9,7 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /** Re-export pure kind list for pickers (SSOT: studio-draw-hud). */
 export const STUDIO_DRAW_SHAPE_PICKER_KINDS = DRAW_SHAPE_PICKER_KINDS;

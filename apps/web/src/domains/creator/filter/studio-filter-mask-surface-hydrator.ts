@@ -9,12 +9,12 @@ import type { StudioCrdtDocument } from "../live/studio-crdt-document";
 import type {
   StudioRasterOperationLog,
   StudioRasterSurfaceSpec,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 import {
   isStudioFilterMaskSurfaceId,
   isStudioFilterMaskSurfaceSpec,
-} from "@/lib/studio-filter-mask-surface-contract";
+} from "@/shared/lib/studio-filter-mask-surface-contract";
 
 export const STUDIO_FILTER_MASK_MAX_CONCURRENT_HYDRATIONS = 2;
 export const STUDIO_FILTER_MASK_MAX_OBSERVED_SURFACES = 256;

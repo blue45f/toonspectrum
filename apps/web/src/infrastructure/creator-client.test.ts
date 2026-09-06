@@ -19,7 +19,7 @@ import {
   updateWork,
 } from "./creator-client";
 
-import { CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES } from "@/lib/creator-asset-contract";
+import { CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES } from "@/shared/lib/creator-asset-contract";
 
 const { apiGet, apiPatch, apiPost, createStudioSharedAssetPreview, toApiError } = vi.hoisted(() => ({
   apiGet: vi.fn(),

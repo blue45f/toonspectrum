@@ -5,12 +5,12 @@ import { useId, useRef, useState } from "react";
 import type {
   CreatorMarketplaceResourceRecord,
   CreatorMarketplaceResourceReportReason,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 import {
   CREATOR_MARKETPLACE_RESOURCE_REPORT_DETAILS_MAX_CHARACTERS,
-} from "@/lib/creator-marketplace-resource-contract";
-import { cx } from "@/lib/cx";
+} from "@/shared/lib/creator-marketplace-resource-contract";
+import { cx } from "@/shared/lib/cx";
 import { useSession } from "@/src/compat/auth-session-store";
 import {
   creatorMarketplaceReportErrorCode,

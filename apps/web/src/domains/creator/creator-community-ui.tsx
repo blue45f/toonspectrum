@@ -5,9 +5,9 @@ import { useState } from "react";
 
 import { FORMAT_LABEL, SERIES_STATUS_LABEL } from "./creator-community-utils";
 
-import { CoverImage } from "@/components/cover-image";
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn, formatCount, relativeDate } from "@/lib/utils";
+import { CoverImage } from "@/shared/components/cover-image";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import {
   createSeries,

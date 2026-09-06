@@ -7,12 +7,12 @@ import { useSearchParams } from "react-router-dom";
 import { WorkCard, WorkGridSkeleton } from "./creator-community-ui";
 import { buildStudioHref } from "./creator-studio-links";
 
-import { CountUp } from "@/components/count-up";
-import { RevealOnScroll } from "@/components/reveal-on-scroll";
-import { Container } from "@/components/section";
-import { ShimmerTitle } from "@/components/shimmer-title";
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn, formatCount } from "@/lib/utils";
+import { CountUp } from "@/shared/components/count-up";
+import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
+import { Container } from "@/shared/components/section";
+import { ShimmerTitle } from "@/shared/components/shimmer-title";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn, formatCount } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";

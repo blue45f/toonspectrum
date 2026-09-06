@@ -4,10 +4,10 @@ import { useLocation } from "react-router-dom";
 import { shouldRenderAppSplash } from "./app-shell-splash";
 import { AppRouter } from "./routes/AppRouter";
 
-import { AuthSessionProvider } from "@/components/auth/session-provider";
-import { CommandPaletteHost } from "@/components/command-palette-host";
-import { RandomIntro } from "@/components/RandomIntro";
-import { pingVisit } from "@/lib/visits-api";
+import { AuthSessionProvider } from "@/shared/components/auth/session-provider";
+import { CommandPaletteHost } from "@/shared/components/command-palette-host";
+import { RandomIntro } from "@/shared/components/RandomIntro";
+import { pingVisit } from "@/shared/lib/visits-api";
 import {
   isStudioRoutePathname,
   shouldPreserveStudioRouteLifecycle,
@@ -17,17 +17,17 @@ import {
 import "@toonspectrum/core/fx/fx.css";
 
 const AgeGateHost = lazy(() =>
-  import("@/components/age-gate-host").then((mod) => ({
+  import("@/shared/components/age-gate-host").then((mod) => ({
     default: mod.AgeGateHost,
   })),
 );
 const StoreSync = lazy(() =>
-  import("@/components/auth/store-sync").then((mod) => ({
+  import("@/shared/components/auth/store-sync").then((mod) => ({
     default: mod.StoreSync,
   })),
 );
 const ToastHost = lazy(() =>
-  import("@/components/toast-host").then((mod) => ({ default: mod.ToastHost })),
+  import("@/shared/components/toast-host").then((mod) => ({ default: mod.ToastHost })),
 );
 
 // 라우트 전환 시 스크롤을 최상단으로 되돌리고, 본문 랜드마크로 포커스를 옮긴다(a11y).

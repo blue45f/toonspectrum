@@ -1,4 +1,4 @@
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 /**
  * The view HUD is opened only after an explicit zoom/rotate-tool action. Keep its keyboard,

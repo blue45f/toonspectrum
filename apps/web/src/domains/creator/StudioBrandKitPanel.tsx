@@ -39,7 +39,7 @@ import { ensureStudioPresetFontsLoaded } from "./studio-preset-font-loading";
 
 import type { StudioNamedPalette } from "./studio-palette-library";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 const MAX_LOGO_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB — 다운스케일 전 원본 파일에 대한 저비용 가드(메인스레드 디코딩 지연 방지).
 const LOGO_MAX_DIM = 320; // downscaleImageFile 최대 픽셀 변 — 로고는 작은 코너 장식이며 canonical SQLite payload 예산 안에 둔다.

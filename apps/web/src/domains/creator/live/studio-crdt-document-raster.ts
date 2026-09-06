@@ -28,7 +28,7 @@ import { assertAlive, type StudioCrdtDocumentHost } from "./studio-crdt-document
 import { STUDIO_CRDT_ORIGIN_LOCAL, STUDIO_CRDT_UPDATE_MAX_BYTES } from "./studio-crdt-protocol";
 import { runStudioCrdtRasterWorker } from "./studio-crdt-raster-worker-client";
 
-import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
+import type { StudioRasterCompactionCheckpoint } from "@/shared/lib/studio-crdt-raster-compaction";
 
 import {
   STUDIO_CRDT_RASTER_MAX_REFERENCED_BYTES,
@@ -41,7 +41,7 @@ import {
   readStudioCrdtRasterDocument,
   type StudioCrdtRasterDocumentSnapshot,
   type StudioCrdtRasterIdentityKind,
-} from "@/lib/studio-crdt-raster-document-contract";
+} from "@/shared/lib/studio-crdt-raster-document-contract";
 import {
   STUDIO_RASTER_CRDT_VERSION,
   STUDIO_RASTER_MAX_OPERATIONS,
@@ -55,7 +55,7 @@ import {
   type StudioRasterOperationLog,
   type StudioRasterUndoAcknowledgement,
   type StudioRasterUndoOperation,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 /**
    * Adds the immutable set-union of one validated raster replica. Existing entries are never

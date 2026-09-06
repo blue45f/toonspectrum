@@ -2,7 +2,7 @@ import { GitBranch, Plus, Spline, Trash2 } from "lucide-react";
 
 import type { BubbleTailDirection, BubbleTailSide, BubbleTailSpec } from "./studio-bubble-path";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 export interface StudioBubblePrimaryTailPatch {
   tail?: "left" | "right" | "none";

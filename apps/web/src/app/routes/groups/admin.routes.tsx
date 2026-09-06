@@ -1,6 +1,6 @@
 import { defineAppRoutes } from "../app-route-definition";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const AdminPage = lazyRetry(
   () => import("@/src/domains/admin/AdminPage").then((module) => ({

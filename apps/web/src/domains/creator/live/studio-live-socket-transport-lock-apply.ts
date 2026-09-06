@@ -27,7 +27,7 @@ import type {
   PendingLockDelta,
 } from "./studio-live-socket-transport-types";
 
-import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
+import { studioLiveLockResourcesConflict } from "@/shared/lib/studio-live-lock-resource";
 
 export function onLockUpdate(this: StudioLiveSocketTransportHost, value: unknown) {
   if (!isRecord(value)) return;

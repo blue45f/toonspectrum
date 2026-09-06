@@ -1,4 +1,4 @@
-import type { ReferenceItem } from "../../../../lib/kmas-reference";
+import type { ReferenceItem } from "../../../shared/lib/kmas-reference";
 
 export const REFERENCE_STORAGE_KEY = "toonstudio:kmas-reference-notes:v1";
 export const MAX_REFERENCE_NOTES = 100;

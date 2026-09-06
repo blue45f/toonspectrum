@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /**
  * 벤토 패널 — eyebrow + 제목 + (차트) + 하단 "인사이트" 캡션.

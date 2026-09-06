@@ -17,8 +17,8 @@ import { usePlayTitles } from "../../use-play-catalog";
 
 import type { PlayGameProps } from "../../play-types";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { cn } from "@/shared/lib/utils";
 
 const PAIRS = 6; // 6쌍 = 12타일
 const MISMATCH_DELAY = 800; // 미스매치 후 다시 닫히기까지(ms)

@@ -5,7 +5,7 @@ import { copyStudioAdvancedRulerAsJson, type StudioAdvancedRulerDocument } from 
 import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
   isStudioFilterMaskReferenceProps,
-} from "@/lib/studio-filter-mask-surface-contract";
+} from "@/shared/lib/studio-filter-mask-surface-contract";
 import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
@@ -13,7 +13,7 @@ import {
   STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS,
   STUDIO_WORK_ASSET_TYPES,
   parseStudioWorkAssetStructuredEditValue,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 export const STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION = 1 as const;
 export const STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES = 16 * 1024;

@@ -18,7 +18,7 @@ import type {
 } from "../models/market-webtoon-spec-inspector";
 
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 
 export type RenderShadingMode =

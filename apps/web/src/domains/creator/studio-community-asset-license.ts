@@ -2,7 +2,7 @@ import {
   creatorAssetLicenseOf,
   isCreatorAssetLicenseId,
   type CreatorAssetLicenseId,
-} from "@/lib/creator-asset-contract";
+} from "@/shared/lib/creator-asset-contract";
 
 export interface StudioCommunityAssetCredit {
   assetId: string;

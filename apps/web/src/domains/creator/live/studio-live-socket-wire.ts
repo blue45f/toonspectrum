@@ -10,7 +10,7 @@ import {
   type StudioLiveParticipant,
 } from "./studio-live-collaboration-protocol";
 
-import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
+import { studioLiveLockResourcesConflict } from "@/shared/lib/studio-live-lock-resource";
 
 export type ServerRole = StudioLiveParticipant["role"];
 export type StudioLiveLockRevision = bigint;

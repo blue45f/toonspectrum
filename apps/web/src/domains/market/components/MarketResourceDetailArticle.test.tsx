@@ -9,13 +9,13 @@ import { MarketResourceDetailArticle } from "./MarketResourceDetailArticle";
 import type {
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 import {
   CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY,
   writeCreatorMarketplaceInstallReceipt,
-} from "@/lib/creator-marketplace-install-receipt";
-import { creatorMarketplaceStudioPackId } from "@/lib/creator-marketplace-package-identity";
+} from "@/shared/lib/creator-marketplace-install-receipt";
+import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
 
 vi.mock("./MarketResourceReleaseHistory", () => ({
   MarketResourceReleaseHistory: ({ resourceId }: { resourceId: string }) => (

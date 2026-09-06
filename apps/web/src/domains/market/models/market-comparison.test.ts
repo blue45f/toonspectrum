@@ -5,9 +5,9 @@ import {
   summarizeMarketComparison,
 } from "./market-comparison";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/lib/creator-marketplace-starter-catalog";
+import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-starter-catalog";
 
 function fixtures(): CreatorMarketplaceResourceRecord[] {
   const base = CREATOR_MARKETPLACE_STARTER_RECORDS[0]!;

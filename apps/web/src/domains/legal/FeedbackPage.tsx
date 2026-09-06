@@ -9,8 +9,8 @@ import "./feedback/feedback-community.css";
 import type { FeedbackFilters } from "./feedback/use-feedback-feed";
 import type { FeedbackEntry, FeedbackKind } from "@toonspectrum/core/feedback";
 
-import { Container } from "@/components/container";
-import { useApp, useHydrated } from "@/lib/store";
+import { Container } from "@/shared/components/container";
+import { useApp, useHydrated } from "@/shared/lib/store";
 import { FEEDBACK_KINDS, FEEDBACK_KIND_LABELS, FEEDBACK_PROGRESS, FEEDBACK_PROGRESS_LABELS, isFeedbackKind } from "@toonspectrum/core/feedback";
 
 const EMPTY_FILTERS: FeedbackFilters = { category: "all", progress: "all", query: "", mine: false, tag: "" };

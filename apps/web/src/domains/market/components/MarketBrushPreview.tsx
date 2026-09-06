@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { BrushPreviewData } from "../models/market-preview";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 interface MarketBrushPreviewProps {
   readonly brush: BrushPreviewData;

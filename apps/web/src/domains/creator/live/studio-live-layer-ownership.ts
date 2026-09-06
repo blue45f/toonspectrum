@@ -14,7 +14,7 @@ import {
   type StudioLiveLockLike,
 } from "./studio-live-mutation-guard";
 
-import { parseStudioLiveLockResourceScope } from "@/lib/studio-live-lock-resource";
+import { parseStudioLiveLockResourceScope } from "@/shared/lib/studio-live-lock-resource";
 
 
 export const STUDIO_LIVE_LAYER_OWNERSHIP_VERSION =

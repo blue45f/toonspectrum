@@ -4,10 +4,10 @@ import { useRef, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 
-import { RatingInput, ScaleSwitcher } from "@/components/rating-input";
-import { Button } from "@/components/ui/button";
-import { useApp, useHydrated } from "@/lib/store";
-import { cn } from "@/lib/utils";
+import { RatingInput, ScaleSwitcher } from "@/shared/components/rating-input";
+import { Button } from "@/shared/components/ui/button";
+import { useApp, useHydrated } from "@/shared/lib/store";
+import { cn } from "@/shared/lib/utils";
 import { useCelebrate } from "@/src/hooks/use-celebrate";
 
 

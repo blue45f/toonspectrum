@@ -10,7 +10,7 @@ import { MarketBrowsePage } from "./MarketBrowsePage";
 
 import type { MarketResourcesPage } from "../hooks/use-market-resources";
 
-import { CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS } from "@/lib/creator-marketplace-resource-contract";
+import { CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS } from "@/shared/lib/creator-marketplace-resource-contract";
 
 vi.mock("../hooks/use-market-resources", () => ({
   useMarketResources: vi.fn(),

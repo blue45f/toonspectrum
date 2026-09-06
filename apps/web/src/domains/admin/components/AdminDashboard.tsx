@@ -26,8 +26,8 @@ import {
 import { AdminNotice, AdminSpinner, Stat, StatGroup } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
-import { useI18n, useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 interface Dashboard {
   updatedAt: string;

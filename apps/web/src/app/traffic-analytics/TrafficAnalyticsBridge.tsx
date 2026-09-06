@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 
 import { apiPath } from "../../infrastructure/api";
 
-import { withCsrfProtection } from "@/lib/csrf";
+import { withCsrfProtection } from "@/shared/lib/csrf";
 
 const VISITOR_STORAGE_KEY = "toonspectrum-traffic-visitor-v1";
 const SESSION_STORAGE_KEY = "toonspectrum-traffic-session-v1";

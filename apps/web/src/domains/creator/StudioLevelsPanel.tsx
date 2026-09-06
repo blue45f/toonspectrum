@@ -26,7 +26,7 @@ import { StudioHistogramSection } from "./StudioHistogramGraph";
 
 import type { StudioImageDataLike } from "./studio-filters";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 // 슬라이더 정의 — 표시 순서·한글 라벨·readout 포맷(감마만 소수 2자리, 나머지는 정수).

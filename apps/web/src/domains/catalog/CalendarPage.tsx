@@ -3,25 +3,25 @@ import { motion } from "motion/react";
 import { useState } from "react";
 
 
-import type { PlatformId, Title, TitleCard } from "@/lib/types";
+import type { PlatformId, Title, TitleCard } from "@/shared/lib/types";
 
-import { AvailabilityDots } from "@/components/availability";
-import { MiniPoster } from "@/components/rank-row";
-import { Container } from "@/components/section";
-import { TitleFilterPanel } from "@/components/title-filter-panel";
-import { buttonClass } from "@/components/ui/button-utils";
-import { RatingInline } from "@/components/ui/stars";
-import { statsAreEstimated } from "@/lib/estimate";
-import { buildWeeklyIcs, downloadIcs, titleToWeeklyIcsEvent } from "@/lib/ics";
-import { useSavedTitleIds } from "@/lib/store";
-import { WEEK_DAYS } from "@/lib/taxonomy";
+import { AvailabilityDots } from "@/shared/components/availability";
+import { MiniPoster } from "@/shared/components/rank-row";
+import { Container } from "@/shared/components/section";
+import { TitleFilterPanel } from "@/shared/components/title-filter-panel";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { RatingInline } from "@/shared/components/ui/stars";
+import { statsAreEstimated } from "@/shared/lib/estimate";
+import { buildWeeklyIcs, downloadIcs, titleToWeeklyIcsEvent } from "@/shared/lib/ics";
+import { useSavedTitleIds } from "@/shared/lib/store";
+import { WEEK_DAYS } from "@/shared/lib/taxonomy";
 import {
   EMPTY_TITLE_FILTERS,
   applyTitleFilters,
   countActiveTitleFilters,
-} from "@/lib/title-filters";
-import { useRememberedFilters } from "@/lib/use-remembered-filters";
-import { cn } from "@/lib/utils";
+} from "@/shared/lib/title-filters";
+import { useRememberedFilters } from "@/shared/lib/use-remembered-filters";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";

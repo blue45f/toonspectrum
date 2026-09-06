@@ -25,7 +25,7 @@ import { useStudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 
 import type { StudioInspectorAsideProps } from "./StudioInspectorAsideTypes";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
   const model = useStudioInspectorAsideModel(props);

@@ -19,7 +19,7 @@ import {
   decodeStudioCrdtBinaryEnvelope,
   encodeStudioCrdtBinaryEnvelope,
   reassembleStudioCrdtBinarySyncEnvelope,
-} from "@/lib/studio-crdt-binary-envelope";
+} from "@/shared/lib/studio-crdt-binary-envelope";
 
 export const STUDIO_CRDT_BINARY_WIRE_VERSION = 1 as const;
 export const STUDIO_CRDT_BINARY_WIRE_FORMAT = "binary-v1" as const;

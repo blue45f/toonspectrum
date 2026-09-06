@@ -12,9 +12,9 @@ import { useNavigate } from "react-router-dom";
 import { useMarketLibrary } from "../hooks/use-market-library";
 import { marketKindMeta, marketLicenseMeta } from "../models/market-kind";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 interface MarketAcquisitionModalProps {
   open: boolean;

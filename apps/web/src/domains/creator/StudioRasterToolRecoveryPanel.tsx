@@ -35,8 +35,8 @@ import type {
   StudioRasterToolAvailability,
 } from "./render/studio-raster-tool-availability";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioRasterRecoveryRequest = Readonly<{
   toolId: StudioRasterToolAvailability["tool"]["id"];

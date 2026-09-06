@@ -32,7 +32,7 @@ import {
   StudioDualColorWell,
 } from "./StudioDualColorWell";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 afterEach(cleanup);
 

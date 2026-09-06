@@ -6,7 +6,7 @@ import {
   studioRasterVisibleDocumentRectFromViewport,
 } from "./render/studio-raster-visible-rect";
 
-import type { StudioRasterOperation } from "@/lib/studio-crdt-raster-ops";
+import type { StudioRasterOperation } from "@/shared/lib/studio-crdt-raster-ops";
 
 const surfaceId = "raster:page-a:ink";
 

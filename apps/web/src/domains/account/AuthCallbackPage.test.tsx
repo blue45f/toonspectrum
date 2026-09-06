@@ -11,11 +11,11 @@ const apiRaw = vi.hoisted(() => vi.fn());
 const completeOAuthLogin = vi.hoisted(() => vi.fn());
 const navigate = vi.hoisted(() => vi.fn());
 
-vi.mock("@/components/section", () => ({
+vi.mock("@/shared/components/section", () => ({
   Container: ({ children }: PropsWithChildren) => <div>{children}</div>,
 }));
 
-vi.mock("@/lib/i18n", () => ({
+vi.mock("@/shared/lib/i18n", () => ({
   useT: () => (key: string) => key,
 }));
 

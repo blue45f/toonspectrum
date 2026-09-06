@@ -54,8 +54,8 @@ import type {
 } from "./studio-main-menu-model";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export type {
   StudioMainMenuGroup,

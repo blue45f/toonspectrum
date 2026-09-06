@@ -77,7 +77,7 @@ import { StudioLayerNavigatorTree } from "./StudioLayerNavigatorTree";
 
 import type { LayerGroup } from "../studio-layers";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const EMPTY_LIVE_LAYER_OWNERSHIP_BY_ITEM_ID: ReadonlyMap<
   string,

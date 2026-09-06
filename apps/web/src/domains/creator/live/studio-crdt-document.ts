@@ -123,8 +123,8 @@ import type {
 } from "./studio-crdt-document-types";
 import type { StudioBrushRenderProvenanceCrdtSidecar } from "../brush/studio-brush-render-provenance";
 import type { StudioShared3dStagePersistedState } from "../studio-shared-3d-stage-collection";
-import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
-import type { StudioRasterOperationLog } from "@/lib/studio-crdt-raster-ops";
+import type { StudioRasterCompactionCheckpoint } from "@/shared/lib/studio-crdt-raster-compaction";
+import type { StudioRasterOperationLog } from "@/shared/lib/studio-crdt-raster-ops";
 
 import {
   STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT,
@@ -132,7 +132,7 @@ import {
   STUDIO_CRDT_RASTER_SURFACES_ROOT,
   STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT,
   STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT,
-} from "@/lib/studio-crdt-raster-document-contract";
+} from "@/shared/lib/studio-crdt-raster-document-contract";
 
 
 export {
@@ -188,7 +188,7 @@ export {
   STUDIO_CRDT_RASTER_SURFACES_ROOT,
   STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT,
   STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT,
-} from "@/lib/studio-crdt-raster-document-contract";
+} from "@/shared/lib/studio-crdt-raster-document-contract";
 export {
   SAMPLE_ARRAY_KEYS,
   OPTIONAL_STRING_PAYLOAD_KEYS,

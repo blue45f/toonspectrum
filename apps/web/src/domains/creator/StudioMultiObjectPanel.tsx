@@ -20,7 +20,7 @@ import {
 
 import type { ReactElement } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 export interface StudioMultiObjectPanelProps {
   /** 현재 배치된 3D 오브젝트 인스턴스 목록. */

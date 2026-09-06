@@ -1,12 +1,12 @@
 // Dynamic static-catalog engine. This module intentionally contains the heavy
 // catalog query/ranking logic and is lazy-loaded by catalog-static.ts only when
 // a request cannot be served from precomputed CDN files.
-import type { PlatformId, ReadState, Title, TitleCard } from "@/lib/types";
+import type { PlatformId, ReadState, Title, TitleCard } from "@/shared/lib/types";
 
-import { detailShardFile, mergeDetailExtra, type DetailShardFile } from "@/lib/catalog-slim";
-import { buildTasteProfile, recommendForTaste, similarTitles } from "@/lib/recommend";
-import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "@/lib/search";
-import { getAuthorData } from "@/lib/server/author";
+import { detailShardFile, mergeDetailExtra, type DetailShardFile } from "@/shared/lib/catalog-slim";
+import { buildTasteProfile, recommendForTaste, similarTitles } from "@/shared/lib/recommend";
+import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "@/shared/lib/search";
+import { getAuthorData } from "@/shared/lib/server/author";
 import {
   activeTags,
   adaptationsOf,
@@ -15,9 +15,9 @@ import {
   originalOf,
   replaceCatalogData,
   TITLES,
-} from "@/lib/server/catalog-store";
-import { getExploreData } from "@/lib/server/explore";
-import { getRankingData } from "@/lib/server/ranking-service";
+} from "@/shared/lib/server/catalog-store";
+import { getExploreData } from "@/shared/lib/server/explore";
+import { getRankingData } from "@/shared/lib/server/ranking-service";
 
 const JSON_HEADERS = { "content-type": "application/json" };
 const NOT_FOUND = Symbol("not-found");

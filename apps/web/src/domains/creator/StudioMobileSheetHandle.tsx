@@ -10,7 +10,7 @@ import { useStudioBottomSheetGesture } from "./useStudioBottomSheetGesture";
 
 import type { RefObject } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioMobileSheetKind = "pages" | "props" | "draw" | "brushes";
 

@@ -12,7 +12,7 @@ import { StudioDrawingShortcutNoticeLayer } from "./StudioDrawingShortcutNoticeL
 import type { StudioCanvasViewportInteraction } from "./studio-canvas-viewport-interaction";
 import type { StudioCanvasViewportProps } from "./StudioCanvasViewportTypes";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export function StudioCanvasViewportHudOverlays({
   viewport,

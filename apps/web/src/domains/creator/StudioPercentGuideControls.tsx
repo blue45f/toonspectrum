@@ -7,7 +7,7 @@ import {
   studioGuidePercentToPx,
 } from "./studio-guide-percent";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioPercentGuideControlsProps {
   readonly canvasHeight: number;

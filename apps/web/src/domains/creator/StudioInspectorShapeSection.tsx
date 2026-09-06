@@ -25,7 +25,7 @@ import type { StudioHokusaiNaturalMediaReplaceHandler } from "./StudioHokusaiNat
 
 
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 interface StudioInspectorShapeSectionProps {
   selected: DrawEl;

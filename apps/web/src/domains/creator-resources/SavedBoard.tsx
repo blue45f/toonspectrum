@@ -3,11 +3,11 @@ import { useState } from "react";
 import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
 import { downloadText } from "./workspace";
 
-import type { BoardSort, DeadlineFilter } from "@/lib/creator-resource-workflow";
-import type { CreatorResource, ResourceProvider } from "@/lib/creator-resources";
+import type { BoardSort, DeadlineFilter } from "@/shared/lib/creator-resource-workflow";
+import type { CreatorResource, ResourceProvider } from "@/shared/lib/creator-resources";
 
-import { selectBoardResources } from "@/lib/creator-resource-workflow";
-import { attributionMarkdown, deadlineLabel, isProvider, RESOURCE_LABELS } from "@/lib/creator-resources";
+import { selectBoardResources } from "@/shared/lib/creator-resource-workflow";
+import { attributionMarkdown, deadlineLabel, isProvider, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
 
 export function SavedBoard({ items, onRemove, disabled = false }: { items: readonly CreatorResource[]; onRemove: (id: string) => void; disabled?: boolean }) {
   const [query, setQuery] = useState("");

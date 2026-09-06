@@ -13,7 +13,7 @@ import {
   type TonePreset,
 } from "./studio-tones";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 
 // 카테고리 표시 순서 고정 — 옅은 망점부터 선·그라데이션·교차선 순으로 읽힌다.

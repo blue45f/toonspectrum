@@ -3,11 +3,11 @@ import {
   STUDIO_LIVE_AUTH_TICKET_VERSION,
   StudioLiveAuthTicketResponseSchema,
   type StudioLiveAuthTicketResponse,
-} from "../../../../lib/studio-live-auth-ticket";
+} from "../../../shared/lib/studio-live-auth-ticket";
 
 import { readOrCreateStudioLiveGuestCredential } from "./studio-live-client-identity";
 
-import { withCsrfHeader } from "@/lib/csrf";
+import { withCsrfHeader } from "@/shared/lib/csrf";
 import { apiPath } from "@/src/infrastructure/api";
 
 const DEFAULT_TIMEOUT_MS = 8_000;

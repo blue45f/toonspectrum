@@ -35,7 +35,7 @@ import {
   type StudioSketchStyle,
 } from "./studio-rough-shape";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 // 칩 안 점선 미리보기 굵기 — 패턴 차이가 또렷하게 보이는 2px 기준으로 스케일.
 const DASH_PREVIEW_WIDTH = 2;

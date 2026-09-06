@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import type { StudioCompanionSurface } from "./studio-tools-companion";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type DedicatedCompanionSurface = Extract<
   StudioCompanionSurface,

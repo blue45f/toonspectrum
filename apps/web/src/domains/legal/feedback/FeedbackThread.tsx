@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import type { FeedbackComment } from "@toonspectrum/core/feedback";
 
-import { useApp } from "@/lib/store";
+import { useApp } from "@/shared/lib/store";
 import { feedbackTimeLabel } from "@toonspectrum/core/feedback";
 import { assertFeedbackComments, isFeedbackComment } from "@toonspectrum/core/feedback-response";
 import { api, getApiErrorMessage } from "@/src/infrastructure/api";

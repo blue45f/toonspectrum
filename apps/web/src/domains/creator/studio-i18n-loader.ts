@@ -1,4 +1,4 @@
-import { registerI18nLocaleEntries, getLocaleCandidates } from "@/lib/i18n";
+import { registerI18nLocaleEntries, getLocaleCandidates } from "@/shared/lib/i18n";
 
 export const STUDIO_I18N_ASSET_LOCALES = [
   "af",

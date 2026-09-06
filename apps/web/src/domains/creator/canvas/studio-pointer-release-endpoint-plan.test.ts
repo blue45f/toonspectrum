@@ -12,7 +12,7 @@ import type { DrawEl } from "../studio-element-model";
 import {
   captureStudioInkInputContractV1,
   captureStudioInkInputContractV2,
-} from "@/lib/studio-ink-input-contract";
+} from "@/shared/lib/studio-ink-input-contract";
 
 function stroke(overrides: Partial<DrawEl> = {}): DrawEl {
   return {

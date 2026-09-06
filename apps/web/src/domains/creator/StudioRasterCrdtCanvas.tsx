@@ -17,7 +17,7 @@ import {
 } from "./render/studio-raster-tile-presenter";
 
 import type { StudioRasterImmutableTileFrame } from "./live/studio-crdt-raster-replay-runtime";
-import type { StudioRasterSurfaceSpec } from "@/lib/studio-crdt-raster-ops";
+import type { StudioRasterSurfaceSpec } from "@/shared/lib/studio-crdt-raster-ops";
 
 export interface StudioRasterCrdtCanvasProps {
   readonly className?: string;

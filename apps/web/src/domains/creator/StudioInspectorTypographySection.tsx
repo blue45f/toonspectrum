@@ -29,7 +29,7 @@ import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 
 import type { BubbleEl, El, TextEl } from "./studio-element-model";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 interface StudioInspectorTypographySectionProps {
   selected: TextEl | BubbleEl;

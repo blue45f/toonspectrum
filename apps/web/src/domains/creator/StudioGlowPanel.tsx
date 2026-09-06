@@ -17,7 +17,7 @@ import {
 } from "./studio-glow";
 import { StudioPanelChip, StudioSliderRow, StudioToggleChip, PANEL_LABEL_ROW } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 // color가 "auto"(원색)일 때 색 입력에 보여줄 폴백 — 단색으로 전환하면 흰색에서 시작.

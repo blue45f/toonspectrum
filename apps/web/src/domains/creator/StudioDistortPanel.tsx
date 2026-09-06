@@ -18,7 +18,7 @@ import {
 } from "./studio-distort";
 import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 // 세기·스케일 슬라이더 정의 — 표시 순서·한글 라벨·범위(세기는 amount, 스케일은 scale).

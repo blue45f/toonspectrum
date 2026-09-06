@@ -39,7 +39,7 @@ import type { CharacterShaperLayout } from "./character-shaper-ui-model";
 import type { LoadStatus } from "../vrm/StudioVrmPoserTypes";
 import type { ChangeEvent, ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import { useMediaQuery } from "@/src/hooks/use-media-query";
 
 type MobileSheetTab = "shelf" | "inspector";

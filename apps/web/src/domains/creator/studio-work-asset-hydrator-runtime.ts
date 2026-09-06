@@ -11,13 +11,13 @@ import type {
   StudioWorkAssetHydratorRuntime,
   StudioWorkAssetPlaceholder,
 } from "./studio-work-asset-hydrator";
-import type { StudioWorkAssetManifest } from "@/lib/studio-work-asset-contract";
+import type { StudioWorkAssetManifest } from "@/shared/lib/studio-work-asset-contract";
 
 import {
   STUDIO_WORK_ASSET_MAX_IMAGE_DECODED_BYTES,
   studioWorkAssetReferenceKey,
   studioWorkAssetSourceUri,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 const DEFAULT_MAXIMUM_CONCURRENT_HYDRATIONS = 4;
 const DEFAULT_MAXIMUM_RESIDENT_BYTES = 96 * 1024 * 1024;

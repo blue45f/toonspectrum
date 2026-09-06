@@ -53,7 +53,7 @@ import type { StudioGpuFilterPresentationSurface } from "./render/studio-gpu-fil
 import type { FrameEl, ImageEl } from "./studio-element-model";
 import type Konva from "konva";
 
-import { toast } from "@/lib/toast-store";
+import { toast } from "@/shared/lib/toast-store";
 
 const IMAGE_FILTER_BUILD_CACHE_LIMIT = 200;
 const IMAGE_FILTER_WORKER_DEBOUNCE_MS = 80;

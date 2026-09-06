@@ -16,7 +16,7 @@ import {
 } from "./studio-clarity";
 import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 
 // 슬라이더 정의 — 표시 순서·한글 라벨·범위. 키마다 범위가 달라(clarity -100..100, dehaze 0..100)

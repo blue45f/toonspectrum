@@ -26,7 +26,7 @@ import { PANEL_CHIP_CLASS, StudioSliderRow, StudioToggleChip } from "./studio-pa
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioHistoryBrushPanelProps = {
   /** 히스토리 브러시가 무장(켜짐) 상태인지. */

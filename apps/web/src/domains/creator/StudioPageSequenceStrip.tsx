@@ -9,7 +9,7 @@
 import { Files, FileText, Plus, X } from "lucide-react";
 import { useEffect, useRef, type ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioPageSequenceStripPage {
   id: string;

@@ -7,7 +7,7 @@ import {
   stageCreatorMarketplaceAuthoringHandoff,
   type CreatorMarketplaceAuthoringDraft,
   type CreatorMarketplaceAuthoringKind,
-} from "@/lib/creator-marketplace-authoring-workshop";
+} from "@/shared/lib/creator-marketplace-authoring-workshop";
 
 const MAX_REMOTE_MANIFEST_BYTES = 8 * 1024 * 1024;
 

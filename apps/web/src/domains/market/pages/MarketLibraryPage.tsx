@@ -13,9 +13,9 @@ import { MarketNavHeader } from "../components/MarketNavHeader";
 import { useMarketLibrary } from "../hooks/use-market-library";
 import { MARKET_KINDS, marketKindMeta, marketLicenseMeta } from "../models/market-kind";
 
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import {
   useDocumentTitle,

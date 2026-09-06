@@ -17,7 +17,7 @@ import { STUDIO_EASE, STUDIO_FOCUS_RING, STUDIO_TOUCH_TARGET } from "./studio-pa
 import type { LucideIcon } from "lucide-react";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /* eslint-disable react-refresh/only-export-components -- tab id helpers ship beside the strip they describe */
 

@@ -5,7 +5,7 @@ import { parseMarketBrowseQuery, resolveMarketBrowseSort } from "./market-query"
 import {
   CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS,
   CREATOR_MARKETPLACE_RESOURCE_QUERY_TAG_MAX_CHARACTERS,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 const PUBLISHER_ID = "123E4567-E89B-42D3-A456-426614174000";
 

@@ -23,7 +23,7 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 function StudioToolBeltHintTarget(props: Omit<ComponentProps<typeof StudioToolHintTarget>, "preferredSide">) {
   return <StudioToolHintTarget preferredSide="bottom" {...props} />;

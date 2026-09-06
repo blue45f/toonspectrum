@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MARKET_CURATED_THEMES, filterThemeResources } from "./market-theme";
 
-import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/lib/creator-marketplace-starter-catalog";
+import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-starter-catalog";
 
 describe("market-theme", () => {
   it("defines all curated themes with valid metadata", () => {

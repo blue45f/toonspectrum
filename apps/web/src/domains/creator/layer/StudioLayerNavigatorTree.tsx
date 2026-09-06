@@ -11,7 +11,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 
 
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioLayerNavigatorTreeProps {
   nodes: readonly StudioLayerNavigatorNode[];

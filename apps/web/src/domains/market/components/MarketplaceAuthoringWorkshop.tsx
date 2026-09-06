@@ -29,7 +29,7 @@ import {
   type CreatorMarketplaceAuthoringDraft,
   type CreatorMarketplaceAuthoringKind,
   type CreatorMarketplaceBrushEngineKind,
-} from "@/lib/creator-marketplace-authoring-workshop";
+} from "@/shared/lib/creator-marketplace-authoring-workshop";
 
 const INPUT_CLASS =
   "min-h-11 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none transition-colors focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/30 motion-reduce:transition-none";

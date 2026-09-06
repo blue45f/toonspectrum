@@ -20,7 +20,7 @@ import type { DrawMode, DrawShapeKind, Tool } from "../studio-editor-tool-model"
 import type { El } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /**
  * Desktop stage HUD — the Sketchbook/Krita-style status bar floating over the canvas: view-input

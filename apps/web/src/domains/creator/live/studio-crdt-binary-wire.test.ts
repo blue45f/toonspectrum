@@ -24,7 +24,7 @@ import {
 import {
   encodeStudioCrdtBinaryEnvelope,
   fragmentStudioCrdtBinarySyncEnvelope,
-} from "@/lib/studio-crdt-binary-envelope";
+} from "@/shared/lib/studio-crdt-binary-envelope";
 
 const WORK_ID = "work-1";
 const REQUEST_ID = "request-1";

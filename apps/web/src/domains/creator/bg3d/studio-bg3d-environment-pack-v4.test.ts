@@ -298,7 +298,7 @@ describe("Studio BG3D Blender 5.2 Wave 4 environment pack", () => {
 
   it("keeps the reproducible generator safe for background or MCP-hosted Blender sessions", () => {
     const generator = readFileSync(
-      fileURLToPath(new URL("../../../../scripts/blender/generate_environment_pack_v4.py", import.meta.url)),
+      fileURLToPath(new URL("../../../../../../scripts/blender/generate_environment_pack_v4.py", import.meta.url)),
       "utf8",
     );
     for (const asset of STUDIO_BG3D_ENVIRONMENT_ASSETS_V4) {

@@ -14,7 +14,7 @@
 import {
   STUDIO_RENDER_FAILURE_EVENT,
   type StudioRenderFailureDetail,
-} from "../../../lib/render-failure-event";
+} from "../../shared/lib/render-failure-event";
 
 import { redactStudioDiagnosticText } from "./studio-diagnostic-redaction";
 

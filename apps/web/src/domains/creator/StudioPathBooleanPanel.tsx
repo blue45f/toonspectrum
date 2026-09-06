@@ -16,7 +16,7 @@ import { STUDIO_PATH_BOOLEAN_OPS, type StudioPathBooleanOp } from "./studio-path
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioPathBooleanPanelProps = {
   /** 결합 연산 진행 중 — 모든 버튼을 잠근다(확장 블렌드 병합과 동일 관례). */

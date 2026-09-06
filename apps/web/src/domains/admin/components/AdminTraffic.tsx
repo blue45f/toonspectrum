@@ -44,8 +44,8 @@ import {
   TrafficTrendChart,
 } from "./AdminTrafficCharts";
 
-import { useI18n, useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 function withPulse(
   overview: TrafficOverview,

@@ -17,10 +17,10 @@ import type {
   CreatorMarketplaceOwnedRelease,
   CreatorMarketplaceResourceListPage,
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { creatorMarketplaceStudioPackId } from "@/lib/creator-marketplace-package-identity";
-import { useI18n } from "@/lib/i18n";
+import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
+import { useI18n } from "@/shared/lib/i18n";
 import { SessionContext } from "@/src/compat/auth-session-store";
 import { NotFoundError } from "@/src/infrastructure/use-api-resource";
 

@@ -13,7 +13,7 @@ import type {
   StudioRasterTileViewport,
 } from "./render/studio-raster-tile-presenter";
 import type { StudioTileDocRect } from "./render/studio-tiledoc-geometry";
-import type { StudioRasterSurfaceSpec } from "@/lib/studio-crdt-raster-ops";
+import type { StudioRasterSurfaceSpec } from "@/shared/lib/studio-crdt-raster-ops";
 
 export interface StudioTiledDocWebGpuSurfaceProps {
   readonly className?: string;

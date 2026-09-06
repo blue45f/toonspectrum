@@ -4,14 +4,14 @@ import { useSearchParams } from "react-router-dom";
 import { ReviewControls } from "./reviews-components/review-controls";
 
 
-import type { ReviewSort, ReviewsResponse } from "@/lib/types";
+import type { ReviewSort, ReviewsResponse } from "@/shared/lib/types";
 
-import { CoverImage } from "@/components/cover-image";
-import { ReviewCard } from "@/components/review-card";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
-import { Stars } from "@/components/ui/stars";
-import { spectrumGradient } from "@/lib/genre-color";
+import { CoverImage } from "@/shared/components/cover-image";
+import { ReviewCard } from "@/shared/components/review-card";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { Stars } from "@/shared/components/ui/stars";
+import { spectrumGradient } from "@/shared/lib/genre-color";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";

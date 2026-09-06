@@ -6,7 +6,7 @@ import {
   type StudioStoryBeat,
 } from "./studio-continuity";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioContinuityMetadataValue = Omit<StudioStoryBeat, "sceneId">;
 

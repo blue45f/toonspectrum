@@ -25,7 +25,7 @@ import { REVEAL_PRESETS, findAmbientPreset, readWorkFx } from "./studio-motion-f
 
 import type { WorkDetail } from "@/src/infrastructure/creator-client";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 function formatSeconds(sec: number): string {
   if (sec <= 0) return "0초";

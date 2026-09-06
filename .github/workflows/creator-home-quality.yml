@@ -6,8 +6,8 @@ on:
     branches: [main]
     paths:
       - 'apps/web/src/domains/marketing/**'
-      - 'apps/web/components/site-header*'
-      - 'apps/web/components/site-footer.tsx'
+      - 'apps/web/src/shared/components/site-header*'
+      - 'apps/web/src/shared/components/site-footer.tsx'
       - 'apps/web/src/app/AppShell.tsx'
       - 'apps/web/src/app/routes/**'
       - 'apps/web/public/brand/**'
@@ -39,7 +39,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: |
-          pnpm exec eslint apps/web/src/domains/marketing apps/web/components/site-header.tsx apps/web/components/site-header-mobile-nav.tsx apps/web/components/site-footer.tsx scripts/verify-creator-home.mjs scripts/verify-creator-film-upgrades.mjs scripts/verify-creator-home-navigation.mjs scripts/creator-film-automation.test.mjs media/brand-film/src media/brand-film/render.mjs --max-warnings=0
+          pnpm exec eslint apps/web/src/domains/marketing apps/web/src/shared/components/site-header.tsx apps/web/src/shared/components/site-header-mobile-nav.tsx apps/web/src/shared/components/site-footer.tsx scripts/verify-creator-home.mjs scripts/verify-creator-film-upgrades.mjs scripts/verify-creator-home-navigation.mjs scripts/creator-film-automation.test.mjs media/brand-film/src media/brand-film/render.mjs --max-warnings=0
           pnpm run typecheck
           pnpm exec vitest run apps/web/src/domains/marketing scripts/creator-film-automation.test.mjs
           node --test scripts/creator-film-automation.test.mjs

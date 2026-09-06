@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 
 import { adminFetch, formatDate } from "./admin-client";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 export interface PromoItem {
   id: string;

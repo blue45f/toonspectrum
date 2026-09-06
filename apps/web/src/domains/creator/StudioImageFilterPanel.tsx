@@ -14,8 +14,8 @@ import {
   type ImageFilterPatch,
 } from "./studio-filters";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 
 // 듀오톤 토글 ON 기본 색쌍(어둠=남색, 빛=분홍).

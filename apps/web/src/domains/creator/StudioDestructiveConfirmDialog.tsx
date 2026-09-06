@@ -24,7 +24,7 @@ import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { STUDIO_Z_CLASS } from "./studio-z-index";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioDestructiveConfirmDialogProps {
   readonly request: StudioDestructiveActionRequest;

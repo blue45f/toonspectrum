@@ -22,13 +22,13 @@ import {
   resolveMarketBrowseSort,
 } from "../models/market-query";
 
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS,
   CreatorMarketplaceResourceSearchQuerySchema,
-} from "@/lib/creator-marketplace-resource-contract";
-import { cn } from "@/lib/utils";
+} from "@/shared/lib/creator-marketplace-resource-contract";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import {
   useDocumentTitle,

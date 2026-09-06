@@ -88,7 +88,7 @@ import {
 } from "./studio-workspaces";
 import { StudioWorkspaceRecommendation } from "./StudioWorkspaceRecommendation";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioWorkspaceMenuProps {
   /** Opens the dialog on the first mount. Used by the intent-gated lazy launcher. */

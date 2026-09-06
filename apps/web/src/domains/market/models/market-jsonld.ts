@@ -1,6 +1,6 @@
 import { marketKindMeta } from "./market-kind";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 
 // packages/core의 SITE_URL과 동일한 출처 — 마켓 도메인 전용 JSON-LD 헬퍼.

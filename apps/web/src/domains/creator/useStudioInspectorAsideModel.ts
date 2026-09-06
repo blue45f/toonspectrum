@@ -43,7 +43,7 @@ import { useStudioRasterSourcePresentation } from "./use-studio-raster-source-pr
 
 import type { El, ImageEl } from "./studio-element-model";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 export type StudioInspectorAsideModel = StudioInspectorAsideProps &
   StudioInspectorAsideHandlers & {

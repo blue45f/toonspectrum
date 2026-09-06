@@ -77,7 +77,7 @@ import type {
   BrushVariantGroup,
 } from "./studio-brush-catalog-lifecycle";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024;
 const PREVIEW_SWATCH_MIN = 10;

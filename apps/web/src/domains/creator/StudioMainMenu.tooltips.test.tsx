@@ -8,7 +8,7 @@ import { StudioToolHintPreferencesProvider } from "./StudioToolHint";
 
 import type { StudioMainMenuGroup } from "./studio-main-menu-model";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 const GROUPS: readonly StudioMainMenuGroup[] = [
   {

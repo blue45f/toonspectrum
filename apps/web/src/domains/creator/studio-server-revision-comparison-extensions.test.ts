@@ -10,7 +10,7 @@ import {
 } from "./studio-revision-document-extensions";
 import { buildStudioServerRevisionComparison } from "./studio-server-revision-comparison";
 
-import { projectRevisionComparisonValue } from "@/lib/revision-comparison-projection";
+import { projectRevisionComparisonValue } from "@/shared/lib/revision-comparison-projection";
 
 function page() {
   return {

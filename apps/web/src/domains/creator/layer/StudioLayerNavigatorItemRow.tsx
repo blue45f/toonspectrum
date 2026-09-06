@@ -48,7 +48,7 @@ import {
 
 import type { StudioLiveLayerOwnership } from "../live/studio-live-layer-ownership";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const COLOR_DOT_CLASS: Record<StudioLayerColor, string> = {
   red: "bg-bad",

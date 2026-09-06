@@ -52,7 +52,7 @@ import {
   type StudioDrawingPalettePresentation,
 } from "./StudioDrawingPaletteOptions";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioDrawingPaletteStackProps {
   readonly layout: StudioDrawingPaletteLayout;

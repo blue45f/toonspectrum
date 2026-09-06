@@ -4,26 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 
-import type { SortKey } from "@/lib/search";
-import type { AgeRating, PlatformId, Pricing, SerialStatus, Title, WorkType } from "@/lib/types";
+import type { SortKey } from "@/shared/lib/search";
+import type { AgeRating, PlatformId, Pricing, SerialStatus, Title, WorkType } from "@/shared/lib/types";
 
-import { AdSlot } from "@/components/ad-slot";
-import { CountUp } from "@/components/count-up";
-import { RevealOnScroll } from "@/components/reveal-on-scroll";
-import { Container } from "@/components/section";
-import { ShimmerTitle } from "@/components/shimmer-title";
-import { TitleCard } from "@/components/title-card";
-import { TitleFilterPanel } from "@/components/title-filter-panel";
-import { genreBorder, genreColor, genreTextColor, genreTint, spectrumGradient } from "@/lib/genre-color";
-import { useSavedTitleIds } from "@/lib/store";
-import { GENRES, TYPE_LABEL } from "@/lib/taxonomy";
+import { AdSlot } from "@/shared/components/ad-slot";
+import { CountUp } from "@/shared/components/count-up";
+import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
+import { Container } from "@/shared/components/section";
+import { ShimmerTitle } from "@/shared/components/shimmer-title";
+import { TitleCard } from "@/shared/components/title-card";
+import { TitleFilterPanel } from "@/shared/components/title-filter-panel";
+import { genreBorder, genreColor, genreTextColor, genreTint, spectrumGradient } from "@/shared/lib/genre-color";
+import { useSavedTitleIds } from "@/shared/lib/store";
+import { GENRES, TYPE_LABEL } from "@/shared/lib/taxonomy";
 import {
   applyClientOnlyFilters,
   countActiveTitleFilters,
   titleFiltersToParams,
   type TitleFilterState,
-} from "@/lib/title-filters";
-import { cn } from "@/lib/utils";
+} from "@/shared/lib/title-filters";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";

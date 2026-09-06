@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import type { ProviderAvailability } from "@/lib/creator-resource-workflow";
-import type { ResourceProvider } from "@/lib/creator-resources";
+import type { ProviderAvailability } from "@/shared/lib/creator-resource-workflow";
+import type { ResourceProvider } from "@/shared/lib/creator-resources";
 
-import { parseProviderAvailability } from "@/lib/creator-resource-workflow";
-import { RESOURCE_LABELS } from "@/lib/creator-resources";
+import { parseProviderAvailability } from "@/shared/lib/creator-resource-workflow";
+import { RESOURCE_LABELS } from "@/shared/lib/creator-resources";
 import { apiPath } from "@/src/infrastructure/api";
 
 export function ProviderStatus({ provider }: { provider?: ResourceProvider }) {

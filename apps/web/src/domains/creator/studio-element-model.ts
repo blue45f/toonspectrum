@@ -79,8 +79,8 @@ import type {
 } from "./studio-tone-artifact-filter-kernels";
 import type { Vibrance } from "./studio-vibrance";
 import type { StudioVrmSceneDocument } from "./vrm/studio-vrm-scene-document";
-import type { StudioFilterMaskSurfaceId } from "@/lib/studio-filter-mask-surface-contract";
-import type { StudioInkInputContract } from "@/lib/studio-ink-input-contract";
+import type { StudioFilterMaskSurfaceId } from "@/shared/lib/studio-filter-mask-surface-contract";
+import type { StudioInkInputContract } from "@/shared/lib/studio-ink-input-contract";
 
 export interface ImageEl {
   id: string;

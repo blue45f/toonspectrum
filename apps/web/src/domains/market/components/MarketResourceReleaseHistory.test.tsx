@@ -9,7 +9,7 @@ import { MarketResourceReleaseHistory } from "./MarketResourceReleaseHistory";
 import type {
   CreatorMarketplaceResourceHistoryItem,
   CreatorMarketplaceResourceHistoryPage,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 const mocks = vi.hoisted(() => ({ getHistory: vi.fn() }));
 

@@ -1,10 +1,10 @@
 import { Scale, Sigma, Gauge, ShieldCheck, ArrowRight } from "lucide-react";
 
-import type { PlatformId } from "@/lib/types";
+import type { PlatformId } from "@/shared/lib/types";
 
-import { Container } from "@/components/section";
-import { PLATFORMS } from "@/lib/platforms";
-import { RANK_AXES, PLATFORM_REACH_WEIGHT } from "@/lib/ranking";
+import { Container } from "@/shared/components/section";
+import { PLATFORMS } from "@/shared/lib/platforms";
+import { RANK_AXES, PLATFORM_REACH_WEIGHT } from "@/shared/lib/ranking";
 import Link from "@/src/compat/router-link";
 
 

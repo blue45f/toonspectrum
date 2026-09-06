@@ -15,8 +15,8 @@ import {
 
 import type { StudioWorkspaceMenuProps } from "./StudioWorkspaceMenu";
 
-import { lazyRetry } from "@/lib/lazy-retry";
-import { cn } from "@/lib/utils";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
+import { cn } from "@/shared/lib/utils";
 
 type StudioWorkspaceMenuModule = {
   default: ComponentType<StudioWorkspaceMenuProps>;

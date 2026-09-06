@@ -5,7 +5,7 @@ import {
   getLocaleCandidates,
   registerI18nLocaleEntries,
   useI18n,
-} from "@/lib/i18n";
+} from "@/shared/lib/i18n";
 
 // Synchronously register embedded base dictionaries for instant zero-latency rendering
 registerI18nLocaleEntries("ko", adminKo);

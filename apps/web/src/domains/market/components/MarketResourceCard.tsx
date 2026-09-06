@@ -9,9 +9,9 @@ import {
 
 import { MarketCompareToggle } from "./MarketCompareToggle";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 
 interface MarketResourceCardProps {

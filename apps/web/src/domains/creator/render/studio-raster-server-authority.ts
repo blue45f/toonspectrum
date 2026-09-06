@@ -1,7 +1,7 @@
 import {
   canonicalStudioRasterJson,
   type StudioRasterOperationLog,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 export interface StudioRasterServerAuthorityEntry {
   readonly surfaceId: string;

@@ -11,7 +11,7 @@ import type { DrawEl, El } from "./studio-element-model";
 import type { StudioLivingInkAuthoritativeSample } from "./studio-living-ink-studio-coordinator";
 
 
-import { isStudioInkInputContractV2 } from "@/lib/studio-ink-input-contract";
+import { isStudioInkInputContractV2 } from "@/shared/lib/studio-ink-input-contract";
 
 type StudioUiPreferencesSqliteModule =
   typeof import("./studio-ui-preferences-sqlite");

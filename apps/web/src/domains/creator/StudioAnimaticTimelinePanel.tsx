@@ -57,7 +57,7 @@ import {
   type StudioAnimaticTransitionKind,
 } from "./studio-animatic-timeline";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export interface StudioAnimaticTimelinePanelProps {
   readonly workScope: string;

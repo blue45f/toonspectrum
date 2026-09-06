@@ -17,8 +17,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import { changelogConfig, getAnonId } from "./config";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { cn } from "@/shared/lib/utils";
 
 type Phase = "idle" | "loading" | "ready" | "error" | "empty";
 

@@ -26,9 +26,9 @@ import { AdminSecurity } from "./components/AdminSecurity";
 import { AdminToastProvider } from "./components/AdminToast";
 import { AdminTraffic } from "./components/AdminTraffic";
 
-import { Container } from "@/components/section";
-import { useI18n, useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { Container } from "@/shared/components/section";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 import {
   usePathname,
   useRouter,

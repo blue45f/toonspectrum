@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'apps/web/src/domains/market/**'
-      - 'apps/web/lib/creator-marketplace*'
+      - 'apps/web/src/shared/lib/creator-marketplace*'
       - 'apps/api/src/db/creator-marketplace*'
       - 'apps/api/src/db/migrations/*creator_marketplace*'
       - 'apps/api/src/modules/creator-marketplace/**'
@@ -16,7 +16,7 @@ on:
     branches: [main]
     paths:
       - 'apps/web/src/domains/market/**'
-      - 'apps/web/lib/creator-marketplace*'
+      - 'apps/web/src/shared/lib/creator-marketplace*'
       - 'apps/api/src/db/creator-marketplace*'
       - 'apps/api/src/db/migrations/*creator_marketplace*'
       - 'apps/api/src/modules/creator-marketplace/**'
@@ -74,7 +74,7 @@ jobs:
         run: >-
           pnpm exec vitest run apps/web/src/domains/market
           apps/api/src/modules/creator-marketplace
-          apps/web/lib/creator-marketplace
+          apps/web/src/shared/lib/creator-marketplace
           scripts/run-production-database-migrations.test.mjs
           scripts/bootstrap-empty-production-database.test.mjs
           --reporter=default

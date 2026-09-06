@@ -15,7 +15,7 @@ import type { StudioRasterImmutableTileFrame } from "../live/studio-crdt-raster-
 import {
   STUDIO_RASTER_CRDT_VERSION,
   type StudioRasterSurfaceSpec,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 const surface = {
   version: STUDIO_RASTER_CRDT_VERSION,

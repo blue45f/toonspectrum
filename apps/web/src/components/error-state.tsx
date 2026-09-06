@@ -1,8 +1,8 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 // 데이터 로드 실패 시 페이지들이 공통으로 쓰는 에러 안내 + 재시도 블록.
 // role="alert"로 등장 시점에 스크린리더에 실패를 즉시 공지한다.

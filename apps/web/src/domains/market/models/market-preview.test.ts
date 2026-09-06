@@ -9,7 +9,7 @@ import {
   templatePreviewData,
 } from "./market-preview";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 function makeBaseRecord(overrides: Partial<CreatorMarketplaceResourceRecord> = {}): CreatorMarketplaceResourceRecord {
   return {

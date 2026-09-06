@@ -18,26 +18,26 @@ import {
   toCalendarTitle,
   toListTitle,
   type DetailShardFile,
-} from "../apps/web/lib/catalog-slim";
-import { PLATFORM_LIST } from "../apps/web/lib/platforms";
-import { rankBy, RANK_AXES } from "../apps/web/lib/ranking";
-import { sortTitles } from "../apps/web/lib/search";
-import { getCalendarData } from "../apps/web/lib/server/calendar";
+} from "../apps/web/src/shared/lib/catalog-slim";
+import { PLATFORM_LIST } from "../apps/web/src/shared/lib/platforms";
+import { rankBy, RANK_AXES } from "../apps/web/src/shared/lib/ranking";
+import { sortTitles } from "../apps/web/src/shared/lib/search";
+import { getCalendarData } from "../apps/web/src/shared/lib/server/calendar";
 import {
   activeTags,
   adaptationsOf,
   getAuthorDirectory,
   replaceCatalogData,
   TITLES,
-} from "../apps/web/lib/server/catalog-store";
-import { getInsightsData } from "../apps/web/lib/server/insights";
-import { getRankingData } from "../apps/web/lib/server/ranking-service";
-import { GENRES, WEEK_DAYS } from "../apps/web/lib/taxonomy";
-import { kstDayOfWeek } from "../apps/web/lib/utils";
+} from "../apps/web/src/shared/lib/server/catalog-store";
+import { getInsightsData } from "../apps/web/src/shared/lib/server/insights";
+import { getRankingData } from "../apps/web/src/shared/lib/server/ranking-service";
+import { GENRES, WEEK_DAYS } from "../apps/web/src/shared/lib/taxonomy";
+import { kstDayOfWeek } from "../apps/web/src/shared/lib/utils";
 
 import { readFileIfExists, writeNews } from "./news-gen";
 
-import type { Title } from "../apps/web/lib/types";
+import type { Title } from "../apps/web/src/shared/lib/types";
 
 const RANK_TYPES = ["all", "webtoon", "webnovel"];
 

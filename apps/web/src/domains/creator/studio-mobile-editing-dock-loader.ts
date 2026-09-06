@@ -1,4 +1,4 @@
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 /**
  * The mobile editing dock is only needed below the Studio mobile breakpoint. Keeping its literal

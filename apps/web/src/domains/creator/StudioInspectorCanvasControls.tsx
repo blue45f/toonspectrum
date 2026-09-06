@@ -26,8 +26,8 @@ import { StudioPercentGuideControls } from "./StudioPercentGuideControls";
 import type { PaperGrainKind } from "./brush/studio-paper-texture";
 import type { MagicResizePreset, MagicResizeStrategy } from "./studio-magic-resize";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioInspectorUserGuide {
   readonly id: string;

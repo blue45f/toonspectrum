@@ -21,7 +21,7 @@ import type { CharacterSlotKind } from "./character-shaper-contract";
 import type { CharacterShaperSlotRailProps } from "./character-shaper-ui-contract";
 import type { KeyboardEvent } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export function CharacterShaperSlotRail({ binding, activeSlot, onSelectSlot, orientation }: CharacterShaperSlotRailProps) {
   const containerRef = useRef<HTMLDivElement>(null);

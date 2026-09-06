@@ -4,7 +4,7 @@ import "./reference-labels";
 import { shouldAppRouterOwnDocumentTitle } from "./app-route-title-ownership";
 import { CREATOR_RESOURCE_TITLES } from "./creator-resource-titles";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 import { isStudioRoutePathname } from "@/src/domains/creator/studio-workspace-route";
 
 

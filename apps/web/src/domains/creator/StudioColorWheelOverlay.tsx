@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { COLOR_WHEEL_SWATCH_RADIUS_PX, colorWheelSliceOffset, hitTestColorWheel, isKeyboardActivatedClick } from "./studio-color-wheel";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export type StudioColorWheelOverlayProps = {
   /** 열림 여부 — false면 아무것도 렌더링하지 않는다. */

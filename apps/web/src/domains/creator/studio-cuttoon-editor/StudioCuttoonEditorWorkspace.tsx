@@ -8,7 +8,7 @@
 import { Suspense, useLayoutEffect, useState } from "react";
 import { createStudioLeftToolRailRuntime } from "../editor-client/studio-left-tool-rail-client";
 import { LazyStudioLeftToolRail, LazyStudioPageListPane } from "../studio-page-modal-lazy-boundaries";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import { StudioCuttoonEditorCanvasColumn } from "./StudioCuttoonEditorCanvasColumn";
 import { StudioCuttoonEditorInspectorColumn } from "./StudioCuttoonEditorInspectorColumn";
 import { StudioCuttoonEditorPanels } from "./StudioCuttoonEditorPanels";

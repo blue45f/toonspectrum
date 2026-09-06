@@ -39,7 +39,7 @@ import {
   StudioWorkAssetManifestSchema,
   type StudioWorkAssetDescriptor,
   type StudioWorkAssetManifest,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 export const STUDIO_LINKED_3D_PASS_CLOUD_ASSET_ID_PREFIX =
   "linked3d-pass-sha256-" as const;

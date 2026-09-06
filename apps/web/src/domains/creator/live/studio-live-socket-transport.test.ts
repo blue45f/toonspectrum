@@ -60,7 +60,7 @@ import {
   decodeStudioCrdtBinaryEnvelope,
   encodeStudioCrdtBinaryEnvelope,
   fragmentStudioCrdtBinarySyncEnvelope,
-} from "@/lib/studio-crdt-binary-envelope";
+} from "@/shared/lib/studio-crdt-binary-envelope";
 
 const NOW = 2_000_000;
 const TOKEN = "signed-session-token-value";

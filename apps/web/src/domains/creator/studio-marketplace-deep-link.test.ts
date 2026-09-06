@@ -19,7 +19,7 @@ import {
 } from "./studio-marketplace-deep-link-operation";
 
 import type { StudioMarketplaceInstallGuard } from "./studio-marketplace-deep-link";
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 
 const studioPageSource = readStudioPageCompositionSource();
@@ -126,7 +126,7 @@ function dependencies(options: {
 describe("Studio marketplace deep link", () => {
   it("keeps strict cloud schemas behind the lazy synchronizer boundary", async () => {
     expect(deepLinkSource).not.toContain(
-      'from "@/lib/creator-marketplace-cloud-library-contract"',
+      'from "@/shared/lib/creator-marketplace-cloud-library-contract"',
     );
     const deps = dependencies({ kind: "template", accountSync: "synchronized" });
     const synchronizeInstalledPack = deps.synchronizeInstalledPack;

@@ -10,7 +10,7 @@ import {
   type PageGradePreset,
 } from "./studio-page-grade";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 // 슬라이더 한 줄 메타 — 표시 순서/라벨/읽기값 포맷을 한곳에 고정한다.
 type GradeRow = {

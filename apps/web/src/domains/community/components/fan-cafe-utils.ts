@@ -1,4 +1,4 @@
-import type { FanCafePostKind } from "@/lib/types";
+import type { FanCafePostKind } from "@/shared/lib/types";
 
 export const KIND_LABEL: Record<FanCafePostKind, string> = {
   talk: "잡담",

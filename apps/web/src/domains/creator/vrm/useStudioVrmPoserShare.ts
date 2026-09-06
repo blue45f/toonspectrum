@@ -59,7 +59,7 @@ import type {
 
 import {
   creatorAssetLicenseOf,
-} from "@/lib/creator-asset-contract";
+} from "@/shared/lib/creator-asset-contract";
 import {
   publishAsset,
 } from "@/src/infrastructure/creator-client";

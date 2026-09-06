@@ -11,7 +11,7 @@ import {
   type StudioRasterReplayRuntimeDependencies,
 } from "./studio-crdt-raster-replay-runtime";
 
-import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
+import type { StudioRasterCompactionCheckpoint } from "@/shared/lib/studio-crdt-raster-compaction";
 
 import {
   STUDIO_RASTER_CRDT_VERSION,
@@ -20,7 +20,7 @@ import {
   type StudioRasterOperation,
   type StudioRasterOperationLog,
   type StudioRasterSurfaceSpec,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 const SEMANTIC_HASH = "0".repeat(64);
 

@@ -4,7 +4,7 @@ import type {
   StudioMarketplaceDeepLinkResult,
   StudioMarketplaceInstallGuard,
 } from "./studio-marketplace-deep-link";
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 const SUCCESSFUL_INSTALL_STATUSES = new Set([
   "installed",

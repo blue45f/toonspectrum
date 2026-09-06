@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { marketBrowseJsonLd, marketHomeJsonLd, marketResourceJsonLd } from "./market-jsonld";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 
 function record(overrides: Partial<CreatorMarketplaceResourceRecord> = {}): CreatorMarketplaceResourceRecord {

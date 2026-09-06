@@ -28,8 +28,8 @@ import type {
   StudioProjectReviewActionId,
 } from "./studio-project-review-actions";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioProjectReviewActionsProps {
   /** 마스터 편집 중에는 히스토리 스크러빙 기반 표면을 열 수 없다. */

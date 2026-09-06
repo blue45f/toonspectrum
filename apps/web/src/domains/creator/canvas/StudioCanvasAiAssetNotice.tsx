@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 
 import { localizeText } from "./studio-canvas-viewport-primitives";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 /** Generative-image disclosure rendered above every isolated Studio surface. */
 /**

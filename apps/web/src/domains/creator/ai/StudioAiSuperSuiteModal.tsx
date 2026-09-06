@@ -66,7 +66,7 @@ import type { StudioCopyFeedbackStatus } from "../use-studio-copy-feedback";
 import type { StudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const AI_SUPER_SUITE_TAB_IDS = [
   "style-filter",

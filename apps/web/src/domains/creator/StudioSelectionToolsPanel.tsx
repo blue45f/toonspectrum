@@ -63,8 +63,8 @@ import type { StudioToolHintPreviewKind } from "./studio-tool-hint-preview-kind"
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { ReactElement } from "react";
 
-import { buttonClass as baseButtonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass as baseButtonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 function buttonClass(options: Parameters<typeof baseButtonClass>[0] = {}): string {
   return cn(

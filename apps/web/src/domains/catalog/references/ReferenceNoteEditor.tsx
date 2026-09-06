@@ -7,9 +7,9 @@ import { sameReferenceNote } from "./reference-storage";
 
 import type { ReferenceNotice } from "./reference-i18n";
 import type { ReferenceNote } from "./reference-storage";
-import type { ReferenceItem } from "@/lib/kmas-reference";
+import type { ReferenceItem } from "@/shared/lib/kmas-reference";
 
-import { useT } from "@/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 
 export type CommitReference = (item: ReferenceItem, text: string, expected: ReferenceNote | null) => Promise<ReferenceNote | null>;
 

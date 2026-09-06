@@ -22,8 +22,8 @@ import { useRpsVoice } from "./use-rps-voice";
 
 import type { PlayGameProps } from "../../play-types";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { cn } from "@/shared/lib/utils";
 
 
 const RpsVrmStage = lazy(() => import("./RpsVrmStage"));

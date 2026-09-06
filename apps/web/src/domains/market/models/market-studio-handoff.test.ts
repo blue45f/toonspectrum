@@ -5,7 +5,7 @@ import {
   marketStudioResourceHref,
 } from "./market-studio-handoff";
 
-import type { CreatorMarketplaceResourceKind } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceKind } from "@/shared/lib/creator-marketplace-resource-contract";
 
 
 const RESOURCE_ID = "10000000-0000-4000-8000-000000000001";

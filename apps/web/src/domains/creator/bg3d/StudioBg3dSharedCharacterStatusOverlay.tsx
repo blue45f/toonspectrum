@@ -1,6 +1,6 @@
 import type { StudioShared3dStageResolution } from "../studio-shared-3d-stage-document";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export interface StudioBg3dSharedCharacterStatusOverlayProps {
   totalCount: number;

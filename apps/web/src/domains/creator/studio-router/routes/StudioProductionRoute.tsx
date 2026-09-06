@@ -2,7 +2,7 @@ import { Suspense, type ComponentProps } from "react";
 
 import { StudioRouteLoading } from "../../StudioLazySurfaceFallback";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const StudioProductionHubPage = lazyRetry(
   () => import("../../studio-production/StudioProductionHubPage").then((module) => ({

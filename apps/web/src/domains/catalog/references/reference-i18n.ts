@@ -1,6 +1,6 @@
-import type { ReferenceErrorCode, ReferenceField, ReferenceItem } from "@/lib/kmas-reference";
+import type { ReferenceErrorCode, ReferenceField, ReferenceItem } from "@/shared/lib/kmas-reference";
 
-import { registerI18nLocaleEntries } from "@/lib/i18n";
+import { registerI18nLocaleEntries } from "@/shared/lib/i18n";
 
 const ko = {
   eyebrow: "COMIC REFERENCE LIBRARY", title: "다음 이야기의 시작,", titleAccent: "좋은 레퍼런스에서.",

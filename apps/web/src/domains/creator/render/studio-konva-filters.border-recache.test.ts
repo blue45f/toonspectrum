@@ -41,7 +41,7 @@ import {
 
 import type { StudioCrdtSceneElementRecord } from "../live/studio-crdt-document";
 
-import { studioWorkAssetSourceUri } from "@/lib/studio-work-asset-contract";
+import { studioWorkAssetSourceUri } from "@/shared/lib/studio-work-asset-contract";
 
 const PAGE_ID = "page-1";
 const ASSET_ID = "img-1";

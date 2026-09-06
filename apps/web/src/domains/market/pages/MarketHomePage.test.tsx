@@ -9,7 +9,7 @@ import { useMarketResources } from "../hooks/use-market-resources";
 import { MarketHomePage } from "./MarketHomePage";
 
 import type { MarketResourcesPage } from "../hooks/use-market-resources";
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 vi.mock("../hooks/use-market-resources", () => ({
   useMarketResources: vi.fn(),

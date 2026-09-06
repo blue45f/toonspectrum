@@ -21,11 +21,11 @@ const validation = readFileSync(
   "utf8",
 );
 const browserGate = readFileSync(
-  new URL("../../../scripts/studio-living-ink-execution-browser.ts", import.meta.url),
+  new URL("../../../../../scripts/studio-living-ink-execution-browser.ts", import.meta.url),
   "utf8",
 );
 const verifier = readFileSync(
-  new URL("../../../scripts/verify-studio-living-ink-execution.mjs", import.meta.url),
+  new URL("../../../../../scripts/verify-studio-living-ink-execution.mjs", import.meta.url),
   "utf8",
 );
 

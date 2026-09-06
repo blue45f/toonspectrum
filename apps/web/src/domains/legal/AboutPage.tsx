@@ -11,7 +11,7 @@ import {
   MapPin,
 } from "lucide-react";
 
-import { Container } from "@/components/section";
+import { Container } from "@/shared/components/section";
 import Link from "@/src/compat/router-link";
 
 // 사이트 소개·튜토리얼 페이지(/about) — 처음 온 사람에게 툰스펙트럼이 무엇이고 무엇을 할 수 있는지,

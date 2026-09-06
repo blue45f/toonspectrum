@@ -27,7 +27,7 @@ import {
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const BRUSH_MODES: { id: QuickMaskBrushMode; label: string; tip: string }[] = [
   { id: "paint", label: "칠하기", tip: "칠한 곳을 선택 영역에 추가합니다(틴트가 걷힙니다)." },

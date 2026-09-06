@@ -24,7 +24,7 @@ import {
   type StudioRasterOperation,
   type StudioRasterOperationLog,
   type StudioRasterSurfaceSpec,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 import {
   STUDIO_FILTER_MASK_SURFACE_MAX_EDGE,
   STUDIO_FILTER_MASK_SURFACE_TILE_SIZE,
@@ -32,7 +32,7 @@ import {
   createStudioFilterMaskSurfaceSpec,
   isStudioFilterMaskSurfaceSpec,
   type StudioFilterMaskSurfaceId,
-} from "@/lib/studio-filter-mask-surface-contract";
+} from "@/shared/lib/studio-filter-mask-surface-contract";
 
 const SAFE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@-]*$/u;
 const UUID_PATTERN =

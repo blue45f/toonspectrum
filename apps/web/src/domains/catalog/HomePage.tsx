@@ -1,19 +1,19 @@
 import { ArrowRight, Search } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 
-import type { Title } from "@/lib/types";
+import type { Title } from "@/shared/lib/types";
 
-import { Container } from "@/components/container";
-import { CountUp } from "@/components/count-up";
-import { HeroBannerStatic } from "@/components/hero-banner-static";
-import { OpenSearchButton } from "@/components/open-search-button";
-import { ShimmerTitle } from "@/components/shimmer-title";
-import { spectrumGradient } from "@/lib/genre-color";
-import { useT } from "@/lib/i18n";
+import { Container } from "@/shared/components/container";
+import { CountUp } from "@/shared/components/count-up";
+import { HeroBannerStatic } from "@/shared/components/hero-banner-static";
+import { OpenSearchButton } from "@/shared/components/open-search-button";
+import { ShimmerTitle } from "@/shared/components/shimmer-title";
+import { spectrumGradient } from "@/shared/lib/genre-color";
+import { useT } from "@/shared/lib/i18n";
 import Link from "@/src/compat/router-link";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";
 
-const HeroBanner = lazy(() => import("@/components/hero-banner").then((module) => ({ default: module.HeroBanner })));
+const HeroBanner = lazy(() => import("@/shared/components/hero-banner").then((module) => ({ default: module.HeroBanner })));
 const HomeDeferredSections = lazy(() =>
   import("./HomeDeferredSections").then((module) => ({ default: module.HomeDeferredSections }))
 );

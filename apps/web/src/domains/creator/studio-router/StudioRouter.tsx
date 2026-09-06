@@ -10,7 +10,7 @@ import { StudioStoryworldRoute } from "./routes/StudioStoryworldRoute";
 import { resolveStudioRoute } from "./studio-route-manifest";
 import { StudioRouteFailure, StudioRoutePlaceholder } from "./StudioRouteFallbacks";
 
-import { lazyRetry } from "@/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const StudioLift3dPage = lazyRetry(
   () => import("../lift3d/StudioLift3dPage").then((module) => ({

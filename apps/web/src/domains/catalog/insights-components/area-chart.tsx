@@ -1,5 +1,5 @@
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import { useInView } from "@/src/hooks/use-in-view";
 
 export interface AreaPoint {

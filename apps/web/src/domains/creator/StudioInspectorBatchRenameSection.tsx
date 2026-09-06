@@ -11,8 +11,8 @@ import type {
 import type { El } from "./studio-element-model";
 import type { LayerGroup } from "./studio-layers";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 const inputClass =
   "min-h-11 min-w-0 rounded-lg border border-line bg-card px-2 text-xs font-semibold text-fg outline-none placeholder:text-fg-3 focus-visible:border-accent/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent lg:min-h-9 pointer-coarse:min-h-11";

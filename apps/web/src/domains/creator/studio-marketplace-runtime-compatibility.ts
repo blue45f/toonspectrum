@@ -6,7 +6,7 @@ import {
 import {
   CREATOR_MARKETPLACE_RESOURCE_ENGINES,
   type CreatorMarketplaceResourceEngine,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 /**
  * Marketplace manifests target this Studio compatibility contract, not the npm application

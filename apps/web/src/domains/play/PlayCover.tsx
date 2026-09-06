@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 /** 결정적 32bit FNV-1a 해시 — 패턴/글로우 선택 시드. */
 function hash(s: string): number {

@@ -6,7 +6,7 @@ import {
   REALTIME_WEBSOCKET_PROTOCOL,
   type RealtimeChannel,
   type ServerEventMessage,
-} from "../../../deploy/cloudflare-realtime/src/protocol";
+} from "../../../../../deploy/cloudflare-realtime/src/protocol";
 
 import {
   createStudioCloudflareRealtimeAdapterFactory,

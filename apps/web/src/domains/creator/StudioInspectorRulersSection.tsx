@@ -16,7 +16,7 @@ import type { StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-
 import type { LayerGroup } from "./studio-layers";
 import type { VanishingPoint } from "./studio-perspective-guide";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 interface StudioInspectorSymmetrySectionProps {
   symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";

@@ -1,8 +1,8 @@
 import { useSearchParams } from "react-router-dom";
 
-import { LibraryView } from "@/components/library-view";
-import { Container } from "@/components/section";
-import { useApp } from "@/lib/store";
+import { LibraryView } from "@/shared/components/library-view";
+import { Container } from "@/shared/components/section";
+import { useApp } from "@/shared/lib/store";
 
 const TABS = ["shelf", "rated", "alerts", "taste", "collections"] as const;
 

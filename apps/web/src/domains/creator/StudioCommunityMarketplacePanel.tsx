@@ -92,8 +92,8 @@ import {
   type CreatorMarketplaceCloudLibraryItem,
   type CreatorMarketplaceCloudLibraryMembership,
   type CreatorMarketplaceCloudLibraryView,
-} from "@/lib/creator-marketplace-cloud-library-contract";
-import { creatorMarketplaceStudioPackId } from "@/lib/creator-marketplace-package-identity";
+} from "@/shared/lib/creator-marketplace-cloud-library-contract";
+import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
 import {
   CREATOR_MARKETPLACE_RESOURCE_RELEASE_NOTES_MAX_CHARACTERS,
   CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS,
@@ -102,15 +102,15 @@ import {
   type CreatorMarketplaceResourceKind,
   type CreatorMarketplaceResourceLicense,
   type CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 import {
   CREATOR_MARKETPLACE_SEMVER_MAX_CHARACTERS,
   isCreatorMarketplaceSemver,
   suggestNextCreatorMarketplaceSemver,
-} from "@/lib/creator-marketplace-semver";
-import { filterStarterMarketplaceResources } from "@/lib/creator-marketplace-starter-catalog";
-import { cx } from "@/lib/cx";
-import { useT } from "@/lib/i18n";
+} from "@/shared/lib/creator-marketplace-semver";
+import { filterStarterMarketplaceResources } from "@/shared/lib/creator-marketplace-starter-catalog";
+import { cx } from "@/shared/lib/cx";
+import { useT } from "@/shared/lib/i18n";
 import { useSession } from "@/src/compat/auth-session-store";
 import { CreatorMarketplaceReportAction } from "@/src/domains/market/components/CreatorMarketplaceReportAction";
 import {

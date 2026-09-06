@@ -20,7 +20,7 @@ import {
 
 import type { CharacterShaperMobileSheetProps } from "./character-shaper-ui-contract";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const SHEET_HEIGHT: Readonly<Record<CharacterShaperMobileSheetProps["state"], string>> = {
   collapsed: "4.75rem",

@@ -6,7 +6,7 @@ import {
   STUDIO_RASTER_MAX_SURFACE_TILES,
   assertStudioRasterSurfaceSpec,
   type StudioRasterSurfaceSpec,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 export const STUDIO_RASTER_TILE_UPLOAD_ROW_ALIGNMENT = 256;
 export const STUDIO_RASTER_TILE_PRESENTER_MAX_VISIBLE_TILES = 512;

@@ -2,13 +2,13 @@ import { ArrowLeft, Coffee, Crown, DoorOpen, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import type { CommunityCafe } from "@/lib/types";
+import type { CommunityCafe } from "@/shared/lib/types";
 
-import { FanCafePanel } from "@/components/fan-cafe-panel";
-import { Container } from "@/components/section";
-import { resolveApiError, safeParseJson } from "@/lib/http-safe";
-import { useApp } from "@/lib/store";
-import { relativeDate } from "@/lib/utils";
+import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
+import { Container } from "@/shared/components/section";
+import { resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
+import { useApp } from "@/shared/lib/store";
+import { relativeDate } from "@/shared/lib/utils";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
 import { api, apiPath, getApiErrorMessage } from "@/src/infrastructure/api";

@@ -18,7 +18,7 @@ import type { El } from "./studio-element-model";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 // 이 파일의 기대값은 전부 **한국어 제품 문구**다. 레일 셸 문구는 이제 로케일을 따라가므로,
 // jsdom 의 기본 navigator 로케일(en)에 기대면 한국어를 검증하는 테스트가 영어를 받게 된다.

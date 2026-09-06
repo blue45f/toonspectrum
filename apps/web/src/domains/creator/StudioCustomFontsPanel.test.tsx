@@ -21,7 +21,7 @@ import type {
   StudioCustomFontWithContentHash,
 } from "./studio-custom-font-sqlite-opfs-repository";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 type FakeFontFaceFactory = (family: string, source: StudioFontFaceBinarySource) => StudioFontFaceLike;
 

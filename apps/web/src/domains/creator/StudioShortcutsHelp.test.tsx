@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultStudioAppSettings } from "./studio-app-settings";
 import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 const { createPortalMock } = vi.hoisted(() => ({
   createPortalMock: vi.fn((children: unknown, _container: unknown) => children),

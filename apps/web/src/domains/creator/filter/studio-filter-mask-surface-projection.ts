@@ -2,7 +2,7 @@ import type { StudioFilterMaskSurfaceHydrationState } from "./studio-filter-mask
 
 import {
   isStudioFilterMaskSurfaceId,
-} from "@/lib/studio-filter-mask-surface-contract";
+} from "@/shared/lib/studio-filter-mask-surface-contract";
 
 export interface StudioFilterMaskSurfaceElementLike {
   readonly id: string;

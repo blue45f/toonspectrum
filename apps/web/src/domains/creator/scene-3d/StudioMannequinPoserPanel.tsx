@@ -111,8 +111,8 @@ import { StudioShaperPanel } from "./StudioShaperPanel";
 
 import type { ReactElement } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 export type { StudioMannequinCaptureResult } from "./studio-mannequin-scene";
 

@@ -27,7 +27,7 @@ import {
   type WorkFxSettings,
 } from "./studio-motion-fx";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import { updateWork, type WorkDetail } from "@/src/infrastructure/creator-client";
 
 // 컷별 효과 셀렉트 공통 클래스 — 4개(등장·강조·효과음·BGM 전환)가 같은 룩을 공유한다.

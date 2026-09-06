@@ -5,7 +5,7 @@ import {
   marketLicenseMeta,
 } from "./market-kind";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 const ENGINE_LABELS: Readonly<Record<string, string>> = {
   canvas2d: "Canvas 2D",

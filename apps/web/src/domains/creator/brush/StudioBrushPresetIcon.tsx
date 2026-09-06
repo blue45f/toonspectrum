@@ -56,7 +56,7 @@ import {
 
 import { studioBrushIconId, type StudioBrushIconId } from "./studio-brush-icons";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const ICON_MAP: Record<StudioBrushIconId, LucideIcon> = {
   pen: Pen,

@@ -541,7 +541,7 @@ describe("Studio BG3D Blender 5.2 Wave 5 environment pack", () => {
 
   it("keeps the Blender generator scene-safe and documents exact CC0 provenance", () => {
     const generator = readFileSync(
-      fileURLToPath(new URL("../../../../scripts/blender/generate_environment_pack_v5.py",
+      fileURLToPath(new URL("../../../../../../scripts/blender/generate_environment_pack_v5.py",
         import.meta.url,
       )),
       "utf8",

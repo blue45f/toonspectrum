@@ -1,6 +1,6 @@
 import { StudioPressureCurveGraph } from "../StudioPressureCurveGraph";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export interface StudioBrushInputControlsProps {
   useVelocityPressure: boolean;

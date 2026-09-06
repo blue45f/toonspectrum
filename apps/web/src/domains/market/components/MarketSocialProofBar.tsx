@@ -8,7 +8,7 @@ import {
 
 import { useMarketSocial } from "../hooks/use-market-social";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import { useSession } from "@/src/compat/auth-session-store";
 
 export function MarketSocialProofBar({

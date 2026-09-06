@@ -6,7 +6,7 @@ import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
 import { STUDIO_AI_IMAGE_SIZES, type StudioAiImageSize } from "./studio-ai-client";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 const BACKGROUND_PROMPT_MAX = 4_000;
 

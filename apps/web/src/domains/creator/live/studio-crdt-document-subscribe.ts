@@ -41,7 +41,7 @@ import type {
   StudioCrdtUpdateHandler,
 } from "./studio-crdt-document-types";
 
-import { compareStudioRasterEventOrder } from "@/lib/studio-crdt-raster-ops";
+import { compareStudioRasterEventOrder } from "@/shared/lib/studio-crdt-raster-ops";
 
 export function subscribe(host: StudioCrdtDocumentHost, handler: StudioCrdtUpdateHandler): () => void {
     assertAlive(host);

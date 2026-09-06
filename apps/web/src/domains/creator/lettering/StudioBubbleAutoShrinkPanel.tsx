@@ -14,7 +14,7 @@ import { BUBBLE_AUTO_SHRINK_MIN_FONT_RANGE } from "./studio-bubble-text-fit";
 
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type StudioBubbleAutoShrinkPanelProps = {
   /** selected.autoShrinkText — 켜져 있으면 높이 자동 확장 대신 폰트 축소 모드. */

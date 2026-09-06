@@ -49,7 +49,7 @@ import type { El } from "./studio-element-model";
 import type { StudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 import type { ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 function isDrawingInspectorFocusTarget(
   target: StudioInspectorFocusTarget,

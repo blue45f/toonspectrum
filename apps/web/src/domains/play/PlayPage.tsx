@@ -4,9 +4,9 @@ import { useSearchParams } from "react-router-dom";
 
 import { findGame, PLAY_GAMES } from "./game-registry";
 
-import { Container } from "@/components/section";
-import { SharePageButton } from "@/components/share-page-button";
-import { cn } from "@/lib/utils";
+import { Container } from "@/shared/components/section";
+import { SharePageButton } from "@/shared/components/share-page-button";
+import { cn } from "@/shared/lib/utils";
 
 
 export function PlayPage() {

@@ -47,7 +47,7 @@ import type {
 import type {
   CreatorMarketplaceJsonValue,
   CreatorMarketplaceResourceKind,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 import {
   CREATOR_MARKETPLACE_RESOURCE_MAX_ENTRY_BYTES,
@@ -55,7 +55,7 @@ import {
   CreatorMarketplaceResourceManifestSchema,
   canonicalizeCreatorMarketplaceJson,
   creatorMarketplaceJsonByteSize,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 import {
   createCreatorMarketplacePortableDelivery,
 } from "@/src/infrastructure/creator-marketplace-client";

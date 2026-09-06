@@ -6,7 +6,7 @@ import type { Tool } from "../studio-editor-tool-model";
 import type { StudioWebGpuCommittedPlanGates } from "./studio-webgpu-committed-plan";
 import type { StudioWebGpuViewportSurfacePlan } from "./studio-webgpu-viewport";
 
-import { canonicalStudioRasterJson } from "@/lib/studio-crdt-raster-ops";
+import { canonicalStudioRasterJson } from "@/shared/lib/studio-crdt-raster-ops";
 
 /**
  * M2 gate slice: editor tools whose armed state may keep the raster handoff presented.

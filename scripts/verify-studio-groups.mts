@@ -62,7 +62,7 @@ const LIVE_DRAW_STROKE = "#0b9b6d";
 const FIXTURE_TEXT_FILL = "#16100c";
 /**
  * Every locator below names a Korean control ("텍스트 추가", "복구하기", "3개 선택", …).
- * Studio localizes its chrome from the browser locale (`apps/web/lib/i18n.ts` seeds the store with
+ * Studio localizes its chrome from the browser locale (`apps/web/src/shared/lib/i18n.ts` seeds the store with
  * `detectBrowserLocale()`), and Playwright's default context is `en-US`, so the audited
  * pages must be opened the way the Korean UI these assertions describe is actually served.
  */

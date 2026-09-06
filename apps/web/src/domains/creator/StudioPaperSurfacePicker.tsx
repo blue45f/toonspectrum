@@ -11,8 +11,8 @@ import { getStudioPaperSurfacePreviewTile } from "./brush/studio-paper-surface-p
 
 import type { PaperGrainKind } from "./brush/studio-paper-texture";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioPaperSurfacePickerProps {
   readonly controlsDisabled: boolean;

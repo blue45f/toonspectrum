@@ -11,7 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { announceStudioRenderFailure } from "../../../lib/render-failure-event";
+import { announceStudioRenderFailure } from "../../shared/lib/render-failure-event";
 
 import { activateStudioModalSheet } from "./useStudioModalSheet";
 

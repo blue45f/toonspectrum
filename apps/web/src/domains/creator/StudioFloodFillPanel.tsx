@@ -25,7 +25,7 @@ import {
 
 import type { AdvancedFillDiagnostics } from "./studio-advanced-fill";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export interface StudioFloodFillPanelProps {
   active: boolean;

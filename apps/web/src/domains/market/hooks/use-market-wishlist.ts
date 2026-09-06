@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { findMergedMarketResourceById } from "../models/market-custom-registry";
 
-import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 const WISHLIST_STORAGE_KEY = "toonspectrum:market:wishlist";
 export const MARKET_WISHLIST_EVENT = "toonspectrum:market:wishlist-changed";

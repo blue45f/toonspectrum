@@ -12,7 +12,7 @@ import {
   type HistorySnapshot,
 } from "./studio-history-labels";
 
-import { cx } from "@/lib/cx";
+import { cx } from "@/shared/lib/cx";
 
 export type StudioHistoryPanelProps = {
   /** 히스토리 스냅샷 배열 — StudioPage 의 pagesHistory 를 그대로 받는다(불변). */

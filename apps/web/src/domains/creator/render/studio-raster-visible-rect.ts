@@ -3,7 +3,7 @@ import type { StudioRasterReplayTileFilterInput } from "../live/studio-crdt-rast
 import type {
   StudioRasterOperation,
   StudioRasterSurfaceSpec,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 export interface StudioRasterVisibleDocumentRect {
   readonly x: number;

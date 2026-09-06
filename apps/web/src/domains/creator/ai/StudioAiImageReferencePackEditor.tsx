@@ -18,7 +18,7 @@ import {
   type StudioAiImageReferenceRole,
 } from "./studio-ai-image-reference-roles";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export const STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX = 16;
 

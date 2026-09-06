@@ -3,7 +3,7 @@ import { normalizeStudioPersistedPointerChannels } from "../studio-persisted-poi
 import type { NormalizedCalligraphyStylusInput } from "../studio-brush";
 import type { DrawEl } from "../studio-element-model";
 
-import { captureStudioInkInputContractV2 } from "@/lib/studio-ink-input-contract";
+import { captureStudioInkInputContractV2 } from "@/shared/lib/studio-ink-input-contract";
 
 interface StudioPointerStartInkSample {
   readonly pointerType?: unknown;

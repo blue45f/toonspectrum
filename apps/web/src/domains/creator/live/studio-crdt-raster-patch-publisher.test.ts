@@ -14,7 +14,7 @@ import {
 import {
   STUDIO_RASTER_CRDT_VERSION,
   type StudioRasterAssetReference,
-} from "@/lib/studio-crdt-raster-ops";
+} from "@/shared/lib/studio-crdt-raster-ops";
 
 const surface = {
   version: STUDIO_RASTER_CRDT_VERSION,

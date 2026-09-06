@@ -10,7 +10,7 @@ import {
   REFERENCE_VIEW_TAB_KEYS,
 } from "./reference-i18n";
 
-import { i18nDict } from "@/lib/i18n";
+import { i18nDict } from "@/shared/lib/i18n";
 
 // lib/__tests__/i18n.test.ts only recognises translator calls whose key is a quoted literal.
 // Keys the UI selects through these maps at runtime are invisible to that scan, so this is the

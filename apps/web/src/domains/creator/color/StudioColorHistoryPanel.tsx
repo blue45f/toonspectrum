@@ -15,7 +15,7 @@ import {
   INITIAL_COLOR_HISTORY,
 } from "./studio-color-history";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioColorHistoryPanelProps {
   readonly activeColor: string;

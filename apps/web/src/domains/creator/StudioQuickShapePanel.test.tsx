@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioQuickShapePanel } from "./StudioQuickShapePanel";
 
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/shared/lib/i18n";
 
 beforeEach(() => {
   useI18n.getState().setLang("ko");

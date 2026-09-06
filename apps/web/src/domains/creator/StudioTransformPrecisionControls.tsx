@@ -2,8 +2,8 @@ import { Link2, Unlink2 } from "lucide-react";
 
 import type { StudioSelectionResizeAnchor } from "./studio-selection-transform-advanced";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 const RESIZE_ANCHOR_OPTIONS: readonly {
   readonly value: StudioSelectionResizeAnchor;

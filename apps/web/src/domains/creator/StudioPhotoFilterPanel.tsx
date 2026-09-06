@@ -16,7 +16,7 @@ import {
   type PhotoFilter,
 } from "./studio-photo-filter";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 export function StudioPhotoFilterPanel({
   value,

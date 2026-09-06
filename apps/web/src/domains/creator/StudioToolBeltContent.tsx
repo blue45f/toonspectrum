@@ -60,7 +60,7 @@ import type {
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
 import type { StudioDialogueTranslateSurface } from "./StudioDialogueTranslatePanel";
-import type { CreatorAssetReportReason } from "@/lib/creator-asset-contract";
+import type { CreatorAssetReportReason } from "@/shared/lib/creator-asset-contract";
 import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,

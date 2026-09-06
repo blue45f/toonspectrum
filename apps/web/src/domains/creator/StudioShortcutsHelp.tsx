@@ -14,7 +14,7 @@ import {
   tokenizeStudioSearchQuery,
 } from "./studio-search-text";
 
-import { useI18n, useT } from "@/lib/i18n";
+import { useI18n, useT } from "@/shared/lib/i18n";
 
 
 interface ShortcutRow {

@@ -5,7 +5,7 @@ import {
   studioPitchPptxFileName,
 } from "./studio-pptx-export";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 interface PitchSlideLike {
   readonly id: string;

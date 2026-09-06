@@ -6,8 +6,8 @@ import { useMarketResourceDetail } from "../hooks/use-market-resource-detail";
 import { useMarketResources } from "../hooks/use-market-resources";
 import { marketResourceJsonLd } from "../models/market-jsonld";
 
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import Link from "@/src/compat/router-link";
 import {
   useDocumentTitle,

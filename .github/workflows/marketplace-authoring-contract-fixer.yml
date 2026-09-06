@@ -43,9 +43,9 @@ jobs:
       - name: Verify authoring contracts
         run: |
           pnpm exec vitest run \
-            apps/web/lib/creator-marketplace-authoring-workshop.test.ts \
-            apps/web/lib/creator-marketplace-package-builder.test.ts \
-            apps/web/lib/creator-marketplace-quality-validation.test.ts \
+            apps/web/src/shared/lib/creator-marketplace-authoring-workshop.test.ts \
+            apps/web/src/shared/lib/creator-marketplace-package-builder.test.ts \
+            apps/web/src/shared/lib/creator-marketplace-quality-validation.test.ts \
             apps/web/src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx \
             apps/web/src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx \
             apps/web/src/domains/market/components/MarketplaceAssetQualityMatrix.test.tsx
@@ -56,9 +56,9 @@ jobs:
         run: |
           set -euo pipefail
           git add \
-            apps/web/lib/creator-marketplace-authoring-workshop.ts \
-            apps/web/lib/creator-marketplace-package-builder.ts \
-            apps/web/lib/creator-marketplace-quality-validation.test.ts
+            apps/web/src/shared/lib/creator-marketplace-authoring-workshop.ts \
+            apps/web/src/shared/lib/creator-marketplace-package-builder.ts \
+            apps/web/src/shared/lib/creator-marketplace-quality-validation.test.ts
           if git diff --cached --quiet; then
             echo "No contract repair was required."
             exit 0

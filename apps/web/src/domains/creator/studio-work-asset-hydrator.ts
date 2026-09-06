@@ -2,13 +2,13 @@ import type {
   DownloadedStudioWorkAsset,
   StudioWorkAssetReference,
 } from "./studio-work-asset-client";
-import type { StudioWorkAssetManifest } from "@/lib/studio-work-asset-contract";
+import type { StudioWorkAssetManifest } from "@/shared/lib/studio-work-asset-contract";
 
 import {
   STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
   STUDIO_WORK_ASSET_MAX_IMAGE_DECODED_BYTES,
   studioWorkAssetReferenceKey,
-} from "@/lib/studio-work-asset-contract";
+} from "@/shared/lib/studio-work-asset-contract";
 
 export type StudioWorkAssetHydrationErrorCode =
   | "forbidden"

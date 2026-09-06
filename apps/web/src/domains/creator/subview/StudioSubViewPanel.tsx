@@ -32,8 +32,8 @@ import {
   type StudioSubViewImage,
 } from "./studio-subview-model";
 
-import { buttonClass } from "@/components/ui/button-utils";
-import { cn } from "@/lib/utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioSubViewPanelProps {
   readonly onPickColor?: (hexColor: string) => void;

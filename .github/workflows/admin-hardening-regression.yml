@@ -82,7 +82,7 @@ jobs:
         if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
         run: >-
           pnpm exec vitest run apps/web/src/domains/admin apps/api/src/modules/admin
-          apps/web/lib/__tests__/admin-emails.test.ts apps/web/lib/__tests__/admin-security.test.ts
+          apps/web/src/shared/lib/__tests__/admin-emails.test.ts apps/web/src/shared/lib/__tests__/admin-security.test.ts
           --maxWorkers=2 --reporter=default --reporter=json
           --outputFile=test-results/admin-hardening/vitest.json
       - name: Verify isolated accounts and real session APIs

@@ -1,6 +1,6 @@
 import { BookOpen, Layers, Trophy, X } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export type PublishContext = {
   series?: { id: string; title: string; nextEpisodeNo: number } | null;

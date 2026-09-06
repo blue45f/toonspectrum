@@ -7,7 +7,7 @@ import {
   type StudioRealtimeTicketIssuer,
 } from "./studio-realtime-provider-runtime";
 
-import { withCsrfHeader } from "@/lib/csrf";
+import { withCsrfHeader } from "@/shared/lib/csrf";
 import { apiPath } from "@/src/infrastructure/api";
 
 const DEFAULT_TICKET_TIMEOUT_MS = 8_000;

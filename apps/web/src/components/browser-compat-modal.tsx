@@ -1,7 +1,7 @@
 import { AlertCircle, AlertTriangle, Compass, Globe, Monitor, RefreshCw, X } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 
-import { copyText } from "../../lib/copy-text";
+import { copyText } from "../../shared/lib/copy-text";
 import { checkBrowserCompatibility, getBrowserInfo } from "../compat/browser-check";
 
 

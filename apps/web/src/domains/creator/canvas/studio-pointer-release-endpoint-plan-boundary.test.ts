@@ -52,7 +52,7 @@ describe("studio pointer-release endpoint planning ownership boundary", () => {
       "../studio-brush",
       "../studio-persisted-pointer-channels",
       "../studio-element-model",
-      "@/lib/studio-ink-input-contract",
+      "@/shared/lib/studio-ink-input-contract",
     ]);
     expect(planner.source).not.toMatch(/from\s+["'](?:react|konva|react-konva)/u);
     expect(planner.source).not.toMatch(

@@ -53,14 +53,14 @@ import type { StudioNamedPalette } from "./studio-palette-library";
 import type {
   CreatorMarketplaceResourceIdentity,
   CreatorMarketplaceResourceRecord,
-} from "@/lib/creator-marketplace-resource-contract";
+} from "@/shared/lib/creator-marketplace-resource-contract";
 
 import {
   isCreatorMarketplaceInstallReceiptKind,
   removeCreatorMarketplaceInstallReceipt,
   writeCreatorMarketplaceInstallReceipt,
   type CreatorMarketplaceInstallReceiptStorage,
-} from "@/lib/creator-marketplace-install-receipt";
+} from "@/shared/lib/creator-marketplace-install-receipt";
 
 export { STUDIO_CREATOR_PACK_SQLITE_NAMESPACE } from "./studio-community-pack-legacy-migration";
 

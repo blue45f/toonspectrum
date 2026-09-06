@@ -19,7 +19,7 @@ import { normalizeStudioPersistedPointerChannels } from "../studio-persisted-poi
 
 import type { DrawEl } from "../studio-element-model";
 
-import { isStudioInkInputContractV2 } from "@/lib/studio-ink-input-contract";
+import { isStudioInkInputContractV2 } from "@/shared/lib/studio-ink-input-contract";
 
 const RELEASE_ENDPOINT_EPSILON = 1e-6;
 

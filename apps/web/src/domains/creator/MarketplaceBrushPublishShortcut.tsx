@@ -6,7 +6,7 @@ import {
   createCreatorMarketplaceDraftFromBrushStudio,
   saveCreatorMarketplaceAuthoringDraft,
   stageCreatorMarketplaceAuthoringHandoff,
-} from "@/lib/creator-marketplace-authoring-workshop";
+} from "@/shared/lib/creator-marketplace-authoring-workshop";
 
 export const MARKETPLACE_BRUSH_SNAPSHOT_REQUEST_EVENT =
   "toonspectrum:brush-studio-market-snapshot-request";

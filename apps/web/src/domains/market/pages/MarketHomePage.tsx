@@ -18,8 +18,8 @@ import { marketHomeJsonLd } from "../models/market-jsonld";
 import { MARKET_KINDS, MARKET_LICENSES } from "../models/market-kind";
 import { MARKET_CURATED_THEMES } from "../models/market-theme";
 
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button-utils";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 import Link from "@/src/compat/router-link";
 import {
   useDocumentTitle,

@@ -24,7 +24,7 @@ import type { StudioVrmBlenderRuntimeAsset } from "../vrm/studio-vrm-blender-cha
 import type { StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
 import type { ChangeEvent } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 
 export const CHARACTER_SHAPER_BLENDER_DOC_PATH = "docs/studio/blender-character-pipeline.md";
 

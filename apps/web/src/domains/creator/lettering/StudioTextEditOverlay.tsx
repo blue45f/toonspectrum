@@ -15,7 +15,7 @@ import {
 import type { El } from "../studio-element-model";
 import type Konva from "konva";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass } from "@/shared/components/ui/button-utils";
 
 const OVERLAY_BUBBLE_TEXT_MEASURER = createCanvasBubbleTextMeasurer();
 

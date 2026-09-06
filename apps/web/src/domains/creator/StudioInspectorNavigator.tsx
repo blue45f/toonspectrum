@@ -35,8 +35,8 @@ import {
 } from "./studio-inspector-tab-a11y";
 import { STUDIO_FOCUS_RING, StudioContextPill } from "./studio-panel-ui";
 
-import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { useT } from "@/shared/lib/i18n";
+import { cn } from "@/shared/lib/utils";
 
 export interface StudioInspectorNavigatorProps {
   layout: StudioInspectorLayout;

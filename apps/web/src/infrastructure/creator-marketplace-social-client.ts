@@ -2,13 +2,13 @@ import type {
   CreateCreatorMarketplaceSocialComment,
   CreatorMarketplaceSocialPage,
   UpsertCreatorMarketplaceSocialReview,
-} from "@/lib/creator-marketplace-social-contract";
+} from "@/shared/lib/creator-marketplace-social-contract";
 
 import {
   CreateCreatorMarketplaceSocialCommentSchema,
   CreatorMarketplaceSocialPageSchema,
   UpsertCreatorMarketplaceSocialReviewSchema,
-} from "@/lib/creator-marketplace-social-contract";
+} from "@/shared/lib/creator-marketplace-social-contract";
 import { api, toApiError } from "@/src/infrastructure/api";
 
 const BASE = "/creator/marketplace/resources";
