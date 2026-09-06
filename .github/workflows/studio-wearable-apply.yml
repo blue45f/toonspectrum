@@ -75,7 +75,17 @@ jobs:
 
           '''
           change(p,marker,test+marker)
+          change('src/domains/creator/vrm/studio-vrm-head-surface.test.ts','mode: "manual"','mode: "custom"')
+          p='scripts/verify-studio-wearable-v5.mts'
+          change(p,'import { build } from "vite";','import { build } from "vite";\nimport { measureWearableFramePixels } from "./studio-wearable-frame-evidence.mjs";')
+          change(p,'error?:string;distinctColors?:number}','error?:string;distinctColors?:number;nonblank?:boolean;foregroundPixels?:number;largestComponent?:number;occupiedWidth?:number;occupiedHeight?:number}')
+          change(p,'async function inspect(){return page.evaluate(()=>{','async function inspect(){const info = await page.evaluate(()=>{')
+          change(p,'if(!canvas)return {status:api.status,receipt:api.receipt,distinctColors:0};','if(!canvas)return {status:api.status,receipt:api.receipt,distinctColors:0,rgba:[] as number[]};')
+          change(p,'  return {status:api.status,receipt:api.receipt,distinctColors:colors.size};\n});}', '  return {status:api.status,receipt:api.receipt,distinctColors:colors.size,rgba:Array.from(data)};\n});const {rgba,...state}=info;return {...state,...measureWearableFramePixels(rgba,160,160)};}')
+          change(p,'(frame.distinctColors??0)<12','!frame.nonblank')
           PY
+      - name: Prove the frame detector accepts monochrome objects and rejects empty or noisy frames
+        run: node --test scripts/studio-wearable-frame-evidence.node-check.mjs
       - name: Regenerate the exact original GLB pack
         run: pnpm exec tsx scripts/generate-studio-wearable-v5.mts > wearable-final-integration/generation.json
       - name: Lint the changed production code and tests
@@ -91,7 +101,7 @@ jobs:
           test "$GITHUB_REF_NAME" = 'fix/studio-wearable-quality-audit-20260906'
           git fetch origin "$GITHUB_REF_NAME"
           test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
-          git add -- src/domains/creator/vrm/studio-vrm-head-surface.ts src/domains/creator/vrm/studio-vrm-head-surface.test.ts src/domains/creator/vrm/studio-vrm-prop-rig.ts src/domains/creator/vrm/studio-vrm-props.ts src/domains/creator/vrm/studio-vrm-prop-quality-policy.ts src/domains/creator/vrm/StudioVrmPropPanel.tsx src/domains/creator/vrm/StudioVrmPropPanel.quality.test.tsx src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts scripts/generate-studio-wearable-v5.mts
+          git add -- src/domains/creator/vrm/studio-vrm-head-surface.ts src/domains/creator/vrm/studio-vrm-head-surface.test.ts src/domains/creator/vrm/studio-vrm-prop-rig.ts src/domains/creator/vrm/studio-vrm-props.ts src/domains/creator/vrm/studio-vrm-prop-quality-policy.ts src/domains/creator/vrm/StudioVrmPropPanel.tsx src/domains/creator/vrm/StudioVrmPropPanel.quality.test.tsx src/domains/creator/vrm/useStudioVrmPoserRuntimeE.ts scripts/generate-studio-wearable-v5.mts scripts/verify-studio-wearable-v5.mts
           node --input-type=module <<'EOF'
           import fs from 'node:fs';
           import {createHash} from 'node:crypto';
@@ -128,7 +138,7 @@ jobs:
           mkdir -p wearable-final-integration
           git rev-parse HEAD > wearable-final-integration/commit.txt
           git diff --binary > wearable-final-integration/uncommitted.patch
-          tar -czf wearable-final-integration/review-source.tar.gz src/domains/creator/vrm public/assets/3d scripts/generate-studio-wearable-v5.mts
+          tar -czf wearable-final-integration/review-source.tar.gz src/domains/creator/vrm public/assets/3d scripts/generate-studio-wearable-v5.mts scripts/verify-studio-wearable-v5.mts scripts/studio-wearable-frame-evidence.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
