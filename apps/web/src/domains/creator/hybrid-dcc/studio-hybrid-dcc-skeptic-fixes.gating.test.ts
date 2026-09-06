@@ -383,7 +383,7 @@ describe("VP4 model-build ops: undo round-trip + reload topology", () => {
 
 describe("CHR-001 real GLB/VRM + OBJ import pipeline", () => {
   it("parses real VRM/GLB fixture into SceneIR with non-zero counts and report fields", () => {
-    const vrmPath = resolve(process.cwd(), "public/vrm/AvatarSample_A.vrm");
+    const vrmPath = resolve(process.cwd(), "apps/web/public/vrm/AvatarSample_A.vrm");
     expect(existsSync(vrmPath)).toBe(true);
     const bytes = new Uint8Array(readFileSync(vrmPath));
 

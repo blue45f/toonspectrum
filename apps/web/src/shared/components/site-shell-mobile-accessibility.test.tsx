@@ -10,7 +10,7 @@ import { SiteHeader } from "./site-header";
 
 import { useI18n } from "@/shared/lib/i18n";
 
-vi.mock("./auth/auth-menu-shell", () => ({
+vi.mock("../../domains/auth/components/auth-menu-shell", () => ({
   AuthMenuShell: () => <button type="button">계정</button>,
 }));
 

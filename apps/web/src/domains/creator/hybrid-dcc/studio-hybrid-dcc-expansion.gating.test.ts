@@ -180,7 +180,7 @@ describe("workspace import path", () => {
   });
 
   it("imports real VRM when fixture present", () => {
-    const path = resolve(process.cwd(), "public/vrm/AvatarSample_A.vrm");
+    const path = resolve(process.cwd(), "apps/web/public/vrm/AvatarSample_A.vrm");
     if (!existsSync(path)) return;
     let ws = createStudioHybridDccWorkspace("vrm-ws");
     ws = workspaceImportBytes(ws, "a.vrm", new Uint8Array(readFileSync(path)));

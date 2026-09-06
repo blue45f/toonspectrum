@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 
-import { AuthMenuShell } from "./auth/auth-menu-shell";
+import { AuthMenuShell } from "../../domains/auth/components/auth-menu-shell";
 import { ToonSpectrumMark } from "./visual-marks";
 
 import { cx } from "@/shared/lib/cx";

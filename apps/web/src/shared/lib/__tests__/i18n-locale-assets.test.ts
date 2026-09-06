@@ -26,7 +26,7 @@ import {
   buildCatalogSource,
   measureTranslatedRatio,
   readAppLocaleDictionaries,
-} from "@/scripts/generate-app-i18n-catalog.mjs";
+} from "../../../../../../scripts/generate-app-i18n-catalog.mjs";
 
 const ASSET_DIRECTORY = path.resolve(process.cwd(), "apps/web/public", "i18n", "app");
 const REFERENCE_LOCALE = "en";

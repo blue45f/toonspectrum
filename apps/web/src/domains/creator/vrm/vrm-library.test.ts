@@ -344,7 +344,7 @@ describe("VRM library helpers", () => {
   });
 
   it("extracts embedded PNG/JPEG thumbnails or main texture bytes from sample VRM GLB files", () => {
-    const filePath = join(process.cwd(), "public/vrm/AvatarSample_A.vrm");
+    const filePath = join(process.cwd(), "apps/web/public/vrm/AvatarSample_A.vrm");
     if (!existsSync(filePath)) return;
     const buffer = readFileSync(filePath);
     const result = extractEmbeddedVrmThumbnailBytes(buffer);
