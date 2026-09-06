@@ -18,7 +18,7 @@ class BlenderPipelineRegressionTests(unittest.TestCase):
 
     def test_quality_report_is_final_before_manifest_receipts_are_hashed(self) -> None:
         source = (KIT / "pipeline.py").read_text(encoding="utf-8")
-        quality_role = source.index('outputs["qualityReport"] = QUALITY_REPORT_FILENAME')
+        quality_role = source.index('outputs["qualityReport"] = "quality-report.json"')
         manifest_role = source.index('outputs["manifest"] = "character-package.json"')
         report_build = source.index("report = PipelineReport(", quality_role)
         report_write = source.index('write_json(output_dir / QUALITY_REPORT_FILENAME', report_build)
