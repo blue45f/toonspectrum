@@ -1,0 +1,60 @@
+name: Inspect 2D integration conflicts
+on:
+  push:
+    branches: [diagnostics/2d-merge-gate-20260906]
+    paths: [.github/workflows/inspect-2d-merge.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 5f8f3e4d10f991f9c0f8e4dad58463253aa4ece3
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout: |
+            src/domains/creator
+            lib
+            scripts
+            .github/workflows
+          persist-credentials: false
+      - name: Inspect a local three-way merge only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/2d-merge-evidence
+          git config user.name '2D merge inspector'
+          git config user.email 'inspection@example.invalid'
+          git rev-parse origin/main > /tmp/2d-merge-evidence/main-sha.txt
+          set +e
+          git merge --no-commit --no-ff origin/main > /tmp/2d-merge-evidence/merge-output.txt 2>&1
+          result=$?
+          set -e
+          echo "$result" > /tmp/2d-merge-evidence/merge-exit.txt
+          git diff --name-only --diff-filter=U > /tmp/2d-merge-evidence/conflict-paths.txt
+          git status --short > /tmp/2d-merge-evidence/status.txt
+          git ls-files -u > /tmp/2d-merge-evidence/unmerged-index.txt
+          python3 - <<'PY'
+          import pathlib,subprocess,json
+          out=pathlib.Path('/tmp/2d-merge-evidence')
+          conflicts=(out/'conflict-paths.txt').read_text().splitlines()
+          for name in conflicts:
+              p=pathlib.Path(name)
+              for suffix,contents in [('merged',p.read_bytes())]+[(str(stage),subprocess.check_output(['git','show',f':{stage}:{name}'])) for stage in (1,2,3)]:
+                  dest=out/'sources'/suffix/name
+                  dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(contents)
+          summary={'main':(out/'main-sha.txt').read_text().strip(),'head':subprocess.check_output(['git','rev-parse','HEAD']).decode().strip(),'conflicts':conflicts}
+          (out/'summary.json').write_text(json.dumps(summary,indent=2))
+          print(json.dumps(summary,indent=2))
+          print((out/'merge-output.txt').read_text()[-8000:])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 2d-integration-conflict-evidence
+          path: /tmp/2d-merge-evidence/
+          retention-days: 3
+          if-no-files-found: error
