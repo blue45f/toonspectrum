@@ -49,7 +49,7 @@ import { pathToFileURL } from "node:url";
 
 import { chromium, type Browser, type CDPSession, type Page } from "playwright";
 
-import { STUDIO_CANVAS_WIDTH } from "../src/domains/creator/canvas/studio-canvas-constants";
+import { STUDIO_CANVAS_WIDTH } from "../apps/web/src/domains/creator/canvas/studio-canvas-constants";
 
 import {
   findFreePort,

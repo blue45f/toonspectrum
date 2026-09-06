@@ -8,19 +8,19 @@ import { DIST_DIR } from "./lib/repo-paths.mjs";
 const outputDirectory = path.resolve(process.env.STUDIO_BUNDLE_DIR ?? DIST_DIR);
 const manifestPath = path.join(outputDirectory, ".vite", "manifest.json");
 const studioEntry =
-  "src/domains/creator/studio-legacy-editor-adapter.tsx";
+  "apps/web/src/domains/creator/studio-legacy-editor-adapter.tsx";
 const appEntry = "index.html";
 // This is the sole production exception to the engine-lab ban. Its transitive Babylon chunks may
 // be emitted only behind this analyzable BG3D dynamic import and may not be shared by another owner.
 const approvedBabylonSpecialistEntry =
-  "src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts";
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts";
 const approvedBabylonRuntimeChunkName = "studio-bg3d-babylon-runtime";
 const babylonManifestPattern = /(?:@babylonjs|babylon(?:\.js)?)/i;
 // The next-generation Three WebGPU renderer is production code, not a lab, but it carries a second
 // ~200 KiB gzip renderer graph. It is admitted only behind this analyzable dynamic import so the
 // WebGL editor activation never pays for it and no other owner can share the chunk.
 const approvedWebgpuRendererEntry =
-  "src/domains/creator/bg3d/studio-bg3d-three-webgpu-entry.ts";
+  "apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-entry.ts";
 // The entry chunk itself carries Three's `three.webgpu`/`three.tsl` builds. They are deliberately
 // NOT forced into a named manual chunk: see the note in vite.config.ts — naming one drags the
 // shared `three.core` graph in with it and every three importer then pays for the WebGPU engine.

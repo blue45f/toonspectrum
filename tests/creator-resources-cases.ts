@@ -2,8 +2,8 @@ import { createResourceEngine, ResourceInputError, ResourceBusyError } from "../
 import {
   attributionMarkdown, dateOnly, deadlineCalendar, deadlineLabel, emptyWorkspace, httpsUrl,
   parseDeadline, parseResource, parseSearchResult, parseWorkspace, storyMarkdown,
-} from "../lib/creator-resources";
-import { exerciseSvg, recipeById, RECIPES } from "../src/domains/creator-resources/recipes";
+} from "../apps/web/lib/creator-resources";
+import { exerciseSvg, recipeById, RECIPES } from "../apps/web/src/domains/creator-resources/recipes";
 
 export interface CreatorResourceCase { name: string; run: () => void | Promise<void> }
 function ok(value: unknown, message = "expected truthy value"): asserts value { if (!value) throw new Error(message); }

@@ -10,7 +10,7 @@ import { build } from "vite";
 const directory=resolve(".artifacts/studio-wearable-v5");
 await rm(directory,{recursive:true,force:true});await mkdir(join(directory,"screenshots"),{recursive:true});
 const entry=join(directory,"entry.ts");
-const domain=resolve("src/domains/creator");
+const domain=resolve("apps/web/src/domains/creator");
 const source=[
   "export * as THREE from 'three';",
   "export {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';",

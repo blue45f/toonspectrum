@@ -16,7 +16,7 @@ const required = [
   "config/blender/reference-character.json",
   "config/blender/avatar-orion-production.json",
   "config/blender/toonstudio-character-pipeline.schema.json",
-  "src/domains/creator/vrm/studio-vrm-blender-character-package.ts",
+  "apps/web/src/domains/creator/vrm/studio-vrm-blender-character-package.ts",
 ];
 for (const relative of required) {
   const target = path.join(root, relative);

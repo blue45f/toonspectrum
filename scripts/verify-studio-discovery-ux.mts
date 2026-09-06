@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { chromium } from "playwright";
 
-import { STUDIO_FILTER_DIALOG_CATALOG } from "../src/domains/creator/filter/studio-filter-catalog";
+import { STUDIO_FILTER_DIALOG_CATALOG } from "../apps/web/src/domains/creator/filter/studio-filter-catalog";
 
 import { findFreePort, spawnVitePreview, stopChildProcess, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 

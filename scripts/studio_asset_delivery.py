@@ -190,7 +190,7 @@ def audit_existing(output: Path) -> None:
     print('EXISTING ASSET FINDINGS', json.dumps([r for r in records if r['findings']], ensure_ascii=False), flush=True)
     print('ACTUAL BUNDLED MODEL CATALOG REFERENCES', flush=True)
     found = 0
-    for path in sorted((ROOT / 'src/domains/creator').rglob('*.ts*')):
+    for path in sorted((ROOT / 'apps/web/src/domains/creator').rglob('*.ts*')):
         if '.test.' in path.name: continue
         text = path.read_text()
         lines = text.splitlines()

@@ -2,7 +2,7 @@
 /**
  * Khronos-conformance gate for the Hybrid DCC GLB exporter.
  *
- * `src/domains/creator/hybrid-dcc/studio-hybrid-dcc-glb-export.ts` writes GLB 2.0
+ * `apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-glb-export.ts` writes GLB 2.0
  * containers by hand — chunk headers, buffer views, accessor min/max, padding. The
  * existing unit suite asserts that byte layout against our own reader, which means
  * a shared misreading of the spec passes on both sides. This gate closes that loop
@@ -26,12 +26,12 @@ import {
   createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
   hashStudioEditableMesh,
-} from "../src/domains/creator/studio-editable-half-edge-mesh.ts";
+} from "../apps/web/src/domains/creator/studio-editable-half-edge-mesh.ts";
 import {
   exportStudioHybridDccMeshGlb,
   STUDIO_HYBRID_DCC_GLB_EXPORT_GENERATOR,
   STUDIO_HYBRID_DCC_GLB_MIME_TYPE,
-} from "../src/domains/creator/hybrid-dcc/studio-hybrid-dcc-glb-export.ts";
+} from "../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-glb-export.ts";
 
 const GLB_MAGIC = 0x46546c67;
 const GLB_VERSION = 2;

@@ -113,3 +113,11 @@ crates/*/target/
 
 # tsc --generateTrace output (pnpm run typecheck:trace); regenerated, never committed
 /.tstrace/
+
+# generated QA reports (keep in CI artifacts, not source control)
+/qa-results/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~

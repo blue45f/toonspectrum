@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
-const target = resolve(root, "src/domains/market/components/MarketplaceAuthoringInstallAction.tsx");
+const target = resolve(root, "apps/web/src/domains/market/components/MarketplaceAuthoringInstallAction.tsx");
 if (!existsSync(target)) throw new Error("MarketplaceAuthoringInstallAction.tsx is missing");
 let source = readFileSync(target, "utf8");
 

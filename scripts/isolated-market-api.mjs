@@ -287,7 +287,7 @@ export async function startIsolatedMarketApi(target, options = {}) {
   await requireUnusedApiTarget(target);
   const child = spawn(
     process.execPath,
-    ["--import", "tsx", "src/main.ts"],
+    ["--import", "tsx", "apps/web/src/main.ts"],
     {
       cwd: API_ROOT,
       detached: process.platform !== "win32",

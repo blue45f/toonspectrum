@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path("/Users/hjunkim/WebstormProjects/toonspectrum")
-CREATOR = ROOT / "src/domains/creator"
+CREATOR = ROOT / "apps/web/src/domains/creator"
 SKIP_TOP_DIRS = {"studio-router", "kernel", "components"}
 
 RULES: list[tuple[str, str]] = [
@@ -165,8 +165,8 @@ def resolve_import(importer: Path, spec: str) -> Path | None:
         return CREATOR / rest
     if spec.startswith("/src/domains/creator/"):
         return CREATOR / spec[len("/src/domains/creator/") :]
-    if "src/domains/creator/" in spec and not spec.startswith("."):
-        rest = spec.split("src/domains/creator/", 1)[1]
+    if "apps/web/src/domains/creator/" in spec and not spec.startswith("."):
+        rest = spec.split("apps/web/src/domains/creator/", 1)[1]
         return CREATOR / rest
     if spec.startswith("."):
         try:
@@ -272,8 +272,8 @@ def main() -> None:
                 if new != spec:
                     replacements += 1
                 return new
-            if "src/domains/creator/" in spec:
-                head, rest = spec.split("src/domains/creator/", 1)
+            if "apps/web/src/domains/creator/" in spec:
+                head, rest = spec.split("apps/web/src/domains/creator/", 1)
                 target = locate_target(rest)
                 if target is None:
                     return spec

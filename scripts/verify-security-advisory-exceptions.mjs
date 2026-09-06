@@ -265,7 +265,7 @@ export function verifySecurityAdvisoryExceptions({
     || !/<BrowserRouter(?:\s|>)/u.test(appSource)
   ) {
     errors.push(
-      "src/app/App.tsx must retain the reviewed BrowserRouter Declarative Mode boundary.",
+      "apps/web/src/app/App.tsx must retain the reviewed BrowserRouter Declarative Mode boundary.",
     );
   }
 
@@ -275,7 +275,7 @@ export function verifySecurityAdvisoryExceptions({
     : "";
   if (!/\bcreateRoot\s*\(/u.test(mainSource)) {
     errors.push(
-      "src/app/main.tsx must retain the reviewed client-only createRoot entry.",
+      "apps/web/src/app/main.tsx must retain the reviewed client-only createRoot entry.",
     );
   }
 
@@ -288,7 +288,7 @@ export function verifySecurityAdvisoryExceptions({
     || !/\bRoute\b/u.test(appRouterSource)
   ) {
     errors.push(
-      "src/app/routes/AppRouter.tsx must retain the reviewed declarative Routes/Route boundary.",
+      "apps/web/src/app/routes/AppRouter.tsx must retain the reviewed declarative Routes/Route boundary.",
     );
   }
 

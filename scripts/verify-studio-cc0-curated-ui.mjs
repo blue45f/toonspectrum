@@ -19,7 +19,7 @@ const manifest = JSON.parse(await readFile(path.join(root,'public/assets/studio/
 const htmlName = 'cc0-curation-private-test.html';
 const entryName = 'cc0-curation-private-test.tsx';
 for (const file of [htmlName,entryName]) if (existsSync(path.join(root,file))) throw new Error('Test fixture path already exists');
-const mainPath = path.join(root,'src/app/main.tsx');
+const mainPath = path.join(root,'apps/web/src/app/main.tsx');
 const mainSource = await readFile(mainPath,'utf8');
 const cssImports = [...mainSource.matchAll(/import\s*["']([^"']+\.css)["']/g)].map(match => {
   const resolved = path.resolve(path.dirname(mainPath),match[1]);

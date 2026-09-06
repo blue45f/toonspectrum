@@ -61,7 +61,7 @@ def prepare() -> None:
         'await page.waitForFunction(() => window.rendererReady, {timeout:30000});',
         'await page.waitForFunction(() => window.rendererReady, undefined, {timeout:30000});')
 
-    panel = ROOT / 'src/domains/creator/StudioAssetMenuPanel.tsx'
+    panel = ROOT / 'apps/web/src/domains/creator/StudioAssetMenuPanel.tsx'
     replace_once(panel,
         'const studioOriginalAssetMarketplaceLoader = createStudioIntentLazyLoader(() =>',
         'const studioCc0AssetLibraryLoader = createStudioIntentLazyLoader(() =>\n'
@@ -83,7 +83,7 @@ def prepare() -> None:
         '        <LazyStudioCc0AssetLibraryPanel onUseAsset={onUseLocalAsset} />\n'
         '        <LazyStudioOriginalAssetMarketplacePanel onUseAsset={onUseLocalAsset} />')
 
-    originals = ROOT / 'src/domains/creator/studio-original-free-asset-packs.ts'
+    originals = ROOT / 'apps/web/src/domains/creator/studio-original-free-asset-packs.ts'
     replace_once(originals,
         'export const STUDIO_ORIGINAL_FREE_ASSET_PACKAGES: readonly StudioOriginalFreeAssetPackage[] =',
         'const ALL_STUDIO_ORIGINAL_FREE_ASSET_PACKAGES: readonly StudioOriginalFreeAssetPackage[] =')

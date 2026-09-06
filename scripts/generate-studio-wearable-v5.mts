@@ -382,7 +382,7 @@ await writeFile(resolve(output,"wearable-v5-manifest.json"),`${JSON.stringify({v
 if (output === resolve("public/assets/3d")) {
   const revisions = Object.fromEntries(manifest.map((asset) => [`/assets/3d/${asset.file}`, asset.sha256]));
   await writeFile(
-    resolve("src/domains/creator/vrm/studio-vrm-prop-asset-revisions.ts"),
+    resolve("apps/web/src/domains/creator/vrm/studio-vrm-prop-asset-revisions.ts"),
     "/** Generated from wearable-v5-manifest.json; regenerate with generate-studio-wearable-v5.mts. */\n"
       + `export const STUDIO_VRM_PROP_ASSET_REVISIONS: Readonly<Record<string, string>> = Object.freeze(${JSON.stringify(revisions, null, 2)});\n`,
   );

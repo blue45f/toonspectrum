@@ -4,10 +4,10 @@ import { stripTypeScriptTypes } from "node:module";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 // Execute the production controller verbatim, without a separate copied model or a DOM package.
-const source = readFileSync(new URL("../src/domains/creator/studio-2d-image-readiness.ts", import.meta.url), "utf8");
+const source = readFileSync(new URL("../apps/web/src/domains/creator/studio-2d-image-readiness.ts", import.meta.url), "utf8");
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source)).toString("base64")}`;
 const { observeStudio2dImage } = process.env.VITEST
-  ? await import("../src/domains/creator/studio-2d-image-readiness.ts")
+  ? await import("../apps/web/src/domains/creator/studio-2d-image-readiness.ts")
   : await import(/* @vite-ignore */ moduleUrl);
 class FakeImage extends EventTarget {
   src = "/test.png";

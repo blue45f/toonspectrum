@@ -6,7 +6,7 @@ import { gzipSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-import { AVATAR_FORGE_PRESETS } from "../src/domains/creator/vrm/studio-vrm-avatar-forge";
+import { AVATAR_FORGE_PRESETS } from "../apps/web/src/domains/creator/vrm/studio-vrm-avatar-forge";
 
 import {
   STUDIO_VRM_AVATAR_REFERENCE_ARTIFACT_PATH,
@@ -48,7 +48,7 @@ describe("browser harness module boundaries", () => {
       resolve(STUDIO_VRM_AVATAR_REFERENCE_ROOT, "scripts/studio-vrm-avatar-reference-catalogue-browser.tsx"),
       "utf8",
     );
-    expect(harness).toContain('"../src/domains/creator/vrm/studio-vrm-asset-runtime.ts"');
+    expect(harness).toContain('"../apps/web/src/domains/creator/vrm/studio-vrm-asset-runtime.ts"');
   });
 });
 

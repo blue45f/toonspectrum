@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
-const target = resolve(root, "src/domains/market/components/MarketplaceAuthoringWorkshop.tsx");
+const target = resolve(root, "apps/web/src/domains/market/components/MarketplaceAuthoringWorkshop.tsx");
 let source = readFileSync(target, "utf8");
 
 function replaceOnce(before, after, label) {
@@ -139,5 +139,5 @@ source = source.replace(
 writeFileSync(target, source);
 writeFileSync(
   resolve(root, "marketplace-source-package-integration-report.json"),
-  `${JSON.stringify({ target: "src/domains/market/components/MarketplaceAuthoringWorkshop.tsx", status: "integrated" }, null, 2)}\n`,
+  `${JSON.stringify({ target: "apps/web/src/domains/market/components/MarketplaceAuthoringWorkshop.tsx", status: "integrated" }, null, 2)}\n`,
 );

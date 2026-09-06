@@ -2,10 +2,10 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import { StudioSceneTemplateBrowser } from "../../../src/domains/creator/catalog/StudioSceneTemplateBrowser";
-import { SCENE_TEMPLATES, SCENE_TEMPLATE_CATEGORIES } from "../../../src/domains/creator/studio-scene-templates";
-import { StudioElementsPanel } from "../../../src/domains/creator/StudioElementsPanel";
-import "../../../src/styles/globals.css";
+import { StudioSceneTemplateBrowser } from "../../../apps/web/src/domains/creator/catalog/StudioSceneTemplateBrowser";
+import { SCENE_TEMPLATES, SCENE_TEMPLATE_CATEGORIES } from "../../../apps/web/src/domains/creator/studio-scene-templates";
+import { StudioElementsPanel } from "../../../apps/web/src/domains/creator/StudioElementsPanel";
+import "../../../apps/web/src/styles/globals.css";
 
 function Fixture() {
   const [surface, setSurface] = useState("scenes");

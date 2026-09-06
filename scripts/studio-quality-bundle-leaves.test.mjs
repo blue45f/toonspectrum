@@ -8,7 +8,7 @@ const { test } = process.env.VITEST ? await import("vitest") : await import("nod
 const leaves = ["studio-page-review.ts", "studio-frame-animation-timing.ts"];
 for (const name of leaves) {
   test(name + " remains a dependency-free document chunk leaf", () => {
-    const path = "src/domains/creator/" + name;
+    const path = "apps/web/src/domains/creator/" + name;
     const source = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
     for (const node of source.statements) {
       if (ts.isImportDeclaration(node)) assert.equal(node.importClause?.isTypeOnly, true);

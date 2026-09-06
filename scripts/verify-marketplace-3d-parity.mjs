@@ -4,12 +4,12 @@ import { readFile } from "node:fs/promises";
 
 import pg from "pg";
 
-import { creatorMarketplacePackageIdentityPreimage } from "../lib/creator-marketplace-cloud-library-contract.ts";
+import { creatorMarketplacePackageIdentityPreimage } from "../apps/web/lib/creator-marketplace-cloud-library-contract.ts";
 import {
   CreatorMarketplaceResourceManifestSchema,
   canonicalizeCreatorMarketplaceJson,
-} from "../lib/creator-marketplace-resource-contract.ts";
-import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "../lib/creator-marketplace-starter-catalog.ts";
+} from "../apps/web/lib/creator-marketplace-resource-contract.ts";
+import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "../apps/web/lib/creator-marketplace-starter-catalog.ts";
 
 const OLD_MIGRATIONS = [
   "0021_creator_marketplace_resource.sql",

@@ -4,7 +4,7 @@
  * Proves that the test runner and the type checker are still LOOKING AT the code.
  *
  * `vitest.config.ts` pins an explicit `TEST_ROOTS` list precisely so that moving a tree
- * (`src/` -> `apps/web/`, say) forces someone to edit that list. Its own comment then promises
+ * (`apps/web/src/` -> `apps/web/`, say) forces someone to edit that list. Its own comment then promises
  * that "scripts/verify-toolchain-coverage.mjs 의 수집 파일 수 floor 가 게이트를 터뜨린다" if the
  * edit is forgotten. That script did not exist. The comment described a guard nobody had built,
  * which is worse than no comment at all: every reader since has believed they were covered.

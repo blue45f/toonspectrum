@@ -3,7 +3,7 @@ import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const STUDIO_2D_MANIFEST_PATH = "src/domains/creator/studio-2d-asset-manifest.json";
+export const STUDIO_2D_MANIFEST_PATH = "apps/web/src/domains/creator/studio-2d-asset-manifest.json";
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const SOURCE_PREFIX = "/assets/studio/backgrounds/";
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);

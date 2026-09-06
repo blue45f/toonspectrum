@@ -36,11 +36,11 @@ const requiredPaths = [
   "deploy/oci/crawl-update.sh",
   "scripts/vercel-workflow-policy.mjs",
   "scripts/vercel-workflow-policy.test.mjs",
-  "src/app/routes/app-route-definition.ts",
-  "src/app/routes/groups/app-routes.tsx",
-  "src/domains/creator/studio-router/routes/StudioEditorRoute.tsx",
-  "src/domains/creator/studio-router/routes/StudioPublishRoute.tsx",
-  "src/domains/creator/studio-cuttoon-editor/runtime/useStudioDocumentAccessRuntime.ts",
+  "apps/web/src/app/routes/app-route-definition.ts",
+  "apps/web/src/app/routes/groups/app-routes.tsx",
+  "apps/web/src/domains/creator/studio-router/routes/StudioEditorRoute.tsx",
+  "apps/web/src/domains/creator/studio-router/routes/StudioPublishRoute.tsx",
+  "apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioDocumentAccessRuntime.ts",
   ".husky/pre-commit",
   ".husky/commit-msg",
 ];
@@ -49,7 +49,7 @@ for (const file of requiredPaths) {
 }
 
 // Root Vite app entry points (index.html -> src/app/main.tsx).
-const requiredEntries = ["index.html", "src/app/main.tsx", "vite.config.ts"];
+const requiredEntries = ["apps/web/index.html", "apps/web/src/app/main.tsx", "vite.config.ts"];
 for (const entry of requiredEntries) {
   if (!exists(entry)) issues.push(`missing app entry: ${entry}`);
 }
@@ -58,12 +58,12 @@ for (const entry of requiredEntries) {
 // src 루트에 `*-main.ts(x)` 로, 그 페이지가 레포 루트에 `*.html` 로 눌러앉으면 "앱 소스"와
 // "일회성 실험"이 같은 트리에서 구분되지 않는다. 하네스의 집은 tools/browser-harnesses/ 다.
 const SRC_ROOT_ENTRY_PATTERN = /(?:^|-)main\.tsx?$/;
-if (exists("src")) {
-  for (const entry of fs.readdirSync(path.join(ROOT, "src"), { withFileTypes: true })) {
+if (exists("apps/web/src")) {
+  for (const entry of fs.readdirSync(path.join(ROOT, "apps/web/src"), { withFileTypes: true })) {
     if (!entry.isFile() || !SRC_ROOT_ENTRY_PATTERN.test(entry.name)) continue;
     issues.push(
-      `entry-shaped module at the src root: src/${entry.name}`
-      + ` (the app entry is src/app/main.tsx; browser harnesses belong in tools/browser-harnesses/)`,
+      `entry-shaped module at the src root: apps/web/src/${entry.name}`
+      + ` (the app entry is apps/web/src/app/main.tsx; browser harnesses belong in tools/browser-harnesses/)`,
     );
   }
 }
@@ -72,7 +72,7 @@ for (const entry of fs.readdirSync(ROOT, { withFileTypes: true })) {
   if (entry.name === "index.html") continue;
   issues.push(
     `stray HTML entry at the repo root: ${entry.name}`
-    + ` (only index.html may live here; harness pages belong in tools/browser-harnesses/)`,
+    + ` (only apps/web/index.html is the application entry; harness pages belong in tools/browser-harnesses/)`,
   );
 }
 if (!exists("tools/browser-harnesses")) {
@@ -97,10 +97,15 @@ if (!exists(LEGACY_EXCEPTIONS_LEDGER)) {
   }
 }
 for (const guard of [
-  "src/domains/creator/studio-host-architecture-ratchet.test.ts",
+  "apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts",
   "scripts/eslint-legacy-exceptions.test.mjs",
 ]) {
   if (!exists(guard)) issues.push(`missing architecture guard test: ${guard}`);
+}
+
+// Frontend code belongs under apps/web; keep the repository root limited to workspace infrastructure.
+for (const legacyRoot of ["components", "lib", "src", "public"]) {
+  if (exists(legacyRoot)) issues.push("legacy frontend directory at repository root: " + legacyRoot + "/");
 }
 
 // Root scripts wired into the build/lint/test chain.

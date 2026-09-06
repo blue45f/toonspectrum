@@ -34,7 +34,7 @@ import {
   AVATAR_FORGE_PRESETS,
   createAvatarForgeState,
   serializeAvatarForgeState,
-} from "../src/domains/creator/vrm/studio-vrm-avatar-forge";
+} from "../apps/web/src/domains/creator/vrm/studio-vrm-avatar-forge";
 import {
   STUDIO_VRM_AVATAR_REFERENCE_MODEL_BYTE_LENGTH,
   STUDIO_VRM_AVATAR_REFERENCE_MODEL_ID,
@@ -45,7 +45,7 @@ import {
   STUDIO_VRM_AVATAR_REFERENCE_PROVIDER_ID,
   type StudioVrmAvatarReferenceCatalogue,
   type StudioVrmAvatarReferenceEmbedding,
-} from "../src/domains/creator/vrm/studio-vrm-avatar-reference-recommendation";
+} from "../apps/web/src/domains/creator/vrm/studio-vrm-avatar-reference-recommendation";
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 export const STUDIO_VRM_AVATAR_REFERENCE_ROOT = resolve(SCRIPT_DIRECTORY, "..");
@@ -496,11 +496,11 @@ async function generateEnvelope(): Promise<Readonly<{
     hashFile(executablePath),
     hashFile(resolve(
       STUDIO_VRM_AVATAR_REFERENCE_ROOT,
-      "src/domains/creator/vrm/StudioVrmAvatarForge.tsx",
+      "apps/web/src/domains/creator/vrm/StudioVrmAvatarForge.tsx",
     )),
     hashFile(resolve(
       STUDIO_VRM_AVATAR_REFERENCE_ROOT,
-      "src/domains/creator/vrm/studio-vrm-avatar-forge.ts",
+      "apps/web/src/domains/creator/vrm/studio-vrm-avatar-forge.ts",
     )),
     Promise.all([
       readPackageVersion("three"),
