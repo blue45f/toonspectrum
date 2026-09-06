@@ -1,0 +1,93 @@
+name: Studio brush core fix
+on:
+  push:
+    branches: [fix/studio-brush-stability-core-20260906]
+permissions:
+  contents: write
+concurrency:
+  group: studio-brush-core-fix-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  fix-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[brush-core-fix]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    env:
+      CI: 'true'
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Fix short-stroke contract for non-pigment paint tools
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/verify-studio-brushes.mts')
+          s=p.read_text()
+          def one(old,new,label):
+              global s
+              count=s.count(old)
+              if count!=1: raise SystemExit(f'{label}: expected 1 anchor, found {count}')
+              s=s.replace(old,new,1)
+          one(
+          '''      const operation = verifierBrushOperation(expectedSelection);\n      const lowDensityEraser = operation === "erase"\n''',
+          '''      const operation = verifierBrushOperation(expectedSelection);\n      // A water-only brush intentionally moves existing wet pigment and deposits no pigment on\n      // blank paper. Treating an empty-paper screenshot as a required visible paint mark made the\n      // stability gate contradict the product's own wet-ink contract. Keep persistence/history\n      // checks strict, but do not fabricate pixels for a transparent operation.\n      const transparentPaint = operation === "paint"\n        && !studioWetInkBrushDepositsPigment(expectedSelection.runtimeBrushId);\n      const lowDensityEraser = operation === "erase"\n''','transparent classification')
+          one(
+          '''      invariant(\n        hasMeaningfulPixelChange(immediateDiff),\n        operation === "erase"\n          ? `${preset.id}: released eraser did not visibly remove baseline paint`\n          : `${preset.id}: fast short stroke produced no visible pixels`,\n      );\n''',
+          '''      invariant(\n        transparentPaint || hasMeaningfulPixelChange(immediateDiff),\n        operation === "erase"\n          ? `${preset.id}: released eraser did not visibly remove baseline paint`\n          : `${preset.id}: fast short stroke produced no visible pixels`,\n      );\n''','immediate visibility')
+          one(
+          '''      invariant(\n        visualChanged,\n        operation === "erase"\n          ? `${preset.id}: erased baseline reappeared before commit`\n          : `${preset.id}: released stroke disappeared before becoming durable`,\n      );\n''',
+          '''      invariant(\n        transparentPaint || visualChanged,\n        operation === "erase"\n          ? `${preset.id}: erased baseline reappeared before commit`\n          : `${preset.id}: released stroke disappeared before becoming durable`,\n      );\n''','settled visibility')
+          one(
+          '''      const persistedProStroke = preset.source === "pro" && operation === "paint"\n        ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)\n        : null;\n      const persistedErase = operation === "erase"\n''',
+          '''      const persistedProStroke = preset.source === "pro" && operation === "paint"\n        ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)\n        : null;\n      const persistedTransparentStroke = transparentPaint\n        ? await waitForPersistedSelectedOperation(\n            page, expectedSelection, "paint", 1, false, 15_000,\n          )\n        : null;\n      const persistedErase = operation === "erase"\n''','transparent persistence')
+          one(
+          '''      await page.keyboard.press("Meta+z");\n      // Wait for the undo to actually SETTLE rather than for a fixed 60ms. The old constant made\n''',
+          '''      await page.keyboard.press("Meta+z");\n      if (transparentPaint) {\n        await waitForPersistedDrawElements(\n          page,\n          (draws) => draws.length === 0,\n          `${preset.id}: Undo did not remove the transparent paint operation`,\n          15_000,\n        );\n      }\n      // Wait for the undo to actually SETTLE rather than for a fixed 60ms. The old constant made\n''','transparent undo persistence')
+          one(
+          '''      const undoDiff = await compareScreenshotPixels(page, before, undone, 20);\n      const undoRestoredPixels = undoDiff.changedPixels <= 3;\n''',
+          '''      const undoDiff = await compareScreenshotPixels(page, before, undone, 20);\n      const undoRestoredPixels = transparentPaint || undoDiff.changedPixels <= 3;\n''','transparent undo pixels')
+          one(
+          '''      await page.keyboard.press("Meta+Shift+z");\n      await page.waitForTimeout(60);\n      const redone = await page.screenshot({ animations: "disabled", clip: usedClip });\n      const redoDiff = await compareScreenshotPixels(page, before, redone);\n      const redoRestoredStroke = hasMeaningfulPixelChange(redoDiff);\n      invariant(redoRestoredStroke, `${preset.id}: Redo did not restore visible stroke pixels`);\n''',
+          '''      await page.keyboard.press("Meta+Shift+z");\n      if (transparentPaint) {\n        await waitForPersistedSelectedOperation(\n          page, expectedSelection, "paint", 1, false, 15_000,\n        );\n      }\n      await page.waitForTimeout(60);\n      const redone = await page.screenshot({ animations: "disabled", clip: usedClip });\n      const redoDiff = await compareScreenshotPixels(page, before, redone);\n      const redoRestoredStroke = transparentPaint || hasMeaningfulPixelChange(redoDiff);\n      invariant(redoRestoredStroke, `${preset.id}: Redo did not restore visible stroke pixels`);\n''','transparent redo')
+          one(
+          '''        persistedCatalogId:\n          persistedProStroke?.brushCatalogId ?? persistedErase?.stroke.brushCatalogId ?? null,\n        persistedRuntimeBrushId:\n          persistedProStroke?.brush ?? persistedErase?.stroke.brush ?? null,\n''',
+          '''        persistedCatalogId:\n          persistedProStroke?.brushCatalogId\n            ?? persistedTransparentStroke?.stroke.brushCatalogId\n            ?? persistedErase?.stroke.brushCatalogId ?? null,\n        persistedRuntimeBrushId:\n          persistedProStroke?.brush\n            ?? persistedTransparentStroke?.stroke.brush\n            ?? persistedErase?.stroke.brush ?? null,\n''','transparent evidence identity')
+          p.write_text(s)
+          PY
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Source-level regression and lint
+        run: |
+          pnpm exec vitest run src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts
+          pnpm exec eslint --max-warnings=0 scripts/verify-studio-brushes.mts
+      - name: Build production bundle
+        run: pnpm run build:bundle
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify transparent water brush and pro persistence
+        env:
+          TOONSPECTRUM_BRUSH_VERIFY_STAGE: desktop
+          TOONSPECTRUM_BRUSH_SURVEY: '1'
+          TOONSPECTRUM_BRUSH_VERIFY_IDS: inkwash-water-brush,core-round
+        run: pnpm run verify:studio-brushes
+      - name: Recheck pencil live-release quality on current main descendant
+        env:
+          TOONSPECTRUM_BRUSH_VERIFY_STAGE: long
+          TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX: '1'
+          TOONSPECTRUM_BRUSH_VERIFY_IDS: pencil,pencil--side-shade
+        run: pnpm run verify:studio-brushes
+      - name: Commit verified source fix
+        run: |
+          git add scripts/verify-studio-brushes.mts
+          git diff --cached --check
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' -c core.hooksPath=/dev/null commit -m 'fix(studio): align transparent brush stability with wet-media contract [brush-core-fix]'
+          git push origin HEAD:${GITHUB_REF_NAME}
