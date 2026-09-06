@@ -896,8 +896,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         if (points.length < 6) return;
         const alpha = Math.min(
           1,
-          (element.opacity ?? 1)
-          * passOpacityScale
+          passOpacityScale
           * Math.sqrt(opacityScale * flowScale),
         );
         const rung = studioPencilRibbonAlphaBucket(alpha);
@@ -916,7 +915,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         for (const [rung, coords] of [...buckets.entries()].sort((a, b) => a[0] - b[0])) {
           issue({
             kind: "fill", coordinates: coords, color: element.stroke,
-            alpha: inherited * (rung / STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT),
+            alpha: inherited * (element.opacity ?? 1) * (rung / STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT),
           });
         }
         buckets.clear();
@@ -947,9 +946,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
             collectMark(cap.points, cap.opacityScale, cap.flowScale, pass.opacityScale);
           }
         }
+        // Soft-edge shells share alpha buckets but are distinct pigment layers. Union only
+        // cells WITHIN a pass; unioning shells together erases the intended graded shading.
+        flushBuckets(inherited);
         paintedCells = Math.max(paintedCells, passCells);
       }
-      flushBuckets(inherited);
       // 원시 꼬리 폴리라인: 검증된 점 개수는 곡선 빌더가 이미 알고 있으므로(sourcePointCount)
       // 점 배열을 다시 스캔하지 않고 suffix 인덱스만 직접 읽는다.
       // 꼬리 폴리라인은 **곡선이 아직 세그먼트로 만들지 못한 원시 점들만** 잇는다. 예전에는
