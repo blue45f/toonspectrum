@@ -141,43 +141,43 @@ function validMarketResource(value) {
   );
 }
 
-
 function handleMarketLanding(res, { host, proto, marketPage }) {
-    const origin = `${proto}://${host}`;
-    const isBrowse = marketPage === "browse";
-    const title = isBrowse ? "마켓 탐색 · 툰스펙트럼" : "창작 마켓 · 툰스펙트럼";
-    const description = isBrowse
-      ? "웹툰 제작에 필요한 브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋과 에셋을 종류와 사용권으로 찾아보세요."
-      : "브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋과 에셋을 살펴보고 ToonSpectrum Studio에서 바로 활용하세요.";
-    const url = `${origin}${isBrowse ? "/market/browse" : "/market"}`;
-    const image = `${origin}/og-web.png`;
-    const structuredData = {
-      "@context": "https://schema.org",
-      "@type": isBrowse ? "SearchResultsPage" : "CollectionPage",
-      name: title.replace(" · 툰스펙트럼", ""),
-      description,
-      url,
-      isPartOf: {
-        "@type": "WebSite",
-        "@id": `${origin}/#website`,
-        name: "툰스펙트럼",
-        url: `${origin}/`,
-      },
-    };
-    const page = injectPageMetadata(template(), {
-      title,
-      description,
-      url,
-      image,
-      imageAlt: "툰스펙트럼 창작 마켓",
-      type: "website",
-    }, structuredData);
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=300, s-maxage=86400");
-    return res.status(200).send(page);
+  const origin = `${proto}://${host}`;
+  const isBrowse = marketPage === "browse";
+  const title = isBrowse ? "마켓 탐색 · 툰스펙트럼" : "창작 마켓 · 툰스펙트럼";
+  const description = isBrowse
+    ? "웹툰 제작에 필요한 브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋과 에셋을 종류와 사용권으로 찾아보세요."
+    : "브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋과 에셋을 살펴보고 ToonSpectrum Studio에서 바로 활용하세요.";
+  const url = `${origin}${isBrowse ? "/market/browse" : "/market"}`;
+  const image = `${origin}/og-web.png`;
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": isBrowse ? "SearchResultsPage" : "CollectionPage",
+    name: title.replace(" · 툰스펙트럼", ""),
+    description,
+    url,
+    isPartOf: {
+      "@type": "WebSite",
+      "@id": `${origin}/#website`,
+      name: "툰스펙트럼",
+      url: `${origin}/`,
+    },
+  };
+  const page = injectPageMetadata(template(), {
+    title,
+    description,
+    url,
+    image,
+    imageAlt: "툰스펙트럼 창작 마켓",
+    type: "website",
+  }, structuredData);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=300, s-maxage=86400");
+  return res.status(200).send(page);
 }
 
-const MARKET_RESOURCE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\s\S])/iu;
+const MARKET_RESOURCE_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\s\S])/iu;
 
 async function fetchMarketResource(host, proto, marketResourceId) {
   if (!MARKET_RESOURCE_ID_RE.test(marketResourceId)) return null;
@@ -197,76 +197,76 @@ async function fetchMarketResource(host, proto, marketResourceId) {
 }
 
 async function handleMarketResource(res, { host, proto, marketResourceId }) {
-    const resource = await fetchMarketResource(host, proto, marketResourceId);
-    let page = template();
-    if (resource) {
-      const origin = `${proto}://${host}`;
-      const name = cleanText(resource.name, 80);
-      const publisher = cleanText(resource.publisher.name, 120);
-      const kind = MARKET_KIND_LABEL[resource.kind];
-      const description = cleanText(resource.description, 160)
-        || `${name}의 구성, 사용권, 호환성과 Studio 적용 방법을 확인하세요.`;
-      const fullDescription = `${publisher} · ${kind} · 무료 공유 — ${description}`.slice(0, 200);
-      const url = `${origin}/market/resource/${encodeURIComponent(marketResourceId)}`;
-      const image = `${origin}/og-web.png`;
-      const title = `${name} · 툰스펙트럼`;
-      const tags = Array.isArray(resource.tags)
-        ? resource.tags.filter((tag) => typeof tag === "string").slice(0, 8)
-        : [];
-      const structuredData = {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "CreativeWork",
-            "@id": `${url}#resource`,
-            name,
-            description,
-            url,
-            version: cleanText(resource.resourceVersion, 40) || undefined,
-            author: { "@type": "Person", name: publisher },
-            publisher: { "@type": "Person", name: publisher },
-            datePublished: cleanText(resource.createdAt, 40) || undefined,
-            dateModified: cleanText(resource.updatedAt, 40) || undefined,
-            license: marketLicenseUrl(resource.license, origin),
-            isAccessibleForFree: true,
-            keywords: tags.length > 0 ? tags.join(", ") : undefined,
-          },
-          {
-            "@type": "BreadcrumbList",
-            itemListElement: [
-              {
-                "@type": "ListItem",
-                position: 1,
-                name: "창작 마켓",
-                item: `${origin}/market`,
-              },
-              {
-                "@type": "ListItem",
-                position: 2,
-                name,
-                item: url,
-              },
-            ],
-          },
-        ],
-      };
-      page = injectPageMetadata(page, {
-        title,
-        description: fullDescription,
-        url,
-        image,
-        imageAlt: `${name} 창작 리소스`,
-        type: "article",
-      }, structuredData);
-    }
+  const resource = await fetchMarketResource(host, proto, marketResourceId);
+  let page = template();
+  if (resource) {
+    const origin = `${proto}://${host}`;
+    const name = cleanText(resource.name, 80);
+    const publisher = cleanText(resource.publisher.name, 120);
+    const kind = MARKET_KIND_LABEL[resource.kind];
+    const description = cleanText(resource.description, 160)
+      || `${name}의 구성, 사용권, 호환성과 Studio 적용 방법을 확인하세요.`;
+    const fullDescription = `${publisher} · ${kind} · 무료 공유 — ${description}`.slice(0, 200);
+    const url = `${origin}/market/resource/${encodeURIComponent(marketResourceId)}`;
+    const image = `${origin}/og-web.png`;
+    const title = `${name} · 툰스펙트럼`;
+    const tags = Array.isArray(resource.tags)
+      ? resource.tags.filter((tag) => typeof tag === "string").slice(0, 8)
+      : [];
+    const structuredData = {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "CreativeWork",
+          "@id": `${url}#resource`,
+          name,
+          description,
+          url,
+          version: cleanText(resource.resourceVersion, 40) || undefined,
+          author: { "@type": "Person", name: publisher },
+          publisher: { "@type": "Person", name: publisher },
+          datePublished: cleanText(resource.createdAt, 40) || undefined,
+          dateModified: cleanText(resource.updatedAt, 40) || undefined,
+          license: marketLicenseUrl(resource.license, origin),
+          isAccessibleForFree: true,
+          keywords: tags.length > 0 ? tags.join(", ") : undefined,
+        },
+        {
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            {
+              "@type": "ListItem",
+              position: 1,
+              name: "창작 마켓",
+              item: `${origin}/market`,
+            },
+            {
+              "@type": "ListItem",
+              position: 2,
+              name,
+              item: url,
+            },
+          ],
+        },
+      ],
+    };
+    page = injectPageMetadata(page, {
+      title,
+      description: fullDescription,
+      url,
+      image,
+      imageAlt: `${name} 창작 리소스`,
+      type: "article",
+    }, structuredData);
+  }
 
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    // Release visibility is mutable even though its manifest is immutable. Until the
-    // moderation path owns an edge-purge authority, caching a successful detail shell could
-    // keep a newly hidden resource's title, publisher, and description visible to crawlers.
-    // Keep discovery-page metadata cacheable, but always revalidate release-scoped metadata.
-    res.setHeader("Cache-Control", "no-store");
-    return res.status(200).send(page);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  // Release visibility is mutable even though its manifest is immutable. Until the
+  // moderation path owns an edge-purge authority, caching a successful detail shell could
+  // keep a newly hidden resource's title, publisher, and description visible to crawlers.
+  // Keep discovery-page metadata cacheable, but always revalidate release-scoped metadata.
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(200).send(page);
 }
 
 async function fetchTitle(host, proto, slug) {
@@ -285,51 +285,50 @@ async function fetchTitle(host, proto, slug) {
   return null;
 }
 
-
 function buildTitleStructuredData(t, { proto, host, url, fullDesc, img }) {
-    // 구조화 데이터(schema.org) — 작품을 Book으로, 평점이 있으면 aggregateRating 포함(별점 리치 결과).
-    const st = t.stats || {};
-    const ratingCount = Number(st.ratingCount) || 0;
-    const ratingValue = Number(st.ratingAvg) || 0;
-    const work = {
-      "@type": "Book",
-      "@id": `${url}#work`,
-      name: t.title,
-      url,
-      inLanguage: "ko",
+  // 구조화 데이터(schema.org) — 작품을 Book으로, 평점이 있으면 aggregateRating 포함(별점 리치 결과).
+  const st = t.stats || {};
+  const ratingCount = Number(st.ratingCount) || 0;
+  const ratingValue = Number(st.ratingAvg) || 0;
+  const work = {
+    "@type": "Book",
+    "@id": `${url}#work`,
+    name: t.title,
+    url,
+    inLanguage: "ko",
+  };
+  if (t.author) work.author = { "@type": "Person", name: t.author };
+  if (fullDesc) work.description = fullDesc;
+  if (img) work.image = img;
+  if (Array.isArray(t.genres) && t.genres.length) work.genre = t.genres;
+  if (t.releaseYear) work.datePublished = String(t.releaseYear);
+  if (ratingCount > 0 && ratingValue > 0) {
+    work.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: Math.round(ratingValue * 10) / 10,
+      ratingCount,
+      bestRating: 5,
+      worstRating: 1,
     };
-    if (t.author) work.author = { "@type": "Person", name: t.author };
-    if (fullDesc) work.description = fullDesc;
-    if (img) work.image = img;
-    if (Array.isArray(t.genres) && t.genres.length) work.genre = t.genres;
-    if (t.releaseYear) work.datePublished = String(t.releaseYear);
-    if (ratingCount > 0 && ratingValue > 0) {
-      work.aggregateRating = {
-        "@type": "AggregateRating",
-        ratingValue: Math.round(ratingValue * 10) / 10,
-        ratingCount,
-        bestRating: 5,
-        worstRating: 1,
-      };
-    }
-    const ld = {
-      "@context": "https://schema.org",
-      "@graph": [
-        work,
-        {
-          "@type": "BreadcrumbList",
-          itemListElement: [
-            {
-              "@type": "ListItem",
-              position: 1,
-              name: "홈",
-              item: `${proto}://${host}/`,
-            },
-            { "@type": "ListItem", position: 2, name: t.title, item: url },
-          ],
-        },
-      ],
-    };
+  }
+  const ld = {
+    "@context": "https://schema.org",
+    "@graph": [
+      work,
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "홈",
+            item: `${proto}://${host}/`,
+          },
+          { "@type": "ListItem", position: 2, name: t.title, item: url },
+        ],
+      },
+    ],
+  };
   return ld;
 }
 
@@ -395,7 +394,6 @@ async function handleRequest(req, res) {
     return handleMarketResource(res, { host, proto, marketResourceId });
   }
   return handleTitleRequest(res, { host, proto, slug });
-
 }
 
 module.exports = handleRequest;

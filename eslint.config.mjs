@@ -37,8 +37,8 @@ export default defineConfig(
   // 공유 베이스(TS + import 위생 + 커스텀 규칙 + prettier 충돌 비활성).
   base({ files: ['**/*.{ts,tsx,mts,cts}'] }),
 
-  // 루트 Vite 앱(apps/web/src/·components/·lib/) — React 19 + RC + jsx-a11y.
-  // ToonSpectrum Vite 앱은 apps/web 에 있고, NestJS API 만 apps/api 에 있다.
+  // apps/web/src 아래의 Vite 브라우저 앱 — React 19 + RC + jsx-a11y.
+  // 루트 package.json이 프런트엔드 툴체인을 소유하고, NestJS API만 별도 workspace package다.
   react({ files: ['apps/web/src/**/*.{ts,tsx}'] }),
 
   // The architecture move changed every app import root at once; keep import order diagnostics disabled
@@ -179,7 +179,7 @@ export default defineConfig(
 
   // 서버/DB/스크립트 유틸은 Node 런타임.
   {
-    files: ['lib/db/**/*.ts', 'lib/server/**/*.ts', 'scripts/**/*.{ts,tsx,mts,cts}'],
+    files: ['scripts/**/*.{ts,tsx,mts,cts}'],
     languageOptions: { globals: globals.node },
   },
 
