@@ -280,25 +280,6 @@ const STUDIO_SERVICE_WORKER_WARM_URLS = STUDIO_I18N_NAMESPACES.flatMap((namespac
  * reads that manifest to police the eager module graph, so emitting the worker
  * as an app chunk would put a precache list on the studio bundle ratchet.
  */
-function studioBrowserHarnessPlugin(): Plugin {
-  const harnessRoot = path.resolve(repositoryRoot, "tools/browser-harnesses");
-  const prefix = "/tools/browser-harnesses/";
-  return {
-    name: "toonspectrum-browser-harnesses",
-    configureServer(server) {
-      server.middlewares.use((request, _response, next) => {
-        const pathname = request.url?.split("?", 1)[0] ?? "";
-        if (!pathname.startsWith(prefix)) { next(); return; }
-        const relative = pathname.slice(prefix.length);
-        const file = path.resolve(harnessRoot, relative);
-        if (!file.startsWith(harnessRoot + path.sep) || !existsSync(file)) { next(); return; }
-        request.url = "/@fs" + file;
-        next();
-      });
-    },
-  };
-}
-
 function studioServiceWorkerPlugin(): Plugin {
   let root = process.cwd();
   let outDir = path.resolve(root, "dist");
@@ -391,7 +372,6 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     preferImplementationOverTestModulePlugin(),
     studioCrossOriginIsolationPlugin(),
-    studioBrowserHarnessPlugin(),
     studioServiceWorkerPlugin(),
     react(),
     babel({ presets: [reactCompilerPreset()] }),
