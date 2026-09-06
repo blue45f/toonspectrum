@@ -1,5 +1,3 @@
-import { DatabaseSync } from "node:sqlite";
-
 import { buildInkBasicKpp } from "../brushes/kpp/synthetic-kpp";
 
 import type {
@@ -7,6 +5,11 @@ import type {
   CspSqliteTableSnapshot,
   CspSutSqliteReader,
 } from "../../../packages/studio-format-gateway/src/csp-sut";
+import type { DatabaseSync } from "node:sqlite";
+
+// Resolved at runtime rather than imported: jsdom component tests import this fixture through
+// Vite's client pipeline, which cannot bundle a Node built-in.
+const { DatabaseSync: SqliteDatabase } = process.getBuiltinModule("node:sqlite");
 
 
 type SerializableDatabaseSync = DatabaseSync & {
@@ -33,7 +36,7 @@ export interface SutFixtureOptions {
 }
 
 export function buildAuthoredSutFixture(options: SutFixtureOptions = {}): Uint8Array {
-  const database = new DatabaseSync(":memory:") as SerializableDatabaseSync;
+  const database = new SqliteDatabase(":memory:") as SerializableDatabaseSync;
   try {
     database.exec(`
       PRAGMA page_size = 4096;
@@ -136,7 +139,7 @@ export const readAuthoredSutWithNodeSqlite: CspSutSqliteReader = async (
   context,
 ): Promise<CspSqliteSnapshot> => {
   if (context.signal?.aborted) throw new DOMException("aborted", "AbortError");
-  const database = new DatabaseSync(":memory:") as SerializableDatabaseSync;
+  const database = new SqliteDatabase(":memory:") as SerializableDatabaseSync;
   try {
     database.deserialize(bytes);
     database.enableDefensive(true);

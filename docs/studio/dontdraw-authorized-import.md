@@ -161,40 +161,6 @@ growing/truncated files, inode/timestamp changes, size limits, invalid UTF-8, pr
 and rollback that preserves independent data.
 No synthetic fixture is represented as a Dontdraw acquisition.
 
-## Reliability hardening — 2026-09-06
-
-The CLI exits with `1` when an inspection report contains invalid files, while keeping the
-complete machine-readable report on stdout. Command/manifest errors also exit with `1` and
-write their error to stderr. Exit `0` never means publication or visual approval; the exit-code
-table in the next section defines every status. Duplicate options, blank path values, and
-`--write` without `--output` are rejected before I/O. Help is accepted as a standalone `--help`,
-not as a way to mask invalid write arguments.
-
-Both manifests and original files use the same bounded reader. It rejects devices, directories,
-symlinks and named pipes before opening; where the OS supports them, no-follow and nonblocking
-flags additionally guard the open operation. Reads are positional and limited to the initial
-file size in chunks of at most 64 KiB, plus one byte to detect growth. Descriptor/path identity,
-size, modification time and change time are compared to detect concurrent mutations. Invalid
-UTF-8 manifests are rejected rather than silently altered. The remaining batch budget is
-checked before reading an additional payload, not after an oversized allocation.
-
-Staging re-reads and hashes bounded source bytes before writing, rather than copying a path
-that can change beneath an unbounded copy operation. On POSIX, newly created bundle directories
-use mode `0700` and original files/reports/manifests use `0600`, including under a permissive
-umask. Windows ACLs are not configured by this command.
-
-The new contracts cover real named-pipe rejection in isolated child processes, failing CLI exit
-status with intact JSON, partial reads, growing/truncated files, inode/timestamp changes, size
-limits, private permissions and rollback that preserves independent data. Existing contracts
-remain unchanged. Node's built-in runner and the root Vitest collector use the same test files.
-The focused CI workflow is additional evidence only; it does not replace the required `core`
-check or alter branch protection.
-
-These checks are not a filesystem sandbox against an actively hostile local user or a timeout
-for a stalled network filesystem. Keep source/output parent directories operator-controlled and
-unchanged during intake. Container validation is still not full decoding or visual approval;
-no source asset, catalogue entry, licence verification or public publication is added here.
-
 ## Automation and review workflow hardening
 
 The inspection CLI now returns meaningful process exit codes. This fixes the earlier case in

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { studioFilterCatalogEntry } from "./filter/studio-filter-catalog";
 import { STUDIO_FILTER_UNION_WAVE_KINDS } from "./filter/studio-filter-pack-registry";
 import {
   STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
@@ -16,6 +17,7 @@ import {
   serializeStudioAdjustmentStack,
   studioAdjustmentDefaultParams,
   studioAdjustmentEngineHasLivePreview,
+  studioAdjustmentEngineLabel,
   studioAdjustmentOperationToFilterFields,
   studioAdjustmentStackHasLivePreview,
   studioAdjustmentStackSerializedByteLength,
@@ -382,6 +384,21 @@ describe("studio adjustment stack", () => {
       ...STUDIO_FILTER_UNION_WAVE_KINDS,
     ]));
     expect(STUDIO_ADJUSTMENT_ENGINE_IDS).toHaveLength(77);
+  });
+
+  it("labels every engine with the shared catalogue title so a stack chip matches its add-list row", () => {
+    for (const engine of STUDIO_ADJUSTMENT_ENGINE_IDS) {
+      const entry = studioFilterCatalogEntry(engine);
+      expect(entry, `${engine} has no catalogue entry`).not.toBeNull();
+      expect(studioAdjustmentEngineLabel(engine), engine).toBe(entry?.title);
+    }
+    // #771 (c9ef0ff7) renamed these in the catalogue; the inspector must not keep the old copy.
+    expect(studioAdjustmentEngineLabel("field-iris-blur")).toBe("영역 초점 블러");
+    expect(studioAdjustmentEngineLabel("tileable-blur")).toBe("이음매 없는 블러");
+    expect(studioAdjustmentEngineLabel("ink-threshold")).toBe("흑백 이진화");
+    expect(studioAdjustmentEngineLabel("jpeg-artifact-reduction")).toBe("JPEG 압축 깨짐 제거");
+    expect(studioAdjustmentEngineLabel("edge-aware-denoise")).toBe("윤곽 보존 노이즈 제거");
+    expect(studioAdjustmentEngineLabel("god-rays")).toBe("빛줄기");
   });
 
   it("projects every Filter Gallery union engine into an editable non-destructive operation", () => {

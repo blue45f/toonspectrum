@@ -5,8 +5,8 @@
  * Can live on image elements as `smartFilters` or on a dedicated adjustment layer record.
  */
 
+import { studioFilterCatalogEntry } from "./filter/studio-filter-catalog";
 import {
-  STUDIO_FILTER_PACK_LABELS,
   STUDIO_FILTER_UNION_WAVE_KINDS,
   type StudioFilterUnionWaveKind,
 } from "./filter/studio-filter-pack-registry";
@@ -635,134 +635,15 @@ export function normalizeStudioAdjustmentFilterOperations(
   });
 }
 
+/**
+ * Chip and aria-label wording for a stack entry. Read from the shared filter catalogue so the
+ * entry never disagrees with the add-list row it came from — #771 (c9ef0ff7) renamed twelve
+ * filters there (JPEG 아티팩트 감소 → JPEG 압축 깨짐 제거, 필드 아이리스 블러 → 영역 초점 블러, …) and a
+ * hand-written copy here kept the old names inside the same panel. The engine id is the fallback
+ * only for an engine the catalogue has not described yet.
+ */
 export function studioAdjustmentEngineLabel(engine: StudioAdjustmentEngineId): string {
-  if (isStudioAdjustmentUnionWaveEngine(engine)) {
-    return STUDIO_FILTER_PACK_LABELS[engine];
-  }
-  switch (engine) {
-    case "curves":
-      return "곡선";
-    case "levels":
-      return "레벨";
-    case "brightness-contrast":
-      return "밝기/대비";
-    case "shadow-highlight":
-      return "섀도우/하이라이트";
-    case "hue-saturation":
-      return "색조/채도";
-    case "color-balance":
-      return "색 균형";
-    case "channel-mixer":
-      return "채널 믹서";
-    case "gradient-map":
-      return "그라디언트 맵";
-    case "blur":
-      return "빠른 블러";
-    case "gaussian-blur":
-      return "가우시안 블러";
-    case "motion-blur":
-      return "모션 블러";
-    case "spin-blur":
-      return "회전 블러";
-    case "zoom-blur":
-      return "줌 블러";
-    case "lens-blur":
-      return "렌즈 블러";
-    case "field-iris-blur":
-      return "필드 아이리스 블러";
-    case "tilt-shift-blur":
-      return "틸트 시프트 블러";
-    case "selective-gaussian-blur":
-      return "선택적 가우시안 블러";
-    case "tileable-blur":
-      return "타일러블 블러";
-    case "sharpen":
-      return "샤픈";
-    case "smart-sharpen":
-      return "스마트 샤픈";
-    case "median-despeckle":
-      return "미디언 잡티 제거";
-    case "high-pass":
-      return "하이패스";
-    case "noise":
-      return "노이즈";
-    case "invert":
-      return "반전";
-    case "grayscale":
-      return "그레이스케일";
-    case "sepia":
-      return "세피아";
-    case "pixelate":
-      return "모자이크 / 픽셀화";
-    case "posterize":
-      return "포스터화";
-    case "ink-threshold":
-      return "먹선 임계값";
-    case "line-extraction":
-      return "선화 추출";
-    case "line-cleanup":
-      return "스케치 선화 정리";
-    case "screentone-removal":
-      return "스크린톤 제거";
-    case "jpeg-artifact-reduction":
-      return "JPEG 아티팩트 감소";
-    case "edge-aware-denoise":
-      return "엣지 보존 노이즈 감소";
-    case "dust-scratches":
-      return "먼지와 스크래치 제거";
-    case "difference-of-gaussians":
-      return "가우시안 차분 선화";
-    case "color-to-alpha":
-      return "색상 투명화";
-    case "screentone":
-      return "흑백 스크린톤";
-    case "color-halftone":
-      return "컬러 하프톤";
-    case "chromatic-aberration":
-      return "색수차";
-    case "edge-detect":
-      return "외곽선 검출";
-    case "emboss":
-      return "엠보스";
-    case "solarize":
-      return "솔라리제이션";
-    case "oil-paint":
-      return "유화";
-    case "exposure":
-      return "노출 / 감마 / 오프셋";
-    case "unsharp-mask":
-      return "언샤프 마스크";
-    case "morphology":
-      return "팽창 / 침식";
-    case "offset":
-      return "픽셀 오프셋";
-    case "custom-convolution":
-      return "사용자 컨볼루션";
-    case "clouds":
-      return "구름 텍스처";
-    case "surface-blur":
-      return "표면 보존 블러";
-    case "crystal-mosaic":
-      return "크리스털 모자이크";
-    case "pencil-sketch":
-      return "연필 스케치";
-    case "crosshatch":
-      return "교차 해칭";
-    case "ordered-dither":
-      return "순서 디더";
-    case "glowing-edges":
-      return "빛나는 외곽선";
-    case "cutout":
-      return "종이 컷아웃";
-    case "retro-film":
-      return "레트로 필름";
-    case "watercolor":
-      return "수채화";
-    case "diffuse-glow":
-      return "확산 글로우";
-    default:
-      return engine;
-  }
+  return studioFilterCatalogEntry(engine)?.title ?? engine;
 }
 
 export type StudioAdjustmentEntryFilterFields = {

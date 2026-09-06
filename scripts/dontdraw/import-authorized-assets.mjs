@@ -88,9 +88,21 @@ async function sourceFile(root, relativePath) {
   return resolved;
 }
 
-async function inspectFile(filename, maxBytes = MAX_FILE_BYTES) {
-  const bytes = await readStableFile(filename, maxBytes);
+async function inspectFile(filename, maximumBytes = MAX_FILE_BYTES) {
+  const bytes = await readStableFile(filename, maximumBytes);
   return { bytes, sha256: createHash("sha256").update(bytes).digest("hex"), size: bytes.length };
+}
+
+async function readSourceManifest(filename) {
+  let bytes;
+  try {
+    // The bounded descriptor reader rejects pipes/devices/symlinks before opening and enforces the byte limit.
+    bytes = await readStableFile(filename, MAX_MANIFEST_BYTES);
+  } catch (error) {
+    throw new Error(`Source manifest must be a regular file of at most 8 MiB: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
+  // Invalid UTF-8 is an error, never silently replaced with U+FFFD before validation.
+  return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
 }
 
 function inspectReadyFormat(extension, bytes) {
@@ -150,13 +162,7 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
   const root = await realpath(sourceDir);
   if (!(await lstat(root)).isDirectory()) throw new Error("sourceDir must be a directory");
   const sourceManifest = await sourceFile(root, manifestPath);
-  const manifestStat = await lstat(sourceManifest);
-  if (manifestStat.isFile() && manifestStat.size > MAX_MANIFEST_BYTES) {
-    throw new Error(`Source manifest exceeds 8 MiB (${MAX_MANIFEST_BYTES} bytes)`);
-  }
-  // The stable reader rejects FIFOs/devices before open; invalid UTF-8 must fail, never be replaced.
-  const manifestBytes = await readStableFile(sourceManifest, MAX_MANIFEST_BYTES);
-  const input = validateSourceManifest(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(manifestBytes)));
+  const input = validateSourceManifest(await readSourceManifest(sourceManifest));
   const destination = outputDir ? path.resolve(outputDir) : undefined;
   if (write && !destination) throw new Error("--output is required with --write");
   if (destination && (within(root, destination) || within(destination, root))) throw new Error("Output and source must not overlap");
@@ -211,8 +217,7 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
     await mkdir(path.dirname(destination), { recursive: true });
     const actualDestination = path.join(await realpath(path.dirname(destination)), path.basename(destination));
     if (within(root, actualDestination) || within(actualDestination, root)) throw new Error("Output and source must not overlap through symlinks");
-    // Exclusive private reservation; /ready appears only after every source and output has passed,
-    // and a failed run cleans up only its own staging data (identity-checked, never a substituted path).
+    // Exclusive reservation, staging directory, atomic /ready exposure and scoped cleanup live in stagePrivateBundle.
     await stagePrivateBundle(actualDestination, async (temporary) => {
       await mkdir(path.join(temporary, "files"), { mode: 0o700 });
       for (const item of entries) {
@@ -235,12 +240,11 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
 
 export function parseCliOptions(argv) {
   const options = { manifestPath: "source.json", write: false };
-  // A Map keeps prototype names such as "toString" from resolving as options.
   const names = new Map([["--source-dir", "sourceDir"], ["--manifest", "manifestPath"], ["--output", "outputDir"]]);
   const seen = new Set();
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
-    if (flag === "--") continue;
+    if (flag === "--") continue; // pnpm/npm argument separator
     if (seen.has(flag)) throw new Error(`Duplicate option: ${flag}`);
     seen.add(flag);
     if (flag === "--write") { options.write = true; continue; }
@@ -254,9 +258,9 @@ export function parseCliOptions(argv) {
 }
 
 export async function runCli(argv) {
-  // Only a standalone --help succeeds; "--write --help" must not mask a broken command with exit 0.
+  // Help is honoured only on its own so it can never mask a malformed write command.
   if (argv.length === 1 && argv[0] === "--help") {
-    console.log("node scripts/dontdraw/import-authorized-assets.mjs --source-dir /originals --manifest source.json [--output /new-batch --write]\nDefault is read-only inspection. --write stages an offline bundle under /new-batch/ready, not a public upload.\nExit code: 0 = structurally ready for review (not publication); 1 = invalid files or command failure; 2 = conversion required, unsupported format or empty batch.");
+    console.log("node scripts/dontdraw/import-authorized-assets.mjs --source-dir /originals --manifest source.json [--output /new-batch --write]\nDefault is read-only inspection. --write stages an offline bundle under /new-batch/ready, not a public upload. Exit: 0=structurally ready, 1=invalid/error, 2=conversion/unsupported/empty batch.");
     return 0;
   }
   const result = await prepareAuthorizedImport(parseCliOptions(argv));

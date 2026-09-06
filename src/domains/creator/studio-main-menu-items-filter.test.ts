@@ -11,6 +11,9 @@
  * filters, or the moment a registered filter kind has no way in from the menubar.
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { STUDIO_FILTER_CATALOG, STUDIO_FILTER_DIALOG_CATALOG, studioFilterGroupLabel } from "./filter/studio-filter-catalog";
@@ -19,6 +22,7 @@ import { STUDIO_FILTER_DIALOG_GROUP_ORDER } from "./filter/studio-filter-menu-gr
 import { STUDIO_FILTER_PACK_DEFS } from "./filter/studio-filter-pack";
 import {
   STUDIO_FILTER_ALL_KINDS,
+  STUDIO_FILTER_ALL_LABELS,
   STUDIO_FILTER_PACK_KINDS,
   STUDIO_FILTER_PACK_LABELS,
 } from "./filter/studio-filter-pack-registry";
@@ -144,6 +148,26 @@ describe("filter menu ↔ filter gallery parity", () => {
         STUDIO_FILTER_LABELS[item.id as keyof typeof STUDIO_FILTER_LABELS],
       );
     }
+  });
+
+  it("names every filter in the Korean locale pack exactly as the catalogue does", () => {
+    // public/i18n/studio/ko.json overrides the source labels once the pack loads, so a registry
+    // rename that skips the pack (#771, c9ef0ff7 left twelve rows behind) shows the old name in
+    // the menubar while the dialog, the inspector chips and command search show the new one.
+    const pack = JSON.parse(
+      readFileSync(path.resolve(process.cwd(), "public", "i18n", "studio", "ko.json"), "utf8"),
+    ) as Record<string, string>;
+    const missing = STUDIO_FILTER_ALL_KINDS.filter(
+      (kind) => !(`studio.mainMenu.item.filter.${kind}` in pack),
+    );
+    expect(missing).toEqual([]);
+    const drift = STUDIO_FILTER_ALL_KINDS.flatMap((kind) => {
+      const packed = pack[`studio.mainMenu.item.filter.${kind}`];
+      return packed === STUDIO_FILTER_ALL_LABELS[kind]
+        ? []
+        : [{ kind, pack: packed, catalogue: STUDIO_FILTER_ALL_LABELS[kind] }];
+    });
+    expect(drift).toEqual([]);
   });
 
   it("keeps the pack schema label and the registry label the same string", () => {
