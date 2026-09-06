@@ -104,17 +104,17 @@ describe("portable Remotion kit", () => {
     expect(pkg.dependencies.remotion).toBe(PROMO_REMOTION_VERSION);
     expect(pkg.dependencies["@remotion/cli"]).toBe(PROMO_REMOTION_VERSION);
     expect(pkg.scripts.render).toContain("--codec=h264");
-    expect(files["apps/web/src/index.ts"]).toContain("registerRoot(Root)");
-    expect(files["apps/web/src/Promo.tsx"]).toContain("drawPromoFrame");
-    expect(files["apps/web/src/Promo.tsx"]).toContain('loopVolumeCurveBehavior="extend"');
-    expect(files["apps/web/src/promo-model.ts"]).toBe("model source");
+    expect(files["src/index.ts"]).toContain("registerRoot(Root)");
+    expect(files["src/Promo.tsx"]).toContain("drawPromoFrame");
+    expect(files["src/Promo.tsx"]).toContain('loopVolumeCurveBehavior="extend"');
+    expect(files["src/promo-model.ts"]).toBe("model source");
     expect(files["public/panel-1.png"]).toEqual(new TextEncoder().encode("hello"));
     expect(files["project.json"]).not.toContain("base64");
     expect(files["captions.srt"]).toContain("00:00:15,000");
   });
   it("produces standard CRC32 and a deterministic ZIP central directory", () => {
     expect(promoCrc32(new TextEncoder().encode("123456789"))).toBe(0xcbf43926);
-    const files = { "apps/web/src/a.ts": "한글", "public/a.png": new Uint8Array([1, 2, 3]) };
+    const files = { "src/a.ts": "한글", "public/a.png": new Uint8Array([1, 2, 3]) };
     const zip = promoZip(files);
     expect(zip).toEqual(promoZip(files));
     const view = new DataView(zip.buffer);

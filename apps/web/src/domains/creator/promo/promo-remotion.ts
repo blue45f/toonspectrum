@@ -33,15 +33,15 @@ export function promoRemotionFiles(input: PromoProject, sources: PromoRenderSour
   }
   files["project.json"] = JSON.stringify({ ...project, panels, audio }, null, 2);
   files["captions.srt"] = promoSrt(project);
-  files["apps/web/src/promo-model.ts"] = sources.model;
-  files["apps/web/src/promo-canvas.ts"] = sources.canvas;
+  files["src/promo-model.ts"] = sources.model;
+  files["src/promo-canvas.ts"] = sources.canvas;
   files["package.json"] = JSON.stringify({
     name: "toonstudio-promo-render", private: true, version: "1.0.0",
     scripts: { studio: "remotion studio src/index.ts", render: "remotion render src/index.ts WebtoonPromo out/promo.mp4 --codec=h264 --crf=18 --pixel-format=yuv420p" },
     dependencies: { "@remotion/cli": PROMO_REMOTION_VERSION, remotion: PROMO_REMOTION_VERSION, react: "19.2.0", "react-dom": "19.2.0" },
   }, null, 2);
-  files["apps/web/src/index.ts"] = 'import {registerRoot} from "remotion";\nimport {Root} from "./Root";\nregisterRoot(Root);\n';
-  files["apps/web/src/Root.tsx"] = `import React from "react";
+  files["src/index.ts"] = 'import {registerRoot} from "remotion";\nimport {Root} from "./Root";\nregisterRoot(Root);\n';
+  files["src/Root.tsx"] = `import React from "react";
 import {Composition, staticFile} from "remotion";
 import raw from "../project.json";
 import {Promo} from "./Promo";
@@ -51,7 +51,7 @@ const project = {...input, panels: input.panels.map(p => ({...p, src: staticFile
 const size = promoSize(project.ratio);
 export const Root = () => <Composition id="WebtoonPromo" component={Promo} defaultProps={{project}} fps={PROMO_FPS} durationInFrames={promoFrameCount(project)} width={size.width} height={size.height} />;
 `;
-  files["apps/web/src/Promo.tsx"] = `import React, {useEffect, useLayoutEffect, useRef, useState} from "react";
+  files["src/Promo.tsx"] = `import React, {useEffect, useLayoutEffect, useRef, useState} from "react";
 import {AbsoluteFill, Html5Audio, cancelRender, continueRender, delayRender, useCurrentFrame, useVideoConfig} from "remotion";
 import {drawPromoFrame, loadPromoImages, type PromoImages} from "./promo-canvas";
 import {promoAudioGain, type PromoProject} from "./promo-model";
