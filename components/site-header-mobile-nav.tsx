@@ -23,24 +23,25 @@ import Link from "@/src/compat/router-link";
 
 const MOBILE_NAV = [
   { i18n: "nav.home", href: "/", icon: Home, exact: true },
+  { i18n: "nav.studio", href: "/studio", icon: Palette },
+  { i18n: "nav.assets", href: "/market", icon: Store },
+  { i18n: "nav.creators", href: "/create", icon: Palette },
+  { i18n: "nav.discover", href: "/explore", icon: Compass },
   { i18n: "nav.ranking", href: "/ranking", icon: TrendingUp },
   { i18n: "nav.calendar", href: "/calendar", icon: CalendarDays },
   { i18n: "nav.recommend", href: "/recommend", icon: Sparkles },
-  { i18n: "nav.explore", href: "/explore", icon: Compass },
   { i18n: "nav.fortune", href: "/fortune", icon: Moon },
   { i18n: "nav.play", href: "/play", icon: Gamepad2 },
   { i18n: "nav.reviews", href: "/reviews", icon: MessageSquareQuote },
   { i18n: "nav.community", href: "/community", icon: MessageCircle },
-  { i18n: "nav.create", href: "/create", icon: Palette },
   { i18n: "nav.shaper", href: "/shaper", icon: UserRoundPen },
-  { i18n: "nav.market", href: "/market", icon: Store },
   { i18n: "nav.insights", href: "/insights", icon: BarChart3 },
 ];
 
 // 모바일 하단 탭바: 빠른 접근용 핵심 4개 (+ 서재). 나머지(연재·리뷰·인사이트)는
 // 햄버거 오버플로 메뉴로 모두 도달 가능하다.
 const MOBILE_TABS = MOBILE_NAV.filter((n) =>
-  ["/", "/ranking", "/recommend", "/explore", "/community"].includes(n.href)
+  ["/", "/studio", "/market", "/create", "/explore"].includes(n.href)
 );
 
 interface MobileHeaderNavigationProps {

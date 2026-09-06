@@ -1,8 +1,12 @@
-import { HomePage } from "../catalog/HomePage";
+import { CreatorHomePage as MarketingCreatorHomePage } from "../marketing/CreatorHomePage";
 
 import { CreatorHubEntry } from "./CreatorHubEntry";
 
-/** Load the hub entry with the home route, never with the shared Studio shell. */
+/**
+ * The root route renders the creator-first marketing home (#799) followed by the
+ * creator resources hub entry (#788). Load both with the home route, never with the
+ * shared Studio shell.
+ */
 export function CreatorHomePage() {
-  return <><HomePage /><CreatorHubEntry /></>;
+  return <><MarketingCreatorHomePage /><CreatorHubEntry /></>;
 }
