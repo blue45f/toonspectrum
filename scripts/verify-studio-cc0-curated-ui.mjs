@@ -30,7 +30,7 @@ await writeFile(path.join(root,htmlName),'<!doctype html><html lang="ko"><meta c
 await writeFile(path.join(root,entryName),`${cssImports}
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import {StudioCc0AssetLibraryPanel} from '../apps/web/src/domains/creator/StudioCc0AssetLibraryPanel';
+import {StudioCc0AssetLibraryPanel} from './apps/web/src/domains/creator/StudioCc0AssetLibraryPanel';
 window.__cc0Accept=true;
 window.__cc0Used=null;
 window.__cc0UseCount=0;
