@@ -14,6 +14,7 @@ import { CatalogModule } from "./modules/catalog/catalog.module";
 import { CommunityModule } from "./modules/community/community.module";
 import { CreatorModule } from "./modules/creator/creator.module";
 import { CreatorMarketplaceModule } from "./modules/creator-marketplace/creator-marketplace.module";
+import { CreatorResourcesModule } from "./modules/creator-resources/creator-resources.module";
 import { FeedbackModule } from "./modules/feedback/feedback.module";
 import { FortuneModule } from "./modules/fortune/fortune.module";
 import { HealthModule } from "./modules/health/health.module";
@@ -51,6 +52,7 @@ const studioRealtimeTicketModule =
     FeedbackModule,
     CreatorMarketplaceModule,
     CreatorModule,
+    CreatorResourcesModule,
     ...(studioRealtimeTicketModule
       ? [studioRealtimeTicketModule]
       : []),

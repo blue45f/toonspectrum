@@ -3,7 +3,7 @@ import { defineAppRoutes } from "../app-route-definition";
 import { lazyRetry } from "@/lib/lazy-retry";
 
 const HomePage = lazyRetry(
-  () => import("@/src/domains/catalog/HomePage").then((module) => ({ default: module.HomePage })),
+  () => import("@/src/domains/creator-resources/CreatorHomePage").then((module) => ({ default: module.CreatorHomePage })),
   "HomePage",
 );
 const RankingPage = lazyRetry(

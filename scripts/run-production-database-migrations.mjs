@@ -6,6 +6,7 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";
 import {
   createPsqlEnvironment,
   validateProductionDatabaseUrl,
@@ -2364,6 +2365,8 @@ export function runProductionDatabaseMigrations({
     // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildFeedbackRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildFeedbackCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole));
     psql(
       databaseUrl,

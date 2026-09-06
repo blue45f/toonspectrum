@@ -33,6 +33,16 @@ const CharacterShaperLandingPage = lazyRetry(
   })),
   "CharacterShaperLandingPage",
 );
+const StudioBrushLabPage = lazyRetry(
+  async () => {
+    const [module] = await Promise.all([
+      import("@/src/domains/creator/brush-lab/StudioBrushLabPage"),
+      loadStudioI18nDictionaries(),
+    ]);
+    return { default: module.StudioBrushLabPage };
+  },
+  "StudioBrushLabPage",
+);
 const LearnPage = lazyRetry(
   () => import("@/src/domains/learn/LearnPage").then((module) => ({ default: module.LearnPage })),
   "LearnPage",
@@ -56,6 +66,7 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-series", path: "/create/series/:id", element: <CreateSeriesPage /> },
   { id: "creator-work", path: "/create/:id", element: <CreateWorkPage /> },
   { id: "creator-character-shaper", path: "/shaper", element: <CharacterShaperLandingPage /> },
+  { id: "creator-brush-lab", path: "/brush-lab", element: <StudioBrushLabPage /> },
   { id: "creator-learning", path: "/learn/*", element: <LearnPage /> },
   { id: "creator-studio", path: "/studio/*", element: <StudioRouter /> },
 ]);

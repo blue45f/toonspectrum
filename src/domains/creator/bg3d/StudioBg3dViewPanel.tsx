@@ -7,6 +7,7 @@ import {
   summarizeStudioBg3dProductionLook,
 } from "./studio-bg3d-production-pass-readiness";
 import { summarizeStudioBg3dProductionScene } from "./studio-bg3d-production-workflow";
+import { StudioBg3dSpatialStoryboardLauncher } from "./StudioBg3dSpatialStoryboardLauncher";
 import { StudioBg3dViewPanel as StudioBg3dViewPanelContent } from "./StudioBg3dViewPanelContent";
 
 import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
@@ -136,6 +137,7 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
   return (
     <StudioBg3dProSuiteRuntimeContext.Provider value={runtime}>
       <StudioBg3dViewPanelContent {...props} />
+      <StudioBg3dSpatialStoryboardLauncher hidden={props.hidden} />
     </StudioBg3dProSuiteRuntimeContext.Provider>
   );
 }

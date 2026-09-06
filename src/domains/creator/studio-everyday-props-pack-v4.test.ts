@@ -61,16 +61,7 @@ const EVERYDAY_PROPS: readonly EverydayPropGate[] = [
       { anchorId: "secondary", node: "Book_RightGripEdge" },
     ],
   },
-  {
-    id: "cap",
-    filename: "everyday_cap.glb",
-    assetId: "everyday_cap_v4",
-    qualityClass: "headwear",
-    minNodes: 14,
-    minTriangles: 2_500,
-    requiredNodes: ["Cap_Crown", "Cap_Brim", "Cap_HeadContact", "Cap_PanelSeam_1"],
-    contacts: [{ anchorId: "surface", node: "Cap_HeadContact" }],
-  },
+  // Cap v5 is covered by studio-vrm-wearable-v5.test.ts; hollow headwear must not require a visible contact post.
   {
     id: "glasses",
     filename: "everyday_glasses.glb",

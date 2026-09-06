@@ -991,3 +991,9 @@ export type {
   StudioComipoAssemblyModule,
   StudioWebtoonGuidesModule,
 };
+
+// Keep optional scene loading in the shared registry, never in a popover body.
+export const Studio2dSceneBrowser = lazyRetry(
+  () => import("./Studio2dSceneBrowser").then((module) => ({ default: module.Studio2dSceneBrowser })),
+  "Studio2dSceneBrowser"
+);

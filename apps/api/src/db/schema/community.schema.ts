@@ -2,6 +2,8 @@ import { boolean, index, jsonb, pgTable, primaryKey, text, timestamp } from "dri
 
 import { users } from "./index";
 
+import type { FeedbackDetails } from "../../../../../packages/core/src/feedback";
+
 export const fanPosts = pgTable(
   "fan_post",
   {
@@ -108,11 +110,13 @@ export const feedbackPosts = pgTable(
     userId: text("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    category: text("category").notNull().default("question"), // question | idea | bug
+    category: text("category").notNull().default("question"), // question | idea | bug | request
     title: text("title").notNull(),
     text: text("text").notNull(),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
-    status: text("status").notNull().default("open"), // open(답변대기) | answered(답변완료)
+    status: text("status").notNull().default("open"), // reply status, independent of delivery
+    progress: text("progress").notNull().default("received"),
+    metadata: jsonb("metadata").$type<FeedbackDetails>().notNull().default({}),
     answeredAt: timestamp("answeredAt", { mode: "date" }),
     hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
     createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
@@ -120,6 +124,8 @@ export const feedbackPosts = pgTable(
   (t) => [
     index("idx_feedback_post_created").on(t.createdAt), // 목록 커서(createdAt desc, id desc)
     index("idx_feedback_post_status_created").on(t.status, t.createdAt), // 상태 필터 목록
+    index("idx_feedback_post_progress_created").on(t.progress, t.createdAt, t.id),
+    index("idx_feedback_post_user_created").on(t.userId, t.createdAt, t.id),
   ]
 );
 
@@ -145,4 +151,16 @@ export const feedbackReplies = pgTable(
     index("idx_feedback_reply_post").on(t.postId, t.createdAt), // 글 상세 답글 목록
     index("idx_feedback_reply_parent").on(t.parentId), // 하위 답글 존재 확인
   ]
+);
+
+
+// One authenticated person has at most one vote per post.
+export const feedbackVotes = pgTable(
+  "feedback_vote",
+  {
+    postId: text("postId").notNull().references(() => feedbackPosts.id, { onDelete: "cascade" }),
+    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] }), index("idx_feedback_vote_user").on(t.userId)]
 );

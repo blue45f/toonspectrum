@@ -49,7 +49,7 @@ export const STUDIO_CHROME_REGIONS: readonly StudioChromeRegionSpec[] = [
     role: "document-and-app-menus",
     labelKo: "상단 메뉴",
     description:
-      "파일·편집·삽입·보기 등 문서/앱 명령과 사용자 구성 명령 바 (CSP/PowerPoint 상단 메뉴 + CSP 커맨드 바; §15.3 Window ▸ Action Bar 는 `window/command-bar` 가 토글)",
+      "파일·편집·보기·삽입·레이어·그리기·만화·효과·AI·도움말의 워크플로 메뉴와 사용자 구성 명령 바 (정본 카탈로그는 유지하고 표시 계층만 통합)",
   },
   {
     id: "left-tool-rail",

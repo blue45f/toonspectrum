@@ -3,10 +3,24 @@ name: Studio brush and filter stability
 on:
   push:
     branches: [main]
-    paths: ['src/domains/creator/**', 'scripts/verify-studio-brushes.mts', 'scripts/verify-studio-filter-dialog.mts', '.github/workflows/studio-brush-filter-stability.yml']
+    paths:
+      - 'src/domains/creator/brush/**'
+      - 'src/domains/creator/filter/**'
+      - 'src/domains/creator/studio-image-filter*'
+      - 'src/domains/creator/studio-detail*'
+      - 'scripts/verify-studio-brushes.mts'
+      - 'scripts/verify-studio-filter-dialog.mts'
+      - '.github/workflows/studio-brush-filter-stability.yml'
   pull_request:
     branches: [main]
-    paths: ['src/domains/creator/**', 'scripts/verify-studio-brushes.mts', 'scripts/verify-studio-filter-dialog.mts', '.github/workflows/studio-brush-filter-stability.yml']
+    paths:
+      - 'src/domains/creator/brush/**'
+      - 'src/domains/creator/filter/**'
+      - 'src/domains/creator/studio-image-filter*'
+      - 'src/domains/creator/studio-detail*'
+      - 'scripts/verify-studio-brushes.mts'
+      - 'scripts/verify-studio-filter-dialog.mts'
+      - '.github/workflows/studio-brush-filter-stability.yml'
   workflow_dispatch:
 
 permissions:

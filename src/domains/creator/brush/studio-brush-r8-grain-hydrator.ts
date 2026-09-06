@@ -13,7 +13,6 @@ import {
   resolveStudioBrushR8GrainSampler,
   type StudioBrushR8GrainHydrationResult,
 } from "./studio-brush-r8-grain-runtime";
-
 import { createStudioBrushR8PngDecoder } from "./studio-brush-r8-png-decoder";
 
 import type { DownloadedStudioWorkAsset } from "../studio-work-asset-client";

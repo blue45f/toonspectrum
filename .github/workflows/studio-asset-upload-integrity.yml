@@ -1,0 +1,75 @@
+name: Studio asset upload integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/upload-toonstudio-3d-assets.mts
+      - scripts/upload-toonstudio-3d-assets.test.mjs
+      - src/domains/creator/StudioContinuityPanel.hardening.test.tsx
+      - src/domains/creator/StudioContinuityPanel.test.tsx
+      - src/domains/creator/StudioContinuityPanel.tsx
+      - src/domains/creator/quality-review-store.ts
+      - .github/workflows/studio-asset-upload-integrity.yml
+  push:
+    branches: [main]
+    paths:
+      - scripts/upload-toonstudio-3d-assets.mts
+      - scripts/upload-toonstudio-3d-assets.test.mjs
+      - src/domains/creator/StudioContinuityPanel.hardening.test.tsx
+      - src/domains/creator/StudioContinuityPanel.test.tsx
+      - src/domains/creator/StudioContinuityPanel.tsx
+      - src/domains/creator/quality-review-store.ts
+      - .github/workflows/studio-asset-upload-integrity.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-upload-integrity-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  upload-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Syntax and native Node contracts including loopback multipart
+        run: |
+          node --experimental-strip-types --check scripts/upload-toonstudio-3d-assets.mts
+          node --check scripts/upload-toonstudio-3d-assets.test.mjs
+          node --experimental-strip-types --test scripts/upload-toonstudio-3d-assets.test.mjs
+      - uses: pnpm/action-setup@v6
+      - run: pnpm install --frozen-lockfile
+      - name: Scoped zero-warning lint
+        run: pnpm exec eslint scripts/upload-toonstudio-3d-assets.mts scripts/upload-toonstudio-3d-assets.test.mjs src/domains/creator/StudioContinuityPanel.hardening.test.tsx src/domains/creator/StudioContinuityPanel.test.tsx src/domains/creator/quality-review-store.ts --max-warnings=0
+      - name: Register and execute the same contracts with root Vitest
+        run: pnpm exec vitest run scripts/upload-toonstudio-3d-assets.test.mjs
+      - name: Repeat quality-review teardown and upload regressions in shuffled order
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results/upload-review
+          for seed in 7791 7792 7793 7794 7795; do
+            pnpm exec vitest run \
+              scripts/upload-toonstudio-3d-assets.test.mjs \
+              src/domains/creator/StudioContinuityPanel.test.tsx \
+              src/domains/creator/StudioContinuityPanel.hardening.test.tsx \
+              --sequence.shuffle --sequence.seed="$seed" \
+              --reporter=default --reporter=json \
+              --outputFile="test-results/upload-review/seed-$seed.json"
+          done
+      - name: Retain actual per-seed results, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-review-regressions-${{ github.sha }}
+          path: test-results/upload-review/*.json
+          if-no-files-found: warn
+          retention-days: 7

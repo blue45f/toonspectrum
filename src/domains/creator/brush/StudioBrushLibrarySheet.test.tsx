@@ -199,7 +199,7 @@ describe("StudioBrushLibrarySheet", () => {
       screen.getByRole("button", { name: /떡지우개, 38% 지움/u })
         .getAttribute("aria-pressed"),
     ).toBe("true");
-    expect(screen.queryByRole("button", { name: "펜(매끈) 선택" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "매끈한 펜 선택" })).toBeNull();
     expect(screen.queryByRole("group", { name: "브러시 표시 방식" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /일반 지우개, 100% 지움/u }));
@@ -339,7 +339,7 @@ describe("StudioBrushLibrarySheet", () => {
     expect(screen.getByRole("button", { name: "작은 타일" }).getAttribute("aria-pressed"))
       .toBe("true");
     expect(container.querySelector('[data-studio-brush-preview-density="tile"]')).toBeTruthy();
-    expect(screen.getByRole("button", { name: "펜(매끈) 선택" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "매끈한 펜 선택" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "이름 목록" }));
     expect(viewGrid()?.dataset.studioBrushView).toBe("text");
@@ -347,9 +347,9 @@ describe("StudioBrushLibrarySheet", () => {
     expect(container.querySelector("[data-studio-brush-preview]")).toBeNull();
     expect(container.querySelectorAll('[data-studio-brush-text-row="true"]'))
       .toHaveLength(beginnerCatalogCount);
-    expect(screen.getByRole("button", { name: "펜(매끈) 선택" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "매끈한 펜 선택" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "G펜(필압) 선택" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "펜(매끈) 즐겨찾기" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "매끈한 펜 즐겨찾기" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "G펜(필압) 즐겨찾기" })).toBeTruthy();
   });
 
@@ -456,12 +456,12 @@ describe("StudioBrushLibrarySheet", () => {
     expect(container.querySelector('[data-studio-brush-kind-badge="ink"]')?.textContent).toBe(
       "잉크"
     );
-    fireEvent.click(screen.getByRole("button", { name: "펜(매끈) 기본값 다시 적용" }));
+    fireEvent.click(screen.getByRole("button", { name: "매끈한 펜 기본값 다시 적용" }));
 
     await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({
       catalogId: "pen",
-      catalogName: "펜(매끈)",
+      catalogName: "매끈한 펜",
       runtimeBrushId: "pen",
       defaultWidth: 6,
       defaultOpacity: 1,
@@ -810,7 +810,7 @@ describe("StudioBrushLibrarySheet", () => {
     const favoriteActions = screen.getAllByRole("button", { name: /즐겨찾기/u });
     expect(favoriteActions.every((button) => button.tabIndex === -1)).toBe(true);
 
-    const penTile = screen.getByRole("button", { name: "펜(매끈) 선택" });
+    const penTile = screen.getByRole("button", { name: "매끈한 펜 선택" });
     expect(penTile.getAttribute("aria-keyshortcuts")).toBe("F");
     penTile.focus();
     fireEvent.keyDown(penTile, { key: "f" });
@@ -831,7 +831,7 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "펜(매끈) 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "매끈한 펜 선택" }));
     rerender(
       <StudioBrushLibrarySheet
         open={false}
@@ -860,7 +860,7 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "펜(매끈) 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "매끈한 펜 선택" }));
     fireEvent.pointerDown(document.body);
     expect(onClose).toHaveBeenCalledOnce();
     expect(onClose).toHaveBeenCalledWith("outside-pointer");
@@ -923,7 +923,7 @@ describe("StudioBrushLibrarySheet", () => {
 
     expect(html).toMatch(/aria-label="펜\(매끈\) 선택" aria-pressed="true"/);
     expect(html).toMatch(/aria-label="G펜\(필압\) 선택" aria-pressed="false"/);
-    expect(html).toContain('aria-label="펜(매끈) 즐겨찾기 해제"');
+    expect(html).toContain('aria-label="매끈한 펜 즐겨찾기 해제"');
     expect(html).toContain('fill="currentColor"');
   });
 

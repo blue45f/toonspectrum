@@ -4,7 +4,7 @@
  * Menubar interaction contract measured in a real browser against the shipped build:
  * clicking a neighbouring title while a menu is open switched nothing (hover opened the
  * menu, then the click's own toggle closed it), Tab from inside an open panel dropped
- * focus on BODY while leaving the panel open, and the bar exposed 18 tab stops with no
+ * focus on BODY while leaving the panel open, and the ungrouped bar exposed 18 tab stops with no
  * menubar semantics. Each test below fails without the corresponding fix.
  */
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -169,23 +169,24 @@ describe("StudioMainMenu menubar interaction", () => {
 });
 
 /**
- * A composite title (삽입 · 도구) concatenates several catalogue groups into one
- * dropdown and captions each section with the group it came from. The caption used
- * to render `aria-hidden`, so a screen-reader user heard ~15 flat rows under 도구
- * with no sign that 팀 · 공유 권한 came from 협업. The sections are now `role="group"`
- * wrappers labelled by that same visible caption.
+ * Workflow composites concatenate related catalogue groups into one dropdown and
+ * name every source as an accessible section. Rows remain one flat menuitem sequence,
+ * so keyboard navigation crosses section boundaries without changing command ids.
  */
 describe("StudioMainMenu composite dropdown sections", () => {
   const CATALOGUE: readonly StudioMainMenuGroup[] = [
-    // 파일 is passed through by the presentation, not absorbed: it is the control
-    // that proves the wrappers belong to composite titles and not to every menu.
     {
-      id: "file",
-      label: "파일",
+      id: "layer",
+      label: "레이어",
       items: [
-        { id: "save", label: "초안 저장", onSelect: vi.fn() },
-        { id: "export", label: "내보내기…", onSelect: vi.fn() },
+        { id: "bring-front", label: "맨 위로", onSelect: vi.fn() },
+        { id: "send-back", label: "맨 뒤로", onSelect: vi.fn() },
       ],
+    },
+    {
+      id: "view",
+      label: "보기",
+      items: [{ id: "zoom-in", label: "확대", onSelect: vi.fn() }],
     },
     {
       id: "canvas",
@@ -196,14 +197,9 @@ describe("StudioMainMenu composite dropdown sections", () => {
       ],
     },
     {
-      id: "animation",
-      label: "애니메이션",
-      items: [{ id: "frames", label: "프레임 애니메이션", onSelect: vi.fn() }],
-    },
-    {
-      id: "collaboration",
-      label: "협업",
-      items: [{ id: "share", label: "팀 · 공유 권한…", onSelect: vi.fn() }],
+      id: "window",
+      label: "창",
+      items: [{ id: "reference", label: "참고 이미지", onSelect: vi.fn() }],
     },
   ];
 
@@ -218,54 +214,40 @@ describe("StudioMainMenu composite dropdown sections", () => {
   }
 
   function renderComposite(): HTMLElement {
-    const tools = presentedGroups().find((group) => group.id === "tools");
-    expect(tools?.label).toBe("도구");
-    expect(tools?.items).toHaveLength(4);
-    return openPanel("도구");
+    const view = presentedGroups().find((group) => group.id === "view");
+    expect(view?.label).toBe("보기");
+    expect(view?.items).toHaveLength(4);
+    return openPanel("보기");
   }
 
-  /**
-   * Section wrappers only — `getAllByRole("group")` would also collect any hint
-   * wrapper that takes `role="group"` when its row is unavailable, so scoping by
-   * the wrapper attribute keeps the assertion about sections. The role itself is
-   * still asserted below rather than assumed.
-   */
   function sectionWrappers(panel: HTMLElement): HTMLElement[] {
     return Array.from(
       panel.querySelectorAll<HTMLElement>("[data-studio-main-menu-section-group]"),
     );
   }
 
-  it("names each absorbed catalogue group as a labelled group inside the menu", () => {
+  it("names each source group as a labelled section inside the workflow menu", () => {
     const panel = renderComposite();
-
     const sections = sectionWrappers(panel);
+
     expect(sections.map((section) => section.getAttribute("data-studio-main-menu-section-group")))
-      .toEqual(["캔버스", "애니메이션", "협업"]);
+      .toEqual(["보기", "캔버스", "창"]);
     expect(sections.map((section) => section.getAttribute("role"))).toEqual([
       "group",
       "group",
       "group",
     ]);
-
-    // The caption is the accessible name, so the grouping survives even if the
-    // visible copy is localized later.
     expect(
       within(panel)
-        .getByRole("group", { name: "협업" })
-        .contains(screen.getByRole("menuitem", { name: "팀 · 공유 권한…" })),
-    ).toBe(true);
-    expect(
-      within(panel)
-        .getByRole("group", { name: "애니메이션" })
-        .contains(screen.getByRole("menuitem", { name: "프레임 애니메이션" })),
+        .getByRole("group", { name: "창" })
+        .contains(screen.getByRole("menuitem", { name: "참고 이미지" })),
     ).toBe(true);
   });
 
-  it("keeps the section caption in the accessibility tree", () => {
+  it("keeps section captions in the accessibility tree", () => {
     const panel = renderComposite();
-
     const captions = panel.querySelectorAll("[data-studio-main-menu-section]");
+
     expect(captions).toHaveLength(3);
     for (const caption of captions) {
       expect(caption.getAttribute("aria-hidden")).toBeNull();
@@ -274,17 +256,16 @@ describe("StudioMainMenu composite dropdown sections", () => {
     }
   });
 
-  it("keeps every row a flat menuitem that arrow keys still walk across sections", () => {
+  it("keeps a flat row order that arrow keys traverse across sections", () => {
     const panel = renderComposite();
-
     const items = within(panel).getAllByRole("menuitem");
+
     expect(items.map((item) => item.getAttribute("data-studio-menu-item-id"))).toEqual([
+      "zoom-in",
       "canvas-size",
       "canvas-rotate",
-      "frames",
-      "share",
+      "reference",
     ]);
-    // The group wrappers must not renumber the roving index the panel navigates by.
     expect(items.map((item) => item.getAttribute("data-studio-main-menu-item-index"))).toEqual([
       "0",
       "1",
@@ -295,20 +276,16 @@ describe("StudioMainMenu composite dropdown sections", () => {
     items[0]!.focus();
     fireEvent.keyDown(items[0]!, { key: "ArrowDown" });
     fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
-    // Third row opens the 애니메이션 section: arrows cross the wrapper boundary.
     expect(document.activeElement).toBe(items[2]);
-
     fireEvent.keyDown(document.activeElement!, { key: "End" });
     expect(document.activeElement).toBe(items[3]);
     fireEvent.keyDown(document.activeElement!, { key: "Home" });
     expect(document.activeElement).toBe(items[0]);
   });
 
-  it("wraps nothing in a non-composite dropdown, whose rows have no source group", () => {
-    const panel = openPanel("파일");
+  it("does not invent section wrappers for standalone Layer", () => {
+    const panel = openPanel("레이어");
 
-    // 파일 absorbed nobody, so there is no source group to name: wrapping its rows
-    // in a labelled group would invent a section a screen reader would then announce.
     expect(sectionWrappers(panel)).toHaveLength(0);
     expect(panel.querySelectorAll("[data-studio-main-menu-section]")).toHaveLength(0);
     expect(within(panel).queryAllByRole("group")).toHaveLength(0);
@@ -316,6 +293,6 @@ describe("StudioMainMenu composite dropdown sections", () => {
       within(panel)
         .getAllByRole("menuitem")
         .map((item) => item.getAttribute("data-studio-menu-item-id")),
-    ).toEqual(["save", "export"]);
+    ).toEqual(["bring-front", "send-back"]);
   });
 });

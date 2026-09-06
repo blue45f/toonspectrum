@@ -2,6 +2,7 @@ import { accountRoutes } from "./account.routes";
 import { adminRoutes } from "./admin.routes";
 import { catalogRoutes } from "./catalog.routes";
 import { communityRoutes } from "./community.routes";
+import { creatorResourcesRoutes } from "./creator-resources.routes";
 import { creatorRoutes } from "./creator.routes";
 import { experienceRoutes } from "./experience.routes";
 import { legalRoutes } from "./legal.routes";
@@ -18,6 +19,7 @@ export const appRoutes = [
   ...referenceRoutes,
   ...communityRoutes,
   ...creatorRoutes,
+  ...creatorResourcesRoutes,
   ...marketRoutes,
   ...accountRoutes,
   ...adminRoutes,
