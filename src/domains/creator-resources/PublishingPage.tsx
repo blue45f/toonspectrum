@@ -27,7 +27,7 @@ export function PublishingPage() {
     </section>
     <div className="grid gap-4 md:grid-cols-2">{CHECKLIST.map((item) => {
       const id = `publish-${item.id}`;
-      return <label htmlFor={id} key={id} className="flex cursor-pointer gap-4 rounded-2xl border border-line bg-panel p-5">
+      return <label aria-label={item.title} htmlFor={id} key={id} className="flex cursor-pointer gap-4 rounded-2xl border border-line bg-panel p-5">
         <input id={id} type="checkbox" className="mt-1 size-5 shrink-0" checked={workspace.checks.includes(id)} disabled={!ready || !writable || saving} onChange={(event) => { const checked = event.target.checked; void update((value) => ({ ...value, checks: checked ? [...new Set([...value.checks, id])] : value.checks.filter((key) => key !== id) })); }} />
         <span><span className="mb-2 block text-xs font-semibold text-accent">{item.group}</span><span className="block font-semibold leading-7">{item.title}</span><span className="mt-2 block text-sm leading-7 text-fg-2">{item.detail}</span></span>
       </label>;

@@ -136,7 +136,7 @@ export function parseWorkspace(raw: string | null): CreatorWorkspace {
     checks: [...new Set(v.checks.filter((item): item is string => typeof item === "string" && /^[\w-]{1,100}$/u.test(item)))],
   };
 }
-const markdownText = (value: string) => value.replaceAll("\\", "\\\\").replace(/[\[\]<>`*_]/gu, "\\$&");
+const markdownText = (value: string) => value.replaceAll("\\", "\\\\").replace(/[[\]<>`*_]/gu, "\\$&");
 export function attributionMarkdown(items: readonly CreatorResource[]): string {
   return "# 창작 자료 출처 기록\n\n검색·열람 권한은 이미지 재배포 허가와 다릅니다. 제작에 사용하기 전 원문 조건을 다시 확인하세요.\n\n" + items.map((item) =>
     `## ${markdownText(item.title)}\n- 제공처: ${RESOURCE_LABELS[item.provider]}\n- 저작자: ${markdownText(item.creator || "원문 확인")}\n- 원문: ${item.sourceUrl}\n- 이용조건: ${item.license}\n- 크레딧: ${markdownText(item.credit)}\n- 조회일: ${item.fetchedAt}\n`,

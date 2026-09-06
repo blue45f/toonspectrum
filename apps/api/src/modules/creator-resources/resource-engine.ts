@@ -197,7 +197,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
     async search(raw: unknown, clientId = "anonymous"): Promise<ResourceSearchResult> {
       const input = recordOf(raw);
       if (!isProvider(input.provider)) throw new ResourceInputError("지원하지 않는 데이터 제공처입니다.");
-      if (typeof input.q !== "string" || input.q.trim().length < 2 || input.q.length > 80 || /[\u0000-\u001f]/u.test(input.q)) throw new ResourceInputError("검색어는 2~80자로 입력하세요.");
+      if (typeof input.q !== "string" || input.q.trim().length < 2 || input.q.length > 80 || Array.from(input.q).some((character) => character.charCodeAt(0) < 32)) throw new ResourceInputError("검색어는 2~80자로 입력하세요.");
       const page = input.page === undefined ? 1 : Number(input.page);
       if ((typeof input.page !== "string" && input.page !== undefined && typeof input.page !== "number") || !Number.isInteger(page) || page < 1 || page > 20) throw new ResourceInputError("페이지는 1~20 범위여야 합니다.");
       takeClient(clientId);

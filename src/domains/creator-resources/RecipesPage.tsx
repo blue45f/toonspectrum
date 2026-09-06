@@ -12,7 +12,7 @@ function RecipePreview({ recipe, amount }: { recipe: Recipe; amount: number }) {
   const captions = ["문이 열렸다.", "그런데…", "이곳에 네가 왜?"];
   return <div className="space-y-3">
     <p className="text-xs text-fg-2">직접 제작한 도형 예시 · 완성 원고가 아닌 연출 실험입니다.</p>
-    <div className="max-h-[520px] overflow-y-auto rounded-xl border border-line bg-canvas p-4" tabIndex={0} aria-label="스크롤 가능한 실습 예시">
+    <div className="rounded-xl border border-line bg-canvas p-4" aria-label="실습 예시">
       {captions.map((caption, index) => <div key={caption} className="relative overflow-hidden rounded-lg border border-line" style={{ marginTop: index ? recipe.id === "scroll" ? amount : 20 : 0, height: index === 2 && recipe.id === "beats" ? amount : 140, background: recipe.id === "values" ? `hsl(0 0% ${amount}%)` : "#eeeeee" }}>
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 320 140" aria-hidden="true">
           {recipe.id === "motion" && Array.from({ length: amount }, (_, line) => <line key={`motion-${line}`} x1="15" x2={95 + line % 3 * 20} y1={12 + line * 7} y2={12 + line * 7} stroke="#606060" strokeWidth="2" />)}

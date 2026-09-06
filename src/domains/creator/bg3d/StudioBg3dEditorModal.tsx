@@ -16,6 +16,8 @@ export function StudioBg3dEditorModal({ h }) {
     webXrSessionState, requestUserClose,
   } = { ...R, ...h };
   if (!open && !webXrRendererLifetimeRetained) return null;
+  // A dense scrim separates workspaces without a full-screen backdrop-filter pass over the
+  // underlying 2D GPU canvas. The 3D viewport, resolution and output colour contract are unchanged.
   return (
     <div
       ref={modalDialogRef}
@@ -25,7 +27,7 @@ export function StudioBg3dEditorModal({ h }) {
       data-testid="studio-bg3d-dialog"
       hidden={!open}
       inert={!open ? true : undefined}
-      className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.94)] p-2 text-fg sm:p-4"
       role={open ? "dialog" : undefined}
       tabIndex={-1}
       style={{

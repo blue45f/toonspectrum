@@ -148,6 +148,16 @@ export function WorkFxPanel({
             흐르며, 배경음악을 켤 수 있어요. (배경음악은 독자가 재생 버튼을 눌러야 들려요.)
           </p>
 
+          <a
+            href={`/music?workId=${encodeURIComponent(work.id)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-sm font-medium text-accent hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <Music4 size={15} aria-hidden />
+            이 작품의 AI BGM · OST 만들기 (새 창)
+          </a>
+
           <label className="flex flex-col gap-1 text-xs text-fg-2">
             배경음악
             <select

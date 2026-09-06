@@ -1,10 +1,9 @@
 import { defineAppRoutes } from "../app-route-definition";
 
 import { lazyRetry } from "@/lib/lazy-retry";
-import { CreatorHubEntry } from "@/src/domains/creator-resources/CreatorHubEntry";
 
 const HomePage = lazyRetry(
-  () => import("@/src/domains/catalog/HomePage").then((module) => ({ default: module.HomePage })),
+  () => import("@/src/domains/creator-resources/CreatorHomePage").then((module) => ({ default: module.CreatorHomePage })),
   "HomePage",
 );
 const RankingPage = lazyRetry(
@@ -69,7 +68,7 @@ const GuidePage = lazyRetry(
 );
 
 export const catalogRoutes = defineAppRoutes([
-  { id: "catalog-home", path: "/", element: <><HomePage /><CreatorHubEntry /></> },
+  { id: "catalog-home", path: "/", element: <HomePage /> },
   { id: "catalog-ranking", path: "/ranking", element: <RankingPage /> },
   { id: "catalog-search", path: "/search", element: <SearchPage /> },
   { id: "catalog-recommend", path: "/recommend", element: <RecommendPage /> },

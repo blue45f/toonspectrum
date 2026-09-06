@@ -6,10 +6,9 @@ import { ProviderStatus } from "./ProviderStatus";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
+import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@/lib/creator-resources";
 import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/lib/creator-resources";
 import { apiPath } from "@/src/infrastructure/api";
-
-import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@/lib/creator-resources";
 
 const CONFIG = {
   met: { title: "창작 레퍼런스", intro: "복식·장식·가구·미술 자료를 찾아 출처와 함께 저장하세요. 공개 이용이 확인된 Met 자료만 미리보기를 제공합니다.", hint: "예: armor, costume, furniture, Korea", url: "https://www.metmuseum.org/art/collection", examples: ["armor", "costume", "furniture", "Korea"] },

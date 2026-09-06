@@ -1,0 +1,72 @@
+name: Studio music regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/domains/creator/music/**"
+      - "lib/studio-music*"
+      - "lib/server/studio-music*"
+      - "apps/api/src/modules/studio-music/**"
+      - ".github/workflows/studio-music-regression.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-music-regression-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  music-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify music contracts, storage authority and rendered React recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          git rev-parse HEAD > artifacts/music-tested-sha.txt
+          pnpm exec vitest run \
+            lib/studio-music.test.ts \
+            lib/server/studio-music-core.test.ts \
+            src/domains/creator/music/studio-music-library.test.ts \
+            src/domains/creator/music/studio-music-recovery.test.ts \
+            src/domains/creator/music/studio-music-work-scope.test.ts \
+            src/domains/creator/music/StudioMusicPage.test.tsx \
+            src/domains/creator/studio-browser-kv-authority-boundary.test.ts \
+            --maxWorkers=2 --reporter=default --reporter=json \
+            --outputFile=artifacts/music-regression.json
+      - name: Confirm the rendered page suite actually executed
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          import assert from 'node:assert/strict';
+          const report = JSON.parse(readFileSync('artifacts/music-regression.json', 'utf8'));
+          assert.equal(report.success, true);
+          const page = report.testResults.find((result) => result.name.endsWith('/music/StudioMusicPage.test.tsx'));
+          assert.ok(page, 'The rendered music page suite is missing from the report');
+          assert.ok(page.assertionResults.length >= 18, 'The rendered music page suite is incomplete');
+          assert.ok(page.assertionResults.every((result) => result.status === 'passed'));
+          JS
+      - name: Upload actual music test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-music-regression-${{ github.run_id }}
+          path: artifacts/music-*
+          retention-days: 7
+          if-no-files-found: warn

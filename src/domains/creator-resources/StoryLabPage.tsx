@@ -4,13 +4,12 @@ import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
+import type { StoryDraft } from "@/lib/creator-workspace-persistence";
 import { STORY_FIELDS, STORY_LABELS, storyMarkdown } from "@/lib/creator-resources";
 import {
   changedStoryFields, CREATOR_STORY_DRAFT_KEY, editStoryDraft, parseStoryDraft,
   resolveStoryConflict, storyDraftConflicts, storyDraftView,
 } from "@/lib/creator-workspace-persistence";
-
-import type { StoryDraft } from "@/lib/creator-workspace-persistence";
 
 export function StoryLabPage() {
   const { workspace, saveStory, clearError, error, ready, saving, writable } = useCreatorWorkspace();
