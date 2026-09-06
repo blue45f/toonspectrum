@@ -10,37 +10,49 @@ concurrency:
   group: studio-discovery-merge-review-771
   cancel-in-progress: false
 jobs:
-  inspect:
+  previous-failures:
     if: github.repository == 'blue45f/toonspectrum'
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
-      - name: Read the previously failed regression diagnostics
+      - name: Read previously failed regression diagnostics without forwarding credentials across hosts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
           import os, re, urllib.request
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+                  if redirected is not None:
+                      redirected.remove_header('Authorization')
+                  return redirected
           url = 'https://api.github.com/repos/blue45f/toonspectrum/actions/jobs/101369822575/logs'
           headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'}
-          with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as response:
+          opener = urllib.request.build_opener(SafeRedirect())
+          with opener.open(urllib.request.Request(url, headers=headers), timeout=60) as response:
               text = response.read().decode('utf-8', errors='replace')
           text = re.sub(r'\x1b\[[0-9;]*m', '', text)
           lines = text.splitlines()
           selected = set()
           for index, line in enumerate(lines):
               if any(word in line for word in ['FAIL ', 'AssertionError', 'Failed Tests', 'Failed Suites', 'Unhandled Error', 'Test Files', 'Tests  ', 'Error:']):
-                  selected.update(range(max(0, index - 1), min(len(lines), index + 22)))
+                  selected.update(range(max(0, index - 1), min(len(lines), index + 18)))
           print('BEGIN_PREVIOUS_TEST_DIAGNOSTICS')
-          print('\n'.join(lines[index] for index in sorted(selected))[-14500:])
+          print('\n'.join(lines[index] for index in sorted(selected))[-13000:])
           print('END_PREVIOUS_TEST_DIAGNOSTICS')
           PY
+  conflicts:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
           fetch-depth: 100
           persist-credentials: false
-      - name: Inspect current main integration without publishing or choosing conflict sides
+      - name: Inspect main integration without publishing or choosing conflict sides
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -59,19 +71,22 @@ jobs:
           print('CONFLICT_FILES:', conflicts)
           for name in conflicts:
               print('BEGIN_CONFLICT:', name)
+              for stage in (1, 2, 3):
+                  result = subprocess.run(['git', 'rev-parse', ':' + str(stage) + ':' + name], capture_output=True, text=True)
+                  print('STAGE', stage, result.stdout.strip())
               lines = Path(name).read_text(errors='replace').splitlines()
               selected = set()
               active = False
               for index, line in enumerate(lines):
                   if line.startswith('<<<<<<<'):
                       active = True
-                      selected.update(range(max(0, index - 6), index))
+                      selected.update(range(max(0, index - 4), index))
                   if active:
                       selected.add(index)
                   if line.startswith('>>>>>>>'):
                       active = False
-                      selected.update(range(index + 1, min(len(lines), index + 7)))
-              print('\n'.join(str(index + 1) + ': ' + lines[index] for index in sorted(selected))[:17000])
+                      selected.update(range(index + 1, min(len(lines), index + 5)))
+              print('\n'.join(str(index + 1) + ': ' + lines[index] for index in sorted(selected))[:12000])
               print('END_CONFLICT:', name)
           PY
           if [ "$code" -ne 0 ]; then
