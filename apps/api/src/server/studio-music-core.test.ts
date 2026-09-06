@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { defaultMusicBrief, MUSIC_MAX_BYTES } from "../studio-music";
+import { defaultMusicBrief, MUSIC_MAX_BYTES } from "@toonspectrum/core/studio-music";
 
 import { composeMusic, musicStatus } from "./studio-music-core";
 

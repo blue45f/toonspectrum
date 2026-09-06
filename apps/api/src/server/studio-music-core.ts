@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 
-import { buildMusicPrompt, isMp3, MUSIC_MAX_BYTES, parseMusicBrief } from "../studio-music";
+import { buildMusicPrompt, isMp3, MUSIC_MAX_BYTES, parseMusicBrief } from "@toonspectrum/core/studio-music";
 
-import type { MusicBrief, MusicStatus } from "../studio-music";
+import type { MusicBrief, MusicStatus } from "@toonspectrum/core/studio-music";
 
 export class MusicError extends Error {
   constructor(readonly status: number, message: string) { super(message); this.name = "MusicError"; }

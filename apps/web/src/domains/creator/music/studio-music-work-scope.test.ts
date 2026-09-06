@@ -4,7 +4,7 @@ import { describe, it } from "vitest";
 
 import { readMusicWorkId, scopeMusicBrief } from "./studio-music-work-scope";
 
-import type { MusicBrief } from "@/shared/lib/studio-music";
+import type { MusicBrief } from "@toonspectrum/core/studio-music";
 
 function brief(): MusicBrief {
   return {

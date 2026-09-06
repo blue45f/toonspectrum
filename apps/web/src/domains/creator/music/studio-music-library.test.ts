@@ -6,7 +6,7 @@ import { createMusicLibrary, MUSIC_LIBRARY_NAMESPACE, type MusicLibraryLock } fr
 
 import type { LocalMusicTrack } from "./studio-music-client";
 
-import { defaultMusicBrief, MUSIC_MAX_BYTES, MUSIC_TERMS_URL } from "@/shared/lib/studio-music";
+import { defaultMusicBrief, MUSIC_MAX_BYTES, MUSIC_TERMS_URL } from "@toonspectrum/core/studio-music";
 
 function track(index: number, ownerId = "owner-a"): LocalMusicTrack {
   return {

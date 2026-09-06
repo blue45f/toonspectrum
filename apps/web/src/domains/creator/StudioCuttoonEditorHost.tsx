@@ -1403,7 +1403,7 @@ import type {
 } from "@/src/infrastructure/creator-client";
 import type Konva from "konva";
 
-import { scheduleIdle } from "@/shared/components/auth/schedule-idle";
+import { scheduleIdle } from "@/domains/auth/components/schedule-idle";
 import { useIsMobile } from "@/src/hooks/use-media-query";
 import { useResizable } from "@/src/hooks/use-resizable";
 import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";

@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 import { shouldRenderAppSplash } from "./app-shell-splash";
 import { AppRouter } from "./routes/AppRouter";
 
-import { AuthSessionProvider } from "@/shared/components/auth/session-provider";
+import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { RandomIntro } from "@/shared/components/RandomIntro";
 import { pingVisit } from "@/shared/lib/visits-api";
@@ -22,7 +22,7 @@ const AgeGateHost = lazy(() =>
   })),
 );
 const StoreSync = lazy(() =>
-  import("@/shared/components/auth/store-sync").then((mod) => ({
+  import("@/domains/auth/components/store-sync").then((mod) => ({
     default: mod.StoreSync,
   })),
 );

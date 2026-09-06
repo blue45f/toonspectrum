@@ -17,7 +17,7 @@ import {
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { AuthModal } from "@/shared/components/auth/auth-modal";
+import { AuthModal } from "@/domains/auth/components/auth-modal";
 import { AvatarUploader } from "@/shared/components/avatar-uploader";
 import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";

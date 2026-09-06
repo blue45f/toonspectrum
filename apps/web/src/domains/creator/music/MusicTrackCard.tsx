@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { LocalMusicTrack } from "./studio-music-client";
 
-import { MUSIC_MOODS, musicFilename } from "@/shared/lib/studio-music";
+import { MUSIC_MOODS, musicFilename } from "@toonspectrum/core/studio-music";
 
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);

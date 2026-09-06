@@ -1,4 +1,4 @@
-import type { MusicBrief } from "@/shared/lib/studio-music";
+import type { MusicBrief } from "@toonspectrum/core/studio-music";
 
 /** The current route, including an explicitly unbound /music route, owns new requests. */
 export function readMusicWorkId(value: string | null | undefined): string {

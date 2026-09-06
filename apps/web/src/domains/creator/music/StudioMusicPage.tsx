@@ -10,7 +10,7 @@ import { readMusicWorkId, scopeMusicBrief } from "./studio-music-work-scope";
 
 import type { LocalMusicTrack } from "./studio-music-client";
 
-import { buildMusicPrompt, defaultMusicBrief, MUSIC_DURATIONS, MUSIC_INSTRUMENTS, MUSIC_MOODS, MUSIC_PURPOSES, MUSIC_TERMS_URL, parseMusicBrief, type MusicBrief, type MusicStatus } from "@/shared/lib/studio-music";
+import { buildMusicPrompt, defaultMusicBrief, MUSIC_DURATIONS, MUSIC_INSTRUMENTS, MUSIC_MOODS, MUSIC_PURPOSES, MUSIC_TERMS_URL, parseMusicBrief, type MusicBrief, type MusicStatus } from "@toonspectrum/core/studio-music";
 import { useSession } from "@/src/compat/auth-session-store";
 import { getApiErrorMessage } from "@/src/infrastructure/api";
 

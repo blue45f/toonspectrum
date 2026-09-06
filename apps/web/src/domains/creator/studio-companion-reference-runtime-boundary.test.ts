@@ -226,7 +226,7 @@ function propertyInitializers(sourceFile: ts.SourceFile, name: string): ts.Expre
   return initializers;
 }
 
-const CAPTURE_RUNTIME = "@/shared/components/studio/runtime/studio-companion-reference-capture-runtime";
+const CAPTURE_RUNTIME = "@/domains/creator/studio/components/runtime/studio-companion-reference-capture-runtime";
 const SOURCE_RUNTIME = "./studio-companion-reference-source-runtime";
 const PREVIEW_RUNTIME = "@/src/domains/creator/studio-companion-reference-preview";
 const REFERENCE_DISPLAY = "./StudioCompanionReferenceDisplay";
