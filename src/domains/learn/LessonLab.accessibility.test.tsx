@@ -19,7 +19,7 @@ describe("learning diagram keyboard access", () => {
     viewport.focus();
     expect(document.activeElement).toBe(viewport);
     expect(within(viewport).getByRole("img").getAttribute("aria-labelledby")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "설명 재생", exact: true })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "일시정지", exact: true })).toBeNull();
+    expect(screen.getByRole("button", { name: "설명 재생" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "일시정지" })).toBeNull();
   });
 });
