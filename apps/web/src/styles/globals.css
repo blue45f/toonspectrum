@@ -639,24 +639,8 @@ body[data-studio-app="true"] .route-stage::before,
 }
 
 /* Chrome layer stacking — menubar MUST exceed options or File menu paints under the strip */
-[data-studio-app-menubar="true"] {
-  position: relative;
-  z-index: var(--studio-z-menubar, 50);
-}
-[data-studio-draw-options="true"],
-[data-studio-select-options="true"] {
-  position: relative;
-  z-index: var(--studio-z-options, 40);
-}
 [data-studio-tool-belt="true"] {
   z-index: var(--studio-z-tool-belt, 30);
-}
-[data-studio-tool-rail="true"] {
-  position: relative;
-  z-index: var(--studio-z-tool-rail, 20);
-}
-[data-studio-status-bar="true"] {
-  z-index: var(--studio-z-canvas-hud, 10);
 }
 [data-studio-main-menu="true"] {
   position: relative;
@@ -685,6 +669,8 @@ body[data-studio-app="true"] .route-stage::before,
 }
 
 [data-studio-app-menubar="true"] {
+  position: relative;
+  z-index: var(--studio-z-menubar, 50);
   background:
     linear-gradient(
       180deg,
@@ -699,6 +685,8 @@ body[data-studio-app="true"] .route-stage::before,
 
 [data-studio-draw-options="true"],
 [data-studio-select-options="true"] {
+  position: relative;
+  z-index: var(--studio-z-options, 40);
   background:
     linear-gradient(
       180deg,
@@ -730,6 +718,8 @@ body[data-studio-app="true"] .route-stage::before,
 }
 
 [data-studio-tool-rail="true"] {
+  position: relative;
+  z-index: var(--studio-z-tool-rail, 20);
   background:
     linear-gradient(
       180deg,
@@ -744,6 +734,7 @@ body[data-studio-app="true"] .route-stage::before,
 
 /* Floating status — premium glass (Sketchbook / Concepts HUD) */
 [data-studio-status-bar="true"] {
+  z-index: var(--studio-z-canvas-hud, 10);
   backdrop-filter: blur(18px) saturate(1.2);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   background:
@@ -1138,18 +1129,13 @@ body[data-studio-app="true"] .route-stage::before,
     min-height: 100svh;
     height: 100dvh;
     max-height: 100dvh;
+    --studio-immersive-menubar-block: calc(0.375rem + 2.75rem + 0.5rem + 2px);
   }
 
   [data-studio-mobile-dock-scroll="primary"] {
     scroll-padding-inline-end: 3rem;
   }
 
-  [data-studio-editor="true"][data-studio-mobile-immersive="true"] {
-    /* 좌상단 플로팅 알약이 뷰포트 위에서 실제로 차지하는 세로 띠.
-       top(0.375rem) + 레인 min-height(2.75rem) + 레인 세로 패딩(0.5rem) + 알약 테두리(2px).
-       캔버스 위에 겹쳐 뜨는 다른 크롬은 이 값을 넘겨서 시작해야 알약을 덮지 않는다. */
-    --studio-immersive-menubar-block: calc(0.375rem + 2.75rem + 0.5rem + 2px);
-  }
 
   /* 몰입 헤더는 44px 접근성 타깃을 보존하되 레이아웃 높이를 점유하지 않는 작은 플로팅
      컨트롤로 만든다. 상태 메시지가 실제로 있을 때만 그 아래 공간을 다시 확보한다.

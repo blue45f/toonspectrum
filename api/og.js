@@ -63,6 +63,13 @@ function marketLicenseUrl(license, origin) {
   return `${origin}/terms`;
 }
 
+function titleImage(coverImage, proto, host) {
+  if (!coverImage) return proto + "://" + host + "/og-web.png";
+  if (coverImage.startsWith("http")) return coverImage;
+  const pathPart = coverImage.startsWith("/") ? coverImage : "/" + coverImage;
+  return proto + "://" + host + pathPart;
+}
+
 function injectPageMetadata(page, metadata, structuredData) {
   let next = page
     .replace(/<title>[^<]*<\/title>/, () => `<title>${esc(metadata.title)}</title>`)
@@ -134,29 +141,8 @@ function validMarketResource(value) {
   );
 }
 
-module.exports = async (req, res) => {
-  // SSRF 방지 — 서버 사이드 fetch와 정규(canonical) URL은 신뢰 가능한 고정 호스트만 사용한다.
-  // 요청 Host/X-Forwarded-Host 헤더는 공격자가 조작할 수 있어(내부 IP·메타데이터 엔드포인트 등) 신뢰하지 않는다.
-  const host = (
-    process.env.CANONICAL_HOST || "www.toonstudio.cloud"
-  ).toString();
-  const proto = "https";
-  const slug = safeDecode(req.query?.slug);
-  const hasMarketResource = Object.prototype.hasOwnProperty.call(
-    req.query ?? {},
-    "marketResourceId",
-  );
-  const marketResourceId = safeDecode(req.query?.marketResourceId);
-  const marketPage = cleanText(req.query?.marketPage, 16);
-  const ua = (req.headers["user-agent"] || "").toString();
 
-  // 사람: 평소 SPA 셸(빠름). 크롤러만 작품 메타 주입.
-  if (!BOT_RE.test(ua)) {
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    return res.status(200).send(template());
-  }
-
-  if (marketPage === "home" || marketPage === "browse") {
+function handleMarketLanding(res, { host, proto, marketPage }) {
     const origin = `${proto}://${host}`;
     const isBrowse = marketPage === "browse";
     const title = isBrowse ? "마켓 탐색 · 툰스펙트럼" : "창작 마켓 · 툰스펙트럼";
@@ -189,28 +175,29 @@ module.exports = async (req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=300, s-maxage=86400");
     return res.status(200).send(page);
-  }
+}
 
-  if (hasMarketResource) {
-    let resource = null;
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(marketResourceId)) {
-      try {
-        const response = await fetch(
-          `${proto}://${host}/api/creator/marketplace/resources/${encodeURIComponent(marketResourceId)}`,
-          {
-            headers: { Accept: "application/json" },
-            signal: AbortSignal.timeout(22000),
-          },
-        );
-        if (response.ok) {
-          const value = await response.json();
-          if (validMarketResource(value)) resource = value;
-        }
-      } catch {
-        /* fall back to the default shell; failures are deliberately not cached */
-      }
+const MARKET_RESOURCE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![\s\S])/iu;
+
+async function fetchMarketResource(host, proto, marketResourceId) {
+  if (!MARKET_RESOURCE_ID_RE.test(marketResourceId)) return null;
+  try {
+    const response = await fetch(
+      proto + "://" + host + "/api/creator/marketplace/resources/" + encodeURIComponent(marketResourceId),
+      { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(22000) },
+    );
+    if (response.ok) {
+      const value = await response.json();
+      if (validMarketResource(value)) return value;
     }
+  } catch {
+    /* fall back to the default shell; failures are deliberately not cached */
+  }
+  return null;
+}
 
+async function handleMarketResource(res, { host, proto, marketResourceId }) {
+    const resource = await fetchMarketResource(host, proto, marketResourceId);
     let page = template();
     if (resource) {
       const origin = `${proto}://${host}`;
@@ -280,38 +267,26 @@ module.exports = async (req, res) => {
     // Keep discovery-page metadata cacheable, but always revalidate release-scoped metadata.
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).send(page);
-  }
+}
 
-  let t = null;
+async function fetchTitle(host, proto, slug) {
   try {
-    const r = await fetch(
-      `${proto}://${host}/api/titles/${encodeURIComponent(slug)}`,
+    const response = await fetch(
+      proto + "://" + host + "/api/titles/" + encodeURIComponent(slug),
       {
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(22000), // API 콜드스타트(카탈로그 적재) 여유
+        signal: AbortSignal.timeout(22000),
       },
     );
-    if (r.ok) t = (await r.json())?.title ?? null;
+    if (response.ok) return (await response.json())?.title ?? null;
   } catch {
     /* fall back to default OG */
   }
+  return null;
+}
 
-  let page = template();
-  if (t) {
-    const titleText = `${t.title} · 툰스펙트럼`;
-    const desc =
-      (t.synopsis || "").replace(/\s+/g, " ").trim().slice(0, 160) ||
-      `${t.title} — 툰스펙트럼에서 평점·플랫폼·가격을 한눈에.`;
-    const img = t.coverImage
-      ? t.coverImage.startsWith("http")
-        ? t.coverImage
-        : `${proto}://${host}${t.coverImage.startsWith("/") ? "" : "/"}${t.coverImage}`
-      : `${proto}://${host}/og-web.png`;
-    const url = `${proto}://${host}/title/${encodeURIComponent(slug)}`;
-    const sub = [t.author, ...(t.genres || []).slice(0, 2)]
-      .filter(Boolean)
-      .join(" · ");
-    const fullDesc = sub ? `${sub} — ${desc}` : desc;
+
+function buildTitleStructuredData(t, { proto, host, url, fullDesc, img }) {
     // 구조화 데이터(schema.org) — 작품을 Book으로, 평점이 있으면 aggregateRating 포함(별점 리치 결과).
     const st = t.stats || {};
     const ratingCount = Number(st.ratingCount) || 0;
@@ -355,6 +330,24 @@ module.exports = async (req, res) => {
         },
       ],
     };
+  return ld;
+}
+
+async function handleTitleRequest(res, { host, proto, slug }) {
+  const t = await fetchTitle(host, proto, slug);
+  let page = template();
+  if (t) {
+    const titleText = `${t.title} · 툰스펙트럼`;
+    const desc =
+      (t.synopsis || "").replace(/\s+/g, " ").trim().slice(0, 160) ||
+      `${t.title} — 툰스펙트럼에서 평점·플랫폼·가격을 한눈에.`;
+    const img = titleImage(t.coverImage, proto, host);
+    const url = `${proto}://${host}/title/${encodeURIComponent(slug)}`;
+    const sub = [t.author, ...(t.genres || []).slice(0, 2)]
+      .filter(Boolean)
+      .join(" · ");
+    const fullDesc = sub ? `${sub} — ${desc}` : desc;
+    const ld = buildTitleStructuredData(t, { proto, host, url, fullDesc, img });
     page = injectPageMetadata(page, {
       title: titleText,
       description: fullDesc,
@@ -371,4 +364,38 @@ module.exports = async (req, res) => {
     t ? "public, max-age=300, s-maxage=86400" : "no-store",
   );
   return res.status(200).send(page);
-};
+}
+
+async function handleRequest(req, res) {
+  // SSRF 방지 — 서버 사이드 fetch와 정규(canonical) URL은 신뢰 가능한 고정 호스트만 사용한다.
+  // 요청 Host/X-Forwarded-Host 헤더는 공격자가 조작할 수 있어(내부 IP·메타데이터 엔드포인트 등) 신뢰하지 않는다.
+  const host = (
+    process.env.CANONICAL_HOST || "www.toonstudio.cloud"
+  ).toString();
+  const proto = "https";
+  const slug = safeDecode(req.query?.slug);
+  const hasMarketResource = Object.prototype.hasOwnProperty.call(
+    req.query ?? {},
+    "marketResourceId",
+  );
+  const marketResourceId = safeDecode(req.query?.marketResourceId);
+  const marketPage = cleanText(req.query?.marketPage, 16);
+  const ua = (req.headers["user-agent"] || "").toString();
+
+  // 사람: 평소 SPA 셸(빠름). 크롤러만 작품 메타 주입.
+  if (!BOT_RE.test(ua)) {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.status(200).send(template());
+  }
+
+  if (marketPage === "home" || marketPage === "browse") {
+    return handleMarketLanding(res, { host, proto, marketPage });
+  }
+  if (hasMarketResource) {
+    return handleMarketResource(res, { host, proto, marketResourceId });
+  }
+  return handleTitleRequest(res, { host, proto, slug });
+
+}
+
+module.exports = handleRequest;
