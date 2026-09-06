@@ -408,6 +408,27 @@ async function dismissOverlays(page: Page) {
   await page.keyboard.press("Escape").catch(() => undefined);
 }
 
+/**
+ * Resolves once the element's box has stopped moving for `quietMs`. Playwright's own
+ * stability check only spans two animation frames, which is shorter than the gap between
+ * the pointerdown and mouseup it dispatches on a loaded runner.
+ */
+async function waitForStableBox(target: Locator, quietMs: number, timeoutMs: number): Promise<void> {
+  const started = Date.now();
+  let last = await target.boundingBox();
+  let quietSince = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    await target.page().waitForTimeout(50);
+    const next = await target.boundingBox();
+    const same = Boolean(last && next)
+      && last!.x === next!.x && last!.y === next!.y
+      && last!.width === next!.width && last!.height === next!.height;
+    if (!same) quietSince = Date.now();
+    last = next;
+    if (next && Date.now() - quietSince >= quietMs) return;
+  }
+}
+
 async function openMainMenuGroup(page: Page, label: string): Promise<void> {
   const nav = page.locator('[data-studio-main-menu="true"]');
   await nav.waitFor({ state: "visible", timeout: 15000 });
@@ -415,8 +436,32 @@ async function openMainMenuGroup(page: Page, label: string): Promise<void> {
   await page.keyboard.press("Escape").catch(() => undefined);
   await page.waitForTimeout(80);
   const btn = nav.getByRole("menuitem", { name: label, exact: true });
-  await btn.click({ timeout: 5000 });
-  await page.locator(`[role="menu"][aria-label="${label}"]`).waitFor({ state: "visible", timeout: 5000 });
+  const menu = page.locator(`[role="menu"][aria-label="${label}"]`);
+  // The workspace chip to the left of the titles grows by a "변경됨"/"세션" badge once the
+  // workspace preferences settle after a cold load. Traced on CI's Chrome build (2026-09-06):
+  // when that badge lands between the pointerdown and the mouseup of the first click, every
+  // title shifts ~38px, the click falls on the bar instead of the button and no menu opens,
+  // although every later open settles in well under 100ms. Let the title hold still first and
+  // retry a click that was swallowed that way; a menu that never opens still fails.
+  await waitForStableBox(btn, 350, 4000);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await btn.click({ timeout: 5000 });
+    const opened = await menu
+      .waitFor({ state: "visible", timeout: attempt === 0 ? 2500 : 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (opened) return;
+    if ((await btn.getAttribute("aria-expanded").catch(() => null)) === "true") {
+      // The click landed and the dropdown is on its way; do not toggle it shut again.
+      await menu.waitFor({ state: "visible", timeout: 5000 });
+      return;
+    }
+    if (attempt === 0) {
+      log(`  retry: 메인 메뉴 [${label}] 첫 클릭이 제목 이동에 밀려 무시됨 — 안정화 후 다시 클릭`);
+      await waitForStableBox(btn, 350, 4000);
+    }
+  }
+  throw new Error(`메인 메뉴 [${label}] 열기 실패: 다시 클릭해도 메뉴가 열리지 않음`);
 }
 
 async function hasVisibleMenuItem(menu: Locator, name: string): Promise<boolean> {
