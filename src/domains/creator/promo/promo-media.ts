@@ -38,7 +38,8 @@ export async function importPromoPanel(file: File, index: number, signal?: Abort
 }
 export function promoRecorderMime(): string | null {
   if (typeof MediaRecorder === "undefined" || typeof HTMLCanvasElement === "undefined" || !HTMLCanvasElement.prototype.captureStream) return null;
-  return ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null;
+  // Prefer the lower-latency real-time encoder; VP9 remains a supported fallback.
+  return ["video/webm;codecs=vp8,opus", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null;
 }
 export interface PromoRecordingOptions { signal: AbortSignal; onProgress: (progress: number) => void; shortSide?: 720 | 1080 }
 /** Real-time browser recording, not a fake MP4/renamed WebM or a server render job. */
@@ -51,7 +52,7 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
   const canvas = document.createElement("canvas");
   canvas.width = size.width;
   canvas.height = size.height;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) throw new Error("영상 캔버스를 만들지 못했어요.");
   let stream: MediaStream | null = null;
   let audioContext: AudioContext | null = null;
@@ -68,6 +69,8 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
     if (signal.aborted) throw new DOMException("취소했어요.", "AbortError");
     drawPromoFrame(ctx, project, images, 0, size.width, size.height);
     stream = canvas.captureStream(PROMO_FPS);
+    const videoTrack = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined;
+    if (!videoTrack) throw new Error("영상 캡처 트랙을 만들지 못했어요.");
     if (project.audio && audioContext) {
       const response = await fetch(project.audio.src, { signal });
       const audio = await audioContext.decodeAudioData(await response.arrayBuffer());
@@ -142,7 +145,16 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
           drawPromoFrame(ctx, project, images, Math.min(total - 1, frame), size.width, size.height);
           if (audioGain && audioContext) audioGain.gain.setValueAtTime(promoAudioGain(Math.min(total - 1, frame), total, project.audio?.volume ?? 0), audioContext.currentTime);
           onProgress(Math.min(0.99, frame / total));
-          if (frame >= total) { finish(); return; }
+          if (frame >= total) {
+            // Canvas capture happens when the canvas is painted, after this callback.
+            // Let the ending frame reach the track before stopping the recorder.
+            videoTrack.requestFrame?.();
+            raf = requestAnimationFrame(() => {
+              if (finished) return;
+              raf = requestAnimationFrame(() => finish());
+            });
+            return;
+          }
           raf = requestAnimationFrame(tick);
         } catch { finish(new Error("영상 프레임을 처리하지 못했어요.")); }
       };
