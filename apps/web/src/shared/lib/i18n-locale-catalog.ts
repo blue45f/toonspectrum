@@ -1,13 +1,13 @@
 // GENERATED FILE — do not hand-edit.
 //
-// Source of truth: public/i18n/app/<locale>.json.
+// Source of truth: apps/web/public/i18n/app/<namespace>/<locale>.json.
 // Regenerate with `node scripts/generate-app-i18n-catalog.mjs`.
-// lib/__tests__/i18n-locale-assets.test.ts fails when this catalog drifts from the assets.
+// apps/web/src/shared/lib/__tests__/i18n-locale-assets.test.ts fails when this catalog drifts from the assets.
 
 /** Locales compiled into the app shell so the fallback chain never awaits I/O. */
 export const APP_I18N_BUILT_IN_LOCALES = ["ko", "en"] as const;
 
-/** Every locale that has a `public/i18n/app/<locale>.json` asset. */
+/** Every locale that has a `apps/web/public/i18n/app/<namespace>/<locale>.json` asset. */
 export const APP_I18N_ASSET_LOCALES = [
   "af",
   "am",
