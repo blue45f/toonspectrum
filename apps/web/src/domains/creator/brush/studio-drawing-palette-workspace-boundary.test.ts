@@ -20,7 +20,7 @@ const workspaceSource = readFileSync(
   "utf8",
 );
 const viteSource = readFileSync(
-  new URL("../../../../vite.config.ts", import.meta.url),
+  new URL("../../../../config/vite-manual-chunks.ts", import.meta.url),
   "utf8",
 );
 
