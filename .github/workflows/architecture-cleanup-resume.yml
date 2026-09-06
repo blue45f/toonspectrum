@@ -112,6 +112,12 @@ jobs:
           rm .github/workflows/architecture-cleanup-finalize.yml
           rm .github/workflows/architecture-cleanup-resume.yml
           git restore --source=HEAD --staged --worktree .github/workflows/ci.yml
+          while IFS= read -r file; do
+            case "$file" in
+              .github/workflows/architecture-cleanup-finalize.yml|.github/workflows/architecture-cleanup-resume.yml) ;;
+              *) git restore --source=HEAD --staged --worktree "$file" ;;
+            esac
+          done < <(git diff --name-only -- .github/workflows)
           git add -A
           git diff --cached --stat
           git config user.name 'github-actions[bot]'
