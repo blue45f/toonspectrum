@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   FALLBACK_CHAIN,
@@ -188,6 +188,14 @@ describe("getLanguageOptions", () => {
 });
 
 describe("runtime translation bundles", () => {
+  // Every test below installs a fetch spy and restores it on its last line. When an assertion in
+  // between fails, that restore never runs, and the next `vi.spyOn(globalThis, "fetch")` reuses the
+  // still-installed spy — call history included — so one failure cascades into
+  // "fetch called 2008 times" in the tests that assert no network. Restore unconditionally.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("builds locale runtime translation bundle using external translator", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
