@@ -68,7 +68,7 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
     const images = await loadPromoImages(project, signal);
     if (signal.aborted) throw new DOMException("취소했어요.", "AbortError");
     drawPromoFrame(ctx, project, images, 0, size.width, size.height);
-    stream = canvas.captureStream(PROMO_FPS);
+    stream = canvas.captureStream(Math.min(PROMO_FPS, 15));
     const videoTrack = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined;
     if (!videoTrack) throw new Error("영상 캡처 트랙을 만들지 못했어요.");
     if (project.audio && audioContext) {
