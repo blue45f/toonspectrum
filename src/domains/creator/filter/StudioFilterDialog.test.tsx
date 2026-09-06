@@ -627,8 +627,8 @@ describe("StudioFilterDialog", () => {
     );
     // The category strip is a radiogroup: exactly one category is active, and nine independent
     // aria-pressed toggles said otherwise.
-    fireEvent.click(within(gallery).getByRole("radio", { name: "변형" }));
-    expect(within(gallery).getByRole("radio", { name: "변형" }).getAttribute("aria-checked"))
+    fireEvent.click(within(gallery).getByRole("radio", { name: "변형·왜곡" }));
+    expect(within(gallery).getByRole("radio", { name: "변형·왜곡" }).getAttribute("aria-checked"))
       .toBe("true");
 
     expect(within(gallery).getByText(`${transformFilterCount}개 필터`)).toBeTruthy();

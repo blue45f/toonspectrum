@@ -190,7 +190,9 @@ describe("§15.3 menu group spec", () => {
       // 2026-09-03: 현지화 QA(text/localization-qa)는 Localization Layout 행의 두 번째
       // 항목이라 extras 가 아니라 partial 행에 머문다(rowsPartial 36 그대로) — 로케일별
       // 폰트/박스 오버라이드가 남아 present 로 올리지 않는다.
-      extras: 38,
+      // 2026-09-06: #794 의 사용자 매뉴얼(help/user-manual)은 §15.3 행이 없는 제품 전용
+      // 진입점이라 extras 로 잡는다(38 → 39).
+      extras: 39,
     });
   });
 
