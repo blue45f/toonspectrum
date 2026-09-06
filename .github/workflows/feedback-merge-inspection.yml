@@ -1,0 +1,62 @@
+name: Inspect feedback merge conflicts
+on:
+  push:
+    branches: [chore/feedback-ci-recovery-20260906]
+    paths: [.github/workflows/feedback-merge-inspection.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      HUSKY: '0'
+      GIT_LFS_SKIP_SMUDGE: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/feedback-community-20260906
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout: |
+            .github
+            src
+            packages
+            apps/api/src
+            scripts
+            components
+            e2e
+            lib
+          persist-credentials: false
+      - name: Inspect merge and package conflict evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/feedback-merge-evidence
+          git config user.name 'Feedback merge inspection'
+          git config user.email 'feedback-inspection@example.invalid'
+          git rev-parse HEAD > /tmp/feedback-merge-evidence/feature-sha.txt
+          git rev-parse origin/main > /tmp/feedback-merge-evidence/main-sha.txt
+          git merge --no-commit --no-ff origin/main > /tmp/feedback-merge-evidence/merge.log 2>&1 || true
+          git diff --name-only --diff-filter=U > /tmp/feedback-merge-evidence/conflict-paths.txt
+          git diff --stat HEAD > /tmp/feedback-merge-evidence/merge-stat.txt
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          out = Path('/tmp/feedback-merge-evidence')
+          entries = []
+          for path in (out/'conflict-paths.txt').read_text().splitlines():
+              stages = {}
+              for label, stage in [('base', 1), ('feature', 2), ('main', 3)]:
+                  p = subprocess.run(['git', 'show', f':{stage}:{path}'], capture_output=True)
+                  stages[label] = p.stdout.decode('utf8') if p.returncode == 0 else None
+              entries.append({'path': path, **stages})
+          (out/'conflicts.json').write_text(json.dumps(entries, ensure_ascii=False, indent=2))
+          print((out/'merge.log').read_text()[-12000:])
+          print('CONFLICT PATHS:', [entry['path'] for entry in entries])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feedback-merge-inspection
+          path: /tmp/feedback-merge-evidence
+          retention-days: 3
