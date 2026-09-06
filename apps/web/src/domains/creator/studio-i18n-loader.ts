@@ -1,3 +1,4 @@
+import { STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
 import { registerI18nLocaleEntries, getLocaleCandidates } from "@/shared/lib/i18n";
 
 export const STUDIO_I18N_ASSET_LOCALES = [
@@ -100,8 +101,9 @@ function normalizedBaseUrl(baseUrl: string): string {
 export function studioI18nAssetUrl(
   locale: string,
   baseUrl = import.meta.env.BASE_URL,
+  namespace = "mainMenu",
 ): string {
-  return `${normalizedBaseUrl(baseUrl)}i18n/studio/${locale}.json`;
+  return `${normalizedBaseUrl(baseUrl)}i18n/studio/${namespace}/${locale}.json`;
 }
 
 export function parseStudioI18nDictionary(
@@ -161,27 +163,27 @@ export async function loadStudioI18nLocale(
   if (typeof fetchImpl !== "function") {
     throw new Error("Studio translation assets require the Fetch API.");
   }
-
   const job = (async () => {
-    const response = await fetchImpl(
-      studioI18nAssetUrl(assetLocale, options.baseUrl),
-      {
-        cache: "force-cache",
-        credentials: "same-origin",
-      },
-    );
-    if (!response.ok) {
-      throw new Error(
-        `Studio translation asset failed to load (${assetLocale}, ${response.status}).`,
+    const merged: Record<string, string> = {};
+    for (const namespace of STUDIO_I18N_NAMESPACES) {
+      const response = await fetchImpl(
+        studioI18nAssetUrl(assetLocale, options.baseUrl, namespace),
+        { cache: "force-cache", credentials: "same-origin" },
       );
+      if (!response.ok) {
+        throw new Error(
+          `Studio translation asset failed to load (${assetLocale}/${namespace}, ${response.status}).`,
+        );
+      }
+      const dictionary = parseStudioI18nDictionary(await response.text());
+      if (!dictionary) {
+        throw new Error(`Studio translation asset is invalid (${assetLocale}/${namespace}).`);
+      }
+      Object.assign(merged, dictionary);
     }
-    const dictionary = parseStudioI18nDictionary(await response.text());
-    if (!dictionary) {
-      throw new Error(`Studio translation asset is invalid (${assetLocale}).`);
-    }
-    registerI18nLocaleEntries(assetLocale, dictionary);
+    registerI18nLocaleEntries(assetLocale, merged);
     if (locale !== assetLocale) {
-      registerI18nLocaleEntries(locale, dictionary);
+      registerI18nLocaleEntries(locale, merged);
     }
   })();
 

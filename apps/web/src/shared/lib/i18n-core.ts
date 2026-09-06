@@ -2,8 +2,7 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import appEnDictionary from "../../public/i18n/app/en.json";
-import appKoDictionary from "../../public/i18n/app/ko.json";
+import { builtinAppDictionaries } from "./i18n-built-in-dictionaries";
 
 import {
   normalizeLocaleCode,
@@ -19,7 +18,7 @@ import {
 // 앱 전역에서 쓰는 다국어 사전.
 //
 // 앱 셸에는 ko/en 두 벌만 컴파일된다. FALLBACK_CHAIN(en → ko)은 어떤 상황에서도 네트워크를
-// 기다리지 않고 해소돼야 하기 때문이다. 나머지 로케일은 public/i18n/app/<locale>.json 에서
+// 기다리지 않고 해소돼야 하기 때문이다. 나머지 로케일은 public/i18n/app/<namespace>/<locale>.json 에서
 // 지연 로드한다(Studio·Admin 라우트가 이미 쓰는 패턴과 동일). 요청한 로케일의 자산이 없거나
 // 로드가 실패하면 en → ko 로 내려가되 **조용히 넘어가지 않는다** — getAppI18nLocaleStatus()가
 // 어떤 자산이 실제로 문자열을 공급했는지, 왜 폴백했는지를 항상 관측 가능하게 남긴다.
@@ -46,8 +45,8 @@ type DictByLocale = Record<string, Dict>;
 
 // 앱 셸에 정적으로 포함되는 유일한 두 사전. 나머지는 전부 지연 자산이다.
 export const DICT: DictByLocale = {
-  ko: { ...(appKoDictionary as Dict) },
-  en: { ...(appEnDictionary as Dict) },
+  ko: { ...builtinAppDictionaries.ko },
+  en: { ...builtinAppDictionaries.en },
 };
 
 export interface I18nState {

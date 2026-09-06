@@ -17,7 +17,7 @@ const MANIFEST = {
   buildId: BUILD_ID,
   shellUrls: ["/", "/studio"],
   criticalUrls: ["/assets/index-abc.js", "/assets/index-abc.css"],
-  warmUrls: ["/i18n/studio/ko.json"],
+  warmUrls: ["/i18n/studio/mainMenu/ko.json"],
 };
 
 interface Listener {

@@ -36,9 +36,9 @@ describe("admin lazy i18n loader", () => {
 
     await loadAdminI18nLocale("fr-CA", "/preview");
 
-    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(fetchSpy).toHaveBeenCalledTimes(25);
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/preview/i18n/admin/fr.json",
+      "/preview/i18n/admin/dashboard/fr.json",
       {
         cache: "force-cache",
         credentials: "same-origin",
@@ -58,7 +58,7 @@ describe("admin lazy i18n loader", () => {
     const first = loadAdminI18nLocale("de-DE", "/preview");
     const second = loadAdminI18nLocale("de-AT", "/preview");
 
-    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(fetchSpy).toHaveBeenCalledTimes(25);
 
     resolveResponse(
       new Response(JSON.stringify({ "admin.title": "Admin-Konsole" }), {
@@ -68,7 +68,7 @@ describe("admin lazy i18n loader", () => {
     );
     await Promise.all([first, second]);
 
-    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(fetchSpy).toHaveBeenCalledTimes(25);
     expect(resolveI18nValue("de-DE", "admin.title")).toBe("Admin-Konsole");
     expect(resolveI18nValue("de-AT", "admin.title")).toBe("Admin-Konsole");
   });
@@ -91,7 +91,7 @@ describe("admin lazy i18n loader", () => {
       loadAdminI18nLocale("es-MX", "/preview"),
     ).resolves.toBeUndefined();
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(25);
     expect(resolveI18nValue("es-MX", "admin.title")).toBe(
       "Consola de administración",
     );
@@ -99,7 +99,7 @@ describe("admin lazy i18n loader", () => {
 
   it("constructs an asset URL without duplicating separators", () => {
     expect(adminI18nAssetUrl("zh-hant", "/preview")).toBe(
-      "/preview/i18n/admin/zh-hant.json",
+      "/preview/i18n/admin/dashboard/zh-hant.json",
     );
   });
 });

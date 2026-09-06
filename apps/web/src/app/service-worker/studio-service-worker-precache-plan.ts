@@ -11,7 +11,7 @@
  *              activates, and the previous worker keeps serving. That is the
  *              fail-safe, not a bug.
  *   warm     — the two dictionaries the Studio route *blocks* on:
- *              `/i18n/studio/{ko,en}.json` are `Promise.all`-ed with the route
+ *              `/i18n/studio/<namespace>/{ko,en}.json` are `Promise.all`-ed with the route
  *              chunk in `AppRouter`, so the route cannot commit without them and
  *              an offline Studio boot dies there. Fetched best-effort the first
  *              time a Studio navigation is seen, so catalog-only visitors never

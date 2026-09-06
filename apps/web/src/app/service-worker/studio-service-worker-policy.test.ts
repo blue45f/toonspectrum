@@ -97,7 +97,7 @@ describe("classifyStudioServiceWorkerRequest", () => {
       ["/audio/theme.mp3", "static-media"],
       ["/images/hero.png", "static-media"],
       ["/data/catalog.json", "catalog-data"],
-      ["/i18n/studio/ko.json", "catalog-data"],
+      ["/i18n/studio/mainMenu/ko.json", "catalog-data"],
       ["/catalog/avatars-v1.json", "catalog-data"],
       ["/api/cover", "cover-image"],
       ["/api/search", "api"],

@@ -9,6 +9,7 @@ import {
   getLocaleCandidates,
   getLocaleCandidateChain,
 } from "./i18n-intl-utils";
+import { APP_I18N_NAMESPACES, STUDIO_I18N_NAMESPACES } from "./i18n-asset-manifest";
 import {
   APP_I18N_ASSET_LOCALES,
   APP_I18N_BUILT_IN_LOCALES,
@@ -20,7 +21,7 @@ import {
 import type { Dict } from "./i18n-core";
 
 /* ------------------------------------------------------------------------ *
- * 앱 셸 로케일 자산 (public/i18n/app/<locale>.json)
+ * 앱 셸 로케일 자산 (public/i18n/app/<namespace>/<locale>.json)
  *
  * 계약:
  *  1. ko/en 은 번들에 컴파일된다 — 폴백 체인은 절대 I/O 를 기다리지 않는다.
@@ -94,13 +95,17 @@ function appI18nBaseUrl(): string {
   return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
 }
 
-export function appI18nAssetUrl(assetLocale: string, baseUrl?: string): string {
+export function appI18nAssetUrl(
+  assetLocale: string,
+  baseUrl?: string,
+  namespace = "nav",
+): string {
   const normalizedBase = baseUrl
     ? baseUrl.endsWith("/")
       ? baseUrl
       : `${baseUrl}/`
     : appI18nBaseUrl();
-  return `${normalizedBase}i18n/app/${assetLocale}.json`;
+  return `${normalizedBase}i18n/app/${namespace}/${assetLocale}.json`;
 }
 
 /**
@@ -273,19 +278,21 @@ export async function loadAppI18nLocale(
         if (typeof resolvedFetch !== "function") {
           throw new Error("The Fetch API is unavailable in this runtime.");
         }
-        const response = await resolvedFetch(
-          appI18nAssetUrl(assetLocale, options.baseUrl),
-          {
+        const merged: Record<string, string> = {};
+        for (const namespace of APP_I18N_NAMESPACES) {
+          const url = appI18nAssetUrl(assetLocale, options.baseUrl, namespace);
+          const response = await resolvedFetch(url, {
             cache: "force-cache",
             credentials: "same-origin",
-          },
-        );
-        if (!response.ok) {
-          throw new Error(
-            `HTTP ${response.status} for ${appI18nAssetUrl(assetLocale, options.baseUrl)}`,
-          );
+          });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status} for ${url}`);
+          }
+          const part = parseAppI18nDictionary(await response.text());
+          if (!part) throw new Error(`Malformed app dictionary asset for "${assetLocale}/${namespace}".`);
+          Object.assign(merged, part);
         }
-        source = await response.text();
+        source = JSON.stringify(merged);
       }
 
       const dictionary = parseAppI18nDictionary(source);
@@ -360,23 +367,20 @@ export async function loadStudioAssetIfAvailable(
           ? (window as unknown as Record<string, string>).__VITE_BASE_URL__
           : "/";
       const normBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-      const response = await fetch(
-        `${normBaseUrl}i18n/studio/${assetLocale}.json`,
-        {
-          cache: "force-cache",
-          credentials: "same-origin",
-        },
-      );
-      if (response.ok) {
+      const merged: Record<string, string> = {};
+      for (const namespace of STUDIO_I18N_NAMESPACES) {
+        const response = await fetch(
+          `${normBaseUrl}i18n/studio/${namespace}/${assetLocale}.json`,
+          { cache: "force-cache", credentials: "same-origin" },
+        );
+        if (!response.ok) continue;
         const data = await response.json();
-        if (data && typeof data === "object") {
-          registerI18nLocaleEntries(assetLocale, data);
-          if (assetLocale !== normalized) {
-            registerI18nLocaleEntries(normalized, data);
-          }
-          triggerTranslationBundleUpdate();
-          // ({
-        }
+        if (data && typeof data === "object" && !Array.isArray(data)) Object.assign(merged, data);
+      }
+      if (Object.keys(merged).length > 0) {
+        registerI18nLocaleEntries(assetLocale, merged);
+        if (assetLocale !== normalized) registerI18nLocaleEntries(normalized, merged);
+        triggerTranslationBundleUpdate();
       }
     } catch {
       // Ignore if fetch not available or file not found

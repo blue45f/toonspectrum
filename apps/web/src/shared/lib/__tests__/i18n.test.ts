@@ -348,8 +348,8 @@ describe("translation dictionary completeness", () => {
   it("keeps every t() key covered by its shell or lazy route dictionaries", () => {
     const usedKeys = collectSourceI18nKeys();
     const shellKeys = new Set([...Object.keys(i18nDict.ko), ...Object.keys(i18nDict.en)]);
-    const adminEn = readRouteDictionary("apps/web/public/i18n/admin/en.json");
-    const adminKo = readRouteDictionary("apps/web/public/i18n/admin/ko.json");
+    const adminEn = readRouteDictionary("apps/web/public/i18n/admin");
+    const adminKo = readRouteDictionary("apps/web/public/i18n/admin");
     const adminKeys = [...usedKeys].filter((key) => key.startsWith("admin."));
     const shellMissing = [...usedKeys]
       .filter((key) => !key.startsWith("admin.") && !shellKeys.has(key))
@@ -365,7 +365,7 @@ describe("translation dictionary completeness", () => {
   });
 
   // Per-locale coverage of the 75 published dictionaries lives in i18n-locale-assets.test.ts;
-  // it reads public/i18n/app/*.json directly because those assets are no longer bundled.
+  // it reads public/i18n/app/<namespace>/<locale>.json directly because those assets are no longer bundled.
   it("compiles only the ko/en fallback pair into the app shell", () => {
     expect([...APP_I18N_BUILT_IN_LOCALES]).toEqual(["ko", "en"]);
 

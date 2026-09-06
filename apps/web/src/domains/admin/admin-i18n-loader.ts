@@ -1,24 +1,19 @@
-import adminEn from "../../../public/i18n/admin/en.json";
-import adminKo from "../../../public/i18n/admin/ko.json";
+import { ADMIN_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
+import { getLocaleCandidates, registerI18nLocaleEntries, useI18n } from "@/shared/lib/i18n";
+import { adminI18nBuiltins } from "./admin-i18n-builtins";
 
-import {
-  getLocaleCandidates,
-  registerI18nLocaleEntries,
-  useI18n,
-} from "@/shared/lib/i18n";
-
-// Synchronously register embedded base dictionaries for instant zero-latency rendering
-registerI18nLocaleEntries("ko", adminKo);
-registerI18nLocaleEntries("en", adminEn);
+registerI18nLocaleEntries("ko", adminI18nBuiltins.ko);
+registerI18nLocaleEntries("en", adminI18nBuiltins.en);
 
 const pendingLoads = new Map<string, Promise<void>>();
 
 export function adminI18nAssetUrl(
   locale: string,
   baseUrl = import.meta.env.BASE_URL,
+  namespace = "dashboard",
 ): string {
   const normBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  return `${normBaseUrl}i18n/admin/${locale}.json`;
+  return `${normBaseUrl}i18n/admin/${namespace}/${locale}.json`;
 }
 
 export async function loadAdminI18nLocale(
@@ -28,37 +23,34 @@ export async function loadAdminI18nLocale(
   const candidates = getLocaleCandidates(locale);
   const normalized = candidates[0] || "en";
   const rootLocale = normalized.split("-")[0] || "en";
-
-  // Base dictionaries are embedded in this lazy admin chunk. Region variants resolve through the
-  // normal candidate chain, so en-US/ko-KR must not issue redundant asset requests.
   if (rootLocale === "ko" || rootLocale === "en") return;
 
   const assetLocale = candidates.includes("zh-hant") ? "zh-hant" : rootLocale;
-
   const existing = pendingLoads.get(assetLocale);
   if (existing) return existing;
 
   const job = (async () => {
     if (typeof fetch !== "function") return;
-    const response = await fetch(adminI18nAssetUrl(assetLocale, baseUrl), {
-      cache: "force-cache",
-      credentials: "same-origin",
-    });
-    if (response.ok) {
-      const dictionary = await response.json();
-      if (dictionary && typeof dictionary === "object") {
-        registerI18nLocaleEntries(assetLocale, dictionary);
-        if (normalized !== assetLocale) {
-          registerI18nLocaleEntries(normalized, dictionary);
-        }
-        useI18n.setState((state) => ({
-          translationBundleRevision: state.translationBundleRevision + 1,
-        }));
+    const merged: Record<string, string> = {};
+    for (const namespace of ADMIN_I18N_NAMESPACES) {
+      const response = await fetch(adminI18nAssetUrl(assetLocale, baseUrl, namespace), {
+        cache: "force-cache",
+        credentials: "same-origin",
+      });
+      if (!response.ok) continue;
+      const dictionary = await response.clone().json();
+      if (dictionary && typeof dictionary === "object" && !Array.isArray(dictionary)) {
+        Object.assign(merged, dictionary);
       }
     }
+    if (Object.keys(merged).length > 0) {
+      registerI18nLocaleEntries(assetLocale, merged);
+      if (normalized !== assetLocale) registerI18nLocaleEntries(normalized, merged);
+      useI18n.setState((state) => ({
+        translationBundleRevision: state.translationBundleRevision + 1,
+      }));
+    }
   })().catch(() => {
-    // Keep the public loader fail-soft, but never let a rejected request poison the dedupe cache.
-    // A later navigation or transient-network recovery must be able to start a fresh request.
     pendingLoads.delete(assetLocale);
   });
 

@@ -36,8 +36,8 @@ const SIZES: Record<string, number> = {
   "/assets/react-mno.js": 440,
   "/assets/i18n-ghi.js": 4_096,
   "/assets/index-jkl.css": 398_195,
-  "/i18n/studio/ko.json": 92_000,
-  "/i18n/studio/en.json": 89_363,
+  "/i18n/studio/mainMenu/ko.json": 92_000,
+  "/i18n/studio/mainMenu/en.json": 89_363,
 };
 
 const sizeOf = (url: string): number | null => SIZES[url] ?? null;
@@ -72,14 +72,14 @@ describe("planStudioServiceWorkerPrecache", () => {
     const plan = planStudioServiceWorkerPrecache({
       manifest: MANIFEST,
       appEntryKey: "index.html",
-      warmUrls: ["/i18n/studio/ko.json", "/i18n/studio/en.json"],
+      warmUrls: ["/i18n/studio/mainMenu/ko.json", "/i18n/studio/mainMenu/en.json"],
       sizeOf,
     });
     expect(plan.violations).toEqual([]);
     expect(plan.shellUrls).toEqual(["/", "/studio"]);
     expect(plan.criticalUrls).toHaveLength(5);
     expect(plan.criticalBytes).toBe(825_622);
-    expect(plan.warmUrls).toEqual(["/i18n/studio/ko.json", "/i18n/studio/en.json"]);
+    expect(plan.warmUrls).toEqual(["/i18n/studio/mainMenu/ko.json", "/i18n/studio/mainMenu/en.json"]);
     expect(plan.warmBytes).toBe(181_363);
   });
 
@@ -122,21 +122,21 @@ describe("planStudioServiceWorkerPrecache", () => {
     const plan = planStudioServiceWorkerPrecache({
       manifest: MANIFEST,
       appEntryKey: "index.html",
-      warmUrls: ["/assets/index-abc.js", "/i18n/studio/ko.json", "/i18n/studio/ko.json"],
+      warmUrls: ["/assets/index-abc.js", "/i18n/studio/mainMenu/ko.json", "/i18n/studio/mainMenu/ko.json"],
       sizeOf,
     });
-    expect(plan.warmUrls).toEqual(["/i18n/studio/ko.json"]);
+    expect(plan.warmUrls).toEqual(["/i18n/studio/mainMenu/ko.json"]);
   });
 
   it("warns rather than fails when a target is absent from disk", () => {
     const plan = planStudioServiceWorkerPrecache({
       manifest: MANIFEST,
       appEntryKey: "index.html",
-      warmUrls: ["/i18n/studio/xx.json"],
+      warmUrls: ["/i18n/studio/mainMenu/xx.json"],
       sizeOf,
     });
     expect(plan.violations).toEqual([]);
-    expect(plan.warnings.some((w) => w.includes("/i18n/studio/xx.json"))).toBe(true);
+    expect(plan.warnings.some((w) => w.includes("/i18n/studio/mainMenu/xx.json"))).toBe(true);
   });
 });
 

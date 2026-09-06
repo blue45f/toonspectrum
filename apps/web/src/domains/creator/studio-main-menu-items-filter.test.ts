@@ -151,7 +151,7 @@ describe("filter menu ↔ filter gallery parity", () => {
   });
 
   it("names every filter in the Korean locale pack exactly as the catalogue does", () => {
-    // public/i18n/studio/ko.json overrides the source labels once the pack loads, so a registry
+    // public/i18n/studio/mainMenu/ko.json overrides the source labels once the pack loads, so a registry
     // rename that skips the pack (#771, c9ef0ff7 left twelve rows behind) shows the old name in
     // the menubar while the dialog, the inspector chips and command search show the new one.
     const pack = JSON.parse(

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -29,6 +29,15 @@ const SLOT_LABELS = [
 
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.resolve(process.cwd(), relativePath), "utf8");
+}
+
+function readAppLocale(locale: string): Record<string, string> {
+  const merged: Record<string, string> = {};
+  for (const namespace of readdirSync(path.resolve(process.cwd(), "apps/web/public/i18n/app"))) {
+    const file = path.resolve(process.cwd(), "apps/web/public/i18n/app", namespace, `${locale}.json`);
+    try { Object.assign(merged, JSON.parse(readFileSync(file, "utf8"))); } catch { /* namespace has no locale */ }
+  }
+  return merged;
 }
 
 function renderPage() {
@@ -154,8 +163,8 @@ describe("/shaper registration", () => {
   });
 
   it("publishes the new app-shell keys in the built-in locales", () => {
-    const ko = JSON.parse(readRepoFile("apps/web/public/i18n/app/ko.json")) as Record<string, string>;
-    const en = JSON.parse(readRepoFile("apps/web/public/i18n/app/en.json")) as Record<string, string>;
+    const ko = readAppLocale("ko");
+    const en = readAppLocale("en");
 
     expect(ko["route.shaper"]).toBe("캐릭터 셰이퍼");
     expect(en["route.shaper"]).toBe("Character Shaper");

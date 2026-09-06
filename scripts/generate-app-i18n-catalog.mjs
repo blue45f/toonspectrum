@@ -2,7 +2,7 @@
 //
 // The catalog is the app shell's only compiled knowledge about locales it does not bundle:
 // which ones have an asset, and how much of each asset is actually translated. Both facts are
-// measured here from apps/web/public/i18n/app/*.json — never authored by hand — so the language picker
+// measured here from apps/web/public/i18n/app/<namespace>/<locale>.json — never authored by hand — so the language picker
 // cannot advertise a locale as translated when it renders English.
 //
 //   node scripts/generate-app-i18n-catalog.mjs
@@ -69,14 +69,14 @@ export function buildCatalogSource(dictionaries) {
   const lines = [
     "// GENERATED FILE — do not hand-edit.",
     "//",
-    "// Source of truth: apps/web/public/i18n/app/<locale>.json.",
+    "// Source of truth: apps/web/public/i18n/app/<namespace>/<locale>.json.",
     "// Regenerate with `node scripts/generate-app-i18n-catalog.mjs`.",
     "// apps/web/src/shared/lib/__tests__/i18n-locale-assets.test.ts fails when this catalog drifts from the assets.",
     "",
     "/** Locales compiled into the app shell so the fallback chain never awaits I/O. */",
     `export const APP_I18N_BUILT_IN_LOCALES = [${BUILT_IN_LOCALES.map((locale) => JSON.stringify(locale)).join(", ")}] as const;`,
     "",
-    "/** Every locale that has a `apps/web/public/i18n/app/<locale>.json` asset. */",
+    "/** Every locale that has a `apps/web/public/i18n/app/<namespace>/<locale>.json` asset. */",
     "export const APP_I18N_ASSET_LOCALES = [",
     ...locales.map((locale) => `  ${JSON.stringify(locale)},`),
     "] as const;",

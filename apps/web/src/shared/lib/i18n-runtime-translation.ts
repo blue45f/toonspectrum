@@ -214,7 +214,7 @@ export async function loadRuntimeTranslationBundle(locale: string): Promise<void
   if (!normalized) return;
 
   // 활성 로케일 하나만 받는다. ko/en 은 셸에 있으므로 즉시 반환하고, 그 외에는
-  // public/i18n/app/<locale>.json 1건만 요청한다.
+  // public/i18n/app/<namespace>/<locale>.json 1건만 요청한다.
   await loadAppI18nLocale(normalized);
   void loadStudioAssetIfAvailable(normalized);
 

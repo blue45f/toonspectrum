@@ -204,8 +204,8 @@ describe("explicit fallback chain", () => {
   });
 
   it("builds asset URLs under the published app namespace", () => {
-    expect(appI18nAssetUrl("af", "/")).toBe("/i18n/app/af.json");
-    expect(appI18nAssetUrl("af", "/base")).toBe("/base/i18n/app/af.json");
+    expect(appI18nAssetUrl("af", "/")).toBe("/i18n/app/nav/af.json");
+    expect(appI18nAssetUrl("af", "/base")).toBe("/base/i18n/app/nav/af.json");
   });
 });
 

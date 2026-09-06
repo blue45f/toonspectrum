@@ -2,37 +2,24 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
-
+import { STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
 import {
   loadStudioI18nDictionaries,
   parseStudioI18nDictionary,
   STUDIO_I18N_ASSET_LOCALES,
   studioI18nAssetUrl,
 } from "./studio-i18n-loader";
-
-import {
-  resolveI18nValue,
-} from "@/shared/lib/i18n";
+import { resolveI18nValue } from "@/shared/lib/i18n";
 
 function readAsset(locale: string): string {
-  return readFileSync(
-    path.resolve(
-      process.cwd(),
-      "public",
-      "i18n",
-      "studio",
-      `${locale}.json`,
-    ),
-    "utf8",
-  );
+  const merged: Record<string, string> = {};
+  for (const namespace of STUDIO_I18N_NAMESPACES) {
+    const file = path.resolve(process.cwd(), "apps/web/public/i18n/studio", namespace, `${locale}.json`);
+    Object.assign(merged, JSON.parse(readFileSync(file, "utf8")));
+  }
+  return JSON.stringify(merged);
 }
 
-describe("Studio lazy i18n assets", () => {
-  it("keeps complete, validated Korean and English dictionaries", () => {
-    for (const locale of STUDIO_I18N_ASSET_LOCALES) {
-      const dictionary = parseStudioI18nDictionary(readAsset(locale));
-      expect(dictionary).not.toBeNull();
-      // 1_323 → 1_325: 컴패니언 창의 막다른 상태에 붙인 탈출구 두 줄
       // (studio.toolsCompanion.exit.disconnected / .editor).
       // 1_325 → 1_328: 모바일 도크 "페이지" 버튼의 라벨·열기·닫기 aria 세 키
       // (studio.mobileDock.tool.pages / .pagesOpen / .pagesClose) — 하드코딩 한국어가 `en` 도구막대에
@@ -180,13 +167,11 @@ describe("Studio lazy i18n assets", () => {
       baseUrl: "/preview/",
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls.map(([url]) => String(url)).sort()).toEqual([
-      "/preview/i18n/studio/en.json",
-      "/preview/i18n/studio/ko.json",
-    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(STUDIO_I18N_NAMESPACES.length * 2);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/preview/i18n/studio/");
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain("/preview/i18n/studio/");
     expect(studioI18nAssetUrl("ko", "/preview")).toBe(
-      "/preview/i18n/studio/ko.json",
+      "/preview/i18n/studio/mainMenu/ko.json",
     );
   });
 

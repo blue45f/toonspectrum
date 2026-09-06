@@ -261,10 +261,15 @@ function studioCrossOriginIsolationPlugin(): Plugin {
  * module graph: `AppRouter` `Promise.all`s these two dictionaries with the route
  * chunk, so the route cannot commit until they resolve.
  */
-const STUDIO_SERVICE_WORKER_WARM_URLS = [
-  "/i18n/studio/ko.json",
-  "/i18n/studio/en.json",
+const STUDIO_I18N_NAMESPACES = [
+  "aiNotice", "aiToolPopover", "assetMenu", "background", "bubble", "bubbleTail", "canvas",
+  "commandBar", "commandSearch", "community", "creativeModes", "customFonts", "hub",
+  "imageAdjustments", "mainMenu", "mobileDock", "quickShape", "quickStart", "settings",
+  "shortcuts", "toolsCompanion", "tutorial", "tutorialTry",
 ];
+const STUDIO_SERVICE_WORKER_WARM_URLS = STUDIO_I18N_NAMESPACES.flatMap((namespace) =>
+  ["ko", "en"].map((locale) => `/i18n/studio/${namespace}/${locale}.json`),
+);
 
 /**
  * Compiles `src/app/service-worker/studio-service-worker-entry.ts` into
