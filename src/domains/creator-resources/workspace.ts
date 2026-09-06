@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CreatorWorkspace } from "@/lib/creator-resources";
 import type { StoryDraft } from "@/lib/creator-workspace-persistence";
+
 import { emptyWorkspace } from "@/lib/creator-resources";
 import {
   browserWorkspaceLock, createCreatorWorkspaceStorage, CREATOR_WORKSPACE_EVENT,

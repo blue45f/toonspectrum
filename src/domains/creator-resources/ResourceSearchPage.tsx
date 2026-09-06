@@ -7,6 +7,7 @@ import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
 import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@/lib/creator-resources";
+
 import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/lib/creator-resources";
 import { apiPath } from "@/src/infrastructure/api";
 
