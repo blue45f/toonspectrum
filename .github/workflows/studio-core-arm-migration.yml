@@ -1,0 +1,60 @@
+name: Studio core ARM migration
+
+on:
+  push:
+    branches: [feat/studio-pptx-server-revisions-final-20260906]
+    paths: ['.github/workflows/studio-core-arm-migration.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/studio-pptx-server-revisions-final-20260906
+      - name: Move required core jobs to ARM without changing checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('.github/workflows/ci.yml')
+          text = path.read_text()
+          jobs = ['lint', 'typecheck', 'build', 'test', 'test-serial', 'core', 'verify']
+          changed = 0
+          for job in jobs:
+              pattern = re.compile(rf'(?ms)^  {re.escape(job)}:\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)')
+              match = pattern.search(text)
+              if not match:
+                  raise SystemExit(f'missing CI job: {job}')
+              block = match.group(0)
+              old = '    runs-on: ubuntu-24.04'
+              if old not in block:
+                  raise SystemExit(f'{job} is not on ubuntu-24.04 as expected')
+              updated = block.replace(old, '    runs-on: ubuntu-24.04-arm', 1)
+              text = text[:match.start()] + updated + text[match.end():]
+              changed += 1
+          if changed != len(jobs):
+              raise SystemExit(f'expected {len(jobs)} replacements, got {changed}')
+          path.write_text(text)
+          PY
+          git diff --check
+          grep -A4 '^  lint:' .github/workflows/ci.yml | grep -F 'runs-on: ubuntu-24.04-arm'
+          grep -A4 '^  test:' .github/workflows/ci.yml | grep -F 'runs-on: ubuntu-24.04-arm'
+          grep -A12 '^  core:' .github/workflows/ci.yml | grep -F 'runs-on: ubuntu-24.04-arm'
+      - name: Commit only the permanent scheduler change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/ci.yml
+          git rm .github/workflows/studio-core-arm-migration.yml
+          git commit -m 'ci: run required core lane on GitHub ARM runners'
+          git push origin HEAD:feat/studio-pptx-server-revisions-final-20260906
