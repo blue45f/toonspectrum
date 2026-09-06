@@ -67,6 +67,21 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
 
+          path = Path('eslint.config.mjs')
+          source = path.read_text()
+          for entry in [
+              "      { type: 'shared', pattern: 'apps/web/src/shared/**/*', mode: 'full' },\n",
+              "      { type: 'shared', pattern: 'apps/web/src/types/**/*', mode: 'full' },\n",
+          ]:
+              if source.count(entry) != 1:
+                  raise SystemExit(f'expected one generated boundary entry, found {source.count(entry)}')
+              source = source.replace(entry, '')
+          path.write_text(source)
+          PY
+
+          python3 <<'PY'
+          from pathlib import Path
+
           path = Path('scripts/validate-architecture.mjs')
           source = path.read_text()
           old = '    forbidden: "tools/browser-harnesses/promo-e2e.html",'
