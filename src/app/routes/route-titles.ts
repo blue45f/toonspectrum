@@ -2,6 +2,7 @@ import { useEffect } from "react";
 
 import "./reference-labels";
 import { shouldAppRouterOwnDocumentTitle } from "./app-route-title-ownership";
+import { CREATOR_RESOURCE_TITLES } from "./creator-resource-titles";
 
 import { useT } from "@/lib/i18n";
 import { isStudioRoutePathname } from "@/src/domains/creator/studio-workspace-route";
@@ -60,7 +61,9 @@ export function useRouteTitle(pathname: string, search: string) {
   useEffect(() => {
     if (!shouldAppRouterOwnDocumentTitle({ pathname, search })) return;
     let title: string | undefined;
-    if (pathname in STATIC_TITLES) {
+    if (Object.hasOwn(CREATOR_RESOURCE_TITLES, pathname)) {
+      title = CREATOR_RESOURCE_TITLES[pathname];
+    } else if (pathname in STATIC_TITLES) {
       const titleKey = STATIC_TITLES[pathname];
       title = titleKey ? t(titleKey) : "";
     } else if (pathname.startsWith("/author/")) {
