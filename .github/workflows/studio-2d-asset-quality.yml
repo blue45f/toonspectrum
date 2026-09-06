@@ -7,6 +7,8 @@ on:
       - 'src/domains/creator/studio-2d*'
       - 'src/domains/creator/Studio2d*'
       - 'src/domains/creator/StudioSceneToolPopoverBody.tsx'
+      - 'src/domains/creator/studio-page-lazy-ui.ts'
+      - 'src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts'
       - 'src/domains/creator/StudioToolBeltContent.tsx'
       - 'src/domains/creator/StudioCuttoonEditorHost.tsx'
       - 'scripts/studio-2d*'
@@ -19,6 +21,8 @@ on:
       - 'src/domains/creator/studio-2d*'
       - 'src/domains/creator/Studio2d*'
       - 'src/domains/creator/StudioSceneToolPopoverBody.tsx'
+      - 'src/domains/creator/studio-page-lazy-ui.ts'
+      - 'src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts'
       - 'src/domains/creator/StudioToolBeltContent.tsx'
       - 'src/domains/creator/StudioCuttoonEditorHost.tsx'
       - 'scripts/studio-2d*'
@@ -54,9 +58,9 @@ jobs:
           node scripts/studio-2d-asset-audit.mjs | tee artifacts/studio-2d/asset-audit.json
           node --test scripts/studio-2d-asset-quality.test.mjs | tee artifacts/studio-2d/file-tests.txt
       - name: Test filtering, accessible insertion and original aspect ratio
-        run: pnpm exec vitest run src/domains/creator/studio-2d-asset-quality.test.ts src/domains/creator/studio-2d-source-size.test.ts src/domains/creator/studio-2d-review-content.test.ts src/domains/creator/Studio2dSceneBrowser.test.tsx scripts/studio-2d-asset-quality.test.mjs src/domains/creator/studio-assets.test.ts src/domains/creator/studio-host-architecture-ratchet.test.ts | tee artifacts/studio-2d/component-tests.txt
+        run: pnpm exec vitest run src/domains/creator/studio-2d-lazy-boundary.test.ts src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts src/domains/creator/studio-2d-asset-quality.test.ts src/domains/creator/studio-2d-source-size.test.ts src/domains/creator/studio-2d-review-content.test.ts src/domains/creator/Studio2dSceneBrowser.test.tsx scripts/studio-2d-asset-quality.test.mjs src/domains/creator/studio-assets.test.ts src/domains/creator/studio-host-architecture-ratchet.test.ts | tee artifacts/studio-2d/component-tests.txt
       - name: Lint changed modules
-        run: pnpm exec eslint src/domains/creator/studio-2d-*.ts src/domains/creator/Studio2d*.tsx src/domains/creator/studio-bg-scenes.ts src/domains/creator/StudioSceneToolPopoverBody.tsx scripts/studio-2d-*.mjs
+        run: pnpm exec eslint src/domains/creator/studio-2d-*.ts src/domains/creator/Studio2d*.tsx src/domains/creator/studio-bg-scenes.ts src/domains/creator/StudioSceneToolPopoverBody.tsx src/domains/creator/studio-page-lazy-ui.ts scripts/studio-2d-*.mjs
       - run: pnpm exec playwright install --with-deps chromium
       - name: Validate actual component with original images in Chromium
         run: node scripts/studio-2d-browser-smoke.mjs
