@@ -1,14 +1,21 @@
-name: Dontdraw intake contracts
+name: Dontdraw intake regression
 
 on:
   pull_request:
+    branches: [main]
     paths:
       - "scripts/dontdraw/**"
+      - "scripts/upload-toonstudio-3d-assets.mts"
+      - "docs/studio/dontdraw-authorized-import.md"
+      - "docs/studio/dontdraw-upload-handoff.md"
       - ".github/workflows/dontdraw-intake.yml"
   push:
     branches: [main]
     paths:
       - "scripts/dontdraw/**"
+      - "scripts/upload-toonstudio-3d-assets.mts"
+      - "docs/studio/dontdraw-authorized-import.md"
+      - "docs/studio/dontdraw-upload-handoff.md"
       - ".github/workflows/dontdraw-intake.yml"
 
 permissions:
@@ -19,7 +26,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  dontdraw-intake-contracts:
+  intake-node24:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -27,9 +34,17 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Check offline intake syntax
+      - name: Check syntax and run real offline intake contracts
+        shell: bash
         run: |
-          node --check scripts/dontdraw/import-authorized-assets.mjs
-          node --check scripts/dontdraw/authorized-intake-io.mjs
-      - name: Execute intake and filesystem regression contracts
-        run: node --test scripts/dontdraw/*.test.mjs
+          set -euo pipefail
+          for source in scripts/dontdraw/*.mjs; do node --check "$source"; done
+          node --check scripts/upload-toonstudio-3d-assets.mts
+          node --test scripts/dontdraw/*.test.mjs | tee dontdraw-intake-tests.tap
+      - name: Retain actual test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dontdraw-intake-node24-${{ github.run_id }}
+          path: dontdraw-intake-tests.tap
+          if-no-files-found: warn
