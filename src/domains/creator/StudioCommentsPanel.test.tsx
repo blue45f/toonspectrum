@@ -95,6 +95,14 @@ function makeThread(
   };
 }
 
+function renderedThread(threadId: string): HTMLElement {
+  const element = globalThis.document.querySelector<HTMLElement>(
+    `[data-studio-comment-thread-id="${threadId}"]`
+  );
+  if (!element) throw new Error(`thread ${threadId} is not rendered`);
+  return element;
+}
+
 function makeDocument(
   threads: readonly StudioCommentThread[] = [makeThread()]
 ): StudioCommentsDocument {
@@ -407,8 +415,9 @@ describe("StudioCommentsPanel review rail contract", () => {
   });
 
   it("exposes guarded edit operations for the current actor", () => {
-    expect(source).toContain("actorsRepresentSamePerson(thread.author, currentActor)");
-    expect(source).toContain("actorsRepresentSamePerson(reply.author, currentActor)");
+    // 비교기는 studio-comment-inbox-filter 로 옮겨 검수함 필터와 같은 정체성 규칙을 쓴다.
+    expect(source).toContain("studioCommentActorsRepresentSamePerson(thread.author, currentActor)");
+    expect(source).toContain("studioCommentActorsRepresentSamePerson(reply.author, currentActor)");
     expect(source).toContain("editStudioCommentThread(document");
     expect(source).toContain("editStudioCommentReply(document");
   });
@@ -546,11 +555,20 @@ describe("StudioCommentsPanel personalized review workflow", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /나와 관련\s*4/u }));
     expect(globalThis.document.querySelectorAll("[data-studio-comment-thread-id]")).toHaveLength(4);
-    expect(screen.getByText("내 댓글")).toBeTruthy();
-    expect(screen.getByText("내가 참여")).toBeTruthy();
-    expect(screen.getByText("내 담당")).toBeTruthy();
-    expect(screen.getByText("나를 멘션")).toBeTruthy();
+    // 관계 배지는 각 스레드 안에서 찾는다 — "내 담당"·"나를 멘션"은 필터 칩 라벨과도 겹친다.
+    expect(within(renderedThread("thread-self-authored")).getByText("내 댓글")).toBeTruthy();
+    expect(within(renderedThread("thread-participated")).getByText("내가 참여")).toBeTruthy();
+    expect(within(renderedThread("thread-assigned")).getByText("내 담당")).toBeTruthy();
+    expect(within(renderedThread("thread-mentioned")).getByText("나를 멘션")).toBeTruthy();
     expect(screen.queryByText("다른 팀 피드백")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /내 담당\s*1/u }));
+    expect(globalThis.document.querySelectorAll("[data-studio-comment-thread-id]")).toHaveLength(1);
+    expect(screen.getByText("내 담당 피드백")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /나를 멘션\s*1/u }));
+    expect(globalThis.document.querySelectorAll("[data-studio-comment-thread-id]")).toHaveLength(1);
+    expect(screen.getByText("나를 부른 피드백")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /전체\s*5/u }));
     const search = screen.getByRole<HTMLInputElement>("searchbox", { name: "댓글 검색" });

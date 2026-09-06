@@ -27,6 +27,11 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 
 import {
+  studioCommentActorsRepresentSamePerson,
+  studioCommentThreadAssignedToActor,
+  studioCommentThreadMentionsActor,
+} from "./studio-comment-inbox-filter";
+import {
   addStudioCommentReply,
   addStudioCommentThread,
   mergeStudioTeamCommentMutableDocument,
@@ -126,7 +131,7 @@ export interface StudioCommentsPanelCapabilities {
   assign: boolean;
 }
 
-type CommentFilter = "current" | "all" | "mine" | "unread" | "open" | "resolved";
+type CommentFilter = "current" | "all" | "mine" | "unread" | "assigned" | "mentioned" | "open" | "resolved";
 type CommentSort = "recent" | "oldest" | "location";
 type CurrentActorRelation = "mentioned" | "assigned" | "authored" | "participated" | null;
 
@@ -140,6 +145,8 @@ const FILTERS: readonly { value: CommentFilter; label: string }[] = [
   { value: "all", label: "전체" },
   { value: "mine", label: "나와 관련" },
   { value: "unread", label: "읽지 않음" },
+  { value: "assigned", label: "내 담당" },
+  { value: "mentioned", label: "나를 멘션" },
   { value: "open", label: "열림" },
   { value: "resolved", label: "해결됨" },
 ];
@@ -192,27 +199,18 @@ function actorInitial(actor: StudioCommentActor): string {
   return Array.from(actor.displayName.trim())[0] ?? "?";
 }
 
-function actorsRepresentSamePerson(
-  left: StudioCommentActor,
-  right: StudioCommentActor
-): boolean {
-  if (left.id || right.id) return Boolean(left.id && right.id && left.id === right.id);
-  return left.displayName.normalize("NFKC").toLocaleLowerCase()
-    === right.displayName.normalize("NFKC").toLocaleLowerCase();
-}
-
 function studioCommentThreadCurrentActorRelation(
   thread: StudioCommentThread,
   currentActor: StudioCommentActor
 ): CurrentActorRelation {
-  const mentioned = [...thread.mentions, ...thread.replies.flatMap((reply) => reply.mentions)]
-    .some((actor) => actorsRepresentSamePerson(actor, currentActor));
-  if (mentioned) return "mentioned";
-  if (thread.assignee && actorsRepresentSamePerson(thread.assignee, currentActor)) {
-    return "assigned";
-  }
-  if (actorsRepresentSamePerson(thread.author, currentActor)) return "authored";
-  if (thread.replies.some((reply) => actorsRepresentSamePerson(reply.author, currentActor))) {
+  if (studioCommentThreadMentionsActor(thread, currentActor)) return "mentioned";
+  if (studioCommentThreadAssignedToActor(thread, currentActor)) return "assigned";
+  if (studioCommentActorsRepresentSamePerson(thread.author, currentActor)) return "authored";
+  if (
+    thread.replies.some((reply) =>
+      studioCommentActorsRepresentSamePerson(reply.author, currentActor)
+    )
+  ) {
     return "participated";
   }
   return null;
@@ -551,11 +549,19 @@ export function StudioCommentsPanel({
         studioCommentAnchorsEqual(thread.anchor, activeAnchor)
       ).length
     : 0;
+  const assignedCount = document.threads.filter((thread) =>
+    studioCommentThreadAssignedToActor(thread, currentActor)
+  ).length;
+  const mentionedCount = document.threads.filter((thread) =>
+    studioCommentThreadMentionsActor(thread, currentActor)
+  ).length;
   const filterCounts: Record<CommentFilter, number> = {
     current: currentCount,
     all: document.threads.length,
     mine: mineCount,
     unread: unreadCount,
+    assigned: assignedCount,
+    mentioned: mentionedCount,
     open: openCount,
     resolved: resolvedCount,
   };
@@ -571,6 +577,12 @@ export function StudioCommentsPanel({
         return studioCommentThreadCurrentActorRelation(thread, currentActor) !== null;
       }
       if (filter === "unread") return unreadThreadIds.has(thread.id);
+      if (filter === "assigned") {
+        return studioCommentThreadAssignedToActor(thread, currentActor);
+      }
+      if (filter === "mentioned") {
+        return studioCommentThreadMentionsActor(thread, currentActor);
+      }
       if (filter === "open") return !thread.resolved;
       if (filter === "resolved") return thread.resolved;
       return true;
@@ -1165,6 +1177,7 @@ export function StudioCommentsPanel({
                   : !composerAnchorValid
                     ? "삭제되지 않은 페이지, 컷 또는 요소를 다시 선택해 주세요."
                     : "수정할 점이나 확인이 필요한 내용을 남겨 주세요."}
+                aria-keyshortcuts="Control+Enter Meta+Enter"
                 onChange={(event) =>
                   setNewComment(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH))
                 }
@@ -1466,7 +1479,7 @@ export function StudioCommentsPanel({
                 const isReplying = !isReadOnlyArchive && activeReplyThreadId === thread.id;
                 const isAssigning = !isReadOnlyArchive && assigningThreadId === thread.id;
                 const threadTarget: CommentMessageTarget = { threadId: thread.id };
-                const ownsThread = actorsRepresentSamePerson(thread.author, currentActor);
+                const ownsThread = studioCommentActorsRepresentSamePerson(thread.author, currentActor);
                 const canEditThread = !isReadOnlyArchive && capabilities.editOwn && ownsThread && !saving;
                 const isEditingThread = !isReadOnlyArchive && messageTargetsEqual(editingMessage, threadTarget);
                 const locationLabel = getAnchorLabel(thread.anchor, anchorOptions);
@@ -1483,7 +1496,7 @@ export function StudioCommentsPanel({
                 const taskExpanded = expandedTaskThreadId === thread.id;
                 const assignedToCurrentActor = Boolean(
                   thread.assignee
-                  && actorsRepresentSamePerson(thread.assignee, currentActor)
+                  && studioCommentActorsRepresentSamePerson(thread.assignee, currentActor)
                 );
                 const taskConversionDisabledReason = isReadOnlyArchive
                   ? "읽기 전용 보관 댓글은 작업으로 전환할 수 없습니다."
@@ -1660,7 +1673,7 @@ export function StudioCommentsPanel({
                               threadId: thread.id,
                               replyId: reply.id,
                             };
-                            const ownsReply = actorsRepresentSamePerson(reply.author, currentActor);
+                            const ownsReply = studioCommentActorsRepresentSamePerson(reply.author, currentActor);
                             const canEditReply = !isReadOnlyArchive && capabilities.editOwn && ownsReply && !saving;
                             const isEditingReply = !isReadOnlyArchive && messageTargetsEqual(editingMessage, replyTarget);
                             const isDeletingReply = false;
