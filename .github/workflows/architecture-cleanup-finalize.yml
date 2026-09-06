@@ -188,10 +188,44 @@ jobs:
             '  "validate:architecture",\n  "verify:studio-menus",',
             '  "validate:architecture",\n  "verify:csp",\n  "verify:toolchain-coverage",\n  "verify:studio-menus",',
           );
+
+          const architectureGuardBlock = [
+            'for (const script of requiredScripts) {',
+            '  if (!scripts[script]) issues.push(`missing script: ${script}`);',
+            '}',
+            '',
+            'const expectedCspCommand = "node scripts/verify-vercel-csp.mjs apps/web/index.html";',
+            'if (scripts["verify:csp"] !== expectedCspCommand) {',
+            '  issues.push(`verify:csp must target the canonical entry: ${expectedCspCommand}`);',
+            '}',
+            '',
+            'const canonicalWorkflowReferences = [',
+            '  {',
+            '    file: ".github/workflows/studio-asset-browser.yml",',
+            '    required: "      - apps/web/tests/browser-fixtures/studio-catalog/**",',
+            '    forbidden: "\\n      - tests/browser-fixtures/studio-catalog/**",',
+            '  },',
+            '  {',
+            '    file: ".github/workflows/studio-promo-video.yml",',
+            '    required: "apps/web/tools/browser-harnesses/promo-e2e.html",',
+            '    forbidden: "tools/browser-harnesses/promo-e2e.html",',
+            '  },',
+            '  {',
+            '    file: ".github/workflows/studio-wearable-runtime-review.yml",',
+            '    required: "cp apps/web/tools/browser-harnesses/props-compare-main.ts",',
+            '    forbidden: "cp tools/browser-harnesses/props-compare-main.ts",',
+            '  },',
+            '];',
+            'for (const { file, required, forbidden } of canonicalWorkflowReferences) {',
+            '  const source = read(file);',
+            '  if (!source.includes(required)) issues.push(`${file}: missing canonical web path ${required.trim()}`);',
+            '  if (source.includes(forbidden)) issues.push(`${file}: stale root path ${forbidden.trim()}`);',
+            '}',
+          ].join('\n');
           replaceExact(
             'scripts/validate-architecture.mjs',
-            'for (const script of requiredScripts) {\n  if (!scripts[script]) issues.push(`missing script: ${script}`);\n}\n',
-            'for (const script of requiredScripts) {\n  if (!scripts[script]) issues.push(`missing script: ${script}`);\n}\n\nconst expectedCspCommand = "node scripts/verify-vercel-csp.mjs apps/web/index.html";\nif (scripts["verify:csp"] !== expectedCspCommand) {\n  issues.push(`verify:csp must target the canonical entry: ${expectedCspCommand}`);\n}\n\nconst canonicalWorkflowReferences = [\n  {\n    file: ".github/workflows/studio-asset-browser.yml",\n    required: "      - apps/web/tests/browser-fixtures/studio-catalog/**",\n    forbidden: "\\n      - tests/browser-fixtures/studio-catalog/**",\n  },\n  {\n    file: ".github/workflows/studio-promo-video.yml",\n    required: "apps/web/tools/browser-harnesses/promo-e2e.html",\n    forbidden: "\\'tools/browser-harnesses/promo-e2e.html\\'",\n  },\n  {\n    file: ".github/workflows/studio-wearable-runtime-review.yml",\n    required: "cp apps/web/tools/browser-harnesses/props-compare-main.ts",\n    forbidden: "cp tools/browser-harnesses/props-compare-main.ts",\n  },\n];\nfor (const { file, required, forbidden } of canonicalWorkflowReferences) {\n  const source = read(file);\n  if (!source.includes(required)) issues.push(`${file}: missing canonical web path ${required.trim()}`);\n  if (source.includes(forbidden)) issues.push(`${file}: stale root path ${forbidden.trim()}`);\n}\n',
+            'for (const script of requiredScripts) {\n  if (!scripts[script]) issues.push(`missing script: ${script}`);\n}',
+            architectureGuardBlock,
           );
 
           replaceExact(
