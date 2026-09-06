@@ -40,7 +40,7 @@ if (!browserType) throw new Error(`Unsupported QA_BROWSER: ${BROWSER_NAME}`);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const digest = (value) => createHash("sha256").update(value).digest("hex").slice(0, 16);
 const textError = (error) => String(error?.stack ?? error?.message ?? error).slice(0, 2_000);
-const safeFilePart = (value) => value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+const safeFilePart = (value) => value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/(?:^-+|-+$)/g, "");
 
 async function inspectDom(page) {
   return page.evaluate((minimumTap) => {

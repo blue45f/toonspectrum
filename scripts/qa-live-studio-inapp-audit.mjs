@@ -77,7 +77,7 @@ function sleep(ms) {
 }
 
 function slug(value) {
-  return value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/(?:^-+|-+$)/g, "");
 }
 
 function sha256(buffer) {

@@ -57,7 +57,7 @@ function readEnvLocalValue(key) {
     try {
       const txt = readFileSync(new URL(rel, import.meta.url), "utf8");
       const m = txt.match(new RegExp(`^\\s*${key}\\s*=\\s*(.+?)\\s*$`, "m"));
-      if (m) return m[1].replace(/^['"]|['"]$/g, "").trim();
+      if (m) return m[1].replace(/(?:^['"]|['"]$)/g, "").trim();
     } catch {
       /* 파일 없음 — 다음 후보 */
     }

@@ -185,7 +185,7 @@ def strip_known_suffix(path: Path) -> Path:
 
 
 def rewrite_spec(importer_new: Path, spec: str, moved: dict[Path, Path], old_to_new_file: dict[Path, Path]) -> str | None:
-    resolved = resolve_import(importer_new if importer_new.exists() else importer_new, spec)
+    resolve_import(importer_new, spec)
     # importer_new may not exist yet during planning; resolve from old location instead.
     return None
 

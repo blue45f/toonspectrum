@@ -133,7 +133,7 @@ function sleep(ms) {
 }
 
 function slug(value) {
-  return value.replace(/[^a-zA-Z0-9_-]+/gu, "-").replace(/^-+|-+$/gu, "");
+  return value.replace(/[^a-zA-Z0-9_-]+/gu, "-").replace(/(?:^-+|-+$)/gu, "");
 }
 
 function sha256(buffer) {

@@ -65,7 +65,7 @@ function normalizeToken(value) {
     .toLowerCase()
     .replace(/3d/gu, "three-d")
     .replace(/[^a-z0-9가-힣]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
+    .replace(/(?:^-+|-+$)/gu, "");
 }
 
 function tokenWords(value) {

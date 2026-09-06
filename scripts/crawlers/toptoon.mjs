@@ -62,7 +62,7 @@ function parseItem(block, source) {
   if (!rawTitle) return null;
 
   const coverRaw = (block.match(/serial__image[^>]*background-image\s*:\s*url\(([^)]+)\)/i) || [])[1] || "";
-  const coverUrl = coverRaw.replace(/^['"]|['"]$/g, "").trim();
+  const coverUrl = coverRaw.replace(/(?:^['"]|['"]$)/g, "").trim();
   // 실제 공개 썸네일(smurfs.toptoon.com)만 통과. UI 에셋(/assets/img/) 은 표지가 아니다.
   const realCover = /^https:\/\/[^/]*toptoon\.com\/assets\/upfile\//i.test(coverUrl) ? coverUrl : undefined;
 
