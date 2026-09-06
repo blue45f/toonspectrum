@@ -99,7 +99,7 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       expect(studioBrushCatalogItemById(item.id), `${item.id}: lookup drift`).toBe(item);
       expect(studioBrushCatalogKindLabel(item), `${item.id}: missing kind label`).toMatch(
-        /^(잉크|연필|마커|수채|유화|에어브러시|파스텔|질감|톤|효과|지우개)$/u
+        /^(펜·잉크|연필·흑연|마커|수채·수묵|유화·아크릴|에어브러시|목탄·파스텔|질감|망점·해칭|빛·효과|지우개)$/u
       );
       // V17.1 quarantined ids stay resolvable above but leave every picker listing/search —
       // their exposure contract is asserted in the dedicated quarantine block below.

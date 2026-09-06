@@ -54,7 +54,7 @@ describe("studio brush default restore contract", () => {
     expect(profile).toMatchObject({
       source: "built-in",
       sourceId: "spray",
-      sourceName: "스프레이",
+      sourceName: "미세 스프레이",
       values: {
         strokeWidth: 40,
         brushOpacity: 0.55,

@@ -371,7 +371,7 @@ describe("StudioBrushLibrarySheet", () => {
     const result = screen.getByRole("button", { name: "하트 도장 선택" });
     expect(result.tabIndex).toBe(0);
     expect(screen.getByRole("status").textContent).toBe("1/1개의 브러시가 표시됩니다.");
-    expect(screen.getByText(`분류와 관계없이 전체 ${paintCatalogCount}종에서 검색 중`)).toBeTruthy();
+    expect(screen.getByText(`재질 분류와 관계없이 전체 ${paintCatalogCount}종에서 검색 중`)).toBeTruthy();
   });
 
   it("keeps a long brush name inside the 320px text-row flex boundary", () => {
@@ -431,12 +431,12 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
 
-    expect(screen.getByRole("tab", { name: "기본" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "시작 도구" }).getAttribute("aria-selected")).toBe("true");
     fireEvent.change(screen.getByRole("searchbox", { name: "전체 브러시 검색" }), {
       target: { value: "heart-stamp" },
     });
 
-    expect(screen.getByText(`분류와 관계없이 전체 ${paintCatalogCount}종에서 검색 중`)).toBeTruthy();
+    expect(screen.getByText(`재질 분류와 관계없이 전체 ${paintCatalogCount}종에서 검색 중`)).toBeTruthy();
     expect(screen.getByRole("status").textContent).toBe("1/1개의 브러시가 표시됩니다.");
     expect(screen.getByRole("button", { name: "하트 도장 선택" })).toBeTruthy();
   });
@@ -454,7 +454,7 @@ describe("StudioBrushLibrarySheet", () => {
     );
 
     expect(container.querySelector('[data-studio-brush-kind-badge="ink"]')?.textContent).toBe(
-      "잉크"
+      "펜·잉크"
     );
     fireEvent.click(screen.getByRole("button", { name: "매끈한 펜 기본값 다시 적용" }));
 
@@ -921,7 +921,7 @@ describe("StudioBrushLibrarySheet", () => {
       onToggleFavorite: vi.fn(),
     });
 
-    expect(html).toMatch(/aria-label="펜\(매끈\) 선택" aria-pressed="true"/);
+    expect(html).toMatch(/aria-label="매끈한 펜 선택" aria-pressed="true"/);
     expect(html).toMatch(/aria-label="G펜\(필압\) 선택" aria-pressed="false"/);
     expect(html).toContain('aria-label="매끈한 펜 즐겨찾기 해제"');
     expect(html).toContain('fill="currentColor"');
