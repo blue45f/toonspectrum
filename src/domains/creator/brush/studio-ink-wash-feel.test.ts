@@ -3,14 +3,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { StudioLiveWetInkOverlayRenderer } from "../live/studio-live-wet-ink-overlay";
 import { BRUSH_PRESETS } from "../studio-brush";
 
-import { filterStudioBrushCatalogItems } from "./studio-brush-catalog";
+import { filterStudioBrushCatalogItems, studioBrushCatalogItemById } from "./studio-brush-catalog";
 import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
 import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import {
   planStudioDrawPointerStart,
   type StudioDrawPointerStartInput,
 } from "./studio-draw-pointer-start-plan";
-import { STUDIO_SUB_TOOL_PALETTE_CATEGORIES } from "./studio-sub-tool-palette-data";
 import {
   createStudioInkwashFluidSession,
   depositStudioInkwashFluidStamp,
@@ -232,7 +231,7 @@ describe("InkWash pen/water product start on the shipped wet/fluid path", () => 
     resetStudioInkwashWash();
   });
 
-  it("lists the pen and water brush in the picker, search, and 붓 palette", () => {
+  it("lists the pen and water brush in the picker and search under their stable IDs", () => {
     for (const id of ["inkwash-pen", "inkwash-water-brush"] as const) {
       expect(isStudioBrushQuarantinedPresetId(id), id).toBe(false);
       expect(
@@ -250,10 +249,19 @@ describe("InkWash pen/water product start on the shipped wet/fluid path", () => 
     expect(
       filterStudioBrushCatalogItems({ query: "물붓" }).some((item) => item.id === "inkwash-water-brush"),
     ).toBe(true);
-    const brushTab = STUDIO_SUB_TOOL_PALETTE_CATEGORIES.find((category) => category.id === "brush");
-    expect(brushTab?.tools.map((tool) => tool.id)).toEqual(
-      expect.arrayContaining(["inkwash-pen", "inkwash-water-brush"]),
-    );
+    // #771 (c9ef0ff7) trimmed the compact 채색·물감 shortcuts to four representatives and moved
+    // the InkWash pair out on purpose (studio-shortcut-order.test.ts pins that list). The
+    // product promise that survives is the full library: same IDs, found by their former names.
+    for (const [id, formerName] of [
+      ["inkwash-pen", "잉크워시 펜"],
+      ["inkwash-water-brush", "잉크워시 붓"],
+    ] as const) {
+      expect(studioBrushCatalogItemById(id)?.id, `${id}: catalogue identity`).toBe(id);
+      expect(
+        filterStudioBrushCatalogItems({ query: formerName }).some((item) => item.id === id),
+        `${id}: former name "${formerName}" no longer finds it in the full library`,
+      ).toBe(true);
+    }
   });
 
   it("accepts pointer-start snapshots and keeps water from depositing ink", () => {

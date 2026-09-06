@@ -43,7 +43,6 @@ import { useStudioModalSheet } from "../useStudioModalSheet";
 
 import {
   STUDIO_FILTER_DIALOG_CATALOG,
-  STUDIO_FILTER_GROUP_ORDER,
   searchStudioFilterDialogCatalog,
   studioFilterDialogPreviewStyle,
   studioFilterGroupLabel,
@@ -68,6 +67,7 @@ import {
   type StudioFilterKind,
   type StudioFilterPackDraft,
 } from "./studio-filter-menu";
+import { STUDIO_FILTER_DIALOG_GROUP_ORDER } from "./studio-filter-menu-groups";
 import {
   STUDIO_FILTER_PACK_DEFS,
   isStudioFilterPackKind,
@@ -107,7 +107,7 @@ const STUDIO_FILTER_GALLERY_VIEWS: readonly {
   { id: "all", label: "전체" },
   { id: "favorites", label: "즐겨찾기" },
   { id: "recent", label: "최근" },
-  ...STUDIO_FILTER_GROUP_ORDER.map((group) => ({
+  ...STUDIO_FILTER_DIALOG_GROUP_ORDER.map((group) => ({
     id: group,
     label: studioFilterGroupLabel(group),
   })),

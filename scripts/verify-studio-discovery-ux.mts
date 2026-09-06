@@ -17,7 +17,7 @@ mkdirSync(output, { recursive: true });
 const html = "studio-discovery-qa.html";
 const entry = "studio-discovery-qa.tsx";
 const runtimeErrors: string[] = [];
-const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[] } = { checks: [], runtimeErrors, screenshots: [] };
+const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[]; failure?: string } = { checks: [], runtimeErrors, screenshots: [] };
 const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
 const devPort = await findFreePort();
 const previewPort = await findFreePort();
@@ -134,8 +134,8 @@ try {
   await page.mouse.up();
   await page.waitForTimeout(400);
   const nav = page.locator('[data-studio-main-menu="true"]');
-  await nav.getByRole("menuitem", { name: "필터", exact: true }).click();
-  await page.locator('[role="menu"][aria-label="필터"]').getByRole("menuitem", { name: "가우시안 블러", exact: true }).click();
+  await nav.locator('[data-studio-main-menu-trigger="filter"]').click();
+  await page.locator('[data-studio-main-menu-panel="true"] [data-studio-menu-item-id="gaussian-blur"]').click();
   const dialog = page.locator('[aria-labelledby="studio-filter-dialog-title"]');
   await dialog.waitFor({ state: "visible" });
   const filterSearch = dialog.getByRole("searchbox", { name: "필터 검색" });
@@ -153,6 +153,13 @@ try {
   await context.close();
   assert.equal(runtimeErrors.length, 0, runtimeErrors.join("\n"));
   console.log(JSON.stringify(receipt, null, 2));
+} catch (error) {
+  receipt.failure = error instanceof Error ? error.stack ?? error.message : String(error);
+  for (const [index, page] of browser.contexts().flatMap((context) => context.pages()).entries()) {
+    await screenshot(page, `failure-${index}.png`).catch(() => undefined);
+    writeFileSync(join(output, `failure-${index}.html`), await page.content().catch(() => ""));
+  }
+  throw error;
 } finally {
   writeFileSync(join(output, "receipt.json"), JSON.stringify(receipt, null, 2));
   await browser.close();

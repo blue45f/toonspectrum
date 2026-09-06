@@ -13,8 +13,9 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { STUDIO_FILTER_CATALOG, STUDIO_FILTER_DIALOG_CATALOG } from "./filter/studio-filter-catalog";
+import { STUDIO_FILTER_CATALOG, STUDIO_FILTER_DIALOG_CATALOG, studioFilterGroupLabel } from "./filter/studio-filter-catalog";
 import { STUDIO_FILTER_LABELS, STUDIO_FILTER_MENU_KINDS } from "./filter/studio-filter-menu";
+import { STUDIO_FILTER_DIALOG_GROUP_ORDER } from "./filter/studio-filter-menu-groups";
 import { STUDIO_FILTER_PACK_DEFS } from "./filter/studio-filter-pack";
 import {
   STUDIO_FILTER_ALL_KINDS,
@@ -91,6 +92,9 @@ const BASE_STATE: StudioMainMenuBuilderState = {
 
 /** Rows that open a filter dialog — everything except 마지막 필터 and the two layer adjustments. */
 const NON_FILTER_ROW_IDS = new Set(["last-filter", "levels", "tone-curve"]);
+const PURPOSE_ORDERED_KINDS = STUDIO_FILTER_DIALOG_GROUP_ORDER.flatMap((group) =>
+  STUDIO_FILTER_DIALOG_CATALOG.filter((entry) => entry.group === group).map((entry) => entry.kind),
+);
 
 function filterRows(state: Partial<StudioMainMenuBuilderState> = {}) {
   const opened: string[] = [];
@@ -111,11 +115,11 @@ function filterRows(state: Partial<StudioMainMenuBuilderState> = {}) {
 }
 
 describe("filter menu ↔ filter gallery parity", () => {
-  it("offers exactly one menu row per registered filter kind, in registration order", () => {
+  it("offers exactly one menu row per registered filter kind, in shared purpose-group order", () => {
     const { items } = filterRows();
     const openable = items.filter((item) => !NON_FILTER_ROW_IDS.has(item.id));
 
-    expect(openable.map((item) => item.id)).toEqual([...STUDIO_FILTER_MENU_KINDS]);
+    expect(openable.map((item) => item.id)).toEqual(PURPOSE_ORDERED_KINDS);
     // The registry is the one list; the menu and the gallery are two readers of it.
     expect(openable).toHaveLength(STUDIO_FILTER_DIALOG_CATALOG.length);
     expect(openable).toHaveLength(STUDIO_FILTER_ALL_KINDS.length);
@@ -165,7 +169,7 @@ describe("filter menu ↔ filter gallery parity", () => {
       if (NON_FILTER_ROW_IDS.has(item.id)) continue;
       item.onSelect();
     }
-    expect(opened).toEqual([...STUDIO_FILTER_MENU_KINDS]);
+    expect(opened).toEqual(PURPOSE_ORDERED_KINDS);
   });
 
   it("reaches the 16 union-wave filters that used to exist only in gallery search", () => {
@@ -200,16 +204,11 @@ describe("filter menu ↔ filter gallery parity", () => {
         item.sectionLabel ? [[item.id, item.sectionLabel] as const] : [],
       ),
     ).toEqual([
-      ["gaussian-blur", "기본 필터"],
+      ...STUDIO_FILTER_DIALOG_GROUP_ORDER.map((group) => [
+        STUDIO_FILTER_DIALOG_CATALOG.find((entry) => entry.group === group)!.kind,
+        studioFilterGroupLabel(group),
+      ]),
       ["levels", "레이어 보정"],
-      ["mosaic", "픽셀화"],
-      ["radial-blur", "블러"],
-      ["chromatic-aberration", "렌즈·화면 효과"],
-      ["emboss", "스타일화"],
-      ["line-cleanup", "선화·복원"],
-      ["noise-add", "노이즈"],
-      ["wave-warp", "왜곡"],
-      ["film-grain-pro", "질감·변환"],
     ]);
   });
 

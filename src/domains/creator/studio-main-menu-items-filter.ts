@@ -9,8 +9,12 @@
  * engines, dialog entries and search metadata, but never got a menubar row, so a third of the
  * filter catalogue was reachable only by typing into the gallery's search box. The rows are now
  * generated from `STUDIO_FILTER_PACK_KINDS` + `STUDIO_FILTER_PACK_LABELS` (the same registry the
- * dialog gallery counts), and this module only decides the icon and the separators. A new filter
- * kind therefore appears in the menu the moment it exists — it cannot be forgotten here again.
+ * dialog gallery counts), and this module only decides the icon. A new filter kind therefore
+ * appears in the menu the moment it exists — it cannot be forgotten here again.
+ *
+ * Purpose grouping, section labels and separators are not authored here either: the rows go
+ * through `orderStudioFilterMenuItems`, so the menu and the filter gallery read one taxonomy
+ * (#771 — 흐림·초점, 선화·복원, 빛·렌즈 …) instead of two hand-kept ones that drift apart.
  */
 
 import {
@@ -56,6 +60,7 @@ import {
   Zap,
 } from "lucide-react";
 
+import { orderStudioFilterMenuItems } from "./filter/studio-filter-menu-groups";
 import {
   STUDIO_FILTER_PACK_KINDS,
   STUDIO_FILTER_PACK_LABELS,
@@ -117,34 +122,7 @@ const STUDIO_FILTER_PACK_MENU_ICONS: Readonly<Record<StudioFilterPackKind, Lucid
   "polar-coordinates": Compass,
 };
 
-/**
- * Rows after which the menu draws a rule. These are family boundaries in the registry order
- * (blur → optical/CRT → stylize → restoration → distort → noise/texture), not a second ordering.
- */
-const STUDIO_FILTER_PACK_MENU_SEPARATORS: ReadonlySet<StudioFilterPackKind> = new Set([
-  "tileable-blur",
-  "lens-flare",
-  "surface-blur",
-  "noise-add",
-  "lens-distortion",
-  "perlin-texture",
-]);
-
-/** First row of each visible family in the otherwise 52-row Filter menu. */
-const STUDIO_FILTER_PACK_MENU_SECTION_LABELS: Readonly<
-  Partial<Record<StudioFilterPackKind, string>>
-> = Object.freeze({
-  mosaic: "픽셀화",
-  "radial-blur": "블러",
-  "chromatic-aberration": "렌즈·화면 효과",
-  emboss: "스타일화",
-  "line-cleanup": "선화·복원",
-  "noise-add": "노이즈",
-  "wave-warp": "왜곡",
-  "film-grain-pro": "질감·변환",
-});
-
-/** Core rows keep their bespoke drafts, their ⌘⇧n chords, and their declaration order. */
+/** Core rows keep their bespoke drafts and ⌘⇧n chords; the shared grouping decides where they sit. */
 const STUDIO_FILTER_CORE_MENU_ROWS = [
   { id: "gaussian-blur", label: "가우시안 블러", icon: Droplets, shortcut: "⌘⇧1" },
   { id: "motion-blur", label: "모션 블러", icon: Wind, shortcut: "⌘⇧2" },
@@ -167,7 +145,7 @@ export function buildStudioFilterMenuItems({
     ? state.filterUnavailableReason ?? "현재 편집 상태에서는 필터를 적용할 수 없습니다."
     : undefined;
 
-  return [
+  const items: StudioMainMenuItem[] = [
     {
       id: "last-filter",
       commandId: "filter.last",
@@ -187,11 +165,10 @@ export function buildStudioFilterMenuItems({
         }
       },
     },
-    ...STUDIO_FILTER_CORE_MENU_ROWS.map(({ id, label, icon, shortcut }, index) => ({
+    ...STUDIO_FILTER_CORE_MENU_ROWS.map(({ id, label, icon, shortcut }) => ({
       id,
       commandId: `filter.${id}`,
       searchActivation: "execute" as const,
-      ...(index === 0 ? { sectionLabel: "기본 필터" } : {}),
       label,
       icon,
       shortcut,
@@ -204,23 +181,17 @@ export function buildStudioFilterMenuItems({
     // §15.3 Filter ▸ Adjustment Layer. 위 항목들과 달리 픽셀을 굽지 않고 선택 레이어의
     // 보정 파라미터를 편집한다 — 인스펙터 보정 패널이 실제 편집면이고, 메뉴는 그 문이다.
     // (감사 §2.2: 레벨·커브 둘 다 메뉴·팔레트·검색 어디에도 없어 3동작을 넘겼다.)
+    // 다이얼로그 필터가 아니라 공유 분류 밖에 남고, 정렬 뒤에는 메뉴 맨 끝 구역이 된다.
     ...([
       { id: "levels", commandId: "filter.levels", label: "레이어 보정 · 레벨", icon: SlidersHorizontal },
-      {
-        id: "tone-curve",
-        commandId: "filter.tone-curve",
-        label: "레이어 보정 · 톤 커브",
-        icon: Spline,
-        separatorAfter: true,
-      },
-    ] as const).map(({ id, commandId, label, icon, ...rest }, index) => ({
+      { id: "tone-curve", commandId: "filter.tone-curve", label: "레이어 보정 · 톤 커브", icon: Spline },
+    ] as const).map(({ id, commandId, label, icon }, index) => ({
       id,
       commandId,
       searchActivation: "execute" as const,
       ...(index === 0 ? { sectionLabel: "레이어 보정" } : {}),
       label,
       icon,
-      ...("separatorAfter" in rest && rest.separatorAfter ? { separatorAfter: true } : {}),
       disabled: !state.imageLayerSelected,
       unavailableReason: state.imageLayerSelected
         ? undefined
@@ -230,17 +201,13 @@ export function buildStudioFilterMenuItems({
       },
     })),
     // 필터 팩 전체 — 하나도 빠뜨릴 수 없도록 레지스트리를 그대로 순회한다. 라벨은
-    // 다이얼로그(STUDIO_FILTER_PACK_DEFS)와 같은 문자열이고, 여기서 정하는 건 아이콘과 구분선뿐.
+    // 다이얼로그(STUDIO_FILTER_PACK_DEFS)와 같은 문자열이고, 여기서 정하는 건 아이콘뿐.
     ...STUDIO_FILTER_PACK_KINDS.map((kind) => ({
       id: kind,
       commandId: `filter.${kind}`,
       searchActivation: "execute" as const,
-      ...(STUDIO_FILTER_PACK_MENU_SECTION_LABELS[kind]
-        ? { sectionLabel: STUDIO_FILTER_PACK_MENU_SECTION_LABELS[kind] }
-        : {}),
       label: STUDIO_FILTER_PACK_LABELS[kind],
       icon: STUDIO_FILTER_PACK_MENU_ICONS[kind],
-      ...(STUDIO_FILTER_PACK_MENU_SEPARATORS.has(kind) ? { separatorAfter: true } : {}),
       disabled: state.filterDisabled,
       unavailableReason: filterUnavailableReason,
       onSelect: () => {
@@ -248,4 +215,6 @@ export function buildStudioFilterMenuItems({
       },
     })),
   ];
+  // 용도별 그룹·구분선은 갤러리와 같은 한 곳에서 정한다. ID·콜백·단축키·비활성 사유는 그대로다.
+  return orderStudioFilterMenuItems(items);
 }
