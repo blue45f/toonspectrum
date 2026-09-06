@@ -83,12 +83,12 @@ describe("2D resilient image insertion", () => {
   it("supports the text-free filter independently and resets it explicitly", () => {
     render(<Studio2dSceneBrowser groups={groupBgScenes(BG_SCENES)} query="" onQueryChange={vi.fn()} genre="all"
       onGenreChange={vi.fn()} loading={false} error={null} disabled={false} onPick={vi.fn()} />);
-    fireEvent.click(screen.getByLabelText("문자·간판 없는 이미지 배경만"));
+    fireEvent.click(screen.getByLabelText("문자 형태 없는 이미지 배경만"));
     const ids = [...document.querySelectorAll("[data-studio-2d-asset]")].map((node) => node.getAttribute("data-studio-2d-asset"));
     expect(ids.length).toBeGreaterThan(0);
     expect(ids.sort()).toEqual(STUDIO_2D_ASSET_METADATA.filter((asset) => !asset.containsText).map((asset) => asset.id).sort());
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
-    expect((screen.getByLabelText("문자·간판 없는 이미지 배경만") as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText("문자 형태 없는 이미지 배경만") as HTMLInputElement).checked).toBe(false);
   });
   it("never treats unknown originals as text-free and composes with person-free filtering", () => {
     const unknown = { ...rooftop, id: "unknown", imgSrc: "/unknown.png" };
