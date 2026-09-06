@@ -98,12 +98,15 @@ try {
     if (name === "desktop") {
       await page.getByTestId("creator-film-play").click();
       const video = page.locator("video");
-      await video.evaluate((element) => new Promise((resolve, reject) => {
-        if (element.readyState >= 2) return resolve(true);
-        const timer = setTimeout(() => reject(new Error("Video readiness timeout")), 20000);
-        element.addEventListener("loadeddata", () => { clearTimeout(timer); resolve(true); }, { once: true });
-        element.addEventListener("error", () => { clearTimeout(timer); reject(new Error("Video decoding failed")); }, { once: true });
-      }));
+      // Poll current media state instead of relying on one loadeddata event. Fast decoders can
+      // emit that event between the click and listener registration, producing a false timeout.
+      await expect.poll(
+        () => video.evaluate((element) => element.error ? -element.error.code : element.readyState),
+        {
+          message: "Brand film reaches HAVE_CURRENT_DATA without a media error",
+          timeout: 30000,
+        },
+      ).toBeGreaterThanOrEqual(2);
       await page.waitForFunction(() => document.querySelector("video")?.currentTime > 0.2);
       assert(Math.abs(await video.evaluate((element) => element.duration) - 24) < 0.1);
       await page.locator(".ch-film-chapters button").nth(2).click();
