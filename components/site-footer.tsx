@@ -2,6 +2,7 @@ import { ToonSpectrumMark } from "./visual-marks";
 
 import { spectrumGradient } from "@/lib/genre-color";
 import { useT } from "@/lib/i18n";
+import "@/src/app/routes/reference-labels";
 import Link from "@/src/compat/router-link";
 
 // 약관·개인정보처리방침은 내부 페이지(/terms·/privacy)가 TermsDesk 게시 정본을 렌더한다.
@@ -38,6 +39,7 @@ const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
     links: [
       { key: "footer.link.create", href: "/create" },
       { key: "footer.link.studio", href: "/studio" },
+      { key: "footer.link.references", href: "/references" },
       { key: "footer.link.shaper", href: "/shaper" },
       { key: "footer.link.market", href: "/market" },
     ],

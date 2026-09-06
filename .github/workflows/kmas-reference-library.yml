@@ -1,0 +1,54 @@
+name: KMAS reference library
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'lib/kmas-reference.ts'
+      - 'lib/__tests__/kmas-reference*.test.ts'
+      - 'apps/api/src/server/kmas-reference.ts'
+      - 'apps/api/src/modules/catalog/**'
+      - 'src/domains/catalog/references/**'
+      - 'src/app/routes/**'
+      - 'src/domains/legal/SitemapPage.tsx'
+      - 'components/site-footer.tsx'
+      - 'e2e/kmas-references.spec.ts'
+      - 'playwright.references.config.ts'
+      - '.github/workflows/kmas-reference-library.yml'
+permissions:
+  contents: read
+concurrency:
+  group: kmas-references-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  references:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      VITE_TRAFFIC_ANALYTICS_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Reference contract tests
+        run: pnpm exec vitest run lib/__tests__/kmas-reference.test.ts lib/__tests__/kmas-reference-hardening.test.ts lib/__tests__/kmas-reference-recovery.test.ts lib/__tests__/kmas-reference-merge-readiness.test.ts
+      - name: Zero-warning reference lint
+        run: pnpm exec eslint lib/kmas-reference.ts lib/__tests__/kmas-reference.test.ts lib/__tests__/kmas-reference-hardening.test.ts lib/__tests__/kmas-reference-recovery.test.ts lib/__tests__/kmas-reference-merge-readiness.test.ts apps/api/src/server/kmas-reference.ts apps/api/src/modules/catalog/kmas-reference.controller.ts apps/api/src/modules/catalog/catalog.module.ts src/domains/catalog/references src/app/routes/reference-labels.ts src/app/routes/groups/reference.routes.tsx src/app/routes/groups/app-routes.tsx src/app/routes/route-titles.ts components/site-footer.tsx src/app/routes/route-manifest.ts src/domains/legal/SitemapPage.tsx e2e/kmas-references.spec.ts --max-warnings=0
+      - run: pnpm run catalog:gen && pnpm run build:bundle
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Chromium route and interaction verification
+        run: pnpm exec playwright test --config playwright.references.config.ts
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: kmas-reference-browser-evidence
+          path: |
+            reference-test-results
+            reference-playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
