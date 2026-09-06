@@ -154,6 +154,8 @@ export function LessonLab({ kind }: { kind: LabKind }) {
     <section className="learn-lab" ref={root} aria-labelledby={`${id}-heading`}>
       <div className="learn-section-heading"><div><span className="learn-eyebrow">INTERACTIVE LAB</span><h2 id={`${id}-heading`}>{config.title}</h2></div><span className="learn-tag">직접 조절하기</span></div>
       {config.comparable && <div className="learn-comparison-controls" role="group" aria-label="도식 비교 보기">{(["both", "reference", "comparison"] as const).map((mode) => <button type="button" key={mode} aria-pressed={view === mode} onClick={() => setView(mode)}>{mode === "both" ? "나란히" : mode === "reference" ? "기준만" : "비교만"}</button>)}</div>}
+      {/* MDN overflow accessibility: a labelled scrolling region must retain keyboard focus; removing tabIndex strands keyboard-only readers. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- This named overflow viewport is keyboard-scrollable; LessonLab.accessibility.test.tsx protects its focus contract. */}
       <div className="learn-diagram-scroll" tabIndex={0} role="region" aria-label={config.comparable ? "개념 비교 도식. 기준만·비교만 버튼으로 한쪽씩 크게 볼 수 있습니다." : "개념 설명 도식. 좁은 화면에서는 좌우로 스크롤할 수 있습니다."}><LessonDiagram kind={kind} value={value} frame={timeline.frame} view={view} /></div>
       {config.comparable && <p className="learn-small">기준만·비교만은 같은 좌표와 배율로 표시합니다. 나란히 보기에서는 두 결과를 함께 확인할 수 있습니다.</p>}
       <label className="learn-range-label" htmlFor={`${id}-parameter`}>{config.label}<strong>{value} {config.unit}</strong></label>

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { hasLearningActivity, MAX_LEARNING_BACKUP_BYTES, readLearningBackup, summarizeLearningProgress, writeLearningBackup, type BackupPreview } from "./learning-backup";
 import { LESSONS, TERMS } from "./learning-content";
+
 import type { LearningStore } from "./use-learning-progress";
 
 const TERM_IDS = TERMS.map((term) => term.id);
