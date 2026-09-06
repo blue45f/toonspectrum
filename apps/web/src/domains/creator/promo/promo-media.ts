@@ -149,10 +149,16 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
             // Canvas capture happens when the canvas is painted, after this callback.
             // Let the ending frame reach the track before stopping the recorder.
             videoTrack.requestFrame?.();
-            setTimeout(() => {
-              if (finished) return;
-              finish();
-            }, 500);
+            if (typeof window === "undefined") {
+              raf = requestAnimationFrame(() => {
+                if (finished) return;
+                raf = requestAnimationFrame(() => finish());
+              });
+            } else {
+              setTimeout(() => {
+                if (!finished) finish();
+              }, 500);
+            }
             return;
           }
           raf = requestAnimationFrame(tick);
