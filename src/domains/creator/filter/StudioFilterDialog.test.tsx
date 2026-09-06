@@ -568,7 +568,7 @@ describe("StudioFilterDialog", () => {
       />,
     );
 
-    expect(html).toContain(">원형 리플</h2>");
+    expect(html).toContain(">동심원 물결</h2>");
     for (const label of ["진폭", "파장", "중심 X", "중심 Y", "위상"]) {
       expect(html).toContain(`>${label}</label>`);
     }

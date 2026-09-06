@@ -284,12 +284,15 @@ describe("database integration runner CI policy", () => {
 
     // The proof runs parallel to core on its own VM: no `needs`, no services, nothing shared.
     expect(parityJob).toMatchObject({
-      "runs-on": "ubuntu-latest",
       "timeout-minutes": 20,
       env: {
         NODE_OPTIONS: "--max-old-space-size=8192",
       },
     });
+    // Any GitHub-hosted Ubuntu image is a fresh VM. Pin it to the image the core lanes use so a
+    // runner migration cannot leave the proof on a different toolchain than the gates it certifies.
+    expect(parityJob?.["runs-on"]).toMatch(/^ubuntu-(?:latest|\d{2}\.\d{2})$/u);
+    expect(parityJob?.["runs-on"]).toBe(workflow.jobs?.test?.["runs-on"]);
     expect(parityJob?.needs).toBeUndefined();
     expect(parityJob?.if).toBeUndefined();
     expect(parityJob?.services).toBeUndefined();

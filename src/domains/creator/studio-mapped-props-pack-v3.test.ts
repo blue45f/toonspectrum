@@ -42,6 +42,19 @@ const WAVE3_PROPS: readonly PropGate[] = [
   { mappedId: "blender_tactical_helmet", filename: "tactical_helmet.glb", assetId: "tactical_helmet_v3", qualityClass: "headwear", minNodes: 21, minEmissiveMaterials: 2, requiredNodes: ["Helmet_MainShell", "Helmet_FrontVisor"] },
 ] as const;
 
+/** Atelier v5 wearables/props (wearable-v5-manifest.json) share the same URL table. */
+const ATELIER_V5_PACK_IDS = [
+  "mic",
+  "beret",
+  "sunglasses",
+  "headphones",
+  "ribbon",
+  "beanie",
+  "camera",
+  "medicalBag",
+  "shoulderbag",
+] as const;
+
 const EXCLUDED_WAVE2_IDS = [
   "blender_magic_chest",
   "blender_modern_smartphone",
@@ -126,13 +139,14 @@ function triangleCount(json: JsonRecord): number {
 
 describe("ToonSpectrum mapped Blender prop pack v3", () => {
   it("covers exactly the 21 mappings not already replaced by the v2 pack", () => {
-    expect(Object.keys(BLENDER_PROP_GLTF_URLS)).toHaveLength(55);
+    expect(Object.keys(BLENDER_PROP_GLTF_URLS)).toHaveLength(64);
     expect(WAVE3_PROPS).toHaveLength(21);
     const expectedIds = new Set([
       ...WAVE3_PROPS.map((gate) => gate.mappedId),
       ...EXCLUDED_WAVE2_IDS,
       ...EXCLUDED_EVERYDAY_V4_IDS,
       ...V6_DIVERSE_PACK_IDS,
+      ...ATELIER_V5_PACK_IDS,
     ]);
     expect(new Set(Object.keys(BLENDER_PROP_GLTF_URLS))).toEqual(expectedIds);
     for (const gate of WAVE3_PROPS) {

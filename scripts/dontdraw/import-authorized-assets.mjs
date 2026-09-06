@@ -151,9 +151,11 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
   if (!(await lstat(root)).isDirectory()) throw new Error("sourceDir must be a directory");
   const sourceManifest = await sourceFile(root, manifestPath);
   const manifestStat = await lstat(sourceManifest);
-  if (!manifestStat.isFile() || manifestStat.size > MAX_MANIFEST_BYTES) throw new Error("Source manifest exceeds 8 MiB");
+  if (!manifestStat.isFile()) throw new Error("Only regular files are accepted; devices, pipes and directories are rejected");
+  if (manifestStat.size > MAX_MANIFEST_BYTES) throw new Error(`Source manifest exceeds 8 MiB (${MAX_MANIFEST_BYTES} bytes)`);
   const manifestBytes = await readBoundedFile(sourceManifest, MAX_MANIFEST_BYTES);
-  const input = validateSourceManifest(JSON.parse(manifestBytes.toString("utf8")));
+  // A manifest with invalid UTF-8 is rejected outright, never decoded with replacement characters.
+  const input = validateSourceManifest(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(manifestBytes)));
   const destination = outputDir ? path.resolve(outputDir) : undefined;
   if (write && !destination) throw new Error("--output is required with --write");
   if (destination && (within(root, destination) || within(destination, root))) throw new Error("Output and source must not overlap");
@@ -238,22 +240,33 @@ export async function prepareAuthorizedImport({ sourceDir, manifestPath, outputD
   return { report, manifest, reviewQueue };
 }
 
-export async function runCli(argv) {
-  if (argv.includes("--help")) {
-    console.log("node scripts/dontdraw/import-authorized-assets.mjs --source-dir /originals --manifest source.json [--output /new-batch --write]\nDefault is read-only inspection. --write stages an offline bundle under /new-batch/ready, not a public upload. Exit: 0=structurally ready, 1=invalid/error, 2=conversion/unsupported/empty batch.");
-    return 0;
-  }
+export function parseCliOptions(argv) {
   const options = { manifestPath: "source.json", write: false };
-  const names = { "--source-dir": "sourceDir", "--manifest": "manifestPath", "--output": "outputDir" };
+  // A Map, not a plain object: a positional "toString" must not resolve to Object.prototype.
+  const names = new Map([["--source-dir", "sourceDir"], ["--manifest", "manifestPath"], ["--output", "outputDir"]]);
+  const seen = new Set();
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === "--") continue;
-    if (argv[i] === "--write") { options.write = true; continue; }
-    const key = names[argv[i]];
-    if (!key || !argv[i + 1] || argv[i + 1].startsWith("--")) throw new Error(`Unknown option or missing value: ${argv[i]}`);
+    const flag = argv[i];
+    if (flag === "--") continue;
+    if (seen.has(flag)) throw new Error(`Duplicate option: ${flag}`);
+    seen.add(flag);
+    if (flag === "--write") { options.write = true; continue; }
+    const key = names.get(flag);
+    if (!key || !argv[i + 1]?.trim() || argv[i + 1].startsWith("--")) throw new Error(`Unknown option or missing value: ${flag}`);
     options[key] = argv[++i];
   }
   if (!options.sourceDir) throw new Error("--source-dir is required");
-  const result = await prepareAuthorizedImport(options);
+  if (options.write && !options.outputDir) throw new Error("--output is required with --write");
+  return options;
+}
+
+export async function runCli(argv) {
+  // Only a bare --help is help; "--write --help" is a broken write command and must fail.
+  if (argv.length === 1 && argv[0] === "--help") {
+    console.log("node scripts/dontdraw/import-authorized-assets.mjs --source-dir /originals --manifest source.json [--output /new-batch --write]\nDefault is read-only inspection. --write stages an offline bundle under /new-batch/ready, not a public upload. Exit: 0=structurally ready, 1=invalid/error, 2=conversion/unsupported/empty batch.");
+    return 0;
+  }
+  const result = await prepareAuthorizedImport(parseCliOptions(argv));
   console.log(JSON.stringify({ ...result.report, reviewQueue: result.reviewQueue }, null, 2));
   return intakeExitCode(result.report);
 }

@@ -66,6 +66,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "fan_post_reply",
   "feedback_post",
   "feedback_reply",
+  "feedback_vote",
   "monetization_plan",
   "rating",
   "read",

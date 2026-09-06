@@ -47,16 +47,8 @@ const QUALITY_GATES: readonly QualityGate[] = [
     minEmissiveMaterials: 2,
     requiredNodes: ["Chest_Base", "Lid_ArchedWood", "Lock_Rune", "Corner_SoulGem_1"],
   },
-  {
-    filename: "modern_smartphone_prop.glb",
-    assetId: "modern_smartphone_prop_v2",
-    minBytes: 150 * 1024,
-    minNodes: 16,
-    minMaterials: 6,
-    minTriangles: 3_000,
-    minEmissiveMaterials: 3,
-    requiredNodes: ["Phone_Chassis", "Phone_OLED", "Rear_CameraIsland", "CameraLens_1"],
-  },
+  // modern_smartphone_prop.glb left this pack on 2026-09-06: the atelier v5 smartphone replaced
+  // the v2 mesh and is pinned by wearable-v5-manifest.json / studio-vrm-prop-asset-revisions.ts.
   {
     filename: "cyber_glasses.glb",
     assetId: "cyber_glasses_v2",

@@ -24,8 +24,8 @@ describe("StudioSmartFiltersPanel", () => {
     expect(html).toContain("선화 추출");
     expect(html).toContain("스케치 선화 정리");
     expect(html).toContain("스크린톤 제거");
-    expect(html).toContain("JPEG 아티팩트 감소");
-    expect(html).toContain("엣지 보존 노이즈 감소");
+    expect(html).toContain("JPEG 압축 깨짐 제거");
+    expect(html).toContain("윤곽 보존 노이즈 제거");
     expect(html).toContain("컬러 하프톤");
     expect(html).toContain("미디언 잡티 제거");
     expect(html).toContain("표면 보존 블러");
@@ -34,16 +34,16 @@ describe("StudioSmartFiltersPanel", () => {
     expect(html).toContain("수채화");
     expect(html).toContain("확산 글로우");
     expect(html).toContain("렌즈 블러");
-    expect(html).toContain("필드 아이리스 블러");
+    expect(html).toContain("영역 초점 블러");
     expect(html).toContain("틸트 시프트 블러");
     expect(html).toContain("선택적 가우시안 블러");
-    expect(html).toContain("타일러블 블러");
+    expect(html).toContain("이음매 없는 블러");
     expect(html).toContain("먼지와 스크래치 제거");
     expect(html).toContain("가우시안 차분 선화");
     expect(html).toContain("색상 투명화");
-    expect(html).toContain("사인 웨이브");
+    expect(html).toContain("물결 왜곡");
     expect(html).toContain("스테인드글라스");
-    expect(html).toContain("볼류메트릭 광선");
+    expect(html).toContain("빛줄기");
     expect(html).toContain("극좌표 변환");
   });
 
@@ -117,7 +117,7 @@ describe("StudioSmartFiltersPanel", () => {
       />,
     );
     expect(html).toContain("렌즈 블러 끄기");
-    expect(html).toContain("필드 아이리스 블러 끄기");
+    expect(html).toContain("영역 초점 블러 끄기");
     expect(html).toContain("틸트 시프트 블러 끄기");
     expect(html).toContain("선택적 가우시안 블러 끄기");
     expect(html).toContain("조리개 날");
@@ -209,8 +209,8 @@ describe("StudioSmartFiltersPanel", () => {
       />,
     );
     expect(html).toContain("스크린톤 제거 끄기");
-    expect(html).toContain("JPEG 아티팩트 감소 끄기");
-    expect(html).toContain("엣지 보존 노이즈 감소 끄기");
+    expect(html).toContain("JPEG 압축 깨짐 제거 끄기");
+    expect(html).toContain("윤곽 보존 노이즈 제거 끄기");
     expect(html).toContain("블록 제거");
     expect(html).toContain("링잉 제거");
     expect(html).toContain("색 경계 보호");
