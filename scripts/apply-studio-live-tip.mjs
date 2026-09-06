@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 const file = 'src/domains/creator/live/studio-live-retained-media-overlay.ts';
 let text = fs.readFileSync(file, 'utf8');
@@ -11,14 +12,16 @@ replace('  pencilProgram?: StudioLivePencilPaintCommand[];','  pencilProgram?: S
 replace('  private active: ActiveRetainedStroke | null = null;', '  private active: ActiveRetainedStroke | null = null;\n  private readonly pencilTip = new StudioLiveTransientTip();');
 replace('    this.activeCanvas = canvases?.activeCanvas ?? null;', '    this.pencilTip.discard(true);\n    this.activeCanvas = canvases?.activeCanvas ?? null;');
 const start = text.indexOf('  private paintPencilSuffix(');
+if (start < 0) throw new Error('Missing reviewed paintPencilSuffix method');
 const body = text.indexOf('    try {\n', start);
-text = text.slice(0, body) + text.slice(body).replace('    try {\n', '    try {\n      if (target === this.activeContext && this.activeCanvas) {\n        this.pencilTip.restore(this.activeCanvas, context);\n      }\n      active.pencilTip = [];\n');
+if (body < 0) throw new Error('Missing reviewed paintPencilSuffix body');
+text = text.slice(0, body) + text.slice(body).replace('    try {\n', '    try {\n      if (target === this.activeContext && this.activeCanvas) {\n        this.pencilTip.restore(this.activeCanvas, context);\n      }\n      const pencilTip: StudioLivePencilPaintCommand[] = [];\n      active.pencilTip = pencilTip;\n');
 replace('            if (cap.role === "end" && !finalize) continue;', `            if (cap.role === "end" && !finalize) {
               if (target === this.activeContext) {
                 const rung = studioPencilRibbonAlphaBucket(Math.min(
                   1, pass.opacityScale * Math.sqrt(cap.opacityScale * cap.flowScale),
                 ));
-                if (rung > 0) active.pencilTip!.push({
+                if (rung > 0) pencilTip.push({
                   kind: "fill", coordinates: cap.points, color: element.stroke,
                   alpha: inherited * (element.opacity ?? 1)
                     * (rung / STUDIO_PENCIL_RIBBON_ALPHA_BUCKET_COUNT),
@@ -66,4 +69,8 @@ replace('  private resetActiveState(): void {\n    this.clearCapRepaintWake();',
 replace('  private clearActiveRect(): void {\n    this.clearCanvas(this.activeContext, this.activeCanvas);',
 '  private clearActiveRect(): void {\n    this.pencilTip.discard();\n    this.clearCanvas(this.activeContext, this.activeCanvas);');
 fs.writeFileSync(file, text);
-console.log('Applied exact reviewed moving-tip integration anchors');
+// Resolve repository formatting errors before unit tests/build; lint failures stay fatal.
+// Existing commit hooks, push hooks and protected-branch checks remain enabled.
+execFileSync('pnpm', ['exec', 'eslint', file, '--fix'], { stdio: 'inherit' });
+execFileSync('pnpm', ['exec', 'eslint', file], { stdio: 'inherit' });
+console.log('Applied and lint-checked reviewed moving-tip integration anchors');
