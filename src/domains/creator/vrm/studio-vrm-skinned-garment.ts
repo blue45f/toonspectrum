@@ -693,7 +693,8 @@ function appendGenericPart(
   if (!boneNode) return null;
   const sourceGeometry = buildStudioVrmGarmentGeometry(part.shape);
   try {
-    sourceGeometry.computeVertexNormals();
+    // Preserve analytic seam normals; UV duplicates are not separate cloth surfaces.
+    if (!sourceGeometry.hasAttribute("normal")) sourceGeometry.computeVertexNormals();
     const sourcePosition = sourceGeometry.getAttribute("position");
     const sourceNormal = sourceGeometry.getAttribute("normal");
     const sourceUv = sourceGeometry.getAttribute("uv");

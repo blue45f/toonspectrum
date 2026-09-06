@@ -381,6 +381,12 @@ describe("VRM 소품 카탈로그", () => {
     expect(propDefById("medicalBag")!.anchors.find((candidate) => candidate.id === "primary")!.position).toEqual([0, 0.155, 0]);
     expect(propDefById("umbrella")!.anchors.find((candidate) => candidate.id === "primary")!.position).toEqual([-0.03, -0.35, 0]);
   });
+
+  it("응급 의료 가방 손잡이 앵커는 가방이 손 아래로 매달리는 방향을 기록한다", () => {
+    const handle = propDefById("medicalBag")!.anchors.find((candidate) => candidate.id === "primary")!;
+    expect(handle.forward).toEqual([0, -1, 0]);
+    expect(handle.up).toEqual([0, 0, 1]);
+  });
 });
 
 describe("부착 인스턴스 생성·직렬화", () => {

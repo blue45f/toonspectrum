@@ -51,6 +51,24 @@ describe("close-up inspection framing", () => {
     expect(resolveStudioVrmInspectionBounds("inspectUnknown", body, points)).toBeNull();
     expect(resolveStudioVrmInspectionBounds("fullBody", body, points)).toBeNull();
   });
+  it("answers null, never infinite bounds, when no landmark survives validation", () => {
+    // Math.min/max over an empty point set is ±Infinity; a crop must either carry real finite edges or be absent.
+    const keys = Object.keys(points) as (keyof StudioVrmInspectionLandmarks)[];
+    const stale = Object.fromEntries(keys.map((key) => [key, [99, 99, 99] as Vec3]));
+    const degenerate: StudioVrmInspectionLandmarks[] = [
+      {}, stale,
+      ...keys.map((key) => Object.fromEntries([[key, points[key]!]])),
+      ...keys.map((key) => ({ ...points, [key]: [NaN, NaN, NaN] as Vec3 })),
+    ];
+    for (const { id } of crops) {
+      for (const landmarks of degenerate) {
+        const crop = resolveStudioVrmInspectionBounds(id, body, landmarks);
+        if (crop === null) continue;
+        for (const edge of ["min", "max"] as const) for (const value of crop[edge]) expect(Number.isFinite(value)).toBe(true);
+        crop.min.forEach((value, axis) => expect(value).toBeLessThan(crop.max[axis]));
+      }
+    }
+  });
   it("does not mutate authored landmarks", () => {
     const before = JSON.stringify(points);
     for (const { id } of crops) resolveStudioVrmInspectionBounds(id, body, points);
