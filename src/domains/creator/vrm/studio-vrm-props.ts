@@ -137,6 +137,15 @@ type LegacyPropDef = Omit<PropDef, "anchors" | "geometrySource" | "grip" | "fit"
 
 /** Blender로 제작해 public 번들에 포함한 소품의 안정적인 직렬화 ID → GLB 경로 매핑. */
 export const BLENDER_PROP_GLTF_URLS = Object.freeze({
+  mic: "/assets/3d/atelier_microphone.glb",
+  beret: "/assets/3d/atelier_beret.glb",
+  sunglasses: "/assets/3d/atelier_sunglasses.glb",
+  headphones: "/assets/3d/atelier_headphones.glb",
+  ribbon: "/assets/3d/atelier_ribbon.glb",
+  beanie: "/assets/3d/atelier_beanie.glb",
+  camera: "/assets/3d/atelier_camera.glb",
+  medicalBag: "/assets/3d/atelier_medical_bag.glb",
+  shoulderbag: "/assets/3d/atelier_shoulder_bag.glb",
   // Recommended-row stable IDs. Existing documents keep their IDs and rig profiles while the
   // renderer upgrades only their geometry source. The legacy blender phone ID below remains
   // resolvable and deliberately shares the same decoded GLB cache entry.
@@ -309,7 +318,7 @@ const VRM_PROP_BASES = [
   { id: "blender_bubble_tea", label: "블렌더 버블티", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0.02, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 펄 버블티 컵." },
   { id: "blender_paper_lantern", label: "블렌더 종이 등롱", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0.05, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 발광 종이 등롱." },
   { id: "blender_fox_mask", label: "블렌더 여우 가면", category: "head", defaultBone: "head", defaultPosition: [0, -0.02, 0.075], defaultRotationDeg: [0, 0, 0], defaultScale: 0.8, defaultColor: null, hint: "Blender 5.2 생성 여우 탈. 얼굴에 착용." },
-  { id: "blender_wizard_hat", label: "블렌더 마법사 모자", category: "head", defaultBone: "head", defaultPosition: [0, 0.09, 0], defaultRotationDeg: [-6, 0, 4], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 별 반짝이 마법사 모자." },
+  { id: "blender_wizard_hat", label: "펠트 마법사 모자", category: "head", defaultBone: "head", defaultPosition: [0, 0.09, 0], defaultRotationDeg: [-6, 0, 4], defaultScale: 1.0, defaultColor: null, hint: "연속 곡면 크라운과 가죽 밴드로 제작한 마법사 모자." },
   { id: "blender_potted_monstera", label: "블렌더 몬스테라 화분", category: "body", defaultBone: "hips", defaultPosition: [0.7, -0.85, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 인테리어 몬스테라 화분." },
   { id: "blender_bonsai_tree", label: "블렌더 분재 나무", category: "body", defaultBone: "hips", defaultPosition: [-0.7, -0.85, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 선반용 분재." },
   { id: "blender_street_food_cart", label: "블렌더 노점 포장마차", category: "body", defaultBone: "hips", defaultPosition: [0, -0.9, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 랜턴 노점 카트." },
@@ -445,7 +454,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   },
   medicalBag: {
     // 반원 손잡이의 빈 중심이 아니라 실제 상단 손잡이 튜브 중심선에 손바닥을 둔다.
-    anchors: [handAnchor("primary", "primary", [0, 0.155, 0], 0.012)],
+    anchors: [handAnchor("primary", "primary", [0, 0.155, 0], 0.012, [0, -1, 0], [0, 0, 1])],
     grip: grip("handle", 0.012, 60, 44),
     fit: fit("hand", 0.075, 0.72, 1.45),
   },

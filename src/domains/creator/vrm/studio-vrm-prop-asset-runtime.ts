@@ -2,6 +2,8 @@ import * as THREE from "three";
 
 import { applyStudioBg3dRuntimeAssetQuality } from "../bg3d/studio-bg3d-runtime-asset-quality";
 
+import { STUDIO_VRM_PROP_ASSET_REVISIONS } from "./studio-vrm-prop-asset-revisions";
+
 import type { PropGltfGeometrySource } from "./studio-vrm-props";
 
 export interface StudioVrmPropAssetLease {
@@ -37,6 +39,12 @@ function assertFirstPartyPropUrl(url: string): void {
   if (!FIRST_PARTY_PROP_GLTF_URL.test(url)) {
     throw new TypeError(`Unsupported VRM prop GLTF URL: ${url}`);
   }
+}
+
+/** Canonical catalogue/cache keys stay stable; the browser request is content-addressed. */
+export function studioVrmPropAssetRequestUrl(url: string): string {
+  const revision = STUDIO_VRM_PROP_ASSET_REVISIONS[url];
+  return revision ? `${url}?v=${revision}` : url;
 }
 
 function preparePropClone(object: THREE.Object3D, propId: string): void {
@@ -195,7 +203,7 @@ export function createStudioVrmPropAssetRuntime(
 
 async function loadStudioVrmPropAssetRoot(url: string): Promise<THREE.Object3D> {
   const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
-  const gltf = await new GLTFLoader().loadAsync(url);
+  const gltf = await new GLTFLoader().loadAsync(studioVrmPropAssetRequestUrl(url));
   return gltf.scene;
 }
 
