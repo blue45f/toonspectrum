@@ -3,6 +3,10 @@ import { defineAppRoutes } from "../app-route-definition";
 import { lazyRetry } from "@/lib/lazy-retry";
 import { loadStudioI18nDictionaries } from "@/src/domains/creator/studio-i18n-loader";
 
+const StudioMusicPage = lazyRetry(
+  () => import("@/src/domains/creator/music/StudioMusicPage").then((module) => ({ default: module.StudioMusicPage })),
+  "StudioMusicPage",
+);
 const CreateGalleryPage = lazyRetry(
   () => import("@/src/domains/creator/CreateGalleryPage").then((module) => ({ default: module.CreateGalleryPage })),
   "CreateGalleryPage",
@@ -41,6 +45,7 @@ const StudioRouter = lazyRetry(
 );
 
 export const creatorRoutes = defineAppRoutes([
+  { id: "creator-music", path: "/music", element: <StudioMusicPage /> },
   { id: "creator-gallery", path: "/create", element: <CreateGalleryPage /> },
   { id: "creator-challenges", path: "/create/challenges", element: <CreateChallengesPage /> },
   { id: "creator-promo", path: "/create/promo", element: <StudioPromoPage /> },
