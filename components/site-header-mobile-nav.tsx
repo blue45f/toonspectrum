@@ -34,6 +34,8 @@ const MOBILE_NAV = [
   { i18n: "nav.play", href: "/play", icon: Gamepad2 },
   { i18n: "nav.reviews", href: "/reviews", icon: MessageSquareQuote },
   { i18n: "nav.community", href: "/community", icon: MessageCircle },
+  { i18n: "footer.link.feedback", href: "/feedback", icon: MessageSquareQuote },
+  { i18n: "nav.create", href: "/create", icon: Palette },
   { i18n: "nav.shaper", href: "/shaper", icon: UserRoundPen },
   { i18n: "nav.insights", href: "/insights", icon: BarChart3 },
 ];

@@ -236,7 +236,7 @@ export interface FanCafePostList {
 }
 
 // ── 사이트 Q&A·의견 게시판 ──
-export type FeedbackCategory = "question" | "idea" | "bug";
+export type FeedbackCategory = import("./feedback").FeedbackKind;
 export type FeedbackStatus = "open" | "answered";
 
 export interface FeedbackReply {

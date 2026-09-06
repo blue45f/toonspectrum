@@ -24,6 +24,7 @@ const NAV = [
   { i18n: "nav.creators", href: "/create" },
   { i18n: "nav.discover", href: "/explore" },
   { i18n: "nav.allMenu", href: "/sitemap" },
+  { i18n: "footer.link.feedback", href: "/feedback" },
 ];
 
 const MobileHeaderNavigation = lazy(() =>
