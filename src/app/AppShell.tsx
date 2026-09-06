@@ -137,7 +137,7 @@ export function AppShell({
   useVisitPing();
   return (
     <AuthSessionProvider>
-      {shouldRenderAppSplash(pathname, search) ? (splash ?? <RandomIntro />) : null}
+      {pathname !== "/" && shouldRenderAppSplash(pathname, search) ? (splash ?? <RandomIntro />) : null}
       <Suspense fallback={null}>
         <StoreSync />
       </Suspense>

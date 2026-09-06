@@ -9,6 +9,12 @@ import {
   STUDIO_I18N_ASSET_LOCALES,
 } from "@/src/domains/creator/studio-i18n-loader";
 
+// The reference library registers its ko/en strings synchronously while its lazy route chunk
+// evaluates instead of fetching an asset. Evaluate that module here for the same reason as the
+// Studio block below: the t() completeness gate and component tests must see the dictionary the
+// route actually commits with.
+import "@/src/domains/catalog/references/reference-i18n";
+
 // Production routes fetch these static assets before their lazy component
 // commits. Direct component tests have no HTTP server, so mirror the same
 // validated registration from disk once per isolated Vitest graph.

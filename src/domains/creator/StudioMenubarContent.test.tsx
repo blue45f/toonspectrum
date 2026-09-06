@@ -55,8 +55,8 @@ const MENU_GROUP_IDS = [
 ] as const;
 
 /**
- * The twelve presented titles (UX 감사 2026-09-02 §3.4): thin specialist groups fold into
- * 삽입 / 도구 and Help is pinned last. The catalogue itself still ships all 17 (+AI).
+ * The ten workflow titles (IA audit 2026-09-05): related catalogue groups fold into
+ * task-oriented menus, AI remains visible, and Help is pinned last.
  */
 const PRESENTED_MENU_GROUP_IDS = [...STUDIO_MAIN_MENU_PRESENTATION_ORDER] as const;
 
@@ -168,7 +168,7 @@ describe("resolveStudioMenubarLaneOverflow", () => {
 });
 
 describe("StudioMenubarContent menu presentation", () => {
-  it("presents the twelve-title menubar with composite 삽입/도구 and Help last", () => {
+  it("presents the ten-title workflow menubar with AI visible and Help last", () => {
     const { container } = render(
       <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
     );
@@ -692,9 +692,15 @@ describe("StudioMenubarContent", () => {
     const { container } = render(
       <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
     );
-    // 600px 레인의 오른쪽 경계(600)를 걸치는 트리거를 만든다.
-    const { triggers } = stubMenubarGeometry(container, { triggerPitch: 50, triggerWidth: 90 });
-    const straddling = triggers[11]!; // left 550, right 640 → 오른쪽 경계에 걸친다
+    // 마지막 트리거가 레인의 오른쪽 경계를 걸치도록 레인 폭을 트리거 수에서 잡는다 — 제시되는
+    // 메뉴 제목 수가 바뀌어도(IA 개편) 이 테스트가 고정 인덱스 때문에 깨지지 않게.
+    const triggerCount = container.querySelectorAll("[data-studio-main-menu-trigger]").length;
+    const { triggers } = stubMenubarGeometry(container, {
+      laneWidth: (triggerCount - 1) * 50 + 45,
+      triggerPitch: 50,
+      triggerWidth: 90,
+    });
+    const straddling = triggers[triggerCount - 1]!; // left (n-1)*50, right +90 → 경계(+45)에 걸친다
     fireEvent.focusIn(straddling);
     expect(straddling.scrollIntoView).toHaveBeenCalledWith({
       block: "nearest",

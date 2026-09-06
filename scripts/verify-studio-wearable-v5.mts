@@ -25,6 +25,7 @@ const source=[
 await writeFile(entry,source);
 await build({configFile:false,publicDir:false,resolve:{alias:{"@":process.cwd()}},define:{"process.env.NODE_ENV":JSON.stringify("production")},build:{outDir:join(directory,"runtime"),lib:{entry,formats:["es"],fileName:()=>"runtime.mjs"},minify:false,sourcemap:false}});
 await copyFile("scripts/studio-wearable-review-page.mjs",join(directory,"page.mjs"));
+await copyFile("scripts/studio-wearable-frame-evidence.mjs",join(directory,"runtime/frame-evidence.mjs"));
 await writeFile(join(directory,"index.html"),'<!doctype html><html lang="en"><meta charset="utf-8"><title>Wearable production-renderer review</title><style>html,body,#root{margin:0;width:100%;height:100%;overflow:hidden}canvas{display:block}</style><div id="root"></div><script type="module" src="/page.mjs"></script></html>');
 await symlink(resolve("public/assets"),join(directory,"assets"),"dir");
 await symlink(resolve("public/vrm"),join(directory,"vrm"),"dir");
@@ -41,19 +42,27 @@ await new Promise<void>((done)=>server.listen(5278,"127.0.0.1",done));
 const browser=await chromium.launch({headless:true,args:["--no-sandbox","--use-gl=angle","--use-angle=swiftshader","--enable-unsafe-swiftshader"],...(process.env.PLAYWRIGHT_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH}:{})});
 const page=await browser.newPage({viewport:{width:800,height:800},deviceScaleFactor:1});
 const pageErrors:string[]=[];page.on("pageerror",(error)=>pageErrors.push(error.message));
-interface Frame {title:string;file:string;status:string;receipt:unknown;error?:string;distinctColors?:number}
+interface Frame {title:string;file:string;status:string;receipt:unknown;error?:string;distinctColors?:number;nonblank?:boolean;foregroundPixels?:number;largestComponent?:number;occupiedWidth?:number;occupiedHeight?:number}
 const frames:Frame[]=[];
 const assets=JSON.parse(readFileSync("public/assets/3d/wearable-v5-manifest.json","utf8")) as {assets:{id:string;file:string;sha256:string}[]};
 let fatal:unknown=null;
-async function inspect(){return page.evaluate(()=>{
+async function inspect(){return page.evaluate(async()=>{
+  // Keep pixel analysis in the browser: sending 102,400 numeric values per frame through
+  // Playwright is unnecessary. This imports the exact module used by the Node controls.
+  const moduleUrl="/runtime/frame-evidence.mjs";
+  const {measureWearableFramePixels}=await import(moduleUrl) as {
+    measureWearableFramePixels:(rgba:Uint8ClampedArray,width:number,height:number)=>{
+      nonblank:boolean;foregroundPixels:number;largestComponent:number;occupiedWidth:number;occupiedHeight:number;
+    };
+  };
   const api=(window as unknown as {studioWearableQA:{status:string;frames:number;receipt:unknown}}).studioWearableQA;
   const canvas=document.querySelector("canvas");
-  if(!canvas)return {status:api.status,receipt:api.receipt,distinctColors:0};
+  if(!canvas)return {status:api.status,receipt:api.receipt,distinctColors:0,...measureWearableFramePixels(new Uint8ClampedArray(),160,160)};
   const copy=document.createElement("canvas");copy.width=160;copy.height=160;
   const ctx=copy.getContext("2d")!;ctx.drawImage(canvas,0,0,160,160);
   const data=ctx.getImageData(0,0,160,160).data;const colors=new Set<string>();
   for(let i=0;i<data.length;i+=16)colors.add(`${data[i]!>>4},${data[i+1]!>>4},${data[i+2]!>>4}`);
-  return {status:api.status,receipt:api.receipt,distinctColors:colors.size};
+  return {status:api.status,receipt:api.receipt,distinctColors:colors.size,...measureWearableFramePixels(data,160,160)};
 });}
 async function capture(title:string){
   await page.waitForFunction(()=>{
@@ -126,6 +135,6 @@ try{
   await writeFile(join(directory,"review.json"),JSON.stringify({sourceCommit:process.env.GITHUB_SHA??"local",assets:assets.assets,frames,pageErrors,fatal,note:"Ready means loaded/rendered, not human aesthetic approval. Inspect the PNGs, worn views and deformation frames."},null,2));
   await browser.close();await new Promise<void>((done)=>server.close(()=>done()));
 }
-const failingAssets=frames.filter((frame)=>(frame.title.startsWith("asset-")||frame.title.includes("-prop-"))&&(frame.status!=="ready"||(frame.distinctColors??0)<12));
+const failingAssets=frames.filter((frame)=>(frame.title.startsWith("asset-")||frame.title.includes("-prop-"))&&(frame.status!=="ready"||!frame.nonblank));
 if(fatal||pageErrors.length||failingAssets.length)throw new Error(JSON.stringify({fatal,pageErrors,failingAssets},null,2));
 console.log(`Saved ${frames.filter((frame)=>frame.file).length} real rendered frames in ${directory}`);

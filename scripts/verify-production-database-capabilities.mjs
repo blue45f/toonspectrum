@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { buildFeedbackCapabilitySql } from "./feedback-database-contract.mjs";
 import {
   buildAuthRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
@@ -371,6 +372,7 @@ export function buildProductionCapabilityVerificationSql(
     .join(",\n          ");
 
   return `
+${buildFeedbackCapabilitySql(runtimeDatabaseRole)}
 DO $toonspectrum_readiness$
 DECLARE
   missing_relations text[];

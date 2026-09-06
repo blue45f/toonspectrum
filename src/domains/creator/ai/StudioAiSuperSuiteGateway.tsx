@@ -2,13 +2,12 @@ import { Suspense, useEffect, useState } from "react";
 
 import { compileStudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
 import { subscribeStudioAiSuperSuiteOpenRequest } from "./studio-ai-super-suite-intent";
+import { studioAiSuperSuiteModalLoader } from "./studio-ai-super-suite-loader";
 
 import { lazyRetry } from "@/lib/lazy-retry";
 
 const StudioAiSuperSuiteModal = lazyRetry(
-  () => import("./StudioAiSuperSuiteModal").then((module) => ({
-    default: module.StudioAiSuperSuiteModal,
-  })),
+  studioAiSuperSuiteModalLoader.load,
   "StudioAiSuperSuiteModal",
 );
 

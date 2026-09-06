@@ -6,6 +6,7 @@
  */
 import { BRUSH_PRESETS, type BrushPreset } from "../studio-brush";
 
+import { STUDIO_BRUSH_DISCOVERY } from "./studio-brush-discovery";
 import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
 
 export type StudioSubToolPaletteCategoryId =
@@ -22,6 +23,8 @@ export interface StudioSubToolPaletteItem {
   id: string;
   name: string;
   shortcut?: string;
+  hint?: string;
+  searchAliases?: readonly string[];
 }
 
 export interface StudioSubToolPaletteCategory {
@@ -41,34 +44,32 @@ interface StudioSubToolPaletteCategorySeed {
 const STUDIO_SUB_TOOL_PALETTE_CATEGORY_SEEDS: readonly StudioSubToolPaletteCategorySeed[] = [
   {
     id: "pen",
-    label: "펜",
+    label: "펜·선화",
     drawMode: "pen",
-    presetIds: ["gpen", "pen", "fountain-pen", "perfect-ink"],
+    presetIds: ["gpen", "pen", "fountain-pen"],
   },
   {
     id: "pencil",
-    label: "연필",
+    label: "연필·목탄",
     drawMode: "pen",
-    presetIds: ["pencil", "pencil--side-shade", "pencil-grain", "charcoal--compressed-edge"],
+    presetIds: ["pencil", "pencil--side-shade", "charcoal--compressed-edge"],
   },
   {
     id: "brush",
-    label: "붓",
+    label: "채색·물감",
     drawMode: "pen",
     presetIds: [
       "watercolor",
-      "inkwash-pen",
-      "inkwash-water-brush",
+      "marker",
       "gouache--matte-body",
       "oil--filbert-ribbon",
-      "brush",
     ],
   },
   {
     id: "airbrush",
-    label: "에어브러시",
+    label: "분사·입자",
     drawMode: "pen",
-    presetIds: ["airbrush", "hard-airbrush", "spray", "splatter"],
+    presetIds: ["airbrush", "spray", "splatter"],
   },
   {
     id: "eraser",
@@ -78,7 +79,7 @@ const STUDIO_SUB_TOOL_PALETTE_CATEGORY_SEEDS: readonly StudioSubToolPaletteCateg
   },
   {
     id: "manga",
-    label: "만화",
+    label: "만화·톤",
     drawMode: "pen",
     presetIds: ["screentone", "web-cross-hatch-pen", "web-radial-burst"],
   },
@@ -105,7 +106,12 @@ export const STUDIO_SUB_TOOL_PALETTE_CATEGORIES: readonly StudioSubToolPaletteCa
             if (!preset) return [];
             if (isStudioBrushQuarantinedPresetId(preset.id)) return [];
             if (presetDrawMode(preset) !== seed.drawMode) return [];
-            return [Object.freeze({ id: preset.id, name: preset.name })];
+            return [Object.freeze({
+              id: preset.id,
+              name: preset.name,
+              hint: STUDIO_BRUSH_DISCOVERY[preset.id]?.hint,
+              searchAliases: preset.searchAliases,
+            })];
           }),
         ),
       }),

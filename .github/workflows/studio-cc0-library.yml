@@ -1,0 +1,69 @@
+name: Studio CC0 library regression
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/studio-cc0-library.yml'
+      - 'src/domains/creator/StudioCc0AssetLibraryPanel.tsx'
+      - 'src/domains/creator/studio-cc0-*.ts'
+      - 'src/domains/creator/useStudioModalSheet.ts'
+      - 'scripts/studio-cc0-lifecycle-checks.mjs'
+      - 'scripts/verify-studio-cc0-curated-ui.mjs'
+      - 'public/assets/studio/cc0-20260906/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-cc0-library-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cc0-library-runtime:
+    runs-on: macos-15-intel
+    timeout-minutes: 25
+    env:
+      HUSKY: '0'
+      CI: 'true'
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+          package-manager-cache: false
+      - name: Install the locked dependencies
+        run: |
+          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check the asset implementation without rewriting source
+        run: |
+          pnpm exec eslint --max-warnings=0 src/domains/creator/studio-cc0-curation.ts src/domains/creator/studio-cc0-curation.test.ts src/domains/creator/StudioCc0AssetLibraryPanel.tsx scripts/verify-studio-cc0-curated-ui.mjs scripts/studio-cc0-lifecycle-checks.mjs
+          pnpm exec tsc -p tsconfig.json --pretty false
+      - name: Verify the catalog and existing asset contracts
+        run: |
+          pnpm exec vitest run src/domains/creator/studio-cc0-curation.test.ts src/domains/creator/studio-cc0-asset-delivery.test.ts src/domains/creator/studio-original-free-asset-packs.test.ts src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx src/domains/creator/studio-shared-asset-drag.test.ts src/domains/creator/vrm/studio-vrm-outfit-static-asset-audit.test.ts
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Exercise actual assets and cancelled insertion recovery
+        run: |
+          node scripts/verify-studio-cc0-curated-ui.mjs "$RUNNER_TEMP/studio-cc0-ui"
+      - name: Preserve the exact tested revision
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/studio-cc0-ui"
+          git rev-parse HEAD > "$RUNNER_TEMP/studio-cc0-ui/tested-revision.txt"
+          git diff --exit-code -- src/domains/creator scripts
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: studio-cc0-library-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/studio-cc0-ui/
+          retention-days: 14
+          if-no-files-found: error

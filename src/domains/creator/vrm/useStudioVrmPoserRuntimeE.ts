@@ -47,11 +47,12 @@ import {
   stripFingerBones,
   buildVrmPoseDataUrlMetadata,
 } from "./studio-vrm-poser-utils";
+import { isStudioVrmPropSelectable } from "./studio-vrm-prop-quality-policy";
 import {
+  createPropInstance,
   serializeVrmProps,
   type PropInstance,
 } from "./studio-vrm-props";
-import { createSelectableStudioVrmPropInstance as createPropInstance } from "./studio-vrm-prop-selection";
 import {
   captureStudioVrmRgba,
   encodeStudioVrmCapturePngDataUrl,
@@ -354,6 +355,7 @@ export function useStudioVrmPoserRuntimeE(h: StudioVrmPoserHost): void {
 
   /* ── 본 부착 소품 핸들러 ────────────────────────────────────────── */
   function addVrmProp(propId: string) {
+    if (!isStudioVrmPropSelectable(propId)) return;
     const instance = createPropInstance(propId);
     if (!instance) return;
     setVrmPropItems((prev: PropInstance[]) => [...prev, instance]);

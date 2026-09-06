@@ -181,7 +181,7 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     const steps = job?.steps ?? [];
 
     expect(job).toBeDefined();
-    expect(job?.["runs-on"]).toBe("ubuntu-latest");
+    expect(job?.["runs-on"]).toBe("ubuntu-24.04");
     expect(job?.["timeout-minutes"]).toBe(12);
     expect(job?.services).toBeUndefined();
     expect(steps.map((step) => step.uses).filter(Boolean)).toEqual([

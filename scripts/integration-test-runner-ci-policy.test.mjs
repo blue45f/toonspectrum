@@ -64,6 +64,35 @@ describe("database integration runner CI policy", () => {
     expect(packageManifest.scripts?.["build:bundle"]).toBe(
       "NODE_OPTIONS='--max-old-space-size=8192' vite build",
     );
+    // pnpm runs `pre<script>`/`post<script>` around any script name. `build` gets the catalog
+    // generation (public/data/ is gitignored, so without it the bundle ships no catalog) and the
+    // third-party notices plus CSP verification; the bundle-only build must get the same, or the
+    // dist the browser gates drive is not the dist production serves.
+    expect(packageManifest.scripts?.prebuild).toBe("pnpm catalog:gen");
+    expect(packageManifest.scripts?.["prebuild:bundle"]).toBe("pnpm run prebuild");
+    expect(packageManifest.scripts?.["postbuild:bundle"]).toBe("pnpm run postbuild");
+    expect(packageManifest.scripts?.postbuild).toContain(
+      "dist/legal/THIRD_PARTY_NOTICES.generated.md",
+    );
+  });
+
+  it("never forwards a standalone `--` through `pnpm run`", () => {
+    const workflow = readYaml(".github/workflows/ci.yml");
+
+    // pnpm 11 passes a standalone `--` to the script verbatim. Vitest then puts everything after
+    // it in options["--"] and Playwright stops parsing options at it, so `--shard` and `--grep`
+    // silently vanish: every shard and both visual lanes ran the entire suite in run 2643.
+    for (const [jobId, job] of Object.entries(workflow.jobs ?? {})) {
+      for (const command of runCommands(job)) {
+        for (const line of command.split("\n")) {
+          if (!line.trimStart().startsWith("pnpm run ")) continue;
+          expect(line.split(/\s+/u), `${jobId}: ${line.trim()}`).not.toContain("--");
+        }
+      }
+    }
+    for (const entry of workflow.jobs?.["studio-3d-visual"]?.strategy?.matrix?.include ?? []) {
+      expect(entry.filter.split(/\s+/u), entry.lane).not.toContain("--");
+    }
   });
 
   it.each([1, 2, 3])("passes matrix shard %i to the actual Vitest CLI parser", (shard) => {
@@ -303,23 +332,26 @@ describe("database integration runner CI policy", () => {
         .toBe(false);
     }
 
-    // The release-facing "CI / verify" check is core AND the proof. A failed or cancelled core must
-    // produce a failing verify, never a merge-neutral skipped one, so the gate always runs and
-    // reads both results itself.
+    // The release-facing "CI / verify" check is core AND the proof. It needs the five core gates
+    // directly rather than the `core` job: a gate job also waits for a runner, and on a saturated
+    // queue that wait alone cost 30 minutes per hop (run 2643). A failed or cancelled upstream job
+    // must still produce a failing verify, never a merge-neutral skipped one, so the gate always
+    // runs and reads every result itself.
     expect(releaseGate?.name).toBe("verify");
-    expect(releaseGate?.needs).toEqual(["core", "studio-3d-runtime"]);
+    expect(releaseGate?.needs).toEqual([
+      ...workflow.jobs.core.needs,
+      "studio-3d-runtime",
+    ]);
     expect(releaseGate?.if).toBe("${{ always() }}");
     expect(releaseGate?.services).toBeUndefined();
     expect(usesActions(releaseGate)).toEqual([]);
     const releaseGateStep = releaseGate?.steps?.find(
-      (step) => step.name === "Require successful core CI and the Studio 3D runtime proof",
+      (step) =>
+        step.name === "Require every core gate and the Studio 3D runtime proof to succeed",
     );
-    expect(releaseGateStep?.env).toEqual({
-      CORE_RESULT: "${{ needs.core.result }}",
-      PARITY_RESULT: "${{ needs.studio-3d-runtime.result }}",
-    });
-    expect(releaseGateStep?.run).toContain('if [[ "$CORE_RESULT" != "success" ]]');
-    expect(releaseGateStep?.run).toContain('if [[ "$PARITY_RESULT" != "success" ]]');
+    expect(releaseGateStep?.env?.GATE_RESULTS).toBe("${{ toJSON(needs) }}");
+    expect(releaseGateStep?.run).toContain('select(.value.result != "success")');
+    expect(releaseGateStep?.run).toContain("exit 1");
     expect(releaseGateStep?.if).toBeUndefined();
     expect(releaseGateStep?.["continue-on-error"]).not.toBe(true);
   });
@@ -335,11 +367,13 @@ describe("database integration runner CI policy", () => {
     expect(visualJob?.name).toBe("studio-3d-visual (${{ matrix.lane }})");
     expect(visualJob?.strategy?.["fail-fast"]).toBe(false);
     expect(visualJob?.strategy?.matrix?.include?.map((entry) => entry.filter)).toEqual([
-      "--grep @slow",
-      "--grep-invert @slow",
+      "--grep=@slow",
+      "--grep-invert=@slow",
     ]);
+    // No `--` between the script and the filter: pnpm 11 forwards a standalone `--` verbatim and
+    // Playwright stops reading options at it, so both lanes ran the whole suite (run 2643).
     expect(runCommands(visualJob)).toContain(
-      "pnpm run verify:studio-3d-visual -- ${{ matrix.filter }}",
+      "pnpm run verify:studio-3d-visual ${{ matrix.filter }}",
     );
     expect(spec.match(/\{ tag: "@slow" \}/gu)).toHaveLength(1);
     expect(spec).toContain(

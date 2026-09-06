@@ -40,6 +40,8 @@ export interface StudioImageFilterWorkerLike {
         preventDefault?(): void;
       }) => void)
     | null;
+  /** Deserialization failures do not dispatch `error`; settle them explicitly. */
+  onmessageerror?: ((event: MessageEvent<unknown>) => void) | null;
   postMessage(message: StudioImageFilterWorkerRequestMessage, transfer: Transferable[]): void;
   terminate(): void;
 }
@@ -285,14 +287,28 @@ function runImageFilterDirect(
 }
 
 function deserializeWorkerError(response: {
-  readonly error: {
-    readonly message: string;
-    readonly name: string;
-  };
+  readonly error?: unknown;
 }): Error {
-  const error = new Error(response.error.message);
-  error.name = response.error.name || "Error";
+  const payload = response.error;
+  if (!payload || typeof payload !== "object"
+    || !("message" in payload) || typeof payload.message !== "string") {
+    return createWorkerUnavailableError("이미지 필터 Worker의 오류 응답 형식이 올바르지 않습니다.");
+  }
+  const error = new Error(payload.message);
+  error.name = "name" in payload && typeof payload.name === "string" && payload.name
+    ? payload.name
+    : "Error";
   return error;
+}
+
+function assertResultDimensions(
+  result: StudioImageDataLike,
+  source: StudioImageDataLike,
+): void {
+  assertStudioImageFilterImageData(result, "이미지 필터 Worker 결과");
+  if (result.width !== source.width || result.height !== source.height) {
+    throw new RangeError("이미지 필터 Worker 결과 크기가 원본과 일치하지 않습니다.");
+  }
 }
 
 function runImageFilterWithWorker(
@@ -304,6 +320,7 @@ function runImageFilterWithWorker(
     let settled = false;
     let requestPosted = false;
     let readyTimer: ReturnType<typeof setTimeout> | null = null;
+    let runTimer: ReturnType<typeof setTimeout> | null = null;
     const message: StudioImageFilterWorkerRunMessage = {
       type: "studio-image-filter/run",
       version: STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
@@ -312,9 +329,11 @@ function runImageFilterWithWorker(
 
     const cleanup = () => {
       if (readyTimer !== null) clearTimeout(readyTimer);
+      if (runTimer !== null) clearTimeout(runTimer);
       signal?.removeEventListener("abort", onAbort);
       worker.onmessage = null;
       worker.onerror = null;
+      worker.onmessageerror = null;
       worker.terminate();
     };
     const finish = (callback: () => void) => {
@@ -325,6 +344,7 @@ function runImageFilterWithWorker(
     };
     const onAbort = () => finish(() => reject(createAbortError()));
     worker.onmessage = (event) => {
+      if (settled) return;
       const response = event.data;
       if (
         !response
@@ -342,6 +362,10 @@ function runImageFilterWithWorker(
         }
         try {
           requestPosted = true;
+          runTimer = setTimeout(
+            () => finish(() => reject(new Error("이미지 필터 Worker 계산 시간이 초과되었습니다."))),
+            30_000,
+          );
           worker.postMessage(message, studioImageFilterRequestTransfers(message));
         } catch (error) {
           requestPosted = false;
@@ -365,7 +389,7 @@ function runImageFilterWithWorker(
         return;
       }
       try {
-        assertStudioImageFilterImageData(response.imageData, "이미지 필터 Worker 결과");
+        assertResultDimensions(response.imageData, request.imageData);
       } catch (error) {
         finish(() => reject(error));
         return;
@@ -384,6 +408,10 @@ function runImageFilterWithWorker(
             );
       finish(() => reject(error));
     };
+
+    worker.onmessageerror = () => finish(() => reject(createWorkerUnavailableError(
+      "이미지 필터 Worker 응답을 읽지 못했습니다.",
+    )));
 
     signal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted) {
@@ -489,6 +517,7 @@ export function createStudioImageFilterWorkerSession(
     if (worker) {
       worker.onmessage = null;
       worker.onerror = null;
+      worker.onmessageerror = null;
       worker.terminate();
     }
     worker = null;
@@ -540,7 +569,6 @@ export function createStudioImageFilterWorkerSession(
     };
     try {
       task.posted = true;
-      worker.postMessage(message, studioImageFilterRequestTransfers(message));
       runTimer = setTimeout(() => {
         const timedOut = current;
         if (!timedOut) return;
@@ -550,6 +578,7 @@ export function createStudioImageFilterWorkerSession(
           () => pending.reject(new Error("이미지 필터 Worker 계산 시간이 초과되었습니다.")),
         ));
       }, 30_000);
+      worker.postMessage(message, studioImageFilterRequestTransfers(message));
     } catch (error) {
       task.posted = false;
       rejectCurrentWorkerUnavailable(
@@ -563,6 +592,7 @@ export function createStudioImageFilterWorkerSession(
     worker = nextWorker;
     ready = false;
     worker.onmessage = (event) => {
+      if (disposed || worker !== nextWorker) return;
       const response = event.data;
       if (
         !response
@@ -610,7 +640,7 @@ export function createStudioImageFilterWorkerSession(
         return;
       }
       try {
-        assertStudioImageFilterImageData(response.imageData, "이미지 필터 Worker 결과");
+        assertResultDimensions(response.imageData, task.request.imageData);
       } catch (error) {
         closeWorker();
         completeCurrent((pending) => settle(pending, () => pending.reject(error)));
@@ -622,6 +652,7 @@ export function createStudioImageFilterWorkerSession(
       ));
     };
     worker.onerror = (event) => {
+      if (disposed || worker !== nextWorker) return;
       event.preventDefault?.();
       const error = event.error instanceof Error
         ? event.error
@@ -630,6 +661,10 @@ export function createStudioImageFilterWorkerSession(
           );
       closeWorker();
       completeCurrent((pending) => settle(pending, () => pending.reject(error)));
+    };
+    worker.onmessageerror = () => {
+      if (disposed || worker !== nextWorker) return;
+      rejectCurrentWorkerUnavailable("이미지 필터 Worker 응답을 읽지 못했습니다.");
     };
     readyTimer = setTimeout(
       () => rejectCurrentWorkerUnavailable(
@@ -697,7 +732,15 @@ export function createStudioImageFilterWorkerSession(
           settled: false,
           onAbort: () => {
             settle(task, () => reject(createAbortError()));
-            if (current !== task) queueMicrotask(pump);
+            if (current === task && !task.posted) {
+              completeCurrent();
+            } else if (current !== task) {
+              // A busy Worker may take seconds. Do not retain cancelled full-size buffers
+              // until it finishes while a slider keeps producing newer previews.
+              const index = queue.indexOf(task);
+              if (index !== -1) queue.splice(index, 1);
+              queueMicrotask(pump);
+            }
           },
         } satisfies StudioImageFilterSessionTask;
         task.signal?.addEventListener("abort", task.onAbort, { once: true });
@@ -828,6 +871,7 @@ export function createStudioImageFilterResidentWorkerSession(
     if (worker) {
       worker.onmessage = null;
       worker.onerror = null;
+      worker.onmessageerror = null;
       worker.terminate();
     }
     worker = null;
@@ -990,6 +1034,7 @@ export function createStudioImageFilterResidentWorkerSession(
     loadedSource = null;
     loadingSource = null;
     worker.onmessage = (event) => {
+      if (disposed || worker !== nextWorker) return;
       const response = event.data;
       if (
         !response
@@ -1075,13 +1120,7 @@ export function createStudioImageFilterResidentWorkerSession(
         return;
       }
       try {
-        assertStudioImageFilterImageData(response.imageData, "이미지 필터 Worker 결과");
-        if (
-          response.imageData.width !== task.request.imageData.width
-          || response.imageData.height !== task.request.imageData.height
-        ) {
-          throw new RangeError("이미지 필터 Worker 결과 크기가 상주 원본과 일치하지 않습니다.");
-        }
+        assertResultDimensions(response.imageData, task.request.imageData);
       } catch (error) {
         closeWorker();
         completeCurrent((pending) => settle(pending, () => pending.reject(error)));
@@ -1093,6 +1132,7 @@ export function createStudioImageFilterResidentWorkerSession(
       ));
     };
     worker.onerror = (event) => {
+      if (disposed || worker !== nextWorker) return;
       event.preventDefault?.();
       const error = event.error instanceof Error
         ? event.error
@@ -1101,6 +1141,10 @@ export function createStudioImageFilterResidentWorkerSession(
           );
       closeWorker();
       completeCurrent((pending) => settle(pending, () => pending.reject(error)));
+    };
+    worker.onmessageerror = () => {
+      if (disposed || worker !== nextWorker) return;
+      rejectCurrentWorkerUnavailable("이미지 필터 Worker 응답을 읽지 못했습니다.");
     };
     readyTimer = setTimeout(
       () => rejectCurrentWorkerUnavailable(
@@ -1181,6 +1225,8 @@ export function createStudioImageFilterResidentWorkerSession(
             if (current === task && task.phase === "queued") {
               completeCurrent();
             } else if (current !== task) {
+              const index = queue.indexOf(task);
+              if (index !== -1) queue.splice(index, 1);
               queueMicrotask(pump);
             }
           },

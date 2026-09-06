@@ -7,7 +7,20 @@ import Link from "@/src/compat/router-link";
 // 약관·개인정보처리방침은 내부 페이지(/terms·/privacy)가 TermsDesk 게시 정본을 렌더한다.
 // 문의는 내부 /support(desk-platform 공개 게시판)로 통합 — 외부 지원 보드 링크는 제거했다.
 
-const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
+const COLS: { titleKey: string; links: { key: string; href: string; label?: string }[] }[] = [
+  {
+    // 창작 표면(/create·/studio·/shaper·/market)은 사이트맵 색인과 같은 이유로 푸터에서도 빠지지 않는다.
+    titleKey: "footer.section.create",
+    links: [
+      { key: "footer.link.studio", href: "/studio" },
+      { key: "footer.link.create", href: "/create" },
+      { key: "footer.link.references", href: "/references" },
+      { key: "learn", href: "/learn", label: "웹툰 제작 강좌 (한국어)" },
+      { key: "glossary", href: "/learn/glossary", label: "웹툰 용어 사전 (한국어)" },
+      { key: "footer.link.shaper", href: "/shaper" },
+      { key: "footer.link.market", href: "/market" },
+    ],
+  },
   {
     titleKey: "footer.section.browse",
     links: [
@@ -33,17 +46,7 @@ const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
     ],
   },
   {
-    // 창작 표면(/create·/studio·/shaper·/market)은 사이트맵 색인과 같은 이유로 푸터에서도 빠지지 않는다.
-    titleKey: "footer.section.create",
-    links: [
-      { key: "footer.link.create", href: "/create" },
-      { key: "footer.link.studio", href: "/studio" },
-      { key: "footer.link.shaper", href: "/shaper" },
-      { key: "footer.link.market", href: "/market" },
-    ],
-  },
-  {
-    titleKey: "footer.section.brand",
+    titleKey: "app.name",
     links: [
       { key: "footer.link.news", href: "/news" },
       { key: "footer.link.about", href: "/about" },
@@ -66,13 +69,19 @@ const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
 export function SiteFooter() {
   const t = useT();
   const year = new Date().getFullYear();
+  const siteBrand = t("app.name");
+  // Older translations embed a product name in labels such as "About ToonSpectrum".
+  // Resolve only navigation labels against the canonical brand, preserving the rest
+  // of each translation. User content and the authoritative policy text are untouched.
+  const navigationLabel = (key: string) =>
+    t(key).replaceAll(/ToonSpectrum|툰스펙트럼/g, () => siteBrand);
 
   return (
     <footer
       data-site-chrome="footer"
       className="relative mt-24 border-t border-line/60 bg-gradient-to-b from-card/60 to-card/25 pb-[calc(3.75rem+env(safe-area-inset-bottom))] md:pb-0"
     >
-      {/* 시그니처 스펙트럼 헤어라인 — 히어로 상단 스트립과 호응해 페이지를 양 끝에서 닫는다. */}
+      {/* 공통 브랜드 구분선 — 기존 사이트의 컬러 시스템을 유지한다. */}
       <span
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-px"
@@ -84,7 +93,7 @@ export function SiteFooter() {
           <Link href="/" className="group inline-flex items-center gap-2.5">
             <ToonSpectrumMark className="size-7 rounded-[0.55rem] transition-transform duration-200 ease-out-expo group-hover:-rotate-6 group-hover:scale-105" />
             <span className="font-display text-lg font-bold transition-colors group-hover:text-accent">
-              {t("footer.brand")}
+              {siteBrand}
             </span>
           </Link>
           <p className="mt-4 text-sm leading-relaxed text-fg-2">{t("footer.description.primary")}</p>
@@ -98,7 +107,7 @@ export function SiteFooter() {
             key={col.titleKey}
             className="flex flex-col gap-3 rounded-xl border border-line/60 bg-card/20 p-4"
           >
-            <h2 className="eyebrow text-fg-3">{t(col.titleKey)}</h2>
+            <h2 className="eyebrow text-fg-3">{navigationLabel(col.titleKey)}</h2>
             {col.links.map((l) => (
               <Link
                 key={l.href}
@@ -110,8 +119,8 @@ export function SiteFooter() {
                   aria-hidden
                   className="h-px w-0 origin-left rounded-full bg-accent/70 transition-all duration-200 ease-out-expo group-hover/link:w-3"
                 />
-                <span className="transition-transform duration-200 ease-out-expo group-hover/link:translate-x-0.5">
-                  {t(l.key)}
+                <span lang={l.label ? "ko" : undefined} className="transition-transform duration-200 ease-out-expo group-hover/link:translate-x-0.5">
+                  {l.label ?? navigationLabel(l.key)}
                 </span>
               </Link>
             ))}

@@ -1,0 +1,61 @@
+name: Studio discovery contracts
+
+on:
+  # The broader Studio discovery UX workflow already exercises these contracts on PRs.
+  # Keep this focused machine-readable report available for deliberate operator runs.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-discovery-contracts-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify exact catalogue and discovery contracts
+        shell: bash
+        run: |
+          git rev-parse HEAD
+          set +e
+          pnpm exec vitest run src/domains/creator/brush/studio-brush-catalog-names.test.ts src/domains/creator/brush/studio-sub-tool-palette-data.test.ts src/domains/creator/brush/StudioSubToolPalette.discovery.test.tsx src/domains/creator/brush/studio-brush-discovery.test.ts src/domains/creator/filter/studio-filter-discovery.test.ts --reporter=json --outputFile=/tmp/studio-discovery-contracts.json
+          result=$?
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report_path = Path('/tmp/studio-discovery-contracts.json')
+          if not report_path.exists():
+              raise SystemExit('Vitest did not produce a report')
+          report = json.loads(report_path.read_text())
+          print(json.dumps({key:report.get(key) for key in ['numTotalTests','numPassedTests','numFailedTests','success']}, ensure_ascii=False))
+          for suite in report.get('testResults', []):
+              for test in suite.get('assertionResults', []):
+                  if test.get('status') == 'failed':
+                      print(suite['name'], test.get('fullName'))
+                      for message in test.get('failureMessages', []):
+                          print(message)
+          PY
+          exit "$result"
+      - name: Preserve machine-readable contract results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-discovery-contracts
+          path: /tmp/studio-discovery-contracts.json
+          retention-days: 7
+          if-no-files-found: warn

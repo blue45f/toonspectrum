@@ -1,0 +1,164 @@
+name: Feedback community validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/src/**'
+      - 'packages/core/src/**'
+      - 'src/domains/legal/**'
+      - 'components/inquiry-form.tsx'
+      - 'components/site-header*.tsx'
+      - 'e2e/feedback-community*'
+      - 'scripts/verify-feedback-community-db.mts'
+      - '*feedback*.ts'
+      - '.github/workflows/feedback-community-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+# A failed test piped through tee must fail its step, not just appear in a log.
+defaults:
+  run:
+    shell: bash
+concurrency:
+  group: feedback-community-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  feedback-community:
+    name: Feedback community regression gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: feedback_community_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=6144
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/feedback_community_test
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Prepare evidence directory
+        run: |
+          mkdir -p artifacts/feedback
+          git rev-parse HEAD > artifacts/feedback/source-commit.txt
+          cat > /tmp/feedback-lint-files <<'EOF'
+          apps/api/src/db/schema/community.schema.ts
+          apps/api/src/modules/feedback/feedback.controller.ts
+          apps/api/src/modules/feedback/feedback.service.ts
+          apps/api/src/server/feedback.ts
+          components/inquiry-form.tsx
+          components/site-header-mobile-nav.tsx
+          components/site-header.tsx
+          e2e/feedback-community-harness.tsx
+          e2e/feedback-community.spec.ts
+          e2e/feedback-community-contract.spec.ts
+          e2e/feedback-community-resilience.spec.ts
+          packages/core/src/feedback.test.ts
+          packages/core/src/feedback.ts
+          packages/core/src/feedback-response.ts
+          packages/core/src/feedback-response.test.ts
+          packages/core/src/index.ts
+          packages/core/src/types.ts
+          playwright.feedback.config.ts
+          scripts/verify-feedback-community-db.mts
+          src/domains/legal/ContactPage.tsx
+          src/domains/legal/FeedbackPage.tsx
+          src/domains/legal/SitemapPage.tsx
+          src/domains/legal/feedback/FeedbackComposer.tsx
+          src/domains/legal/feedback/FeedbackPostCard.tsx
+          src/domains/legal/feedback/FeedbackThread.tsx
+          src/domains/legal/feedback/use-feedback-feed.ts
+          vite.feedback-review.config.ts
+          EOF
+          tar -czf artifacts/feedback/reviewed-source.tar.gz -T /tmp/feedback-lint-files .github/workflows/feedback-community-validation.yml src/domains/legal/feedback/feedback-community.css e2e/feedback-community.html docs/feedback-community.md
+      - name: Upload exact source for independent review
+        uses: actions/upload-artifact@v4
+        with:
+          name: feedback-review-source-${{ github.sha }}
+          path: artifacts/feedback/reviewed-source.tar.gz
+          retention-days: 3
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint changed feature surfaces
+        id: lint
+        continue-on-error: true
+        run: xargs pnpm exec eslint --no-warn-ignored --max-warnings=0 < /tmp/feedback-lint-files 2>&1 | tee artifacts/feedback/lint.log
+      - name: Typecheck web and API
+        id: types
+        continue-on-error: true
+        run: pnpm run typecheck 2>&1 | tee artifacts/feedback/typecheck.log
+      - name: Shared input and response contract tests
+        id: unit
+        continue-on-error: true
+        run: pnpm exec vitest run packages/core/src/feedback.test.ts packages/core/src/feedback-response.test.ts 2>&1 | tee artifacts/feedback/unit.log
+      - name: Isolated PostgreSQL regression tests
+        id: database
+        continue-on-error: true
+        env:
+          TSX_TSCONFIG_PATH: apps/api/tsconfig.json
+        run: pnpm exec tsx scripts/verify-feedback-community-db.mts 2>&1 | tee artifacts/feedback/database.log
+      - name: Install Chromium
+        id: browser_install
+        continue-on-error: true
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser and responsive regression tests
+        id: browser
+        continue-on-error: true
+        run: pnpm exec playwright test --config playwright.feedback.config.ts 2>&1 | tee artifacts/feedback/browser.log
+      - name: Build isolated UI review bundle
+        id: build
+        continue-on-error: true
+        run: pnpm exec vite build --config vite.feedback-review.config.ts 2>&1 | tee artifacts/feedback/build.log
+      - name: Build complete production application
+        id: production
+        continue-on-error: true
+        run: pnpm run build 2>&1 | tee artifacts/feedback/production-build.log
+      - name: Collect optional lint fix suggestions without changing tested commit
+        if: always() && steps.lint.outcome == 'failure'
+        run: |
+          xargs pnpm exec eslint --fix --no-warn-ignored < /tmp/feedback-lint-files > artifacts/feedback/lint-fix.log 2>&1 || true
+          git diff -- . ':!pnpm-lock.yaml' > artifacts/feedback/eslint-suggested.patch
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feedback-community-verification
+          retention-days: 7
+          path: |
+            artifacts/feedback
+            test-results
+            dist-feedback-review
+      - name: Require every check to pass
+        if: always()
+        env:
+          LINT: ${{ steps.lint.outcome }}
+          TYPES: ${{ steps.types.outcome }}
+          UNIT: ${{ steps.unit.outcome }}
+          DATABASE: ${{ steps.database.outcome }}
+          BROWSER_INSTALL: ${{ steps.browser_install.outcome }}
+          BROWSER: ${{ steps.browser.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          PRODUCTION: ${{ steps.production.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os
+          keys = ['LINT', 'TYPES', 'UNIT', 'DATABASE', 'BROWSER_INSTALL', 'BROWSER', 'BUILD', 'PRODUCTION']
+          for key in keys:
+              print(f'{key}: {os.environ.get(key, "missing")}')
+          failed = [key for key in keys if os.environ.get(key) != 'success']
+          if failed:
+              raise SystemExit('Failed or unexecuted checks: ' + ', '.join(failed))
+          PY

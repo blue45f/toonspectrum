@@ -1,0 +1,10 @@
+{
+  "quarantined": [
+    {
+      "id": "kenney-food-glass-wine",
+      "reason": "visual-render-artifact",
+      "originalFilePreserved": true
+    }
+  ],
+  "rotationVariants": []
+}

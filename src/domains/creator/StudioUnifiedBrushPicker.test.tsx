@@ -58,7 +58,7 @@ describe("StudioUnifiedBrushPicker", () => {
     expect(html).toContain('aria-label="기본 프리셋"');
     expect(html).toContain("앱 제공 · 내 브러시와 별도");
     expect(html).toContain("현재 브러시");
-    expect(html).toContain("펜(매끈)");
+    expect(html).toContain("매끈한 펜");
     expect(html).toContain("12px");
     expect(html).toContain("농도 75%");
     expect(html).toContain("잉크 · 원형 촉");
@@ -67,7 +67,7 @@ describe("StudioUnifiedBrushPicker", () => {
     expect(html).toContain('data-studio-brush-tray="true"');
     expect(html).toContain('data-studio-open-brush-library="true"');
     expect(html).toContain('aria-expanded="true"');
-    expect(html).toContain('aria-label="펜(매끈) 즐겨찾기 해제"');
+    expect(html).toContain('aria-label="매끈한 펜 즐겨찾기 해제"');
     expect(html).toContain("size-11");
   });
 

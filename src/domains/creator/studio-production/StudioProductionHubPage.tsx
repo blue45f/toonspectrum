@@ -30,6 +30,8 @@ import {
   resolveStudioProductionScope,
   type StudioProductionScope as ProductionScope,
 } from "./studio-production-scope";
+import { StudioPitchPptxCard } from "./StudioPitchPptxCard";
+import { StudioServerVersionsCard } from "./StudioServerVersionsCard";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -846,6 +848,10 @@ function StudioProductionHubWorkspace({ surface, scope, onOpenStudio }: {
           </Card>
         ) : null}
 
+        {surface === "versions" ? (
+          <StudioServerVersionsCard scopeKey={scope.key} />
+        ) : null}
+
         {surface === "present" ? (
           <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
             <Card title="피치 슬라이드" description="핵심 메시지를 순서대로 구성합니다.">
@@ -877,6 +883,26 @@ function StudioProductionHubWorkspace({ surface, scope, onOpenStudio }: {
               </div>
             </Card>
           </div>
+        ) : null}
+
+        {surface === "present" ? (
+          <StudioPitchPptxCard
+            title={workspace.title}
+            slides={workspace.slides}
+            onNotice={setNotice}
+            onAddSlide={() => commit((current) => ({
+              ...current,
+              slides: [...current.slides, {
+                id: createId("slide"),
+                title: `새 슬라이드 ${current.slides.length + 1}`,
+                body: "핵심 메시지를 입력하세요.",
+              }],
+            }), "피치 슬라이드를 추가했습니다.")}
+            onChangeSlide={(id, patch) => commit((current) => ({
+              ...current,
+              slides: current.slides.map((slide) => slide.id === id ? { ...slide, ...patch } : slide),
+            }), "피치 슬라이드를 수정했습니다.")}
+          />
         ) : null}
 
         {surface === "share" ? (

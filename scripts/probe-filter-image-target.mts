@@ -82,8 +82,8 @@ async function main(): Promise<void> {
       await nav.waitFor({ state: "visible", timeout: 15_000 });
       await page.keyboard.press("Escape");
       await page.waitForTimeout(120);
-      await nav.getByRole("menuitem", { name: "필터", exact: true }).click();
-      await page.locator('[role="menu"][aria-label="필터"]').waitFor({ state: "visible", timeout: 5_000 });
+      await nav.getByRole("menuitem", { name: "효과", exact: true }).click();
+      await page.locator('[role="menu"][aria-label="효과"]').waitFor({ state: "visible", timeout: 5_000 });
     }
     await openFilterMenu();
     await page.getByRole("menuitem", { name: /^비네트/ }).click({ timeout: 10_000 });
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
     await openFilterMenu();
     await page.waitForTimeout(300);
     const diag = await page.evaluate(() => {
-      const menu = document.querySelector('[role="menu"][aria-label="필터"]');
+      const menu = document.querySelector('[role="menu"][aria-label="효과"]');
       if (!menu) return { menu: false };
       const items = [...menu.querySelectorAll('[role="menuitem"]')].slice(0, 8);
       return {

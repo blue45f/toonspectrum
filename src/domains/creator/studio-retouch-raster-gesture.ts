@@ -52,7 +52,11 @@ function pointWithPressure(
   const pressure = pointer.pointerType === "pen" && Number.isFinite(pointer.pressure)
     ? Math.min(1, Math.max(0, Number(pointer.pressure)))
     : undefined;
-  return pressure === undefined ? point : { ...point, pressure };
+  // The caller may reuse a mutable stage-position object before raster preparation resolves.
+  // Own every coordinate sample, including mouse/touch samples without pressure.
+  return pressure === undefined
+    ? { x: point.x, y: point.y }
+    : { x: point.x, y: point.y, pressure };
 }
 
 export function beginStudioPendingRasterRetouchGesture(input: {
@@ -112,8 +116,15 @@ export function endStudioPendingRasterRetouchGesture(
     readonly releasePoint?: { readonly x: number; readonly y: number };
   },
 ): StudioPendingRasterRetouchGesture {
-  if (pointerId(pointer) !== gesture.pointerId) return gesture;
-  const withRelease = options.releasePoint
+  // Cancellation is terminal. Duplicate successful releases must not revive cancelled work or
+  // copy an already-finalized journal. A released gesture may still be cancelled while its
+  // asynchronous raster preparation is pending, so released alone is not a terminal guard.
+  if (
+    pointerId(pointer) !== gesture.pointerId
+    || gesture.cancelled
+    || (gesture.released && !options.cancelled)
+  ) return gesture;
+  const withRelease = !options.cancelled && options.releasePoint
     ? appendStudioPendingRasterRetouchGesturePoint(
         gesture,
         pointer,

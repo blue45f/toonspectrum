@@ -32,8 +32,8 @@ export type {
 } from "./StudioBackground3DTypes";
 
 const LazyStudioBg3dAssetLibraryPanel = lazy(() =>
-  import("./StudioBg3dAssetLibraryPanel").then(({ StudioBg3dAssetLibraryPanel }) => ({
-    default: StudioBg3dAssetLibraryPanel,
+  import("./StudioBg3dAssetLibraryPanelWithPresets").then(({ StudioBg3dAssetLibraryPanelWithPresets }) => ({
+    default: StudioBg3dAssetLibraryPanelWithPresets,
   }))
 );
 

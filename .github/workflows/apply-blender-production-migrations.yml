@@ -1,11 +1,8 @@
 name: Apply Blender production migrations
 
 on:
-  push:
-    branches:
-      - feat/blender-character-quality-pipeline-20260904
-    paths:
-      - .github/workflows/apply-blender-production-migrations.yml
+  # Production writes are explicit operator actions, never branch-push side effects.
+  workflow_dispatch:
 
 permissions:
   contents: write

@@ -1,3 +1,5 @@
+import { STUDIO_AUTHORED_SCENE_TEMPLATES } from "./catalog/studio-authored-scene-templates";
+
 /**
  * Studio Scene Templates — 원클릭 "장면 템플릿" 라이브러리.
  *
@@ -1469,6 +1471,7 @@ export const SCENE_TEMPLATES: SceneTemplate[] = [
       },
     ],
   },
+  ...STUDIO_AUTHORED_SCENE_TEMPLATES,
 ];
 
 /** 카테고리로 템플릿 거르기(미지정이면 전체). */

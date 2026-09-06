@@ -164,8 +164,9 @@ export function filterStudioBrushCatalogItems(options: {
 } = {}): StudioBrushCatalogItem[] {
   const { operation, ...libraryOptions } = options;
   const query = (libraryOptions.query ?? "").trim();
-  const category = query ? "all" : libraryOptions.category;
-  const pinnedLane = category === "favorites" || category === "recent";
+  const pinnedLane = libraryOptions.category === "favorites" || libraryOptions.category === "recent";
+  // Search escapes material tabs, never a deliberately selected personal collection.
+  const category = query && !pinnedLane ? "all" : libraryOptions.category;
   const exhaustive = Boolean(query) || pinnedLane || category === "all";
   return filterStudioBrushLibraryItems({
     ...libraryOptions,

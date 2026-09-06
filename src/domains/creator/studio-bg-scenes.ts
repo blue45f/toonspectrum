@@ -1,3 +1,5 @@
+import { isRecommendedStudio2dScene } from "./studio-2d-asset-quality";
+
 // 창작 스튜디오 — 장르 전면 배경 씬(풀캔버스 배경 이미지로 삽입).
 // 720×1080 세로 캔버스에 맞춘 자체 벡터 SVG 배경. 라이선스 이슈 없는 순수 원본 벡터만 사용
 // (외부 아트/이모지/<image>/base64 래스터 없음). 레이어드 linearGradient + 단순 실루엣/도형.
@@ -8,6 +10,8 @@ export interface BgScene {
   genre: string;
   svg?: string;
   imgSrc?: string;
+  width?: number;
+  height?: number;
 }
 
 // 공통 viewBox. 모든 씬은 720×1080 풀캔버스 기준.
@@ -677,35 +681,35 @@ const sRomanceBloomingRoses = (() => {
 })();
 
 export const BG_SCENES: BgScene[] = [
-  { id: "webtoon-classroom", label: "웹툰 교실 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_classroom.png" },
-  { id: "webtoon-street", label: "웹툰 노을 거리 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_street.png" },
-  { id: "webtoon-bedroom", label: "웹툰 방 야경 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_bedroom.png" },
-  { id: "webtoon-convenience", label: "웹툰 밤 편의점 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_convenience.png" },
-  { id: "webtoon-corridor", label: "웹툰 저녁 복도 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_corridor.png" },
-  { id: "webtoon-palace", label: "웹툰 판타지 왕실 (일러스트)", genre: "fantasy", imgSrc: "/assets/studio/backgrounds/webtoon_palace.png" },
-  { id: "webtoon-cafe", label: "웹툰 예쁜 카페 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_cafe.png" },
-  { id: "webtoon-rooftop-sunset", label: "웹툰 노을 옥상 (AI)", genre: "romance", imgSrc: "/assets/studio/backgrounds/webtoon_rooftop_sunset.png" },
-  { id: "webtoon-neon-alley", label: "웹툰 비 오는 네온 골목 (AI)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_neon_alley.png" },
-  { id: "webtoon-creator-room", label: "웹툰 창작자 방 (AI)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_creator_room.png" },
-  { id: "webtoon-moonlit-forest", label: "웹툰 달빛 숲길 (AI)", genre: "fantasy", imgSrc: "/assets/studio/backgrounds/webtoon_moonlit_forest.png" },
-  { id: "webtoon-romance-carnival", label: "웹툰 밤 놀이공원 (AI)", genre: "romance", imgSrc: "/assets/studio/backgrounds/webtoon_romance_carnival.png" },
-  { id: "webtoon-romance-cherry-blossom", label: "웹툰 벚꽃길 (AI)", genre: "romance", imgSrc: "/assets/studio/backgrounds/webtoon_romance_cherry_blossom.png" },
-  { id: "webtoon-fantasy-dragon-peak", label: "웹툰 용의 봉우리 (AI)", genre: "fantasy", imgSrc: "/assets/studio/backgrounds/webtoon_fantasy_dragon_peak.png" },
-  { id: "webtoon-wuxia-palace-courtyard", label: "웹툰 궁궐 마당 (AI)", genre: "wuxia", imgSrc: "/assets/studio/backgrounds/webtoon_wuxia_palace_courtyard.png" },
-  { id: "webtoon-wuxia-cliff-duel", label: "웹툰 절벽 대결 (AI)", genre: "wuxia", imgSrc: "/assets/studio/backgrounds/webtoon_wuxia_cliff_duel.png" },
-  { id: "webtoon-wuxia-market-street", label: "웹툰 저잣거리 (AI)", genre: "wuxia", imgSrc: "/assets/studio/backgrounds/webtoon_wuxia_market_street.png" },
-  { id: "webtoon-sf-space-station", label: "웹툰 우주정거장 (AI)", genre: "sf", imgSrc: "/assets/studio/backgrounds/webtoon_sf_space_station.png" },
-  { id: "webtoon-sf-cyberpunk-street", label: "웹툰 사이버펑크 거리 (AI)", genre: "sf", imgSrc: "/assets/studio/backgrounds/webtoon_sf_cyberpunk_street.png" },
-  { id: "webtoon-sf-research-lab", label: "웹툰 미래 연구실 (AI)", genre: "sf", imgSrc: "/assets/studio/backgrounds/webtoon_sf_research_lab.png" },
-  { id: "webtoon-drama-hospital-corridor", label: "웹툰 병원 복도 (AI)", genre: "드라마", imgSrc: "/assets/studio/backgrounds/webtoon_drama_hospital_corridor.png" },
-  { id: "webtoon-drama-courtroom", label: "웹툰 법정 (AI)", genre: "드라마", imgSrc: "/assets/studio/backgrounds/webtoon_drama_courtroom.png" },
-  { id: "webtoon-drama-boardroom", label: "웹툰 회의실 (AI)", genre: "드라마", imgSrc: "/assets/studio/backgrounds/webtoon_drama_boardroom.png" },
-  { id: "webtoon-action-ruined-city", label: "웹툰 폐허 도시 (AI)", genre: "액션", imgSrc: "/assets/studio/backgrounds/webtoon_action_ruined_city.png" },
-  { id: "webtoon-action-jungle-temple", label: "웹툰 정글 유적 (AI)", genre: "모험", imgSrc: "/assets/studio/backgrounds/webtoon_action_jungle_temple.png" },
-  { id: "webtoon-action-highway-chase", label: "웹툰 야간 추격전 (AI)", genre: "액션", imgSrc: "/assets/studio/backgrounds/webtoon_action_highway_chase.png" },
-  { id: "webtoon-horror-abandoned-hospital", label: "웹툰 폐병원 (AI)", genre: "공포", imgSrc: "/assets/studio/backgrounds/webtoon_horror_abandoned_hospital.png" },
-  { id: "webtoon-horror-foggy-cabin", label: "웹툰 안개 오두막 (AI)", genre: "공포", imgSrc: "/assets/studio/backgrounds/webtoon_horror_foggy_cabin.png" },
-  { id: "webtoon-horror-dark-tunnel", label: "웹툰 어둠의 터널 (AI)", genre: "스릴러", imgSrc: "/assets/studio/backgrounds/webtoon_horror_dark_tunnel.png" },
+  { id: "webtoon-classroom", label: "웹툰 교실 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_classroom.jpg", width: 1024, height: 1024 },
+  { id: "webtoon-street", label: "웹툰 노을 거리 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_street.jpg", width: 1024, height: 1024 },
+  { id: "webtoon-bedroom", label: "웹툰 방 야경 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_bedroom.jpg", width: 627, height: 940 },
+  { id: "webtoon-convenience", label: "웹툰 밤 편의점 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_convenience.jpg", width: 627, height: 940 },
+  { id: "webtoon-corridor", label: "웹툰 저녁 복도 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_corridor.jpg", width: 1024, height: 1024 },
+  { id: "webtoon-palace", label: "웹툰 판타지 왕실 (일러스트)", genre: "fantasy", imgSrc: "/assets/studio/backgrounds/webtoon_palace.jpg", width: 1024, height: 1024 },
+  { id: "webtoon-cafe", label: "웹툰 예쁜 카페 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_cafe.jpg", width: 1024, height: 1024 },
+  { id: "webtoon-rooftop-sunset", label: "웹툰 노을 옥상 (AI)", genre: "romance", imgSrc: "/assets/studio/backgrounds/webtoon_rooftop_sunset.png", width: 1672, height: 941 },
+  { id: "webtoon-neon-alley", label: "웹툰 비 오는 네온 골목 (AI)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_neon_alley.png", width: 1536, height: 1024 },
+  { id: "webtoon-creator-room", label: "웹툰 창작자 방 (AI)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_creator_room.png", width: 1536, height: 1024 },
+  { id: "webtoon-moonlit-forest", label: "웹툰 달빛 숲길 (AI)", genre: "fantasy", imgSrc: "/assets/studio/backgrounds/webtoon_moonlit_forest.png", width: 1536, height: 1024 },
+  { id: "webtoon-romance-carnival", label: "웹툰 밤 놀이공원 (AI)", genre: "romance", imgSrc: "/assets/studio/backgrounds/webtoon_romance_carnival.jpg", width: 627, height: 940 },
+  { id: "webtoon-romance-cherry-blossom", label: "웹툰 벚꽃길 (AI)", genre: "romance", imgSrc: "/assets/studio/backgrounds/webtoon_romance_cherry_blossom.jpg", width: 627, height: 940 },
+  { id: "webtoon-fantasy-dragon-peak", label: "웹툰 용의 봉우리 (AI)", genre: "fantasy", imgSrc: "/assets/studio/backgrounds/webtoon_fantasy_dragon_peak.jpg", width: 627, height: 940 },
+  { id: "webtoon-wuxia-palace-courtyard", label: "웹툰 궁궐 마당 (AI)", genre: "wuxia", imgSrc: "/assets/studio/backgrounds/webtoon_wuxia_palace_courtyard.jpg", width: 627, height: 940 },
+  { id: "webtoon-wuxia-cliff-duel", label: "웹툰 절벽 대결 (AI)", genre: "wuxia", imgSrc: "/assets/studio/backgrounds/webtoon_wuxia_cliff_duel.jpg", width: 627, height: 940 },
+  { id: "webtoon-wuxia-market-street", label: "웹툰 저잣거리 (AI)", genre: "wuxia", imgSrc: "/assets/studio/backgrounds/webtoon_wuxia_market_street.jpg", width: 627, height: 940 },
+  { id: "webtoon-sf-space-station", label: "웹툰 우주정거장 (AI)", genre: "sf", imgSrc: "/assets/studio/backgrounds/webtoon_sf_space_station.jpg", width: 627, height: 940 },
+  { id: "webtoon-sf-cyberpunk-street", label: "웹툰 사이버펑크 거리 (AI)", genre: "sf", imgSrc: "/assets/studio/backgrounds/webtoon_sf_cyberpunk_street.jpg", width: 627, height: 940 },
+  { id: "webtoon-sf-research-lab", label: "웹툰 미래 연구실 (AI)", genre: "sf", imgSrc: "/assets/studio/backgrounds/webtoon_sf_research_lab.jpg", width: 627, height: 940 },
+  { id: "webtoon-drama-hospital-corridor", label: "웹툰 병원 복도 (AI)", genre: "드라마", imgSrc: "/assets/studio/backgrounds/webtoon_drama_hospital_corridor.jpg", width: 627, height: 940 },
+  { id: "webtoon-drama-courtroom", label: "웹툰 법정 (AI)", genre: "드라마", imgSrc: "/assets/studio/backgrounds/webtoon_drama_courtroom.jpg", width: 627, height: 940 },
+  { id: "webtoon-drama-boardroom", label: "웹툰 회의실 (AI)", genre: "드라마", imgSrc: "/assets/studio/backgrounds/webtoon_drama_boardroom.jpg", width: 627, height: 940 },
+  { id: "webtoon-action-ruined-city", label: "웹툰 폐허 도시 (AI)", genre: "액션", imgSrc: "/assets/studio/backgrounds/webtoon_action_ruined_city.jpg", width: 627, height: 940 },
+  { id: "webtoon-action-jungle-temple", label: "웹툰 정글 유적 (AI)", genre: "모험", imgSrc: "/assets/studio/backgrounds/webtoon_action_jungle_temple.jpg", width: 627, height: 940 },
+  { id: "webtoon-action-highway-chase", label: "웹툰 야간 추격전 (AI)", genre: "액션", imgSrc: "/assets/studio/backgrounds/webtoon_action_highway_chase.jpg", width: 627, height: 940 },
+  { id: "webtoon-horror-abandoned-hospital", label: "웹툰 폐병원 (AI)", genre: "공포", imgSrc: "/assets/studio/backgrounds/webtoon_horror_abandoned_hospital.jpg", width: 627, height: 940 },
+  { id: "webtoon-horror-foggy-cabin", label: "웹툰 안개 오두막 (AI)", genre: "공포", imgSrc: "/assets/studio/backgrounds/webtoon_horror_foggy_cabin.jpg", width: 627, height: 940 },
+  { id: "webtoon-horror-dark-tunnel", label: "웹툰 어둠의 터널 (AI)", genre: "스릴러", imgSrc: "/assets/studio/backgrounds/webtoon_horror_dark_tunnel.jpg", width: 627, height: 940 },
   { id: "fantasy-forest", label: "판타지 숲", genre: "fantasy", svg: sFantasyForest },
   { id: "magic-castle", label: "마법 성", genre: "fantasy", svg: sMagicCastle },
   { id: "bright-sky", label: "환한 하늘", genre: "daily", svg: sBrightSky },
@@ -757,7 +761,7 @@ export function bgGenreOf(scene: BgScene): string {
 }
 
 // 모든 배경을 장르별로 묶어 우선순위 순서로 정렬한 그룹 배열을 반환.
-// 각 그룹 안에서는 고품질 일러스트(imgSrc)를 앞에, 그다음 벡터 순.
+// 각 그룹 안에서는 래스터 이미지 다음에 벡터를 배치한다. 파일 형식은 품질 판정이 아니다.
 export function groupBgScenes(scenes: BgScene[]): { genre: string; scenes: BgScene[] }[] {
   const buckets = new Map<string, BgScene[]>();
   for (const scene of scenes) {
@@ -778,10 +782,10 @@ export function groupBgScenes(scenes: BgScene[]): { genre: string; scenes: BgSce
     .sort((a, b) => order(a.genre) - order(b.genre));
 }
 
-// 메뉴 섹션: 고품질 일러스트(imgSrc)를 "추천"으로 맨 위에 모으고,
-// 나머지 벡터 씬은 장르별 그룹으로 보여줘 우선순위를 명확히 한다.
+// 추천은 원본 픽셀 크기와 개별 시각 검수 원장이 뒷받침하는 경우만 노출한다.
+// 소형 원본/미확인 소재는 삭제하지 않고 장르별 목록에 보존한다.
 export function bgSceneSections(scenes: BgScene[]): { genre: string; scenes: BgScene[] }[] {
-  const featured = scenes.filter((s) => s.imgSrc);
-  const rest = scenes.filter((s) => !s.imgSrc);
+  const featured = scenes.filter(isRecommendedStudio2dScene);
+  const rest = scenes.filter((s) => !isRecommendedStudio2dScene(s));
   return [...(featured.length ? [{ genre: "추천", scenes: featured }] : []), ...groupBgScenes(rest)];
 }

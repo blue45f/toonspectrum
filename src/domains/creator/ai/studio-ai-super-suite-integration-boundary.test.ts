@@ -26,13 +26,17 @@ describe("AI super-suite production integration boundary", () => {
     );
 
     const gateway = source("src/domains/creator/ai/StudioAiSuperSuiteGateway.tsx");
+    // The gateway mounts the modal through its loader module, which is the one lazy boundary
+    // launchers also warm (`preload`) — so the import literal is asserted there.
+    const loader = source("src/domains/creator/ai/studio-ai-super-suite-loader.ts");
     expect(popover).toContain("requestStudioAiSuperSuiteOpen");
     expect(popover).toContain("<StudioAiSuperSuiteGateway onApplyPrompt={applySuperSuitePrompt}");
     expect(popover).not.toContain("useState(");
     expect(popover).not.toContain("import(");
     expect(gateway).toContain("subscribeStudioAiSuperSuiteOpenRequest");
     expect(gateway).toContain("compileStudioAiSuitePromptHandoff");
-    expect(gateway).toContain('import("./StudioAiSuperSuiteModal")');
+    expect(loader).toContain('import("./StudioAiSuperSuiteModal")');
+    expect(gateway).toContain("studioAiSuperSuiteModalLoader.load");
     expect(popover).toContain('setMenu("aiAssist")');
     expect(modal).toContain("onApplyPromptRecipe");
   });
