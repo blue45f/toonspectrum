@@ -40,11 +40,13 @@ const SOURCES = [
 // "143만"/"5천"/"1.0만"/"2,645만" → 정수 조회수. 실패 시 undefined.
 function parseViews(s) {
   const t = String(s || "").replace(/,/g, "").trim();
-  const m = t.match(/^([\d.]+)\s*(만|천)?/);
+  const m = t.match(/^([\d.]+)\s*([만천])?/);
   if (!m) return undefined;
   const n = Number(m[1]);
   if (!Number.isFinite(n)) return undefined;
-  const unit = m[2] === "만" ? 10_000 : m[2] === "천" ? 1_000 : 1;
+  let unit = 1;
+  if (m[2] === "만") unit = 10_000;
+  else if (m[2] === "천") unit = 1_000;
   const v = Math.round(n * unit);
   return v > 0 ? v : undefined;
 }

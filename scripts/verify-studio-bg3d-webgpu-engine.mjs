@@ -387,7 +387,7 @@ async function readHarnessResult(browser, port, { userAgent, probeVrm = false } 
       ...diagnostics.requestFailures.slice(0, 8).map((entry) => `request: ${entry}`),
     ].join(" | ");
     throw new Error(
-      `${error instanceof Error ? error.message : String(error)}${detail ? ` — ${detail}` : ""}`,
+      `${error instanceof Error ? error.message : String(error)}${detail ? " — " + detail : ""}`,
       { cause: error },
     );
   } finally {

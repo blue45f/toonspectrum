@@ -205,9 +205,7 @@ function validate(result, diagnostics, lane) {
     !(selection.fullTopMiddleLightening > selection.partialTopLeftLightening)
     || !(selection.partialTopLeftLightening > selection.untouchedTopRightLightening + 0.1)
   ) failures.push("non-symmetric partial-alpha selection clear is not ordered correctly");
-  if (!(Math.abs(selection.untouchedBottomLightening) < 0.1)) {
-    failures.push("selection Y orientation cleared or painted the wrong half");
-  }
+  if (Math.abs(selection.untouchedBottomLightening) >= 0.1) failures.push("selection Y orientation cleared or painted the wrong half");
   if (!(result.clearDarkness < 20)) failures.push("clear did not return to paper");
   if (!(result.layering?.darkOverWhiteCenterDarkness > result.layering?.whiteCenterDarkness + 1)) {
     failures.push("white-fix-dark transmittance layering did not darken in order");

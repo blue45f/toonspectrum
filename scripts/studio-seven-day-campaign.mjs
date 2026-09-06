@@ -309,7 +309,7 @@ function appendGitHubOutputs(outputPath, plan) {
   };
   fs.appendFileSync(
     outputPath,
-    `${Object.entries(values).map(([key, value]) => `${key}=${String(value).replaceAll("\n", "%0A")}`).join("\n")}\n`,
+    `${Object.entries(values).map(([key, value]) => key + "=" + String(value).replaceAll("\n", "%0A")).join("\n")}\n`,
     "utf8",
   );
 }
@@ -319,7 +319,7 @@ function main() {
   const config = readJson(options.configPath, null);
   const configIssues = validateStudioSevenDayCampaignConfig(config);
   if (configIssues.length > 0) {
-    throw new Error(`Campaign config is invalid:\n${configIssues.map((issue) => ` - ${issue}`).join("\n")}`);
+    throw new Error(`Campaign config is invalid:\n${configIssues.map((issue) => " - " + issue).join("\n")}`);
   }
   const plan = buildStudioSevenDayCampaignPlan({
     config,

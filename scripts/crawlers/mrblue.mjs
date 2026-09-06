@@ -45,7 +45,7 @@ function parseListHtml(html) {
   if (!html) return items;
 
   // <a href="/comic/<ID>"> ... </a> 단위로 스캔(앵커 내부의 lazy 표지 img 를 매칭).
-  const anchorRe = /<a\s+href="\/comic\/([A-Za-z0-9_]+)"[^>]*>([\s\S]*?)<\/a>/g;
+  const anchorRe = /<a\s+href="\/comic\/(\w+)"[^>]*>([\s\S]*?)<\/a>/g;
   let m;
   while ((m = anchorRe.exec(html)) !== null) {
     const workId = m[1];
@@ -53,7 +53,7 @@ function parseListHtml(html) {
 
     // 앵커 내부의 표지 이미지(data-original 의 ID 가 앵커 ID 와 일치하는 것만 신뢰).
     const imgRe =
-      /<img[^>]*class="lazy"[^>]*data-original="(https:\/\/img\.mrblue\.com\/prod_img\/comics\/([A-Za-z0-9_]+)\/cover_w480\.jpg)"[^>]*alt="([^"]*)"[^>]*>/i;
+      /<img[^>]*class="lazy"[^>]*data-original="(https:\/\/img\.mrblue\.com\/prod_img\/comics\/(\w+)\/cover_w480\.jpg)"[^>]*alt="([^"]*)"[^>]*>/i;
     const img = imgRe.exec(inner);
     if (!img) continue;
 

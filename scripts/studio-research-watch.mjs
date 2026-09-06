@@ -328,7 +328,8 @@ async function main() {
   const registry = JSON.parse(fs.readFileSync(path.resolve(options.registryPath), "utf8"));
   const issues = validateStudioResearchRegistry(registry);
   if (issues.length > 0) {
-    throw new Error(`Research registry is invalid:\n${issues.map((issue) => ` - ${issue}`).join("\n")}`);
+    const issueList = issues.map((issue) => " - " + issue).join("\n");
+    throw new Error(`Research registry is invalid:\n${issueList}`);
   }
   const report = await buildStudioResearchWatchReport(registry, options);
   const json = `${JSON.stringify(report, null, 2)}\n`;

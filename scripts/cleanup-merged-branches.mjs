@@ -154,7 +154,7 @@ async function compareBranchToDefault(repository, branchSha, defaultBranch, toke
 
 async function openPullRequestsForBranch(repository, branch, token) {
   return paginate(
-    `/repos/${repository.owner}/${repository.repo}/pulls?state=open&head=${encodeURIComponent(`${repository.owner}:${branch}`)}`,
+    `/repos/${repository.owner}/${repository.repo}/pulls?state=open&head=${encodeURIComponent(repository.owner + ":" + branch)}`,
     token,
   );
 }
@@ -167,7 +167,7 @@ async function exactMergedPullRequestForBranch(
   token,
 ) {
   const pulls = await paginate(
-    `/repos/${repository.owner}/${repository.repo}/pulls?state=closed&head=${encodeURIComponent(`${repository.owner}:${branch}`)}&sort=updated&direction=desc`,
+    `/repos/${repository.owner}/${repository.repo}/pulls?state=closed&head=${encodeURIComponent(repository.owner + ":" + branch)}&sort=updated&direction=desc`,
     token,
   );
   return pulls.find((pull) => mergedPullRequestProvesHead(
@@ -373,7 +373,8 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   if (args.pr) await cleanupPullRequest(repository, args.pr, context);
   else {
     const branches = await paginate(`/repos/${repository.owner}/${repository.repo}/branches`, token);
-    for (const branch of branches.sort((left, right) => left.name.localeCompare(right.name))) {
+    const sortedBranches = [...branches].sort((left, right) => left.name.localeCompare(right.name));
+    for (const branch of sortedBranches) {
       await inspectAndMaybeDelete(repository, branch, context);
     }
   }

@@ -335,9 +335,8 @@ export function renderStudioBenchmarkGapPlanMarkdown(plan) {
   ];
 
   for (const lane of plan.lanePlans.filter((item) => item.assignmentCount > 0).slice(0, 15)) {
-    const issues = lane.issueQueue.length > 0
-      ? ` · ${lane.issueQueue.map((issue) => `#${issue}`).join(", ")}`
-      : "";
+    const issueList = lane.issueQueue.map((issue) => "#" + issue).join(", ");
+    const issues = lane.issueQueue.length > 0 ? ` · ${issueList}` : "";
     lines.push(`### ${lane.id}${issues}`);
     lines.push("");
     for (const assignment of lane.assignments.slice(0, 8)) {

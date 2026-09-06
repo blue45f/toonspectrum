@@ -73,7 +73,7 @@ function countTestFilesByRoot(roots) {
     ["ls-files", "--cached", "--others", "--exclude-standard"],
     { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
   );
-  const testFile = /\.(test|spec)\.(c|m)?[jt]sx?$/;
+  const testFile = /\.(test|spec)\.[cm]?[jt]sx?$/;
   const counts = Object.fromEntries(roots.map((root) => [root, 0]));
   for (const line of stdout.split("\n")) {
     const file = line.trim();

@@ -1573,18 +1573,12 @@ export function parsePnpmLicenseInventory(raw) {
 }
 
 export function isRecoverablePnpmLicenseInventoryError(error) {
-  const stderr =
-    typeof error?.stderr === "string"
-      ? error.stderr
-      : Buffer.isBuffer(error?.stderr)
-        ? error.stderr.toString("utf8")
-        : "";
-  const stdout =
-    typeof error?.stdout === "string"
-      ? error.stdout
-      : Buffer.isBuffer(error?.stdout)
-        ? error.stdout.toString("utf8")
-        : "";
+  let stderr = "";
+  if (typeof error?.stderr === "string") stderr = error.stderr;
+  else if (Buffer.isBuffer(error?.stderr)) stderr = error.stderr.toString("utf8");
+  let stdout = "";
+  if (typeof error?.stdout === "string") stdout = error.stdout;
+  else if (Buffer.isBuffer(error?.stdout)) stdout = error.stdout.toString("utf8");
   return `${String(error?.message ?? "")}\n${stderr}\n${stdout}`.includes(
     "ERR_PNPM_MISSING_PACKAGE_INDEX_FILE",
   );
@@ -1765,11 +1759,12 @@ function collectLicenseDocuments(inventory, additionalDocuments = []) {
     );
   }
 
+  const sortedMissing = [...missing].sort((left, right) => left.name.localeCompare(right.name));
   return {
     documents: [...documents.entries()]
       .map(([digest, document]) => ({ digest, ...document }))
       .sort((left, right) => left.digest.localeCompare(right.digest)),
-    missing: missing.sort((left, right) => left.name.localeCompare(right.name)),
+    missing: sortedMissing,
   };
 }
 
@@ -1934,14 +1929,14 @@ function renderNotice(
   const rows = inventory
     .map(
       (entry) =>
-        `| \`${escapeTableCell(entry.name)}\` | ${escapeTableCell(entry.versions.join(", "))} | ${escapeTableCell(entry.license)} | ${escapeTableCell(entry.author || "not supplied")} | ${entry.homepage ? `<${escapeTableCell(entry.homepage)}>` : "not supplied"} |`,
+        `| \`${escapeTableCell(entry.name)}\` | ${escapeTableCell(entry.versions.join(", "))} | ${escapeTableCell(entry.license)} | ${escapeTableCell(entry.author || "not supplied")} | ${entry.homepage ? "<" + escapeTableCell(entry.homepage) + ">" : "not supplied"} |`,
     )
     .join("\n");
 
   const missingRows = missing
     .map(
       (entry) =>
-        `| \`${escapeTableCell(entry.name)}\` | ${escapeTableCell(entry.versions.join(", "))} | ${escapeTableCell(entry.license)} | ${entry.homepage ? `<${escapeTableCell(entry.homepage)}>` : "not supplied"} |`,
+        `| \`${escapeTableCell(entry.name)}\` | ${escapeTableCell(entry.versions.join(", "))} | ${escapeTableCell(entry.license)} | ${entry.homepage ? "<" + escapeTableCell(entry.homepage) + ">" : "not supplied"} |`,
     )
     .join("\n");
 

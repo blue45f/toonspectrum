@@ -207,13 +207,13 @@ describe("database integration runner CI policy", () => {
       "expected_verified=$((adoption_baseline + bootstrap_count))",
     );
     expect(adoptionStep?.run).not.toMatch(
-      /19 adopted, [0-9]+ applied, [0-9]+ checksum-verified skips/u,
+      /19 adopted, \d+ applied, \d+ checksum-verified skips/u,
     );
     expect(rerunStep?.run).toContain(
       "0 applied, ${manifest_count} checksum-verified skips",
     );
     expect(rerunStep?.run).not.toMatch(
-      /0 applied, [0-9]+ checksum-verified skips/u,
+      /0 applied, \d+ checksum-verified skips/u,
     );
   });
 

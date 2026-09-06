@@ -148,7 +148,10 @@ function upsert(acc, item, ctx) {
   const id = `${PREFIX}-${workId}`;
   const alias = String(item?.alias || "").trim();
   const detailUrl = alias ? `${ORIGIN}/detail/${alias}` : `${ORIGIN}/detail/${workId}`;
-  const pricing = freetime ? "wait-free" : freeCount > 0 ? "free" : "paid";
+  let pricing;
+  if (freetime) pricing = "wait-free";
+  else if (freeCount > 0) pricing = "free";
+  else pricing = "paid";
 
   const row = {
     _normTitle: norm(title),
@@ -241,8 +244,7 @@ export async function crawl() {
   }
 
   // 3) 요일별 schedule → 완결 플래그/요일/추가 작품 보강.
-  for (let i = 0; i < WEEKDAY_MENUS.length; i++) {
-    const [menu, weekday] = WEEKDAY_MENUS[i];
+  for (const [menu, weekday] of WEEKDAY_MENUS) {
     const res = await fetchJson(
       `${API}/contents/main/schedule/COMIC?adultToggle=false&contentsThumbnailType=${THUMB_TYPES}&days=7&groupMenu=${menu}&mainGenre=ALL`,
       { referer: REFERER, headers: { ...HEADERS, "x-referer": REFERER } },

@@ -83,7 +83,7 @@ function parseListItems(html) {
     // 평점(0~10 스케일) + 평가 인원: <em>8.4</em> (515명)
     let ratingAvg;
     let ratingCount;
-    const scoreMatch = li.match(/<em>([0-9]+(?:\.[0-9]+)?)<\/em>\s*\(([0-9,]+)\s*명\)/);
+    const scoreMatch = li.match(/<em>(\d+(?:\.\d+)?)<\/em>\s*\(([0-9,]+)\s*명\)/);
     if (scoreMatch) {
       const cnt = Number(scoreMatch[2].replace(/,/g, ""));
       const avg10 = Number(scoreMatch[1]);

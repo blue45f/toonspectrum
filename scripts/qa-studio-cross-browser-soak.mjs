@@ -57,7 +57,7 @@ async function inspectDom(page) {
     const describe = (element) => {
       const text = (element.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 64);
       const name = element.getAttribute("aria-label") ?? element.getAttribute("title") ?? text;
-      return `${element.tagName.toLowerCase()}${name ? `[${name}]` : ""}`;
+      return element.tagName.toLowerCase() + (name ? `[${name}]` : "");
     };
     const inHorizontalScroller = (element) => {
       let current = element.parentElement;
@@ -358,10 +358,13 @@ try {
   while (Date.now() < DEADLINE) {
     const landscape = cycle % 2 === 1;
     const viewport = landscape ? { width: HEIGHT, height: WIDTH } : { width: WIDTH, height: HEIGHT };
+    let deviceScaleFactor = 3;
+    if (cycle % 3 === 0) deviceScaleFactor = 1;
+    else if (cycle % 3 === 1) deviceScaleFactor = 2;
     const settings = {
       blockPopups: cycle % 3 !== 2,
       colorScheme: cycle % 2 === 0 ? "light" : "dark",
-      deviceScaleFactor: cycle % 3 === 0 ? 1 : cycle % 3 === 1 ? 2 : 3,
+      deviceScaleFactor,
       orientation: landscape ? "landscape" : "portrait",
       reducedMotion: cycle % 4 < 2 ? "no-preference" : "reduce",
       viewport,

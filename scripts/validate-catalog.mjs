@@ -99,7 +99,9 @@ function main() {
 
   // ── 리포트 ──
   console.log(`\n검증 대상: ${newPath}`);
-  console.log(`전체 작품 수: ${total}${prev ? ` (직전 ${prev.length}, Δ${total - prev.length >= 0 ? "+" : ""}${total - prev.length})` : ""}`); // NOSONAR S8689 집계 수치만 출력(기밀 아님)
+  const previousDeltaSign = prev && total - prev.length >= 0 ? "+" : "";
+  const previousSummary = prev ? ` (직전 ${prev.length}, Δ${previousDeltaSign}${total - prev.length})` : "";
+  console.log(`전체 작품 수: ${total}${previousSummary}`); // NOSONAR S8689 집계 수치만 출력(기밀 아님)
   console.log(`불완전 레코드: ${malformed} (${(malformedRatio * 100).toFixed(2)}%)`);
   console.log("플랫폼별:");
   const allIds = [...new Set([...Object.keys(nextPc), ...(prevPc ? Object.keys(prevPc) : [])])].sort(

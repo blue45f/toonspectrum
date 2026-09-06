@@ -178,9 +178,7 @@ export function validateStudioThirdPartyReuseRegistry(registry) {
       }
     }
 
-    if (evidenceType === "public-license") {
-      validateHttpsUrl(entry.licenseUrl, `${prefix}.licenseUrl`, issues);
-    } else if (entry.licenseUrl != null) {
+    if (evidenceType === "public-license" || entry.licenseUrl != null) {
       validateHttpsUrl(entry.licenseUrl, `${prefix}.licenseUrl`, issues);
     }
     if (

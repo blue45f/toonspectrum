@@ -374,7 +374,7 @@ async function main() {
     );
     await page.addInitScript(() => {
       window.addEventListener("securitypolicyviolation", event => {
-        void window.__recordStudioOpfsV2CspViolation?.({
+        window.__recordStudioOpfsV2CspViolation?.({
           effectiveDirective: event.effectiveDirective,
           blockedUri: event.blockedURI,
         });

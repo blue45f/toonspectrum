@@ -190,7 +190,10 @@ for (const status of [401, 403, 429, 500]) test(`HTTP ${status} error body is no
 const STALLED_STAGE_TIMEOUT_MS = "2000";
 for (const stage of ["login", "work", "lookup", "upload"]) test(`real CLI ${stage} request times out without automatic retries`, async () => withManifest(async (manifest) => {
   await withServer(async (req, res) => {
-    const current = req.url.includes("/auth/") ? "login" : req.method === "PUT" ? "upload" : req.url.includes("/assets/") ? "lookup" : "work";
+    let current = "work";
+    if (req.url.includes("/auth/")) current = "login";
+    else if (req.method === "PUT") current = "upload";
+    else if (req.url.includes("/assets/")) current = "lookup";
     if (current === stage) { res.writeHead(200); res.flushHeaders(); res.write("{"); return; }
     if (current === "lookup") { json(res, {}, 404); return; }
     json(res, { id: "test-work" });
@@ -203,7 +206,9 @@ for (const stage of ["login", "work", "lookup", "upload"]) test(`real CLI ${stag
     assert.equal(puts.length, stage === "upload" ? 1 : 0);
   });
 }));
-
+    let extras = [];
+    if (kind === "filter") extras = ["--filter-category", "absent"];
+    else if (kind === "resume") extras = ["--start-index", "2"];
 for (const kind of ["empty", "filter", "resume"]) test(`empty ${kind} selection makes no work or auth request`, async () => withManifest(async (manifest) => {
   await withServer((req, res) => json(res, { id: "unexpected-work" }), async (url, requests) => {
     const extras = kind === "filter" ? ["--filter-category", "absent"] : kind === "resume" ? ["--start-index", "2"] : [];

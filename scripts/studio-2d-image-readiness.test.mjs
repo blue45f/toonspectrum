@@ -104,7 +104,7 @@ test("error and duplicate load events cannot authorize or repeatedly decode a fi
 });
 test("lazy offscreen images have no deadline until they approach the viewport", async () => {
   const original = globalThis.IntersectionObserver; let intersect; let disconnects = 0;
-  globalThis.IntersectionObserver = class { constructor(callback) { intersect = callback; } observe() {} disconnect() { disconnects++; } };
+  globalThis.IntersectionObserver = class { constructor(callback) { intersect = callback; } observe() { return undefined; } disconnect() { disconnects++; } };
   const image = new FakeImage(); image.loading = "lazy"; const run = setup(image, undefined, 10);
   try {
     await new Promise((resolve) => setTimeout(resolve, 30)); assert.equal(run.latest().status, "loading");

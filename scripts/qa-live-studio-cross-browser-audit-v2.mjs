@@ -218,7 +218,7 @@ async function inspectDom(page, profile) {
 
       const describe = (element) => {
         const name = accessibleName(element).replace(/\s+/gu, " ").slice(0, 80);
-        return `${element.tagName.toLowerCase()}${name ? `[${name}]` : ""}`;
+        return element.tagName.toLowerCase() + (name ? `[${name}]` : "");
       };
 
       const horizontalScrollerAncestor = (element) => {

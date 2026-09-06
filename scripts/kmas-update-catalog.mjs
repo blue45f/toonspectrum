@@ -312,7 +312,7 @@ function cleanText(value) {
 }
 
 function cleanBookTitle(value) {
-  return value.replace(/\[[^\]]+\]/g, "").replace(/\s+\d+(?:권|화|부)?$/g, "").trim();
+  return value.replace(/\[[^\]]+\]/g, "").replace(/\s+\d+[권화부]?$/g, "").trim();
 }
 
 function cleanCreator(value) {

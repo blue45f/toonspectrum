@@ -159,7 +159,10 @@ function parseCards(html) {
     const workId = m[1];
     const t = TITLE_RE.exec(block);
     const altM = ALT_RE.exec(block);
-    const title = (t ? t[1] : altM ? altM[1] : "").trim();
+    let title = "";
+    if (t) title = t[1];
+    else if (altM) title = altM[1];
+    title = title.trim();
     if (!title) continue;
     const cov = COVER_RE.exec(block);
     const subM = SUB_RE.exec(block);

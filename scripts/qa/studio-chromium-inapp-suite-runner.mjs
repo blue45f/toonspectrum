@@ -207,8 +207,7 @@ function selectCases(suite) {
   const requested = new Set(REQUESTED_CASES);
   const selected = suite.filter((testCase) => {
     if (requested.size > 0 && !requested.has(testCase.id)) return false;
-    if (CASE_PATTERN && !CASE_PATTERN.test(testCase.id)) return false;
-    return true;
+    return !CASE_PATTERN || CASE_PATTERN.test(testCase.id);
   });
   if (selected.length === 0) {
     const available = suite.map((testCase) => testCase.id).join(", ");
@@ -312,7 +311,7 @@ async function jiraRequest(endpoint, options = {}) {
     ...options,
     headers: {
       Accept: "application/json",
-      Authorization: `Basic ${Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString("base64")}`,
+      Authorization: `Basic ${Buffer.from(JIRA_EMAIL + ":" + JIRA_API_TOKEN).toString("base64")}`,
       "Content-Type": "application/json",
       ...(options.headers ?? {}),
     },

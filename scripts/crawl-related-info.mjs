@@ -133,7 +133,9 @@ async function crawlYoutube(query, max = 3) {
   const re =
     /"videoId":"([\w-]{11})"[\s\S]{0,600}?"title":\{(?:"runs":\[\{"text":"((?:[^"\\]|\\.)*)"|"simpleText":"((?:[^"\\]|\\.)*)")/g;
   let m;
-  while ((m = re.exec(html)) && out.length < max) {
+  while (true) {
+    m = re.exec(html);
+    if (!m || out.length >= max) break;
     const id = m[1];
     if (seen.has(id)) continue;
     seen.add(id);

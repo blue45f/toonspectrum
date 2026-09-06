@@ -53,7 +53,8 @@ export function readImageDimensions(bytes) {
   throw new Error("JPEG has no supported frame header");
 }
 
-export function auditStudio2dAssets(root = ROOT, input) {
+export function auditStudio2dAssets(root, input) {
+  root ??= ROOT;
   const manifest = input ?? JSON.parse(readFileSync(path.join(root, STUDIO_2D_MANIFEST_PATH), "utf8"));
   const errors = [];
   const ids = new Set();

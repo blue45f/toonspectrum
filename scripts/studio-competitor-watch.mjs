@@ -264,7 +264,8 @@ async function main() {
   const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
   const issues = validateStudioCompetitorRegistry(registry);
   if (issues.length > 0) {
-    throw new Error(`Registry is invalid:\n${issues.map((issue) => ` - ${issue}`).join("\n")}`);
+    const issueList = issues.map((issue) => " - " + issue).join("\n");
+    throw new Error(`Registry is invalid:\n${issueList}`);
   }
   const report = await buildStudioCompetitorWatchReport(registry, options);
   const json = `${JSON.stringify(report, null, 2)}\n`;

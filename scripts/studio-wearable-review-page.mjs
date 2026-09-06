@@ -69,14 +69,19 @@ api.select = async ({ type="wardrobe", id, model="sample", angle=30, crop="full"
   selectState(active);
 };
 api.view = (angle,crop=active?.crop??"full")=>{
-  if(!active)return; active={...active,angle,crop};api.frames=0;selectState(active);
+  if (!active) return;
+  active = {...active, angle, crop};
+  api.frames = 0;
+  selectState(active);
 };
 api.pose = (kind)=>{
   if(!active?.vrm)return;
-  const vrm=active.vrm;vrm.humanoid.setNormalizedPose(active.idlePose);
+    if (l) { l.rotation.z = 0.40; }
+    if (r) { r.rotation.z = -0.40; }
   if(kind==="arms-up"){
     const l=vrm.humanoid.getNormalizedBoneNode("leftUpperArm");const r=vrm.humanoid.getNormalizedBoneNode("rightUpperArm");
-    if(l)l.rotation.z=.40;if(r)r.rotation.z=-.40;
+      if (thigh) { thigh.rotation.x = -1.05; }
+      if (knee) { knee.rotation.x = 1.35; }
   }else if(kind==="bent-knees"){
     for(const side of ["left","right"]){
       const thigh=vrm.humanoid.getNormalizedBoneNode(`${side}UpperLeg`);const knee=vrm.humanoid.getNormalizedBoneNode(`${side}LowerLeg`);

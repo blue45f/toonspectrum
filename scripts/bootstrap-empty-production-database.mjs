@@ -875,13 +875,14 @@ function assertBootstrapContractUnchanged(expectedFingerprint) {
 
 function printPlan({ assessment, contract, databaseContract, options }) {
   const state = assessment.state;
+  const applicationState = assessment.nonempty ? `nonempty (${state.applicationObjectCount} object(s))` : "empty";
   const lines = [
     "ToonSpectrum disposable PostgreSQL bootstrap plan",
     `Target: ${databaseContract.hostname}:${databaseContract.port}/${databaseContract.databaseName}`,
     `Transport: ${databaseContract.tlsVerified ? "direct TLS verify-full + channel binding" : "explicit loopback test override"}`,
     `Release: ${options.releaseSha}`,
     `Runtime role: ${options.runtimeDatabaseRole} (${assessment.runtimeRoleMustBeCreated ? "create with environment secret" : "reuse verified separated role"})`,
-    `Current application state: ${assessment.nonempty ? `nonempty (${state.applicationObjectCount} object(s))` : "empty"}`,
+    `Current application state: ${applicationState}`,
     `Other client connections: ${state.activeConnectionCount}`,
     `Schema contract fingerprint: ${contract.fingerprint}`,
     `Historical baseline: ${contract.historical[0].id} .. ${contract.historical.at(-1).id}`,

@@ -153,8 +153,7 @@ async function run() {
 
   async function mustReject(operation, constraint) {
     await assert.rejects(operation, (error) => error?.code === "23514" && (!constraint || error.constraint === constraint),
-      `Expected PostgreSQL CHECK rejection${constraint ? ` from ${constraint}` : ""}`);
-    rejected += 1;
+      `Expected PostgreSQL CHECK rejection${constraint ? " from " + constraint : ""}`);
   }
 
   async function unchangedGuards() {

@@ -1081,11 +1081,10 @@ function evaluateRatchet(group, baselineMetrics) {
     const improvedFloor = measurement.kind === "count"
       ? baselineValue
       : Math.floor(baselineValue * (1 - ratchetPolicy.byteTolerance));
-    const status = measurement.value > ceiling
-      ? "REGRESSED"
-      : measurement.value < improvedFloor
-        ? "improved"
-        : "ok";
+    let status;
+    if (measurement.value > ceiling) status = "REGRESSED";
+    else if (measurement.value < improvedFloor) status = "improved";
+    else status = "ok";
     rows.push({ ...measurement, baselineValue, ceiling, status });
   }
   const stale = Object.keys(baselineMetrics ?? {}).filter((key) => !seen.has(key));

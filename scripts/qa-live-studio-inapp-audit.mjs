@@ -106,7 +106,7 @@ async function inspectDom(page) {
     const describe = (element) => {
       const text = (element.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 48);
       const label = element.getAttribute("aria-label") ?? element.getAttribute("title") ?? text;
-      return `${element.tagName.toLowerCase()}${label ? `[${label}]` : ""}`;
+      return element.tagName.toLowerCase() + (label ? `[${label}]` : "");
     };
 
     const insideHorizontalScroller = (element) => {

@@ -210,7 +210,7 @@ function verifyLegacyBootstrapSyntax(source) {
       label: "post-ES5 keyword",
     },
     { pattern: /\bfunction\b[^()]*\([^)]*=/u, label: "default parameter" },
-    { pattern: /\b(?:var|for)\s*(?:\[|\{)/u, label: "destructuring" },
+    { pattern: /\b(?:var|for)\s*[\[{]/u, label: "destructuring" },
   ];
   const violation = forbidden.find(({ pattern }) => pattern.test(masked));
   if (violation) {

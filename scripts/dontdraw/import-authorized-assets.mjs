@@ -38,7 +38,7 @@ export function validateSourceManifest(input) {
   let fileCount = 0;
   const products = input.products.map((product) => {
     const id = text(product?.id, "product.id", 16);
-    if (!/^[1-9][0-9]*$/u.test(id) || ids.has(id)) throw new Error(`Invalid or duplicate product ID: ${id}`);
+    if (!/^[1-9]\d*$/u.test(id) || ids.has(id)) throw new Error(`Invalid or duplicate product ID: ${id}`);
     ids.add(id);
     const title = text(product.title, "product.title", 200);
     const sourceUrl = text(product.sourceUrl, "product.sourceUrl");

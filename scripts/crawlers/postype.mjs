@@ -139,7 +139,7 @@ function extractLocs(xml) {
 
 // 채널/포스트 URL(.../@handle 또는 .../@handle/post/123)에서 핸들만 추출.
 function handleFromUrl(url) {
-  const m = String(url || "").match(/postype\.com\/@([A-Za-z0-9_]+)/);
+  const m = String(url || "").match(/postype\.com\/@(\w+)/);
   return m ? m[1] : null;
 }
 
@@ -262,7 +262,8 @@ async function crawlHandle(handle, byWorkId) {
   let addedTotal = 0;
   let prevSize = -1;
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const url = `${ORIGIN}/@${handle}/series${page > 1 ? `?page=${page}` : ""}`;
+    const pageQuery = page > 1 ? `?page=${page}` : "";
+    const url = `${ORIGIN}/@${handle}/series${pageQuery}`;
     const html = await fetchText(url, { referer: ORIGIN + "/" });
     if (!html) break;
 

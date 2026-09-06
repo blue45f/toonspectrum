@@ -107,7 +107,8 @@ for (const asset of ASSETS) {
         assert.ok(offset+12+length<=png.length);
         assert.equal(crc32(png.subarray(offset+4,offset+8+length)),png.readUInt32BE(offset+8+length));
         if(type==='IDAT')chunks.push(png.subarray(offset+8,offset+8+length));
-        if(type==='IEND')ended=true; offset+=length+12;
+        if (type === "IEND") { ended = true; }
+        offset += length + 12;
       }
       assert.equal(ended,true); assert.equal(png.readUInt32BE(16),128); assert.equal(png.readUInt32BE(20),128);
       assert.equal(inflateSync(Buffer.concat(chunks)).length,(128*3+1)*128);
