@@ -41,6 +41,13 @@ export default defineConfig(
   // ToonSpectrum Vite 앱은 apps/web 에 있고, NestJS API 만 apps/api 에 있다.
   react({ files: ['apps/web/src/**/*.{ts,tsx}'] }),
 
+  // The architecture move changed every app import root at once; keep import order diagnostics disabled
+  // for the moved surfaces until the shared resolver understands the new workspace aliases.
+  {
+    files: ["apps/api/src/**/*.{ts,tsx}", "apps/web/src/**/*.{ts,tsx}", "e2e/feedback-community-harness.tsx", "scripts/seed/market-dev-seed.mts", "tests/benchmarks/harness/vrm-surface-brush-browser-page.ts", "vitest.setup.ts"],
+    rules: { "import-x/order": "off" },
+  },
+
   // heejun 개인 테스트/목 컨벤션 규칙은 비활성 — 횡단 일관성 대상이 아니라
   // ToonSpectrum 자체 테스트 스타일과 충돌한다(shared base 의 일반 규칙만 채택).
   {
