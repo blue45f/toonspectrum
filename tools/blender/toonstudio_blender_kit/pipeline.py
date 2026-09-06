@@ -611,7 +611,7 @@ def run_pipeline(
     # Declare stable sibling paths before serialising the report.  The report can
     # reference its manifest without hashing itself; the manifest is written only
     # after the final report bytes exist, so its qualityReport receipt is immutable.
-    outputs["qualityReport"] = QUALITY_REPORT_FILENAME
+    outputs["qualityReport"] = "quality-report.json"
     outputs["manifest"] = "character-package.json"
 
     score = calculate_score(issues)
