@@ -48,7 +48,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - run: pnpm install --frozen-lockfile
       - name: Scoped zero-warning lint
-        run: pnpm exec eslint scripts/upload-toonstudio-3d-assets.mts scripts/upload-toonstudio-3d-assets.test.mjs src/domains/creator/StudioContinuityPanel.hardening.test.tsx --max-warnings=0
+        run: pnpm exec eslint scripts/upload-toonstudio-3d-assets.mts scripts/upload-toonstudio-3d-assets.test.mjs src/domains/creator/StudioContinuityPanel.hardening.test.tsx src/domains/creator/StudioContinuityPanel.test.tsx --max-warnings=0
       - name: Register and execute the same contracts with root Vitest
         run: pnpm exec vitest run scripts/upload-toonstudio-3d-assets.test.mjs
       - name: Repeat quality-review teardown and upload regressions in shuffled order
