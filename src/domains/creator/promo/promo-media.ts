@@ -38,11 +38,13 @@ export async function importPromoPanel(file: File, index: number, signal?: Abort
 }
 export function promoRecorderMime(): string | null {
   if (typeof MediaRecorder === "undefined" || typeof HTMLCanvasElement === "undefined" || !HTMLCanvasElement.prototype.captureStream) return null;
-  return ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null;
+  // Prefer the lower-latency real-time encoder; VP9 remains a supported fallback.
+  return ["video/webm;codecs=vp8,opus", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null;
 }
 export interface PromoRecordingOptions { signal: AbortSignal; onProgress: (progress: number) => void; shortSide?: 720 | 1080 }
 /** Real-time browser recording, not a fake MP4/renamed WebM or a server render job. */
 export async function recordPromoVideo(project: PromoProject, { signal, onProgress, shortSide = 720 }: PromoRecordingOptions): Promise<Blob> {
+  if (signal.aborted) throw new DOMException("취소했어요.", "AbortError");
   const mimeType = promoRecorderMime();
   if (!mimeType) throw new Error("이 브라우저는 영상 저장을 지원하지 않아요. Remotion 프로젝트로 내보내 주세요.");
   if (!project.panels.length || document.hidden) throw new Error("컷을 추가하고 이 탭을 화면에 표시한 상태에서 저장해 주세요.");
@@ -50,7 +52,7 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
   const canvas = document.createElement("canvas");
   canvas.width = size.width;
   canvas.height = size.height;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) throw new Error("영상 캔버스를 만들지 못했어요.");
   let stream: MediaStream | null = null;
   let audioContext: AudioContext | null = null;
@@ -67,6 +69,8 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
     if (signal.aborted) throw new DOMException("취소했어요.", "AbortError");
     drawPromoFrame(ctx, project, images, 0, size.width, size.height);
     stream = canvas.captureStream(PROMO_FPS);
+    const videoTrack = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined;
+    if (!videoTrack) throw new Error("영상 캡처 트랙을 만들지 못했어요.");
     if (project.audio && audioContext) {
       const response = await fetch(project.audio.src, { signal });
       const audio = await audioContext.decodeAudioData(await response.arrayBuffer());
@@ -98,14 +102,24 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
         clearTimeout(watchdog);
         signal.removeEventListener("abort", abort);
         document.removeEventListener("visibilitychange", visibility);
+        activeRecorder.ondataavailable = null;
+        activeRecorder.onstop = null;
+        activeRecorder.onerror = null;
       };
       const finish = (error?: Error) => {
+        if (settled) return;
+        // stop() flushes data asynchronously. Preserve failures arriving before onstop.
+        if (error) failure ??= error;
         if (finished) return;
         finished = true;
-        failure = error ?? null;
         cancelAnimationFrame(raf);
-        if (activeRecorder.state !== "inactive") activeRecorder.stop();
-        else settle();
+        try {
+          if (activeRecorder.state !== "inactive") activeRecorder.stop();
+          else settle();
+        } catch {
+          failure ??= new Error("영상 녹화를 안전하게 종료하지 못했어요.");
+          settle();
+        }
       };
       const settle = () => {
         if (settled) return;
@@ -113,13 +127,15 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
         cleanup();
         if (failure) reject(failure);
         else if (!finished || !chunks.length) reject(new Error("영상 녹화가 예상보다 일찍 종료되었어요. 다시 시도해 주세요."));
-        else { onProgress(1); resolve(new Blob(chunks, { type: activeRecorder.mimeType || mimeType })); }
+        else {
+          try { onProgress(1); resolve(new Blob(chunks, { type: activeRecorder.mimeType || mimeType })); }
+          catch { reject(new Error("영상 파일을 마무리하지 못했어요.")); }
+        }
       };
       const abort = () => finish(new DOMException("취소했어요.", "AbortError"));
-      const visibility = () => { if (document.hidden) finish(new Error("다른 탭으로 이동해 녹화를취소했어요. 정확한 영상 저장을 위해 이 탭을 유지해 주세요.")); };
+      const visibility = () => { if (document.hidden) finish(new Error("다른 탭으로 이동해 녹화를 취소했어요. 정확한 영상 저장을 위해 이 탭을 유지해 주세요.")); };
       const watchdog = setTimeout(() => {
-        failure = new Error("영상 저장 제한 시간을 초과했어요.");
-        finish(failure);
+        finish(new Error("영상 저장 제한 시간을 초과했어요."));
         settle();
       }, (project.seconds + 15) * 1000);
       const tick = () => {
@@ -129,7 +145,16 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
           drawPromoFrame(ctx, project, images, Math.min(total - 1, frame), size.width, size.height);
           if (audioGain && audioContext) audioGain.gain.setValueAtTime(promoAudioGain(Math.min(total - 1, frame), total, project.audio?.volume ?? 0), audioContext.currentTime);
           onProgress(Math.min(0.99, frame / total));
-          if (frame >= total) { finish(); return; }
+          if (frame >= total) {
+            // Canvas capture happens when the canvas is painted, after this callback.
+            // Let the ending frame reach the track before stopping the recorder.
+            videoTrack.requestFrame?.();
+            raf = requestAnimationFrame(() => {
+              if (finished) return;
+              raf = requestAnimationFrame(() => finish());
+            });
+            return;
+          }
           raf = requestAnimationFrame(tick);
         } catch { finish(new Error("영상 프레임을 처리하지 못했어요.")); }
       };
@@ -151,7 +176,8 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
       } catch { finish(new Error("영상 녹화를 시작하지 못했어요.")); }
     });
   } finally {
-    if (recorder && recorder.state !== "inactive") recorder.stop();
+    try { if (recorder && recorder.state !== "inactive") recorder.stop(); }
+    catch { /* Still release the underlying media tracks when the encoder cannot stop. */ }
     stream?.getTracks().forEach((track) => track.stop());
     if (audioSource) { try { audioSource.stop(); } catch { /* A cancelled setup may not have started it. */ } audioSource.disconnect(); }
     audioGain?.disconnect();

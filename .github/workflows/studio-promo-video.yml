@@ -8,6 +8,9 @@ on:
       - 'src/domains/creator/ai/StudioAiProductionLaunchpad.tsx'
       - 'e2e/studio-promo.spec.ts'
       - 'tools/browser-harnesses/promo-e2e.html'
+      - 'tools/verify-studio-promo-recording.mjs'
+      - 'tools/verify-studio-promo-preview.mjs'
+      - 'tools/verify-studio-promo-output.py'
       - '.github/workflows/studio-promo-video.yml'
 permissions:
   contents: read
@@ -29,6 +32,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Recording and preview lifecycle regressions (mocked boundaries)
+        run: |
+          node tools/verify-studio-promo-recording.mjs
+          node tools/verify-studio-promo-preview.mjs
+          python3 tools/verify-studio-promo-output.py --self-test
       - run: pnpm exec vitest run src/domains/creator/promo/promo-model.test.ts
       - run: pnpm exec eslint src/domains/creator/promo src/app/routes/groups/creator.routes.tsx src/domains/creator/ai/StudioAiProductionLaunchpad.tsx e2e/studio-promo.spec.ts --max-warnings=0
       - run: pnpm exec playwright install --with-deps chromium
@@ -62,6 +70,8 @@ jobs:
           assert any(s['codec_type'] == 'audio' for s in data['streams'])
           print('Validated 450 frames, 30 fps, 15 seconds, H.264 + audio')
           PY
+      - name: Verify native recording reaches the ending with synchronized audio
+        run: python3 tools/verify-studio-promo-output.py --results test-results --remotion "${{ runner.temp }}/promo-render/out/promo.mp4"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
