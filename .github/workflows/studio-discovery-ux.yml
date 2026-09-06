@@ -75,10 +75,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build:bundle
+      - name: Require the production manifest used by SQLite durability checks
+        run: test -s dist/.vite/manifest.json
       - uses: actions/upload-artifact@v6
         with:
           name: studio-discovery-dist
           path: dist
+          include-hidden-files: true
           retention-days: 2
 
   browser:
@@ -110,6 +113,8 @@ jobs:
         with:
           name: studio-discovery-dist
           path: dist
+      - name: Confirm the downloaded production manifest is present
+        run: test -s dist/.vite/manifest.json
       - name: Real component responsive keyboard and production editor integration
         if: matrix.suite == 'discovery'
         run: pnpm exec tsx scripts/verify-studio-discovery-ux.mts
