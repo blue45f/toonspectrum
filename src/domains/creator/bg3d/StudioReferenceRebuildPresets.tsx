@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
+import { createStudioReferenceRebuildWorker } from "./studio-reference-rebuild-worker-client";
+
 const PRESETS = [
   ["school-room", "채광 교실"],
   ["school-desk", "책걸상 세트"],
@@ -46,10 +48,8 @@ export function StudioReferenceRebuildPresets({ disabled, onFile, onBusyChange }
 
   const build = (): void => {
     if (disabled || operation.current || !PRESETS.some(([id]) => id === selected)) return;
-    let worker: Worker;
-    try {
-      worker = new Worker("/assets/reference-rebuild/worker.mjs", { type: "module" });
-    } catch {
+    const worker = createStudioReferenceRebuildWorker();
+    if (!worker) {
       setMessage("모델 생성 Worker를 열지 못했습니다. 검토실의 GLB 저장을 이용해 주세요.");
       return;
     }
