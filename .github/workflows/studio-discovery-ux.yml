@@ -9,12 +9,22 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'src/domains/creator/**'
+      - 'src/domains/creator/brush/**'
+      - 'src/domains/creator/filter/**'
+      - 'src/domains/creator/studio-tool-search*'
+      - 'src/domains/creator/studio-brush.ts'
+      - 'src/domains/creator/studio-creative-ux.ts'
+      - 'src/domains/creator/studio-basic-brush-expansion.test.ts'
+      - 'src/domains/creator/StudioUnifiedBrushPicker.test.tsx'
       - 'scripts/verify-studio-discovery-ux.mts'
       - '.github/workflows/studio-discovery-ux.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: studio-discovery-ux-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:

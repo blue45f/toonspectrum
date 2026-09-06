@@ -1,8 +1,7 @@
 name: Recover verified wearable source and content-addressed requests
 on:
-  push:
-    branches: [fix/studio-wearable-quality-audit-20260906]
-    paths: ['.github/workflows/studio-wearable-apply.yml']
+  # Source recovery and writes are explicit operator actions, never PR or branch-push work.
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
