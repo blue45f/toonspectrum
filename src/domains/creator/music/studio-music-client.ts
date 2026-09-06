@@ -1,7 +1,8 @@
+import type { MusicBrief, MusicStatus, MusicTrackMetadata } from "@/lib/studio-music";
+
 import { isMp3, MUSIC_MAX_BYTES, MUSIC_TERMS_URL, parseMusicBrief } from "@/lib/studio-music";
 import { api } from "@/src/infrastructure/api";
 
-import type { MusicBrief, MusicStatus, MusicTrackMetadata } from "@/lib/studio-music";
 
 export interface LocalMusicTrack { metadata: MusicTrackMetadata; audio: Blob; ownerId: string }
 export async function getMusicStatus(signal: AbortSignal): Promise<MusicStatus> {

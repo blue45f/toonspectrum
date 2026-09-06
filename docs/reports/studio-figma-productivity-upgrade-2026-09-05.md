@@ -59,6 +59,31 @@ Figma는 같은 Properties, Fill, Stroke, Effect, Text properties, Font, Instanc
 
 - https://help.figma.com/hc/en-us/articles/360040449873-Select-layers-and-objects
 
+### 1.3 레이어 일괄 이름 변경
+
+복수 선택 전용 Inspector에 미리보기 기반 Batch Rename을 추가했다.
+
+- 형식 토큰: `{n}` 번호, `{type}` 요소 유형, `{name}` 현재 이름
+- 번호 제어: 시작값, 증가값, 1~6자리 0 패딩
+- 순서 기준: 레이어 위→아래, 레이어 아래→위, 캔버스 위→아래, 캔버스 왼쪽→오른쪽
+- 찾기·바꾸기: 전체 치환, 대소문자 구분 선택
+- 미리보기: 적용 전 최대 5개 결과와 나머지 개수 표시
+- 충돌 안내: 이번 변경으로 생기는 중복 이름만 경고
+- 원자성: 잠긴 멤버, 사라진 선택 ID, 0 증가값, 빈 결과 이름이 있으면 전체 거부
+- 문서 효율: 선택 밖 요소는 객체 참조를 유지해 불필요한 CRDT diff 방지
+- 기록: 전체 이름 변경을 한 번의 `commit`과 한 Undo/Redo 단계로 처리
+- 접근성: 실제 disclosure 계약, live status, 고유 control ID, 44px 터치 타깃 적용
+
+관련 구현:
+
+- `src/domains/creator/studio-batch-rename.ts`
+- `src/domains/creator/StudioInspectorBatchRenameSection.tsx`
+- `src/domains/creator/StudioInspectorMultiSelectionSection.tsx`
+
+Figma Rename layers 참고:
+
+- https://help.figma.com/hc/en-us/articles/360039958934-Rename-Layers
+
 ## 2. 현재 Studio에 이미 있는 대응 기능
 
 | Figma 계열 기능 | Studio 상태 | 판단 |
@@ -67,6 +92,7 @@ Figma는 같은 Properties, Fill, Stroke, Effect, Text properties, Font, Instanc
 | 숫자 X/Y/W/H/회전/불투명도 | 단일 선택 구현 + 이번에 복수 선택 확장 | 이번 완료 |
 | 복수 선택 정렬·분배·순서·복제·삭제 | 이번에 Inspector 공용 액션으로 통합 | 이번 완료 |
 | 같은 속성 선택 | 유형·외형·조판·원본 기준 구현 | 이번 완료 |
+| 레이어 일괄 이름 변경 | 형식·번호·순서·치환·미리보기 구현 | 이번 완료 |
 | Zoom to selection | 구현됨 | 유지 |
 | 선택 중심 Flip | 구현됨 | 유지 |
 | Smart layout 자동 수정 | `studio-smart-layout-auto-fix.ts` 구현 | 웹툰 패널·식자 흐름으로 계속 특화 |
@@ -79,22 +105,6 @@ Figma는 같은 Properties, Fill, Stroke, Effect, Text properties, Font, Instanc
 협업 세부 현황과 서버 선행조건은 `docs/studio-figma-collaboration-benchmark-2026-07-13.md`를 따른다.
 
 ## 3. 추가 가치가 큰 기능 검토
-
-### P0 — 레이어 일괄 이름 변경
-
-Figma는 선택한 레이어의 이름을 문자열 치환, 번호 삽입, 증감 순서, 미리보기와 함께 일괄 변경한다.
-
-- https://help.figma.com/hc/en-us/articles/360039958934-Rename-Layers
-
-Studio 적용안:
-
-- `컷 01`, `컷 02`, `대사 001`처럼 자릿수 지정 번호
-- 앞/뒤 문자열 추가와 검색·치환
-- 위→아래, 아래→위, 레이어 순서 기준 번호
-- 적용 전 충돌·빈 이름·중복 이름 미리보기
-- 한 번의 배치 변경을 한 Undo 및 한 협업 커밋으로 기록
-
-현재 단일 이름 변경 권위는 있으나 배치 원자 커밋 계약이 없다. 반복 rename 액션으로 임시 구현하면 Undo가 레이어 수만큼 쪼개지므로, `studio-layer-operations`에 원자 배치 rename 계획기를 먼저 추가한 뒤 UI를 연결한다.
 
 ### P1 — 웹툰 스타일 변수와 Mode
 
@@ -152,7 +162,7 @@ Studio 적용안:
 | P0 | 숫자 Multi-edit | 반복 배치·크기 통일·회전 작업 즉시 단축 | 낮음: 기존 변형 권위 재사용 | 이번 완료 |
 | P0 | 복수 선택 공용 액션 | Inspector 왕복과 메뉴 탐색 감소 | 낮음: 기존 명령 경로 재사용 | 이번 완료 |
 | P0 | 같은 속성 선택 | 대규모 회차 일괄 수정의 핵심 진입점 | 중간: 의미 비교 키 필요 | 이번 완료 |
-| P0 | 레이어 일괄 이름 변경 | 컷·식자·에셋 정리 시간 단축 | 중간: 원자 배치 rename 필요 | 다음 안전 단계 |
+| P0 | 레이어 일괄 이름 변경 | 컷·식자·에셋 정리 시간 단축 | 중간: 원자 배치 계획 필요 | 이번 완료 |
 | P1 | 스타일 변수/Mode | 작품 전역 룩·식자 일관성 | 중상: 문서 스키마·공유 권한 | 토큰 권위 설계 후 |
 | P1 | Component/Variant/Instance | 반복 요소 재사용과 원본 갱신 | 높음: override·분리·병합 | 독립 문서 모델로 |
 | P2 | Branch/Review/Merge | 편집부 협업과 대안 관리 | 매우 높음: 서버 revision 필수 | 영속 버전 이후 |
@@ -182,5 +192,14 @@ Studio 적용안:
 - 안정 에셋 ID가 있으면 데이터 URL보다 우선한다.
 - 공유 숨김 및 로컬 숨김 요소는 선택 후보에서 제외한다.
 - 결과는 기존 캔버스·레이어 선택 어댑터로만 반영한다.
+
+### Batch rename
+
+- 형식 토큰, 번호 시작·증가·자릿수, 네 가지 정렬 순서가 미리보기와 실제 결과에서 동일하다.
+- 찾기·바꾸기는 전체 일치와 대소문자 구분을 정확히 처리한다.
+- 잠금, 오래된 선택 ID, 0 증가값, 빈 결과 이름은 전체를 거부한다.
+- 기존 문서의 무관한 이름 중복은 경고하지 않고 이번 변경으로 충돌하는 결과만 경고한다.
+- 적용은 한 번의 문서 커밋이며 선택 밖 요소 참조가 유지된다.
+- disclosure 상태, live status, control ID, 우선순위, 터치 타깃이 Inspector 접근성 계약을 충족한다.
 
 순수 계획기, Inspector DOM, 선택 경계, 접근성, 전체 Vitest, 타입 검사, 린트, 프로덕션 빌드와 Studio 런타임 CI가 통과해야 완료한다.

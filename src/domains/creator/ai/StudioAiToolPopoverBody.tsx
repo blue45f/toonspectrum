@@ -24,7 +24,11 @@ import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 import { pushStudioAiRecentPrompt } from "./studio-ai-assist-ux";
 import { isStudioAiConfigured } from "./studio-ai-client";
+import { requestStudioAiEpisodeProductionOpen } from "./studio-ai-episode-production-intent";
+import { preloadStudioAiEpisodeProductionModal } from "./studio-ai-episode-production-loader";
 import { requestStudioAiSuperSuiteOpen } from "./studio-ai-super-suite-intent";
+import { preloadStudioAiSuperSuiteModal } from "./studio-ai-super-suite-loader";
+import { StudioAiEpisodeProductionGateway } from "./StudioAiEpisodeProductionGateway";
 import { StudioAiSuperSuiteGateway } from "./StudioAiSuperSuiteGateway";
 
 import type { StudioMenu } from "../studio-editor-tool-model";
@@ -32,6 +36,8 @@ import type { StudioServerAiProviderPreference } from "../studio-server-ai-clien
 import type { StudioToolBeltContentProps } from "../StudioToolBeltContent";
 
 import { useT } from "@/lib/i18n";
+
+
 
 export interface StudioAiToolPopoverBodyProps {
   readonly toolBelt: StudioToolBeltContentProps;
@@ -111,10 +117,36 @@ export function StudioAiToolPopoverBody({
     updateServerAiProvider,
   } = toolBelt.stableHandlers;
 
-  const applySuperSuitePrompt = (prompt: string) => {
-    setAiAssistTool("background");
-    setAiBgPrompt(prompt);
+  const applyEpisodeBatchPrompt = (prompt: string) => {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    setAiAssistTool("composition");
+    setAiCompositionDraft(trimmed);
+    setAiRecentPrompts(
+      pushStudioAiRecentPrompt(globalThis.sessionStorage, "composition", trimmed)
+    );
     setMenu("aiAssist");
+    announceDrawingShortcut(
+      "회차 프로덕션의 첫 배치 프롬프트를 구도 제안 도구에 적용했어요."
+    );
+  };
+
+  const applySuperSuitePrompt = (prompt: string) => {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    const target = aiAssistTool === "character" ? "character" : "background";
+    if (target === "character") setAiCharacterPrompt(trimmed);
+    else setAiBgPrompt(trimmed);
+    setAiAssistTool(target);
+    setAiRecentPrompts(
+      pushStudioAiRecentPrompt(globalThis.sessionStorage, target, trimmed)
+    );
+    setMenu("aiAssist");
+    announceDrawingShortcut(
+      target === "character"
+        ? "슈퍼 스위트 프롬프트를 캐릭터 생성 도구에 적용했어요."
+        : "슈퍼 스위트 프롬프트를 배경 생성 도구에 적용했어요."
+    );
   };
 
   return (
@@ -123,7 +155,7 @@ export function StudioAiToolPopoverBody({
         icon={WandSparkles}
         title={lt("AI 연동", "studio.aiToolPopover.title")}
         description={lt(
-          "초안·스톡·시나리오를 연결하고, 키 설정은 연동 탭에서 관리합니다.",
+          "회차 제작·초안·스톡·시나리오를 연결하고, 키 설정은 연동 탭에서 관리합니다.",
           "studio.aiToolPopover.description"
         )}
         className="shrink-0"
@@ -152,7 +184,7 @@ export function StudioAiToolPopoverBody({
             id: "aiAssist",
             label: lt("어시스트", "studio.aiToolPopover.tabAssist"),
             icon: Sparkles,
-            title: lt("BYOK 배경·캐릭터·구도 제안", "studio.aiToolPopover.tabAssistTitle"),
+            title: lt("회차 제작·배경·캐릭터·구도 제안", "studio.aiToolPopover.tabAssistTitle"),
           },
           {
             id: "scenario",
@@ -210,19 +242,22 @@ export function StudioAiToolPopoverBody({
                 setMenu("integrations");
               }}
               onPreloadSettings={preloadStudioIntegrationsSettingsPanel}
+              onOpenEpisodeProduction={() => requestStudioAiEpisodeProductionOpen()}
+              onPreloadEpisodeProduction={preloadStudioAiEpisodeProductionModal}
+              onPreloadSuperSuite={preloadStudioAiSuperSuiteModal}
               recentState={aiRecentPrompts}
               onApplyPresetPrompt={applyAiAssistPresetPrompt}
-                  onOpenScenario={() => {
-                    if (masterEditMode) return;
-                    setScenarioOpen(true);
-                    setMenu(null);
-                  }}
-                  scenarioDisabled={masterEditMode}
-                  scenarioDisabledReason="마스터 편집 중에는 시나리오 제작을 사용할 수 없어요."
-                  onOpenSuperSuite={() => {
-                    requestStudioAiSuperSuiteOpen();
-                  }}
-                  providerSlot={
+              onOpenScenario={() => {
+                if (masterEditMode) return;
+                setScenarioOpen(true);
+                setMenu(null);
+              }}
+              scenarioDisabled={masterEditMode}
+              scenarioDisabledReason="마스터 편집 중에는 시나리오 제작을 사용할 수 없어요."
+              onOpenSuperSuite={() => {
+                requestStudioAiSuperSuiteOpen();
+              }}
+              providerSlot={
                 textAiTransport.mode === "server" && configuredServerAiProviders.length > 0 ? (
                   <div className="rounded-xl border border-line bg-card/35 p-2.5">
                     <label className="flex items-center justify-between gap-2 text-xs font-semibold text-fg-2">
@@ -416,6 +451,9 @@ export function StudioAiToolPopoverBody({
           </Suspense>
         </div>
       )}
+
+      <StudioAiEpisodeProductionGateway onApplyPrompt={applyEpisodeBatchPrompt} />
+
       <StudioAiSuperSuiteGateway onApplyPrompt={applySuperSuitePrompt} />
     </>
   );
