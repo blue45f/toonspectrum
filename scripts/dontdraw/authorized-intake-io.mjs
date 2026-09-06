@@ -83,7 +83,7 @@ export async function stagePrivateBundle(destination, populate) {
     try {
       // Do not traverse a substituted output path or recursively remove its unrelated contents.
       if (!identity || !sameDirectory(identity, await lstat(destination, { bigint: true }))) {
-        throw new Error("Output ownership changed; cleanup was not attempted");
+        throw new Error("Output ownership changed; cleanup was not attempted", { cause: error });
       }
       if (temporary) await rm(temporary, { recursive: true, force: true });
       try {
