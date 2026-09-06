@@ -157,12 +157,20 @@ forbidPaths(
     "qa-results",
     "scripts/qa/runs",
     "docs/merge-preservation",
+    "docs/learn/merge-blocker-followup.md",
     "scripts/marketplace",
+    "scripts/apply-blender-source-aware-quality.py",
+    "scripts/fix-blender-orion-capability-audit.py",
+    "scripts/zz-fable-probe.mts",
+    "marketplace-benchmark/.route-marker",
+    "marketplace-benchmark/.upload-probe.txt",
+    "marketplace-benchmark/.upload-route-readme.md",
   ],
   "ephemeral receipt or completed migration path belongs outside maintained source",
 );
 
 const forbiddenOneOffWorkflows = [
+  "apply-blender-production-migrations.yml",
   "architecture-merge-gate-v3-pr690.yml",
   "finalize-fixed-all-branch-integration.yml",
   "merge-all-branches-fixed-integration.yml",
