@@ -877,6 +877,7 @@ export function StudioCommentThreadPopover({
                 aria-readonly={submitting || pendingMutation !== null}
                 aria-describedby={`${hintId} ${countId}${replyRestriction ? ` ${restrictionId}` : ""}${error || syncError ? ` ${errorId}` : ""}${notice ? ` ${noticeId}` : ""}`}
                 placeholder={thread.resolved ? "다시 열면 답글을 남길 수 있어요." : "답글을 입력하세요."}
+                aria-keyshortcuts="Control+Enter Meta+Enter"
                 onChange={(event) => {
                   onReplyBodyChange(
                     thread.id,

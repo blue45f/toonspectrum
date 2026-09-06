@@ -20,7 +20,9 @@ describe("Studio focused comment inbox integration", () => {
   });
 
   it("supports fast keyboard submission without taking Enter away from multiline editing", () => {
-    expect(commentsPanelSource.match(/aria-keyshortcuts="Control\+Enter Meta\+Enter"/g)).toHaveLength(2);
+    // 새 댓글 작성기와 핀 빠른 답글은 등록 단축키만 갖고, 검수 레일 답글은 Esc 취소까지 노출한다.
+    expect(commentsPanelSource.match(/aria-keyshortcuts="Control\+Enter Meta\+Enter"/g)).toHaveLength(1);
+    expect(commentsPanelSource).toContain('aria-keyshortcuts="Meta+Enter Control+Enter Escape"');
     expect(threadPopoverSource).toContain('aria-keyshortcuts="Control+Enter Meta+Enter"');
     expect(commentsPanelSource).toContain("event.currentTarget.form?.requestSubmit()");
     expect(threadPopoverSource).toContain("event.currentTarget.form?.requestSubmit()");
