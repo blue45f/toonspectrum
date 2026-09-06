@@ -8,14 +8,17 @@ import { chromium } from "playwright";
 
 import { STUDIO_FILTER_DIALOG_CATALOG } from "../apps/web/src/domains/creator/filter/studio-filter-catalog";
 
+import { WEB_ROOT } from "./lib/repo-paths.mjs";
 import { findFreePort, spawnVitePreview, stopChildProcess, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 import type { Page } from "playwright";
 
 const output = process.env.STUDIO_DISCOVERY_QA_DIR ?? "/tmp/studio-discovery-ux";
 mkdirSync(output, { recursive: true });
-const html = "studio-discovery-qa.html";
-const entry = "studio-discovery-qa.tsx";
+const htmlName = "studio-discovery-qa.html";
+const entryName = "studio-discovery-qa.tsx";
+const html = join(WEB_ROOT, htmlName);
+const entry = join(WEB_ROOT, entryName);
 const runtimeErrors: string[] = [];
 const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[]; failure?: string } = { checks: [], runtimeErrors, screenshots: [] };
 const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
@@ -27,9 +30,9 @@ writeFileSync(html, '<!doctype html><html lang="ko" class="dark"><head><meta cha
 writeFileSync(entry, `
 import {useState} from "react";
 import {createRoot} from "react-dom/client";
-import "../apps/web/src/styles/globals.css";
-import {StudioSubToolPalette} from "../apps/web/src/domains/creator/brush/StudioSubToolPalette";
-import {studioSubToolPaletteCategoryIdForBrushId} from "../apps/web/src/domains/creator/brush/studio-sub-tool-palette-data";
+import "./src/styles/globals.css";
+import {StudioSubToolPalette} from "./src/domains/creator/brush/StudioSubToolPalette";
+import {studioSubToolPaletteCategoryIdForBrushId} from "./src/domains/creator/brush/studio-sub-tool-palette-data";
 function App(){
   const [category,setCategory]=useState("pen");
   const [selected,setSelected]=useState("gpen");
@@ -63,7 +66,7 @@ try {
     const context = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 1 });
     const page = await context.newPage();
     watch(page);
-    await page.goto(`${devOrigin}/${html}`, { waitUntil: "networkidle" });
+    await page.goto(`${devOrigin}/${htmlName}`, { waitUntil: "networkidle" });
     const palette = page.locator('[data-studio-subtool-palette="true"]');
     await palette.waitFor({ state: "visible" });
     assert.equal(await palette.getByRole("tab").count(), 6);
