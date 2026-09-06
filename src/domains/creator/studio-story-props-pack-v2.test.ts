@@ -47,16 +47,10 @@ const QUALITY_GATES: readonly QualityGate[] = [
     minEmissiveMaterials: 2,
     requiredNodes: ["Chest_Base", "Lid_ArchedWood", "Lock_Rune", "Corner_SoulGem_1"],
   },
-  {
-    filename: "modern_smartphone_prop.glb",
-    assetId: "modern_smartphone_prop_v2",
-    minBytes: 150 * 1024,
-    minNodes: 16,
-    minMaterials: 6,
-    minTriangles: 3_000,
-    minEmissiveMaterials: 3,
-    requiredNodes: ["Phone_Chassis", "Phone_OLED", "Rear_CameraIsland", "CameraLens_1"],
-  },
+  // modern_smartphone_prop.glb left this Blender pack in 1aa838087 (PR #803): the wearable pack v5
+  // regenerated it with scripts/generate-studio-wearable-v5.mts (7 nodes, no emissive OLED
+  // materials, no asset_id extras), pinned its SHA-256 in wearable-v5-manifest.json and
+  // vrm/studio-vrm-prop-asset-revisions.ts, and gates it in vrm/studio-vrm-wearable-v5.test.ts.
   {
     filename: "cyber_glasses.glb",
     assetId: "cyber_glasses_v2",
