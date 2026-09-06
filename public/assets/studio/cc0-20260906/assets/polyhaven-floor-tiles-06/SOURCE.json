@@ -1,0 +1,89 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/floor_tiles_06",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 1,
+    "date_published": 1538356638,
+    "name": "Floor Tiles 06",
+    "categories": [
+      "floor",
+      "indoor",
+      "clean",
+      "man made"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      3000,
+      3000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "22b151bef1f180591e0d306e551fb15e4bdf2990",
+    "tags": [
+      "marble",
+      "tiles",
+      "checkerboard",
+      "checkered",
+      "floor",
+      "tiled",
+      "square tiles",
+      "dirty"
+    ],
+    "description": "Free 8K texture of checkered marble floor tiles - alternating brown and beige squares with subtle veining, thin grout lines, light wear, scuffs and low gloss.",
+    "category_id": "332a7c92-1556-5937-b7a9-8a0f52d20df4",
+    "category": "Stone/Slabs & Tiles/Marble",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "indoor"
+    },
+    "download_count": 172425,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/floor_tiles_06.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_06/floor_tiles_06_diff_2k.jpg",
+      "bytes": 1394898,
+      "sha256": "fe326c219d096e8f5d31c9be6da5a617f34c58b3042d0733f7d4450a38906b37",
+      "sourceMd5": "72e61a5a191b4d5f1889a51598e481c2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_06/floor_tiles_06_rough_2k.jpg",
+      "bytes": 483344,
+      "sha256": "9b8058cb0f471db05bca1ca47fa9190ea6c31a1684c93c17123e4ecfa2d70e28",
+      "sourceMd5": "f033300454b582486675a87006cf2cf2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_06/floor_tiles_06_nor_gl_2k.jpg",
+      "bytes": 1010594,
+      "sha256": "930ee26e4018f0d44d8f011b364b141c7ccf02bd3e47b85e591cbbaeb9f47046",
+      "sourceMd5": "07aded52ddd8758b4703cbd831c5b17d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_06/floor_tiles_06_ao_2k.jpg",
+      "bytes": 1109365,
+      "sha256": "b2ff3e6d1ceb30689aa803eb04b58b9b550ad79db0a94b69896157f2657a3238",
+      "sourceMd5": "16e7ff88668e9f273982950f8133287b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_06/floor_tiles_06_disp_2k.jpg",
+      "bytes": 358381,
+      "sha256": "56a920b67b41556f48a67ddf2ee05ea4b5d6f5749663bcd5f53ac65be876e332",
+      "sourceMd5": "0a8c3e308f08ce56435f6d3d552b1172"
+    }
+  ]
+}

@@ -11,15 +11,15 @@ import {
 } from "./studio-original-free-asset-packs";
 
 describe("ToonSpectrum original free starter asset packs", () => {
-  it("ships four distinct packages and 32 unique original SVG assets", () => {
-    expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(4);
-    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(32);
+  it("ships three selectable packages and 24 unique non-blockout SVG assets", () => {
+    expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(3);
+    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(24);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.map((pkg) => pkg.id)).size)
-      .toBe(4);
+      .toBe(3);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSETS.map((asset) => asset.id)).size)
-      .toBe(32);
+      .toBe(24);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSETS.map((asset) => asset.contentFingerprint)).size)
-      .toBe(32);
+      .toBe(24);
   });
 
   it("makes provenance and CC0-safe rights explicit at package and item level", () => {
@@ -61,7 +61,7 @@ describe("ToonSpectrum original free starter asset packs", () => {
 
   it("searches across Korean names and tags and intersects package/category filters", () => {
     expect(filterStudioOriginalFreeAssets({ query: "병원" }).map((asset) => asset.id))
-      .toEqual(["original-clinic-waiting-room"]);
+      .toEqual([]); // The blockout remains resolvable by ID, but is not a new-selection result.
     expect(filterStudioOriginalFreeAssets({
       query: "오버레이",
       categories: ["atmosphere-fx"],

@@ -1,0 +1,19 @@
+{
+  "scope": "actual-component-with-bundled-files",
+  "steps": [
+    "lazy loading and detailed originals first",
+    "component inclusion changes 46 to 47 without losing originals",
+    "actual enlarged preview Escape and focus return",
+    "actual same-origin GLB download verified by SHA-256",
+    "real WebP hash/decode/dimensions/rights insertion; success-only dismissal",
+    "Korean search and empty state",
+    "390px mobile layout without horizontal overflow or page errors"
+  ],
+  "inserted": {
+    "width": 2048,
+    "height": 2048,
+    "license": "CC0-1.0"
+  },
+  "errors": [],
+  "fullEditorRoundTrip": false
+}

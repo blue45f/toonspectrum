@@ -1,3 +1,4 @@
+import { createStudioAbortableSerialQueue } from "./studio-abortable-serial-queue";
 import {
   assertStudioRetouchWorkerRequest,
   STUDIO_RETOUCH_DIRECT_MAX_IMAGE_PIXELS,
@@ -18,6 +19,8 @@ export interface StudioRetouchWorkerLike {
         preventDefault?(): void;
       }) => void)
     | null;
+  /** Structured-clone receive errors are separate from Worker execution errors. */
+  onmessageerror?: ((event: MessageEvent<unknown>) => void) | null;
   postMessage(message: StudioRetouchWorkerRunMessage, transfer: Transferable[]): void;
   terminate(): void;
 }
@@ -92,7 +95,39 @@ function cloneSafeRequest(
     && data.byteLength === data.buffer.byteLength
     ? data
     : new Uint8ClampedArray(data);
-  return { ...request, data: transferable } as StudioRetouchWorkerRunRequest;
+  // Own the small mutable journal/settings before any asynchronous queue or ready wait.
+  // Do not spread caller objects: incidental UI functions are not structured-cloneable, and
+  // changing a shared paintColor must not recolor an earlier, already admitted stroke.
+  // Pixel buffers keep the existing dedicated-transfer/subarray-copy ownership contract.
+  const raster = {
+    data: transferable,
+    w: request.w,
+    h: request.h,
+    points: request.points.map(({ x, y }) => ({ x, y })),
+  };
+  if (request.kind === "dodge-burn") {
+    const { radiusPx, hardness, exposure, mode, range, sponge } = request.settings;
+    return {
+      ...raster,
+      kind: request.kind,
+      settings: { radiusPx, hardness, exposure, mode, range, sponge },
+    };
+  }
+  const {
+    radiusPx, hardness, strength, wetness, pickup, paintColor,
+    loadDepletion, initialLoad, mixModel,
+  } = request.settings;
+  return {
+    ...raster,
+    kind: request.kind,
+    settings: {
+      radiusPx, hardness, strength, wetness, pickup,
+      paintColor: { r: paintColor.r, g: paintColor.g, b: paintColor.b },
+      ...(loadDepletion === undefined ? {} : { loadDepletion }),
+      ...(initialLoad === undefined ? {} : { initialLoad }),
+      ...(mixModel === undefined ? {} : { mixModel }),
+    },
+  };
 }
 
 function runRetouchDirect(
@@ -147,6 +182,7 @@ function runRetouchWithWorker(
       lifecycle.disposeSignal?.removeEventListener("abort", onAbort);
       worker.onmessage = null;
       worker.onerror = null;
+      worker.onmessageerror = null;
       if (!keepWorker) worker.terminate();
     };
     const finish = (callback: () => void, keepWorker = false) => {
@@ -187,6 +223,7 @@ function runRetouchWithWorker(
     };
 
     worker.onmessage = (event) => {
+      if (settled) return;
       const response = event.data;
       if (
         !response
@@ -248,6 +285,8 @@ function runRetouchWithWorker(
       finish(() => reject(error));
     };
 
+    worker.onmessageerror = () => rejectWorkerUnavailable("리터치 Worker 응답을 읽지 못했습니다.");
+
     signal?.addEventListener("abort", onAbort, { once: true });
     lifecycle.disposeSignal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted || lifecycle.disposeSignal?.aborted) {
@@ -269,7 +308,10 @@ let sharedRetouchWorker: StudioRetouchWorkerLike | null = null;
 let sharedRetouchWorkerReady = false;
 let sharedRetouchWorkerEpoch = 0;
 let sharedRetouchDisposeGeneration = 0;
-let sharedRetouchQueue: Promise<void> = Promise.resolve();
+const sharedRetouchQueue = createStudioAbortableSerialQueue<
+  StudioRetouchWorkerRunRequest,
+  StudioRetouchWorkerClientResult
+>();
 let sharedRetouchIdleTimer: ReturnType<typeof setTimeout> | null = null;
 let sharedRetouchFlight: {
   readonly worker: StudioRetouchWorkerLike;
@@ -296,6 +338,7 @@ export function disposeStudioRetouchModuleWorker(): void {
   sharedRetouchWorkerEpoch += 1;
   sharedRetouchDisposeGeneration += 1;
   sharedRetouchFlight = null;
+  sharedRetouchQueue.cancelPending();
   flight?.controller.abort();
   if (worker && !flightOwnsWorker) worker.terminate();
 }
@@ -338,11 +381,12 @@ function runRetouchWithSharedModuleWorker(
   options: StudioRetouchWorkerClientOptions,
 ): Promise<StudioRetouchWorkerClientResult> {
   const disposeGeneration = sharedRetouchDisposeGeneration;
-  clearSharedRetouchIdleTimer();
-  const operation = sharedRetouchQueue.then(async () => {
-    clearSharedRetouchIdleTimer();
+  return sharedRetouchQueue.run(request, async (queuedRequest) => {
     if (disposeGeneration !== sharedRetouchDisposeGeneration) throw createAbortError();
     throwIfAborted(options.signal);
+    // Admission can be cancelled before this executor starts. Keep the warm Worker's idle
+    // deadline until live work actually takes ownership, including the queue handoff microtask.
+    clearSharedRetouchIdleTimer();
     let creationError: unknown;
     if (!sharedRetouchWorker) {
       try {
@@ -362,7 +406,7 @@ function runRetouchWithSharedModuleWorker(
     const controller = new AbortController();
     sharedRetouchFlight = { worker, epoch, controller };
     try {
-      const result = await runRetouchWithWorker(worker, request, options, {
+      const result = await runRetouchWithWorker(worker, queuedRequest, options, {
         keepAlive: true,
         workerAlreadyReady: sharedRetouchWorkerReady,
         disposeSignal: controller.signal,
@@ -383,9 +427,7 @@ function runRetouchWithSharedModuleWorker(
     } finally {
       if (sharedRetouchFlight?.controller === controller) sharedRetouchFlight = null;
     }
-  });
-  sharedRetouchQueue = operation.then(() => undefined, () => undefined);
-  return operation;
+  }, options.signal);
 }
 
 /**

@@ -626,7 +626,7 @@ function originalPackage(input: {
   });
 }
 
-export const STUDIO_ORIGINAL_FREE_ASSET_PACKAGES: readonly StudioOriginalFreeAssetPackage[] =
+const ALL_STUDIO_ORIGINAL_FREE_ASSET_PACKAGES: readonly StudioOriginalFreeAssetPackage[] =
   Object.freeze([
     originalPackage({
       id: EVERYDAY_PACKAGE_ID,
@@ -670,6 +670,16 @@ export const STUDIO_ORIGINAL_FREE_ASSET_PACKAGES: readonly StudioOriginalFreeAss
     }),
   ]);
 
+/** Blockout-only backgrounds are retained for old works, not advertised as finished art. */
+export const STUDIO_RETIRED_ORIGINAL_FREE_ASSETS = Object.freeze([...EVERYDAY_ASSETS]);
+
+export const STUDIO_ORIGINAL_FREE_ASSET_PACKAGES: readonly StudioOriginalFreeAssetPackage[] =
+  Object.freeze(ALL_STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.filter((pkg) => pkg.id !== EVERYDAY_PACKAGE_ID));
+
+const ALL_STUDIO_ORIGINAL_FREE_ASSETS = Object.freeze(
+  ALL_STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.flatMap((pkg) => pkg.includedItems)
+);
+
 export const STUDIO_ORIGINAL_FREE_ASSETS: readonly StudioOriginalFreeAsset[] =
   Object.freeze(
     STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.flatMap((pkg) => pkg.includedItems)
@@ -697,14 +707,14 @@ export function findStudioOriginalFreeAsset(
   assetId: unknown
 ): StudioOriginalFreeAsset | null {
   if (typeof assetId !== "string") return null;
-  return STUDIO_ORIGINAL_FREE_ASSETS.find((asset) => asset.id === assetId) ?? null;
+  return ALL_STUDIO_ORIGINAL_FREE_ASSETS.find((asset) => asset.id === assetId) ?? null;
 }
 
 export function findStudioOriginalFreeAssetPackage(
   packageId: unknown
 ): StudioOriginalFreeAssetPackage | null {
   if (typeof packageId !== "string") return null;
-  return STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.find((pkg) => pkg.id === packageId) ?? null;
+  return ALL_STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.find((pkg) => pkg.id === packageId) ?? null;
 }
 
 export function filterStudioOriginalFreeAssets(input: {

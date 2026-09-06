@@ -1,0 +1,96 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rocky_terrain_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "name": "Rocky Terrain 02",
+    "type": 1,
+    "tags": [
+      "rocky",
+      "terrain",
+      "uneven terrain",
+      "grass",
+      "drone",
+      "landscape",
+      "nature",
+      "nature",
+      "boulders",
+      "wilderness",
+      "scenic",
+      "mountain",
+      "landform",
+      "natural landscape"
+    ],
+    "authors": {
+      "Amal Kumar": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "dimensions": [
+      90000,
+      90000
+    ],
+    "date_published": 1726704000,
+    "categories": [
+      "outdoor",
+      "terrain",
+      "natural",
+      "aerial"
+    ],
+    "files_hash": "a4c0d422c59c4234227eb04c1fa9d28694c60fbe",
+    "description": "Free, 8K terrain texture of uneven grassy ground with scattered rocks and boulder clusters, subtle height variation and soil patches",
+    "category_id": "ad8bbc58-82b8-5734-a99b-3fbdb7f0163c",
+    "category": "Ground & Terrain/Rocky Ground/Rocky Landscape",
+    "attributes": {
+      "surface_use": "ground",
+      "origin": "natural",
+      "setting": "outdoor",
+      "aerial": true,
+      "condition": [
+        "clean"
+      ]
+    },
+    "download_count": 265456,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/rocky_terrain_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rocky_terrain_02/rocky_terrain_02_diff_2k.jpg",
+      "bytes": 3232826,
+      "sha256": "9b042fe0618ffbc3650592456d7d8d265ba9a1cb5ce802f5f1d86b7ee79508a1",
+      "sourceMd5": "68f9c94575ff3c3512be9b010eb03f0e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rocky_terrain_02/rocky_terrain_02_rough_2k.jpg",
+      "bytes": 1589303,
+      "sha256": "89f3c7b9e467160a821cbac32a1fdfd75f13cb87c9deeb22099d16677a711126",
+      "sourceMd5": "eb3ca6990da229305918c08980ceb66f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rocky_terrain_02/rocky_terrain_02_nor_gl_2k.jpg",
+      "bytes": 4149208,
+      "sha256": "556ed903180a9431b253fc1c334c769dc4615c5c0f4ef1cedf20533ae8409ce8",
+      "sourceMd5": "672bfdf5e7835fa369da6a5d1209026a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rocky_terrain_02/rocky_terrain_02_ao_2k.jpg",
+      "bytes": 1767074,
+      "sha256": "30a581b6d3f11db1f5f4f5bd3cbe89695d94042455311bb44a54f6691743a648",
+      "sourceMd5": "1b502baf775dc25086a169f3ed117070"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rocky_terrain_02/rocky_terrain_02_disp_2k.jpg",
+      "bytes": 759583,
+      "sha256": "84a544dad4d12da56962297dbc7c64813c918ca4942cc8b71b5a18799e454c24",
+      "sourceMd5": "1965b895b166c1aa2c0a2628b8111ba8"
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+name: Studio raster snapshot stability
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/studio-smudge-worker-*.ts'
+      - 'src/domains/creator/studio-retouch-worker-*.ts'
+      - 'src/domains/creator/studio-raster-worker-*.ts'
+      - 'src/domains/creator/studio-abortable-serial-queue.ts'
+      - '.github/workflows/studio-raster-snapshot-stability.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/domains/creator/studio-smudge-worker-*.ts'
+      - 'src/domains/creator/studio-retouch-worker-*.ts'
+      - 'src/domains/creator/studio-raster-worker-*.ts'
+      - 'src/domains/creator/studio-abortable-serial-queue.ts'
+      - '.github/workflows/studio-raster-snapshot-stability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-raster-snapshot-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  raster-snapshots:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Record actual tested revision
+        run: |
+          mkdir -p /tmp/studio-raster-snapshot-evidence
+          git rev-parse HEAD > /tmp/studio-raster-snapshot-evidence/tested-head.txt
+          git diff --exit-code
+      - name: Existing raster behavior and new admission regressions
+        run: |
+          pnpm exec vitest run \
+            src/domains/creator/studio-smudge-worker-client.test.ts \
+            src/domains/creator/studio-retouch-worker-client.test.ts \
+            src/domains/creator/studio-raster-worker-queue-stability.test.ts \
+            src/domains/creator/studio-raster-worker-idle-stability.test.ts \
+            src/domains/creator/studio-raster-worker-request-snapshot.test.ts \
+            --reporter=default --reporter=json \
+            --outputFile.json=/tmp/studio-raster-snapshot-evidence/vitest.json
+      - name: Strict lint of affected sources and tests
+        run: |
+          set -o pipefail
+          pnpm exec eslint --max-warnings=0 \
+            src/domains/creator/studio-smudge-worker-client.ts \
+            src/domains/creator/studio-retouch-worker-client.ts \
+            src/domains/creator/studio-abortable-serial-queue.ts \
+            src/domains/creator/studio-raster-worker-queue-stability.test.ts \
+            src/domains/creator/studio-raster-worker-idle-stability.test.ts \
+            src/domains/creator/studio-raster-worker-request-snapshot.test.ts \
+            2>&1 | tee /tmp/studio-raster-snapshot-evidence/lint.log
+      - name: Full frontend TypeScript check
+        run: |
+          set -o pipefail
+          pnpm exec tsc -p tsconfig.json --noEmit \
+            2>&1 | tee /tmp/studio-raster-snapshot-evidence/types.log
+      - name: Preserve executed pass or failure evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-raster-snapshot-evidence
+          path: /tmp/studio-raster-snapshot-evidence
+          retention-days: 7
+          if-no-files-found: warn

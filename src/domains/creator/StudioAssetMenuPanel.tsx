@@ -84,6 +84,12 @@ function localizeText(
   return translated === key ? fallback : translated;
 }
 
+const studioCc0AssetLibraryLoader = createStudioIntentLazyLoader(() =>
+  import("./StudioCc0AssetLibraryPanel").then((module) => ({
+    default: module.StudioCc0AssetLibraryPanel,
+  }))
+);
+
 const studioOriginalAssetMarketplaceLoader = createStudioIntentLazyLoader(() =>
   import("./StudioOriginalAssetMarketplacePanel").then((module) => ({
     default: module.StudioOriginalAssetMarketplacePanel,
@@ -100,6 +106,11 @@ const studioCommunityMarketplaceLoader = createStudioIntentLazyLoader(() =>
   }))
 );
 
+const LazyStudioCc0AssetLibraryPanel = lazyRetry(
+  studioCc0AssetLibraryLoader.load,
+  "StudioCc0AssetLibraryPanel"
+);
+
 const LazyStudioOriginalAssetMarketplacePanel = lazyRetry(
   studioOriginalAssetMarketplaceLoader.load,
   "StudioOriginalAssetMarketplacePanel"
@@ -114,6 +125,7 @@ const LazyStudioCommunityMarketplacePanel = lazyRetry(
 );
 
 function preloadStudioAssetMarketplacePanels(): void {
+  studioCc0AssetLibraryLoader.preload();
   studioOriginalAssetMarketplaceLoader.preload();
   studioCreatorPackMarketplaceLoader.preload();
   studioCommunityMarketplaceLoader.preload();
@@ -137,6 +149,7 @@ function StudioAssetMarketplacePanels({
   return (
     <Suspense fallback={<StudioAssetMarketplaceLoading />}>
       <div data-studio-asset-marketplace-lazy-boundary="true">
+        <LazyStudioCc0AssetLibraryPanel onUseAsset={onUseLocalAsset} />
         <LazyStudioOriginalAssetMarketplacePanel onUseAsset={onUseLocalAsset} />
         <LazyStudioCreatorPackMarketplacePanel />
         <LazyStudioCommunityMarketplacePanel

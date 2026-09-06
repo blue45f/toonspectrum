@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wine_barrel_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "barrel",
+      "wine",
+      "celler",
+      "old",
+      "worn",
+      "grape",
+      "farmhouse",
+      "farm"
+    ],
+    "date_published": 1623767646,
+    "sponsors": [
+      "3267566"
+    ],
+    "name": "Wine Barrel 01",
+    "categories": [
+      "containers"
+    ],
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 10820,
+    "texel_density": 2580.2600580932635,
+    "dimensions": [
+      741.9015169143677,
+      756.035715341568,
+      871.2633550167084
+    ],
+    "files_hash": "943d486d1d003b1f56157522fd5382e24ab4bf07",
+    "description": "Free 8K wine barrel model with worn oak staves, weathered metal hoops and bung hole - high-detail farmhouse/cellar prop perfect for rustic farm scenes.",
+    "category_id": "fb26976a-7974-5a13-bbc8-05494b04962a",
+    "category": "Containers & Storage/Barrels & Drums/Wooden Barrels",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "download_count": 25283,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wine_barrel_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wine_barrel_01/wine_barrel_01_2k.gltf",
+      "bytes": 6673,
+      "sha256": "cfff0c36ffde5ba24adf1ea499a7219a9369b870b7214d0bd1b554d758c279c9",
+      "sourceMd5": "d539ff427a5712be4133ffc8489b093b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_barrel_01/wine_barrel_01_arm_2k.jpg",
+      "bytes": 579968,
+      "sha256": "a8902e757c8fe2a80a851bf419906da641fd3829f5f21e5c6cd13016ee13180b",
+      "sourceMd5": "05f9953cd7d08c3cd4ae197c84262a3e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wine_barrel_01/wine_barrel_01.bin",
+      "bytes": 385912,
+      "sha256": "d827c31afed824b923ea9168462c93ab3ad3a88c4a68b155bd35efb1a02cbf00",
+      "sourceMd5": "84f578460020912056a1e3fbe3ec1b97"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_barrel_01/wine_barrel_01_nor_gl_2k.jpg",
+      "bytes": 531442,
+      "sha256": "a241d134de243f3f52e12e883eeeda881a4604d17486a94b7b994b33de08eacb",
+      "sourceMd5": "9ba30a934324a4bb078bcb1e220b062f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wine_barrel_01/wine_barrel_01_diff_2k.jpg",
+      "bytes": 728748,
+      "sha256": "6a76da96d9bbe957fcab8021fc2710bf153eb98d22ff1439fa5093c7c90a7fdb",
+      "sourceMd5": "dbc89b97cee96eae289c8786c7d99351"
+    }
+  ]
+}

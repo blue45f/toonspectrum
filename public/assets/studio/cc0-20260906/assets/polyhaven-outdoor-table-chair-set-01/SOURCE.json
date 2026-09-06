@@ -1,0 +1,117 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/outdoor_table_chair_set_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-06"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "outdoor",
+      "foldable",
+      "folding",
+      "seating",
+      "coffee",
+      "diner",
+      "street",
+      "urban",
+      "deli",
+      "wood",
+      "city",
+      "cafe"
+    ],
+    "name": "Outdoor Table Chair Set 01",
+    "categories": [
+      "furniture",
+      "seating"
+    ],
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "date_published": 1634083200,
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 9828,
+    "texel_density": 3205.4733996309574,
+    "dimensions": [
+      776.0046124458313,
+      1831.0473561286926,
+      858.5816156119108
+    ],
+    "files_hash": "6e1e83970732c6c4e9f2056f37cec189cc80adc5",
+    "description": "Free 4K model: compact outdoor foldable table & two chairs with wood slats and metal frame; perfect for city cafes, diners, patios and street seating.",
+    "category_id": "ef6056e6-580d-59e6-b916-a0f766d42fe8",
+    "category": "Furniture/Seating/Outdoor Seating",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "sponsors": [
+      "20953239",
+      "26820710"
+    ],
+    "download_count": 42570,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/outdoor_table_chair_set_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_2k.gltf",
+      "bytes": 6826,
+      "sha256": "2e2376efc210d849a22bd352b40442d38985c74953fc8020bb01ca94c66c68ca",
+      "sourceMd5": "ea86f7e4fdbbe5b600543477a894d4cf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_chair_nor_gl_2k.jpg",
+      "bytes": 227267,
+      "sha256": "02723a5d2275e357d07e41a71a87dc46b89e11fec9711b84a7c1d082ada8144a",
+      "sourceMd5": "a47a0f3b2335652059ad8a0251a1bfcb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_table_arm_2k.jpg",
+      "bytes": 695054,
+      "sha256": "64b584f6cf5993b9b78c7ec51ad471ad010a90455ee4bb45a3c9be1263db4d97",
+      "sourceMd5": "9d2d72416720979df7fe41fd14191c4c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_table_diff_2k.jpg",
+      "bytes": 520192,
+      "sha256": "8259d7200a753037516e153d0989bd5812d50874be7631c34794abdeb2796384",
+      "sourceMd5": "f1d68ab150bf932478e4c8331d550604"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_chair_diff_2k.jpg",
+      "bytes": 506077,
+      "sha256": "5f6ce1dcd8dbfc0293ae62f01f0cef0a8a07862bd6d744eefa459206e9206eb1",
+      "sourceMd5": "77cf6bb1c96b6864d7f0b6a2dff600e3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_chair_arm_2k.jpg",
+      "bytes": 583486,
+      "sha256": "646ed8503d7e1d1806506a38c3b2d31b616e0720538e7df054c3d982b9bfa5ae",
+      "sourceMd5": "ca1eaffe9c45ecc241784b5c1fd29e0c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/outdoor_table_chair_set_01/outdoor_table_chair_set_01_table_nor_gl_2k.jpg",
+      "bytes": 205693,
+      "sha256": "8ab2e82a262da2912cb64b3439377f943dd29f344b8d4b8b25eb389efdceabc8",
+      "sourceMd5": "8d2b60d4d1001c2dc7c6fef682b9b14e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/outdoor_table_chair_set_01/outdoor_table_chair_set_01.bin",
+      "bytes": 456856,
+      "sha256": "d62458c79c6c902d1195bff875e42bf7579c6b309c6b96f9cd7543af43170220",
+      "sourceMd5": "8596ca40855bc417ac5248a54bd85990"
+    }
+  ]
+}

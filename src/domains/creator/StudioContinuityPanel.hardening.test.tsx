@@ -130,11 +130,47 @@ describe("quality center review ownership", () => {
       const view = render(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={pages} documentKey={`unmounted-${index}`} />);
       view.unmount();
     }
+    // Reads first await the write queue before importing the database. An
+    // import-settled snapshot alone is not proof that all reads have started.
+    // Keep the exact 20-request contract and wait for its observable boundary.
+    await waitFor(() => {
+      expect(reviewDb.acquire).toHaveBeenCalledTimes(20);
+      expect(reviewDb.get).toHaveBeenCalledTimes(20);
+    });
     await act(async () => { await vi.dynamicImportSettled(); });
     expect(reviewDb.acquire).toHaveBeenCalledTimes(20);
     expect(reviewDb.get).toHaveBeenCalledTimes(20);
     for (let index = 0; index < 20; index += 1) {
       expect(reviewDb.get).toHaveBeenCalledWith(`toonstudio:quality-inspection:v2:unmounted-${index}`);
+    }
+    expect(reviewDb.set).not.toHaveBeenCalled();
+    expect(reviewDb.rows.size).toBe(0);
+  });
+
+  it("does not persist twenty delayed reads completed only after their owners unmount", async () => {
+    const pages = [page()];
+    const pending: Array<() => void> = [];
+    reviewDb.get.mockImplementation(() => new Promise<string | null>((resolveRead) => {
+      pending.push(() => resolveRead(null));
+    }));
+    try {
+      for (let index = 0; index < 20; index += 1) {
+        const view = render(<StudioContinuityPanel open onClose={vi.fn()} issues={emptyIssues} pages={pages} documentKey={`delayed-${index}`} />);
+        await waitFor(() => expect(reviewDb.get).toHaveBeenCalledWith(`toonstudio:quality-inspection:v2:delayed-${index}`));
+        view.unmount();
+      }
+      expect(reviewDb.acquire).toHaveBeenCalledTimes(20);
+      expect(reviewDb.get).toHaveBeenCalledTimes(20);
+      expect(pending).toHaveLength(20);
+      expect(reviewDb.set).not.toHaveBeenCalled();
+    } finally {
+      cleanup();
+      await act(async () => {
+        for (const finish of pending) finish();
+        await vi.dynamicImportSettled();
+      });
+      // Teardown's sentinel must not create an unresolved synthetic read.
+      reviewDb.get.mockImplementation(async (key: string) => reviewDb.rows.get(key) ?? null);
     }
     expect(reviewDb.set).not.toHaveBeenCalled();
     expect(reviewDb.rows.size).toBe(0);

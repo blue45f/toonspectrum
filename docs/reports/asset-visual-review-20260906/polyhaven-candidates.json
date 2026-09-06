@@ -1,0 +1,776 @@
+{
+  "models": [
+    {
+      "id": "modern_arm_chair_01",
+      "name": "Modern Arm Chair 01",
+      "category": "Furniture/Seating/Chairs",
+      "polycount": 8916,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "chair"
+    },
+    {
+      "id": "outdoor_table_chair_set_01",
+      "name": "Outdoor Table Chair Set 01",
+      "category": "Furniture/Seating/Outdoor Seating",
+      "polycount": 9828,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "chair"
+    },
+    {
+      "id": "GreenChair_01",
+      "name": "Green Chair 01",
+      "category": "Furniture/Seating/Chairs",
+      "polycount": 4213,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "chair"
+    },
+    {
+      "id": "Lantern_01",
+      "name": "Lantern 01",
+      "category": "Lighting/Portable/Lanterns",
+      "polycount": 33902,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "table"
+    },
+    {
+      "id": "wooden_table_02",
+      "name": "Wooden Table 02",
+      "category": "Furniture/Tables/Dining Tables",
+      "polycount": 196,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "table"
+    },
+    {
+      "id": "tea_set_01",
+      "name": "Tea Set 01",
+      "category": "Food & Kitchen/Tableware/Tea & Coffee Sets",
+      "polycount": 40296,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "table"
+    },
+    {
+      "id": "potted_plant_02",
+      "name": "Potted Plant 02",
+      "category": "Nature/Plants/Potted Plants",
+      "polycount": 69806,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "plant"
+    },
+    {
+      "id": "potted_plant_04",
+      "name": "Potted Plant 04",
+      "category": "Nature/Plants/Potted Plants",
+      "polycount": 6097,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "plant"
+    },
+    {
+      "id": "fern_02",
+      "name": "Fern 02",
+      "category": "Nature/Plants/Ferns",
+      "polycount": 6232,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "plant"
+    },
+    {
+      "id": "potted_plant_01",
+      "name": "Potted Plant 01",
+      "category": "Nature/Plants/Potted Plants",
+      "polycount": 96030,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "potted"
+    },
+    {
+      "id": "street_lamp_01",
+      "name": "Street Lamp 01",
+      "category": "Lighting/Street & Outdoor/Street Lamps",
+      "polycount": 30610,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "lamp"
+    },
+    {
+      "id": "modern_ceiling_lamp_01",
+      "name": "Modern Ceiling Lamp 01",
+      "category": "Lighting/Ceiling/Pendant Lights",
+      "polycount": 5602,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "lamp"
+    },
+    {
+      "id": "desk_lamp_arm_01",
+      "name": "Desk Lamp Arm 01",
+      "category": "Lighting/Floor & Desk/Desk Lamps",
+      "polycount": 25710,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "lamp"
+    },
+    {
+      "id": "sofa_02",
+      "name": "Sofa 02",
+      "category": "Furniture/Seating/Sofas & Couches",
+      "polycount": 2728,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "sofa"
+    },
+    {
+      "id": "sofa_03",
+      "name": "Sofa 03",
+      "category": "Furniture/Seating/Sofas & Couches",
+      "polycount": 8004,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "sofa"
+    },
+    {
+      "id": "Sofa_01",
+      "name": "Sofa 01",
+      "category": "Furniture/Seating/Sofas & Couches",
+      "polycount": 4101,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "sofa"
+    },
+    {
+      "id": "decorative_book_set_01",
+      "name": "Decorative Book Set 01",
+      "category": "Office & Stationery/Books & Documents/Books",
+      "polycount": 112560,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "book"
+    },
+    {
+      "id": "book_encyclopedia_set_01",
+      "name": "Book Encyclopedia Set 01",
+      "category": "Office & Stationery/Books & Documents/Books",
+      "polycount": 67306,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "book"
+    },
+    {
+      "id": "steel_frame_shelves_01",
+      "name": "Steel Frame Shelves 01",
+      "category": "Furniture/Storage Furniture/Shelving & Bookcases",
+      "polycount": 4348,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "book"
+    },
+    {
+      "id": "wine_bottles_01",
+      "name": "Wine Bottles 01",
+      "category": "Food & Kitchen/Drinks/Bottles & Wine",
+      "polycount": 28848,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "food"
+    },
+    {
+      "id": "food_apple_01",
+      "name": "Food Apple 01",
+      "category": "Food & Kitchen/Produce/Fruit",
+      "polycount": 7012,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "food"
+    },
+    {
+      "id": "brass_goblets",
+      "name": "Brass Goblets",
+      "category": "Food & Kitchen/Tableware/Cups & Goblets",
+      "polycount": 9600,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "food"
+    },
+    {
+      "id": "wooden_bowl_01",
+      "name": "Wooden Bowl 01",
+      "category": "Food & Kitchen/Tableware/Bowls",
+      "polycount": 14122,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "bowl"
+    },
+    {
+      "id": "wooden_bowl_02",
+      "name": "Wooden Bowl 02",
+      "category": "Food & Kitchen/Tableware/Bowls",
+      "polycount": 4666,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "bowl"
+    },
+    {
+      "id": "brass_pan_01",
+      "name": "Brass Pan 01",
+      "category": "Food & Kitchen/Cookware/Pots & Pans",
+      "polycount": 4340,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "pot"
+    },
+    {
+      "id": "brass_pot_02",
+      "name": "Brass Pot 02",
+      "category": "Food & Kitchen/Cookware/Pots & Pans",
+      "polycount": 3344,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "pot"
+    },
+    {
+      "id": "planter_pot_clay",
+      "name": "Planter Pot Clay",
+      "category": "Decor & Art/Vases & Vessels/Terracotta Pots",
+      "polycount": 3080,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "pot"
+    },
+    {
+      "id": "Barrel_01",
+      "name": "Barrel_01",
+      "category": "Containers & Storage/Barrels & Drums/Metal Drums",
+      "polycount": 2682,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "barrel"
+    },
+    {
+      "id": "Barrel_02",
+      "name": "Barrel 02",
+      "category": "Containers & Storage/Barrels & Drums/Plastic Drums",
+      "polycount": 2688,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "barrel"
+    },
+    {
+      "id": "wine_barrel_01",
+      "name": "Wine Barrel 01",
+      "category": "Containers & Storage/Barrels & Drums/Wooden Barrels",
+      "polycount": 10820,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "barrel"
+    },
+    {
+      "id": "modular_street_seating",
+      "name": "Modular Street Seating",
+      "category": "Furniture/Seating/Benches",
+      "polycount": 25156,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "bench"
+    },
+    {
+      "id": "bench_vice_01",
+      "name": "Bench Vice 01",
+      "category": "Tools & Equipment/Workshop Equipment/Vices & Clamps",
+      "polycount": 2864,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "bench"
+    },
+    {
+      "id": "painted_wooden_bench",
+      "name": "Painted Wooden Bench",
+      "category": "Furniture/Seating/Benches",
+      "polycount": 630,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "bench"
+    },
+    {
+      "id": "GothicCabinet_01",
+      "name": "Gothic Cabinet 01",
+      "category": "Furniture/Storage Furniture/Cabinets & Cupboards",
+      "polycount": 12170,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "cabinet"
+    },
+    {
+      "id": "vintage_cabinet_01",
+      "name": "Vintage Cabinet 01",
+      "category": "Furniture/Storage Furniture/Cabinets & Cupboards",
+      "polycount": 61096,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "cabinet"
+    },
+    {
+      "id": "painted_wooden_cabinet",
+      "name": "Painted Wooden Cabinet",
+      "category": "Furniture/Storage Furniture/Cabinets & Cupboards",
+      "polycount": 2227,
+      "maxResolution": [
+        4096,
+        4096
+      ],
+      "selectionTerm": "cabinet"
+    }
+  ],
+  "textures": [
+    {
+      "id": "plywood",
+      "name": "Plywood",
+      "category": "Wood/Engineered Wood/Plywood",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "wood"
+    },
+    {
+      "id": "laminate_floor_02",
+      "name": "Laminate Floor 02",
+      "category": "Wood/Engineered Wood/Laminate",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "wood"
+    },
+    {
+      "id": "wood_table_001",
+      "name": "Wood Table 001",
+      "category": "Wood/Boards & Planks/Finished & Varnished",
+      "polycount": null,
+      "maxResolution": [
+        16384,
+        16384
+      ],
+      "selectionTerm": "wood"
+    },
+    {
+      "id": "fabric_pattern_07",
+      "name": "Fabric Pattern 07",
+      "category": "Textiles & Leather/Woven/Plaid & Check",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "fabric"
+    },
+    {
+      "id": "denmin_fabric_02",
+      "name": "Denim Fabric 02",
+      "category": "Textiles & Leather/Denim",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "fabric"
+    },
+    {
+      "id": "fabric_pattern_05",
+      "name": "Fabric Pattern 05",
+      "category": "Textiles & Leather/Woven/Plaid & Check",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "fabric"
+    },
+    {
+      "id": "red_brick",
+      "name": "Red Brick",
+      "category": "Brick & Block/Clay Brick/Running-Bond",
+      "polycount": null,
+      "maxResolution": [
+        16384,
+        16384
+      ],
+      "selectionTerm": "brick"
+    },
+    {
+      "id": "red_brick_03",
+      "name": "Red Brick 03",
+      "category": "Brick & Block/Clay Brick/Running-Bond",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "brick"
+    },
+    {
+      "id": "medieval_blocks_03",
+      "name": "Medieval Blocks 03",
+      "category": "Brick & Block/Stone Block & Paver/Ashlar & Coursed Stone",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "brick"
+    },
+    {
+      "id": "metal_plate",
+      "name": "Metal Plate",
+      "category": "Metal/Plate & Grating/Diamond & Checker Plate",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "metal"
+    },
+    {
+      "id": "green_metal_rust",
+      "name": "Green Metal Rust",
+      "category": "Metal/Sheet & Corrugated/Flat Sheet",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "metal"
+    },
+    {
+      "id": "rust_coarse_01",
+      "name": "Rust Coarse 01",
+      "category": "Metal/Sheet & Corrugated/Flat Sheet",
+      "polycount": null,
+      "maxResolution": [
+        16384,
+        16384
+      ],
+      "selectionTerm": "metal"
+    },
+    {
+      "id": "beige_wall_001",
+      "name": "Beige Wall 001",
+      "category": "Concrete/Plaster & Stucco/Painted Plaster",
+      "polycount": null,
+      "maxResolution": [
+        16384,
+        16384
+      ],
+      "selectionTerm": "plaster"
+    },
+    {
+      "id": "painted_plaster_wall",
+      "name": "Painted Plaster Wall",
+      "category": "Concrete/Plaster & Stucco/Painted Plaster",
+      "polycount": null,
+      "maxResolution": [
+        16384,
+        16384
+      ],
+      "selectionTerm": "plaster"
+    },
+    {
+      "id": "white_plaster_02",
+      "name": "White Plaster 02",
+      "category": "Concrete/Plaster & Stucco/Bare Plaster",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "plaster"
+    },
+    {
+      "id": "asphalt_02",
+      "name": "Asphalt 02",
+      "category": "Asphalt & Bitumen/Asphalt/Cracked Asphalt",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "asphalt"
+    },
+    {
+      "id": "aerial_asphalt_01",
+      "name": "Aerial Asphalt 01",
+      "category": "Asphalt & Bitumen/Asphalt/Worn Road Surface",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "asphalt"
+    },
+    {
+      "id": "asphalt_01",
+      "name": "Asphalt 01",
+      "category": "Asphalt & Bitumen/Asphalt/Worn Road Surface",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "asphalt"
+    },
+    {
+      "id": "concrete_floor_worn_001",
+      "name": "Concrete Floor Worn 001",
+      "category": "Concrete/Cast Walls & Floors/Bare Cast",
+      "polycount": null,
+      "maxResolution": [
+        16384,
+        16384
+      ],
+      "selectionTerm": "concrete"
+    },
+    {
+      "id": "concrete_floor_02",
+      "name": "Concrete Floor 02",
+      "category": "Concrete/Cast Walls & Floors/Bare Cast",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "concrete"
+    },
+    {
+      "id": "concrete_layers_02",
+      "name": "Concrete Layers 02",
+      "category": "Concrete/Plaster & Stucco/Bare Plaster",
+      "polycount": null,
+      "maxResolution": [
+        16384,
+        16384
+      ],
+      "selectionTerm": "concrete"
+    },
+    {
+      "id": "coast_sand_rocks_02",
+      "name": "Coast Sand Rocks 02",
+      "category": "Stone/Rock & Cliffs/Coastal Rock",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "stone"
+    },
+    {
+      "id": "aerial_rocks_02",
+      "name": "Aerial Rocks 02",
+      "category": "Stone/Rock & Cliffs/Rough Rock Faces",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "stone"
+    },
+    {
+      "id": "aerial_grass_rock",
+      "name": "Aerial Grass Rock",
+      "category": "Stone/Rock & Cliffs/Mossy & Lichened Rock",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "stone"
+    },
+    {
+      "id": "leather_red_02",
+      "name": "Leather Red 02",
+      "category": "Textiles & Leather/Leather/Upholstery Leather",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "leather"
+    },
+    {
+      "id": "book_pattern",
+      "name": "Book Pattern",
+      "category": "Textiles & Leather/Woven/Plain Weave Cotton",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "leather"
+    },
+    {
+      "id": "brown_leather",
+      "name": "Brown Leather",
+      "category": "Textiles & Leather/Leather/Upholstery Leather",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "leather"
+    },
+    {
+      "id": "marble_01",
+      "name": "Marble 01",
+      "category": "Stone/Slabs & Tiles/Marble",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "tile"
+    },
+    {
+      "id": "leather_white",
+      "name": "Leather White",
+      "category": "Textiles & Leather/Leather/Upholstery Leather",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "tile"
+    },
+    {
+      "id": "floor_tiles_06",
+      "name": "Floor Tiles 06",
+      "category": "Stone/Slabs & Tiles/Marble",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "tile"
+    },
+    {
+      "id": "decrepit_wallpaper",
+      "name": "Decrepit Wallpaper",
+      "category": "Paper & Card/Wallpaper/Peeling & Distressed Wallpaper",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "paper"
+    },
+    {
+      "id": "brown_mud_leaves_01",
+      "name": "Brown Mud Leaves 01",
+      "category": "Ground & Terrain/Forest Floor/Leaf Litter",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "ground"
+    },
+    {
+      "id": "forrest_ground_01",
+      "name": "Forest Ground 01",
+      "category": "Ground & Terrain/Forest Floor/Leaf Litter",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "ground"
+    },
+    {
+      "id": "rocky_terrain_02",
+      "name": "Rocky Terrain 02",
+      "category": "Ground & Terrain/Rocky Ground/Rocky Landscape",
+      "polycount": null,
+      "maxResolution": [
+        8192,
+        8192
+      ],
+      "selectionTerm": "ground"
+    }
+  ]
+}

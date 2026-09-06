@@ -1,0 +1,112 @@
+name: BG3D production runtime regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/domains/creator/bg3d/**"
+      - "e2e/studio-3d-visual-verification.spec.ts"
+      - "e2e/studio-bg3d-*"
+      - "playwright.config.ts"
+      - "playwright.bg3d-runtime.config.ts"
+      - "tsconfig.bg3d-runtime.json"
+      - "scripts/studio-bg3d-runtime-*"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/bg3d-runtime-regression.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/domains/creator/bg3d/**"
+      - "e2e/studio-3d-visual-verification.spec.ts"
+      - "e2e/studio-bg3d-*"
+      - "playwright.config.ts"
+      - "playwright.bg3d-runtime.config.ts"
+      - "tsconfig.bg3d-runtime.json"
+      - "scripts/studio-bg3d-runtime-*"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/bg3d-runtime-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bg3d-runtime-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bg3d-production-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+      PLAYWRIGHT_CHANNEL: ""
+      STUDIO_BG3D_WEBGPU_GIZMO: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check changed verification and capability code
+        run: |
+          pnpm exec eslint --no-ignore --max-warnings 0 \
+            e2e/studio-bg3d-production-rotation.runtime.ts e2e/studio-bg3d-runtime-diagnostics.ts \
+            e2e/studio-bg3d-compositor-sampler.ts \
+            playwright.bg3d-runtime.config.ts scripts/studio-bg3d-runtime-reporter.ts \
+            scripts/studio-bg3d-runtime-reporter.test.ts scripts/studio-bg3d-runtime-discovery.test.ts \
+            scripts/studio-bg3d-runtime-release-wiring.test.ts scripts/studio-bg3d-runtime-setup.mts \
+            src/domains/creator/bg3d/studio-bg3d-engine-selection.ts \
+            src/domains/creator/bg3d/studio-bg3d-engine-selection-notice.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-webgpu-capability.ts \
+            src/domains/creator/bg3d/studio-bg3d-webgpu-capability-late.test.ts \
+            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.ts \
+            src/domains/creator/bg3d/useStudioBg3dEngineRuntime.late.test.tsx \
+            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.ts \
+            src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer-ownership.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-render-policy.ts \
+            src/domains/creator/bg3d/studio-bg3d-render-policy.test.ts \
+            src/domains/creator/bg3d/studio-bg3d-frame-scheduling.test.tsx \
+            src/domains/creator/bg3d/StudioBg3dSceneNodes.tsx
+      - name: Typecheck browser verification and application interfaces
+        run: |
+          pnpm exec tsc --project tsconfig.bg3d-runtime.json
+          pnpm run typecheck
+      - name: Test the entire BG3D domain and release verification contracts
+        run: |
+          mkdir -p test-results
+          pnpm exec vitest run src/domains/creator/bg3d \
+            scripts/studio-bg3d-runtime-reporter.test.ts \
+            scripts/studio-bg3d-runtime-discovery.test.ts \
+            scripts/studio-bg3d-runtime-release-wiring.test.ts \
+            --reporter=default --reporter=json --outputFile=test-results/bg3d-unit-results.json
+      - name: Install Chromium and its runtime dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build the production app to be verified
+        run: pnpm run build:bundle
+      - name: Verify live WebGPU rotation without skips or retries
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a --server-args="-screen 0 1920x1200x24" \
+            pnpm exec playwright test --config=playwright.bg3d-runtime.config.ts \
+            2>&1 | tee "$RUNNER_TEMP/bg3d-runtime.log"
+      - name: Preserve unit results, runtime screenshots, metrics, trace and HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bg3d-production-runtime-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/bg3d-runtime/
+            ${{ runner.temp }}/bg3d-runtime.log
+          if-no-files-found: warn
+          retention-days: 7
