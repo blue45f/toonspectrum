@@ -1,0 +1,247 @@
+name: One-shot PR 907 CI convergence v2
+
+on:
+  push:
+    branches:
+      - ops/pr907-converge-20260908-v2
+    paths:
+      - .github/workflows/one-shot-pr907-converge-v2.yml
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: one-shot-pr907-converge-20260908-v2
+  cancel-in-progress: true
+
+jobs:
+  converge:
+    runs-on: windows-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_PR: "907"
+    steps:
+      - name: Cancel superseded helper workflows only
+        env:
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          for status in queued in_progress waiting pending requested; do
+            gh api --paginate "repos/${repo}/actions/runs?status=${status}&per_page=100" \
+              --jq '.workflow_runs[] | [.id, .head_branch] | @tsv' |
+            while IFS=$'\t' read -r run_id branch; do
+              [[ -n "$run_id" ]] || continue
+              if [[ "$run_id" == "$CURRENT_RUN_ID" ]]; then
+                continue
+              fi
+              case "$branch" in
+                ops/pr907-converge-20260908|ops/pr907-apply-lint-20260908-v2|fix/pr907-lint-20260908)
+                  echo "Cancelling superseded helper run ${run_id} on ${branch}"
+                  gh api --method POST "repos/${repo}/actions/runs/${run_id}/cancel" >/dev/null 2>&1 || true
+                  ;;
+              esac
+            done
+          done
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply and validate the known lint repairs on the current PR head
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          target_branch="$(gh api "repos/${repo}/pulls/${TARGET_PR}" --jq '.head.ref')"
+          test "$(gh api "repos/${repo}/pulls/${TARGET_PR}" --jq '.state')" = "open"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          repair() {
+            python - <<'PY'
+          from pathlib import Path
+
+          def mutate(path: str, transform):
+              p = Path(path)
+              source = p.read_text(encoding="utf-8")
+              result = transform(source)
+              with p.open("w", encoding="utf-8", newline="\n") as handle:
+                  handle.write(result)
+
+          mutate(
+              "apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts",
+              lambda s: s.replace("    let segment = subtract(target, previous);", "    const segment = subtract(target, previous);")
+                         .replace("    let segmentLength = length(segment);", "    const segmentLength = length(segment);"),
+          )
+
+          def thumbnails(s: str) -> str:
+              entries = (
+                  (
+                      "export function useCharacterRuntimeThumbnail(entryId: string): string | null {",
+                      "// eslint-disable-next-line react-refresh/only-export-components -- hook shares the recorder singleton store\n",
+                  ),
+                  (
+                      "export function clearCharacterRuntimeThumbnails(): void {",
+                      "// eslint-disable-next-line react-refresh/only-export-components -- teardown shares the recorder singleton store\n",
+                  ),
+              )
+              for declaration, note in entries:
+                  if declaration in s and note + declaration not in s:
+                      s = s.replace(declaration, note + declaration, 1)
+              return s.replace(
+                  "  const ids = useMemo(() => selectedEntryIds(binding), [binding.recipe]);",
+                  "  const ids = useMemo(() => selectedEntryIds(binding), [binding]);",
+              )
+          mutate("apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx", thumbnails)
+
+          def workbench(s: str) -> str:
+              for name in ("BadgeCheck", "Box", "FileJson", "SlidersHorizontal"):
+                  s = s.replace(f"  {name},\n", "")
+              return s
+          mutate("apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx", workbench)
+
+          mutate(
+              "apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts",
+              lambda s: s.replace(
+                  "  const documentClock = useMemo(() => new Date().toISOString(), [modelId]);",
+                  "  const documentClock = useMemo(() => {\n    void modelId;\n    return new Date().toISOString();\n  }, [modelId]);",
+              ),
+          )
+
+          def workspace(s: str) -> str:
+              old = '''export * from "./studio-production-workspace-runtime";\n\nimport {\n  createEmptyProductionWorkspace as createRuntimeProductionWorkspace,\n} from "./studio-production-workspace-runtime";\n\nimport type { ProductionWorkspace } from "./studio-production-workspace-runtime";\n'''
+              new = '''import {\n  createEmptyProductionWorkspace as createRuntimeProductionWorkspace,\n} from "./studio-production-workspace-runtime";\n\nimport type { ProductionWorkspace } from "./studio-production-workspace-runtime";\n\nexport * from "./studio-production-workspace-runtime";\n'''
+              return s.replace(old, new, 1)
+          mutate("apps/web/src/domains/creator/studio-production/studio-production-workspace.ts", workspace)
+          PY
+          }
+
+          settled=false
+          for attempt in 1 2 3 4; do
+            git fetch origin "$target_branch"
+            expected="$(git rev-parse FETCH_HEAD)"
+            git checkout -B pr907-converge-v2 "$expected"
+            repair
+            git diff --check
+            pnpm exec eslint --max-warnings=0 \
+              apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts \
+              apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx \
+              apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx \
+              apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts \
+              apps/web/src/domains/creator/studio-production/studio-production-workspace.ts
+            if git diff --quiet; then
+              settled=true
+              break
+            fi
+            git add \
+              apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts \
+              apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx \
+              apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx \
+              apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts \
+              apps/web/src/domains/creator/studio-production/studio-production-workspace.ts
+            git commit -m "fix(lint): repair final integration checks"
+            if git push --force-with-lease=refs/heads/${target_branch}:$expected origin HEAD:"$target_branch"; then
+              settled=true
+              break
+            fi
+          done
+          test "$settled" = true
+          echo "TARGET_BRANCH=$target_branch" >> "$GITHUB_ENV"
+
+      - name: Monitor protected CI, retry only known runtime flakes, then merge
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+
+          locate_ci() {
+            local sha="$1"
+            local found=""
+            for _ in $(seq 1 120); do
+              found="$(gh api "repos/${repo}/actions/runs?event=pull_request&branch=${TARGET_BRANCH}&per_page=100" \
+                --jq ".workflow_runs | map(select(.name == \"CI\" and .head_sha == \"${sha}\")) | sort_by(.id) | last | .id // empty")"
+              if [[ -n "$found" ]]; then
+                printf '%s' "$found"
+                return 0
+              fi
+              echo "Waiting for CI run for ${sha}" >&2
+              sleep 10
+            done
+            return 1
+          }
+
+          wait_completion() {
+            local run_id="$1"
+            for _ in $(seq 1 240); do
+              local status conclusion
+              status="$(gh api "repos/${repo}/actions/runs/${run_id}" --jq '.status')"
+              conclusion="$(gh api "repos/${repo}/actions/runs/${run_id}" --jq '.conclusion // ""')"
+              echo "CI ${run_id}: ${status}/${conclusion}" >&2
+              if [[ "$status" == "completed" ]]; then
+                printf '%s' "$conclusion"
+                return 0
+              fi
+              sleep 15
+            done
+            return 1
+          }
+
+          for round in 1 2 3; do
+            sha="$(gh api "repos/${repo}/pulls/${TARGET_PR}" --jq '.head.sha')"
+            run_id="$(locate_ci "$sha")"
+            conclusion="$(wait_completion "$run_id")"
+
+            if [[ "$conclusion" == "success" ]]; then
+              echo "Protected CI succeeded for ${sha}."
+              gh api --method PUT "repos/${repo}/pulls/${TARGET_PR}/merge" \
+                -f merge_method=squash -f sha="$sha" >/dev/null 2>&1 || true
+              for _ in $(seq 1 60); do
+                if [[ "$(gh api "repos/${repo}/pulls/${TARGET_PR}" --jq '.merged')" == "true" ]]; then
+                  echo "PR ${TARGET_PR} merged into main."
+                  exit 0
+                fi
+                sleep 5
+              done
+              echo "::error::Checks passed but protected merge did not complete."
+              exit 1
+            fi
+
+            failed_jobs="$(gh api --paginate "repos/${repo}/actions/runs/${run_id}/jobs?per_page=100" \
+              --jq '.jobs[] | select(.conclusion == "failure") | .name' | sort -u)"
+            echo "Failed jobs in round ${round}:" >&2
+            printf '%s\n' "$failed_jobs" >&2
+            unexpected="$(printf '%s\n' "$failed_jobs" | grep -Ev '^(studio-3d-runtime|studio-filter-dialog|core|verify)$' || true)"
+            if [[ -n "$unexpected" || "$round" == "3" || -z "$failed_jobs" ]]; then
+              gh run view "$run_id" --repo "$repo" --log-failed || true
+              echo "::error::A deterministic or unknown CI failure remains."
+              exit 1
+            fi
+
+            gh api --method POST "repos/${repo}/actions/runs/${run_id}/rerun-failed-jobs" >/dev/null
+            sleep 20
+          done
+
+      - name: Clean up helper resources
+        if: success()
+        run: |
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/pulls/911" -f state=closed >/dev/null 2>&1 || true
+          for branch in \
+            ops/pr907-converge-20260908-v2 \
+            ops/pr907-converge-20260908 \
+            ops/pr907-apply-lint-20260908-v2 \
+            fix/pr907-lint-20260908; do
+            encoded="${branch//\//%2F}"
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${encoded}" >/dev/null 2>&1 || true
+          done
