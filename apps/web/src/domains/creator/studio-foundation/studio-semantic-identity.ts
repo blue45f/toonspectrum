@@ -62,6 +62,7 @@ export type StudioIdentityIssueCode =
   | "invalid-work-scope"
   | "invalid-semantic-id"
   | "invalid-reference"
+  | "invalid-created-at"
   | "duplicate-semantic-id"
   | "duplicate-reference"
   | "reference-owned-by-another-link"
@@ -75,6 +76,18 @@ export interface StudioIdentityIssue {
   readonly semanticId?: string;
   readonly referenceKey?: string;
   readonly candidateIndex?: number;
+}
+
+export class StudioIdentityValidationError extends Error {
+  readonly name = "StudioIdentityValidationError";
+
+  constructor(
+    readonly code: StudioIdentityIssueCode,
+    message: string,
+    readonly referenceKey?: string,
+  ) {
+    super(message);
+  }
 }
 
 export interface StudioIdentityCandidate {
@@ -179,7 +192,10 @@ export function createEmptyStudioIdentityIndex(
   workScope: string,
 ): StudioIdentityIndexV1 {
   if (!validIdentifier(workScope)) {
-    throw new Error("Studio identity index requires a valid work scope.");
+    throw new StudioIdentityValidationError(
+      "invalid-work-scope",
+      "Studio identity index requires a valid work scope.",
+    );
   }
   return Object.freeze({ version: 1, workScope, links: [] });
 }
@@ -194,10 +210,16 @@ export function createStudioIdentityLink(input: {
   readonly createdAt: string;
 }): StudioIdentityLinkV1 {
   if (!validIdentifier(input.semanticId)) {
-    throw new Error("Studio semantic identity requires a valid identifier.");
+    throw new StudioIdentityValidationError(
+      "invalid-semantic-id",
+      "Studio semantic identity requires a valid identifier.",
+    );
   }
   if (!validTimestamp(input.createdAt)) {
-    throw new Error("Studio semantic identity requires a canonical UTC timestamp.");
+    throw new StudioIdentityValidationError(
+      "invalid-created-at",
+      "Studio semantic identity requires a canonical UTC timestamp.",
+    );
   }
   if (
     input.confidence !== undefined
@@ -205,11 +227,22 @@ export function createStudioIdentityLink(input: {
       || input.confidence < 0
       || input.confidence > 1)
   ) {
-    throw new Error("Studio semantic identity confidence must be between 0 and 1.");
+    throw new StudioIdentityValidationError(
+      "invalid-confidence",
+      "Studio semantic identity confidence must be between 0 and 1.",
+    );
   }
   const references = dedupeReferences(input.references ?? []);
-  if (!references.every(validateStudioDomainReference)) {
-    throw new Error("Studio semantic identity contains an invalid domain reference.");
+  const invalidReference = references.find((reference) =>
+    !validateStudioDomainReference(reference)
+  );
+  if (invalidReference) {
+    const referenceKey = canonicalStudioDomainReferenceKey(invalidReference);
+    throw new StudioIdentityValidationError(
+      "invalid-reference",
+      "Studio semantic identity contains an invalid domain reference.",
+      referenceKey,
+    );
   }
   const state = deriveStudioIdentityLinkState(
     input.kind,
@@ -254,9 +287,11 @@ export function upsertStudioIdentityLink(
       nextReferenceKeys.has(canonicalStudioDomainReferenceKey(reference))
     );
     if (collision) {
-      throw new Error(
-        `Studio domain reference already belongs to ${link.semanticId}: `
-          + canonicalStudioDomainReferenceKey(collision),
+      const referenceKey = canonicalStudioDomainReferenceKey(collision);
+      throw new StudioIdentityValidationError(
+        "reference-owned-by-another-link",
+        `Studio domain reference already belongs to ${link.semanticId}: ${referenceKey}`,
+        referenceKey,
       );
     }
   }
@@ -275,7 +310,12 @@ export function addStudioIdentityReference(
   reference: StudioDomainReference,
 ): StudioIdentityIndexV1 {
   const link = index.links.find((candidate) => candidate.semanticId === semanticId);
-  if (!link) throw new Error(`Unknown Studio semantic identity: ${semanticId}`);
+  if (!link) {
+    throw new StudioIdentityValidationError(
+      "invalid-semantic-id",
+      `Unknown Studio semantic identity: ${semanticId}`,
+    );
+  }
   return upsertStudioIdentityLink(index, {
     ...link,
     references: [...link.references, reference],
@@ -325,6 +365,14 @@ export function validateStudioIdentityIndex(
       });
     }
     semanticIds.add(link.semanticId);
+
+    if (!validTimestamp(link.createdAt)) {
+      issues.push({
+        code: "invalid-created-at",
+        semanticId: link.semanticId,
+        message: `Invalid createdAt for ${link.semanticId}`,
+      });
+    }
 
     if (
       link.confidence !== undefined
@@ -439,11 +487,24 @@ export function buildStudioSemanticIdentityShadowIndex(input: {
         createdAt: first.createdAt ?? now(),
       });
     } catch (error) {
-      issues.push({
-        code: "reference-owned-by-another-link",
-        semanticId,
-        message: error instanceof Error ? error.message : "Identity link collision.",
-      });
+      if (error instanceof StudioIdentityValidationError) {
+        issues.push({
+          code: error.code,
+          semanticId,
+          ...(error.referenceKey === undefined
+            ? {}
+            : { referenceKey: error.referenceKey }),
+          message: error.message,
+        });
+      } else {
+        issues.push({
+          code: "invalid-reference",
+          semanticId,
+          message: error instanceof Error
+            ? error.message
+            : "Identity link validation failed.",
+        });
+      }
     }
   }
 
