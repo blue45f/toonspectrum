@@ -15,6 +15,7 @@ import {
   type StudioToolHintMode,
 } from "./studio-tool-hint-preferences";
 import {
+  DEFAULT_STUDIO_UI_DENSITY_MODE,
   normalizeStudioUiDensityMode,
   type StudioUiDensityMode,
 } from "./studio-ui-density";
@@ -33,75 +34,92 @@ export const STUDIO_APP_SETTINGS_TABS = [
 export type StudioAppSettingsTab = (typeof STUDIO_APP_SETTINGS_TABS)[number];
 
 /**
- * Left tool-rail catalog — order matches CSP-style groups in `studio-chrome-ia-map`
- * (선택·이동 → 그리기 → 채색·보정 → 선택 범위 → 변형 → 오브젝트 → 3D·참고 → 보기).
+ * Left tool-rail catalog — order matches the professional groups in `studio-chrome-ia-map`.
+ * Labels prefer plain task language; familiar editor terms remain searchable aliases elsewhere.
  */
 export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "select", label: "선택", labelKey: "studio.settings.tool.select", defaultShortcut: "V" },
-  { id: "hand", label: "핸드(팬)", labelKey: "studio.settings.tool.hand", defaultShortcut: "Space" },
+  { id: "hand", label: "화면 이동", labelKey: "studio.settings.tool.hand", defaultShortcut: "Space" },
   { id: "pen", label: "펜", labelKey: "studio.settings.tool.pen", defaultShortcut: "B" },
   { id: "pixel-pencil", label: "픽셀 펜", labelKey: "studio.settings.tool.pixelPencil", defaultShortcut: "P" },
   { id: "eraser", label: "지우개", labelKey: "studio.settings.tool.eraser", defaultShortcut: "E" },
-  { id: "blend", label: "문지르기", labelKey: "studio.settings.tool.blend", defaultShortcut: "N" },
-  { id: "wet-mix", label: "혼색 브러시", labelKey: "studio.settings.tool.wetMix", defaultShortcut: "Shift+N" },
-  { id: "dodge-burn", label: "닷지/번", labelKey: "studio.settings.tool.dodgeBurn", defaultShortcut: "O" },
-  { id: "liquify", label: "리퀴파이", labelKey: "studio.settings.tool.liquify", defaultShortcut: "J" },
-  { id: "fill", label: "채우기", labelKey: "studio.settings.tool.fill", defaultShortcut: "G" },
+  { id: "blend", label: "색 경계 섞기", labelKey: "studio.settings.tool.blend", defaultShortcut: "N" },
+  { id: "wet-mix", label: "물감처럼 섞어 칠하기", labelKey: "studio.settings.tool.wetMix", defaultShortcut: "Shift+N" },
+  { id: "dodge-burn", label: "밝게·어둡게 칠하기", labelKey: "studio.settings.tool.dodgeBurn", defaultShortcut: "O" },
+  { id: "liquify", label: "밀어서 모양 바꾸기", labelKey: "studio.settings.tool.liquify", defaultShortcut: "J" },
+  { id: "fill", label: "색 채우기", labelKey: "studio.settings.tool.fill", defaultShortcut: "G" },
   { id: "lasso-fill", label: "올가미 채우기", labelKey: "studio.settings.tool.lassoFill", defaultShortcut: "" },
-  { id: "eyedropper", label: "스포이드", labelKey: "studio.settings.tool.eyedropper", defaultShortcut: "I" },
+  { id: "eyedropper", label: "색 가져오기", labelKey: "studio.settings.tool.eyedropper", defaultShortcut: "I" },
   { id: "marquee-rect", label: "사각 선택", labelKey: "studio.settings.tool.marqueeRect", defaultShortcut: "M" },
   { id: "marquee-circle", label: "원형 선택", labelKey: "studio.settings.tool.marqueeCircle", defaultShortcut: "Shift+M" },
   { id: "lasso", label: "올가미 선택", labelKey: "studio.settings.tool.lasso", defaultShortcut: "L" },
-  { id: "transform", label: "변형", labelKey: "studio.settings.tool.transform", defaultShortcut: "Shift+T" },
+  { id: "transform", label: "크기·회전 바꾸기", labelKey: "studio.settings.tool.transform", defaultShortcut: "Shift+T" },
   { id: "crop", label: "자르기", labelKey: "studio.settings.tool.crop", defaultShortcut: "C" },
   { id: "smart-shape", label: "스마트 도형", labelKey: "studio.settings.tool.smartShape", defaultShortcut: "" },
   { id: "shape-rect", label: "사각형 도형", labelKey: "studio.settings.tool.shapeRect", defaultShortcut: "" },
   { id: "shape-ellipse", label: "타원 도형", labelKey: "studio.settings.tool.shapeEllipse", defaultShortcut: "" },
   { id: "text", label: "텍스트", labelKey: "studio.settings.tool.text", defaultShortcut: "T" },
   { id: "bubble", label: "말풍선", labelKey: "studio.settings.tool.bubble", defaultShortcut: "T" },
-  { id: "image", label: "이미지", labelKey: "studio.settings.tool.image", defaultShortcut: "" },
+  { id: "image", label: "이미지·소재", labelKey: "studio.settings.tool.image", defaultShortcut: "" },
   { id: "comment", label: "위치 댓글", labelKey: "studio.settings.tool.comment", defaultShortcut: "Alt+C" },
-  { id: "perspective", label: "투시도", labelKey: "studio.settings.tool.perspective", defaultShortcut: "" },
-  { id: "frame-anim", label: "프레임 애니", labelKey: "studio.settings.tool.frameAnim", defaultShortcut: "" },
+  { id: "perspective", label: "투시 가이드", labelKey: "studio.settings.tool.perspective", defaultShortcut: "" },
+  { id: "frame-anim", label: "프레임 애니메이션", labelKey: "studio.settings.tool.frameAnim", defaultShortcut: "" },
   { id: "mannequin3d", label: "3D 데생 인형", labelKey: "studio.settings.tool.mannequin", defaultShortcut: "" },
   { id: "vrm3d", label: "3D 캐릭터", labelKey: "studio.settings.tool.vrm3d", defaultShortcut: "" },
-  { id: "character-shaper", label: "캐릭터 셰이퍼", labelKey: "studio.settings.tool.characterShaper", defaultShortcut: "" },
+  { id: "character-shaper", label: "3D 캐릭터 만들기", labelKey: "studio.settings.tool.characterShaper", defaultShortcut: "" },
   { id: "bg3d", label: "3D 배경", labelKey: "studio.settings.tool.bg3d", defaultShortcut: "" },
-  { id: "hybrid-dcc", label: "Hybrid 3D DCC", labelKey: "studio.settings.tool.hybridDcc", defaultShortcut: "" },
+  { id: "hybrid-dcc", label: "외부 3D 편집 연결", labelKey: "studio.settings.tool.hybridDcc", defaultShortcut: "" },
   { id: "reference", label: "참고 이미지", labelKey: "studio.settings.tool.reference", defaultShortcut: "" },
-  { id: "zoom", label: "보기 확대·축소", labelKey: "studio.settings.tool.zoom", defaultShortcut: "Z" },
-  { id: "zoom-fit", label: "너비에 맞춤", labelKey: "studio.settings.tool.zoomFit", defaultShortcut: "Home" },
-  { id: "rotate-view", label: "보기 회전", labelKey: "studio.settings.tool.rotateView", defaultShortcut: "R" },
+  { id: "zoom", label: "화면 확대·축소", labelKey: "studio.settings.tool.zoom", defaultShortcut: "Z" },
+  { id: "zoom-fit", label: "화면 맞춤", labelKey: "studio.settings.tool.zoomFit", defaultShortcut: "Home" },
+  { id: "rotate-view", label: "화면 회전", labelKey: "studio.settings.tool.rotateView", defaultShortcut: "R" },
 ] as const;
 
 export type StudioRailToolId = (typeof STUDIO_RAIL_TOOL_CATALOG)[number]["id"];
 
+/** Complete professional order used by the toolbar customizer and the “all tools” surface. */
 export const DEFAULT_STUDIO_RAIL_TOOL_ORDER: StudioRailToolId[] = STUDIO_RAIL_TOOL_CATALOG.map(
-  (t) => t.id
+  (tool) => tool.id
 );
+
+/**
+ * Predictable first-run rail: one clear path for select → draw → colour → text/assets → fit.
+ * Persisted users keep their own `visibleIds`; this list is only the fallback for new/invalid state.
+ */
+export const DEFAULT_STUDIO_RAIL_VISIBLE_IDS = [
+  "select",
+  "pen",
+  "eraser",
+  "fill",
+  "eyedropper",
+  "text",
+  "bubble",
+  "image",
+  "zoom-fit",
+] as const satisfies readonly StudioRailToolId[];
 
 /** Customizable shortcut action ids (subset wired in StudioPage). */
 export const STUDIO_SHORTCUT_ACTIONS = [
-  { id: "tool-select", label: "선택 도구", labelKey: "studio.settings.shortcut.toolSelect", defaultKeys: "V" },
-  { id: "tool-hand", label: "핸드(팬)", labelKey: "studio.settings.shortcut.toolHand", defaultKeys: "Space" },
+  { id: "tool-select", label: "선택", labelKey: "studio.settings.shortcut.toolSelect", defaultKeys: "V" },
+  { id: "tool-hand", label: "화면 이동", labelKey: "studio.settings.shortcut.toolHand", defaultKeys: "Space" },
   { id: "tool-pen", label: "펜", labelKey: "studio.settings.shortcut.toolPen", defaultKeys: "B" },
   { id: "tool-pixel", label: "픽셀 펜", labelKey: "studio.settings.shortcut.toolPixel", defaultKeys: "P" },
   { id: "tool-eraser", label: "지우개", labelKey: "studio.settings.shortcut.toolEraser", defaultKeys: "E" },
-  { id: "tool-fill", label: "채우기", labelKey: "studio.settings.shortcut.toolFill", defaultKeys: "G" },
-  { id: "tool-eyedropper", label: "스포이드", labelKey: "studio.settings.shortcut.toolEyedropper", defaultKeys: "I" },
+  { id: "tool-fill", label: "색 채우기", labelKey: "studio.settings.shortcut.toolFill", defaultKeys: "G" },
+  { id: "tool-eyedropper", label: "색 가져오기", labelKey: "studio.settings.shortcut.toolEyedropper", defaultKeys: "I" },
   { id: "tool-lasso", label: "올가미 선택", labelKey: "studio.settings.shortcut.toolLasso", defaultKeys: "L" },
   { id: "tool-marquee", label: "사각 선택", labelKey: "studio.settings.shortcut.toolMarqueeRect", defaultKeys: "M" },
   { id: "tool-marquee-circle", label: "원형 선택", labelKey: "studio.settings.shortcut.toolMarqueeCircle", defaultKeys: "Shift+M" },
-  { id: "tool-transform", label: "변형", labelKey: "studio.settings.shortcut.toolTransform", defaultKeys: "Shift+T" },
+  { id: "tool-transform", label: "크기·회전 바꾸기", labelKey: "studio.settings.shortcut.toolTransform", defaultKeys: "Shift+T" },
   { id: "tool-crop", label: "자르기", labelKey: "studio.settings.shortcut.toolCrop", defaultKeys: "C" },
   { id: "tool-comment", label: "위치 댓글", labelKey: "studio.settings.shortcut.toolComment", defaultKeys: "Alt+C" },
-  { id: "tool-blend", label: "문지르기", labelKey: "studio.settings.shortcut.toolBlend", defaultKeys: "N" },
-  { id: "tool-wet-mix", label: "혼색 브러시", labelKey: "studio.settings.shortcut.toolWetMix", defaultKeys: "Shift+N" },
-  { id: "tool-dodge-burn", label: "닷지/번", labelKey: "studio.settings.shortcut.toolDodgeBurn", defaultKeys: "O" },
-  { id: "tool-liquify", label: "리퀴파이", labelKey: "studio.settings.shortcut.toolLiquify", defaultKeys: "J" },
-  { id: "tool-lettering", label: "레터링(텍스트·말풍선)", labelKey: "studio.settings.shortcut.toolLettering", defaultKeys: "T" },
-  { id: "tool-zoom", label: "보기 확대·축소", labelKey: "studio.settings.tool.zoom", defaultKeys: "Z" },
-  { id: "tool-rotate-view", label: "보기 회전", labelKey: "studio.settings.tool.rotateView", defaultKeys: "R" },
+  { id: "tool-blend", label: "색 경계 섞기", labelKey: "studio.settings.shortcut.toolBlend", defaultKeys: "N" },
+  { id: "tool-wet-mix", label: "물감처럼 섞어 칠하기", labelKey: "studio.settings.shortcut.toolWetMix", defaultKeys: "Shift+N" },
+  { id: "tool-dodge-burn", label: "밝게·어둡게 칠하기", labelKey: "studio.settings.shortcut.toolDodgeBurn", defaultKeys: "O" },
+  { id: "tool-liquify", label: "밀어서 모양 바꾸기", labelKey: "studio.settings.shortcut.toolLiquify", defaultKeys: "J" },
+  { id: "tool-lettering", label: "글자·말풍선", labelKey: "studio.settings.shortcut.toolLettering", defaultKeys: "T" },
+  { id: "tool-zoom", label: "화면 확대·축소", labelKey: "studio.settings.tool.zoom", defaultKeys: "Z" },
+  { id: "tool-rotate-view", label: "화면 회전", labelKey: "studio.settings.tool.rotateView", defaultKeys: "R" },
   { id: "undo", label: "실행취소", labelKey: "studio.settings.shortcut.undo", defaultKeys: "Mod+Z" },
   { id: "redo", label: "다시실행", labelKey: "studio.settings.shortcut.redo", defaultKeys: "Mod+Shift+Z" },
   { id: "deselect-pixels", label: "선택 해제", labelKey: "studio.settings.shortcut.deselectPixels", defaultKeys: "Mod+D" },
@@ -116,13 +134,13 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "flip-selection-h", label: "선택 좌우 반전", labelKey: "studio.settings.shortcut.flipSelectionH", defaultKeys: "Shift+H" },
   { id: "flip-selection-v", label: "선택 상하 반전", labelKey: "studio.settings.shortcut.flipSelectionV", defaultKeys: "Shift+V" },
   { id: "shortcuts-help", label: "단축키 도움말", labelKey: "studio.settings.shortcut.help", defaultKeys: "?" },
-  { id: "toggle-transparent-color", label: "투명색 그리기 토글", labelKey: "studio.settings.shortcut.toggleTransparentColor", defaultKeys: "C" },
-  { id: "new-layer", label: "새 래스터 레이어", labelKey: "studio.settings.shortcut.newLayer", defaultKeys: "Mod+Shift+N" },
-  { id: "merge-layer-down", label: "아래 레이어와 결합", labelKey: "studio.settings.shortcut.mergeLayerDown", defaultKeys: "Mod+E" },
+  { id: "toggle-transparent-color", label: "투명색으로 그리기", labelKey: "studio.settings.shortcut.toggleTransparentColor", defaultKeys: "Shift+C" },
+  { id: "new-layer", label: "새 픽셀 레이어", labelKey: "studio.settings.shortcut.newLayer", defaultKeys: "Mod+Shift+N" },
+  { id: "merge-layer-down", label: "아래 레이어와 합치기", labelKey: "studio.settings.shortcut.mergeLayerDown", defaultKeys: "Mod+E" },
   { id: "duplicate-layer", label: "레이어 복제", labelKey: "studio.settings.shortcut.duplicateLayer", defaultKeys: "Mod+J" },
   { id: "group-layers", label: "선택 레이어 그룹화", labelKey: "studio.settings.shortcut.groupLayers", defaultKeys: "Mod+G" },
   { id: "fit-view", label: "화면 크기에 맞춤", labelKey: "studio.settings.shortcut.fitView", defaultKeys: "Mod+0" },
-  { id: "actual-size-view", label: "100% 원본 뷰", labelKey: "studio.settings.shortcut.actualSizeView", defaultKeys: "Mod+1" },
+  { id: "actual-size-view", label: "100% 원본 보기", labelKey: "studio.settings.shortcut.actualSizeView", defaultKeys: "Mod+1" },
 ] as const;
 
 export type StudioShortcutActionId = (typeof STUDIO_SHORTCUT_ACTIONS)[number]["id"];
@@ -211,7 +229,7 @@ export function defaultStudioShortcuts(): Record<StudioShortcutActionId, string>
 export function defaultStudioAppSettings(): StudioAppSettings {
   return {
     general: {
-      densityMode: "full",
+      densityMode: DEFAULT_STUDIO_UI_DENSITY_MODE,
       toolHintMode: DEFAULT_STUDIO_TOOL_HINT_MODE,
       brushCursorStyle: "outline",
       // Keep the latency-critical surface opt-in. Artists who use strong stabilization can enable
@@ -234,7 +252,7 @@ export function defaultStudioAppSettings(): StudioAppSettings {
       toolHintHoldMs: DEFAULT_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
     },
     toolbar: {
-      visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER],
+      visibleIds: [...DEFAULT_STUDIO_RAIL_VISIBLE_IDS],
     },
     grids: {
       // Precision chrome should never reduce the first-open canvas.
@@ -255,14 +273,14 @@ export function defaultStudioAppSettings(): StudioAppSettings {
 }
 
 export function isStudioRailToolId(value: unknown): value is StudioRailToolId {
-  return typeof value === "string" && STUDIO_RAIL_TOOL_CATALOG.some((t) => t.id === value);
+  return typeof value === "string" && STUDIO_RAIL_TOOL_CATALOG.some((tool) => tool.id === value);
 }
 
 export function isStudioShortcutActionId(value: unknown): value is StudioShortcutActionId {
-  return typeof value === "string" && STUDIO_SHORTCUT_ACTIONS.some((a) => a.id === value);
+  return typeof value === "string" && STUDIO_SHORTCUT_ACTIONS.some((action) => action.id === value);
 }
 
-/** Normalize visible rail order: unique, catalog-only, append missing at end if none hidden. */
+/** Normalize visible rail order: unique and catalog-only; invalid empty state gets the guided rail. */
 export function normalizeStudioRailVisibleIds(value: unknown): StudioRailToolId[] {
   const catalog = new Set(DEFAULT_STUDIO_RAIL_TOOL_ORDER);
   const seen = new Set<StudioRailToolId>();
@@ -274,15 +292,14 @@ export function normalizeStudioRailVisibleIds(value: unknown): StudioRailToolId[
       out.push(entry);
     }
   }
-  // Empty list is invalid — fall back to full default (the rail must always keep some tools).
-  // New catalog tools not in the saved list stay "hidden" and surface via More menu.
-  if (out.length === 0) return [...DEFAULT_STUDIO_RAIL_TOOL_ORDER];
+  // New/invalid state gets a compact, predictable creation path. All other tools stay in More.
+  if (out.length === 0) return [...DEFAULT_STUDIO_RAIL_VISIBLE_IDS];
   return out;
 }
 
 export function studioRailHiddenIds(visibleIds: readonly StudioRailToolId[]): StudioRailToolId[] {
-  const vis = new Set(visibleIds);
-  return DEFAULT_STUDIO_RAIL_TOOL_ORDER.filter((id) => !vis.has(id));
+  const visible = new Set(visibleIds);
+  return DEFAULT_STUDIO_RAIL_TOOL_ORDER.filter((id) => !visible.has(id));
 }
 
 export function moveStudioRailTool(
@@ -291,12 +308,12 @@ export function moveStudioRailTool(
   direction: -1 | 1
 ): StudioRailToolId[] {
   const list = normalizeStudioRailVisibleIds(visibleIds);
-  const idx = list.indexOf(id);
-  if (idx < 0) return list;
-  const next = idx + direction;
+  const index = list.indexOf(id);
+  if (index < 0) return list;
+  const next = index + direction;
   if (next < 0 || next >= list.length) return list;
   const copy = [...list];
-  const [item] = copy.splice(idx, 1);
+  const [item] = copy.splice(index, 1);
   copy.splice(next, 0, item!);
   return copy;
 }
@@ -305,8 +322,8 @@ export function hideStudioRailTool(
   visibleIds: readonly StudioRailToolId[],
   id: StudioRailToolId
 ): StudioRailToolId[] {
-  const list = normalizeStudioRailVisibleIds(visibleIds).filter((x) => x !== id);
-  return list.length === 0 ? [...DEFAULT_STUDIO_RAIL_TOOL_ORDER] : list;
+  const list = normalizeStudioRailVisibleIds(visibleIds).filter((toolId) => toolId !== id);
+  return list.length === 0 ? [...DEFAULT_STUDIO_RAIL_VISIBLE_IDS] : list;
 }
 
 export function showStudioRailTool(
@@ -333,6 +350,10 @@ export function normalizeStudioShortcuts(
   // Browser editors must never turn Tab into an in-canvas trap. Migrate the
   // former desktop-app-style binding while preserving an explicitly unbound key.
   if (base["toggle-chrome"].toLocaleLowerCase() === "tab") base["toggle-chrome"] = "`";
+  // Migrate the shipped C/C collision. Keep crop on the familiar key and move transparent ink.
+  if (base["tool-crop"].toUpperCase() === "C" && base["toggle-transparent-color"].toUpperCase() === "C") {
+    base["toggle-transparent-color"] = "Shift+C";
+  }
   return base;
 }
 
@@ -345,7 +366,7 @@ export function parseStudioShortcutChord(chord: string): {
 } | null {
   const parts = chord
     .split("+")
-    .map((p) => p.trim())
+    .map((part) => part.trim())
     .filter(Boolean);
   if (parts.length === 0) return null;
   let mod = false;
@@ -476,69 +497,72 @@ export function listStudioShortcutConflicts(
 }
 
 export function normalizeStudioAppSettings(value?: unknown): StudioAppSettings {
-  const d = defaultStudioAppSettings();
-  if (!value || typeof value !== "object") return d;
-  const r = value as Record<string, unknown>;
-  const g = (r.general && typeof r.general === "object" ? r.general : {}) as Record<string, unknown>;
-  const m = (r.mouse && typeof r.mouse === "object" ? r.mouse : {}) as Record<string, unknown>;
-  const t = (r.touch && typeof r.touch === "object" ? r.touch : {}) as Record<string, unknown>;
-  const tb = (r.toolbar && typeof r.toolbar === "object" ? r.toolbar : {}) as Record<string, unknown>;
-  const gr = (r.grids && typeof r.grids === "object" ? r.grids : {}) as Record<string, unknown>;
-  const o = (r.other && typeof r.other === "object" ? r.other : {}) as Record<string, unknown>;
+  const defaults = defaultStudioAppSettings();
+  if (!value || typeof value !== "object") return defaults;
+  const record = value as Record<string, unknown>;
+  const general = (record.general && typeof record.general === "object" ? record.general : {}) as Record<string, unknown>;
+  const mouse = (record.mouse && typeof record.mouse === "object" ? record.mouse : {}) as Record<string, unknown>;
+  const touch = (record.touch && typeof record.touch === "object" ? record.touch : {}) as Record<string, unknown>;
+  const toolbar = (record.toolbar && typeof record.toolbar === "object" ? record.toolbar : {}) as Record<string, unknown>;
+  const grids = (record.grids && typeof record.grids === "object" ? record.grids : {}) as Record<string, unknown>;
+  const other = (record.other && typeof record.other === "object" ? record.other : {}) as Record<string, unknown>;
 
-  const pixelSize = asNum(gr.pixelGridSize, d.grids.pixelGridSize, 10, 200);
-  const nearest = PIXEL_GRID_SIZES.reduce((best, sz) =>
-    Math.abs(sz - pixelSize) < Math.abs(best - pixelSize) ? sz : best
+  const pixelSize = asNum(grids.pixelGridSize, defaults.grids.pixelGridSize, 10, 200);
+  const nearest = PIXEL_GRID_SIZES.reduce((best, size) =>
+    Math.abs(size - pixelSize) < Math.abs(best - pixelSize) ? size : best
   );
 
   return {
     general: {
-      densityMode: normalizeStudioUiDensityMode(g.densityMode ?? d.general.densityMode),
-      toolHintMode: normalizeStudioToolHintMode(g.toolHintMode, g.showToolHints),
+      densityMode: normalizeStudioUiDensityMode(general.densityMode ?? defaults.general.densityMode),
+      toolHintMode: normalizeStudioToolHintMode(general.toolHintMode, general.showToolHints),
       brushCursorStyle: asEnum(
-        g.brushCursorStyle,
+        general.brushCursorStyle,
         ["outline", "dot", "none"] as const,
-        d.general.brushCursorStyle
+        defaults.general.brushCursorStyle
       ),
-      showStrokeGuide: asBool(g.showStrokeGuide, d.general.showStrokeGuide),
-      confirmBeforeClearLayer: asBool(g.confirmBeforeClearLayer, d.general.confirmBeforeClearLayer),
+      showStrokeGuide: asBool(general.showStrokeGuide, defaults.general.showStrokeGuide),
+      confirmBeforeClearLayer: asBool(
+        general.confirmBeforeClearLayer,
+        defaults.general.confirmBeforeClearLayer
+      ),
     },
-    shortcuts: normalizeStudioShortcuts(r.shortcuts),
+    shortcuts: normalizeStudioShortcuts(record.shortcuts),
     mouse: {
-      wheel: asEnum(m.wheel, ["zoom", "pan", "brush-size"] as const, d.mouse.wheel),
-      reverseWheel: asBool(m.reverseWheel, d.mouse.reverseWheel),
+      wheel: asEnum(mouse.wheel, ["zoom", "pan", "brush-size"] as const, defaults.mouse.wheel),
+      reverseWheel: asBool(mouse.reverseWheel, defaults.mouse.reverseWheel),
       middleButton: asEnum(
-        m.middleButton,
+        mouse.middleButton,
         ["pan", "zoom", "eyedropper", "context", "none"] as const,
-        d.mouse.middleButton
+        defaults.mouse.middleButton
       ),
       rightButton: asEnum(
-        m.rightButton,
+        mouse.rightButton,
         ["pan", "zoom", "eyedropper", "context", "none"] as const,
-        d.mouse.rightButton
+        defaults.mouse.rightButton
       ),
     },
     touch: {
-      oneFingerDrag: asEnum(t.oneFingerDrag, ["draw", "pan", "none"] as const, d.touch.oneFingerDrag),
-      twoFinger: asEnum(t.twoFinger, ["pan-zoom", "undo-redo"] as const, d.touch.twoFinger),
-      threeFinger: asEnum(t.threeFinger, ["undo", "toggle-ui", "none"] as const, d.touch.threeFinger),
-      palmRejection: asBool(t.palmRejection, d.touch.palmRejection),
-      toolHintHoldMs: normalizeStudioToolHintTouchHoldMs(t.toolHintHoldMs),
+      oneFingerDrag: asEnum(touch.oneFingerDrag, ["draw", "pan", "none"] as const, defaults.touch.oneFingerDrag),
+      twoFinger: asEnum(touch.twoFinger, ["pan-zoom", "undo-redo"] as const, defaults.touch.twoFinger),
+      threeFinger: asEnum(touch.threeFinger, ["undo", "toggle-ui", "none"] as const, defaults.touch.threeFinger),
+      palmRejection: asBool(touch.palmRejection, defaults.touch.palmRejection),
+      toolHintHoldMs: normalizeStudioToolHintTouchHoldMs(touch.toolHintHoldMs),
     },
     toolbar: {
-      visibleIds: normalizeStudioRailVisibleIds(tb.visibleIds),
+      visibleIds: normalizeStudioRailVisibleIds(toolbar.visibleIds),
     },
     grids: {
-      showCanvasRulers: asBool(gr.showCanvasRulers, d.grids.showCanvasRulers),
-      showPixelGrid: asBool(gr.showPixelGrid, d.grids.showPixelGrid),
+      showCanvasRulers: asBool(grids.showCanvasRulers, defaults.grids.showCanvasRulers),
+      showPixelGrid: asBool(grids.showPixelGrid, defaults.grids.showPixelGrid),
       pixelGridSize: nearest,
-      snapToPixelGrid: asBool(gr.snapToPixelGrid, DEFAULT_STUDIO_SNAP_TO_PIXEL_GRID),
-      showAlignmentGuides: asBool(gr.showAlignmentGuides, DEFAULT_STUDIO_SHOW_ALIGNMENT_GUIDES),
-      showIsometricOnDraw: asBool(gr.showIsometricOnDraw, d.grids.showIsometricOnDraw),
+      snapToPixelGrid: asBool(grids.snapToPixelGrid, DEFAULT_STUDIO_SNAP_TO_PIXEL_GRID),
+      showAlignmentGuides: asBool(grids.showAlignmentGuides, DEFAULT_STUDIO_SHOW_ALIGNMENT_GUIDES),
+      showIsometricOnDraw: asBool(grids.showIsometricOnDraw, defaults.grids.showIsometricOnDraw),
     },
     other: {
-      pressureCurve: asNum(o.pressureCurve, d.other.pressureCurve, 0.35, 2.5),
-      reduceMotion: asBool(o.reduceMotion, d.other.reduceMotion),
+      pressureCurve: asNum(other.pressureCurve, defaults.other.pressureCurve, 0.35, 2.5),
+      reduceMotion: asBool(other.reduceMotion, defaults.other.reduceMotion),
     },
   };
 }
@@ -627,7 +651,9 @@ export function studioRailToolLabel(
 ): string {
   const tool = STUDIO_RAIL_TOOL_CATALOG.find((toolItem) => toolItem.id === id);
   if (!tool) return id;
-  return t ? t(tool.labelKey) : tool.label;
+  if (!t) return tool.label;
+  const translated = t(tool.labelKey);
+  return translated === tool.labelKey ? tool.label : translated;
 }
 
 export function studioShortcutActionLabel(
@@ -636,7 +662,9 @@ export function studioShortcutActionLabel(
 ): string {
   const action = STUDIO_SHORTCUT_ACTIONS.find((item) => item.id === actionId);
   if (!action) return actionId;
-  return t ? t(action.labelKey) : action.label;
+  if (!t) return action.label;
+  const translated = t(action.labelKey);
+  return translated === action.labelKey ? action.label : translated;
 }
 
 export const STUDIO_PIXEL_GRID_SIZE_OPTIONS = PIXEL_GRID_SIZES;
