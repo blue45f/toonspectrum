@@ -1,0 +1,104 @@
+name: One-shot PR 917 protected CI priority
+
+on:
+  push:
+    branches:
+      - ops/pr917-priority-20260908
+    paths:
+      - .github/workflows/one-shot-pr917-priority.yml
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: one-shot-pr917-priority-20260908
+  cancel-in-progress: true
+
+jobs:
+  prioritize-latest-final-runs:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_PR: "917"
+    steps:
+      - name: Preserve only the latest run of each workflow for the current PR head
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          self="$GITHUB_RUN_ID"
+
+          pr_json="$(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${repo}/pulls/${TARGET_PR}")"
+          pr_state="$(jq -r '.state' <<<"$pr_json")"
+          final_branch="$(jq -r '.head.ref' <<<"$pr_json")"
+          final_sha="$(jq -r '.head.sha' <<<"$pr_json")"
+          test "$pr_state" = "open"
+          echo "Final candidate: ${final_branch}@${final_sha}"
+
+          candidates="$(mktemp)"
+          keep_ids="$(mktemp)"
+          for status in queued in_progress waiting pending requested; do
+            gh api --paginate \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${repo}/actions/runs?status=${status}&per_page=100" \
+              --jq '.workflow_runs[] | [.id, (.head_branch // ""), .head_sha, .name, .status] | @tsv' \
+              >> "$candidates"
+          done
+          sort -u "$candidates" -o "$candidates"
+
+          awk -F '\t' -v branch="$final_branch" -v sha="$final_sha" '
+            $2 == branch && $3 == sha {
+              name = $4
+              if (($1 + 0) > (latest[name] + 0)) latest[name] = $1
+            }
+            END { for (name in latest) print latest[name] }
+          ' "$candidates" | sort -n > "$keep_ids"
+
+          echo "Protected latest run IDs:"
+          cat "$keep_ids" || true
+
+          cancelled=0
+          preserved=0
+          raced=0
+          while IFS=$'\t' read -r run_id branch sha name status; do
+            [[ -n "$run_id" ]] || continue
+            if [[ "$run_id" == "$self" || -z "$branch" || "$branch" == "main" ]]; then
+              preserved=$((preserved + 1))
+              continue
+            fi
+            if grep -qx "$run_id" "$keep_ids"; then
+              echo "Preserving latest ${name}#${run_id} on ${branch}@${sha} (${status})"
+              preserved=$((preserved + 1))
+              continue
+            fi
+
+            echo "Cancelling superseded ${name}#${run_id} on ${branch}@${sha} (${status})"
+            if gh api --method POST \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${repo}/actions/runs/${run_id}/cancel" >/dev/null 2>&1; then
+              cancelled=$((cancelled + 1))
+            else
+              raced=$((raced + 1))
+            fi
+          done < "$candidates"
+
+          echo "Preserved ${preserved}; cancelled ${cancelled}; raced or already completed ${raced}."
+
+      - name: Retire queue-control branch
+        if: always()
+        shell: bash
+        run: |
+          encoded='ops%2Fpr917-priority-20260908'
+          gh api --method DELETE \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${GITHUB_REPOSITORY}/git/refs/heads/${encoded}" \
+            >/dev/null 2>&1 || true
