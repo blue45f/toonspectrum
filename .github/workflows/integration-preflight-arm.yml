@@ -1,0 +1,52 @@
+name: Integration preflight ARM
+
+on:
+  pull_request:
+    branches:
+      - integration/final-open-worktrees-locked-7ed3d955
+    paths:
+      - '**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-preflight-arm-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck-arm:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run validate:architecture
+      - run: pnpm typecheck
+
+  lint-arm:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run validate:architecture
+      - run: pnpm run verify:csp
+      - run: pnpm run verify:toolchain-coverage
+      - run: pnpm lint
