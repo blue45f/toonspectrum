@@ -14,7 +14,6 @@ import {
   StudioShapePickerGrid,
   StudioUnifiedBrushPicker,
   loadStudioBrushStudio,
-  preloadStudioFilterDialog,
 } from "./studio-page-lazy-ui";
 import {
   StudioMobileEditingDock,
@@ -149,7 +148,11 @@ vi.mock("./studio-page-lazy-ui", () => ({
     </section>
   ),
   loadStudioBrushStudio: vi.fn(async () => undefined),
-  preloadStudioFilterDialog: vi.fn(),
+}));
+
+const preloadStudioFilterDialog = vi.hoisted(() => vi.fn());
+vi.mock("./studio-filter-dialog-intent", () => ({
+  useStudioFilterDialogIntent: () => preloadStudioFilterDialog,
 }));
 
 vi.mock("./StudioLineCorrectionControls", () => ({

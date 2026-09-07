@@ -1,5 +1,3 @@
-import { preloadStudioFilterDialog } from "./studio-page-lazy-ui";
-
 /**
  * Warms the runtime a main-menu group is about to need, on hover or focus.
  *
@@ -15,9 +13,12 @@ import { preloadStudioFilterDialog } from "./studio-page-lazy-ui";
  * change what the artist sees. Failures are swallowed because a warmup that did not happen only
  * costs the boot the click would have paid anyway.
  */
-export function preloadStudioMainMenuGroupRuntime(groupId: string): void {
+export function preloadStudioMainMenuGroupRuntime(
+  groupId: string,
+  preloadFilterDialog: () => void,
+): void {
   if (groupId !== "filter") return;
-  preloadStudioFilterDialog();
+  preloadFilterDialog();
   void import("./render/studio-raster-retouch-preload")
     .then((module) => module.preloadStudioRasterRetouchRuntime())
     .catch(() => undefined);

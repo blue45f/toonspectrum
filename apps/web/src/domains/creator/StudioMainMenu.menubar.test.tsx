@@ -11,14 +11,14 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createStudioMainMenuPresentation } from "./studio-main-menu-presentation";
-import { preloadStudioFilterDialog } from "./studio-page-lazy-ui";
 import { StudioMainMenu } from "./StudioMainMenu";
 import { StudioToolHintPreferencesProvider } from "./StudioToolHint";
 
 import type { StudioMainMenuGroup } from "./studio-main-menu-model";
 
-vi.mock("./studio-page-lazy-ui", () => ({
-  preloadStudioFilterDialog: vi.fn(),
+const preloadStudioFilterDialog = vi.hoisted(() => vi.fn());
+vi.mock("./studio-filter-dialog-intent", () => ({
+  useStudioFilterDialogIntent: () => preloadStudioFilterDialog,
 }));
 
 vi.mock("./render/studio-raster-retouch-preload", () => ({

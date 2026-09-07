@@ -691,6 +691,7 @@ import {
 } from "./studio-magic-wand";
 import { bindStudioMainMenuEditorActions } from "./studio-main-menu-editor-bindings";
 import { buildStudioMainMenuGroups } from "./studio-main-menu-groups";
+import { StudioFilterDialogIntentContext } from "./studio-filter-dialog-intent";
 import { bindStudioMainMenuSurfaceActions } from "./studio-main-menu-surface-bindings";
 import {
   composeThumbPage,
@@ -29420,28 +29421,30 @@ function clearSelectionForEdit() {
   );
 
   return (
-    <StudioDccWorkbenchRoute
-      dccRouteAccess={hybridDccRouteAccess}
-      dccRouteRequested={hybridDccRouteRequested}
-      onCloseWorkbench={closeHybridDccWorkspace}
-      onFlushWorkspacePersistence={flushHybridDccWorkspacePersistence}
-    >
-      {editorSurface}
-      <StudioWebtoonAssistantModal
-        open={webtoonAssistantOpen}
-        onClose={() => setWebtoonAssistantOpen(false)}
-        canvasWidth={CANVAS_W}
-        canvasHeight={canvasH}
-      />
-      <StudioAiSuperSuiteModal
-        open={aiSuperSuiteOpen}
-        onClose={() => setAiSuperSuiteOpen(false)}
-        onApplyPrompt={(prompt) => {
-          setAiBgPrompt(prompt);
-          setAiAssistTool("background");
-          setAiSuperSuiteOpen(false);
-        }}
-      />
-    </StudioDccWorkbenchRoute>
+    <StudioFilterDialogIntentContext value={preloadStudioFilterDialog}>
+      <StudioDccWorkbenchRoute
+        dccRouteAccess={hybridDccRouteAccess}
+        dccRouteRequested={hybridDccRouteRequested}
+        onCloseWorkbench={closeHybridDccWorkspace}
+        onFlushWorkspacePersistence={flushHybridDccWorkspacePersistence}
+      >
+        {editorSurface}
+        <StudioWebtoonAssistantModal
+          open={webtoonAssistantOpen}
+          onClose={() => setWebtoonAssistantOpen(false)}
+          canvasWidth={CANVAS_W}
+          canvasHeight={canvasH}
+        />
+        <StudioAiSuperSuiteModal
+          open={aiSuperSuiteOpen}
+          onClose={() => setAiSuperSuiteOpen(false)}
+          onApplyPrompt={(prompt) => {
+            setAiBgPrompt(prompt);
+            setAiAssistTool("background");
+            setAiSuperSuiteOpen(false);
+          }}
+        />
+      </StudioDccWorkbenchRoute>
+    </StudioFilterDialogIntentContext>
   );
 }

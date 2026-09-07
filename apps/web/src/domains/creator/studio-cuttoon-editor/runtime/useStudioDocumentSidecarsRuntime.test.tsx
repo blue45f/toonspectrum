@@ -13,6 +13,7 @@ import { useStudioDocumentSidecarsRuntime } from "./useStudioDocumentSidecarsRun
 
 import type { StudioPageHistoryJournal } from "../../history/studio-page-sidecars-controller";
 import type { DrawEl } from "../../studio-element-model";
+import type { StudioReferenceBoardItem } from "../../studio-reference-board";
 import type { StudioRetainedStrokeUndoneBatch } from "../../studio-retained-stroke-history";
 import type { StudioDeferredStrokeCommitEngineContext } from "../studio-deferred-stroke-commit";
 
@@ -81,6 +82,41 @@ describe("retained redo across document sidecar edits", () => {
     });
     expect(editor.undone.current).toBe(before);
     expect(editor.discardPixels).not.toHaveBeenCalled();
+  });
+
+  it("publishes one Reference snapshot after batched edits and keeps rejected or pending state private", () => {
+    const editor = fixture();
+    const initial = editor.result.current.referenceBoardCommittedSnapshotRef.current;
+    const item = (id: string): StudioReferenceBoardItem => ({
+      id, asset: { sha256: `sha256:${"a".repeat(64)}` }, view: { ...DEFAULT_STUDIO_REFERENCE_BOARD_ITEM_VIEW },
+    });
+    act(() => {
+      expect(editor.result.current.setReferenceBoard({ version: 1, items: [item("first")] })).toBe(true);
+      expect(editor.result.current.setReferenceBoard({ version: 1, items: [item("second")] })).toBe(true);
+      expect(editor.result.current.referenceBoardLatestRequestedRef.current.items[0]?.id).toBe("second");
+      expect(editor.result.current.referenceBoardCommittedSnapshotRef.current).toBe(initial);
+    });
+    const committed = editor.result.current.referenceBoardCommittedSnapshotRef.current;
+    expect(committed).toEqual({ document: editor.result.current.referenceBoard, revision: initial.revision + 1 });
+    expect(committed.document.items[0]?.id).toBe("second");
+
+    editor.markStudioDocumentChanged.mockReturnValue(false);
+    act(() => {
+      expect(editor.result.current.setReferenceBoard({ version: 1, items: [item("rejected")] })).toBe(false);
+    });
+    expect(editor.result.current.referenceBoardCommittedSnapshotRef.current).toBe(committed);
+    expect(editor.result.current.referenceBoardLatestRequestedRef.current).toBe(committed.document);
+
+    const invalidations = editor.discardPixels.mock.calls.length;
+    act(() => {
+      editor.result.current.setReferenceBoardState({ version: 1, items: [item("hydrated")] });
+      expect(editor.result.current.referenceBoardCommittedSnapshotRef.current).toBe(committed);
+    });
+    expect(editor.result.current.referenceBoardCommittedSnapshotRef.current).toEqual({
+      document: editor.result.current.referenceBoard, revision: committed.revision + 1,
+    });
+    expect(editor.result.current.referenceBoard.items[0]?.id).toBe("hydrated");
+    expect(editor.discardPixels).toHaveBeenCalledTimes(invalidations);
   });
 
   it.each(["undo", "redo"] as const)("keeps the retained branch while restoring journaled sidecar %s", direction => {

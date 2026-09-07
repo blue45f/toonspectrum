@@ -28,7 +28,7 @@ import {
   type StudioInspectorRasterToolPolicy,
 } from "./studio-inspector-raster-tool-policy";
 import { STUDIO_EASE, STUDIO_FOCUS_RING, StudioContextPill } from "./studio-panel-ui";
-import { preloadStudioFilterDialog } from "./studio-page-lazy-ui";
+import { useStudioFilterDialogIntent } from "./studio-filter-dialog-intent";
 
 import type { StudioFilterKind } from "./filter/studio-filter-menu";
 import type {
@@ -530,6 +530,7 @@ export function StudioInspectorFilterLauncher({
   onRecover,
   onSelect,
 }: StudioInspectorFilterLauncherProps): ReactElement {
+  const preloadStudioFilterDialog = useStudioFilterDialogIntent();
   const descriptionId = useId();
   const gate = availability.entry;
   const policy = resolveStudioInspectorRasterToolPolicy(availability);

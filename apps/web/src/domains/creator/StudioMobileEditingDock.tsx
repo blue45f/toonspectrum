@@ -68,7 +68,7 @@ import {
   type StudioMobileSheetSnap,
 } from "./studio-mobile-sheet-snap";
 import { STUDIO_EASE } from "./studio-panel-ui";
-import { preloadStudioFilterDialog } from "./studio-page-lazy-ui";
+import { useStudioFilterDialogIntent } from "./studio-filter-dialog-intent";
 import {
   STUDIO_ERASE_TO_INTERSECTION_LABEL,
   STUDIO_ERASE_TO_INTERSECTION_TIP,
@@ -259,6 +259,7 @@ function StudioMobileFilterSelect({
   onSelect,
   placement,
 }: StudioMobileFilterSelectProps) {
+  const preloadStudioFilterDialog = useStudioFilterDialogIntent();
   const guidanceId = useId();
   const unavailableReason = filterUnavailableReason ?? (
     filterMutationLocked ? "편집 잠금을 해제한 뒤 필터를 적용하세요." : null

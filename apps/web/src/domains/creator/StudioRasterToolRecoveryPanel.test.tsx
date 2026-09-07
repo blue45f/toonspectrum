@@ -5,7 +5,6 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resolveStudioRasterToolAvailability } from "./render/studio-raster-tool-availability";
-import { preloadStudioFilterDialog } from "./studio-page-lazy-ui";
 import {
   StudioInspectorFilterLauncher,
   StudioInspectorPixelSelectionLauncher,
@@ -21,8 +20,9 @@ vi.mock("./render/studio-raster-retouch-preload", () => ({
   preloadStudioRasterRetouchRuntime: preloadRasterRetouchRuntime,
 }));
 
-vi.mock("./studio-page-lazy-ui", () => ({
-  preloadStudioFilterDialog: vi.fn(),
+const preloadStudioFilterDialog = vi.hoisted(() => vi.fn());
+vi.mock("./studio-filter-dialog-intent", () => ({
+  useStudioFilterDialogIntent: () => preloadStudioFilterDialog,
 }));
 
 afterEach(() => {
