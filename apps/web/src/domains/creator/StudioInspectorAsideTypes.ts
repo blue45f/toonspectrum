@@ -211,6 +211,8 @@ export interface StudioInspectorAsideHandlers {
 }
 
 export interface StudioInspectorAsideProps {
+  commandSearchRequest?: import("./studio-help-center-channel").StudioCommandSearchRequest | null;
+  onCommandSearchRequestHandled?: () => void;
   activeSavedBrushId: string | null;
   advancedRulers: StudioAdvancedRulerDocument;
   activeSurfaceReviewLocked: boolean;

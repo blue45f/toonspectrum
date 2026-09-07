@@ -13,6 +13,7 @@
  *
  * Run: pnpm run build && pnpm exec tsx scripts/verify-studio-filter-dialog.mts
  * Expects production build in dist/ (vite preview) — see studio-verify skill §2.
+ * TOONSPECTRUM_VERIFY_ORIGIN reuses an existing production preview and its configured API origin.
  *
  * Exit codes: 0 = every filter case applied, visibly changed pixels and undid cleanly
  *             1 = dialog, preview, apply, pixel-diff or browser-diagnostic failure
@@ -422,8 +423,10 @@ async function main(): Promise<void> {
   });
 
   const startedAt = new Date().toISOString();
-  const port = await findFreePort({ unavailableMessage: "could not allocate preview port" });
-  const url = `http://127.0.0.1:${port}/studio`;
+  const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim().replace(/\/+$/, "");
+  const port = externalOrigin ? null : await findFreePort({ unavailableMessage: "could not allocate preview port" });
+  const origin = externalOrigin ?? `http://127.0.0.1:${port}`;
+  const url = `${origin}/studio`;
   let child: ChildProcess | null = null;
 
   const results: FilterCaseResult[] = [];
@@ -433,14 +436,14 @@ async function main(): Promise<void> {
   };
 
   try {
-    child = spawnVitePreview({
+    child = port === null ? null : spawnVitePreview({
       port,
       runner: "pnpm-exec",
       logPath: LOG_PATH,
     });
-    await waitForServer(`http://127.0.0.1:${port}/`, {
+    await waitForServer(`${origin}/`, {
       timeoutMs: 20_000,
-      notReadyMessage: `preview not ready: http://127.0.0.1:${port}/`,
+      notReadyMessage: `preview not ready: ${origin}/`,
     });
     log(`preview ready @ ${url}`);
 

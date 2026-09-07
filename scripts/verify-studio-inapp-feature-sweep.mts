@@ -112,6 +112,24 @@ function dock(page: Page) {
   return page.locator('[data-studio-mobile-editing-dock="true"]');
 }
 
+async function openDrawSettings(page: Page): Promise<Locator> {
+  const pen = dock(page).locator('button[data-studio-primary-action="draw"]');
+  if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+  const settings = dock(page).getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)", exact: true });
+  if (await settings.getAttribute("aria-expanded") !== "true") await settings.click();
+  const sheet = page.locator("#studio-mobile-draw-settings");
+  await sheet.getByRole("slider", { name: "브러시 굵기 슬라이더", exact: true }).waitFor();
+  return sheet;
+}
+
+async function openBrushLibrary(page: Page): Promise<Locator> {
+  const sheet = await openDrawSettings(page);
+  await sheet.locator('[data-studio-open-brush-library="true"]').click();
+  const library = page.locator('[data-studio-brush-library="true"]').first();
+  await library.waitFor();
+  return library;
+}
+
 /** 작업 메뉴(2행)를 펼친다. 이미 펼쳐져 있으면 그대로 둔다. */
 async function expandWorkRow(page: Page): Promise<boolean> {
   const expanded = page.locator(
@@ -269,43 +287,51 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
     id: "brush-size-and-opacity",
     label: "굵기·투명도 조절",
     run: async (page) => {
-      const sheet = page.locator("#studio-mobile-draw-settings");
-      if (await sheet.count() === 0) return { skipped: "sheet not open" };
-      let touched = 0;
-      for (const name of ["브러시 굵기 슬라이더", "브러시 투명도 슬라이더", "지우기 강도 슬라이더"]) {
-        const slider = sheet.getByRole("slider", { name });
-        if (await slider.count() === 0) continue;
-        await slider.first().fill("40").catch(() => undefined);
-        touched += 1;
-        await page.waitForTimeout(200);
+      const sheet = await openDrawSettings(page);
+      for (const name of ["브러시 굵기", "브러시 투명도"]) {
+        const number = sheet.getByRole("spinbutton", { name: `${name} 숫자`, exact: true });
+        const slider = sheet.getByRole("slider", { name: `${name} 슬라이더`, exact: true });
+        await number.fill("40");
+        if (await slider.inputValue() !== "40") throw new Error(`${name}: numeric entry did not update the slider`);
+        await slider.focus();
+        await slider.press("ArrowRight");
+        if (await number.inputValue() !== "41") throw new Error(`${name}: slider keyboard input did not update the value`);
       }
+      await sheet.getByRole("spinbutton", { name: "브러시 굵기 숫자", exact: true }).fill("8");
+      await sheet.getByRole("spinbutton", { name: "브러시 투명도 숫자", exact: true }).fill("100");
       await settle(page);
-      return touched > 0 ? "ok" : { skipped: "no sliders in the sheet" };
+      return "ok";
     },
   },
   {
     id: "brush-colour-swatch",
     label: "색상 선택",
     run: async (page) => {
-      const sheet = page.locator("#studio-mobile-draw-settings");
-      if (await sheet.count() === 0) return { skipped: "sheet not open" };
-      return clickLocator(page, sheet.getByRole("button", { name: /^색상 #/u }), "colour swatch");
+      const sheet = await openDrawSettings(page);
+      const swatches = sheet.getByRole("button", { name: /^색상 #/u });
+      if (await swatches.count() === 0) throw new Error("brush colour swatches are missing");
+      for (const swatch of await swatches.all()) {
+        await swatch.click();
+        if (await swatch.getAttribute("aria-pressed") !== "true") throw new Error("selected colour was not applied");
+      }
+      await swatches.first().click();
+      return "ok";
     },
   },
   {
     id: "brush-draw-mode-group",
     label: "그리기 모드 전환",
     run: async (page) => {
-      const sheet = page.locator("#studio-mobile-draw-settings");
-      if (await sheet.count() === 0) return { skipped: "sheet not open" };
+      const sheet = await openDrawSettings(page);
       const group = sheet.getByRole("group", { name: "그리기 모드" });
-      if (await group.count() === 0) return { skipped: "no draw mode group" };
       const buttons = group.getByRole("button");
       const count = await buttons.count();
-      for (let index = 0; index < Math.min(count, 4); index += 1) {
-        await buttons.nth(index).click({ timeout: 3_000, force: true }).catch(() => undefined);
-        await page.waitForTimeout(250);
+      if (count !== 4) throw new Error(`expected four draw modes, found ${count}`);
+      for (let index = 0; index < count; index += 1) {
+        await buttons.nth(index).click();
+        if (await buttons.nth(index).getAttribute("aria-pressed") !== "true") throw new Error("draw mode did not activate");
       }
+      await group.getByRole("button", { name: "펜", exact: true }).click();
       await settle(page);
       return "ok";
     },
@@ -314,8 +340,8 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
     id: "brush-quick-tray",
     label: "빠른 브러시 트레이",
     run: async (page) => {
-      const tray = page.locator('[data-studio-brush-tray="true"]');
-      if (await tray.count() === 0) return { skipped: "no brush tray" };
+      const sheet = await openDrawSettings(page);
+      const tray = sheet.locator('[data-studio-brush-tray="true"]');
       return clickLocator(page, tray.locator('[role="option"]'), "brush tray option");
     },
   },
@@ -323,14 +349,7 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
     id: "brush-library-open",
     label: "브러시 전체 라이브러리",
     run: async (page) => {
-      const opened = await clickLocator(
-        page,
-        page.locator('[data-studio-open-brush-library="true"]'),
-        "brush library trigger",
-      );
-      if (opened !== "ok") return opened;
-      const library = page.locator('[data-studio-brush-library="true"]');
-      if (await library.count() === 0) return { skipped: "library did not mount" };
+      await openBrushLibrary(page);
       return "ok";
     },
   },
@@ -338,8 +357,7 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
     id: "brush-library-search-and-pick",
     label: "브러시 검색·선택",
     run: async (page) => {
-      const library = page.locator('[data-studio-brush-library="true"]').first();
-      if (await library.count() === 0) return { skipped: "library not open" };
+      const library = await openBrushLibrary(page);
       const search = library.getByRole("searchbox");
       if (await search.count() > 0) {
         await search.first().fill("펜").catch(() => undefined);
@@ -372,8 +390,12 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       if (opened !== "ok") return opened;
       const sheet = page.locator("#studio-mobile-pages-sheet");
       if (await sheet.count() === 0) return { skipped: "pages sheet did not mount" };
-      await clickLocator(page, sheet.locator('[data-testid="studio-add-page"]'), "add page");
-      await clickLocator(page, sheet.getByRole("button", { name: /^2페이지 선택$/u }), "page 2");
+      await sheet.locator('[data-testid="studio-add-page"]').click();
+      const second = sheet.getByRole("button", { name: /^2페이지 선택$/u });
+      await second.click();
+      if (await second.getAttribute("aria-pressed") !== "true") throw new Error("new page was not selected");
+      // Restore the page containing this sweep's ink so the next layer actions have a real target.
+      await sheet.getByRole("button", { name: /^1페이지 선택$/u }).click();
       return "ok";
     },
   },
@@ -404,19 +426,28 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
     id: "layer-navigator",
     label: "레이어 내비게이터",
     run: async (page) => {
+      await expandWorkRow(page);
+      await page.getByRole("button", { name: "작업 패널", exact: true }).click();
+      const sheet = page.locator('[data-studio-sheet-id="props"]');
+      await sheet.locator('[data-studio-inspector-primary-tab="layers"]').click();
       const navigator = page.locator('[aria-label="전문 레이어 내비게이터"]');
-      if (await navigator.count() === 0) return { skipped: "layer navigator not open" };
+      await navigator.waitFor();
       const rows = navigator.locator('[data-studio-layer-row="true"]');
       if (await rows.count() === 0) return { skipped: "no layer rows" };
       await rows.first().click({ timeout: 3_000, force: true }).catch(() => undefined);
       await page.waitForTimeout(300);
-      for (const action of ["visibility", "lock", "menu"]) {
+      for (const action of ["visibility", "lock"]) {
         const button = rows.first().locator(`[data-studio-layer-row-action="${action}"]`);
-        if (await button.count() === 0) continue;
-        await button.first().click({ timeout: 3_000, force: true }).catch(() => undefined);
-        await page.waitForTimeout(300);
-        await page.keyboard.press("Escape").catch(() => undefined);
+        const originalLabel = await button.getAttribute("aria-label");
+        await button.click();
+        await settle(page);
+        if (await button.getAttribute("aria-label") === originalLabel) throw new Error(`layer ${action} did not change`);
+        await button.click();
+        await settle(page);
+        if (await button.getAttribute("aria-label") !== originalLabel) throw new Error(`layer ${action} did not restore`);
       }
+      await rows.first().locator('[data-studio-layer-row-action="menu"]').click();
+      await page.keyboard.press("Escape");
       await settle(page);
       return "ok";
     },
@@ -433,13 +464,13 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       );
       if (opened !== "ok") return opened;
       const combobox = page.locator('input[role="combobox"]');
-      if (await combobox.count() === 0) return { skipped: "search dialog did not mount" };
+      await combobox.waitFor({ state: "visible", timeout: 15_000 });
       await combobox.first().fill("레이어");
       await settle(page);
       await page.keyboard.press("ArrowDown").catch(() => undefined);
       await page.waitForTimeout(250);
       await page.keyboard.press("Enter").catch(() => undefined);
-      await settle(page);
+      await combobox.waitFor({ state: "hidden", timeout: 5_000 });
       return "ok";
     },
   },
@@ -450,13 +481,16 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       await expandWorkRow(page);
       const select = page.locator('[data-studio-mobile-filter-select="workspace"] select');
       if (await select.count() === 0) return { skipped: "no workspace filter select" };
-      await select.first().selectOption({ index: 1 }).catch(() => undefined);
+      await select.first().selectOption({ index: 1 });
       await settle(page);
       const dialog = page.locator('[aria-labelledby="studio-filter-dialog-title"]');
       if (await dialog.count() === 0) return { skipped: "filter dialog did not mount" };
       const range = dialog.locator('input[type="range"]:visible');
       if (await range.count() > 0) {
-        await range.first().fill("30").catch(() => undefined);
+        const initialValue = await range.first().inputValue();
+        await range.first().focus();
+        await range.first().press("ArrowRight");
+        if (await range.first().inputValue() === initialValue) throw new Error("filter slider did not change");
         await settle(page);
       }
       await clickLocator(page, dialog.getByRole("button", { name: "원본 비교" }), "compare");
@@ -552,7 +586,7 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
     label: "프로젝트 작업",
     run: (page) => clickLocator(
       page,
-      page.getByRole("button", { name: "프로젝트 작업" }),
+      page.getByRole("button", { name: "프로젝트 센터", exact: true }),
       "project actions",
     ),
   },
