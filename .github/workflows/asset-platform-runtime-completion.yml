@@ -1,5 +1,6 @@
 name: Asset platform runtime completion
 
+# Final push-only trigger after consolidating the feature branches.
 on:
   push:
     branches:
