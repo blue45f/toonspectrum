@@ -1,4 +1,4 @@
-name: Prioritize protected core for PR 907
+name: Prioritize final protected core on Windows
 
 on:
   push:
@@ -12,15 +12,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: one-shot-prioritize-core-907-windows
+  group: one-shot-prioritize-final-core-windows
   cancel-in-progress: true
 
 jobs:
-  cancel-optional-runs:
+  cancel-duplicate-runs:
     runs-on: windows-latest
     timeout-minutes: 5
     steps:
-      - name: Cancel optional runner consumers only
+      - name: Preserve CI 34167974156 and cancel duplicate product-tree reruns
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -28,7 +28,14 @@ jobs:
         run: |
           set -euo pipefail
           failed=0
-          for run_id in 34155053160 34155050574 34155176092; do
+          for run_id in \
+            34168100356 \
+            34167973982 34167974046 34167973999 34167973978 \
+            34167973984 34167973913 34167973914 34167973945 \
+            34167973979 34167973973 34167973981 34167974004 \
+            34167974023 34167974014 34167973989 34167974063 \
+            34167973986 34167974078 34167973987 34167973988 \
+            34167974005 34167974054; do
             body="$(mktemp)"
             code="$(curl --silent --show-error --output "$body" --write-out '%{http_code}' \
               --request POST \
@@ -37,10 +44,10 @@ jobs:
               --header 'X-GitHub-Api-Version: 2022-11-28' \
               "https://api.github.com/repos/$GH_REPOSITORY/actions/runs/$run_id/cancel")"
             case "$code" in
-              202) echo "cancelled optional run $run_id" ;;
-              404|409) echo "optional run $run_id already terminal (HTTP $code)" ;;
+              202) echo "cancelled duplicate run $run_id" ;;
+              404|409) echo "run $run_id already terminal (HTTP $code)" ;;
               *)
-                echo "::error::Failed to cancel optional run $run_id (HTTP $code): $(cat "$body")"
+                echo "::error::Failed to cancel run $run_id (HTTP $code): $(cat "$body")"
                 failed=1
                 ;;
             esac
