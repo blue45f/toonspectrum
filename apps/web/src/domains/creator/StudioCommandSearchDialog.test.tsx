@@ -240,7 +240,8 @@ describe("StudioCommandSearchDialog — 범위(scope)", () => {
   it("'명령' 범위에서는 설정 행이 나오지 않는다", () => {
     openDialog({ ...ALL_HANDLERS, initialScope: "command" });
     type("마스크");
-    expect(screen.queryByRole("option", { name: /레이어 마스크/u })).toBeNull();
+    expect(screen.queryByText("레이어 마스크", { exact: true })).toBeNull();
+    expect(screen.getByText("레이어 마스크 편집", { exact: true })).toBeTruthy();
   });
 });
 
@@ -479,7 +480,7 @@ describe("StudioCommandSearchHost", () => {
     fireEvent.click(trigger);
     await screen.findByRole("dialog");
     type("레이어 마스크");
-    fireEvent.click(screen.getByRole("option", { name: /레이어 마스크/u }));
+    fireEvent.click(screen.getByText("레이어 마스크", { exact: true }));
     await waitFor(() => {
       expect(document.activeElement).toBe(
         screen.getByRole("button", { name: "목적지" }),

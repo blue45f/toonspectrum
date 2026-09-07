@@ -468,6 +468,38 @@ describe("통합 Command Search — 인스펙터 행은 목적지를 통째로 �
   };
 
   it.each(CONTEXTS)(
+    "%s — 위치·크기의 대표 행이 라우트·포커스·검색어·선택 조건을 보존한다",
+    (_label, context) => {
+      const built = buildStudioSearchIndex(context);
+      const canonical = built.entries.find(
+        (entry) => entry.id === "property.transform-numeric",
+      );
+      expect(canonical).toMatchObject({
+        label: "위치·크기",
+        kind: "property",
+        requiresSelection: true,
+        target: {
+          type: "inspector",
+          primary: "properties",
+          focusTarget: "selection.geometry",
+        },
+      });
+      expect(built.entries.some((entry) => entry.id === "inspector.selection-layout"))
+        .toBe(false);
+      const action = studioInspectorActions(context).find(
+        (entry) => entry.id === "selection-layout",
+      );
+      for (const query of [...(action?.keywords ?? []), "Free Transform", "자유 변형"]) {
+        const results = searchStudio(query, { totalLimit: 500, sectionLimit: 500 }, built);
+        expect(
+          results.sections.flatMap((section) => section.results).map((result) => result.entry.id),
+          query,
+        ).toContain("property.transform-numeric");
+      }
+    },
+  );
+
+  it.each(CONTEXTS)(
     "%s — 모든 인스펙터 행이 액션이 선언한 라우트·포커스를 그대로 싣는다",
     (_label, context) => {
       const built = buildStudioSearchIndex(context);
@@ -495,10 +527,10 @@ describe("통합 Command Search — 인스펙터 행은 목적지를 통째로 �
 
         expect(entry.kind).toBe(EXPECTED_KIND[action.kind ?? "panel"]);
 
-        // 다이얼로그가 라벨 밑에 그리는 건 `location` 이다. 액션이 이미 정확한
-        // breadcrumb 을 들고 있으므로 통짜 "인스펙터" 로 뭉개면 안 된다.
+        // 쉬운 용어로 표시한 breadcrumb도 목적지별 경로를 유지해야 한다.
+        // 아래 명시적 원장은 실제 설정 UI의 명칭과 탐색 깊이를 검증한다.
         expect(entry.location).toBe(
-          action.path ? `인스펙터 › ${action.path}` : "인스펙터",
+          INSPECTOR_ROW_LEDGER[action.id]?.split(" · ")[1],
         );
         expect(action.path, `${action.id} 가 path 를 선언하지 않았다`).toBeDefined();
       }
@@ -538,29 +570,28 @@ describe("통합 Command Search — 인스펙터 행은 목적지를 통째로 �
    * `tool` → `property` 판정 근거: 같은 목적지를 코퍼스가 이미 property 로
    * 적고 있다(`property.layer-mask` 가 `image-mask` 를, `property.levels` ·
    * `property.tone-curve-panel` 이 `image-quick` 과 같은 `image:"quick"` 을).
-   * 흡수된 세 행(`layers` · `image-mask` · `brush-studio`)은 코퍼스 행이
+   * 흡수된 행(`layers` · `image-mask` · `brush-studio` · `selection-layout`)은 코퍼스 행이
    * 대신 서므로 이 표에 없다 — supersedes 가 늘거나 줄어도 여기서 걸린다.
    */
   const INSPECTOR_ROW_LEDGER: Readonly<Record<string, string>> = {
-    "brush-engines": "property · 인스펙터 › 대상 › 그리기 › 브러시 엔진",
-    canvas: "panel · 인스펙터 › 문서 › 캔버스",
-    "canvas-guides": "property · 인스펙터 › 문서 › 캔버스 › 가이드",
-    "canvas-resize": "property · 인스펙터 › 문서 › 캔버스 › 크기",
-    "canvas-style": "property · 인스펙터 › 문서 › 캔버스 › 스타일",
-    "drawing-properties": "property · 인스펙터 › 대상 › 그리기 도구",
-    grade: "panel · 인스펙터 › 문서 › 색보정",
-    "image-fill": "property · 인스펙터 › 대상 › 이미지 › 채우기·선화",
-    "image-quick": "property · 인스펙터 › 대상 › 이미지 › 빠른 수정",
-    "image-retouch": "property · 인스펙터 › 대상 › 이미지 › 선택·리터치",
-    "image-transform": "property · 인스펙터 › 대상 › 이미지 › 변형",
-    navigator: "panel · 인스펙터 › 문서 › 미니맵",
-    publish: "panel · 인스펙터 › 게시 준비 › 작품 정보",
-    "selection-layout": "property · 인스펙터 › 대상 › 선택 요소 › 배치",
-    "selection-order-align": "property · 인스펙터 › 대상 › 선택 요소 › 정렬·순서",
-    "selection-properties": "property · 인스펙터 › 대상 › 선택 요소",
-    "text-align": "property · 인스펙터 › 대상 › 글자 › 문단",
-    "text-fill": "property · 인스펙터 › 대상 › 글자 › 채우기",
-    typography: "property · 인스펙터 › 대상 › 글자 › 글꼴",
+    "brush-engines": "property · 설정 › 선택 항목 › 그리기 도구 › 브러시 엔진",
+    canvas: "panel · 설정 › 페이지 › 캔버스",
+    "canvas-guides": "property · 설정 › 페이지 › 캔버스 › 가이드",
+    "canvas-resize": "property · 설정 › 페이지 › 캔버스 › 크기",
+    "canvas-style": "property · 설정 › 페이지 › 캔버스 › 스타일",
+    "drawing-properties": "property · 설정 › 선택 항목 › 그리기 도구",
+    grade: "panel · 설정 › 페이지 › 색보정",
+    "image-fill": "property · 설정 › 선택 항목 › 이미지 › 채우기·선화",
+    "image-quick": "property · 설정 › 선택 항목 › 이미지 › 빠른 수정",
+    "image-retouch": "property · 설정 › 선택 항목 › 이미지 › 선택·보정",
+    "image-transform": "property · 설정 › 선택 항목 › 이미지 › 크기·회전",
+    navigator: "panel · 설정 › 페이지 › 미니맵",
+    publish: "panel · 설정 › 게시 준비 › 작품 정보",
+    "selection-order-align": "property · 설정 › 선택 항목 › 순서·캔버스 정렬",
+    "selection-properties": "property · 설정 › 선택 항목 › 선택 요소",
+    "text-align": "property · 설정 › 선택 항목 › 글자 › 문단",
+    "text-fill": "property · 설정 › 선택 항목 › 글자 › 채우기",
+    typography: "property · 설정 › 선택 항목 › 글자 › 글꼴",
   };
 
   it("인스펙터 행별 구획·breadcrumb 이 원장과 정확히 일치한다", () => {
