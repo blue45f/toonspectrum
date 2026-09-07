@@ -1,0 +1,176 @@
+name: One-time cleanup of absorbed branches
+
+on:
+  push:
+    branches:
+      - chore/cleanup-merged-branches-20260908-0242
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: cleanup-merged-branches-20260908-0242
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Verify immutable heads and delete only absorbed branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          WORKFLOW_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          token = os.environ["GH_TOKEN"]
+          repository = os.environ["REPOSITORY"]
+          workflow_branch = os.environ["WORKFLOW_BRANCH"]
+          owner, repo = repository.split("/", 1)
+
+          candidates = {
+              "fix/production-api-runtime-20260908": "15514e01da4b3b13edebe267f028869c64815020",
+              "integration/finalize-all-worktrees-20260908-gpt56": "a6de8a2cc4b75a876a023b4b99e8d3a87277d315",
+              "merge-ready/3ad5d69c-final": "a246496607d10b11abc315a497328b6af5f18c37",
+          }
+          allowed_anchor_branches = {
+              "merge-ready/all-completed-worktrees-final-20260908",
+              "merge-ready/all-worktrees-final-20260908-v2",
+          }
+
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {token}",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "toonspectrum-absorbed-branch-cleanup",
+          }
+
+          def quote_ref(name):
+              return "/".join(urllib.parse.quote(part, safe="") for part in name.split("/"))
+
+          def api(path, method="GET"):
+              request = urllib.request.Request(
+                  f"https://api.github.com{path}", headers=headers, method=method
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      body = response.read()
+                      return json.loads(body) if body else None
+              except urllib.error.HTTPError as error:
+                  detail = error.read().decode("utf-8", "replace")
+                  if error.code == 404:
+                      return None
+                  raise RuntimeError(
+                      f"GitHub API {method} {path} failed: {error.code} {detail}"
+                  ) from error
+
+          open_pulls = api(f"/repos/{owner}/{repo}/pulls?state=open&per_page=100") or []
+          open_heads = {
+              pull["head"]["ref"]
+              for pull in open_pulls
+              if pull.get("head", {}).get("repo", {}).get("full_name") == repository
+          }
+          open_bases = {
+              pull["base"]["ref"]
+              for pull in open_pulls
+              if pull.get("base", {}).get("repo", {}).get("full_name") == repository
+          }
+          anchor_names = sorted(open_heads & allowed_anchor_branches)
+          if not anchor_names:
+              raise RuntimeError("No approved final integration PR head is currently open")
+
+          anchors = {}
+          for name in anchor_names:
+              ref = api(f"/repos/{owner}/{repo}/git/ref/heads/{quote_ref(name)}")
+              if ref is not None:
+                  anchors[name] = ref["object"]["sha"]
+          if not anchors:
+              raise RuntimeError("Approved final integration refs are unavailable")
+
+          report = {"anchors": anchors, "deleted": [], "skipped": [], "errors": []}
+
+          for name, expected_sha in candidates.items():
+              if name in open_heads or name in open_bases:
+                  report["skipped"].append({"branch": name, "reason": "active-open-pr"})
+                  continue
+
+              ref_path = f"/repos/{owner}/{repo}/git/ref/heads/{quote_ref(name)}"
+              ref = api(ref_path)
+              if ref is None:
+                  report["skipped"].append({"branch": name, "reason": "already-absent"})
+                  continue
+              current_sha = ref["object"]["sha"]
+              if current_sha != expected_sha:
+                  report["skipped"].append({
+                      "branch": name,
+                      "reason": "head-moved",
+                      "expectedSha": expected_sha,
+                      "currentSha": current_sha,
+                  })
+                  continue
+
+              proof = None
+              for anchor_name, anchor_sha in anchors.items():
+                  comparison = api(
+                      f"/repos/{owner}/{repo}/compare/{expected_sha}...{anchor_sha}"
+                  )
+                  status = comparison.get("status") if comparison else None
+                  behind_by = int(comparison.get("behind_by", -1)) if comparison else -1
+                  if status in {"ahead", "identical"} and behind_by == 0:
+                      proof = {
+                          "anchor": anchor_name,
+                          "anchorSha": anchor_sha,
+                          "status": status,
+                          "behindBy": behind_by,
+                      }
+                      break
+              if proof is None:
+                  report["skipped"].append({"branch": name, "reason": "not-contained"})
+                  continue
+
+              verify_ref = api(ref_path)
+              verify_sha = verify_ref["object"]["sha"] if verify_ref else None
+              if verify_sha != expected_sha:
+                  report["skipped"].append({
+                      "branch": name,
+                      "reason": "head-changed-after-proof",
+                      "currentSha": verify_sha,
+                  })
+                  continue
+
+              try:
+                  api(
+                      f"/repos/{owner}/{repo}/git/refs/heads/{quote_ref(name)}",
+                      method="DELETE",
+                  )
+                  report["deleted"].append({
+                      "branch": name,
+                      "sha": expected_sha,
+                      "proof": proof,
+                  })
+              except RuntimeError as error:
+                  report["errors"].append({"branch": name, "error": str(error)})
+
+          try:
+              api(
+                  f"/repos/{owner}/{repo}/git/refs/heads/{quote_ref(workflow_branch)}",
+                  method="DELETE",
+              )
+              report["selfDeleted"] = workflow_branch
+          except RuntimeError as error:
+              report["errors"].append({"branch": workflow_branch, "error": str(error)})
+
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          if report["errors"]:
+              raise SystemExit(1)
+          PY
