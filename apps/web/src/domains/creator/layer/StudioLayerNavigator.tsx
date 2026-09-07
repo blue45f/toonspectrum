@@ -816,6 +816,7 @@ export function StudioLayerNavigator({
           focusRing
         )}
         aria-label={target.kind === "item" ? "레이어 이름 편집" : "그룹 이름 편집"}
+        data-studio-escape-scope="true"
       />
     );
   }

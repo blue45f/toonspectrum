@@ -5,19 +5,15 @@ import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { compileCreatorResourceCases } from "./lib/compile-creator-resource-cases.mjs";
 
 const require = createRequire(import.meta.url);
-const root = fileURLToPath(new URL("../", import.meta.url));
 const temporary = mkdtempSync(path.join(tmpdir(), "creator-browser-"));
 let browser;
 let server;
 let passed = 0;
 try {
-  const compilation = spawnSync(process.execPath, [require.resolve("typescript/lib/tsc.js"), "--ignoreConfig", "--strict", "--skipLibCheck", "--target", "es2022", "--module", "commonjs", "--lib", "es2023,dom,dom.iterable", "--outDir", temporary,
-    "tests/creator-resources-cases.ts", "tests/creator-resource-workflow-cases.ts", "tests/creator-workspace-persistence-cases.ts"], { cwd: root, stdio: "inherit" });
-  if (compilation.status !== 0) throw new Error("Browser test sources failed strict compilation");
+  compileCreatorResourceCases(temporary);
   const sources = {};
   function collect(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {

@@ -8,6 +8,18 @@ const AboutPage = lazyRetry(
   })),
   "AboutPage",
 );
+const CrawlerPolicyPage = lazyRetry(
+  () => import("@/src/domains/legal/CrawlerPolicyPage").then((module) => ({
+    default: module.CrawlerPolicyPage,
+  })),
+  "CrawlerPolicyPage",
+);
+const DataSourcesPage = lazyRetry(
+  () => import("@/src/domains/creator-resources/SourcesPage").then((module) => ({
+    default: module.SourcesPage,
+  })),
+  "DataSourcesPage",
+);
 const DesignSystemPage = lazyRetry(
   () => import("@/src/domains/legal/DesignSystemPage").then((module) => ({
     default: module.DesignSystemPage,
@@ -59,6 +71,8 @@ const FeedbackPage = lazyRetry(
 
 export const legalRoutes = defineAppRoutes([
   { id: "legal-about", path: "/about", element: <AboutPage /> },
+  { id: "legal-data-sources", path: "/about/data", element: <DataSourcesPage /> },
+  { id: "legal-crawler-policy", path: "/about/crawler", element: <CrawlerPolicyPage /> },
   { id: "legal-design", path: "/design", element: <DesignSystemPage /> },
   { id: "legal-sitemap", path: "/sitemap", element: <SitemapPage /> },
   { id: "legal-terms", path: "/terms", element: <TermsPage /> },

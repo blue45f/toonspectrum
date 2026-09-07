@@ -208,10 +208,14 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
     );
     expect(record.indexOf("onBeforeRecordSidecar?.()")).toBeGreaterThanOrEqual(0);
     // 984251d8c 이후 호스트는 useStudioDocumentSidecarsRuntime 에 `beforeRecordSidecar` 로 걸고,
-    // 그 런타임이 컨트롤러의 onBeforeRecordSidecar 로 그대로 넘긴다.
+    // 런타임은 대기 획을 먼저 flush 한 뒤, 승인된 사이드카 편집의 retained redo 를 폐기한다.
     const wiring = sourceBetween("beforeRecordSidecar: () => {", "commitStudioHistoryJournal,");
     expect(wiring).toContain("if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();");
-    expect(studioPageSource).toContain("onBeforeRecordSidecar: beforeRecordSidecar,");
+    const beforeRecord = sourceBetween("onBeforeRecordSidecar: () => {", "historyJournalRef,");
+    const flushIndex = beforeRecord.indexOf("beforeRecordSidecar()");
+    const acceptedIndex = beforeRecord.indexOf("onAcceptedMutation()");
+    expect(flushIndex).toBeGreaterThanOrEqual(0);
+    expect(acceptedIndex).toBeGreaterThan(flushIndex);
   });
 
   it("undo 는 최신 항목이 사이드카면 문서만 되돌리고 pagesHi 는 건드리지 않는다", () => {

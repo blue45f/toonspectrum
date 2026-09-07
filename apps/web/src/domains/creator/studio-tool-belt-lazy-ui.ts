@@ -7,7 +7,7 @@ function warmStudioToolPopoverChunk(importer: () => Promise<unknown>): void {
 }
 
 const studioAssetToolPopoverBodyLoader = createStudioIntentLazyLoader(() =>
-  import("./StudioAssetToolPopoverBody")
+  import("./StudioAssetToolPopoverWorkspace")
 );
 const studioSceneToolPopoverBodyLoader = createStudioIntentLazyLoader(() => {
   // bgFill is the initial scene tab. Start its leaves alongside the body so the
@@ -35,9 +35,9 @@ const studioBubbleToolPopoverBodyLoader = createStudioIntentLazyLoader(() =>
 
 export const LazyStudioAssetToolPopoverBody = lazyRetry(
   () => studioAssetToolPopoverBodyLoader.load().then((mod) => ({
-    default: mod.StudioAssetToolPopoverBody,
+    default: mod.StudioAssetToolPopoverWorkspace,
   })),
-  "StudioAssetToolPopoverBody"
+  "StudioAssetToolPopoverWorkspace"
 );
 export const LazyStudioSceneToolPopoverBody = lazyRetry(
   () => studioSceneToolPopoverBodyLoader.load().then((mod) => ({

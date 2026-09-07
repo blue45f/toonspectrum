@@ -20,12 +20,10 @@ import Link from "@/src/compat/router-link";
 
 const NAV = [
   { i18n: "nav.home", href: "/", exact: true },
-  { i18n: "nav.studio", href: "/studio" },
-  { i18n: "nav.assets", href: "/market" },
   { i18n: "nav.creators", href: "/create" },
+  { i18n: "nav.assets", href: "/market" },
   { i18n: "nav.discover", href: "/explore" },
   { i18n: "nav.allMenu", href: "/sitemap" },
-  { i18n: "footer.link.feedback", href: "/feedback" },
 ];
 
 const MobileHeaderNavigation = lazy(() =>
@@ -36,7 +34,7 @@ function useActive() {
   const path = usePathname();
   return (href: string, exact?: boolean) => {
     if (href === "/create") {
-      return path === "/create" || path.startsWith("/create/") || path.startsWith("/studio");
+      return path === "/create" || path.startsWith("/create/");
     }
     return exact ? path === href : path === href || path.startsWith(href + "/");
   };
@@ -134,9 +132,7 @@ export function SiteHeader() {
             </span>
           </Link>
 
-          {/* 데스크탑 내비 (≥1024px) — 9개 항목이 좁은 폭을 침범하지 않도록 lg에서만 노출.
-              텍스트 전용 링크: 항목별 아이콘 박스는 EN 라벨 합산 폭이 컨테이너 상한(1320px)을
-              넘겨 어느 뷰포트에서도 한 줄에 들어가지 않는다(아이콘은 오버플로/모바일 메뉴 담당). */}
+          {/* 데스크톱 내비: 탐색 목적지는 한 번씩만 노출하고 Studio는 우측 CTA가 전담한다. */}
           <nav className="ml-2 hidden items-center gap-0.5 min-[1360px]:flex">
             {NAV.map((n) => {
               const active = isActive(n.href, n.exact);
@@ -163,12 +159,10 @@ export function SiteHeader() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* 검색 트리거 — lg(1024~1280px)에선 9개 내비와 폭을 절충해 한 단계 좁힘.
-                힌트 텍스트는 truncate로 방어하고 ⌘K 배지는 그 구간만 양보(xl부터 복귀) */}
             <button
               onClick={openSearch}
               aria-label={t("nav.searchOpen")}
-              className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 sm:w-48 sm:justify-between lg:w-40 xl:w-56"
+              className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 pointer-coarse:h-11 sm:w-48 sm:justify-between lg:w-40 xl:w-56"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Search size={16} className="shrink-0" />
@@ -182,13 +176,13 @@ export function SiteHeader() {
               </kbd>
             </button>
 
-            {/* 내 서재 — 모바일(<sm)에선 하단 탭바에 동일 항목이 있어 헤더 혼잡을 줄이려 숨긴다 */}
+            {/* Studio 핵심 CTA — 모바일에서는 하단 탭바가 동일 진입점을 제공한다. */}
             <Link
               href="/studio"
               aria-label={t("nav.studio")}
               aria-current={isActive("/studio") ? "page" : undefined}
               className={cx(
-                "group hidden h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium [text-wrap:nowrap] [word-break:keep-all] transition-colors sm:flex",
+                "group hidden h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium [text-wrap:nowrap] [word-break:keep-all] transition-colors pointer-coarse:h-11 sm:flex",
                 isActive("/studio")
                   ? "bg-accent text-on-accent"
                   : "border border-line bg-card text-fg-2 hover:text-fg hover:border-line-strong"
@@ -199,14 +193,8 @@ export function SiteHeader() {
                 {keepInlineText(t("nav.studio"))}
               </span>
             </Link>
-            {/*
-              사이트 계정 진입점은 AuthMenuShell 하나뿐이다.
-              (Google/크리덴셜 세션 → 프로필·서재·설정·관리자·로그아웃)
-              Firebase "회원" 버튼은 별도 세션이라 같은 GNB에 두지 않는다.
-            */}
             <AuthMenuShell />
 
-            {/* 오버플로 메뉴 트리거 (<1024px) — 모든 목적지 도달 보장 */}
             <button
               ref={triggerRef}
               onClick={() => setMenuOpen((o) => !o)}
@@ -214,7 +202,7 @@ export function SiteHeader() {
               aria-haspopup="dialog"
               aria-expanded={menuOpen}
               aria-controls={menuId}
-              className="grid size-10 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg min-[1360px]:hidden"
+              className="grid size-11 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg min-[1360px]:hidden"
             >
               {menuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>

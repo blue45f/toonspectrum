@@ -29,6 +29,8 @@ import {
   createEmptyStudioReleaseScheduleSnapshot,
 } from "../../studio-release-schedule-loader";
 
+import { useStudioDocumentMutationSetter } from "./useStudioDocumentMutationSetter";
+
 import type { El } from "../../studio-element-model";
 import type { StudioPageHistoryJournal } from "../../studio-page-editor-types";
 import type {
@@ -39,6 +41,7 @@ import type { StudioReleaseSchedule } from "../../studio-release-schedule";
 interface UseStudioDocumentSidecarsRuntimeOptions {
   readonly advanceStudioRevisionProjectGeneration: () => void;
   readonly beforeRecordSidecar: () => void;
+  readonly onAcceptedMutation: () => void;
   readonly commitStudioHistoryJournal: (journal: StudioPageHistoryJournal) => void;
   readonly historyJournalRef: RefObject<StudioPageHistoryJournal>;
   readonly markStudioDocumentChanged: () => boolean;
@@ -52,6 +55,7 @@ interface UseStudioDocumentSidecarsRuntimeOptions {
 export function useStudioDocumentSidecarsRuntime({
   advanceStudioRevisionProjectGeneration,
   beforeRecordSidecar,
+  onAcceptedMutation,
   commitStudioHistoryJournal,
   historyJournalRef,
   markStudioDocumentChanged,
@@ -59,10 +63,9 @@ export function useStudioDocumentSidecarsRuntime({
   const [master, setMasterState] = useState<DocumentMaster<El>>(
     () => createEmptyDocumentMaster<El>(),
   );
-  function setMaster(next: Parameters<typeof setMasterState>[0]): void {
-    if (!markStudioDocumentChanged()) return;
-    setMasterState(next);
-  }
+  const setMaster = useStudioDocumentMutationSetter(master, setMasterState, {
+    markStudioDocumentChanged, onAcceptedMutation,
+  });
 
   const {
     characterBible,
@@ -74,7 +77,7 @@ export function useStudioDocumentSidecarsRuntime({
     writerRoom,
   } = useStudioSidecarDocuments({
     markStudioDocumentChanged,
-    onBeforeRecordSidecar: beforeRecordSidecar,
+    onBeforeRecordSidecar: () => { beforeRecordSidecar(); onAcceptedMutation(); },
     historyJournalRef,
     commitStudioHistoryJournal,
   });
@@ -82,12 +85,9 @@ export function useStudioDocumentSidecarsRuntime({
   const [aiProvenance, setAiProvenanceState] = useState<StudioAiProvenanceDocument>(
     createEmptyStudioAiProvenanceDocument,
   );
-  function setAiProvenance(
-    next: Parameters<typeof setAiProvenanceState>[0],
-  ): void {
-    if (!markStudioDocumentChanged()) return;
-    setAiProvenanceState(next);
-  }
+  const setAiProvenance = useStudioDocumentMutationSetter(aiProvenance, setAiProvenanceState, {
+    markStudioDocumentChanged, onAcceptedMutation,
+  });
   function setAiProvenanceOperationState(
     next: Parameters<typeof setAiProvenanceState>[0],
   ): void {
@@ -98,21 +98,15 @@ export function useStudioDocumentSidecarsRuntime({
   const [releaseSchedule, setReleaseScheduleState] = useState<StudioReleaseSchedule>(
     createEmptyStudioReleaseScheduleSnapshot,
   );
-  function setReleaseSchedule(
-    next: Parameters<typeof setReleaseScheduleState>[0],
-  ): void {
-    if (!markStudioDocumentChanged()) return;
-    setReleaseScheduleState(next);
-  }
+  const setReleaseSchedule = useStudioDocumentMutationSetter(releaseSchedule, setReleaseScheduleState, {
+    markStudioDocumentChanged, onAcceptedMutation,
+  });
 
   const [publicationAnalytics, setPublicationAnalyticsState] =
     useState<StudioPublicationAnalyticsDocument>(createEmptyStudioPublicationAnalyticsSnapshot);
-  function setPublicationAnalytics(
-    next: Parameters<typeof setPublicationAnalyticsState>[0],
-  ): void {
-    if (!markStudioDocumentChanged()) return;
-    setPublicationAnalyticsState(next);
-  }
+  const setPublicationAnalytics = useStudioDocumentMutationSetter(publicationAnalytics, setPublicationAnalyticsState, {
+    markStudioDocumentChanged, onAcceptedMutation,
+  });
 
   const [referenceBoard, setReferenceBoardState] = useState<StudioReferenceBoardDocument>(
     createDefaultStudioReferenceBoardDocument,
@@ -132,6 +126,9 @@ export function useStudioDocumentSidecarsRuntime({
     });
   }, [referenceBoard]);
 
+  const commitReferenceBoard = useStudioDocumentMutationSetter(referenceBoard, setReferenceBoardState, {
+    markStudioDocumentChanged, onAcceptedMutation,
+  });
   function setReferenceBoard(next: StudioReferenceBoardDocument): boolean {
     const normalized = normalizeStudioReferenceBoardDocument(next);
     if (
@@ -140,9 +137,8 @@ export function useStudioDocumentSidecarsRuntime({
         normalized,
       )
     ) return true;
-    if (!markStudioDocumentChanged()) return false;
+    if (!commitReferenceBoard(normalized)) return false;
     referenceBoardLatestRequestedRef.current = normalized;
-    setReferenceBoardState(normalized);
     return true;
   }
 
