@@ -379,7 +379,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   private settled: DrawEl[] = [];
   private readonly settledPencilPrograms = new Map<string, readonly StudioLivePencilPaintCommand[]>();
   private settledHasPixels = false;
-  private settledHidden = false;
+  private readonly hiddenSettledStrokeIds = new Set<string>();
   private activePaintedOntoSettled = false;
   private lastFailureReason: StudioLiveRetainedMediaFailureReason | null = null;
 
@@ -611,6 +611,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     for (const stroke of releasedStrokes) {
       if (!this.settled.some((remaining) => remaining.id === stroke.id)) {
         this.settledPencilPrograms.delete(stroke.id);
+        this.hiddenSettledStrokeIds.delete(stroke.id);
       }
     }
     this.replay();
@@ -626,27 +627,38 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     return true;
   }
 
-  hideSettledPixels(): boolean {
-    if (this.settled.length === 0 && !this.settledHasPixels) return false;
-    this.settledHidden = true;
-    this.clearSettledRect();
+  /** Hide only an undone batch; older strokes may still be awaiting canonical handoff. */
+  hideSettledPixels(strokeIds?: readonly string[]): boolean {
+    const selected = strokeIds ? new Set(strokeIds) : null;
+    const strokes = this.settled.filter((stroke) => !selected || selected.has(stroke.id));
+    if (strokes.length === 0) return false;
+    for (const stroke of strokes) this.hiddenSettledStrokeIds.add(stroke.id);
+    this.replaySettledOnly();
     return true;
   }
 
-  showSettledPixels(): boolean {
-    if (this.settled.length === 0) return false;
-    this.settledHidden = false;
+  showSettledPixels(strokeIds?: readonly string[]): boolean {
+    const selected = strokeIds ? new Set(strokeIds) : null;
+    const strokes = this.settled.filter((stroke) => !selected || selected.has(stroke.id));
+    if (strokes.length === 0) return false;
+    for (const stroke of strokes) this.hiddenSettledStrokeIds.delete(stroke.id);
     this.replaySettledOnly();
     return true;
   }
 
   /** A new edit invalidates the undone overlay's redo branch. */
-  discardHiddenSettledStrokes(): void {
-    if (!this.settledHidden) return;
-    this.settled = [];
-    this.settledPencilPrograms.clear();
-    this.settledHidden = false;
-    this.clearSettledRect();
+  discardHiddenSettledStrokes(strokeIds?: readonly string[]): void {
+    const discarded = new Set(strokeIds ?? this.hiddenSettledStrokeIds);
+    for (const id of discarded) {
+      if (!this.hiddenSettledStrokeIds.has(id)) discarded.delete(id);
+    }
+    if (discarded.size === 0) return;
+    this.settled = this.settled.filter((stroke) => !discarded.has(stroke.id));
+    for (const id of discarded) {
+      this.settledPencilPrograms.delete(id);
+      this.hiddenSettledStrokeIds.delete(id);
+    }
+    this.replaySettledOnly();
   }
 
   clear(): void {
@@ -654,7 +666,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     this.lastFailureReason = null;
     this.settled = [];
     this.settledPencilPrograms.clear();
-    this.settledHidden = false;
+    this.hiddenSettledStrokeIds.clear();
     this.clearActiveRect();
     this.clearSettledRect();
   }
@@ -1111,7 +1123,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         context.fill();
         active.paintedPencilMarks = 1;
         active.paintedSourceSegments = 1;
-        this.markSettledPaint(ontoSettled, context);
+        this.markSettledPaint(active, context);
         return true;
       }
       const renderPath = resolveStudioFreehandRenderPath(flatPairs(pairs), {
@@ -1153,7 +1165,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       }
       active.paintedSourceSegments = pairs.length;
       active.paintedPencilMarks = Math.max(active.paintedPencilMarks, 1);
-      this.markSettledPaint(ontoSettled, context);
+      this.markSettledPaint(active, context);
       return true;
     } finally {
       context.restore();
@@ -1197,12 +1209,13 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   }
 
   private markSettledPaint(
-    ontoSettled: boolean,
+    stroke: ActiveRetainedStroke,
     context: CanvasRenderingContext2D,
   ): void {
-    if (ontoSettled || context === this.settledContext) {
+    if (context === this.settledContext) {
       this.settledHasPixels = true;
-      this.activePaintedOntoSettled = true;
+      // Replaying an older highlighter must not claim that the current stroke was flattened.
+      if (stroke === this.active) this.activePaintedOntoSettled = true;
     }
   }
 
@@ -1247,8 +1260,9 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   private replaySettledOnly(): void {
     this.clearCanvas(this.settledContext, this.settledCanvas);
     this.settledHasPixels = false;
-    if (!this.isNativeSurfaceReady || this.settledHidden) return;
+    if (!this.isNativeSurfaceReady) return;
     for (const stroke of this.settled) {
+      if (this.hiddenSettledStrokeIds.has(stroke.id)) continue;
       const kind = retainedKind(stroke);
       if (!kind) continue;
       const pencilProgram = this.settledPencilPrograms.get(stroke.id);

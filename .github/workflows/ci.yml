@@ -300,7 +300,19 @@ jobs:
       # 않아 각 러너가 전체 스위트를 중복 실행한다. shard 옵션을 스크립트에 직접 전달한다.
       - name: Run this shard of the root Vitest suite with per-file progress
         timeout-minutes: 20
-        run: pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }}
+      - name: Preserve this shard's coverage for SonarQube
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
+        with:
+          name: sonar-coverage-${{ matrix.shard }}
+          path: coverage/shard-${{ matrix.shard }}/lcov.info
+          if-no-files-found: error
+          retention-days: 7
+
+  sonarqube:
+    needs: test
+    uses: ./.github/workflows/sonarqube.yml
+    secrets: inherit
 
   test-serial:
     # 조용한 러너 한 대가 필요한 검사들. 벽시계 예산 테스트는 4 worker 와 경쟁하면 코드가 아니라

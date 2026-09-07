@@ -36,6 +36,8 @@ function mockCanvas(width = 256, height = 128) {
   let clearCalls = 0;
   let strokeCalls = 0;
   let fillCalls = 0;
+  let drawImageCalls = 0;
+  const paintColors: string[] = [];
   const context = {
     canvas: { width, height },
     globalAlpha: 1,
@@ -52,11 +54,15 @@ function mockCanvas(width = 256, height = 128) {
     moveTo() {},
     lineTo() {},
     arc() {},
-    fill() { fillCalls += 1; },
+    fill() {
+      fillCalls += 1;
+      paintColors.push(context.fillStyle);
+    },
     stroke() {
       strokeCalls += 1;
+      paintColors.push(context.strokeStyle);
     },
-    drawImage() {},
+    drawImage() { drawImageCalls += 1; },
     setTransform() {},
     getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
     clearRect() {
@@ -77,7 +83,8 @@ function mockCanvas(width = 256, height = 128) {
   return {
     canvas,
     context,
-    stats: () => ({ getCalls, getArea, clearCalls, strokeCalls, fillCalls }),
+    paintColors,
+    stats: () => ({ getCalls, getArea, clearCalls, strokeCalls, fillCalls, drawImageCalls }),
   };
 }
 
@@ -247,6 +254,151 @@ describe("StudioLiveRetainedMediaOverlayRenderer", () => {
     renderer.showSettledPixels();
     expect(settled.stats().fillCalls).toBeGreaterThan(before);
     expect(renderer.settledStrokeCount).toBe(1);
+  });
+
+  it("keeps an older committed stroke visible while an undone batch survives surface changes", () => {
+    const { renderer, active, settled, surface } = attachedRenderer();
+    const older = drawElement("committed", "pencil", [12, 20, 40, 28, 70, 36], {
+      stroke: "#112233",
+    });
+    const pending = drawElement("pending", "pencil", [20, 50, 55, 58, 90, 60], {
+      stroke: "#445566",
+    });
+    for (const stroke of [older, pending]) {
+      expect(renderer.begin(stroke).status).toBe("started");
+      expect(renderer.end(stroke).status).toBe("settled");
+    }
+    const retainedCommands = renderer.retainedPencilCommandCount;
+    settled.paintColors.length = 0;
+    expect(renderer.hideSettledPixels([pending.id])).toBe(true);
+    expect(settled.paintColors.length).toBeGreaterThan(0);
+    expect(new Set(settled.paintColors)).toEqual(new Set([older.stroke]));
+    const olderReplay = [...settled.paintColors];
+
+    for (const change of [
+      () => renderer.setSurface({ ...surface, left: 10 }),
+      () => renderer.attach({ activeCanvas: active.canvas, settledCanvas: settled.canvas }),
+      () => {
+        renderer.begin(drawElement("cancelled", "pencil", [25, 40]));
+        renderer.resetActive();
+      },
+    ]) {
+      settled.paintColors.length = 0;
+      change();
+      expect(settled.paintColors).toEqual(olderReplay);
+    }
+    expect(renderer.settledStrokeCount).toBe(2);
+    expect(renderer.retainedPencilCommandCount).toBe(retainedCommands);
+
+    settled.paintColors.length = 0;
+    expect(renderer.showSettledPixels([pending.id])).toBe(true);
+    expect(new Set(settled.paintColors)).toEqual(new Set([older.stroke, pending.stroke]));
+    expect(renderer.retainedPencilCommandCount).toBe(retainedCommands);
+  });
+
+  it("discards only the undone stroke and preserves the committed FIFO prefix for later release", () => {
+    const { renderer, settled } = attachedRenderer();
+    const older = drawElement("committed", "pencil", [12, 20, 40, 28], { stroke: "#112233" });
+    const pending = drawElement("pending", "pencil", [20, 50, 55, 58], { stroke: "#445566" });
+    const next = drawElement("new-edit", "pencil", [30, 70, 80, 88], { stroke: "#778899" });
+    renderer.begin(older);
+    renderer.end(older);
+    const olderCommands = renderer.retainedPencilCommandCount;
+    renderer.begin(pending);
+    renderer.end(pending);
+    expect(renderer.retainedPencilCommandCount).toBeGreaterThan(olderCommands);
+
+    renderer.hideSettledPixels([pending.id]);
+    settled.paintColors.length = 0;
+    // Passing a visible ID must never discard its outstanding canonical handoff.
+    renderer.discardHiddenSettledStrokes([older.id, pending.id]);
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(renderer.retainedPencilCommandCount).toBe(olderCommands);
+    expect(new Set(settled.paintColors)).toEqual(new Set([older.stroke]));
+    expect(renderer.showSettledPixels([pending.id])).toBe(false);
+
+    renderer.begin(next);
+    renderer.end(next);
+    const nextCommands = renderer.retainedPencilCommandCount - olderCommands;
+    expect(nextCommands).toBeGreaterThan(0);
+    settled.paintColors.length = 0;
+    expect(renderer.releaseSettledPrefix(1)).toBe(1);
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(renderer.retainedPencilCommandCount).toBe(nextCommands);
+    expect(new Set(settled.paintColors)).toEqual(new Set([next.stroke]));
+    expect(renderer.releaseSettledPrefix(1)).toBe(1);
+    expect(renderer.retainedPencilCommandCount).toBe(0);
+  });
+
+  it("shows or discards one hidden batch without exposing another, and clears hidden IDs on release", () => {
+    const { renderer, settled } = attachedRenderer();
+    const first = drawElement("first", "pencil", [12, 20, 40, 28], { stroke: "#112233" });
+    const second = drawElement("second", "pencil", [20, 50, 55, 58], { stroke: "#445566" });
+    for (const stroke of [first, second]) {
+      renderer.begin(stroke);
+      renderer.end(stroke);
+      renderer.hideSettledPixels([stroke.id]);
+    }
+    settled.paintColors.length = 0;
+    expect(renderer.hideSettledPixels(["missing"])).toBe(false);
+    expect(renderer.showSettledPixels([first.id])).toBe(true);
+    expect(new Set(settled.paintColors)).toEqual(new Set([first.stroke]));
+    renderer.hideSettledPixels([first.id]);
+    renderer.discardHiddenSettledStrokes([second.id]);
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(renderer.releaseSettledPrefix(1)).toBe(1);
+    expect(renderer.retainedPencilCommandCount).toBe(0);
+
+    // A subsequent presentation of the same document ID must not inherit its old hidden state.
+    renderer.begin(first);
+    renderer.end(first);
+    settled.paintColors.length = 0;
+    renderer.attach({ activeCanvas: mockCanvas().canvas, settledCanvas: settled.canvas });
+    expect(new Set(settled.paintColors)).toEqual(new Set([first.stroke]));
+  });
+
+  it("still flattens a newly admitted stroke when discarding redo replays an older highlighter", () => {
+    const { renderer, settled } = attachedRenderer();
+    const older = drawElement("committed-highlighter", "pencil", [12, 20, 40, 28], {
+      brush: "highlighter",
+    });
+    const pending = drawElement("undone-pencil", "pencil", [20, 50, 55, 58]);
+    for (const stroke of [older, pending]) {
+      renderer.begin(stroke);
+      renderer.end(stroke);
+    }
+    renderer.hideSettledPixels([pending.id]);
+    const next = drawElement("new-pencil", "pencil", [30, 70, 80, 88]);
+    expect(renderer.begin(next).status).toBe("started");
+    renderer.discardHiddenSettledStrokes([pending.id]);
+    const flattened = settled.stats().drawImageCalls;
+    expect(renderer.end(next).status).toBe("settled");
+    expect(settled.stats().drawImageCalls).toBe(flattened + 1);
+    expect(renderer.settledStrokeCount).toBe(2);
+  });
+
+  it("clears hidden and active ownership before restoring the same stroke in another document session", () => {
+    const { renderer, settled, surface } = attachedRenderer();
+    const stroke = drawElement("restored-document-stroke", "pencil", [12, 20, 40, 28], {
+      stroke: "#112233",
+    });
+    renderer.begin(stroke);
+    renderer.end(stroke);
+    renderer.hideSettledPixels([stroke.id]);
+    renderer.begin(drawElement("interrupted-stroke", "pencil", [40, 70, 80, 90]));
+    expect(renderer.isActive).toBe(true);
+    expect(renderer.retainedPencilCommandCount).toBeGreaterThan(0);
+
+    renderer.clear();
+    expect(renderer.isActive).toBe(false);
+    expect(renderer.settledStrokeCount).toBe(0);
+    expect(renderer.retainedPencilCommandCount).toBe(0);
+    expect(renderer.showSettledPixels([stroke.id])).toBe(false);
+    renderer.begin(stroke);
+    renderer.end(stroke);
+    settled.paintColors.length = 0;
+    renderer.setSurface({ ...surface, left: 10 });
+    expect(new Set(settled.paintColors)).toEqual(new Set([stroke.stroke]));
   });
 
   it("starts calligraphy and highlighter suffixes without remeshing the prefix", () => {

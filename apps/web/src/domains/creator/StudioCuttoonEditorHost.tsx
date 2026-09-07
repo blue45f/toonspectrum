@@ -127,7 +127,12 @@ import { isStudioCanvasInteractionBlocked } from "./canvas/studio-canvas-cursor"
 import { studioCreationLinkParams } from "./creator-studio-links";
 import type { StudioAppSettings } from "./studio-app-settings";
 import { createStudioAssetLibraryMutations } from "./studio-cuttoon-editor/studio-asset-library-mutations";
-import { publishStudioRetainedStrokeHistory } from "./studio-retained-stroke-history";
+import {
+  discardStudioRetainedStrokeRedo,
+  publishStudioRetainedStrokeHistory,
+  restoreStudioRetainedStrokeCommitBatch,
+  resumeStudioRetainedStrokeHistory,
+} from "./studio-retained-stroke-history";
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
 import {
   createStudioDeferredStrokeCommitEngine,
@@ -604,6 +609,11 @@ import {
   studioLiveRetainedMediaOverlaySupportsElement,
 } from "./live/studio-live-retained-media-overlay";
 import { createStudioLiveResourceLeaseController } from "./live/createStudioLiveResourceLeaseController";
+import {
+  applyStudioLayerCompTransaction,
+  captureStudioLayerCompTransaction,
+  changeStudioLayerCompsTransaction,
+} from "./layer/studio-layer-comps-document";
 import { StudioLiveGesturePreviewPublisher } from "./live/studio-live-gesture-preview-publisher";
 import { decideStudioLiveInkBackend } from "./live/studio-live-ink-backend";
 import {
@@ -1882,6 +1892,7 @@ export function StudioCuttoonEditor({
     advanceStudioRevisionProjectGeneration,
     beforeRecordSidecar: () => {
       if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();
+      invalidatePendingRetainedRedo();
     },
     commitStudioHistoryJournal,
     historyJournalRef,
@@ -11269,19 +11280,13 @@ export function StudioCuttoonEditor({
   }
   /** A rejected scene commit must keep both its vector payload and settled pixels recoverable. */
   function restorePendingStrokeCommits(batch: PendingStrokeCommitBatch): void {
-    const retryCount = batch.retryCount + 1;
-    const restored = {
-      ...batch,
-      retryCount,
-      timer: null as ReturnType<typeof setTimeout> | null,
-    };
-    pendingStrokeCommitsRef.current = restored;
-    if (retryCount <= DEFERRED_STROKE_COMMIT_MAX_RETRIES) {
-      restored.timer = globalThis.setTimeout(() => {
-        flushPendingStrokeCommitsRef.current();
-      }, DEFERRED_STROKE_COMMIT_RETRY_MS);
-    }
+    restoreStudioRetainedStrokeCommitBatch(pendingStrokeCommitsRef, batch, {
+      flush: () => flushPendingStrokeCommitsRef.current(),
+      retryDelayMs: DEFERRED_STROKE_COMMIT_RETRY_MS,
+      maxRetries: DEFERRED_STROKE_COMMIT_MAX_RETRIES,
+    });
   }
+
   /**
    * 커밋 성공은 React 상태 예약일 뿐 실제 픽셀 영수증이 아니다. 현재 표면에서 아직 다른
    * handoff가 예약하지 않은 FIFO 접두부만 예약하고, useLayoutEffect의 동기 mainLayer.draw()
@@ -11324,13 +11329,18 @@ export function StudioCuttoonEditor({
     const existing = pendingStrokeCommitsRef.current;
     if (existing && existing.pageId !== activePage.id) {
       // 페이지가 바뀐 잔여 배치 — 새 배치를 시작하기 전에 원래 페이지로 동기화한다.
-      flushPendingStrokeCommitsRef.current();
+      if (!flushPendingStrokeCommitsRef.current()
+        || pendingStrokeCommitsRef.current?.pageId !== undefined
+          && pendingStrokeCommitsRef.current.pageId !== activePage.id) return;
     }
     const batch =
       pendingStrokeCommitsRef.current
       ?? { pageId: activePage.id, strokes: [] as DrawEl[], timer: null, retryCount: 0 };
     pendingStrokeCommitsRef.current = batch;
     batch.strokes.push(finished);
+    // Pointer-down admission and cancelled/rejected gestures must leave Redo intact. This
+    // completed, accepted stroke is the first point that actually starts a new edit branch.
+    invalidatePendingRetainedRedo();
     batch.retryCount = 0;
     if (batch.timer) globalThis.clearTimeout(batch.timer);
     batch.timer = globalThis.setTimeout(function flushDeferredStrokeCommitWhenIdle() {
@@ -11361,6 +11371,12 @@ export function StudioCuttoonEditor({
       ) return;
       persistPendingStrokeEmergencyAutosaveRef.current("pointerup");
     });
+  }
+  function invalidatePendingRetainedRedo(): void {
+    if (discardStudioRetainedStrokeRedo(
+      pendingUndoneStrokeCommitsRef,
+      (ids) => liveRetainedMediaOverlayRendererRef.current.discardHiddenSettledStrokes(ids),
+    )) setHasUndonePendingOverlay(false);
   }
   const scheduleMarqueeRect = (next: { x: number; y: number; w: number; h: number } | null) => {
     pendingMarqueeRectRef.current = next;
@@ -16190,6 +16206,7 @@ const puppetWarpArmed =
     liveRetainedMediaOverlayRendererRef,
     masterEditMode,
     noteStudioHistoryRetention,
+    onHistoryBranch: invalidatePendingRetainedRedo,
     pageEditLocked,
     pages,
     pagesHiRef,
@@ -18168,7 +18185,9 @@ const puppetWarpArmed =
           retryCount: taken.retryCount,
           historyIndex: pagesHiRef.current,
         };
-        liveRetainedMediaOverlayRendererRef.current.hideSettledPixels();
+        liveRetainedMediaOverlayRendererRef.current.hideSettledPixels(
+          taken.strokes.map((stroke) => stroke.id),
+        );
         if (liveDraftVisualRef.current?.mode === "eraser") {
           liveDraftVisualRef.current = null;
           liveDraftDirectRef.current = false;
@@ -18250,23 +18269,31 @@ const puppetWarpArmed =
       releaseStudioHokusaiLivePresentation(hokusaiStroke);
     }
     const undoneRetained = pendingUndoneStrokeCommitsRef.current;
-    if (undoneRetained && pagesHiRef.current >= undoneRetained.historyIndex) {
-      if (!publishStudioRetainedStrokeHistory(
-        pagesHistoryRef.current[pagesHiRef.current] ?? pages, undoneRetained, "redo",
-        publishStudioCrdtHistoryTransition,
-      )) return;
-      pendingUndoneStrokeCommitsRef.current = null;
-      setHasUndonePendingOverlay(false);
-      setHasPendingOverlayCommit(true);
-      for (const stroke of undoneRetained.strokes) {
-        queueDeferredStrokeCommit(stroke);
-        if (stroke.mode === "eraser") {
+    if (undoneRetained && pagesHiRef.current === undoneRetained.historyIndex) {
+      resumeStudioRetainedStrokeHistory({
+        undone: pendingUndoneStrokeCommitsRef,
+        pending: pendingStrokeCommitsRef,
+        getHistoryIndex: () => pagesHiRef.current,
+        getPages: () => pagesHistoryRef.current[pagesHiRef.current] ?? pages,
+        getActivePageId: () => currentPageIdRef.current,
+        isBlocked: () => documentSaveInFlightRef.current || drawingRef.current !== null,
+        flushPending: () => flushPendingStrokeCommitsRef.current(),
+        publish: publishStudioCrdtHistoryTransition,
+        onResumed: () => {
+          setHasUndonePendingOverlay(false);
+          setHasPendingOverlayCommit(true);
+          setUnloadGuardArmed(true);
+        },
+        showOverlay: (ids) => liveRetainedMediaOverlayRendererRef.current.showSettledPixels(ids),
+        showEraser: (stroke) => {
           liveDraftVisualRef.current = stroke;
           liveDraftDirectRef.current = true;
           mainLayerRef.current?.batchDraw();
-        }
-      }
-      liveRetainedMediaOverlayRendererRef.current.showSettledPixels();
+        },
+        persist: () => persistPendingStrokeEmergencyAutosaveRef.current("pointerup"),
+        retryDelayMs: DEFERRED_STROKE_COMMIT_RETRY_MS,
+        maxRetries: DEFERRED_STROKE_COMMIT_MAX_RETRIES,
+      });
       return;
     }
     // 대기 획을 먼저 히스토리에 안착시킨다 — 이번 redo 입력은 동기화로 소비된다.
@@ -23182,9 +23209,6 @@ const puppetWarpArmed =
         globalThis.clearTimeout(pendingBatch.timer);
         pendingBatch.timer = null;
       }
-      liveRetainedMediaOverlayRendererRef.current.discardHiddenSettledStrokes();
-      pendingUndoneStrokeCommitsRef.current = null;
-      setHasUndonePendingOverlay(false);
       // 이전 획이 아직 대기 배치에 있고 WebGPU 권한을 들고 있으면 아래 진입 가드가 새 표면
       // 작업을 통째로 거절한다 — 2초 유휴가 지나기 전에 두 번째 획을 그은 사람은 그 획을
       // 통째로 잃었다(실측: 해칭 간격 0.6초에서 100% 거절, "획을 시작하지 않았습니다" 배너).
@@ -26503,6 +26527,7 @@ function clearSelectionForEdit() {
       currentHistoryIndex,
       restoredPages
     );
+    invalidatePendingRetainedRedo();
     recordStudioHistoryTransition({
       mutationKind: "project.replace",
       previousPages: currentPages,
@@ -27024,7 +27049,46 @@ function clearSelectionForEdit() {
     ? studioRasterHandoffCandidate?.authorityKey ?? null
     : null;
 
+  const studioLayerCompMetadataContext = {
+    prepare: () => !pendingStrokeCommitsRef.current || flushPendingStrokeCommitsRef.current(),
+    getPage: () => (pagesHistoryRef.current[pagesHiRef.current] ?? pages)
+      .find((page) => page.id === currentPageIdRef.current) ?? null,
+    canMutate: () => editorMountedRef.current
+      && !masterEditModeRef.current
+      && !documentSaveInFlightRef.current
+      && !collaborationAccessRef.current.locked
+      && !activeSurfaceReviewLockedRef.current,
+    commit,
+    reportError: setError,
+  };
   const studioInspectorAsideHandlers = useStudioStableHandlers<StudioInspectorAsideHandlers>({
+    onCaptureLayerComp: (name, compId) => captureStudioLayerCompTransaction({
+      ...studioLayerCompMetadataContext, name, compId,
+    }),
+    onChangeLayerComps: (nextComps) => changeStudioLayerCompsTransaction({
+      ...studioLayerCompMetadataContext, nextComps,
+    }),
+    onApplyLayerComp: (comp) => {
+      if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) {
+        return Promise.resolve(false);
+      }
+      const ticket = captureStudioMutationTicket();
+      return applyStudioLayerCompTransaction({
+        comp,
+        getPage: () => (pagesHistoryRef.current[pagesHiRef.current] ?? pages)
+          .find((page) => page.id === currentPageIdRef.current) ?? null,
+        canMutate: () => editorMountedRef.current
+          && !masterEditModeRef.current
+          && !documentSaveInFlightRef.current
+          && !collaborationAccessRef.current.locked
+          && !activeSurfaceReviewLockedRef.current
+          && canApplyStudioMutation(ticket),
+        acquire: (ids) => beginLiveResourceEditAsync(ids),
+        release: endLiveResourceEdit,
+        commit,
+        reportError: setError,
+      });
+    },
     activateCanvasTool: activatePrimaryCanvasTool,
     activatePixelSelectionToolFromInspector,
     applyBuiltInBrushPreset,

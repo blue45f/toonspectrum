@@ -136,6 +136,7 @@ export interface StudioDeferredStrokeCommitEngineContext extends Pick<
   readonly noteStudioHistoryRetention: (
     appended: StudioPagesHistoryAppendResult<PageState>
   ) => void;
+  readonly onHistoryBranch: () => void;
   readonly pageEditLocked: boolean;
   readonly pendingGpuDrawAuthoritiesRef:
     MutableRefObject<StudioGpuPendingDrawAuthority[]>;
@@ -243,6 +244,7 @@ export function createStudioDeferredStrokeCommitEngine(
     liveRetainedMediaOverlayRendererRef,
     masterEditMode,
     noteStudioHistoryRetention,
+    onHistoryBranch,
     pageEditLocked,
     pages,
     pagesHiRef,
@@ -478,6 +480,7 @@ export function createStudioDeferredStrokeCommitEngine(
       currentHistoryIndex,
       nextPages
     );
+    onHistoryBranch();
     recordStudioHistoryTransition({
       mutationKind: "elements.commit",
       previousPages: commitBasePages,
@@ -568,6 +571,7 @@ export function createStudioDeferredStrokeCommitEngine(
       nextHistoryIndex = appended.historyIndex;
       noteStudioHistoryRetention(appended);
     }
+    onHistoryBranch();
     recordStudioHistoryTransition({
       mutationKind: "elements.coalesced-commit",
       previousPages: commitBasePages,
@@ -963,6 +967,7 @@ export function createStudioDeferredStrokeCommitEngine(
       currentHistoryIndex,
       resolvedPages
     );
+    onHistoryBranch();
     recordStudioHistoryTransition({
       mutationKind: "pages.commit",
       previousPages: currentPages,

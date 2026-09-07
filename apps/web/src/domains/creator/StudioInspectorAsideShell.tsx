@@ -228,7 +228,6 @@ export function StudioInspectorAsideShell({
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
             desktopDetached && "lg:h-full lg:w-full lg:flex-1 lg:self-auto lg:border-0 lg:bg-transparent lg:p-0",
             !visibleRightPanelOpen && "lg:hidden",
-            inspectorLayout.primary === "layers" && "overflow-hidden lg:overflow-hidden",
             inspectorDrawing &&
               inspectorLayout.primary === "properties" &&
               "lg:overflow-hidden"
@@ -521,15 +520,20 @@ export function StudioInspectorAsideShell({
             data-studio-inspector-layers-split={layersSplitWithProperties ? "true" : undefined}
             hidden={!layersPaneMounted}
             className={cn(
-              "flex flex-col gap-2",
-              layersSplitWithProperties
-                ? "mt-1 h-[min(22rem,38dvh)] min-h-56 shrink-0 border-t border-line/60 pt-2"
-                : "h-[min(31rem,54dvh)] min-h-72 lg:h-[calc(100dvh-28rem)] lg:min-h-72",
+              "flex shrink-0 flex-col gap-2",
+              layersSplitWithProperties && "mt-1 border-t border-line/60 pt-2",
             )}
           >
             {layersPaneMounted ? (
               <>
-                <div className="min-h-0 flex-1 [&>section]:h-full">
+                {/* Keep the list's viewport independent of the option panels below it.
+                    Sharing a fixed height let layer comps shrink the list to zero on mobile. */}
+                <div className={cn(
+                  "shrink-0 [&>section]:h-full",
+                  layersSplitWithProperties
+                    ? "h-[min(22rem,38dvh)] min-h-56"
+                    : "h-[min(31rem,54dvh)] min-h-72 lg:h-[calc(100dvh-28rem)] lg:min-h-72",
+                )}>
                   <Suspense
                     fallback={
                       <div
@@ -584,20 +588,20 @@ export function StudioInspectorAsideShell({
                 ) : null}
                 {/* CSP 3.0 / 4.0 Layer Comps (레이어 콤프) */}
                 <StudioLayerCompsPanel
-                  layers={layerNavigatorItems.map((item) => ({
-                    id: item.id,
-                    name: item.label,
-                    visible: !item.hidden,
-                    opacity: item.opacity ?? 1,
+                  key={currentPageId}
+                  comps={model.layerComps ?? []}
+                  groups={groups}
+                  disabled={masterEditMode || inspectorInteractionPolicy.global.disabled}
+                  onCompsChange={model.onChangeLayerComps}
+                  onCaptureComp={model.onCaptureLayerComp}
+                  layers={elements.map((element) => ({
+                    id: element.id,
+                    visible: !element.hidden,
+                    opacity: element.opacity ?? 1,
+                    blendMode: element.blendMode ?? "source-over",
+                    groupId: element.groupId,
                   }))}
-                  onApplyComp={(comp) => {
-                    for (const [id, state] of Object.entries(comp.layerStates)) {
-                      patchEl(id, {
-                        visible: state.visible,
-                        opacity: state.opacity,
-                      } as Partial<El>);
-                    }
-                  }}
+                  onApplyComp={model.onApplyLayerComp}
                 />
               </>
             ) : null}

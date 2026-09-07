@@ -22,6 +22,7 @@ export interface LayerCompStateItem {
   readonly visible: boolean;
   readonly opacity: number; // 0..1
   readonly blendMode?: string;
+  readonly groupId?: string;
 }
 
 export interface StudioLayerComp {
@@ -29,6 +30,8 @@ export interface StudioLayerComp {
   readonly name: string;
   readonly createdAt: number;
   readonly layerStates: Readonly<Record<string, LayerCompStateItem>>;
+  /** Folder visibility is independent of each child's own hidden flag. */
+  readonly groupStates?: Readonly<Record<string, { readonly groupId: string; readonly visible: boolean }>>;
   readonly notes?: string;
 }
 
@@ -37,6 +40,29 @@ export interface StudioLayerLikeItem {
   readonly visible: boolean;
   readonly opacity?: number;
   readonly blendMode?: string;
+  readonly groupId?: string;
+}
+
+export interface StudioLayerCompGroupLike {
+  readonly id: string;
+  readonly hidden?: boolean;
+}
+
+function captureLayerStates(layers: readonly StudioLayerLikeItem[]): StudioLayerComp["layerStates"] {
+  return Object.freeze(Object.fromEntries(layers.map((layer) => [layer.id, Object.freeze({
+    layerId: layer.id,
+    visible: layer.visible,
+    opacity: typeof layer.opacity === "number" ? layer.opacity : 1,
+    blendMode: layer.blendMode,
+    ...(layer.groupId === undefined ? {} : { groupId: layer.groupId }),
+  })])));
+}
+
+function captureGroupStates(groups: readonly StudioLayerCompGroupLike[]): StudioLayerComp["groupStates"] {
+  return Object.freeze(Object.fromEntries(groups.map((group) => [group.id, Object.freeze({
+    groupId: group.id,
+    visible: !group.hidden,
+  })])));
 }
 
 /**
@@ -47,24 +73,15 @@ export function captureLayerComp<T extends StudioLayerLikeItem>(
   layers: readonly T[],
   id?: string,
   nowMs = Date.now(),
+  groups?: readonly StudioLayerCompGroupLike[],
 ): StudioLayerComp {
   const compId = id || `comp-${nowMs.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  const states: Record<string, LayerCompStateItem> = {};
-
-  for (const layer of layers) {
-    states[layer.id] = Object.freeze({
-      layerId: layer.id,
-      visible: layer.visible,
-      opacity: typeof layer.opacity === "number" ? layer.opacity : 1.0,
-      blendMode: layer.blendMode,
-    });
-  }
-
   return Object.freeze({
     id: compId,
     name: name.trim() || "새 레이어 콤프",
     createdAt: nowMs,
-    layerStates: Object.freeze(states),
+    layerStates: captureLayerStates(layers),
+    ...(groups === undefined ? {} : { groupStates: captureGroupStates(groups) }),
   });
 }
 
@@ -77,7 +94,7 @@ export function applyLayerComp<T extends StudioLayerLikeItem>(
 ): readonly T[] {
   return Object.freeze(
     layers.map((layer) => {
-      const savedState = comp.layerStates[layer.id];
+      const savedState = Object.hasOwn(comp.layerStates, layer.id) ? comp.layerStates[layer.id] : undefined;
       if (!savedState) return layer;
 
       return Object.freeze({
@@ -96,21 +113,12 @@ export function applyLayerComp<T extends StudioLayerLikeItem>(
 export function updateLayerCompWithCurrentLayers<T extends StudioLayerLikeItem>(
   comp: StudioLayerComp,
   layers: readonly T[],
+  groups?: readonly StudioLayerCompGroupLike[],
 ): StudioLayerComp {
-  const states: Record<string, LayerCompStateItem> = {};
-
-  for (const layer of layers) {
-    states[layer.id] = Object.freeze({
-      layerId: layer.id,
-      visible: layer.visible,
-      opacity: typeof layer.opacity === "number" ? layer.opacity : 1.0,
-      blendMode: layer.blendMode,
-    });
-  }
-
   return Object.freeze({
     ...comp,
-    layerStates: Object.freeze(states),
+    layerStates: captureLayerStates(layers),
+    ...(groups === undefined ? {} : { groupStates: captureGroupStates(groups) }),
   });
 }
 

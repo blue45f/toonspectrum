@@ -516,6 +516,7 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
           cropRect={cropRect}
           currentBrushSnapshot={currentBrushSnapshot}
           currentPageId={currentPageId}
+          layerComps={activePage.layerComps ?? []}
           currentTemplate={currentTemplate}
           description={description}
           drawMode={drawMode}
