@@ -8,6 +8,7 @@ import { apiPath } from "../infrastructure/api";
 import { AppShell } from "./AppShell";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
+import { installStudioDocumentNavigationBridge } from "./studio-document-navigation";
 
 import { FloatingControls } from "@/shared/components/FloatingControls";
 import { SiteHeader } from "@/shared/components/site-header";
@@ -171,6 +172,11 @@ function WebFloatingControls() {
   );
 }
 
+/**
+ * Route-level immersive owner: site GNB/footer never flash on /studio (including the
+ * lazy StudioPage load gap). The current route owns rendering; this bridge mirrors
+ * that truth into the shared UI store for consumers outside the web chrome.
+ */
 function StudioRouteImmersiveBridge() {
   const { pathname } = useLocation();
   const acquireImmersiveSurface = useUi(
@@ -192,6 +198,11 @@ function StudioRouteImmersiveBridge() {
   return null;
 }
 
+function StudioDocumentNavigationBridge() {
+  useEffect(() => installStudioDocumentNavigationBridge(), []);
+  return null;
+}
+
 function SerifWebFontBridge() {
   const { pathname } = useLocation();
 
@@ -207,9 +218,8 @@ function AppRuntime() {
   const [compatResult, setCompatResult] =
     useState<BrowserCompatibilityResult | null>(null);
   const [showCompatModal, setShowCompatModal] = useState(false);
-  const studioImmersive = useUi(
-    (state) => state.immersiveSurface === "studio",
-  );
+  // Route truth is available during the first render; the Zustand bridge runs later in an effect.
+  const studioImmersive = isImmersiveMobileRoute(pathname);
   const adminChrome = isAdminPath(pathname);
   const isolatedChrome = studioImmersive || adminChrome;
 
@@ -234,6 +244,7 @@ function AppRuntime() {
           <TrafficAnalyticsBridge />
         </Suspense>
       ) : null}
+      <StudioDocumentNavigationBridge />
       <StudioRouteImmersiveBridge />
       <SerifWebFontBridge />
       <AppShell
@@ -241,7 +252,6 @@ function AppRuntime() {
         footer={isolatedChrome ? null : <DeferredFooter />}
         floatingControls={isolatedChrome ? null : <WebFloatingControls />}
         showSkipLink={!studioImmersive}
-        showSplash={!adminChrome}
         showCommandPalette={!adminChrome}
         showGlobalOverlays={!adminChrome}
         trackVisit={!adminChrome}
@@ -254,9 +264,11 @@ function AppRuntime() {
         }
         chromeOverlay={
           <>
-            <Suspense fallback={null}>
-              <StudioBg3dRetainedOwnerHost />
-            </Suspense>
+            {studioImmersive ? (
+              <Suspense fallback={null}>
+                <StudioBg3dRetainedOwnerHost />
+              </Suspense>
+            ) : null}
             {!isolatedChrome ? (
               <>
                 <DeferredBackToTop />

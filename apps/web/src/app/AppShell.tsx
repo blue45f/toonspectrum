@@ -1,12 +1,10 @@
 import { type ReactNode, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
-import { shouldRenderAppSplash } from "./app-shell-splash";
 import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
-import { RandomIntro } from "@/shared/components/RandomIntro";
 import { pingVisit } from "@/shared/lib/visits-api";
 import {
   isStudioRoutePathname,
@@ -102,9 +100,7 @@ export interface AppShellProps {
   footer?: ReactNode;
   floatingControls?: ReactNode;
   chromeOverlay?: ReactNode;
-  splash?: ReactNode;
   showSkipLink?: boolean;
-  showSplash?: boolean;
   showCommandPalette?: boolean;
   showGlobalOverlays?: boolean;
   trackVisit?: boolean;
@@ -116,21 +112,15 @@ export function AppShell({
   footer,
   floatingControls,
   chromeOverlay,
-  splash,
   showSkipLink = true,
-  showSplash = true,
   showCommandPalette = true,
   showGlobalOverlays = true,
   trackVisit = true,
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
-  const { pathname, search } = useLocation();
   useVisitPing(trackVisit);
   return (
     <AuthSessionProvider>
-      {showSplash && pathname !== "/" && shouldRenderAppSplash(pathname, search)
-        ? (splash ?? <RandomIntro />)
-        : null}
       <Suspense fallback={null}>
         <StoreSync />
       </Suspense>
