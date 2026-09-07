@@ -1,0 +1,64 @@
+name: One-shot prioritize PR 905 protected core
+
+on:
+  push:
+    branches:
+      - ci/validate-final-8f6a8ef9
+    paths:
+      - .github/workflows/one-shot-pr905-core-priority.yml
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  prioritize-core:
+    runs-on: macos-15
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TARGET_PR: "905"
+    steps:
+      - name: Preserve current protected CI and cancel its duplicate matrices
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          current_head="$(gh api "repos/${repo}/pulls/${TARGET_PR}" --jq '.head.sha')"
+          current_branch="$(gh api "repos/${repo}/pulls/${TARGET_PR}" --jq '.head.ref')"
+          echo "Protected candidate: ${current_branch}@${current_head}"
+
+          candidates="$(mktemp)"
+          for status in queued in_progress waiting pending requested; do
+            gh api --paginate \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${repo}/actions/runs?status=${status}&event=pull_request&per_page=100" \
+              --jq '.workflow_runs[] | [.id, .name, .head_branch, .head_sha, .status] | @tsv' \
+              >> "$candidates"
+          done
+
+          kept=0
+          cancelled=0
+          raced=0
+          while IFS=$'\t' read -r run_id name branch sha status; do
+            [[ -n "$run_id" ]] || continue
+            [[ "$branch" == "$current_branch" && "$sha" == "$current_head" ]] || continue
+            if [[ "$name" == "CI" ]]; then
+              echo "Preserving protected CI ${run_id} (${status})"
+              kept=$((kept + 1))
+              continue
+            fi
+            echo "Cancelling duplicate matrix ${run_id}: ${name} (${status})"
+            if gh api --method POST \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${repo}/actions/runs/${run_id}/cancel" >/dev/null 2>&1; then
+              cancelled=$((cancelled + 1))
+            else
+              raced=$((raced + 1))
+            fi
+          done < <(sort -u "$candidates")
+
+          echo "Preserved ${kept}; cancelled ${cancelled}; raced ${raced}."
