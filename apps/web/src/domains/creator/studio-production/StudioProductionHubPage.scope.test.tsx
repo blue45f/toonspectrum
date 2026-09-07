@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, useNavigate } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -29,6 +29,11 @@ function mount(path: string, surface: StudioProductionSurface = "share") {
       <StudioProductionHubPage surface={surface} onOpenStudio={vi.fn()} />
     </MemoryRouter>,
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
 }
 
 describe("production scope at the actual React page", () => {
@@ -126,8 +131,32 @@ describe("production scope at the actual React page", () => {
       "demo",
     );
     expect(screen.getByText("콘티와 대사 확정")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "리뷰" }).getAttribute("href")).toBe(
+      "/studio/review?demo=1",
+    );
+    expect(screen.getByRole("link", { name: "공유" }).getAttribute("href")).toBe(
+      "/studio/share?demo=1",
+    );
+    expect(screen.getByRole("link", { name: "참여" }).getAttribute("href")).toBe(
+      "/studio/join?demo=1",
+    );
     expect(database.kvGet).not.toHaveBeenCalled();
     expect(database.kvSet).not.toHaveBeenCalled();
+  });
+
+  it("preserves demo mode for Alt-number workspace navigation", async () => {
+    render(
+      <MemoryRouter initialEntries={["/studio/projects?demo=1"]}>
+        <LocationProbe />
+        <StudioProductionHubPage surface="projects" onOpenStudio={vi.fn()} />
+      </MemoryRouter>,
+    );
+    await screen.findByText("데모 · 저장 안 함");
+
+    fireEvent.keyDown(window, { key: "2", altKey: true });
+    await waitFor(() => expect(screen.getByTestId("location").textContent).toBe(
+      "/studio/review?demo=1",
+    ));
   });
 
   it("ignores a demo query for saved work scopes", async () => {
@@ -136,6 +165,9 @@ describe("production scope at the actual React page", () => {
 
     expect(document.querySelector("[data-workspace-mode]")?.getAttribute("data-workspace-mode")).toBe(
       "linked-local",
+    );
+    expect(screen.getByRole("link", { name: "리뷰" }).getAttribute("href")).toBe(
+      "/studio/work/chapter-1/review",
     );
     expect(screen.queryByText("콘티와 대사 확정")).toBeNull();
   });
