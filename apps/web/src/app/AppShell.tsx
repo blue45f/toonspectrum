@@ -5,7 +5,6 @@ import { shouldRenderAppSplash } from "./app-shell-splash";
 import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
-import { StoreSync } from "@/domains/auth/components/store-sync";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { RandomIntro } from "@/shared/components/RandomIntro";
 import { pingVisit } from "@/shared/lib/visits-api";
@@ -19,6 +18,11 @@ import "@toonspectrum/core/fx/fx.css";
 const AgeGateHost = lazy(() =>
   import("@/shared/components/age-gate-host").then((mod) => ({
     default: mod.AgeGateHost,
+  })),
+);
+const StoreSync = lazy(() =>
+  import("@/domains/auth/components/store-sync").then((mod) => ({
+    default: mod.StoreSync,
   })),
 );
 const ToastHost = lazy(() =>

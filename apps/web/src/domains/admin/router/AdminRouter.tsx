@@ -7,6 +7,7 @@ import { AdminGateFallback } from "../components/admin-gate";
 import { useAdminGate } from "../components/admin-gate-state";
 import { AdminToastProvider } from "../components/AdminToast";
 import { AdminShell } from "../shell/AdminShell";
+import { getAdminShellCopy } from "../shell/admin-shell-copy";
 import {
   adminPathFromLegacyTab,
   resolveAdminRedirectHref,
@@ -72,8 +73,10 @@ const AdminCommunityPage = lazyRetry(
 );
 
 function AdminRouteLoading() {
+  const lang = useI18n((state) => state.lang);
+  const copy = getAdminShellCopy(lang);
   return (
-    <div aria-busy="true" aria-label="Loading" className="space-y-4">
+    <div aria-busy="true" aria-label={copy.loading} className="space-y-4">
       <div className="admin-route-skeleton h-24 rounded-2xl border border-line bg-card" />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (

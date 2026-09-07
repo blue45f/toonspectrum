@@ -7,13 +7,14 @@ import {
   ADMIN_ROUTE_BY_ID,
 } from "../router/admin-route-manifest";
 import { AdminRouteIcon } from "../router/admin-route-icons";
+import { getAdminShellCopy } from "../shell/admin-shell-copy";
 import {
   adminFetchText,
   downloadAdminFile,
 } from "./admin-client";
 import { useAdminToast } from "./use-admin-toast";
 
-import { useT } from "@/shared/lib/i18n";
+import { useI18n, useT } from "@/shared/lib/i18n";
 import { usePathname, useRouter } from "@/src/compat/navigation";
 
 export function AdminQuickPalette({ userId }: { userId: string }) {
@@ -21,6 +22,8 @@ export function AdminQuickPalette({ userId }: { userId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const pathname = usePathname();
   const router = useRouter();
+  const lang = useI18n((state) => state.lang);
+  const copy = getAdminShellCopy(lang);
   const t = useT();
   const { showToast } = useAdminToast();
 
@@ -63,8 +66,8 @@ export function AdminQuickPalette({ userId }: { userId: string }) {
       showToast(success);
     } catch (error) {
       showToast(
-        t("admin.palette.downloadFailed"),
-        error instanceof Error ? error.message : t("admin.palette.downloadFailed"),
+        copy.downloadFailed,
+        error instanceof Error ? error.message : copy.downloadFailed,
         "error",
       );
     }
@@ -114,7 +117,7 @@ export function AdminQuickPalette({ userId }: { userId: string }) {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  aria-label={t("admin.shell.closeCommandPalette")}
+                  aria-label={copy.closeCommandPalette}
                   className="inline-flex size-9 items-center justify-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg"
                 >
                   <X size={16} />
@@ -129,7 +132,7 @@ export function AdminQuickPalette({ userId }: { userId: string }) {
                 {ADMIN_NAVIGATION_GROUPS.map((group) => (
                   <Command.Group
                     key={group.id}
-                    heading={t(group.labelKey)}
+                    heading={copy.groups[group.id]}
                     className="mb-2 px-1 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-3"
                   >
                     {group.routeIds.map((routeId) => {
@@ -160,7 +163,7 @@ export function AdminQuickPalette({ userId }: { userId: string }) {
                       void exportCsv(
                         "/users/export/csv",
                         "members.csv",
-                        t("admin.members.exportSuccess"),
+                        copy.exportMembersSuccess,
                       );
                     }}
                     className={itemClass}
@@ -175,7 +178,7 @@ export function AdminQuickPalette({ userId }: { userId: string }) {
                       void exportCsv(
                         "/revenue/export/csv",
                         "revenue-ledger.csv",
-                        t("admin.palette.exportRevenue"),
+                        copy.exportRevenueSuccess,
                       );
                     }}
                     className={itemClass}

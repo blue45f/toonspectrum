@@ -17,8 +17,9 @@ import {
   ADMIN_ROUTE_BY_ID,
   resolveAdminRoute,
 } from "../router/admin-route-manifest";
+import { getAdminShellCopy } from "./admin-shell-copy";
 
-import { useT } from "@/shared/lib/i18n";
+import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 import { usePathname } from "@/src/compat/navigation";
 import Link from "@/src/compat/router-link";
@@ -41,10 +42,12 @@ function AdminNavigation({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const lang = useI18n((state) => state.lang);
+  const copy = getAdminShellCopy(lang);
   const t = useT();
 
   return (
-    <nav aria-label={t("admin.shell.navigation")} className="flex-1 overflow-y-auto px-2 py-4">
+    <nav aria-label={copy.navigation} className="flex-1 overflow-y-auto px-2 py-4">
       {ADMIN_NAVIGATION_GROUPS.map((group) => (
         <section key={group.id} className="mb-5" aria-labelledby={`admin-nav-${group.id}`}>
           <h2
@@ -54,7 +57,7 @@ function AdminNavigation({
               collapsed && "sr-only",
             )}
           >
-            {t(group.labelKey)}
+            {copy.groups[group.id]}
           </h2>
           <div className="space-y-1">
             {group.routeIds.map((routeId) => {
@@ -94,7 +97,8 @@ function AdminNavigation({
 }
 
 function AdminBrand({ collapsed }: { collapsed: boolean }) {
-  const t = useT();
+  const lang = useI18n((state) => state.lang);
+  const copy = getAdminShellCopy(lang);
   return (
     <div className="flex min-h-16 items-center gap-3 border-b border-line px-4">
       <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent">
@@ -102,7 +106,7 @@ function AdminBrand({ collapsed }: { collapsed: boolean }) {
       </span>
       <div className={cn("min-w-0", collapsed && "sr-only")}>
         <p className="truncate text-sm font-semibold text-fg">ToonStudio</p>
-        <p className="truncate text-[11px] text-fg-3">{t("admin.shell.workspace")}</p>
+        <p className="truncate text-[11px] text-fg-3">{copy.workspace}</p>
       </div>
     </div>
   );
@@ -110,6 +114,8 @@ function AdminBrand({ collapsed }: { collapsed: boolean }) {
 
 export function AdminShell({ actor, userId, children }: AdminShellProps) {
   const pathname = usePathname();
+  const lang = useI18n((state) => state.lang);
+  const copy = getAdminShellCopy(lang);
   const t = useT();
   const route = resolveAdminRoute(pathname) ?? ADMIN_ROUTE_BY_ID.overview;
   const group = ADMIN_NAVIGATION_GROUPS.find((candidate) =>
@@ -161,10 +167,10 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
             type="button"
             onClick={toggleCollapsed}
             className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl text-xs font-medium text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-            aria-label={collapsed ? t("admin.shell.expandSidebar") : t("admin.shell.collapseSidebar")}
+            aria-label={collapsed ? copy.expandSidebar : copy.collapseSidebar}
           >
             {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-            {!collapsed ? <span>{t("admin.shell.collapseSidebar")}</span> : null}
+            {!collapsed ? <span>{copy.collapseSidebar}</span> : null}
           </button>
           <div className={cn("mt-1 rounded-xl border border-line bg-card p-3", collapsed && "px-1 text-center")}>
             <p className={cn("truncate text-xs font-semibold text-fg", collapsed && "sr-only")}>
@@ -182,7 +188,7 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
         <div className="fixed inset-0 z-[90] lg:hidden">
           <button
             type="button"
-            aria-label={t("admin.shell.closeNavigation")}
+            aria-label={copy.closeNavigation}
             className="absolute inset-0 bg-canvas/80 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
@@ -192,7 +198,7 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                aria-label={t("admin.shell.closeNavigation")}
+                aria-label={copy.closeNavigation}
                 className="inline-flex size-10 items-center justify-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg"
               >
                 <X size={18} />
@@ -210,14 +216,14 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
               type="button"
               onClick={() => setMobileOpen(true)}
               className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-line bg-card text-fg-2 lg:hidden"
-              aria-label={t("admin.shell.openNavigation")}
+              aria-label={copy.openNavigation}
               aria-expanded={mobileOpen}
             >
               <Menu size={18} />
             </button>
             <div className="min-w-0">
               <p className="truncate text-[11px] text-fg-3">
-                {t("admin.shell.breadcrumbRoot")} / {group ? t(group.labelKey) : ""}
+                {copy.breadcrumbRoot} / {group ? copy.groups[group.id] : ""}
               </p>
               <h1 className="truncate text-base font-semibold text-fg sm:text-lg">
                 {t(route.labelKey)}
@@ -240,9 +246,9 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
             <Link
               href="/"
               className="hidden min-h-10 items-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg md:inline-flex"
-              title={t("admin.shell.openPublicSite")}
+              title={copy.openPublicSite}
             >
-              {t("admin.shell.publicSite")} <ExternalLink size={13} />
+              {copy.publicSite} <ExternalLink size={13} />
             </Link>
           </div>
         </header>

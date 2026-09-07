@@ -64,16 +64,15 @@ export type AdminNavigationGroupId =
 
 export interface AdminNavigationGroup {
   readonly id: AdminNavigationGroupId;
-  readonly labelKey: string;
   readonly routeIds: readonly AdminRouteId[];
 }
 
 export const ADMIN_NAVIGATION_GROUPS: readonly AdminNavigationGroup[] = [
-  { id: "overview", labelKey: "admin.shell.groups.overview", routeIds: ["overview", "traffic"] },
-  { id: "users-trust", labelKey: "admin.shell.groups.usersTrust", routeIds: ["members", "reports", "community"] },
-  { id: "monetization", labelKey: "admin.shell.groups.monetization", routeIds: ["plans", "revenue", "campaigns"] },
-  { id: "growth", labelKey: "admin.shell.groups.growth", routeIds: ["promos", "announcements"] },
-  { id: "platform-security", labelKey: "admin.shell.groups.platformSecurity", routeIds: ["ops", "security", "audit"] },
+  { id: "overview", routeIds: ["overview", "traffic"] },
+  { id: "users-trust", routeIds: ["members", "reports", "community"] },
+  { id: "monetization", routeIds: ["plans", "revenue", "campaigns"] },
+  { id: "growth", routeIds: ["promos", "announcements"] },
+  { id: "platform-security", routeIds: ["ops", "security", "audit"] },
 ] as const;
 
 export const ADMIN_ROUTE_BY_ID = Object.fromEntries(
