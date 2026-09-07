@@ -8,6 +8,7 @@ import { apiPath } from "../infrastructure/api";
 import { AppShell } from "./AppShell";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
+import { installStudioDocumentNavigationBridge } from "./studio-document-navigation";
 
 import { FloatingControls } from "@/shared/components/FloatingControls";
 import { SiteHeader } from "@/shared/components/site-header";
@@ -147,7 +148,8 @@ function WebFloatingControls() {
 
 /**
  * Route-level immersive owner: site GNB/footer never flash on /studio (including the
- * lazy StudioPage load gap). Release only when leaving the studio path.
+ * lazy StudioPage load gap). The current route owns rendering; this bridge mirrors
+ * that truth into the shared UI store for consumers outside the web chrome.
  */
 function StudioRouteImmersiveBridge() {
   const { pathname } = useLocation();
@@ -166,6 +168,11 @@ function StudioRouteImmersiveBridge() {
   return null;
 }
 
+function StudioDocumentNavigationBridge() {
+  useEffect(() => installStudioDocumentNavigationBridge(), []);
+  return null;
+}
+
 /**
  * --font-serif(Nanum Myeongjo) 소유자 — 웹 크롬 경로에서만 스타일시트를 주입한다.
  * 최초 진입은 main.tsx 가 렌더 전에 처리하므로, 여기는 /studio 에서 웹 라우트로 넘어오는
@@ -181,11 +188,12 @@ function SerifWebFontBridge() {
   return null;
 }
 
-// 웹 앱 — 공유 AppShell 을 BrowserRouter(실 URL/history) 안에서 마운트하고 웹 전용 크롬을 주입한다.
-export default function App() {
+function WebAppContent() {
+  const { pathname } = useLocation();
   const [compatResult, setCompatResult] = useState<BrowserCompatibilityResult | null>(null);
   const [showCompatModal, setShowCompatModal] = useState(false);
-  const studioImmersive = useUi((state) => state.immersiveSurface === "studio");
+  // Route truth is available during the first render; the Zustand bridge runs later in an effect.
+  const studioImmersive = isImmersiveMobileRoute(pathname);
 
   useKmasEntryMerge();
 
@@ -205,12 +213,13 @@ export default function App() {
   };
 
   return (
-    <BrowserRouter>
+    <>
       {TRAFFIC_ANALYTICS_ENABLED ? (
         <Suspense fallback={null}>
           <TrafficAnalyticsBridge />
         </Suspense>
       ) : null}
+      <StudioDocumentNavigationBridge />
       <StudioRouteImmersiveBridge />
       <SerifWebFontBridge />
       <AppShell
@@ -226,9 +235,11 @@ export default function App() {
         }
         chromeOverlay={
           <>
-            <Suspense fallback={null}>
-              <StudioBg3dRetainedOwnerHost />
-            </Suspense>
+            {studioImmersive ? (
+              <Suspense fallback={null}>
+                <StudioBg3dRetainedOwnerHost />
+              </Suspense>
+            ) : null}
             {!studioImmersive ? (
               <>
                 <DeferredBackToTop />
@@ -245,6 +256,15 @@ export default function App() {
           </>
         }
       />
+    </>
+  );
+}
+
+// 웹 앱 — 공유 AppShell 을 BrowserRouter(실 URL/history) 안에서 마운트하고 웹 전용 크롬을 주입한다.
+export default function App() {
+  return (
+    <BrowserRouter>
+      <WebAppContent />
     </BrowserRouter>
   );
 }

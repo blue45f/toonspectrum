@@ -1,12 +1,10 @@
 import { type ReactNode, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
-import { shouldRenderAppSplash } from "./app-shell-splash";
 import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
-import { RandomIntro } from "@/shared/components/RandomIntro";
 import { pingVisit } from "@/shared/lib/visits-api";
 import {
   isStudioRoutePathname,
@@ -112,8 +110,6 @@ export interface AppShellProps {
   floatingControls?: ReactNode;
   /** 콘텐츠 트리 밖(셸 최상위)에 얹는 오버레이. */
   chromeOverlay?: ReactNode;
-  /** 인트로/스플래시 노출. 기본=RandomIntro(세션 1회). */
-  splash?: ReactNode;
   /** `sr-only` 본문 바로가기 링크 노출. */
   showSkipLink?: boolean;
   /** `<main>`에 적용할 클래스. */
@@ -129,15 +125,12 @@ export function AppShell({
   footer,
   floatingControls,
   chromeOverlay,
-  splash,
   showSkipLink = true,
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
-  const { pathname, search } = useLocation();
   useVisitPing();
   return (
     <AuthSessionProvider>
-      {pathname !== "/" && shouldRenderAppSplash(pathname, search) ? (splash ?? <RandomIntro />) : null}
       <Suspense fallback={null}>
         <StoreSync />
       </Suspense>
