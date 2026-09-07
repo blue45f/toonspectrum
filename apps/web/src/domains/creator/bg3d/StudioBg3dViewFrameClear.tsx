@@ -5,13 +5,15 @@ import { installStudioBg3dFrameBackpressure } from "./studio-bg3d-frame-backpres
 import {
   clearStudioBg3dViewFrame,
   STUDIO_BG3D_VIEW_FRAME_CLEAR_PRIORITY,
+  syncStudioBg3dCanvasOrigin,
 } from "./studio-bg3d-view-frame-clear";
 
 export function StudioBg3dViewFrameClear() {
   const gl = useThree((state) => state.gl);
   const invalidate = useThree((state) => state.invalidate);
   useLayoutEffect(() => installStudioBg3dFrameBackpressure(gl, invalidate), [gl, invalidate]);
-  useFrame(({ gl }) => {
+  useFrame(({ gl, size, setSize }) => {
+    syncStudioBg3dCanvasOrigin(gl.domElement, size, setSize);
     clearStudioBg3dViewFrame(gl);
   }, STUDIO_BG3D_VIEW_FRAME_CLEAR_PRIORITY);
 

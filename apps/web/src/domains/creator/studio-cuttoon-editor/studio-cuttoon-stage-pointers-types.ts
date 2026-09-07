@@ -227,6 +227,7 @@ export type StudioCuttoonStagePointersHost = {
   polyLassoSessionRef: any;
   postCorrection: any;
   predictedInkTailStateRef: any;
+  prepareStrokeCommitPage: () => boolean;
   preserveCorners: any;
   pressureCurve: any;
   pressureMinSize: any;

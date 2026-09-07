@@ -8,6 +8,7 @@ import {
 } from "./ai/studio-ai-provenance";
 import { studioDrawingAssistHasContent } from "./brush/studio-drawing-assist-document";
 import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
+import { parseStudioLayerComps } from "./layer/studio-layer-comps-document";
 import { normalizeStudioPublishPackageSettings } from "./studio-publish-package";
 import { normalizeStudioPublishPackSettings } from "./studio-publish-preflight";
 import {
@@ -65,6 +66,7 @@ export type StudioAutosavePayload = {
     elements?: unknown[];
     canvasH?: unknown;
     drawingAssist?: unknown;
+    layerComps?: unknown;
     shared3dStage?: unknown;
   }>;
   master?: { elements?: unknown[] } | unknown;
@@ -417,6 +419,7 @@ export function studioAutosaveHasContent(payload: StudioAutosavePayload): boolea
     // A lifecycle receipt is an explicit dirty snapshot. It can intentionally represent deleting
     // the final element or changing page/background metadata that older content heuristics omit.
     payload.lifecycleDurability !== undefined ||
+    payload.pagesList.some((page) => (parseStudioLayerComps(page?.layerComps)?.length ?? 0) > 0) ||
     payload.pagesList.some((page) => Array.isArray(page?.elements) && page.elements.length > 0) ||
     payload.pagesList.some((page) => studioDrawingAssistHasContent(page?.drawingAssist, {
       canvasWidth: STUDIO_CANVAS_WIDTH,

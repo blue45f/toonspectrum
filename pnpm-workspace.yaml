@@ -46,12 +46,12 @@ overrides:
   find-my-way: '>=8.2.2'
   '@fastify/middie': '>=9.3.2'
   fastify: '>=5.7.2'
-  'fast-uri@>=3.0.0 <3.1.5': 3.1.5
+  'fast-uri@>=3.0.0 <3.1.6': 3.1.6
   'socket.io-parser@>=4.0.0 <4.2.7': 4.2.7
   'minimatch@3.1.5>brace-expansion': 5.0.9
   'brace-expansion@>=3.0.0 <5.0.9': 5.0.9
   'js-yaml@>=4.0.0 <4.3.1': 4.3.1
-  'postcss@<=8.5.17': 8.5.18
+  'postcss@>=8.0.0 <8.5.23': 8.5.23
   'sharp@<0.35.0': 0.35.2
   # 이전에 루트 package.json 의 npm 전용 "overrides" 에 있던 핀. pnpm 워크스페이스는 그 블록을
   # 읽지 않아 실제로는 아무것도 고정하지 못했다(@vercel/fun 이 tar 7.5.7 로 해석되고 있었다).
@@ -60,7 +60,11 @@ overrides:
   #  패치와 'minimatch@3.1.5>brace-expansion' 핀, scripts/minimatch-security-compat.test.mjs
   #  회귀 테스트가 3.1.5 의 존재를 전제하므로 전역 ^10 핀은 그것들을 깨뜨린다.)
   tar: '^7.5.18'
-  path-to-regexp: '>=6.3.0'
+  # 각 소비자가 요구하는 라우터 API를 유지한다. 전역 8.x 강제는 Express 4의
+  # callable API와 Vercel, Wrangler의 6.x pathToRegexp 반환 계약을 깨뜨린다.
+  'path-to-regexp@>=0.1.0 <0.1.13': 0.1.13
+  'path-to-regexp@>=6.0.0 <6.3.0': 6.3.0
+  'path-to-regexp@>=8.0.0 <8.4.2': 8.4.2
   serialize-javascript: '>=7.0.3'
   piscina: '>=4.9.3'
   drizzle-orm: '>=0.45.2'
@@ -70,7 +74,24 @@ overrides:
   vite: '>=8.0.16'
   jspdf: '>=4.2.1'
   babylonjs-gltf2interface: '9.19.0'
-  'nanoid@<3.3.17': 3.3.17
+  'nanoid@>=3.0.0 <3.3.18': 3.3.18
+  # 취약한 버전 범위만 해당 major의 수정 릴리스로 올린다. minimatch 3의
+  # callable CommonJS 패치와 이미 더 높은 버전을 쓰는 의존 경로는 보존한다.
+  'browserslist@>=4.0.0 <4.28.7': 4.28.7
+  '@vercel/python-analysis>minimatch': 10.2.3
+  '@vercel/static-config>ajv': 8.18.0
+  'smol-toml@>=1.0.0 <1.6.1': 1.6.1
+  '@tootallnate/once@>=2.0.0 <2.0.1': 2.0.1
+  'protobufjs@>=7.5.0 <7.6.5': 7.6.5
+  'body-parser@>=1.0.0 <1.20.6': 1.20.6
+  'body-parser@>=2.0.0 <2.3.0': 2.3.0
+  'qs@>=6.0.0 <6.16.0': 6.16.0
+  '@xmldom/xmldom@>=0.7.0 <0.8.15': 0.8.15
+  'fflate@>=0.6.0 <0.6.11': 0.6.11
+  'tsx@4.22.3>esbuild': 0.28.1
+  # drizzle-kit의 구형 설정 로더에 포함된 esbuild 0.18에는 보안 백포트가
+  # 없어, 트리에 이미 있는 0.25 수정 버전으로 좁혀 실제 TS 로더를 검증한다.
+  '@esbuild-kit/core-utils>esbuild': 0.25.12
 
 auditConfig:
   ignoreGhsas:

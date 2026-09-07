@@ -15,15 +15,15 @@ const MarketResourceDetailPage = lazyRetry(
   "MarketResourceDetailPage",
 );
 const MarketPublishPage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketPublishPage").then((module) => ({ default: module.MarketPublishPage })),
+  () => import("@/src/domains/market/pages/MarketPublishAuthorityPage").then((module) => ({ default: module.MarketPublishPage })),
   "MarketPublishPage",
 );
 const MarketManagePage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketManagePage").then((module) => ({ default: module.MarketManagePage })),
+  () => import("@/src/domains/market/pages/MarketOwnedResourcesPage").then((module) => ({ default: module.MarketManagePage })),
   "MarketManagePage",
 );
 const MarketLibraryPage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketLibraryPage").then((module) => ({ default: module.MarketLibraryPage })),
+  () => import("@/src/domains/market/pages/MarketCloudLibraryPage").then((module) => ({ default: module.MarketLibraryPage })),
   "MarketLibraryPage",
 );
 const MarketWishlistPage = lazyRetry(
