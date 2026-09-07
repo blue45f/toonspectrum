@@ -23,7 +23,6 @@ export interface AcquiredMarketItem {
 }
 
 const CACHE_PREFIX = "toonspectrum:market:confirmed-library-cache:v3:";
-const MAX_HYDRATION_PAGES = 20;
 export const MARKET_LIBRARY_STORAGE_KEY = CACHE_PREFIX;
 export const MARKET_LIBRARY_EVENT = "toonspectrum:market:library-changed";
 
@@ -95,8 +94,9 @@ async function listAllLibraryItems(
   signal: AbortSignal,
 ): Promise<readonly CreatorMarketplaceCloudLibraryItem[]> {
   const items: CreatorMarketplaceCloudLibraryItem[] = [];
+  const seenCursors = new Set<string>();
   let cursor: string | undefined;
-  for (let pageIndex = 0; pageIndex < MAX_HYDRATION_PAGES; pageIndex += 1) {
+  while (!signal.aborted) {
     const page: CreatorMarketplaceCloudLibraryPage =
       await listCreatorMarketplaceCloudLibrary({
         view: "all",
@@ -104,11 +104,15 @@ async function listAllLibraryItems(
         cursor,
       }, signal);
     items.push(...page.items);
-    const nextCursor = page.nextCursor ?? null;
-    if (!page.hasMore || !nextCursor) break;
+    if (!page.hasMore) return items;
+    const nextCursor = page.nextCursor;
+    if (!nextCursor || seenCursors.has(nextCursor)) {
+      throw new Error("The account library returned an incomplete pagination cursor.");
+    }
+    seenCursors.add(nextCursor);
     cursor = nextCursor;
   }
-  return items;
+  throw new DOMException("Library hydration was aborted", "AbortError");
 }
 
 /**

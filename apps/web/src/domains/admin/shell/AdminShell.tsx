@@ -134,11 +134,14 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
     candidate.routeIds.includes(route.id),
   );
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1",
-  );
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return typeof window !== "undefined" &&
+        window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     setMobileOpen(false);
@@ -154,11 +157,13 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
   }, [mobileOpen]);
 
   const toggleCollapsed = () => {
-    setCollapsed((current) => {
-      const next = !current;
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
       window.localStorage.setItem(SIDEBAR_STORAGE_KEY, next ? "1" : "0");
-      return next;
-    });
+    } catch {
+      // The preference cache must not prevent navigation in storage-restricted contexts.
+    }
   };
 
   const production = import.meta.env.PROD;

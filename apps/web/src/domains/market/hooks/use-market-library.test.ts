@@ -153,6 +153,44 @@ describe("useMarketLibrary", () => {
     );
   });
 
+  it("hydrates every page of a library larger than 1,000 packages", async () => {
+    for (let index = 0; index < 21; index += 1) {
+      const page = cloudPage(`release-${index}`);
+      listLibrary.mockResolvedValueOnce({
+        ...page,
+        items: Array.from({ length: 50 }, (_, itemIndex) => ({
+          ...page.items[0]!,
+          id: `library-${index}-${itemIndex}`,
+        })),
+        hasMore: index < 20,
+        nextCursor: index < 20 ? `cursor-${index + 1}` : null,
+      });
+    }
+    const { result } = renderHook(() => useMarketLibrary());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    expect(result.current.totalCount).toBe(1_050);
+    expect(result.current.isAcquired("release-20")).toBe(true);
+    expect(listLibrary).toHaveBeenCalledTimes(21);
+    expect(listLibrary).toHaveBeenLastCalledWith(
+      { view: "all", limit: 50, cursor: "cursor-20" },
+      expect.any(AbortSignal),
+    );
+  });
+
+  it.each(["missing", "repeated"])("does not mark a %s cursor response as fully hydrated", async (kind) => {
+    listLibrary.mockResolvedValue({
+      ...cloudPage(dummyRecord.id),
+      hasMore: true,
+      nextCursor: kind === "missing" ? null : "same-cursor",
+    });
+    const { result } = renderHook(() => useMarketLibrary());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.hydrated).toBe(false);
+    expect(result.current.totalCount).toBe(0);
+    expect(result.current.isAcquired(dummyRecord.id)).toBe(false);
+    expect(listLibrary).toHaveBeenCalledTimes(kind === "missing" ? 1 : 2);
+  });
+
   it("caches a record only after the server confirms the active account acquisition", async () => {
     acquireRelease.mockResolvedValue({
       operation: "acquire",

@@ -264,11 +264,9 @@ function AppRuntime() {
         }
         chromeOverlay={
           <>
-            {studioImmersive ? (
-              <Suspense fallback={null}>
-                <StudioBg3dRetainedOwnerHost />
-              </Suspense>
-            ) : null}
+            <Suspense fallback={null}>
+              <StudioBg3dRetainedOwnerHost />
+            </Suspense>
             {!isolatedChrome ? (
               <>
                 <DeferredBackToTop />
