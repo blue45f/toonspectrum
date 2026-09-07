@@ -1,0 +1,131 @@
+name: Repository hygiene cleanup
+
+on:
+  push:
+    branches:
+      - chore/architecture-sonar-cleanup
+    paths:
+      - .github/workflows/repository-hygiene-cleanup.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repository-hygiene-cleanup-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: chore/architecture-sonar-cleanup
+          fetch-depth: 1
+
+      - name: Remove generated, recovery, and byte-identical duplicate files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/repository-hygiene
+          : > /tmp/repository-hygiene/removed.txt
+
+          remove_tracked_path() {
+            local path="$1"
+            if git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+              printf '%s\n' "$path" >> /tmp/repository-hygiene/removed.txt
+              git rm -r -- "$path"
+            fi
+          }
+
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              *.orig|*.rej|*.bak|*.tmp|*.swp|*.swo|*~|.DS_Store|*/.DS_Store|qa-results/*|dist/*|coverage/*|playwright-report/*|test-results/*|.tstrace/*|.wearable-review/*)
+                remove_tracked_path "$path"
+                ;;
+            esac
+          done < <(git ls-files -z)
+
+          remove_identical_legacy_tree() {
+            local legacy="$1"
+            local canonical="$2"
+            [[ -d "$legacy" ]] || return 0
+            [[ -d "$canonical" ]] || {
+              echo "Legacy tree exists without canonical peer: $legacy" >&2
+              return 1
+            }
+            while IFS= read -r -d '' path; do
+              local relative="${path#"$legacy"/}"
+              local peer="$canonical/$relative"
+              if [[ ! -f "$peer" ]]; then
+                echo "Refusing to delete non-duplicated legacy file: $path" >&2
+                return 1
+              fi
+              if ! cmp -s -- "$path" "$peer"; then
+                echo "Refusing to delete divergent legacy file: $path" >&2
+                return 1
+              fi
+              remove_tracked_path "$path"
+            done < <(find "$legacy" -type f -print0)
+          }
+
+          remove_identical_legacy_tree tools/browser-harnesses apps/web/tools/browser-harnesses
+          remove_identical_legacy_tree tests/browser-fixtures/studio-catalog apps/web/tests/browser-fixtures/studio-catalog
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.gitignore')
+          source = path.read_text(encoding='utf-8')
+          required = [
+              '*.orig',
+              '*.rej',
+              '.DS_Store',
+              '.tstrace/',
+              'playwright-report/',
+              'test-results/',
+          ]
+          lines = source.splitlines()
+          present = {line.strip() for line in lines}
+          missing = [entry for entry in required if entry not in present]
+          if missing:
+              if source and not source.endswith('\n'):
+                  source += '\n'
+              source += '\n# Recovery files and local verification output\n'
+              source += '\n'.join(missing) + '\n'
+              path.write_text(source, encoding='utf-8')
+          PY
+
+          git diff --check
+          node scripts/validate-architecture.mjs
+          node scripts/verify-vercel-csp.mjs apps/web/index.html
+          node --check scripts/verify-creator-home.mjs
+          node --check scripts/verify-studio-p5-brush-real-runtime.mjs
+
+          echo 'Removed paths:'
+          if [[ -s /tmp/repository-hygiene/removed.txt ]]; then
+            sort -u /tmp/repository-hygiene/removed.txt
+          else
+            echo '(none)'
+          fi
+
+      - name: Commit verified repository hygiene cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git restore --source=HEAD --staged --worktree .github/workflows/repository-hygiene-cleanup.yml
+          git diff --cached --check
+          git diff --cached --stat
+          if git diff --cached --quiet; then
+            echo 'No non-workflow hygiene changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit --no-verify -m 'chore: remove generated and recovery leftovers'
+          git push --no-verify origin HEAD:chore/architecture-sonar-cleanup
