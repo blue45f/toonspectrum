@@ -1,8 +1,8 @@
 name: Retired branch guard tombstone
 
 # One-time protected-branch check for the cleanup branch below.
-# The branch is deleted automatically when PR #862 merges, so this workflow
-# cannot run again during normal repository development.
+# Recreating that branch replaces and cancels any older pending cleanup run;
+# the branch is deleted automatically after this maintenance PR merges.
 on:
   push:
     branches:
@@ -10,6 +10,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: one-time-merged-branch-cleanup
+  cancel-in-progress: true
 
 jobs:
   core:
