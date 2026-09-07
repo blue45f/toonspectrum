@@ -390,8 +390,8 @@ async function verifyNativeTouchScroll(
         timestamp: performance.now(),
       };
       events.push(sample);
-      // Observe cancellation by later handlers without changing the dispatched input.
-      queueMicrotask(() => { sample.defaultPrevented = event.defaultPrevented; });
+      // A task runs after dispatch; a microtask can precede later event handlers.
+      setTimeout(() => { sample.defaultPrevented = event.defaultPrevented; }, 0);
     };
     for (const kind of kinds) document.addEventListener(kind, record, { capture: true, passive: true });
     return {
