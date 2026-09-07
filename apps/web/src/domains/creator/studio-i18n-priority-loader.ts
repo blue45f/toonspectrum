@@ -41,6 +41,11 @@ export const STUDIO_I18N_MANAGED_SENTINEL_KEY =
   "studio.__priorityLoader.managed";
 const STUDIO_I18N_MANAGED_SENTINEL_VALUE = "managed";
 
+export const STUDIO_I18N_CORE_RETRY_DELAYS_MS = [
+  500,
+  2_000,
+] as const;
+
 export const STUDIO_I18N_DEFERRED_RETRY_DELAYS_MS = [
   1_000,
   4_000,
@@ -223,6 +228,39 @@ export function loadStudioI18nDeferred(
   options: StudioI18nPriorityLoaderOptions = {},
 ): Promise<StudioI18nLoadReport> {
   return loadStudioI18nNamespaces(STUDIO_I18N_DEFERRED_NAMESPACES, options);
+}
+
+function waitForStudioI18nRetry(
+  delayMs: number,
+  signal: AbortSignal | undefined,
+): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const onAbort = () => {
+      clearTimeout(handle);
+      resolve(false);
+    };
+    const handle = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, delayMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/** Retries only namespaces that failed in a previous priority-load report. */
+export async function retryFailedStudioI18nNamespaces(
+  initialReport: StudioI18nLoadReport,
+  options: StudioI18nPriorityLoaderOptions = {},
+  retryDelays: readonly number[] = STUDIO_I18N_CORE_RETRY_DELAYS_MS,
+): Promise<StudioI18nLoadReport> {
+  let report = initialReport;
+  for (const delayMs of retryDelays) {
+    if (report.failedNamespaces.length === 0 || options.signal?.aborted) break;
+    if (!await waitForStudioI18nRetry(delayMs, options.signal)) break;
+    report = await loadStudioI18nNamespaces(report.failedNamespaces, options);
+  }
+  return report;
 }
 
 export function scheduleStudioI18nDeferredLoad(
