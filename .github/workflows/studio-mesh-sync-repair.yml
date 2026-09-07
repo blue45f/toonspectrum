@@ -1,47 +1,22 @@
-name: Studio collaboration synchronization
+name: Retire superseded Studio collaboration validation
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - apps/web/src/domains/creator/live/**
-      - scripts/verify-studio-p2p-channel-lifecycle.mjs
-      - .github/workflows/studio-mesh-sync-repair.yml
   push:
-    branches: [fix/collaboration-cross-browser-sync-20260905]
+    branches:
+      - ops/production-final-2015ef35-20260908
     paths:
-      - apps/web/src/domains/creator/live/**
-      - scripts/verify-studio-p2p-channel-lifecycle.mjs
       - .github/workflows/studio-mesh-sync-repair.yml
 
 permissions:
   contents: read
 
 concurrency:
-  group: studio-mesh-sync-${{ github.head_ref || github.ref }}
+  group: studio-mesh-sync-ops/production-final-2015ef35-20260908
   cancel-in-progress: true
 
 jobs:
-  collaboration-sync:
-    runs-on: macos-14
-    timeout-minutes: 25
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
+  retired:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Verify channel lifecycle independently
-        run: node --experimental-strip-types --test scripts/verify-studio-p2p-channel-lifecycle.mjs
-      - run: pnpm install --frozen-lockfile
-      - name: Verify collaboration synchronization and reconnects
-        run: pnpm exec vitest run apps/web/src/domains/creator/live/studio-crdt-room-binding.test.ts apps/web/src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts apps/web/src/domains/creator/live/studio-live-p2p-reconnect.test.ts apps/web/src/domains/creator/live/studio-live-collaboration-transport.test.ts apps/web/src/domains/creator/live/studio-live-signaling-server-transport.test.ts apps/web/src/domains/creator/live/studio-live-collaboration-room.ink.test.ts apps/web/src/domains/creator/live/studio-live-socket-transport.test.ts apps/web/src/domains/creator/live/studio-mesh-sync-regression.test.ts
-      - name: Lint collaboration changes
-        run: pnpm exec eslint apps/web/src/domains/creator/live/studio-crdt-room-binding.ts apps/web/src/domains/creator/live/studio-live-p2p-overlay-transport.ts apps/web/src/domains/creator/live/studio-live-p2p-channel-lifecycle.ts apps/web/src/domains/creator/live/studio-live-p2p-reconnect.test.ts apps/web/src/domains/creator/live/studio-mesh-sync-regression.test.ts
-      - name: Check application types
-        run: pnpm run typecheck
+      - run: echo "Superseded by protected-main integration PR #881"
