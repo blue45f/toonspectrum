@@ -3,7 +3,10 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import rootConfig from "../vitest.config";
 import { PERF_BUDGET_TEST_FILES } from "../vitest.perf-budget-files.mjs";
+import serialConfig from "../vitest.perf.config";
+import { CPU_REFERENCE_TEST_FILES, SERIAL_TEST_FILES } from "../vitest.serial-test-files.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const CATALOGUE_TIMING_TEST = "scripts/studio-brush-catalogue-perf-matrix.test.ts";
@@ -81,5 +84,24 @@ describe("execution-time budget partition", () => {
 
   it("does not list itself or any other partition bookkeeping", () => {
     expect(PERF_BUDGET_TEST_FILES.some((file) => file.startsWith("tests/"))).toBe(false);
+  });
+});
+
+describe("mandatory serial test partition", () => {
+  it("collects every moved test exactly once in the serial lane", () => {
+    expect(new Set(SERIAL_TEST_FILES).size).toBe(SERIAL_TEST_FILES.length);
+    expect(serialConfig.test?.include).toEqual([...SERIAL_TEST_FILES]);
+    for (const file of SERIAL_TEST_FILES) {
+      expect(existsSync(path.join(root, file)), file).toBe(true);
+      expect(rootConfig.test?.exclude, file).toContain(file);
+      expect(serialConfig.test?.exclude, file).not.toContain(file);
+    }
+  });
+
+  it("keeps exhaustive output references separate from elapsed-time budgets", () => {
+    expect([...CPU_REFERENCE_TEST_FILES]).toEqual([...CPU_REFERENCE_TEST_FILES].sort());
+    for (const file of CPU_REFERENCE_TEST_FILES) {
+      expect(PERF_BUDGET_TEST_FILES, file).not.toContain(file);
+    }
   });
 });

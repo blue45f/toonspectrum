@@ -47,6 +47,7 @@ import type {
 import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
 import type { StudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
 import type { StudioPaperSurfaceSettings } from "../brush/studio-paper-granulation-runtime";
+import type { StudioLayerComp } from "../layer/studio-layer-comps";
 
 import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
@@ -495,6 +496,7 @@ const PAGE_PAYLOAD_KEYS = [
   "drawingAssist",
   "paperSurface",
   "paperGrainVisible",
+  "layerComps",
 ] as const;
 
 export interface StudioCrdtCompatibleOrderedPage<
@@ -511,6 +513,7 @@ export interface StudioCrdtCompatibleOrderedPage<
   drawingAssist?: StudioDrawingAssistDocument;
   paperSurface?: StudioPaperSurfaceSettings;
   paperGrainVisible?: boolean;
+  layerComps?: readonly StudioLayerComp[];
   /** Synchronized through the dedicated per-stage CRDT sidecar, never the 8 KiB page envelope. */
   shared3dStage?: StudioShared3dStagePersistedState;
   groups?: StudioCrdtCompatibleLayerGroup[];
@@ -773,6 +776,8 @@ export function reconcileStudioCrdtSceneGraphPages<
       id: record.id,
       elements: source?.elements ?? [],
     } as TPage & { shared3dStage?: StudioShared3dStagePersistedState };
+    // An absent synchronized preset field is authoritative too, including remote removal.
+    if (!Object.hasOwn(record.payload.props, "layerComps")) delete materialized.layerComps;
     // Shared Stage state deliberately lives outside the bounded page envelope. A retained
     // inactive sidecar is authoritative too: it must remove a stale local connection instead of
     // allowing the source snapshot's optional property to survive the spread above.

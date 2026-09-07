@@ -5,7 +5,7 @@ import path from "node:path";
 import { configDefaults, defineConfig } from "vitest/config";
 
 import { resolveVitestDatabaseTarget } from "./scripts/run-postgres-integration-tests.mjs";
-import { PERF_BUDGET_TEST_FILES } from "./vitest.perf-budget-files.mjs";
+import { SERIAL_TEST_FILES } from "./vitest.serial-test-files.mjs";
 
 const root = fileURLToPath(new URL("./", import.meta.url));
 
@@ -84,9 +84,9 @@ export default defineConfig({
       "deploy/cloudflare-realtime/integration/**",
       // Playwright browser E2E (run via `pnpm exec playwright test`, not Vitest).
       "e2e/**",
-      // Wall-clock budget tests run in their own quiet pass after this one
-      // (vitest.perf.config.ts) — see vitest.perf-budget-files.mjs for why.
-      ...PERF_BUDGET_TEST_FILES,
+      // Timing budgets and exhaustive CPU references remain mandatory in the quiet pass
+      // (vitest.perf.config.ts), without V8's hot-loop instrumentation overhead.
+      ...SERIAL_TEST_FILES,
     ],
   },
 });

@@ -93,6 +93,7 @@ import {
   readDurableStudioAutosaveDocument,
   readDurableStudioAutosaveError,
   resolveDurableStudioAutosaveModuleUrl,
+  resolveDurableStudioAutosaveSqliteModuleUrl,
 } from "./lib/studio-verify-durable-autosave.mjs";
 import {
   enabledStudioHistoryControl,
@@ -2471,8 +2472,9 @@ interface PersistedStudioDocument {
 async function persistedStudioDocument(
   page: Page,
   moduleUrl: string | null = null,
+  sqliteModuleUrl: string | null = null,
 ): Promise<PersistedStudioDocument | null> {
-  const document = await readDurableStudioAutosaveDocument(page, AUTOSAVE_KEY, { moduleUrl });
+  const document = await readDurableStudioAutosaveDocument(page, AUTOSAVE_KEY, { moduleUrl, sqliteModuleUrl });
   const error = await readDurableStudioAutosaveError(page);
   if (error) throw new Error(error);
   // The shared reader exposes normalized page metadata alongside the complete raw payload.
@@ -4140,12 +4142,13 @@ async function waitForPersistedStudioDocument(
   page: Page,
   timeoutMilliseconds = 8_000,
   moduleUrl: string | null = null,
+  sqliteModuleUrl: string | null = null,
 ): Promise<PersistedStudioDocument | null> {
   const deadline = performance.now() + timeoutMilliseconds;
   let lastFailure: unknown = null;
   while (performance.now() < deadline) {
     try {
-      const document = await persistedStudioDocument(page, moduleUrl);
+      const document = await persistedStudioDocument(page, moduleUrl, sqliteModuleUrl);
       if (document) return document;
       lastFailure = null;
     } catch (cause: unknown) {
@@ -4289,9 +4292,11 @@ async function runDeferredDurabilityAudit(
     // The away route never mounts Studio. Keep the shipped reader URL before navigation clears
     // resource timing, so recovery still reads the same journal without re-entering the editor.
     const autosaveModuleUrl = await resolveDurableStudioAutosaveModuleUrl(page);
+    const sqliteModuleUrl = await resolveDurableStudioAutosaveSqliteModuleUrl(page);
+    invariant(sqliteModuleUrl, "Studio did not expose its SQLite autosave store module");
     invariant(autosaveModuleUrl, "Studio did not expose its durable autosave session module");
-    // Let the first batch leave the deferred window so the navigation below audits one fresh
-    // release rather than a batch this audit already proved durable.
+    // Separate the gestures without reaching the 2s idle commit: the second pointerup must
+    // produce a new durable receipt for the batch, including the just-released stroke.
     await page.waitForTimeout(400);
     await page.mouse.move(navigationLane.x, navigationLane.y);
     await page.mouse.down();
@@ -4331,7 +4336,7 @@ async function runDeferredDurabilityAudit(
       `navigation was not immediate after pointerup (${navigationIssuedInMs.toFixed(2)}ms)`,
     );
 
-    const survivor = await waitForPersistedStudioDocument(page, 8_000, autosaveModuleUrl);
+    const survivor = await waitForPersistedStudioDocument(page, 8_000, autosaveModuleUrl, sqliteModuleUrl);
     if (!survivor) {
       log(`durability diagnostic: console messages ${JSON.stringify(errors.messages).slice(0, 800)}`);
     }

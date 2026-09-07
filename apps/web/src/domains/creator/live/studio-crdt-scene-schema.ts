@@ -1,5 +1,6 @@
 import { parseStudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
 import { PAPER_GRAIN_KINDS } from "../brush/studio-paper-texture";
+import { parseStudioLayerComps } from "../layer/studio-layer-comps-document";
 import { copyStudioAdvancedRulerAsJson, type StudioAdvancedRulerDocument } from "../studio-advanced-ruler-document";
 
 import {
@@ -186,7 +187,7 @@ export const STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS: Record<
 
 export const STUDIO_CRDT_PAGE_PROPERTY_KEYS: ReadonlySet<string> = new Set([
   "bg", "bgGrad", "canvasH", "name", "note", "hideMaster", "shotType", "cameraAngle",
-  "drawingAssist", "paperSurface", "paperGrainVisible",
+  "drawingAssist", "paperSurface", "paperGrainVisible", "layerComps",
 ]);
 
 const STUDIO_CRDT_PAPER_GRAIN_KIND_SET: ReadonlySet<string> = new Set(PAPER_GRAIN_KINDS);
@@ -576,6 +577,12 @@ export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): S
     ) {
       throw new Error("페이지 종이 표면 설정이 올바르지 않습니다.");
     }
+  }
+  if ("layerComps" in props) {
+    const layerComps = parseStudioLayerComps(props.layerComps);
+    if (!layerComps) throw new Error("페이지 레이어 콤프가 올바르지 않습니다.");
+    // The document parser returns detached, finite JSON values and drops unknown fields.
+    props.layerComps = layerComps as unknown as StudioCrdtJsonValue;
   }
   if ("drawingAssist" in props) {
     const drawingAssist = parseStudioDrawingAssistDocument(props.drawingAssist);
