@@ -45,6 +45,35 @@ export type StudioRetainedStrokeUndoneBatch = StudioRetainedStrokeCommitBatch & 
 
 type MutableRef<T> = { current: T };
 
+type StudioRetainedStrokeUndoContext = {
+  pending: MutableRef<StudioRetainedStrokeQueuedBatch | null>;
+  undone: MutableRef<StudioRetainedStrokeUndoneBatch | null>;
+  getPages: () => readonly PageState[];
+  getHistoryIndex: () => number;
+  isBlocked: (batch: StudioRetainedStrokeQueuedBatch) => boolean;
+  publish: (before: readonly PageState[], after: readonly PageState[]) => boolean;
+  onUndone: (batch: StudioRetainedStrokeCommitBatch) => void;
+  persist: () => void;
+};
+
+/** Replace the pending recovery snapshot after a successful Undo, before returning to input. */
+export function undoStudioRetainedStrokeHistory(context: StudioRetainedStrokeUndoContext): boolean {
+  const batch = context.pending.current;
+  if (!batch || context.isBlocked(batch)) return false;
+  if (!publishStudioRetainedStrokeHistory(context.getPages(), batch, "undo", context.publish)) {
+    return false;
+  }
+  context.pending.current = null;
+  if (batch.timer !== null) globalThis.clearTimeout(batch.timer);
+  const taken = { pageId: batch.pageId, strokes: batch.strokes, retryCount: batch.retryCount };
+  context.undone.current = { ...taken, historyIndex: context.getHistoryIndex() };
+  // The host advances its edit generation even if the earlier pointerup receipt is still pending.
+  // With an empty pending fingerprint on both sides, that generation is the only dirty signal.
+  context.onUndone(taken);
+  context.persist();
+  return true;
+}
+
 /** Finish the previous page's batch before accepting a stroke on another page. */
 export function prepareStudioPendingStrokeCommitPage(
   pending: MutableRef<StudioRetainedStrokeQueuedBatch | null>,

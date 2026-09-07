@@ -130,9 +130,9 @@ import { createStudioAssetLibraryMutations } from "./studio-cuttoon-editor/studi
 import {
   discardStudioRetainedStrokeRedo,
   prepareStudioPendingStrokeCommitPage,
-  publishStudioRetainedStrokeHistory,
   restoreStudioRetainedStrokeCommitBatch,
   resumeStudioRetainedStrokeHistory,
+  undoStudioRetainedStrokeHistory,
 } from "./studio-retained-stroke-history";
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
 import {
@@ -18084,30 +18084,29 @@ const puppetWarpArmed =
         studioLiveRetainedMediaOverlaySupportsElement(stroke)
       ))
     ) {
-      if (pendingBatchAwaitsSelectedGpuFinalReceipt(pendingRetained)) return;
-      if (!publishStudioRetainedStrokeHistory(
-        pagesHistoryRef.current[pagesHiRef.current] ?? pages, pendingRetained, "undo",
-        publishStudioCrdtHistoryTransition,
-      )) return;
-      const taken = takePendingStrokeCommits();
-      if (taken) {
-        pendingUndoneStrokeCommitsRef.current = {
-          pageId: taken.pageId,
-          strokes: taken.strokes,
-          retryCount: taken.retryCount,
-          historyIndex: pagesHiRef.current,
-        };
-        liveRetainedMediaOverlayRendererRef.current.hideSettledPixels(
-          taken.strokes.map((stroke) => stroke.id),
-        );
-        if (liveDraftVisualRef.current?.mode === "eraser") {
-          liveDraftVisualRef.current = null;
-          liveDraftDirectRef.current = false;
-          mainLayerRef.current?.batchDraw();
-        }
-        setHasPendingOverlayCommit(false);
-        setHasUndonePendingOverlay(true);
-      }
+      undoStudioRetainedStrokeHistory({
+        pending: pendingStrokeCommitsRef, undone: pendingUndoneStrokeCommitsRef,
+        getPages: () => pagesHistoryRef.current[pagesHiRef.current] ?? pages,
+        getHistoryIndex: () => pagesHiRef.current,
+        isBlocked: (batch) => documentSaveInFlightRef.current
+          || pendingBatchAwaitsSelectedGpuFinalReceipt(batch),
+        publish: publishStudioCrdtHistoryTransition,
+        onUndone: (taken) => {
+          const ids = taken.strokes.map((stroke) => stroke.id);
+          abortDeferredStrokePostprocess(ids);
+          liveRetainedMediaOverlayRendererRef.current.hideSettledPixels(ids);
+          if (liveDraftVisualRef.current?.mode === "eraser") {
+            liveDraftVisualRef.current = null;
+            liveDraftDirectRef.current = false;
+            mainLayerRef.current?.batchDraw();
+          }
+          markStudioDocumentChanged();
+          setAutosaveRetryNonce((current) => current + 1);
+          setHasPendingOverlayCommit(false);
+          setHasUndonePendingOverlay(true);
+        },
+        persist: () => persistPendingStrokeEmergencyAutosaveRef.current("pointerup"),
+      });
       return;
     }
     if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) {
