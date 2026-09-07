@@ -11,10 +11,10 @@ permissions:
   issues: write
   pull-requests: write
 
-# PR #835 is already closed. Reusing its stale Marketplace run's exact
-# concurrency key cancels that superseded execution before this job starts.
+# The stale Marketplace run was created for closed integration PR #851.
+# Reusing its exact concurrency key cancels that superseded execution first.
 concurrency:
-  group: marketplace-integrity-refs/pull/835/merge
+  group: marketplace-integrity-refs/pull/851/merge
   cancel-in-progress: true
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for run_id in 34144855700 34144949982; do
+          for run_id in 34144855700 34144949982 34145176176; do
             response="$(mktemp)"
             status="$(curl --silent --show-error --location \
               --output "${response}" \
