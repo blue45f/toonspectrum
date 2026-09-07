@@ -3,8 +3,7 @@ node_modules
 **/node_modules
 dist
 **/dist
-apps/api/dist
-public/data
+apps/web/public/data
 .git
 .github
 *.log
