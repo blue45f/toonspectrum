@@ -1,0 +1,137 @@
+name: One-shot PR 907 lint repair
+
+on:
+  push:
+    branches:
+      - fix/pr907-lint-20260908
+    paths:
+      - .github/workflows/one-shot-pr907-lint-repair.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-shot-pr907-lint-repair-20260908
+  cancel-in-progress: true
+
+jobs:
+  repair-lint:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/pr907-lint-20260908
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply minimal lint repairs
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def read(path: str) -> tuple[Path, str]:
+              file = Path(path)
+              return file, file.read_text(encoding="utf-8")
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, found {count}")
+              return text.replace(old, new, 1)
+
+          def write(file: Path, text: str) -> None:
+              with file.open("w", encoding="utf-8", newline="\n") as handle:
+                  handle.write(text)
+
+          file, text = read("apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts")
+          text = replace_once(text, "    let segment = subtract(target, previous);", "    const segment = subtract(target, previous);", "surface ink segment")
+          text = replace_once(text, "    let segmentLength = length(segment);", "    const segmentLength = length(segment);", "surface ink segment length")
+          write(file, text)
+
+          file, text = read("apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx")
+          text = replace_once(
+              text,
+              "export function useCharacterRuntimeThumbnail(entryId: string): string | null {",
+              "// eslint-disable-next-line react-refresh/only-export-components -- the hook shares the recorder's singleton thumbnail store\nexport function useCharacterRuntimeThumbnail(entryId: string): string | null {",
+              "thumbnail hook fast refresh exception",
+          )
+          text = replace_once(
+              text,
+              "export function clearCharacterRuntimeThumbnails(): void {",
+              "// eslint-disable-next-line react-refresh/only-export-components -- teardown uses the recorder's singleton thumbnail store\nexport function clearCharacterRuntimeThumbnails(): void {",
+              "thumbnail teardown fast refresh exception",
+          )
+          text = replace_once(
+              text,
+              "  const ids = useMemo(() => selectedEntryIds(binding), [binding.recipe]);",
+              "  const ids = useMemo(() => selectedEntryIds(binding), [binding]);",
+              "thumbnail binding dependency",
+          )
+          write(file, text)
+
+          file, text = read("apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx")
+          for symbol in ("BadgeCheck", "Box", "FileJson", "SlidersHorizontal"):
+              text = replace_once(text, f"  {symbol},\n", "", f"unused {symbol} import")
+          write(file, text)
+
+          file, text = read("apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts")
+          text = replace_once(
+              text,
+              "  const documentClock = useMemo(() => new Date().toISOString(), [modelId]);",
+              "  const documentClock = useMemo(() => {\n    void modelId;\n    return new Date().toISOString();\n  }, [modelId]);",
+              "model-scoped document clock",
+          )
+          write(file, text)
+
+          file, text = read("apps/web/src/domains/creator/studio-production/studio-production-workspace.ts")
+          old_prefix = """export * from \"./studio-production-workspace-runtime\";\n\nimport {\n  createEmptyProductionWorkspace as createRuntimeProductionWorkspace,\n} from \"./studio-production-workspace-runtime\";\n\nimport type { ProductionWorkspace } from \"./studio-production-workspace-runtime\";\n"""
+          new_prefix = """import {\n  createEmptyProductionWorkspace as createRuntimeProductionWorkspace,\n} from \"./studio-production-workspace-runtime\";\n\nimport type { ProductionWorkspace } from \"./studio-production-workspace-runtime\";\n\nexport * from \"./studio-production-workspace-runtime\";\n"""
+          text = replace_once(text, old_prefix, new_prefix, "studio production import ordering")
+          write(file, text)
+          PY
+          git diff --check
+
+      - name: Verify all reported lint failures
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts \
+            apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx \
+            apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx \
+            apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts \
+            apps/web/src/domains/creator/studio-production/studio-production-workspace.ts
+
+      - name: Collapse the one-shot workflow into one verified fix commit
+        run: |
+          set -euo pipefail
+          original_head="$(git rev-parse HEAD)"
+          base="$(git rev-parse HEAD^)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f .github/workflows/one-shot-pr907-lint-repair.yml
+          git reset --soft "$base"
+          git add \
+            apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts \
+            apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx \
+            apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx \
+            apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts \
+            apps/web/src/domains/creator/studio-production/studio-production-workspace.ts
+          git diff --cached --check
+          git commit -m "fix(lint): repair final integration checks"
+          git push \
+            --force-with-lease=refs/heads/fix/pr907-lint-20260908:"$original_head" \
+            origin HEAD:fix/pr907-lint-20260908
