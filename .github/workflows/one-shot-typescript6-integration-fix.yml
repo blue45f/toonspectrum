@@ -1,0 +1,138 @@
+name: One-shot TypeScript 6 integration fix
+
+on:
+  push:
+    branches:
+      - merge-ready/3ad5d69c-final
+    paths:
+      - .github/workflows/one-shot-typescript6-integration-fix.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-shot-typescript6-integration-fix
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: merge-ready/3ad5d69c-final
+          fetch-depth: 0
+      - name: Apply exact TypeScript 6 fixes and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin merge-ready/3ad5d69c-final
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, found {count}")
+              return text.replace(old, new, 1)
+
+          pointer_path = Path("apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink-pointer.ts")
+          pointer = pointer_path.read_text()
+          pointer = replace_once(
+              pointer,
+              "  return Object.freeze({\n",
+              "  const anchor: CharacterSurfaceInkAnchor = {\n",
+              "surface anchor contextual type",
+          )
+          pointer = replace_once(
+              pointer,
+              "    width: 1,\n  });\n}\n",
+              "    width: 1,\n  };\n  return Object.freeze(anchor);\n}\n",
+              "surface anchor return",
+          )
+          pointer_path.write_text(pointer)
+
+          workbench_path = Path("apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts")
+          workbench = workbench_path.read_text()
+          workbench = replace_once(
+              workbench,
+              "      root: Object.freeze({ position: [0, 0, 0], rotation: [0, 0, 0, 1] }),\n",
+              "      root: Object.freeze({\n        position: [0, 0, 0] as const,\n        rotation: [0, 0, 0, 1] as const,\n      }),\n",
+              "pose root tuples",
+          )
+          workbench = replace_once(
+              workbench,
+              "    setSelectedPoseRegions: (regions) => setSelectedPoseRegionsState(Object.freeze([...regions])),\n",
+              "    setSelectedPoseRegions: (regions: readonly CharacterPoseRegion[]) => setSelectedPoseRegionsState(Object.freeze([...regions])),\n",
+              "pose region callback",
+          )
+          workbench = replace_once(
+              workbench,
+              "    removePreset: (presetId) => { PRESET_STORE.remove(presetId); },\n",
+              "    removePreset: (presetId: string) => { PRESET_STORE.remove(presetId); },\n",
+              "preset removal callback",
+          )
+          workbench_path.write_text(workbench)
+
+          contract_path = Path("apps/web/src/shared/lib/creator-asset-platform-contract.ts")
+          contract = contract_path.read_text()
+          old_transitions = '''const DRAFT_TRANSITIONS: Readonly<
+            Record<CreatorAssetDraftState, ReadonlySet<CreatorAssetDraftState>>
+          > = Object.freeze({
+            editing: new Set(["uploading", "processing", "abandoned"]),
+            uploading: new Set(["editing", "processing", "needs-fix", "abandoned"]),
+            processing: new Set(["needs-fix", "ready-to-submit", "abandoned"]),
+            "needs-fix": new Set(["editing", "uploading", "processing", "abandoned"]),
+            "ready-to-submit": new Set(["editing", "in-review", "abandoned"]),
+            "in-review": new Set(["changes-requested", "approved", "rejected"]),
+            "changes-requested": new Set(["editing", "processing", "in-review", "abandoned"]),
+            approved: new Set(["publishing", "changes-requested"]),
+            publishing: new Set(["published", "approved"]),
+            published: new Set(),
+            rejected: new Set(["editing", "abandoned"]),
+            abandoned: new Set(),
+          });'''.replace("          ", "")
+          new_transitions = '''function draftTransitionSet(
+            ...states: CreatorAssetDraftState[]
+          ): ReadonlySet<CreatorAssetDraftState> {
+            return new Set<CreatorAssetDraftState>(states);
+          }
+
+          const DRAFT_TRANSITIONS: Readonly<
+            Record<CreatorAssetDraftState, ReadonlySet<CreatorAssetDraftState>>
+          > = Object.freeze({
+            editing: draftTransitionSet("uploading", "processing", "abandoned"),
+            uploading: draftTransitionSet("editing", "processing", "needs-fix", "abandoned"),
+            processing: draftTransitionSet("needs-fix", "ready-to-submit", "abandoned"),
+            "needs-fix": draftTransitionSet("editing", "uploading", "processing", "abandoned"),
+            "ready-to-submit": draftTransitionSet("editing", "in-review", "abandoned"),
+            "in-review": draftTransitionSet("changes-requested", "approved", "rejected"),
+            "changes-requested": draftTransitionSet("editing", "processing", "in-review", "abandoned"),
+            approved: draftTransitionSet("publishing", "changes-requested"),
+            publishing: draftTransitionSet("published", "approved"),
+            published: draftTransitionSet(),
+            rejected: draftTransitionSet("editing", "abandoned"),
+            abandoned: draftTransitionSet(),
+          });'''.replace("          ", "")
+          contract = replace_once(contract, old_transitions, new_transitions, "draft transition state sets")
+          contract = replace_once(
+              contract,
+              '  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;\n  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);\n',
+              '  const sourceBytes = typeof value === "string" ? new TextEncoder().encode(value) : value;\n  const digestInput = new ArrayBuffer(sourceBytes.byteLength);\n  new Uint8Array(digestInput).set(sourceBytes);\n  const digest = await globalThis.crypto.subtle.digest("SHA-256", digestInput);\n',
+              "Web Crypto ArrayBuffer input",
+          )
+          contract_path.write_text(contract)
+          PY
+
+          git rm .github/workflows/one-shot-typescript6-integration-fix.yml
+          git add \
+            apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink-pointer.ts \
+            apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts \
+            apps/web/src/shared/lib/creator-asset-platform-contract.ts
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix: resolve TypeScript 6 integration inference"
+          git push origin HEAD:refs/heads/merge-ready/3ad5d69c-final
