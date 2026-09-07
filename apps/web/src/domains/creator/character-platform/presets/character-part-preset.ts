@@ -316,7 +316,7 @@ export function applyCharacterPartPreset(
     ...document,
     recipe: Object.freeze(recipe),
     customControls: Object.freeze(customControls),
-    colors: Object.freeze(colors) as CharacterDocumentV2["colors"],
+    colors: Object.freeze(colors) as unknown as CharacterDocumentV2["colors"],
     expression: preset.payload.expression ?? document.expression,
     pose: preset.payload.pose ?? document.pose,
     camera: preset.payload.cameraShotId !== undefined
