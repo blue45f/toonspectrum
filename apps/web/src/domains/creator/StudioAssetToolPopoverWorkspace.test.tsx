@@ -103,11 +103,13 @@ function createToolBelt(overrides: Record<string, unknown> = {}) {
   return { toolBelt, stableHandlers, setMenu };
 }
 
-function renderRoute(source: StudioUnifiedAssetSource) {
+async function renderRoute(source: StudioUnifiedAssetSource) {
   mocks.catalog = [createItem(source)];
   const context = createToolBelt();
   render(<StudioAssetToolPopoverWorkspace toolBelt={context.toolBelt} />);
-  fireEvent.click(screen.getByRole("button", { name: /테스트 에셋/ }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: /테스트 에셋/ }),
+  );
   return context;
 }
 
@@ -118,12 +120,12 @@ beforeEach(() => {
 });
 
 describe("StudioAssetToolPopoverWorkspace", () => {
-  it("keeps the workspace mounted while legacy asset tabs switch", () => {
+  it("keeps the workspace mounted while legacy asset tabs switch", async () => {
     const first = createToolBelt({ assetTab: "community" });
     const { rerender } = render(
       <StudioAssetToolPopoverWorkspace toolBelt={first.toolBelt} />,
     );
-    expect(screen.getByTestId("legacy-panel")).toBeTruthy();
+    expect(await screen.findByTestId("legacy-panel")).toBeTruthy();
 
     const second = {
       ...first.toolBelt,
@@ -143,10 +145,12 @@ describe("StudioAssetToolPopoverWorkspace", () => {
     expect(screen.getByTestId("legacy-body")).toBeTruthy();
   });
 
-  it("preloads the asset surface from the subtab", () => {
+  it("preloads the legacy asset surface from the active subtab", async () => {
     const { toolBelt, setMenu } = createToolBelt();
     render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
-    fireEvent.click(screen.getByRole("button", { name: "에셋 탭" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "에셋 탭" }),
+    );
     expect(mocks.preload).toHaveBeenCalledTimes(1);
     expect(setMenu).toHaveBeenCalledWith("asset");
   });
@@ -156,7 +160,7 @@ describe("StudioAssetToolPopoverWorkspace", () => {
       kind: "background" as const,
       value: { id: "bg", label: "배경", genre: "학원" },
     };
-    const { stableHandlers } = renderRoute(source);
+    const { stableHandlers } = await renderRoute(source);
     await waitFor(() =>
       expect(stableHandlers.addBgScene).toHaveBeenCalledWith(source.value),
     );
@@ -173,7 +177,7 @@ describe("StudioAssetToolPopoverWorkspace", () => {
         build: () => [],
       },
     };
-    const { setMenu } = renderRoute(source);
+    const { setMenu } = await renderRoute(source);
     await waitFor(() => expect(setMenu).toHaveBeenCalledWith("scene"));
   });
 
@@ -190,7 +194,7 @@ describe("StudioAssetToolPopoverWorkspace", () => {
         svg: '<svg xmlns="http://www.w3.org/2000/svg"/>',
       },
     };
-    const { stableHandlers } = renderRoute(source);
+    const { stableHandlers } = await renderRoute(source);
     await waitFor(() =>
       expect(stableHandlers.addCatalogElement).toHaveBeenCalledWith(
         source.value,
@@ -215,7 +219,7 @@ describe("StudioAssetToolPopoverWorkspace", () => {
         defaultHeight: 100,
       },
     };
-    const { stableHandlers, setMenu } = renderRoute(source);
+    const { stableHandlers, setMenu } = await renderRoute(source);
     await waitFor(() => {
       expect(setMenu).toHaveBeenCalledWith(null);
       expect(stableHandlers.openStudioObjectInsert).toHaveBeenCalledWith({
@@ -237,7 +241,7 @@ describe("StudioAssetToolPopoverWorkspace", () => {
         createdAt: 1,
       },
     };
-    const { stableHandlers } = renderRoute(source);
+    const { stableHandlers } = await renderRoute(source);
     await waitFor(() =>
       expect(stableHandlers.addRenderedImage).toHaveBeenCalledWith(
         source.value.dataUrl,
@@ -258,15 +262,15 @@ describe("StudioAssetToolPopoverWorkspace", () => {
         keywords: [],
       },
     };
-    const { setMenu } = renderRoute(source);
+    const { setMenu } = await renderRoute(source);
     await waitFor(() => expect(setMenu).toHaveBeenCalledWith("bubble"));
   });
 
-  it("hands empty-search context to the AI background tool", () => {
+  it("hands empty-search context to the AI background tool", async () => {
     const { toolBelt, stableHandlers, setMenu } = createToolBelt();
     render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
     fireEvent.change(
-      screen.getByRole("searchbox", { name: "에셋 통합 검색" }),
+      await screen.findByRole("searchbox", { name: "에셋 통합 검색" }),
       { target: { value: "심해 정거장" } },
     );
     fireEvent.click(
