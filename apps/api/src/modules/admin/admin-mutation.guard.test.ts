@@ -1,13 +1,13 @@
 import { ForbiddenException, type ExecutionContext } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AdminMutationGuard } from "./admin-mutation.guard";
+
 const { requireAdminUser } = vi.hoisted(() => ({
   requireAdminUser: vi.fn(),
 }));
 
 vi.mock("./admin-types", () => ({ requireAdminUser }));
-
-import { AdminMutationGuard } from "./admin-mutation.guard";
 
 function context(userId?: string): ExecutionContext {
   return {
