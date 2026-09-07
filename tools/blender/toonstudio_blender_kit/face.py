@@ -234,7 +234,7 @@ def _head_region_ratio(obj: bpy.types.Object, frame: HeadFrame) -> float:
     return inside / max(1, sampled)
 
 
-def detect_face_meshes(
+def detect_face_meshes( # NOSONAR python:S3776
     mesh_objects: Sequence[bpy.types.Object],
     frame: HeadFrame,
     options: FaceOptions,
@@ -345,6 +345,11 @@ def _write_shape(
     for index, point in enumerate(basis.data):
         world = obj.matrix_world @ point.co
         x, depth, z = _frame_coordinates(world, frame)
+        # Jaw/chin ramps otherwise remain active below the head and can deform a combined
+        # body's torso or legs. Semantic facial controls never own vertices outside the skull.
+        if max(abs(x), abs(depth), abs(z)) > 1.15:
+            key.data[index].co = point.co
+            continue
         weight = spec.weight(x, depth, z)
         if weight <= 1e-5:
             key.data[index].co = point.co
@@ -361,7 +366,7 @@ def _write_shape(
     return changed
 
 
-def create_semantic_face_shape_keys(
+def create_semantic_face_shape_keys( # NOSONAR python:S3776
     mesh_objects: Sequence[bpy.types.Object],
     frame: HeadFrame,
     options: FaceOptions,

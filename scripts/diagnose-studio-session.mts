@@ -3,8 +3,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import { chromium, type Page } from "playwright";
 
-import { materializeStudioBrushCatalogSelection } from "../src/domains/creator/brush/studio-brush-selection";
-import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
+import { materializeStudioBrushCatalogSelection } from "../apps/web/src/domains/creator/brush/studio-brush-selection";
+import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
 
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
 

@@ -32,7 +32,7 @@ const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const DIALOG = '[data-character-shaper="true"]';
 const RAIL = `${DIALOG} [data-character-shaper-rail] button`;
-const GRID = `${DIALOG} [data-character-shaper-grid] button`;
+const GRID = `${DIALOG} [data-character-shaper-grid] [data-character-slot-card]`;
 
 const SWIFTSHADER_ARGS = [
   "--no-sandbox",
@@ -165,11 +165,13 @@ async function main(): Promise<void> {
   const evidence: Record<string, unknown> = { origin, capturedAt: new Date().toISOString() };
   try {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "ko-KR", acceptDownloads: true });
+    await ctx.addInitScript({ content: "globalThis.__name ??= (value) => value;" });
     await ctx.addInitScript(([q, m]) => {
       try { localStorage.setItem(q, "1"); localStorage.setItem(m, "1"); } catch { /* ignore */ }
     }, [QUICKSTART_KEY, MOBILE_HINT_KEY]);
     const page = await ctx.newPage();
     const consoleErrors: string[] = [];
+    evidence.consoleErrors = consoleErrors;
     page.on("pageerror", (e) => consoleErrors.push(`pageerror: ${e.message}`));
     await openShaper(page, origin);
     await page.screenshot({ path: join(OUT_DIR, "character-desktop.png") });
@@ -218,7 +220,11 @@ async function main(): Promise<void> {
     const pngButton = page.getByRole("button", { name: "PNG 저장" }).first();
     const pngDownloadPromise = page.waitForEvent("download", { timeout: 120_000 });
     await pngButton.click();
-    const pngDownload: Download = await pngDownloadPromise;
+    const pngDownload: Download = await Promise.race([
+      pngDownloadPromise,
+      page.getByText("PNG를 저장하지 못했습니다.", { exact: true }).waitFor({ state: "visible", timeout: 120_000 })
+        .then(async () => { throw new Error(`PNG export failed: ${await page.locator(DIALOG).innerText()}`); }),
+    ]);
     const pngPath = join(OUT_DIR, "character-export.png");
     await pngDownload.saveAs(pngPath);
     const { readFileSync: readPngFile } = await import("node:fs");
@@ -307,6 +313,10 @@ async function main(): Promise<void> {
     writeFileSync(RESULT_PATH, JSON.stringify(evidence, null, 2));
     console.log(`character shaper evidence → ${RESULT_PATH}`);
   } finally {
+    writeFileSync(RESULT_PATH, JSON.stringify(evidence, null, 2));
+    for (const context of browser.contexts()) {
+      await context.pages()[0]?.screenshot({ path: join(OUT_DIR, `character-final-${context.pages()[0]?.viewportSize()?.width}.png`) }).catch(() => undefined);
+    }
     await browser.close();
     if (preview) await stopChildProcess(preview);
   }

@@ -14,7 +14,7 @@ import {
   Res,
 } from "@nestjs/common";
 
-import { buildAffiliateUrl } from "../../../../../lib/affiliate";
+import { buildAffiliateUrl } from "../../../../web/src/shared/lib/affiliate";
 import { coverImagePolicy } from "../../../../../packages/core/src/server";
 import { getAppConfig } from "../../server/app-config";
 
@@ -148,6 +148,12 @@ export class CatalogController {
   @Header("Cache-Control", "no-store")
   async getConfig() {
     return getAppConfig();
+  }
+
+  @Get("/random")
+  @Header("Cache-Control", "no-store")
+  getRandom(@Query() query: QueryMap) {
+    return this.catalogService.getRandomData(normalizeQueryMap(query));
   }
 
   @Get("/home")

@@ -769,6 +769,9 @@ async function waitForStableHydratedEditor(page: Page): Promise<void> {
     await quickStart.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
 
+  // The editor now starts with the pen. Establish the selection baseline the inventory oracle
+  // compares against before watching allocations or measuring tool transitions.
+  await clickRailTool(page, "select");
   let previousCount = -1;
   let stableSamples = 0;
   for (let attempt = 0; attempt < 40; attempt += 1) {

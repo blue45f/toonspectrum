@@ -10,18 +10,18 @@ const ROOT = new URL("../", import.meta.url);
 
 function fixture() {
   return {
-    html: readFileSync(fileURLToPath(new URL("index.html", ROOT)), "utf8"),
+    html: readFileSync(fileURLToPath(new URL("apps/web/index.html", ROOT)), "utf8"),
     vercelConfig: JSON.parse(
       readFileSync(fileURLToPath(new URL("vercel.json", ROOT)), "utf8"),
     ),
     bootstrapCompatSource: readFileSync(
-      fileURLToPath(new URL("public/bootstrap-compat.js", ROOT)),
+      fileURLToPath(new URL("apps/web/public/bootstrap-compat.js", ROOT)),
       "utf8",
     ),
   };
 }
 
-function createCompatDom({ rootPresent = false, moduleSupported = true } = {}) {
+function createCompatDom({ rootPresent = false, moduleSupported = true } = {}) { // NOSONAR javascript:S3776
   let root = rootPresent ? createRoot() : null;
   const listeners = [];
   let createdElementCount = 0;

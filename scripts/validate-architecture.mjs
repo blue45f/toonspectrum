@@ -7,80 +7,112 @@ import {
 } from "./vercel-workflow-policy.mjs";
 
 const ROOT = process.cwd();
-const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
-const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
+const resolve = (relativePath) => path.join(ROOT, relativePath);
+const exists = (relativePath) => fs.existsSync(resolve(relativePath));
+const read = (relativePath) => fs.readFileSync(resolve(relativePath), "utf8");
+const list = (relativePath) =>
+  exists(relativePath)
+    ? fs.readdirSync(resolve(relativePath), { withFileTypes: true })
+    : [];
 
 const pkg = JSON.parse(read("package.json"));
-const scripts = pkg.scripts || {};
-
+const scripts = pkg.scripts ?? {};
 const issues = [];
 
-// Required docs. ToonSpectrum keeps product/design guides at the repo root and
-// deeper references (ranking math, competitor analysis) under docs/.
-// (AGENTS.md/CLAUDE.md are intentionally git-ignored globally — agent guides
-//  are not committed — so they are NOT validated here.)
-const requiredPaths = [
-  "README.md",
-  "PRODUCT.md",
-  "DESIGN.md",
-  "docs/ranking-architecture.md",
-  "docs/competitor-analysis.md",
-  "docs/architecture/frontend-layered-architecture.md",
-  "pnpm-workspace.yaml",
-  "tsconfig.json",
-  "commitlint.config.cjs",
-  ".github/workflows/catalog-update.yml",
-  ".github/workflows/deploy-vercel.yml",
-  ".github/workflows/related-info-update.yml",
-  "deploy/oci/.env.example",
-  "deploy/oci/crawl-update.sh",
-  "scripts/vercel-workflow-policy.mjs",
-  "scripts/vercel-workflow-policy.test.mjs",
-  "src/app/routes/app-route-definition.ts",
-  "src/app/routes/groups/app-routes.tsx",
-  "src/domains/creator/studio-router/routes/StudioEditorRoute.tsx",
-  "src/domains/creator/studio-router/routes/StudioPublishRoute.tsx",
-  "src/domains/creator/studio-cuttoon-editor/runtime/useStudioDocumentAccessRuntime.ts",
-  ".husky/pre-commit",
-  ".husky/commit-msg",
-];
-for (const file of requiredPaths) {
-  if (!exists(file)) issues.push(`missing file: ${file}`);
-}
-
-// Root Vite app entry points (index.html -> src/app/main.tsx).
-const requiredEntries = ["index.html", "src/app/main.tsx", "vite.config.ts"];
-for (const entry of requiredEntries) {
-  if (!exists(entry)) issues.push(`missing app entry: ${entry}`);
-}
-
-// 앱 진입점은 정확히 하나(index.html -> src/app/main.tsx)여야 한다. 실험용 브라우저 하네스가
-// src 루트에 `*-main.ts(x)` 로, 그 페이지가 레포 루트에 `*.html` 로 눌러앉으면 "앱 소스"와
-// "일회성 실험"이 같은 트리에서 구분되지 않는다. 하네스의 집은 tools/browser-harnesses/ 다.
-const SRC_ROOT_ENTRY_PATTERN = /(?:^|-)main\.tsx?$/;
-if (exists("src")) {
-  for (const entry of fs.readdirSync(path.join(ROOT, "src"), { withFileTypes: true })) {
-    if (!entry.isFile() || !SRC_ROOT_ENTRY_PATTERN.test(entry.name)) continue;
-    issues.push(
-      `entry-shaped module at the src root: src/${entry.name}`
-      + ` (the app entry is src/app/main.tsx; browser harnesses belong in tools/browser-harnesses/)`,
-    );
+function requirePaths(paths, label) {
+  for (const relativePath of paths) {
+    if (!exists(relativePath)) issues.push(`missing ${label}: ${relativePath}`);
   }
 }
-for (const entry of fs.readdirSync(ROOT, { withFileTypes: true })) {
-  if (!entry.isFile() || !entry.name.endsWith(".html")) continue;
-  if (entry.name === "index.html") continue;
-  issues.push(
-    `stray HTML entry at the repo root: ${entry.name}`
-    + ` (only index.html may live here; harness pages belong in tools/browser-harnesses/)`,
-  );
-}
-if (!exists("tools/browser-harnesses")) {
-  issues.push("missing harness home: tools/browser-harnesses/");
+
+function forbidPaths(paths, message) {
+  for (const relativePath of paths) {
+    if (exists(relativePath)) issues.push(`${message}: ${relativePath}`);
+  }
 }
 
-// 린트 예외 원장 + 그 원장과 호스트 결합도를 지키는 두 래칫 테스트. 이 셋 중 하나라도
-// 사라지면 "기계적 추출" 상태가 다시 아무도 안 보는 곳으로 숨는다.
+function validateWorkflowReference({ file, required, forbidden }) {
+  if (!exists(file)) {
+    issues.push(`missing workflow: ${file}`);
+    return;
+  }
+  const source = read(file);
+  if (!source.includes(required)) {
+    issues.push(`${file}: missing canonical web path ${required.trim()}`);
+  }
+  if (source.includes(forbidden)) {
+    issues.push(`${file}: stale root path ${forbidden.trim()}`);
+  }
+}
+
+// Maintained architecture and product documentation.
+requirePaths(
+  [
+    "README.md",
+    "ARCHITECTURE.md",
+    "PRODUCT.md",
+    "DESIGN.md",
+    "docs/ranking-architecture.md",
+    "docs/competitor-analysis.md",
+    "docs/architecture/frontend-layered-architecture.md",
+    "pnpm-workspace.yaml",
+    "tsconfig.json",
+    "commitlint.config.cjs",
+    ".github/workflows/catalog-update.yml",
+    ".github/workflows/deploy-vercel.yml",
+    ".github/workflows/related-info-update.yml",
+    "deploy/oci/.env.example",
+    "deploy/oci/crawl-update.sh",
+    "scripts/vercel-workflow-policy.mjs",
+    "scripts/vercel-workflow-policy.test.mjs",
+    "apps/web/src/app/routes/app-route-definition.ts",
+    "apps/web/src/app/routes/groups/app-routes.tsx",
+    "apps/web/src/domains/creator/studio-router/routes/StudioEditorRoute.tsx",
+    "apps/web/src/domains/creator/studio-router/routes/StudioPublishRoute.tsx",
+    "apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioDocumentAccessRuntime.ts",
+    ".husky/pre-commit",
+    ".husky/commit-msg",
+  ],
+  "file",
+);
+
+// Canonical Vite application and browser-only test assets.
+requirePaths(
+  [
+    "apps/web/index.html",
+    "apps/web/public",
+    "apps/web/src/app/main.tsx",
+    "apps/web/config/vite-manual-chunks.ts",
+    "apps/web/tests/browser-fixtures/studio-catalog/index.html",
+    "apps/web/tools/browser-harnesses/hybrid-dcc-e2e.html",
+    "vite.config.ts",
+  ],
+  "app entry",
+);
+
+const SRC_ROOT_ENTRY_PATTERN = /(?:^|-)main\.tsx?$/;
+for (const entry of list("apps/web/src")) {
+  if (!entry.isFile() || !SRC_ROOT_ENTRY_PATTERN.test(entry.name)) continue;
+  issues.push(
+    `entry-shaped module at the src root: apps/web/src/${entry.name}`
+      + " (the app entry is apps/web/src/app/main.tsx; browser harnesses belong in "
+      + "apps/web/tools/browser-harnesses/)",
+  );
+}
+for (const entry of list(".")) {
+  if (!entry.isFile() || !entry.name.endsWith(".html")) continue;
+  issues.push(
+    `stray HTML entry at the repo root: ${entry.name}`
+      + " (only apps/web/index.html is the application entry; harness pages belong in "
+      + "apps/web/tools/browser-harnesses/)",
+  );
+}
+forbidPaths(
+  ["tools/browser-harnesses", "tests/browser-fixtures/studio-catalog"],
+  "legacy or duplicate browser fixture path",
+);
+
+// Lint exception ledger and its ratchet tests must remain machine-readable.
 const LEGACY_EXCEPTIONS_LEDGER = "eslint.legacy-exceptions.json";
 if (!exists(LEGACY_EXCEPTIONS_LEDGER)) {
   issues.push(`missing lint exception ledger: ${LEGACY_EXCEPTIONS_LEDGER}`);
@@ -96,37 +128,80 @@ if (!exists(LEGACY_EXCEPTIONS_LEDGER)) {
     issues.push(`${LEGACY_EXCEPTIONS_LEDGER}: not parseable JSON (${error.message})`);
   }
 }
-for (const guard of [
-  "src/domains/creator/studio-host-architecture-ratchet.test.ts",
-  "scripts/eslint-legacy-exceptions.test.mjs",
-]) {
-  if (!exists(guard)) issues.push(`missing architecture guard test: ${guard}`);
-}
+requirePaths(
+  [
+    "apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts",
+    "scripts/eslint-legacy-exceptions.test.mjs",
+  ],
+  "architecture guard test",
+);
 
-// Root scripts wired into the build/lint/test chain.
-// V11.1 §12.1/§Phase 8 — 인플레이스 교체 가드: 병렬 Studio 앱·버전 접미사 소스 경로 금지.
-const forbiddenParallelPaths = [
-  "apps/studio-web-v11",
-  "apps/asset-market-v11",
-  "apps/benchmark-lab-v11",
-  "studio-v11",
+// Product browser code belongs under apps/web. Generated evidence and one-shot migration
+// machinery belong in Actions artifacts or commit history, not the maintained source tree.
+forbidPaths(
+  ["components", "hooks", "lib", "public", "shared", "src", "styles"],
+  "legacy frontend directory at repository root",
+);
+forbidPaths(
+  [
+    "apps/studio-web-v11",
+    "apps/asset-market-v11",
+    "apps/benchmark-lab-v11",
+    "studio-v11",
+  ],
+  "forbidden parallel studio path exists",
+);
+forbidPaths(
+  [
+    ".github/qa",
+    "qa-results",
+    "scripts/qa/runs",
+    "docs/merge-preservation",
+    "docs/learn/merge-blocker-followup.md",
+    "scripts/marketplace",
+    "scripts/apply-blender-source-aware-quality.py",
+    "scripts/fix-blender-orion-capability-audit.py",
+    "scripts/zz-fable-probe.mts",
+    "marketplace-benchmark/.route-marker",
+    "marketplace-benchmark/.upload-probe.txt",
+    "marketplace-benchmark/.upload-route-readme.md",
+  ],
+  "ephemeral receipt or completed migration path belongs outside maintained source",
+);
+
+const forbiddenOneOffWorkflows = [
+  "fix-kmas-history-sync.yml",
+  "apply-blender-production-migrations.yml",
+  "architecture-merge-gate-v3-pr690.yml",
+  "finalize-fixed-all-branch-integration.yml",
+  "merge-all-branches-fixed-integration.yml",
+  "merge-all-branches-preserve.yml",
+  "merge-all-branches-preserve-v2.yml",
+  "merge-all-branches-safe-convergence.yml",
+  "merge-generated-branches-history-only.yml",
+  "marketplace-authoring-browser-diagnosis.yml",
+  "marketplace-authoring-browser.yml",
+  "marketplace-authoring-contract-fixer.yml",
+  "marketplace-authoring-detail-integrator.yml",
+  "marketplace-authoring-finalizer.yml",
+  "marketplace-authoring-idempotency.yml",
+  "marketplace-authoring-integrator.yml",
+  "marketplace-authoring-release-gate.yml",
+  "marketplace-brush-recipe-integrator.yml",
+  "marketplace-source-snapshot.yml",
+  "studio-brush-core-fix.yml",
+  "studio-wearable-apply.yml",
+  "studio-wearable-runtime-review.yml",
 ];
-for (const forbidden of forbiddenParallelPaths) {
-  if (exists(forbidden)) issues.push(`forbidden parallel studio path exists: ${forbidden}`);
-}
+forbidPaths(
+  forbiddenOneOffWorkflows.map((file) => `.github/workflows/${file}`),
+  "completed one-off workflow must not return",
+);
 
-// One-off QA receipts are execution artifacts, not maintained source. Keeping dated trigger notes
-// in the tree makes repository search noisy and gives transient evidence the same status as ADRs.
-for (const receiptDir of [".github/qa", "scripts/qa/runs"]) {
-  if (exists(receiptDir)) {
-    issues.push(`ephemeral QA receipt directory belongs in Actions artifacts: ${receiptDir}`);
-  }
-}
 for (const base of ["packages", "crates", "apps"]) {
-  if (!exists(base)) continue;
-  for (const entry of fs.readdirSync(path.join(ROOT, base))) {
-    if (/-v\d+$/.test(entry)) {
-      issues.push(`version-suffixed source directory violates V11.1: ${base}/${entry}`);
+  for (const entry of list(base)) {
+    if (/-v\d+$/.test(entry.name)) {
+      issues.push(`version-suffixed source directory violates V11.1: ${base}/${entry.name}`);
     }
   }
 }
@@ -140,6 +215,8 @@ const requiredScripts = [
   "test",
   "check:studio-bundle",
   "validate:architecture",
+  "verify:csp",
+  "verify:toolchain-coverage",
   "verify:studio-menus",
   "verify:studio-icons",
 ];
@@ -147,34 +224,51 @@ for (const script of requiredScripts) {
   if (!scripts[script]) issues.push(`missing script: ${script}`);
 }
 
-// pnpm workspace members declared in pnpm-workspace.yaml must exist on disk.
+const expectedCspCommand = "node scripts/verify-vercel-csp.mjs apps/web/index.html";
+if (scripts["verify:csp"] !== expectedCspCommand) {
+  issues.push(`verify:csp must target the canonical entry: ${expectedCspCommand}`);
+}
+
+for (const reference of [
+  {
+    file: ".github/workflows/studio-asset-browser.yml",
+    required: "      - apps/web/tests/browser-fixtures/studio-catalog/**",
+    forbidden: "\n      - tests/browser-fixtures/studio-catalog/**",
+  },
+  {
+    file: ".github/workflows/studio-promo-video.yml",
+    required: "apps/web/tools/browser-harnesses/promo-e2e.html",
+    forbidden: "\n      - 'tools/browser-harnesses/promo-e2e.html'",
+  },
+]) {
+  validateWorkflowReference(reference);
+}
+
+// Every declared workspace base must exist. Other YAML lists are deliberately ignored.
 if (exists("pnpm-workspace.yaml")) {
-  const ws = read("pnpm-workspace.yaml");
-  // `packages:` 블록의 리스트 항목만 워크스페이스 글롭으로 본다. (다른 최상위 키,
-  // 예: onlyBuiltDependencies/minimumReleaseAgeExclude 의 `- 항목`은 패키지가 아님.)
-  const pkgBlock = ws.match(/^packages:\s*\n((?:[ \t]*-[ \t]*.*\n?)+)/m)?.[1] ?? ""; // NOSONAR S5852 신뢰된 로컬 입력(pnpm-workspace.yaml), 빌드타임 검증 스크립트
-  const globs = [...pkgBlock.matchAll(/^\s*-\s*['"]?([^'"\n]+?)['"]?\s*$/gm)].map((m) => m[1].trim());
+  const workspace = read("pnpm-workspace.yaml");
+  const packageBlock = workspace.match(
+    /^packages:\s*\n((?:[ \t]*-[ \t]*.*\n?)+)/m,
+  )?.[1] ?? ""; // NOSONAR S5852 — trusted local build-time configuration
+  const globs = [...packageBlock.matchAll(
+    /^\s*-\s*['"]?([^'"\n]+?)['"]?\s*$/gm,
+  )].map((match) => match[1].trim());
   for (const glob of globs) {
-    if (glob === ".") continue; // root package
+    if (glob === ".") continue;
     const base = glob.replace(/\/\*+$/, "");
     if (!exists(base)) issues.push(`workspace dir missing: ${base} (from "${glob}")`);
   }
 }
 
-// The NestJS API workspace package must have a name + build script
-// (build:all runs `pnpm -r run build` across the workspace).
-const apiPkgPath = "apps/api/package.json";
-if (!exists(apiPkgPath)) {
-  issues.push(`missing workspace package: ${apiPkgPath}`);
+const apiPackagePath = "apps/api/package.json";
+if (!exists(apiPackagePath)) {
+  issues.push(`missing workspace package: ${apiPackagePath}`);
 } else {
-  const apiPkg = JSON.parse(read(apiPkgPath));
-  if (!apiPkg.name) issues.push(`apps/api has no "name"`);
-  if (!apiPkg.scripts || !apiPkg.scripts.build) issues.push(`apps/api has no "build" script`);
+  const apiPackage = JSON.parse(read(apiPackagePath));
+  if (!apiPackage.name) issues.push('apps/api has no "name"');
+  if (!apiPackage.scripts?.build) issues.push('apps/api has no "build" script');
 }
 
-// Vercel Git Integration is the primary production path. Keep the Actions CLI
-// path manual-only, project-bound, and exactly pinned so configuring its three
-// secrets later cannot deploy a wrong project or silently adopt a new release.
 const vercelDeployWorkflowPath = ".github/workflows/deploy-vercel.yml";
 if (exists(vercelDeployWorkflowPath)) {
   for (const issue of validateVercelFallbackWorkflow(read(vercelDeployWorkflowPath))) {
@@ -182,8 +276,6 @@ if (exists(vercelDeployWorkflowPath)) {
   }
 }
 
-// Scheduled content commits are ordinary main pushes. Explicit CLI/hook
-// dispatches duplicate Vercel Git Integration builds and consume runner quota.
 for (const workflowPath of [
   ".github/workflows/catalog-update.yml",
   ".github/workflows/related-info-update.yml",
@@ -202,7 +294,7 @@ for (const automationPath of ["deploy/oci/crawl-update.sh", "deploy/oci/.env.exa
 
 if (issues.length > 0) {
   console.error(`architecture validation failed: ${issues.length} issue(s)`);
-  for (const item of issues) console.error(` - ${item}`);
+  for (const issue of issues) console.error(` - ${issue}`);
   process.exit(1);
 }
 

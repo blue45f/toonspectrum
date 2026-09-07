@@ -52,8 +52,12 @@ import {
   type Page,
 } from "playwright";
 
-import { isStudioBrushEraserAliasId } from "../src/domains/creator/brush/studio-brush-alias-profile";
-import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/brush/studio-brush-carrier-quality";
+import {
+  isStudioBrushEraserAliasId,
+  resolveStudioBrushAliasPencilPasses,
+  studioBrushAliasEffectiveDiameter,
+} from "../apps/web/src/domains/creator/brush/studio-brush-alias-profile";
+import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../apps/web/src/domains/creator/brush/studio-brush-carrier-quality";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
@@ -62,28 +66,28 @@ import {
   STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
-} from "../src/domains/creator/brush/studio-brush-catalog";
-import { studioBrushCatalogIdIsIntentionallyDiscontinuous } from "../src/domains/creator/brush/studio-brush-continuity-audit";
-import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/brush/studio-brush-dynamics";
-import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "../src/domains/creator/brush/studio-brush-library";
-import { studioBrushPackDescriptorById } from "../src/domains/creator/brush/studio-brush-pack-index";
+} from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
+import { studioBrushCatalogIdIsIntentionallyDiscontinuous } from "../apps/web/src/domains/creator/brush/studio-brush-continuity-audit";
+import { serializeStudioBrushDynamicsSettingsCanonical } from "../apps/web/src/domains/creator/brush/studio-brush-dynamics";
+import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "../apps/web/src/domains/creator/brush/studio-brush-library";
+import { studioBrushPackDescriptorById } from "../apps/web/src/domains/creator/brush/studio-brush-pack-index";
 import {
   resolveStudioBrushRuntimeContract,
-} from "../src/domains/creator/brush/studio-brush-runtime-contract";
+} from "../apps/web/src/domains/creator/brush/studio-brush-runtime-contract";
 import {
   materializeStudioBrushCatalogSelection,
   type StudioBrushCatalogSelection,
-} from "../src/domains/creator/brush/studio-brush-selection";
-import { captureStudioDrawPointerPressureContract } from "../src/domains/creator/brush/studio-draw-pointer-pressure-contract";
-import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/brush/studio-dry-media-anisotropic-grain-v1";
-import { studioWetInkBrushDepositsPigment } from "../src/domains/creator/brush/studio-wet-ink-brush-runtime";
-import { STUDIO_APP_SETTINGS_STORAGE_KEY } from "../src/domains/creator/studio-app-settings";
-import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
-import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
+} from "../apps/web/src/domains/creator/brush/studio-brush-selection";
+import { captureStudioDrawPointerPressureContract } from "../apps/web/src/domains/creator/brush/studio-draw-pointer-pressure-contract";
+import { classifyStudioDryMediaCatalogIdV1 } from "../apps/web/src/domains/creator/brush/studio-dry-media-anisotropic-grain-v1";
+import { studioWetInkBrushDepositsPigment } from "../apps/web/src/domains/creator/brush/studio-wet-ink-brush-runtime";
+import { STUDIO_APP_SETTINGS_STORAGE_KEY } from "../apps/web/src/domains/creator/studio-app-settings";
+import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
+import { BRUSH_PRESETS } from "../apps/web/src/domains/creator/studio-brush";
 import {
   resolveStudioCc0MypaintStampTuning,
   studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
-} from "../src/domains/creator/studio-cc0-mypaint-preset-import-v1";
+} from "../apps/web/src/domains/creator/studio-cc0-mypaint-preset-import-v1";
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
 import {
@@ -208,6 +212,7 @@ interface BrushStrokeEvidence {
   operation: VerifierBrushOperation;
   selected: boolean;
   visualChanged: boolean;
+  transparentPaint: boolean;
   eraseLiveOperationActive: boolean | null;
   eraseResidualRatio: number | null;
   undoEnabled: boolean;
@@ -2259,6 +2264,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         operation,
         selected: true,
         visualChanged,
+        transparentPaint,
         eraseLiveOperationActive,
         eraseResidualRatio: eraseLift?.residualEnergyRatio ?? null,
         undoEnabled: true,
@@ -2338,7 +2344,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     invariant(errors.failedResponses.length === 0, "desktop browser received unexpected 5xx responses");
     const ok = evidence.length === DESKTOP_STABILITY_CASES.length && evidence.every((entry) =>
       entry.selected
-      && entry.visualChanged
+      && (entry.transparentPaint || entry.visualChanged)
       && (entry.operation === "paint" || entry.eraseLiveOperationActive === true)
       && (
         entry.operation === "paint"
@@ -3293,9 +3299,17 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
             y: y - clip.y + 4 * amount,
           };
         });
+        // Compare pixels against the authored footprint, not the toolbar's base diameter.
+        // Side shading includes a 2.2x pencil shell; its normal end cap was incorrectly
+        // measured as a whole-brush displacement when normalized against the 10px core.
+        const pencilPasses = resolveStudioBrushAliasPencilPasses(expectedSelection.runtimeBrushId);
+        const nominalWidth = studioBrushAliasEffectiveDiameter(
+          expectedSelection.runtimeBrushId,
+          expectedSelection.defaultWidth,
+        ) * Math.max(1, ...pencilPasses.map((pass) => pass.widthScale));
         const crossSectionRadius = Math.max(
           10,
-          Math.min(46, expectedSelection.defaultWidth * 1.5),
+          Math.min(46, nominalWidth * 1.5),
         );
         const cursorIgnoreRadius = 0;
         const quality = analyzeStudioLongBrushQuality({
@@ -3308,7 +3322,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
             points: localRoutePoints,
             crossSectionRadius,
             cursorIgnoreRadius,
-            nominalWidth: expectedSelection.defaultWidth,
+            nominalWidth,
           },
         });
         const qualityArtifacts = saveLongBrushQualityArtifacts(
@@ -4632,6 +4646,7 @@ async function main(): Promise<void> {
     });
     const desktop = runDesktop ? await runDesktopBrushMatrix(browser, studioUrl) : null;
     if (desktop) {
+      writeFileSync(join(SCRATCH, "studio-brush-desktop-result.json"), JSON.stringify(desktop, null, 2));
       invariant(
         desktop.ok,
         `desktop ${BRUSH_MATRIX_CATALOG_COUNT}-brush matrix failed`,
@@ -4639,6 +4654,7 @@ async function main(): Promise<void> {
     }
     const longBrushes = runLong ? await runLongBrushMatrix(browser, studioUrl) : null;
     if (longBrushes) {
+      writeFileSync(join(SCRATCH, "studio-brush-long-result.json"), JSON.stringify(longBrushes, null, 2));
       invariant(
         longBrushes.ok,
         `long ${LONG_BRUSH_CATALOG_COUNT}-brush matrix failed`,

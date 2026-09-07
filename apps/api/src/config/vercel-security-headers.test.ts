@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const VERCEL_CONFIG_URL = new URL("../../../../vercel.json", import.meta.url);
-const INDEX_HTML_URL = new URL("../../../../index.html", import.meta.url);
+const INDEX_HTML_URL = new URL("../../../../apps/web/index.html", import.meta.url);
 
 type Header = Readonly<{ key: string; value: string }>;
 type VercelConfig = Readonly<{

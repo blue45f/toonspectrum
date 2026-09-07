@@ -14,3 +14,4 @@ export * from "./ranking-service";
 export * from "./calendar";
 export * from "./home";
 export * from "./insights";
+export * from "./random";

@@ -50,10 +50,13 @@ class QualityBudget:
     max_unapplied_scale_delta: float = 0.001
     max_degenerate_faces: int = 0
     max_non_manifold_edges: int = 0
+    # Per-mesh topology already present in an immutable, reviewed upgrade source.
+    source_non_manifold_allowances: Mapping[str, int] = field(default_factory=dict)
     minimum_score: int = 86
 
     def validate(self) -> None:
         numeric = asdict(self)
+        numeric.pop("source_non_manifold_allowances")
         for key, value in numeric.items():
             if isinstance(value, bool) or not isinstance(value, (int, float)):
                 raise ContractError(f"quality.{key} must be numeric")
@@ -70,6 +73,9 @@ class QualityBudget:
             raise ContractError("quality.max_vertex_influences must be at least 1")
         if self.max_hair_materials < 1:
             raise ContractError("quality.max_hair_materials must be at least 1")
+        for name, count in self.source_non_manifold_allowances.items():
+            if not isinstance(name, str) or not name or isinstance(count, bool) or not isinstance(count, int) or count < 0:
+                raise ContractError("quality.sourceNonManifoldAllowances must map mesh names to non-negative integers")
 
 
 @dataclass(frozen=True)
@@ -189,7 +195,7 @@ class PipelineConfig:
     quality: QualityBudget = field(default_factory=QualityBudget)
     provenance: Mapping[str, str] = field(default_factory=dict)
 
-    def validate(self) -> None:
+    def validate(self) -> None: # NOSONAR python:S3776
         if self.version != PIPELINE_VERSION:
             raise ContractError(
                 f"config version {self.version!r} is unsupported; expected {PIPELINE_VERSION}"
@@ -222,6 +228,10 @@ class PipelineConfig:
         expected_source_sha = self.provenance.get("sourceSha256")
         if expected_source_sha and not SHA256_PATTERN.fullmatch(expected_source_sha):
             raise ContractError("provenance.sourceSha256 must be a 64-character hex digest")
+        if self.quality.source_non_manifold_allowances and (
+            self.mode != "upgrade" or not expected_source_sha
+        ):
+            raise ContractError("source topology allowances require an upgrade source pinned by sourceSha256")
 
     def canonical_mapping(self) -> dict[str, Any]:
         return _canonical(asdict(self))
@@ -455,6 +465,10 @@ def parse_config(raw: Mapping[str, Any]) -> PipelineConfig:
             "maxNonManifoldEdges",
             default_quality.max_non_manifold_edges,
         ),
+        source_non_manifold_allowances=dict(_mapping(
+            quality_source.get("sourceNonManifoldAllowances", {}),
+            "quality.sourceNonManifoldAllowances",
+        )),
         minimum_score=_int(
             quality_source, "minimumScore", default_quality.minimum_score
         ),

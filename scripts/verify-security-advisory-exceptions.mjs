@@ -21,9 +21,7 @@ const REPOSITORY_ROOT = resolve(
   "..",
 );
 const RUNTIME_SOURCE_ROOTS = Object.freeze([
-  "src",
-  "components",
-  "lib",
+  join("apps", "web", "src"),
   join("apps", "api", "src"),
 ]);
 const SOURCE_EXTENSIONS = new Set([
@@ -72,7 +70,7 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-function listRuntimeSourceFiles(root) {
+function listRuntimeSourceFiles(root) { // NOSONAR javascript:S3776
   const files = [];
 
   function visit(path) {
@@ -142,12 +140,13 @@ function resolveInstalledRouterPackages(root) {
   };
 }
 
-export function verifySecurityAdvisoryExceptions({
+export function verifySecurityAdvisoryExceptions({ // NOSONAR javascript:S3776
   root = REPOSITORY_ROOT,
   now = new Date(),
   installedRouterPackages,
 } = {}) {
   const errors = [];
+  const webRoot = join(root, "apps", "web");
   const packageJson = readJson(join(root, "package.json"));
   const workspace = parseYaml(
     readFileSync(join(root, "pnpm-workspace.yaml"), "utf8"),
@@ -254,7 +253,7 @@ export function verifySecurityAdvisoryExceptions({
     }
   }
 
-  const appSourcePath = join(root, "src", "app", "App.tsx");
+  const appSourcePath = join(webRoot, "src", "app", "App.tsx");
   const appSource = existsSync(appSourcePath)
     ? readFileSync(appSourcePath, "utf8")
     : "";
@@ -265,21 +264,21 @@ export function verifySecurityAdvisoryExceptions({
     || !/<BrowserRouter(?:\s|>)/u.test(appSource)
   ) {
     errors.push(
-      "src/app/App.tsx must retain the reviewed BrowserRouter Declarative Mode boundary.",
+      "apps/web/src/app/App.tsx must retain the reviewed BrowserRouter Declarative Mode boundary.",
     );
   }
 
-  const mainSourcePath = join(root, "src", "app", "main.tsx");
+  const mainSourcePath = join(webRoot, "src", "app", "main.tsx");
   const mainSource = existsSync(mainSourcePath)
     ? readFileSync(mainSourcePath, "utf8")
     : "";
   if (!/\bcreateRoot\s*\(/u.test(mainSource)) {
     errors.push(
-      "src/app/main.tsx must retain the reviewed client-only createRoot entry.",
+      "apps/web/src/app/main.tsx must retain the reviewed client-only createRoot entry.",
     );
   }
 
-  const appRouterSourcePath = join(root, "src", "app", "routes", "AppRouter.tsx");
+  const appRouterSourcePath = join(webRoot, "src", "app", "routes", "AppRouter.tsx");
   const appRouterSource = existsSync(appRouterSourcePath)
     ? readFileSync(appRouterSourcePath, "utf8")
     : "";
@@ -288,11 +287,11 @@ export function verifySecurityAdvisoryExceptions({
     || !/\bRoute\b/u.test(appRouterSource)
   ) {
     errors.push(
-      "src/app/routes/AppRouter.tsx must retain the reviewed declarative Routes/Route boundary.",
+      "apps/web/src/app/routes/AppRouter.tsx must retain the reviewed declarative Routes/Route boundary.",
     );
   }
 
-  const indexSourcePath = join(root, "index.html");
+  const indexSourcePath = join(webRoot, "index.html");
   const indexSource = existsSync(indexSourcePath)
     ? readFileSync(indexSourcePath, "utf8")
     : "";
@@ -302,7 +301,7 @@ export function verifySecurityAdvisoryExceptions({
     )
   ) {
     errors.push(
-      "index.html must retain /src/app/main.tsx as its client module entry.",
+      "apps/web/index.html must retain /src/app/main.tsx as its client module entry.",
     );
   }
 

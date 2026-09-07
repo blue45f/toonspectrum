@@ -36,11 +36,15 @@ test("no eager API call; explicit search and history restore inputs", async ({ p
   await page.locator('input[name="q"]').fill("typing only");
   expect(requests).toBe(0);
   await submit(page, "첫 검색");
+  await expect.poll(async () => new URL(page.url()).searchParams.get("q")).toBe("첫 검색");
   await submit(page, "두번째 검색");
+  await expect.poll(async () => new URL(page.url()).searchParams.get("q")).toBe("두번째 검색");
   await page.goBack();
+  await expect.poll(async () => new URL(page.url()).searchParams.get("q")).toBe("첫 검색");
   await expect(page.locator('input[name="q"]')).toHaveValue("첫 검색");
   await expect(page.locator(".ref-card h3")).toHaveText(fixture.title);
   await page.goForward();
+  await expect.poll(async () => new URL(page.url()).searchParams.get("q")).toBe("두번째 검색");
   await expect(page.locator('input[name="q"]')).toHaveValue("두번째 검색");
 });
 test("detail, personal note, reload, export and deliberate removal", async ({ page }) => {

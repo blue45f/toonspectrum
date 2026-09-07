@@ -11,15 +11,16 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
 import { verifyCc0InsertionCancellation } from './studio-cc0-lifecycle-checks.mjs';
+import { WEB_PUBLIC } from './lib/repo-paths.mjs';
 
 const root = process.cwd();
 const output = path.resolve(process.argv[2] ?? '/tmp/studio-cc0-ui');
 await mkdir(output, {recursive:true});
-const manifest = JSON.parse(await readFile(path.join(root,'public/assets/studio/cc0-20260906/manifest.json'),'utf8'));
+const manifest = JSON.parse(await readFile(path.join(root,'apps/web/public/assets/studio/cc0-20260906/manifest.json'),'utf8'));
 const htmlName = 'cc0-curation-private-test.html';
 const entryName = 'cc0-curation-private-test.tsx';
 for (const file of [htmlName,entryName]) if (existsSync(path.join(root,file))) throw new Error('Test fixture path already exists');
-const mainPath = path.join(root,'src/app/main.tsx');
+const mainPath = path.join(root,'apps/web/src/app/main.tsx');
 const mainSource = await readFile(mainPath,'utf8');
 const cssImports = [...mainSource.matchAll(/import\s*["']([^"']+\.css)["']/g)].map(match => {
   const resolved = path.resolve(path.dirname(mainPath),match[1]);
@@ -30,7 +31,7 @@ await writeFile(path.join(root,htmlName),'<!doctype html><html lang="ko"><meta c
 await writeFile(path.join(root,entryName),`${cssImports}
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import {StudioCc0AssetLibraryPanel} from './src/domains/creator/StudioCc0AssetLibraryPanel';
+import {StudioCc0AssetLibraryPanel} from './apps/web/src/domains/creator/StudioCc0AssetLibraryPanel';
 window.__cc0Accept=true;
 window.__cc0Used=null;
 window.__cc0UseCount=0;
@@ -39,14 +40,15 @@ createRoot(document.getElementById('root')!).render(<main style={{maxWidth:720,m
 let server, browser;
 const errors=[], steps=[];
 try {
-  server = await createServer({root,server:{host:'127.0.0.1',port:5189,strictPort:true,open:false}});
+  server = await createServer({root,publicDir:WEB_PUBLIC,optimizeDeps:{entries:[path.join(root,entryName)]},server:{host:'127.0.0.1',port:5189,strictPort:true,open:false}});
   await server.listen();
   browser = await chromium.launch({headless:true,args:['--disable-dev-shm-usage']});
   const context = await browser.newContext({viewport:{width:1000,height:1100},acceptDownloads:true});
   const page = await context.newPage();
   page.on('pageerror', error=>errors.push(String(error)));
-  await page.goto('http://127.0.0.1:5189/'+htmlName,{waitUntil:'networkidle'});
+  await page.goto('http://127.0.0.1:5189/'+htmlName,{waitUntil:'domcontentloaded',timeout:120_000});
   const panel=page.locator('[data-studio-cc0-library]');
+  await panel.waitFor({state:'visible',timeout:120_000});
   assert.equal(await panel.locator('article').count(),0,'closed library must not build every tile');
   await panel.locator('summary').click();
   await panel.locator('article').first().waitFor();

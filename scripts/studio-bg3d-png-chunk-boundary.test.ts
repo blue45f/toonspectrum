@@ -4,8 +4,10 @@ import { resolve } from "node:path";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const ENCODER = "src/domains/creator/bg3d/studio-bg3d-model-thumbnail-encode.ts";
-const CLIENT = "src/domains/creator/bg3d/studio-bg3d-shot-png-worker-client.ts";
+import { createStudioManualChunks } from "../apps/web/config/vite-manual-chunks";
+
+const ENCODER = "apps/web/src/domains/creator/bg3d/studio-bg3d-model-thumbnail-encode.ts";
+const CLIENT = "apps/web/src/domains/creator/bg3d/studio-bg3d-shot-png-worker-client.ts";
 
 function parseFile(path: string): ts.SourceFile {
   return ts.createSourceFile(path, readFileSync(resolve(process.cwd(), path), "utf8"), ts.ScriptTarget.Latest, true);
@@ -20,7 +22,7 @@ describe("BG3D thumbnail PNG client chunk boundary", () => {
   it("co-locates only the unconditional encoder/client pair, not a Worker or renderer", () => {
     const paths: string[] = [];
     let groups = 0;
-    visitTree(parseFile("vite.config.ts"), (node) => {
+    visitTree(parseFile("apps/web/config/vite-manual-chunks.ts"), (node) => {
       if (!ts.isIfStatement(node) || !ts.isBlock(node.thenStatement)) return;
       const matches = node.thenStatement.statements.some((statement) =>
         ts.isReturnStatement(statement) && statement.expression !== undefined
@@ -34,7 +36,16 @@ describe("BG3D thumbnail PNG client chunk boundary", () => {
       });
     });
     expect(groups).toBe(1);
-    expect(paths.toSorted()).toEqual([`/${ENCODER}`, `/${CLIENT}`].toSorted());
+    expect(paths.toSorted()).toEqual(
+      [ENCODER, CLIENT].map((path) => path.replace(/^apps\/web/, "")).toSorted(),
+    );
+    const manualChunk = createStudioManualChunks({
+      isInitialIconModule: () => false,
+      isStudioCoreIconModule: () => false,
+    });
+    for (const path of [ENCODER, CLIENT]) {
+      expect(manualChunk(resolve(path))).toBe("studio-bg3d-png-client");
+    }
   });
 
   it("keeps the thumbnail wrapper dependent only on the already-required PNG client", () => {

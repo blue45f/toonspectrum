@@ -131,7 +131,48 @@ def _scene_bounds(objects: Sequence[bpy.types.Object]) -> tuple[Vector, Vector]:
     return minimum, maximum
 
 
-def infer_head_frame(
+def _head_weighted_frame(
+    head: bpy.types.PoseBone | None,
+    meshes: Sequence[bpy.types.Object],
+    right: Vector,
+    front: Vector,
+    up: Vector,
+) -> HeadFrame | None:
+    """Prefer the skinned head surface over eye helper bones placed in front of it."""
+    candidates: list[list[Vector]] = []
+    for obj in meshes:
+        if obj.type != "MESH" or obj.get("toonstudio_authored_hair"):
+            continue
+        if any(hint in obj.name.lower() for hint in ("hair", "brow", "lash", "accessory")):
+            continue
+        if obj.get("toonstudio_face_mesh") is True:
+            points = [obj.matrix_world @ vertex.co for vertex in obj.data.vertices]
+        else:
+            group = obj.vertex_groups.get(head.name) if head is not None else None
+            if group is None:
+                continue
+            points = [
+                obj.matrix_world @ vertex.co
+                for vertex in obj.data.vertices
+                if any(weight.group == group.index and weight.weight >= 0.5 for weight in vertex.groups)
+            ]
+        if len(points) >= 120:
+            candidates.append(points)
+    if not candidates:
+        return None
+    # A combined body or primary head mesh defines the skull. Small eye/ear accessories must
+    # not enlarge it; their helper bone locations are not anatomical head centres either.
+    points = max(candidates, key=len)
+    axes = (right, front, up)
+    bounds = [(min(p.dot(axis) for p in points), max(p.dot(axis) for p in points)) for axis in axes]
+    radii = [(high - low) * 0.5 for low, high in bounds]
+    if any(radius <= 1e-5 or not math.isfinite(radius) for radius in radii):
+        return None
+    center = sum((axis * ((low + high) * 0.5) for axis, (low, high) in zip(axes, bounds)), Vector())
+    return HeadFrame(center, right, front, up, radii[0], radii[2], radii[1])
+
+
+def infer_head_frame( # NOSONAR python:S3776
     armature: bpy.types.Object | None,
     mesh_objects: Sequence[bpy.types.Object],
 ) -> HeadFrame:
@@ -188,6 +229,17 @@ def infer_head_frame(
         if (eye_center - head_origin).dot(front) < 0:
             front.negate()
     return HeadFrame(center, right, front, up, radius_x, radius_y, radius_z)
+
+
+def infer_face_frame(
+    armature: bpy.types.Object | None,
+    mesh_objects: Sequence[bpy.types.Object],
+    hair_frame: HeadFrame,
+) -> HeadFrame:
+    """Face deformation uses the skull, independently of the authored hair placement frame."""
+    return _head_weighted_frame(
+        _find_head_bone(armature), mesh_objects, hair_frame.right, hair_frame.front, hair_frame.up,
+    ) or hair_frame
 
 
 def _clump_frame(points: Sequence[Vector], index: int, front_hint: Vector) -> tuple[Vector, Vector]:
@@ -357,7 +409,7 @@ def _guide(
     ]
 
 
-def _style_guides(
+def _style_guides( # NOSONAR python:S3776
     frame: HeadFrame, options: HairOptions, *, lod: int
 ) -> list[tuple[list[Vector], float, float, float]]:
     spec = HAIR_STYLE_PRESETS[options.style]
@@ -365,9 +417,21 @@ def _style_guides(
     side_length = float(spec["sideLength"]) * options.length
     symmetry_break = float(spec["symmetryBreak"])
     density = max(0.5, options.clump_density)
-    guide_count = max(3, round((7 if lod == 0 else 5 if lod == 1 else 3) * density))
+    if lod == 0:
+        guide_base = 7
+    elif lod == 1:
+        guide_base = 5
+    else:
+        guide_base = 3
+    guide_count = max(3, round(guide_base * density))
     guides: list[tuple[list[Vector], float, float, float]] = []
-    root_width = frame.radius_x * (0.24 if lod == 0 else 0.29 if lod == 1 else 0.36)
+    if lod == 0:
+        root_width_factor = 0.24
+    elif lod == 1:
+        root_width_factor = 0.29
+    else:
+        root_width_factor = 0.36
+    root_width = frame.radius_x * root_width_factor
     root_depth = frame.radius_z * 0.18
 
     # Back curtain / layered silhouette.
@@ -529,7 +593,12 @@ def build_authored_hair(
     lod_count = 3 if options.generate_lods else 1
     for lod in range(lod_count):
         accumulator = MeshAccumulator()
-        detail = (32, 18, 16) if lod == 0 else (22, 12, 11) if lod == 1 else (14, 8, 7)
+        if lod == 0:
+            detail = (32, 18, 16)
+        elif lod == 1:
+            detail = (22, 12, 11)
+        else:
+            detail = (14, 8, 7)
         spec = HAIR_STYLE_PRESETS[options.style]
         add_scalp_shell(
             accumulator,

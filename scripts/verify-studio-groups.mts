@@ -27,8 +27,8 @@ import {
   type Page,
 } from "playwright";
 
-import { planStudioDrawObjectTransform } from "../src/domains/creator/brush/studio-draw-object-transform";
-import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
+import { planStudioDrawObjectTransform } from "../apps/web/src/domains/creator/brush/studio-draw-object-transform";
+import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
 
 import {
   readDurableStudioAutosaveDocument,
@@ -43,7 +43,7 @@ import {
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
 
-import type { DrawEl, TextEl } from "../src/domains/creator/studio-element-model";
+import type { DrawEl, TextEl } from "../apps/web/src/domains/creator/studio-element-model";
 
 const SCRATCH =
   process.env.TOONSPECTRUM_GROUP_VERIFY_DIR
@@ -62,7 +62,7 @@ const LIVE_DRAW_STROKE = "#0b9b6d";
 const FIXTURE_TEXT_FILL = "#16100c";
 /**
  * Every locator below names a Korean control ("텍스트 추가", "복구하기", "3개 선택", …).
- * Studio localizes its chrome from the browser locale (`lib/i18n.ts` seeds the store with
+ * Studio localizes its chrome from the browser locale (`apps/web/src/shared/lib/i18n.ts` seeds the store with
  * `detectBrowserLocale()`), and Playwright's default context is `en-US`, so the audited
  * pages must be opened the way the Korean UI these assertions describe is actually served.
  */
@@ -424,6 +424,7 @@ async function prepareSeededMobilePage(page: Page, studioUrl: string): Promise<v
   // just because the Konva shell became visible first — `isVisible()` never waits, so poll
   // for the control the seeded document guarantees and take it.
   await restore.waitFor({ state: "visible", timeout: 15_000 });
+  await page.screenshot({ path: join(SCRATCH, "studio-group-mobile-before-restore.png") });
   await restore.click();
   await restore.waitFor({ state: "hidden" });
   await page.locator(".konvajs-content").first().waitFor({ state: "visible" });

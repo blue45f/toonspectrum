@@ -38,11 +38,27 @@ class ContractTests(unittest.TestCase):
         config = load_config(ROOT / "config/blender/avatar-orion-production.json")
         self.assertEqual(config.mode, "upgrade")
         self.assertTrue(config.export.vrm)
-        self.assertEqual(config.input_path, "public/vrm/Avatar_Orion.vrm")
+        self.assertEqual(config.input_path, "apps/web/public/vrm/Avatar_Orion.vrm")
         self.assertEqual(
             config.provenance["sourceGitBlob"],
             "b244cf74aa845e75b33a4e48a962ebd880ec2210",
         )
+        from hashlib import sha256
+        self.assertEqual(config.provenance["sourceSha256"], sha256((ROOT / config.input_path).read_bytes()).hexdigest())
+
+    def test_source_topology_allowances_require_an_immutable_upgrade_source(self) -> None:
+        raw = json.loads((ROOT / "config/blender/avatar-orion-production.json").read_text())
+        del raw["provenance"]["sourceSha256"]
+        with self.assertRaisesRegex(ContractError, "pinned by sourceSha256"):
+            parse_config(raw)
+        raw["provenance"]["sourceSha256"] = "a" * 64
+        raw["mode"] = "reference"
+        with self.assertRaisesRegex(ContractError, "upgrade source"):
+            parse_config(raw)
+        raw["mode"] = "upgrade"
+        raw["quality"]["sourceNonManifoldAllowances"]["Avatar_Orion_Body"] = -1
+        with self.assertRaisesRegex(ContractError, "non-negative integers"):
+            parse_config(raw)
 
     def test_unsafe_paths_and_unbounded_face_displacement_fail_closed(self) -> None:
         raw = json.loads((ROOT / "config/blender/reference-character.json").read_text())

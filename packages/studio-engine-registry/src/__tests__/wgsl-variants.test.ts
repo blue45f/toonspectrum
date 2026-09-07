@@ -7,11 +7,11 @@ import {
   packStudioGpuBrightnessContrastLut,
   packStudioGpuColorBalanceParams,
   packStudioGpuHslParams,
-} from "../../../../src/domains/creator/render/studio-gpu-filter-kernels";
-import { nativeHSL } from "../../../../src/domains/creator/render/studio-konva-native-filters";
-import { applyColorBalance } from "../../../../src/domains/creator/studio-color-balance";
-import { buildCurveChannelLuts, normalizeCurve } from "../../../../src/domains/creator/studio-curves";
-import { buildChannelLevelsLuts } from "../../../../src/domains/creator/studio-levels";
+} from "../../../../apps/web/src/domains/creator/render/studio-gpu-filter-kernels";
+import { nativeHSL } from "../../../../apps/web/src/domains/creator/render/studio-konva-native-filters";
+import { applyColorBalance } from "../../../../apps/web/src/domains/creator/studio-color-balance";
+import { buildCurveChannelLuts, normalizeCurve } from "../../../../apps/web/src/domains/creator/studio-curves";
+import { buildChannelLevelsLuts } from "../../../../apps/web/src/domains/creator/studio-levels";
 import { EffectCompileError } from "../effect-compiler";
 import {
   registerFilterProviderTestFixtures,

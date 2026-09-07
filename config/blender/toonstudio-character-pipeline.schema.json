@@ -247,6 +247,11 @@
           "type": "integer",
           "minimum": 0
         },
+        "sourceNonManifoldAllowances": {
+          "type": "object",
+          "description": "Audited per-mesh topology in a SHA-256-pinned upgrade source; never applies to authored hair.",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
         "minimumScore": {
           "type": "integer",
           "minimum": 0,

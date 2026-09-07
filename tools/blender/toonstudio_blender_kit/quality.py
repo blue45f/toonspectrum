@@ -99,6 +99,21 @@ def _armature_bone_coverage(armature: bpy.types.Object | None) -> tuple[int, lis
     if armature is None or armature.type != "ARMATURE":
         return 0, [group[0] for group in _REQUIRED_HUMANOID_GROUPS]
     names = {_normalize(bone.name) for bone in armature.data.bones}
+    # VRM humanoid roles are semantic bindings, not bone-name conventions. Orion's chest
+    # is correctly mapped to mixamorig:Spine2; Japanese and arbitrary authored names are valid too.
+    extension = getattr(armature.data, "vrm_addon_extension", None)
+    if extension is not None:
+        if extension.spec_version == "1.0":
+            mapping = extension.vrm1.humanoid.human_bones.human_bone_name_to_human_bone()
+            names = {
+                _normalize(str(role)) for role, binding in mapping.items()
+                if binding.node.bone_name in armature.data.bones
+            }
+        else:
+            names = {
+                _normalize(binding.bone) for binding in extension.vrm0.humanoid.human_bones
+                if binding.node.bone_name in armature.data.bones
+            }
     missing: list[str] = []
     covered = 0
     for aliases in _REQUIRED_HUMANOID_GROUPS:
@@ -130,7 +145,7 @@ def _issue(
     )
 
 
-def audit_character(
+def audit_character( # NOSONAR python:S3776
     config: PipelineConfig,
     mesh_objects: Sequence[bpy.types.Object],
     armature: bpy.types.Object | None,
@@ -154,6 +169,7 @@ def audit_character(
     maximum_influences = 0
     vertices_over_influence_limit = 0
     non_manifold_total = 0
+    allowed_source_non_manifold = 0
     degenerate_total = 0
     unapplied_objects: list[str] = []
     negative_scale_objects: list[str] = []
@@ -163,6 +179,13 @@ def audit_character(
             continue
         non_manifold, degenerate = _mesh_topology_metrics(obj)
         non_manifold_total += non_manifold
+        # Never apply a source allowance to newly authored geometry. A missing/renamed source
+        # mesh receives no allowance, and the pipeline verifies sourceSha256 before import.
+        if not (obj.get("toonstudio_authored_hair") or obj.get("toonstudio_authored_hair_outline")):
+            allowed_source_non_manifold += min(
+                non_manifold,
+                budget.source_non_manifold_allowances.get(obj.name, 0),
+            )
         degenerate_total += degenerate
         max_influences, over_four = _vertex_influence_metrics(obj)
         maximum_influences = max(maximum_influences, max_influences)
@@ -210,11 +233,12 @@ def audit_character(
             "Hair LOD triangle counts must strictly descend.",
             metric="/".join(str(value) for value in hair_lod_triangles),
         ))
-    if non_manifold_total > budget.max_non_manifold_edges:
+    unexpected_non_manifold = non_manifold_total - allowed_source_non_manifold
+    if unexpected_non_manifold > budget.max_non_manifold_edges:
         issues.append(_issue(
             "topology.non_manifold", "error",
             "The package contains non-manifold mesh edges.",
-            metric=non_manifold_total, limit=budget.max_non_manifold_edges,
+            metric=unexpected_non_manifold, limit=budget.max_non_manifold_edges,
             repair_hint="Close boundary holes or explicitly mark intentionally open cards in an authored profile.",
         ))
     if degenerate_total > budget.max_degenerate_faces:
@@ -316,6 +340,8 @@ def audit_character(
         "maximumVertexInfluences": maximum_influences,
         "verticesOverFourInfluences": vertices_over_influence_limit,
         "nonManifoldEdges": non_manifold_total,
+        "auditedSourceNonManifoldEdges": allowed_source_non_manifold,
+        "unexpectedNonManifoldEdges": unexpected_non_manifold,
         "degenerateFaces": degenerate_total,
         "maximumTextureDimension": texture_max,
         "textures": texture_names,

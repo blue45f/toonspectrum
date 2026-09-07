@@ -36,8 +36,8 @@ import {
   type Page,
 } from "playwright";
 
-import { STUDIO_CANVAS_WIDTH } from "../src/domains/creator/canvas/studio-canvas-constants";
-import { DEFAULT_CANVAS_H } from "../src/domains/creator/studio-pages";
+import { STUDIO_CANVAS_WIDTH } from "../apps/web/src/domains/creator/canvas/studio-canvas-constants";
+import { DEFAULT_CANVAS_H } from "../apps/web/src/domains/creator/studio-pages";
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
 import {
@@ -244,7 +244,8 @@ async function installCleanStudioState(page: Page): Promise<void> {
 
 async function dismissQuickStart(page: Page): Promise<void> {
   const quickstart = page.locator('[data-studio-creative-starter="true"]');
-  if (await quickstart.isVisible({ timeout: 300 }).catch(() => false)) {
+  // The lazy coach can mount after the editor shell; isVisible() does not wait for hydration.
+  if (await quickstart.waitFor({ state: "visible", timeout: 2_000 }).then(() => true, () => false)) {
     await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
 }
@@ -471,9 +472,10 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
   try {
     await prepareStudio(page, studioUrl);
     await activatePen(page);
+    await dismissQuickStart(page);
     const stage = page.locator(".konvajs-content").first();
     await stage.waitFor({ state: "visible" });
-    await page.mouse.move(4, 4);
+    await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     const baseline = await captureStableStage(page, stage);
     writeFileSync(baselinePath, baseline);
 
@@ -516,12 +518,13 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     const undo = await enabledHistoryButton(page, "실행취소");
     const historyReadyAfterPointerUpMs = performance.now() - pointerReleasedAt;
     // Remove the live brush cursor from visual evidence; it is UI feedback, not committed ink.
-    await page.mouse.move(4, 4);
+    await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     const committed = await captureStableStage(page, stage);
     writeFileSync(committedPath, committed);
 
     await undo.click();
     const redo = await enabledHistoryButton(page, "다시실행");
+    await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     const undone = await captureStableStage(page, stage);
     writeFileSync(undonePath, undone);
 
@@ -562,7 +565,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     await dismissQuickStart(page);
     // Playwright preserves the physical pointer across navigation. The pre-reload download leaves
     // it over the menubar, which can legitimately reopen a rich tool hint above the recovery rail.
-    await page.mouse.move(4, 4);
+    await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     await page.keyboard.press("Escape");
     const recoveryMessage = page.getByText(
       "이전에 작성 중이던 임시저장 데이터가 있습니다.",
@@ -580,7 +583,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
 
     const restoredStage = page.locator(".konvajs-content").first();
     await restoredStage.waitFor({ state: "visible" });
-    await page.mouse.move(4, 4);
+    await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     let reloaded = await captureStableStage(page, restoredStage);
     let redoneToReloaded = await comparePngPixels(page, redone, reloaded, 2, artworkCrop);
     for (let attempt = 0; attempt < 8 && redoneToReloaded.changedPixels > 192; attempt += 1) {
@@ -688,6 +691,60 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
   }
 }
 
+/** Real production UI with a scoped network fixture; authentication/database coverage is separate. */
+async function verifySourceHydration(browser: Browser, origin: string): Promise<void> {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  const workId = "83000000-0000-4000-8000-000000000001";
+  const sourceTitle = "Source hydration regression";
+  let sourceRequests = 0;
+  try {
+    await page.route("**/api/auth/session", (route) => route.fulfill({ json: {
+      authenticated: true,
+      user: { id: "source-owner", name: "Source owner", email: "source@example.test", image: null, role: "creator" },
+    } }));
+    await page.route(`**/api/creator/works/${workId}/team/document`, (route) => {
+      sourceRequests += 1;
+      return route.fulfill({ json: {
+        workId,
+        role: "owner",
+        status: "active",
+        capabilities: { view: true, edit: true },
+        revision: 1,
+        crdtServerSequence: "0",
+        updatedAt: "2026-09-07T00:00:00.000Z",
+        document: {
+          titleId: null, title: sourceTitle, description: "", cover: "", tags: [],
+          format: "cuttoon", pages: [], status: "draft", seriesId: null,
+          episodeNo: null, challengeId: null, remixFromId: null,
+          doc: { width: 720, pagesList: [{
+            id: "source-page", elements: [], bg: "#ffffff", bgGrad: null, canvasH: 1080,
+          }], currentPageId: "source-page" },
+        },
+      } });
+    });
+    await page.goto(`${origin}studio?id=${workId}`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: sourceTitle, exact: true }).waitFor({ timeout: 20_000 });
+    // This fixture covers source loading only. Editing still requires the real CRDT server,
+    // which is exercised separately by the authenticated API/browser journey.
+    await page.keyboard.press("b");
+    await page.keyboard.press("v");
+    await page.waitForTimeout(2_000);
+    invariant(sourceRequests === 1, `source hydration repeated ${sourceRequests} requests`);
+    invariant(await page.getByRole("heading", { name: sourceTitle, exact: true }).isVisible(),
+      "a subsequent editor render discarded the hydrated source");
+    await page.screenshot({ path: join(SCRATCH, "studio-lifecycle-source-hydrated.png") });
+    log("SOURCE HYDRATION FIXTURE OK: one request, source retained after subsequent renders");
+  } catch (error) {
+    await page.screenshot({ path: join(SCRATCH, "studio-lifecycle-source-failed.png") });
+    writeFileSync(join(SCRATCH, "studio-lifecycle-source-failed.txt"), await page.locator("body").innerText());
+    log(`source hydration fixture requests: ${sourceRequests}`);
+    throw error;
+  } finally {
+    await context.close();
+  }
+}
+
 async function main(): Promise<void> {
   cleanScratch();
   const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
@@ -709,6 +766,7 @@ async function main(): Promise<void> {
   try {
     await waitForServer(origin);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    await verifySourceHydration(browser, origin);
     const result = await runLifecycle(browser, origin);
     await browser.close();
     browser = null;

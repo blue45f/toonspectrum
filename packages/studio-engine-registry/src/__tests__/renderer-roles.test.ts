@@ -41,7 +41,7 @@ const loadFs = async (): Promise<NodeFsPromisesModule> =>
 // packages/studio-engine-registry/src/__tests__/ -> repo root
 const REPO_ROOT_URL = new URL("../../../../", import.meta.url);
 
-const SCAN_ROOTS = ["src", "apps"] as const;
+const SCAN_ROOTS = ["apps/web/src", "apps/api/src"] as const;
 const IGNORED_DIRECTORIES = new Set([
   "node_modules",
   "dist",
@@ -214,14 +214,14 @@ describe("renderer role ledger evidence", () => {
 
 describe("lab engines have zero product import sites", () => {
   it("classifies test and story files out of the product scan", () => {
-    expect(isRendererRoleProductSourceFile("src/a/b.ts")).toBe(true);
-    expect(isRendererRoleProductSourceFile("src/a/b.tsx")).toBe(true);
-    expect(isRendererRoleProductSourceFile("src/a/b.mts")).toBe(true);
-    expect(isRendererRoleProductSourceFile("src/a/b.test.ts")).toBe(false);
-    expect(isRendererRoleProductSourceFile("src/a/b.test.mts")).toBe(false);
-    expect(isRendererRoleProductSourceFile("src/a/b.stories.tsx")).toBe(false);
-    expect(isRendererRoleProductSourceFile("src/__tests__/b.ts")).toBe(false);
-    expect(isRendererRoleProductSourceFile("src/a/b.json")).toBe(false);
+    expect(isRendererRoleProductSourceFile("apps/web/src/a/b.ts")).toBe(true);
+    expect(isRendererRoleProductSourceFile("apps/web/src/a/b.tsx")).toBe(true);
+    expect(isRendererRoleProductSourceFile("apps/web/src/a/b.mts")).toBe(true);
+    expect(isRendererRoleProductSourceFile("apps/web/src/a/b.test.ts")).toBe(false);
+    expect(isRendererRoleProductSourceFile("apps/web/src/a/b.test.mts")).toBe(false);
+    expect(isRendererRoleProductSourceFile("apps/web/src/a/b.stories.tsx")).toBe(false);
+    expect(isRendererRoleProductSourceFile("apps/web/src/__tests__/b.ts")).toBe(false);
+    expect(isRendererRoleProductSourceFile("apps/web/src/a/b.json")).toBe(false);
   });
 
   it("finds a planted violation with an injected filesystem", () => {
@@ -257,10 +257,10 @@ describe("lab engines have zero product import sites", () => {
     ).toEqual(["planted-engine", "plantedSymbol"]);
   });
 
-  it("has zero violations against the real src/ and apps/ trees", async () => {
+  it("has zero violations against the real web and API source trees", async () => {
     const { filesByRoot, contents } = await collectProductSources(SCAN_ROOTS);
     // 스캐너가 조용히 0개 파일을 읽고 초록으로 통과하는 회귀를 막는다.
-    expect((filesByRoot.get("src") ?? []).length).toBeGreaterThan(100);
+    expect((filesByRoot.get("apps/web/src") ?? []).length).toBeGreaterThan(100);
 
     const violations = findLabEngineProductImports({
       roots: [...SCAN_ROOTS],

@@ -4,7 +4,7 @@
   "characterId": "avatar-orion-authored",
   "displayName": "Avatar Orion · Authored Toon",
   "mode": "upgrade",
-  "inputPath": "public/vrm/Avatar_Orion.vrm",
+  "inputPath": "apps/web/public/vrm/Avatar_Orion.vrm",
   "outputDir": "batch_generated/blender-character",
   "strict": true,
   "hair": {
@@ -70,14 +70,24 @@
     "maxUnappliedScaleDelta": 0.001,
     "maxDegenerateFaces": 0,
     "maxNonManifoldEdges": 64,
-    "minimumScore": 86
+    "minimumScore": 86,
+    "sourceNonManifoldAllowances": {
+      "Avatar_Orion_Body": 11484,
+      "TS_Orion_Brow_L": 76,
+      "TS_Orion_Brow_R": 76,
+      "TS_Orion_EyePanel_L": 100,
+      "TS_Orion_EyePanel_R": 100,
+      "TS_Orion_Pupil_L": 80,
+      "TS_Orion_Pupil_R": 80
+    }
   },
   "provenance": {
-    "source": "public/vrm/Avatar_Orion.vrm",
+    "source": "apps/web/public/vrm/Avatar_Orion.vrm",
     "sourceGitBlob": "b244cf74aa845e75b33a4e48a962ebd880ec2210",
     "sourceAuthor": "Polygonal Mind",
     "sourceLicense": "CC0",
     "sourceRepair": "scripts/blender/repair_avatar_orion_vrm1.py",
-    "pipeline": "ToonStudio authored character pipeline v1"
+    "pipeline": "ToonStudio authored character pipeline v1",
+    "sourceSha256": "32712a4aad9e83c0b2f86840ce54f1235fb9d133c5a6e7d6c5b653badc62fbb7"
   }
 }

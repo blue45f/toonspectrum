@@ -14,7 +14,7 @@ const root = fileURLToPath(new URL("./", import.meta.url));
 // 남은 글롭이 조용히 더 적은 파일을 수집하고 스위트는 그대로 초록으로 통과한다. 수집 루트를
 // 명시해두면 트리 이동(예: src/ -> apps/web)이 이 목록 수정을 강제하고, 빠뜨린 경우
 // scripts/verify-toolchain-coverage.mjs 의 수집 파일 수 floor 가 게이트를 터뜨린다.
-const TEST_ROOTS = ["apps", "components", "deploy", "lib", "packages", "scripts", "src", "tests"];
+const TEST_ROOTS = ["apps", "deploy", "packages", "scripts", "tests"];
 
 // Read .env.local only as a last candidate. resolveVitestDatabaseTarget accepts
 // it only when it is loopback; a Neon/production URL is never inherited by the
@@ -42,9 +42,14 @@ process.env.DATABASE_URL = testDatabaseTarget.databaseUrl;
 
 export default defineConfig({
   resolve: {
-    alias: {
-      "@": root,
-    },
+    // Array form keeps longer `@/shared` / `@/domains` / `@/src` matches ahead of bare `@`
+    // for rolldown/vite-node resolvers that do not sort by find length.
+    alias: [
+      { find: "@/shared", replacement: path.resolve(root, "apps/web/src/shared") },
+      { find: "@/domains", replacement: path.resolve(root, "apps/web/src/domains") },
+      { find: "@/src", replacement: path.resolve(root, "apps/web/src") },
+      { find: "@", replacement: path.resolve(root, "apps/web") },
+    ],
   },
   test: {
     // 수집 루트를 이 설정 파일의 디렉터리에 고정한다(기본값은 process.cwd()라 어디서
