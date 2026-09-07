@@ -1,0 +1,277 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { createEmptyStudioVersionCoordinates } from "../studio-foundation/studio-version-coordinates";
+
+import {
+  StudioMutationConflictError,
+  createStudioExistingReducerDomainPort,
+  createStudioMutationCoordinator,
+  validateStudioMutationEnvelope,
+  type StudioDomainCommand,
+  type StudioMutationDurabilityPort,
+  type StudioMutationEnvelopeV2,
+  type StudioMutationReceipt,
+} from "./studio-mutation-coordinator";
+
+const NOW = "2026-09-07T00:00:00.000Z";
+
+function coordinates(sequence = 0) {
+  const empty = createEmptyStudioVersionCoordinates();
+  return {
+    ...empty,
+    local: { ...empty.local, sequence, documentDigest: "document-digest-1" },
+  };
+}
+
+function command(
+  commandId: string,
+  domain: StudioDomainCommand["domain"],
+  type: string,
+): StudioDomainCommand {
+  return {
+    commandId,
+    domain,
+    type,
+    payload: { amount: 1 },
+    affectedSemanticIds: ["panel-1"],
+  };
+}
+
+function envelope(
+  commands: readonly StudioDomainCommand[],
+): StudioMutationEnvelopeV2 {
+  return {
+    schemaVersion: 2,
+    mutationId: "mutation-1",
+    transactionId: "transaction-1",
+    idempotencyKey: "idempotency-1",
+    workScope: { kind: "work", workId: "work-1" },
+    actor: {
+      userId: "user-1",
+      clientId: "client-1",
+      sessionId: "session-1",
+    },
+    base: coordinates(),
+    commands,
+    affectedSemanticIds: ["scene-1"],
+    createdAt: NOW,
+  };
+}
+
+function durability(existing: StudioMutationReceipt | null = null) {
+  const committedByKey = new Map<string, StudioMutationReceipt>();
+  if (existing) committedByKey.set("idempotency-1", existing);
+  const port: StudioMutationDurabilityPort = {
+    findCommittedReceipt: vi.fn(async (key) => committedByKey.get(key) ?? null),
+    begin: vi.fn(async () => undefined),
+    appendPrepared: vi.fn(async () => undefined),
+    commit: vi.fn(async (record, receipt) => {
+      committedByKey.set(record.idempotencyKey, receipt);
+    }),
+    abort: vi.fn(async () => undefined),
+    enqueueServerSync: vi.fn(async () => undefined),
+  };
+  return port;
+}
+
+describe("Studio mutation coordinator", () => {
+  it("commits multiple domains as one local sequence and queues one server sync", async () => {
+    let pageState = { count: 0 };
+    let identityState = { count: 0 };
+    const pagePort = createStudioExistingReducerDomainPort({
+      domain: "page-state",
+      getSnapshot: () => pageState,
+      reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
+      replaceSnapshot: (snapshot) => { pageState = snapshot; },
+    });
+    const identityPort = createStudioExistingReducerDomainPort({
+      domain: "identity-index",
+      getSnapshot: () => identityState,
+      reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
+      replaceSnapshot: (snapshot) => { identityState = snapshot; },
+    });
+    const store = durability();
+    const coordinator = createStudioMutationCoordinator({
+      domains: [pagePort, identityPort],
+      durability: store,
+      getCurrentCoordinates: () => coordinates(),
+      validateProjectedState: (projected) =>
+        projected.size === 2 ? [] : ["두 도메인이 함께 준비되어야 합니다."],
+    });
+
+    const receipt = await coordinator.execute(envelope([
+      command("command-page", "page-state", "page-state/add-frame"),
+      command("command-identity", "identity-index", "identity/link-panel"),
+    ]));
+
+    expect(receipt).toMatchObject({
+      status: "committed",
+      localSequence: 1,
+      serverSyncState: "queued",
+      committedDomains: ["page-state", "identity-index"],
+    });
+    expect(receipt.affectedSemanticIds).toEqual(["scene-1", "panel-1"]);
+    expect(pageState.count).toBe(1);
+    expect(identityState.count).toBe(1);
+    expect(store.begin).toHaveBeenCalledTimes(1);
+    expect(store.appendPrepared).toHaveBeenCalledTimes(1);
+    expect(store.commit).toHaveBeenCalledTimes(1);
+    expect(store.enqueueServerSync).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns an idempotent receipt without preparing or committing again", async () => {
+    const existing: StudioMutationReceipt = {
+      mutationId: "mutation-1",
+      transactionId: "transaction-1",
+      status: "committed",
+      localSequence: 1,
+      serverSyncState: "queued",
+      affectedSemanticIds: ["panel-1"],
+      committedDomains: ["page-state"],
+    };
+    const port = {
+      domain: "page-state" as const,
+      getSnapshot: vi.fn(() => ({ count: 0 })),
+      prepare: vi.fn(),
+      commit: vi.fn(),
+      restore: vi.fn(),
+    };
+    const store = durability(existing);
+    const coordinator = createStudioMutationCoordinator({
+      domains: [port],
+      durability: store,
+      getCurrentCoordinates: () => coordinates(),
+    });
+
+    const receipt = await coordinator.execute(envelope([
+      command("command-page", "page-state", "page-state/add-frame"),
+    ]));
+
+    expect(receipt.status).toBe("idempotent-replay");
+    expect(port.prepare).not.toHaveBeenCalled();
+    expect(store.begin).not.toHaveBeenCalled();
+  });
+
+  it("rejects stale local bases before touching any domain", async () => {
+    const port = {
+      domain: "page-state" as const,
+      getSnapshot: vi.fn(() => ({ count: 0 })),
+      prepare: vi.fn(),
+      commit: vi.fn(),
+      restore: vi.fn(),
+    };
+    const store = durability();
+    const coordinator = createStudioMutationCoordinator({
+      domains: [port],
+      durability: store,
+      getCurrentCoordinates: () => coordinates(9),
+    });
+
+    await expect(coordinator.execute(envelope([
+      command("command-page", "page-state", "page-state/add-frame"),
+    ]))).rejects.toBeInstanceOf(StudioMutationConflictError);
+    expect(port.prepare).not.toHaveBeenCalled();
+    expect(store.begin).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate command IDs and missing domain ports", () => {
+    const commands = [
+      command("command-1", "page-state", "page-state/add-frame"),
+      command("command-1", "identity-index", "identity/link-panel"),
+    ];
+    const issues = validateStudioMutationEnvelope(
+      envelope(commands),
+      coordinates(),
+      [],
+    );
+
+    expect(issues.map((issue) => issue.code)).toEqual(expect.arrayContaining([
+      "duplicate-command-id",
+      "missing-domain-port",
+    ]));
+  });
+
+  it("does not commit when a cross-domain invariant fails", async () => {
+    const state = { count: 0 };
+    const port = createStudioExistingReducerDomainPort({
+      domain: "page-state",
+      getSnapshot: () => state,
+      reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
+      replaceSnapshot: vi.fn(),
+    });
+    const store = durability();
+    const coordinator = createStudioMutationCoordinator({
+      domains: [port],
+      durability: store,
+      getCurrentCoordinates: () => coordinates(),
+      validateProjectedState: () => ["Identity link is missing."],
+    });
+
+    await expect(coordinator.execute(envelope([
+      command("command-page", "page-state", "page-state/add-frame"),
+    ]))).rejects.toBeInstanceOf(StudioMutationConflictError);
+    expect(port.commit).not.toHaveBeenCalled();
+    expect(store.begin).not.toHaveBeenCalled();
+  });
+
+  it("rolls back earlier domain commits when a later commit fails", async () => {
+    let pageState = { count: 0 };
+    let identityState = { count: 0 };
+    const pagePort = createStudioExistingReducerDomainPort({
+      domain: "page-state",
+      getSnapshot: () => pageState,
+      reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
+      replaceSnapshot: (snapshot) => { pageState = snapshot; },
+    });
+    const identityPort = createStudioExistingReducerDomainPort({
+      domain: "identity-index",
+      getSnapshot: () => identityState,
+      reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
+      replaceSnapshot: async (snapshot) => {
+        if (snapshot.count === 1) throw new Error("identity commit failed");
+        identityState = snapshot;
+      },
+    });
+    const store = durability();
+    const coordinator = createStudioMutationCoordinator({
+      domains: [pagePort, identityPort],
+      durability: store,
+      getCurrentCoordinates: () => coordinates(),
+    });
+
+    await expect(coordinator.execute(envelope([
+      command("command-page", "page-state", "page-state/add-frame"),
+      command("command-identity", "identity-index", "identity/link-panel"),
+    ]))).rejects.toThrow("identity commit failed");
+
+    expect(pageState).toEqual({ count: 0 });
+    expect(identityState).toEqual({ count: 0 });
+    expect(store.abort).toHaveBeenCalledTimes(1);
+    expect(store.commit).not.toHaveBeenCalled();
+    expect(store.enqueueServerSync).not.toHaveBeenCalled();
+  });
+
+  it("does not enqueue server sync for an unsaved draft", async () => {
+    let pageState = { count: 0 };
+    const port = createStudioExistingReducerDomainPort({
+      domain: "page-state",
+      getSnapshot: () => pageState,
+      reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
+      replaceSnapshot: (snapshot) => { pageState = snapshot; },
+    });
+    const store = durability();
+    const draftEnvelope: StudioMutationEnvelopeV2 = {
+      ...envelope([command("command-page", "page-state", "page-state/add-frame")]),
+      workScope: { kind: "draft", draftId: "draft-1" },
+    };
+    const coordinator = createStudioMutationCoordinator({
+      domains: [port],
+      durability: store,
+      getCurrentCoordinates: () => coordinates(),
+    });
+
+    const receipt = await coordinator.execute(draftEnvelope);
+    expect(receipt.serverSyncState).toBe("none");
+    expect(store.enqueueServerSync).not.toHaveBeenCalled();
+  });
+});
