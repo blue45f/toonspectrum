@@ -459,14 +459,20 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       await settle(page);
       if (!await sheet.isVisible()) throw new Error("Escape closed the inspector with its layer menu");
       const comps = sheet.getByTestId("studio-layer-comps-panel");
+      const idleComps = sheet.locator('[data-testid="studio-layer-comps-panel"][aria-busy="false"]:enabled');
+      await idleComps.waitFor({ state: "visible" });
       const visibility = rows.first().locator('[data-studio-layer-row-action="visibility"]');
       const capturedVisibility = await visibility.getAttribute("aria-label");
       await comps.getByRole("button", { name: "새 콤프", exact: true }).click();
       await comps.getByPlaceholder("콤프 이름 (예: 대사 없는 클린본)").fill("PR831 레이어 상태");
       await comps.getByRole("button", { name: "저장", exact: true }).click();
+      // Capture and delivery are asynchronous; wait for both before another document edit.
+      await comps.getByRole("button", { name: /^PR831 레이어 상태/u }).waitFor({ state: "visible" });
+      await idleComps.waitFor({ state: "visible" });
       await visibility.click();
       await settle(page);
       await comps.getByRole("button", { name: "적용", exact: true }).click();
+      await idleComps.waitFor({ state: "visible" });
       await settle(page);
       if (await visibility.getAttribute("aria-label") !== capturedVisibility) throw new Error("layer comp did not restore captured visibility");
       await comps.getByTitle("이름 수정").click();
@@ -474,6 +480,7 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       await comps.getByRole("button", { name: "콤프 이름 저장" }).click();
       const compButton = comps.getByRole("button", { name: /^PR831 복원 상태/u });
       await compButton.waitFor({ state: "visible" });
+      await idleComps.waitFor({ state: "visible" });
       let persisted = false;
       for (let attempt = 0; attempt < 32; attempt += 1) {
         const document = await readDurableStudioAutosaveDocument(page, studioAutosaveKey({}));
@@ -488,7 +495,10 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       await page.getByRole("button", { name: "작업 패널", exact: true }).click();
       await sheet.locator('[data-studio-inspector-primary-tab="layers"]').click();
       await compButton.waitFor({ state: "visible" });
+      await idleComps.waitFor({ state: "visible" });
       await comps.getByTitle("콤프 삭제").click();
+      await compButton.waitFor({ state: "detached" });
+      await idleComps.waitFor({ state: "visible" });
       if (await compButton.count() !== 0) throw new Error("layer comp was not deleted");
       return "ok";
     },
