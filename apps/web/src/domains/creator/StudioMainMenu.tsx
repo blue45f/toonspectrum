@@ -35,6 +35,7 @@ import {
 import { STUDIO_COLOR_VISION_HINTS } from "./studio-color-vision-coach";
 import { STUDIO_MENU_GROUP_SPEC } from "./studio-main-menu-group-spec";
 import { preloadStudioMainMenuGroupRuntime } from "./studio-main-menu-intent-preload";
+import { useStudioFilterDialogIntent } from "./studio-filter-dialog-intent";
 import {
   readStudioMainMenuViewport,
   resolveStudioMainMenuCoords,
@@ -309,6 +310,7 @@ function MenuDropdown({
   onFocusTrigger: () => void;
   t: (key: string) => string;
 }): ReactElement {
+  const preloadStudioFilterDialog = useStudioFilterDialogIntent();
   const unavailableReasonLabel = localizeText(t, "Unavailable condition", "studio.mainMenu.unavailableReason");
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -343,6 +345,7 @@ function MenuDropdown({
   };
 
   const openMenu = (focusIntent: MenuOpenFocusIntent) => {
+    preloadStudioMainMenuGroupRuntime(group.id, preloadStudioFilterDialog);
     openFocusIntentRef.current = focusIntent;
     setCoords(measureTrigger(buttonRef.current));
     onOpen();
@@ -689,9 +692,9 @@ function MenuDropdown({
           // APG roving tabindex: the menubar is one tab stop, and arrows move between the
           // 18 groups. Before this, reaching the canvas by keyboard cost 18 Tab presses.
           tabIndex={isTabStop ? 0 : -1}
-          onPointerEnter={() => preloadStudioMainMenuGroupRuntime(group.id)}
+          onPointerEnter={() => preloadStudioMainMenuGroupRuntime(group.id, preloadStudioFilterDialog)}
           onFocus={() => {
-            preloadStudioMainMenuGroupRuntime(group.id);
+            preloadStudioMainMenuGroupRuntime(group.id, preloadStudioFilterDialog);
             onFocusTrigger();
           }}
           aria-haspopup="menu"
@@ -700,6 +703,7 @@ function MenuDropdown({
           onPointerDown={(e) => {
             // Capture coords before open so the first paint is already positioned.
             if (e.button !== 0) return;
+            preloadStudioMainMenuGroupRuntime(group.id, preloadStudioFilterDialog);
             if (!open) setCoords(measureTrigger(buttonRef.current));
           }}
           onKeyDown={(event) => {

@@ -1,0 +1,10 @@
+/*
+ * Tool groups are authored as divider + zero or more buttons. User customisation can hide every
+ * button in a group; consecutive or trailing empty dividers must not survive as labelled clutter.
+ * `:has()` is supported by the Studio browser baseline and keeps this presentation rule in CSS,
+ * without duplicating tool visibility state in the divider component.
+ */
+[data-studio-rail-group-divider]:has(+ [data-studio-rail-group-divider]),
+[data-studio-rail-group-divider]:not(:has(~ [data-studio-rail-tool-id])) {
+  display: none;
+}

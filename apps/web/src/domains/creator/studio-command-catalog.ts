@@ -1,8 +1,7 @@
 /**
- * Public command catalog. The existing declarations are preserved byte-for-byte in
- * studio-command-catalog-base.ts. Small, independently shipped reference surfaces
- * extend the catalog here without rewriting existing command identities or conflicts.
- * Like the base, this module is declaration data only: no React, renderer, or actions.
+ * Public command catalog. Existing declarations remain historical evidence in
+ * `studio-command-catalog-base.ts`; this boundary applies shipped compatibility migrations
+ * before search, help, and shortcut indexes consume them.
  */
 import {
   catalogNativeIds as baseNativeIds,
@@ -13,9 +12,9 @@ import {
 } from "./studio-command-catalog-base";
 
 import type { StudioCommandCatalogEntry, StudioCommandSource } from "./studio-command-catalog-base";
+import type { CommandId } from "@toonspectrum/studio-command-registry";
 
 export {
-  catalogShortcutIndex,
   COMMAND_CONFLICTS,
   STUDIO_COMMAND_CATALOG_UNCOVERED,
   STUDIO_HELP_ROW_INVENTORY,
@@ -31,6 +30,31 @@ export type {
 } from "./studio-command-catalog-base";
 
 const MANUAL_MENU_ID = "help/user-manual";
+const TRANSPARENT_COLOR_COMMAND_ID: CommandId = "color.toggle-transparent";
+const TRANSPARENT_COLOR_SHORTCUT = "Shift+C";
+
+/**
+ * The base file keeps measured historical conflicts. The public catalog must describe the
+ * command users can execute now: Crop owns C and transparent ink owns Shift+C.
+ */
+const NORMALIZED_BASE_CATALOG: readonly StudioCommandCatalogEntry[] = Object.freeze(
+  BASE_CATALOG.map((entry) => {
+    if (entry.id !== TRANSPARENT_COLOR_COMMAND_ID) return entry;
+    return Object.freeze({
+      ...entry,
+      shortcut: TRANSPARENT_COLOR_SHORTCUT,
+      origins: Object.freeze(
+        entry.origins.map((origin) =>
+          origin.source === "keymap"
+            ? Object.freeze({ ...origin, shortcut: TRANSPARENT_COLOR_SHORTCUT })
+            : origin,
+        ),
+      ),
+      note: "Crop uses C; transparent-colour drawing uses Shift+C after the guided-UX migration.",
+    });
+  }),
+);
+
 const MANUAL_COMMAND: StudioCommandCatalogEntry = {
   id: "help.user-manual",
   category: "help",
@@ -47,9 +71,8 @@ const MANUAL_COMMAND: StudioCommandCatalogEntry = {
   origins: [{ source: "menu", nativeId: MANUAL_MENU_ID, status: "wired" }],
 };
 
-// No default chord is assigned, so the base shortcut index remains unchanged.
 export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
-  Object.freeze([...BASE_CATALOG, MANUAL_COMMAND]);
+  Object.freeze([...NORMALIZED_BASE_CATALOG, MANUAL_COMMAND]);
 
 export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze(
   BASE_MENU_INVENTORY.flatMap((id) => id === "help/current-tool" ? [id, MANUAL_MENU_ID] : [id]),
@@ -63,11 +86,25 @@ export const STUDIO_COMMAND_SOURCES = Object.freeze({
   },
 });
 
+/** Canonical public chord → command ids after compatibility migrations. */
+export function catalogShortcutIndex(): Map<string, CommandId[]> {
+  const index = new Map<string, CommandId[]>();
+  for (const entry of STUDIO_COMMAND_CATALOG) {
+    if (!entry.shortcut) continue;
+    const current = index.get(entry.shortcut);
+    if (current) current.push(entry.id);
+    else index.set(entry.shortcut, [entry.id]);
+  }
+  return index;
+}
+
 export function findCatalogEntriesBySource(
   source: StudioCommandSource,
   nativeId: string,
 ): StudioCommandCatalogEntry[] {
-  const entries = findBaseEntries(source, nativeId);
+  const entries = findBaseEntries(source, nativeId).map((entry) =>
+    STUDIO_COMMAND_CATALOG.find((candidate) => candidate.id === entry.id) ?? entry,
+  );
   return source === "menu" && nativeId === MANUAL_MENU_ID ? [...entries, MANUAL_COMMAND] : entries;
 }
 

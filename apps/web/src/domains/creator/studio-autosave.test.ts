@@ -7,6 +7,7 @@ import {
 } from "./ai/studio-ai-provenance";
 import { createDefaultStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
 import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
+import { captureLayerComp } from "./layer/studio-layer-comps";
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
   parseStudioAutosave,
@@ -63,6 +64,20 @@ describe("studio autosave", () => {
     expect(studioAutosaveKey({ userId: "u1", workId: "w1" })).not.toBe(
       studioAutosaveKey({ userId: "u2", workId: "w1" })
     );
+  });
+
+  it("recovers preset-only empty pages while rejecting empty and malformed presets", () => {
+    const comp = captureLayerComp("빈 캔버스 상태", [], "comp-1", 1);
+    const payload = { version: 2 as const, savedAt: "2026-09-07T00:00:00.000Z", pagesList: [{ id: "p1", elements: [], layerComps: [comp] }] };
+    const restored = parseStudioAutosave(serializeStudioAutosave(payload));
+    expect(restored).not.toBeNull();
+    expect(studioAutosaveHasContent(restored!)).toBe(true);
+    expect(restored?.pagesList[0]?.layerComps).toEqual([comp]);
+    const storage = { getItem: (key: string) => key === "preset-recovery" ? serializeStudioAutosave(payload) : null };
+    expect(readStudioAutosave(storage, "preset-recovery")?.payload.pagesList[0]?.layerComps).toEqual([comp]);
+    for (const layerComps of [undefined, [], [comp, comp], [{ ...comp, name: "" }], "invalid"]) {
+      expect(studioAutosaveHasContent({ ...payload, pagesList: [{ elements: [], layerComps }] })).toBe(false);
+    }
   });
 
   it("레거시 페이로드를 v2 최소 형태로 읽는다", () => {

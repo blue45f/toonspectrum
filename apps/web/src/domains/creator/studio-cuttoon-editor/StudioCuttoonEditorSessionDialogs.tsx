@@ -9,7 +9,6 @@ import { Suspense } from "react";
 import { isEffectivelyLocked } from "../studio-layers";
 import { createStudioPixelEditCanvas, encodeStudioPixelEditResultPng, loadStudioPixelEditImage } from "../studio-legacy-editor-runtime-helpers";
 import { StudioFilterDialog, StudioLayerLiftDialog } from "../studio-page-lazy-ui";
-import { commitStudioSelectionFilterMaskTransaction } from "../studio-selection-filter-mask-transaction";
 import type { El, ImageEl } from "../studio-element-model";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
@@ -126,8 +125,10 @@ export function StudioCuttoonEditorSessionDialogs(s: StudioCuttoonEditorViewSess
                     || !canApplyStudioMutation(mutationTicket)
                     || isLatestLayerContentMutationLocked(target.id)
                   ) return;
-                  const { createStudioSelectionFilterMaskTransactionAsync } = await import("../studio-selection-filter-mask-transaction"
-                  );
+                  const {
+                    createStudioSelectionFilterMaskTransactionAsync,
+                    commitStudioSelectionFilterMaskTransaction,
+                  } = await import("../studio-selection-filter-mask-transaction");
                   const result = await createStudioSelectionFilterMaskTransactionAsync({
                     target,
                     selection,
