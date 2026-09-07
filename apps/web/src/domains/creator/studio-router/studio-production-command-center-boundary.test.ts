@@ -25,10 +25,17 @@ const hubSource = readFileSync(
   ),
   "utf8",
 );
-const workspaceSource = readFileSync(
+const workspaceEntrySource = readFileSync(
   resolve(
     process.cwd(),
     "apps/web/src/domains/creator/studio-production/studio-production-workspace.ts",
+  ),
+  "utf8",
+);
+const workspaceSource = readFileSync(
+  resolve(
+    process.cwd(),
+    "apps/web/src/domains/creator/studio-production/studio-production-workspace-runtime.ts",
   ),
   "utf8",
 );
@@ -48,6 +55,9 @@ describe("Studio production command center boundary", () => {
     );
     expect(hubEntrySource).toContain('from "./StudioProductionHubPageV2"');
     expect(hubEntrySource).not.toContain("useState(");
+    expect(workspaceEntrySource).toContain(
+      'export * from "./studio-production-workspace-runtime"',
+    );
   });
 
   it("uses the shared SQLite/OPFS authority and keeps browser KV fallbacks out", () => {
