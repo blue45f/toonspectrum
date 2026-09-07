@@ -120,7 +120,9 @@ async function listAllLibraryItems(
  */
 export function useMarketLibrary() {
   const { data: session, ready, status } = useSession();
-  const userId = ready && status === "authenticated" ? session.user.id : null;
+  const userId = ready && status === "authenticated"
+    ? (session.user.id ?? null)
+    : null;
   const userIdRef = useRef<string | null>(userId);
   const generationRef = useRef(0);
   const [items, setItems] = useState<AcquiredMarketItem[]>([]);
