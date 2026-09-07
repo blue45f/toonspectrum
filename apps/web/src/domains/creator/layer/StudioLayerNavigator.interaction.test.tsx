@@ -2,9 +2,10 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createLayerGroup } from "../studio-layers";
+import { activateStudioModalSheet } from "../useStudioModalSheet";
 
 import {
   StudioLayerNavigator,
@@ -42,6 +43,35 @@ function row(name: RegExp): HTMLElement {
 afterEach(cleanup);
 
 describe("StudioLayerNavigator selection interaction", () => {
+  it("closes only the layer action popover on the first Escape inside a mobile sheet", () => {
+    const dismissSheet = vi.fn();
+    const { container } = render(
+      <div data-testid="root">
+        <aside role="dialog" aria-modal="true" aria-label="작업 패널" tabIndex={-1}>
+          <Harness />
+        </aside>
+      </div>,
+    );
+    const sheet = screen.getByRole("dialog", { name: "작업 패널" });
+    const deactivate = activateStudioModalSheet({
+      dialog: sheet, document, root: container, onDismiss: dismissSheet,
+    });
+    try {
+      fireEvent.click(container.querySelector('[data-studio-layer-row-action="menu"]')!);
+      const popover = screen.getByRole("dialog", { name: /주인공 대사 레이어 작업/u });
+      // jsdom has no layout; expose the already-visible popover before its RAF focus transfer.
+      const rectangles = vi.spyOn(popover, "getClientRects").mockReturnValue({ length: 1 } as DOMRectList);
+      fireEvent.keyDown(container.querySelector('[data-studio-layer-row-action="menu"]')!, { key: "Escape" });
+      rectangles.mockRestore();
+      expect(screen.queryByRole("dialog", { name: /주인공 대사 레이어 작업/u })).toBeNull();
+      expect(dismissSheet).not.toHaveBeenCalled();
+      fireEvent.keyDown(sheet, { key: "Escape" });
+      expect(dismissSheet).toHaveBeenCalledOnce();
+    } finally {
+      deactivate();
+    }
+  });
+
   it("routes standard group shortcuts from the shortcut-bounded layer tree", () => {
     const actions: StudioLayerNavigatorAction[] = [];
     render(

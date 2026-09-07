@@ -63,11 +63,11 @@ export interface RevenueEvent {
 }
 
 export interface RevenueSummary {
-  pendingAmount: number;
-  approvedAmount: number;
-  paidAmount: number;
-  rejectedAmount: number;
-  revokedAmount: number;
+  pendingAmountCents: number;
+  approvedAmountCents: number;
+  paidAmountCents: number;
+  rejectedAmountCents: number;
+  revokedAmountCents: number;
   pendingEvents: number;
   approvedEvents: number;
   paidEvents: number;

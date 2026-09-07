@@ -1,6 +1,7 @@
 /** Versioned, dependency-free contracts shared by the API, browser and regression tests. */
-export type ResourceProvider = "met" | "kakao" | "bizinfo";
+export type ResourceProvider = "met" | "openlibrary" | "openbd" | "kakao" | "bizinfo";
 export type ResourceStatus = "ready" | "partial" | "not_configured" | "unavailable";
+export type ResourceLicense = "CC0" | "metadata-only" | "book-promotion";
 export interface CreatorResource {
   id: string;
   provider: ResourceProvider;
@@ -8,7 +9,7 @@ export interface CreatorResource {
   creator: string;
   description: string;
   sourceUrl: string;
-  license: "CC0" | "metadata-only";
+  license: ResourceLicense;
   licenseUrl: string;
   credit: string;
   fetchedAt: string;
@@ -28,7 +29,11 @@ export interface ResourceSearchResult {
   message: string;
 }
 export const RESOURCE_LABELS: Record<ResourceProvider, string> = {
-  met: "The Met · 공개 미술 자료", kakao: "카카오 · 도서 검색", bizinfo: "기업마당 · 지원사업",
+  met: "The Met · 공개 미술 자료",
+  openlibrary: "Open Library · 글로벌 도서",
+  openbd: "openBD · 일본 서지",
+  kakao: "카카오 · 도서 검색",
+  bizinfo: "기업마당 · 지원사업",
 };
 export function recordOf(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -48,11 +53,17 @@ export function httpsUrl(value: unknown, hosts?: readonly string[]): string {
 }
 const SOURCE_HOSTS: Record<ResourceProvider, readonly string[]> = {
   met: ["www.metmuseum.org", "metmuseum.org"],
+  openlibrary: ["openlibrary.org", "www.openlibrary.org"],
+  openbd: ["openbd.jp", "www.openbd.jp"],
   kakao: ["search.daum.net", "book.daum.net", "m.search.daum.net"],
   bizinfo: ["www.bizinfo.go.kr", "bizinfo.go.kr"],
 };
 export function isProvider(value: unknown): value is ResourceProvider {
-  return value === "met" || value === "kakao" || value === "bizinfo";
+  return value === "met"
+    || value === "openlibrary"
+    || value === "openbd"
+    || value === "kakao"
+    || value === "bizinfo";
 }
 export function dateOnly(value: unknown): string | undefined {
   const raw = textOf(value, 10);
@@ -84,12 +95,20 @@ export function parseResource(value: unknown): CreatorResource | null {
   const sourceUrl = httpsUrl(v.sourceUrl, SOURCE_HOSTS[provider]);
   const fetchedAt = textOf(v.fetchedAt, 40);
   if (!id.startsWith(`${provider}:`) || id.length <= provider.length + 1 || !title || !sourceUrl || !Number.isFinite(Date.parse(fetchedAt))) return null;
-  const license = provider === "met" && v.license === "CC0" ? "CC0" : "metadata-only";
+  const license: ResourceLicense = provider === "met" && v.license === "CC0"
+    ? "CC0"
+    : provider === "openbd" && v.license === "book-promotion"
+      ? "book-promotion"
+      : "metadata-only";
   const imageUrl = license === "CC0" ? httpsUrl(v.imageUrl, ["images.metmuseum.org"]) : "";
+  const licenseUrl = license === "CC0"
+    ? "https://creativecommons.org/publicdomain/zero/1.0/"
+    : license === "book-promotion"
+      ? "https://openbd.jp/terms/"
+      : "";
   return {
-    id, provider, title, sourceUrl, fetchedAt, license,
+    id, provider, title, sourceUrl, fetchedAt, license, licenseUrl,
     creator: textOf(v.creator, 300), description: textOf(v.description, 1200), credit: textOf(v.credit, 500),
-    licenseUrl: license === "CC0" ? "https://creativecommons.org/publicdomain/zero/1.0/" : "",
     ...(imageUrl ? { imageUrl } : {}),
     dateLabel: textOf(v.dateLabel, 100), deadline: dateOnly(v.deadline),
     eligibility: textOf(v.eligibility, 300), isbn: textOf(v.isbn, 100),
