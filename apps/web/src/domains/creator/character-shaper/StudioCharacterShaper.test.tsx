@@ -16,6 +16,14 @@ vi.mock("../vrm/useStudioVrmPoserController", () => ({
   },
 }));
 
+vi.mock("../character-platform/thumbnail/character-runtime-thumbnail-store", () => ({
+  CharacterRuntimeThumbnailRecorder: () => null,
+}));
+
+vi.mock("../character-platform/ui/CharacterPlatformWorkbench", () => ({
+  CharacterPlatformWorkbench: () => null,
+}));
+
 vi.mock("./useCharacterShaperBinding", () => ({
   useCharacterShaperBinding: () => ({
     busyReason: null,
