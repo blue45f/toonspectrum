@@ -1,20 +1,20 @@
 /**
- * Studio UI density modes — three-tier layout presets (Super Simple / Simple / Full),
- * a common commercial drawing-app IA (no branding cloned).
+ * Studio UI density modes — one stable feature set presented at three levels of chrome.
  *
- * Our keys stay simple | full | focus for storage stability:
- * - focus  ≈ Super Simple (minimal chrome, draw tools stay)
- * - simple ≈ Simple (core tools, hide advanced AI/3D)
- * - full   ≈ Full (everything)
+ * Storage keys stay simple | full | focus for compatibility:
+ * - focus  = 집중 작업 (canvas-first, minimum chrome)
+ * - simple = 표준 작업 (core tools and panels, advanced launchers folded)
+ * - full   = 전체 기능 (all professional tools and panels)
  *
- * Pure prefs model; StudioPage applies visibility matrix to toolbar clusters and panels.
+ * Pure prefs model; StudioPage applies the visibility matrix to toolbar clusters and panels.
  */
 
-export const STUDIO_UI_DENSITY_MODES = ["simple", "full", "focus"] as const;
+export const STUDIO_UI_DENSITY_MODES = ["focus", "simple", "full"] as const;
 export type StudioUiDensityMode = (typeof STUDIO_UI_DENSITY_MODES)[number];
 
 export const STUDIO_UI_DENSITY_STORAGE_KEY = "toonspectrum-studio-ui-density:v1";
-export const DEFAULT_STUDIO_UI_DENSITY_MODE: StudioUiDensityMode = "full";
+/** New users start with the predictable core workflow; persisted users keep their saved mode. */
+export const DEFAULT_STUDIO_UI_DENSITY_MODE: StudioUiDensityMode = "simple";
 
 export type StudioUiChromeRegion =
   | "toolbar-assets"
@@ -86,7 +86,7 @@ export function saveStudioUiDensityState(
   }
 }
 
-/** Visibility matrix — false means hide the chrome region. */
+/** Visibility matrix — false means hide the chrome region, never remove the command. */
 export function studioUiDensityAllows(
   mode: StudioUiDensityMode,
   region: StudioUiChromeRegion
@@ -94,7 +94,7 @@ export function studioUiDensityAllows(
   const normalized = normalizeStudioUiDensityMode(mode);
   if (normalized === "full") return true;
 
-  // Super Simple (focus): draw + 삽입 코어(템플릿·에셋·텍스트·말풍선) + 레일. 패널·AI·3D 참조는 접는다.
+  // 집중 작업: keep the canvas, essential drawing/insertion paths, status and quick actions.
   if (normalized === "focus") {
     return (
       region === "toolbar-draw"
@@ -107,12 +107,12 @@ export function studioUiDensityAllows(
     );
   }
 
-  // Simple: core webtoon tools; hide AI/3D-heavy chrome (advanced brush props stay folded).
+  // 표준 작업: keep the complete webtoon workflow while folding AI/3D-heavy launch chrome.
   if (region === "toolbar-ai" || region === "toolbar-reference") return false;
   return true;
 }
 
-/** Short UI chip label (Super Simple / Simple / Full). */
+/** Short labels describe the work style, not a judgement about the user's skill. */
 export function studioUiDensityLabel(
   mode: StudioUiDensityMode,
   t?: (key: string) => string
@@ -122,9 +122,9 @@ export function studioUiDensityLabel(
     if (mode === "focus") return t("studio.settings.uiDensityMode.focus");
     return t("studio.settings.uiDensityMode.full");
   }
-  if (mode === "simple") return "심플";
-  if (mode === "focus") return "슈퍼심플";
-  return "전체";
+  if (mode === "simple") return "표준 작업";
+  if (mode === "focus") return "집중 작업";
+  return "전체 기능";
 }
 
 export function studioUiDensityDescription(
@@ -137,15 +137,15 @@ export function studioUiDensityDescription(
     return t("studio.settings.uiDensityDescription.full");
   }
   if (mode === "simple") {
-    return "심플 모드 — 핵심 도구와 기본 설정만 보여 입문·집중 작업에 맞춥니다.";
+    return "표준 작업 — 자주 쓰는 도구와 설정을 보여 주고 고급 실행기는 필요할 때 펼칩니다.";
   }
   if (mode === "focus") {
-    return "슈퍼심플 모드 — 그리기·삽입(템플릿·에셋·말풍선)과 캔버스 위주, AI·3D·속성 패널은 접습니다.";
+    return "집중 작업 — 캔버스와 그리기·말풍선·소재 같은 핵심 도구만 남겨 작업에 집중합니다.";
   }
-  return "전체 모드 — 모든 메뉴·패널·AI·3D 도구를 표시합니다.";
+  return "전체 기능 — AI·3D를 포함한 모든 전문 도구와 패널을 표시합니다.";
 }
 
-/** Map existing mobile immersive flag into density for unified consumers. */
+/** Map the existing mobile immersive flag without changing established non-immersive sessions. */
 export function studioUiDensityFromImmersive(mobileImmersive: boolean): StudioUiDensityMode {
   return mobileImmersive ? "focus" : "full";
 }
