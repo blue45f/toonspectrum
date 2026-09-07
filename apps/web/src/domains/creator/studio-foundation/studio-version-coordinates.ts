@@ -71,13 +71,23 @@ export interface StudioVersionProjection {
 export type StudioVersionIssueCode =
   | "local-sequence-invalid"
   | "pending-mutation-count-invalid"
+  | "server-revision-invalid"
+  | "local-base-revision-invalid"
   | "local-base-without-server"
   | "local-base-ahead-of-server"
   | "review-without-server"
+  | "review-source-revision-invalid"
+  | "review-source-ahead-of-server"
+  | "review-source-digest-missing"
+  | "review-server-digest-mismatch"
+  | "server-content-digest-missing"
   | "approval-without-review"
+  | "approval-source-revision-invalid"
+  | "approval-source-digest-missing"
   | "approval-review-mismatch"
   | "approval-source-mismatch"
   | "publish-without-approval"
+  | "publish-source-revision-invalid"
   | "publish-approval-mismatch"
   | "publish-source-mismatch"
   | "profile-version-invalid";
@@ -87,8 +97,16 @@ export interface StudioVersionIssue {
   readonly message: string;
 }
 
-function sameDigest(left: string | null, right: string | null): boolean {
-  return left === null || right === null || left === right;
+function hasDigest(value: string | null): value is string {
+  return value !== null && value.trim().length > 0;
+}
+
+function exactDigestMatch(left: string | null, right: string | null): boolean {
+  return hasDigest(left) && hasDigest(right) && left === right;
+}
+
+function observedDigestMismatch(left: string | null, right: string | null): boolean {
+  return hasDigest(left) && hasDigest(right) && left !== right;
 }
 
 function validRevision(value: number): boolean {
@@ -132,14 +150,33 @@ export function validateStudioVersionCoordinates(
   }
 
   const server = coordinates.server;
+  if (server !== null && !validRevision(server.revision)) {
+    issues.push({
+      code: "server-revision-invalid",
+      message: "Server revision must be a positive safe integer.",
+    });
+  }
+
   const localBase = coordinates.local.baseServerRevision;
+  if (localBase !== null && !validRevision(localBase)) {
+    issues.push({
+      code: "local-base-revision-invalid",
+      message: "Local base server revision must be a positive safe integer.",
+    });
+  }
   if (server === null && localBase !== null) {
     issues.push({
       code: "local-base-without-server",
       message: "A local server base cannot exist without a server revision.",
     });
   }
-  if (server !== null && localBase !== null && localBase > server.revision) {
+  if (
+    server !== null
+    && validRevision(server.revision)
+    && localBase !== null
+    && validRevision(localBase)
+    && localBase > server.revision
+  ) {
     issues.push({
       code: "local-base-ahead-of-server",
       message: "The local base revision cannot be ahead of the server revision.",
@@ -147,62 +184,124 @@ export function validateStudioVersionCoordinates(
   }
 
   const review = coordinates.review;
-  if (review !== null && server === null) {
-    issues.push({
-      code: "review-without-server",
-      message: "A review snapshot must pin a server revision.",
-    });
+  if (review !== null) {
+    if (!validRevision(review.sourceRevision)) {
+      issues.push({
+        code: "review-source-revision-invalid",
+        message: "Review source revision must be a positive safe integer.",
+      });
+    }
+    if (!hasDigest(review.sourceDigest)) {
+      issues.push({
+        code: "review-source-digest-missing",
+        message: "A review snapshot must pin a non-empty source digest.",
+      });
+    }
+    if (server === null) {
+      issues.push({
+        code: "review-without-server",
+        message: "A review snapshot must pin a server revision.",
+      });
+    } else if (validRevision(server.revision) && validRevision(review.sourceRevision)) {
+      if (review.sourceRevision > server.revision) {
+        issues.push({
+          code: "review-source-ahead-of-server",
+          message: "A review cannot target a revision ahead of the server head.",
+        });
+      } else if (review.sourceRevision === server.revision) {
+        if (!hasDigest(server.contentDigest)) {
+          issues.push({
+            code: "server-content-digest-missing",
+            message: "The current server revision must expose a content digest before review or approval.",
+          });
+        } else if (
+          hasDigest(review.sourceDigest)
+          && review.sourceDigest !== server.contentDigest
+        ) {
+          issues.push({
+            code: "review-server-digest-mismatch",
+            message: "The review digest does not match the pinned server revision.",
+          });
+        }
+      }
+    }
   }
 
   const approval = coordinates.approval;
-  if (approval !== null && review === null) {
-    issues.push({
-      code: "approval-without-review",
-      message: "An approval must reference a review snapshot.",
-    });
-  } else if (approval !== null && review !== null) {
-    if (approval.reviewSnapshotId !== review.snapshotId) {
+  if (approval !== null) {
+    if (!validRevision(approval.sourceRevision)) {
       issues.push({
-        code: "approval-review-mismatch",
-        message: "The approval and review snapshot identifiers differ.",
+        code: "approval-source-revision-invalid",
+        message: "Approval source revision must be a positive safe integer.",
       });
     }
-    if (
-      approval.sourceRevision !== review.sourceRevision
-      || !sameDigest(approval.sourceDigest, review.sourceDigest)
-    ) {
+    if (!hasDigest(approval.sourceDigest)) {
       issues.push({
-        code: "approval-source-mismatch",
-        message: "The approval must pin the same source as the review snapshot.",
+        code: "approval-source-digest-missing",
+        message: "An approval must pin a non-empty source digest.",
       });
+    }
+    if (review === null) {
+      issues.push({
+        code: "approval-without-review",
+        message: "An approval must reference a review snapshot.",
+      });
+    } else {
+      if (approval.reviewSnapshotId !== review.snapshotId) {
+        issues.push({
+          code: "approval-review-mismatch",
+          message: "The approval and review snapshot identifiers differ.",
+        });
+      }
+      if (
+        approval.sourceRevision !== review.sourceRevision
+        || (
+          hasDigest(approval.sourceDigest)
+          && hasDigest(review.sourceDigest)
+          && approval.sourceDigest !== review.sourceDigest
+        )
+      ) {
+        issues.push({
+          code: "approval-source-mismatch",
+          message: "The approval must pin the same source as the review snapshot.",
+        });
+      }
     }
   }
 
   const publish = coordinates.publish;
-  if (publish !== null && approval === null) {
-    issues.push({
-      code: "publish-without-approval",
-      message: "A publish package must reference an approval.",
-    });
-  } else if (publish !== null && approval !== null) {
-    if (publish.approvalId !== approval.approvalId) {
+  if (publish !== null) {
+    if (!validRevision(publish.sourceRevision)) {
       issues.push({
-        code: "publish-approval-mismatch",
-        message: "The publish package references a different approval.",
+        code: "publish-source-revision-invalid",
+        message: "Publish source revision must be a positive safe integer.",
       });
     }
-    if (publish.sourceRevision !== approval.sourceRevision) {
+    if (approval === null) {
       issues.push({
-        code: "publish-source-mismatch",
-        message: "The publish package must render the approved revision.",
+        code: "publish-without-approval",
+        message: "A publish package must reference an approval.",
+      });
+    } else {
+      if (publish.approvalId !== approval.approvalId) {
+        issues.push({
+          code: "publish-approval-mismatch",
+          message: "The publish package references a different approval.",
+        });
+      }
+      if (publish.sourceRevision !== approval.sourceRevision) {
+        issues.push({
+          code: "publish-source-mismatch",
+          message: "The publish package must render the approved revision.",
+        });
+      }
+    }
+    if (!validRevision(publish.profileVersion)) {
+      issues.push({
+        code: "profile-version-invalid",
+        message: "Publish profile version must be a positive safe integer.",
       });
     }
-  }
-  if (publish !== null && !validRevision(publish.profileVersion)) {
-    issues.push({
-      code: "profile-version-invalid",
-      message: "Publish profile version must be a positive safe integer.",
-    });
   }
 
   return issues;
@@ -215,13 +314,25 @@ export function resolveStudioVersionProjection(
   const server = coordinates.server;
   const local = coordinates.local;
 
+  const localRevisionInvalid = issues.some((issue) =>
+    issue.code === "server-revision-invalid"
+    || issue.code === "local-base-revision-invalid"
+    || issue.code === "local-base-without-server"
+    || issue.code === "local-base-ahead-of-server"
+  );
+
   let serverSyncState: StudioServerSyncState;
   if (server === null) {
-    serverSyncState = "local-only";
-  } else if (local.baseServerRevision !== null && local.baseServerRevision > server.revision) {
+    serverSyncState = local.baseServerRevision === null ? "local-only" : "conflict";
+  } else if (localRevisionInvalid) {
     serverSyncState = "conflict";
   } else if (local.pendingServerMutations > 0) {
     serverSyncState = "queued";
+  } else if (
+    local.baseServerRevision === server.revision
+    && observedDigestMismatch(local.documentDigest, server.contentDigest)
+  ) {
+    serverSyncState = "conflict";
   } else if (local.baseServerRevision === server.revision) {
     serverSyncState = "synced";
   } else {
@@ -232,7 +343,16 @@ export function resolveStudioVersionProjection(
   const approval = coordinates.approval;
   if (approval !== null) {
     const structurallyInvalid = issues.some((issue) =>
-      issue.code === "approval-without-review"
+      issue.code === "server-revision-invalid"
+      || issue.code === "review-without-server"
+      || issue.code === "review-source-revision-invalid"
+      || issue.code === "review-source-ahead-of-server"
+      || issue.code === "review-source-digest-missing"
+      || issue.code === "review-server-digest-mismatch"
+      || issue.code === "server-content-digest-missing"
+      || issue.code === "approval-without-review"
+      || issue.code === "approval-source-revision-invalid"
+      || issue.code === "approval-source-digest-missing"
       || issue.code === "approval-review-mismatch"
       || issue.code === "approval-source-mismatch"
     );
@@ -241,7 +361,7 @@ export function resolveStudioVersionProjection(
     } else if (
       server !== null
       && approval.sourceRevision === server.revision
-      && sameDigest(approval.sourceDigest, server.contentDigest)
+      && exactDigestMatch(approval.sourceDigest, server.contentDigest)
     ) {
       approvalState = "current";
     } else {
@@ -252,8 +372,9 @@ export function resolveStudioVersionProjection(
   let publishState: StudioPublishState = "none";
   const publish = coordinates.publish;
   if (publish !== null) {
-    const structurallyInvalid = issues.some((issue) =>
+    const structurallyInvalid = approvalState === "invalid" || issues.some((issue) =>
       issue.code === "publish-without-approval"
+      || issue.code === "publish-source-revision-invalid"
       || issue.code === "publish-approval-mismatch"
       || issue.code === "publish-source-mismatch"
       || issue.code === "profile-version-invalid"
@@ -276,7 +397,9 @@ export function resolveStudioVersionProjection(
     approvalState,
     publishState,
     publishableRevision:
-      approval !== null && approvalState !== "invalid"
+      server !== null
+      && approval !== null
+      && (approvalState === "current" || approvalState === "stale")
         ? approval.sourceRevision
         : null,
   };
@@ -288,9 +411,20 @@ export function canCreateStudioPublishPackage(
 ): boolean {
   if (!validRevision(sourceRevision)) return false;
   const projection = resolveStudioVersionProjection(coordinates);
-  return (
-    projection.publishableRevision === sourceRevision
-    && coordinates.approval !== null
-    && coordinates.approval.sourceRevision === sourceRevision
-  );
+  const { approval, review, server } = coordinates;
+  if (
+    server === null
+    || review === null
+    || approval === null
+    || (projection.approvalState !== "current" && projection.approvalState !== "stale")
+    || projection.publishableRevision !== sourceRevision
+    || approval.sourceRevision !== sourceRevision
+    || review.sourceRevision !== sourceRevision
+    || sourceRevision > server.revision
+    || !exactDigestMatch(approval.sourceDigest, review.sourceDigest)
+  ) {
+    return false;
+  }
+  return sourceRevision !== server.revision
+    || exactDigestMatch(approval.sourceDigest, server.contentDigest);
 }
