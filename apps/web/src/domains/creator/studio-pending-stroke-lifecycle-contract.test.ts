@@ -187,8 +187,14 @@ describe("pending stroke lifecycle source contract", () => {
     expect(studioCanvasViewportSource).toContain("<StudioCanvasViewportHudOverlays");
     expect(studioCanvasStickyBannersSource).toContain("if (!setCurrentPageId(pageId)) return;");
     expect(studioCanvasModalsOverlaySource).toContain("if (!setCurrentPageId(pageId)) return;");
-    expect(drawingStart).toContain("pendingBatch.pageId !== activePage.id");
-    expect(drawingStart).toContain("!flushPendingStrokeCommitsRef.current()");
+    expect(drawingStart).toContain("if (!h.prepareStrokeCommitPage())");
+    const strokePagePreparation = sourceBetween(
+      "function prepareStrokeCommitPage(): boolean",
+      "function queueDeferredStrokeCommit(finished: DrawEl)",
+    );
+    expect(strokePagePreparation).toContain("prepareStudioPendingStrokeCommitPage(");
+    expect(strokePagePreparation).toContain("pendingStrokeCommitsRef, activePage.id, strokeAdmissionCommitFlushRef");
+    expect(strokePagePreparation).toContain("() => flushPendingStrokeCommitsRef.current()");
     expect(flushPipeline).toContain("return false");
     expect(flushPipeline).toContain("return true");
     expect(flushPipeline).toContain(

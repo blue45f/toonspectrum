@@ -6,10 +6,10 @@ import { describe, expect, it } from "vitest";
 const BODY_SPECS = [
   {
     id: "asset-group",
-    module: "StudioAssetToolPopoverBody",
+    module: "StudioAssetToolPopoverWorkspace",
     lazyComponent: "LazyStudioAssetToolPopoverBody",
     preload: "preloadStudioAssetToolPopoverBody",
-    importPath: "./StudioAssetToolPopoverBody",
+    importPath: "./StudioAssetToolPopoverWorkspace",
   },
   {
     id: "bg-group",

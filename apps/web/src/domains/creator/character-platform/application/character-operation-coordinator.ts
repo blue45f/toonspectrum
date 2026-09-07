@@ -110,7 +110,7 @@ export class CharacterOperationCoordinator {
     const lease: CharacterOperationLease = Object.freeze({
       ...held,
       release: () => {
-        if (released) return false;
+        if (released || this.#operations.get(operationId) !== held) return false;
         released = true;
         return this.#operations.delete(operationId);
       },

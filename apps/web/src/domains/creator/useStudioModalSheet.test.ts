@@ -91,9 +91,11 @@ class InteractionElement {
     return (matches as T | undefined) ?? null;
   }
 
-  querySelectorAll<T>(): T[] {
+  querySelectorAll<T>(selector: string): T[] {
     return this.descendants()
-      .filter((element) => element.tabIndex >= 0)
+      .filter((element) => selector === '[role="dialog"]'
+        ? element.getAttribute("role") === "dialog"
+        : element.tabIndex >= 0)
       .map((element) => element as T);
   }
 

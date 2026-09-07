@@ -16,6 +16,8 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { CharacterRuntimeThumbnailRecorder } from "../character-platform/thumbnail/character-runtime-thumbnail-store";
+import { CharacterPlatformWorkbench } from "../character-platform/ui/CharacterPlatformWorkbench";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { StudioVrmPoserDialog } from "../vrm/StudioVrmPoserDialog";
 import { useStudioVrmPoserController } from "../vrm/useStudioVrmPoserController";
@@ -82,5 +84,11 @@ export function StudioCharacterShaper(props: StudioVrmPoserProps) {
     );
   }
 
-  return <StudioCharacterShaperDialog h={h} binding={binding} onOpenAdvanced={() => setAdvanced(true)} />;
+  return (
+    <>
+      <StudioCharacterShaperDialog h={h} binding={binding} onOpenAdvanced={() => setAdvanced(true)} />
+      <CharacterRuntimeThumbnailRecorder h={h} binding={binding} />
+      <CharacterPlatformWorkbench h={h} binding={binding} />
+    </>
+  );
 }
