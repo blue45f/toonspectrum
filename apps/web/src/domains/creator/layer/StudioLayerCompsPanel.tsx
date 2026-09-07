@@ -320,7 +320,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                   <button
                     type="button"
                     className="flex min-w-0 flex-col flex-1 text-left cursor-pointer select-none bg-transparent p-0 m-0 border-0 text-inherit focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400 rounded"
-                    onClick={() => { void handleApplyComp(comp); }}
+                    onClick={() => handleApplyComp(comp)}
                   >
                     <div className="flex items-center gap-1.5">
                       {isActive && (
@@ -338,7 +338,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                 <div className="flex shrink-0 items-center gap-1 opacity-80 group-hover:opacity-100">
                   <button
                     type="button"
-                    onClick={() => { void handleApplyComp(comp); }}
+                    onClick={() => handleApplyComp(comp)}
                     className={buttonClass({
                       size: "sm",
                       variant: isActive ? "solid" : "outline",
