@@ -379,6 +379,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   private settled: DrawEl[] = [];
   private readonly settledPencilPrograms = new Map<string, readonly StudioLivePencilPaintCommand[]>();
   private settledHasPixels = false;
+  private settledHidden = false;
   private activePaintedOntoSettled = false;
   private lastFailureReason: StudioLiveRetainedMediaFailureReason | null = null;
 
@@ -627,14 +628,25 @@ export class StudioLiveRetainedMediaOverlayRenderer {
 
   hideSettledPixels(): boolean {
     if (this.settled.length === 0 && !this.settledHasPixels) return false;
-    this.clearCanvas(this.settledContext, this.settledCanvas);
+    this.settledHidden = true;
+    this.clearSettledRect();
     return true;
   }
 
   showSettledPixels(): boolean {
     if (this.settled.length === 0) return false;
+    this.settledHidden = false;
     this.replaySettledOnly();
     return true;
+  }
+
+  /** A new edit invalidates the undone overlay's redo branch. */
+  discardHiddenSettledStrokes(): void {
+    if (!this.settledHidden) return;
+    this.settled = [];
+    this.settledPencilPrograms.clear();
+    this.settledHidden = false;
+    this.clearSettledRect();
   }
 
   clear(): void {
@@ -642,6 +654,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     this.lastFailureReason = null;
     this.settled = [];
     this.settledPencilPrograms.clear();
+    this.settledHidden = false;
     this.clearActiveRect();
     this.clearSettledRect();
   }
@@ -1234,7 +1247,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   private replaySettledOnly(): void {
     this.clearCanvas(this.settledContext, this.settledCanvas);
     this.settledHasPixels = false;
-    if (!this.isNativeSurfaceReady) return;
+    if (!this.isNativeSurfaceReady || this.settledHidden) return;
     for (const stroke of this.settled) {
       const kind = retainedKind(stroke);
       if (!kind) continue;
@@ -1264,33 +1277,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
 
   private replay(): void {
     this.clearActiveRect();
-    this.clearSettledRect();
+    this.replaySettledOnly();
     if (!this.isNativeSurfaceReady) return;
-    for (const stroke of this.settled) {
-      const kind = retainedKind(stroke);
-      if (!kind) continue;
-      const pencilProgram = this.settledPencilPrograms.get(stroke.id);
-      if (kind === "pencil" && pencilProgram) {
-        this.replayPencilProgram(pencilProgram, this.settledContext);
-        this.settledHasPixels = pencilProgram.length > 0 || this.settledHasPixels;
-        continue;
-      }
-      this.paintSuffix({
-        id: stroke.id,
-        kind,
-        element: stroke,
-        paintedDabs: 0,
-        paintedOilPasses: 0,
-        paintedOilPoints: null,
-        paintedOilPressures: null,
-        lastOilRepaintAt: 0,
-        lastOilRepaintMs: 0,
-        paintedPencilMarks: 0,
-        paintedSourceSegments: 0,
-        oilPlanner: null,
-        oilCarrierPlanner: null,
-      }, stroke, this.settledContext, true);
-    }
     if (!this.active) return;
     if (this.active.kind === "pencil" && this.active.pencilProgram) {
       this.replayPencilProgram(this.active.pencilProgram, this.activeContext);

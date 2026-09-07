@@ -13,6 +13,7 @@ on:
       - 'tests/creator-resource-workflow*'
       - 'tests/creator-workspace-persistence*'
       - 'scripts/check-creator-resources.mjs'
+      - 'scripts/lib/compile-creator-resource-cases.mjs'
       - 'scripts/verify-creator-workspace-browser.mjs'
       - '.github/workflows/creator-resources.yml'
   workflow_dispatch:
@@ -54,7 +55,7 @@ jobs:
           run_install: false
       - run: pnpm install --frozen-lockfile
       - name: Focused lint
-        run: pnpm exec eslint apps/web/src/shared/lib/creator-resources.ts apps/web/src/shared/lib/creator-resource-workflow.ts apps/web/src/shared/lib/creator-workspace-persistence.ts apps/api/src/modules/creator-resources apps/web/src/domains/creator-resources apps/web/src/app/routes/groups/creator-resources.routes.tsx apps/web/src/app/routes/groups/app-routes.tsx apps/web/src/app/routes/groups/catalog.routes.tsx apps/web/src/app/routes/route-titles.ts apps/api/src/app.module.ts tests/creator-resources*.ts tests/creator-resource-workflow*.ts tests/creator-workspace-persistence*.ts scripts/check-creator-resources.mjs scripts/verify-creator-workspace-browser.mjs --max-warnings=0
+        run: pnpm exec eslint apps/web/src/shared/lib/creator-resources.ts apps/web/src/shared/lib/creator-resource-workflow.ts apps/web/src/shared/lib/creator-workspace-persistence.ts apps/api/src/modules/creator-resources apps/web/src/domains/creator-resources apps/web/src/app/routes/groups/creator-resources.routes.tsx apps/web/src/app/routes/groups/app-routes.tsx apps/web/src/app/routes/groups/catalog.routes.tsx apps/web/src/app/routes/route-titles.ts apps/api/src/app.module.ts tests/creator-resources*.ts tests/creator-resource-workflow*.ts tests/creator-workspace-persistence*.ts scripts/check-creator-resources.mjs scripts/lib/compile-creator-resource-cases.mjs scripts/verify-creator-workspace-browser.mjs --max-warnings=0
       - run: pnpm exec vitest run tests/creator-resources.test.ts tests/creator-resource-workflow.test.ts tests/creator-workspace-persistence.test.ts
       - run: pnpm typecheck
       - run: pnpm build

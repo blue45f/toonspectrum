@@ -35,6 +35,7 @@ function mockCanvas(width = 256, height = 128) {
   let getArea = 0;
   let clearCalls = 0;
   let strokeCalls = 0;
+  let fillCalls = 0;
   const context = {
     canvas: { width, height },
     globalAlpha: 1,
@@ -51,7 +52,7 @@ function mockCanvas(width = 256, height = 128) {
     moveTo() {},
     lineTo() {},
     arc() {},
-    fill() {},
+    fill() { fillCalls += 1; },
     stroke() {
       strokeCalls += 1;
     },
@@ -76,7 +77,7 @@ function mockCanvas(width = 256, height = 128) {
   return {
     canvas,
     context,
-    stats: () => ({ getCalls, getArea, clearCalls, strokeCalls }),
+    stats: () => ({ getCalls, getArea, clearCalls, strokeCalls, fillCalls }),
   };
 }
 
@@ -118,7 +119,7 @@ function attachedRenderer() {
     flipX: false,
   };
   renderer.setSurface(surface);
-  return { renderer, active, clock, wakes };
+  return { renderer, active, settled, surface, clock, wakes };
 }
 
 describe("studioLiveRetainedMediaOverlaySupportsElement", () => {
@@ -211,6 +212,41 @@ describe("StudioLiveRetainedMediaOverlayRenderer", () => {
     expect(renderer.releaseSettledPrefix(1)).toBe(1);
     expect(renderer.settledStrokeCount).toBe(0);
     expect(settled.stats().clearCalls).toBeGreaterThan(0);
+  });
+
+  it("keeps undone settled strokes hidden through resize, reattach, and cancellation", () => {
+    const { renderer, active, settled, surface } = attachedRenderer();
+    const stroke = drawElement("undone", "pencil", [12, 20, 40, 28, 70, 36]);
+    renderer.begin(stroke);
+    renderer.end(stroke);
+    expect(renderer.hideSettledPixels()).toBe(true);
+    const before = settled.stats().fillCalls;
+    renderer.setSurface({ ...surface, left: 10 });
+    renderer.attach({ activeCanvas: active.canvas, settledCanvas: settled.canvas });
+    renderer.begin(drawElement("cancelled", "pencil", [20, 30]));
+    renderer.resetActive();
+    expect(settled.stats().fillCalls).toBe(before);
+    expect(renderer.showSettledPixels()).toBe(true);
+    expect(settled.stats().fillCalls).toBeGreaterThan(before);
+  });
+
+  it("discards the hidden redo branch before a new stroke without retaining its commands", () => {
+    const { renderer, settled } = attachedRenderer();
+    const previous = drawElement("previous", "pencil", [12, 20, 40, 28]);
+    renderer.begin(previous);
+    renderer.end(previous);
+    renderer.hideSettledPixels();
+    renderer.discardHiddenSettledStrokes();
+    expect(renderer.settledStrokeCount).toBe(0);
+    expect(renderer.retainedPencilCommandCount).toBe(0);
+    expect(renderer.showSettledPixels()).toBe(false);
+    const next = drawElement("next", "pencil", [20, 30, 60, 40]);
+    renderer.begin(next);
+    renderer.end(next);
+    const before = settled.stats().fillCalls;
+    renderer.showSettledPixels();
+    expect(settled.stats().fillCalls).toBeGreaterThan(before);
+    expect(renderer.settledStrokeCount).toBe(1);
   });
 
   it("starts calligraphy and highlighter suffixes without remeshing the prefix", () => {
