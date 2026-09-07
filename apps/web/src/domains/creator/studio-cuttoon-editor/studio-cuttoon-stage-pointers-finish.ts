@@ -281,6 +281,7 @@ export function bindStudioCuttoonStagePointersFinish(
     liveRetainedMediaDraftDirectRef,
     liveRetainedMediaOverlayRendererRef,
     liveInkOverlayRendererRef,
+    liveStampOverlayRendererRef,
     liveWetInkDraftDirectRef,
     liveWetInkOverlayRendererRef,
     livingInkStrokeRef,
@@ -409,6 +410,7 @@ export function bindStudioCuttoonStagePointersFinish(
             directLiveDraft: liveDraftDirectRef.current,
             directInkSurfaceAvailable:
               overlayRenderer.isActive
+              || liveStampOverlayRendererRef.current.isActive
               || gpuLiveInkPinnedRef.current
               || liveDynamicBrushOverlayRendererRef.current.isActive
               || liveRetainedMediaOverlayRendererRef.current.isActive
@@ -554,6 +556,8 @@ export function bindStudioCuttoonStagePointersFinish(
           if (committed && !masterEditMode && finished.mode !== "eraser") {
             if (liveDraftDirectRef.current) {
               deferInkCleanup = overlayRenderer.isActive
+                || liveStampOverlayRendererRef.current.isActive
+                || liveStampOverlayRendererRef.current.hasSettledStrokes
                 || gpuLiveInkPinnedRef.current
                 || liveDynamicBrushOverlayRendererRef.current.isActive
                 || liveDynamicBrushOverlayRendererRef.current.hasSettledStrokes

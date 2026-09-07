@@ -15,7 +15,7 @@ let browser;
 let server;
 let passed = 0;
 try {
-  const compilation = spawnSync(process.execPath, [require.resolve("typescript/lib/tsc.js"), "--strict", "--skipLibCheck", "--target", "es2022", "--module", "commonjs", "--lib", "es2023,dom,dom.iterable", "--outDir", temporary,
+  const compilation = spawnSync(process.execPath, [require.resolve("typescript/lib/tsc.js"), "--ignoreConfig", "--strict", "--skipLibCheck", "--target", "es2022", "--module", "commonjs", "--lib", "es2023,dom,dom.iterable", "--outDir", temporary,
     "tests/creator-resources-cases.ts", "tests/creator-resource-workflow-cases.ts", "tests/creator-workspace-persistence-cases.ts"], { cwd: root, stdio: "inherit" });
   if (compilation.status !== 0) throw new Error("Browser test sources failed strict compilation");
   const sources = {};

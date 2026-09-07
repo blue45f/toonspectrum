@@ -5,6 +5,9 @@
  * browser pointer input. It does not upload an image and it does not import application modules in
  * the page. Worker messages, product-owned DOM receipts, the ordinary layer navigator, history,
  * and the persisted Studio document are the only authorities.
+ * While physical mode is retired, the admission gate instead proves absent controls/workers and
+ * independently editable watercolor strokes with Undo/Redo on desktop and mobile. Its distinct
+ * report schema does not satisfy the historical physical-mode validator below.
  *
  * Run only after a production build already exists:
  *   pnpm exec tsx scripts/verify-studio-living-ink-integration.mts
@@ -34,6 +37,8 @@ import {
   type BrowserContext,
   type Page,
 } from "playwright";
+
+import { STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED } from "../apps/web/src/domains/creator/studio-living-ink-brush-admission";
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
 import {
@@ -1274,14 +1279,14 @@ async function prepareStudio(page: Page, studioUrl: string): Promise<void> {
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 15_000 });
   await page.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 15_000 });
   const starter = page.locator('[data-studio-creative-starter="true"]');
-  if (await starter.isVisible({ timeout: 250 }).catch(() => false)) {
+  if (await starter.waitFor({ state: "visible", timeout: 3_000 }).then(() => true).catch(() => false)) {
     await starter.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
 }
 
 async function activatePenAndWatercolor(
   page: Page,
-  expectedState: "ready" | "failed" = "ready",
+  expectedState: "ready" | "failed" | "retired" = "ready",
 ): Promise<void> {
   await page.keyboard.press("b");
   const mobileDock = page.locator('[data-studio-mobile-editing-dock="true"]');
@@ -1317,6 +1322,10 @@ async function activatePenAndWatercolor(
   await catalogue.waitFor({ state: "visible" });
   await catalogue.getByRole("searchbox", { name: "전체 브러시 검색" }).fill(BRUSH.id);
   await catalogue.getByRole("button", { name: `${BRUSH.name} 선택`, exact: true }).click();
+  if (!mobileDockVisible) {
+    await page.locator('[role="dialog"][data-studio-brush-floating]')
+      .getByRole("button", { name: / 닫기$/u }).click();
+  }
   await catalogue.waitFor({ state: "detached" });
   await page.waitForFunction((expectedName) => (
     document.querySelector('[data-studio-brush-active-pill="true"]')
@@ -1324,6 +1333,10 @@ async function activatePenAndWatercolor(
       ?.includes(expectedName) === true
   ), BRUSH.name);
   const controls = page.locator('[data-studio-living-ink-controls="true"]');
+  if (expectedState === "retired") {
+    invariant(await controls.count() === 0, "retired physical controls must remain unavailable");
+    return;
+  }
   await controls.waitFor({ state: "visible", timeout: 12_000 });
   const physicalMode = controls.getByRole("button", {
     name: "수채 번짐 물리 모드",
@@ -2182,6 +2195,84 @@ async function runMobile(
   }
 }
 
+/** Retired admission has its own evidence schema; it never claims the old physical gate passed. */
+async function runRetiredAdmission(browser: Browser, studioUrl: string) {
+  const profiles = [];
+  for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+    const mobile = viewport.width < 600;
+    const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile, locale: "ko-KR" });
+    const page = await context.newPage();
+    try {
+      await installStudioMonitor(page);
+      await prepareStudio(page, studioUrl);
+      await activatePenAndWatercolor(page, "retired");
+      // Close the mobile options sheet before exercising the actual document canvas.
+      if (mobile) await page.keyboard.press("Escape");
+      if (!mobile) {
+        await openLayerNavigator(page);
+        await waitForLayerCount(page, 0);
+      }
+      const box = await page.locator(".konvajs-content").first().boundingBox();
+      invariant(box, "retired admission canvas is unavailable");
+      const left = Math.max(box.x + 25, viewport.width * 0.34);
+      const right = Math.min(box.x + box.width - 25, viewport.width * 0.7);
+      const y = Math.max(box.y + 90, viewport.height * 0.46);
+      const points = Array.from({ length: 41 }, (_, index) => ({
+        x: left + (right - left) * index / 40,
+        y: y + Math.sin(index / 40 * Math.PI * 2) * 18,
+      }));
+      invariant(right > left, "retired admission stroke has no drawable width");
+      const unobstructed = await page.evaluate((route) => route.every((point) => (
+        Boolean(document.elementFromPoint(point.x, point.y)?.closest(".konvajs-content"))
+      )), points);
+      invariant(unobstructed, "editor chrome covers the retired admission drawing route");
+      await page.mouse.move(points[0]!.x, points[0]!.y);
+      await page.mouse.down();
+      for (const point of points.slice(1)) await page.mouse.move(point.x, point.y);
+      await page.mouse.up();
+      if (mobile) {
+        const toolsToggle = page.locator('[data-studio-mobile-workspace-toggle="true"]');
+        if (await toolsToggle.getAttribute("aria-expanded") !== "true") await toolsToggle.click();
+        await page.getByRole("button", { name: "작업 패널", exact: true }).click();
+        await openLayerNavigator(page);
+      }
+      await waitForLayerCount(page, 1);
+      // Modal panels correctly block document shortcuts. Return focus to the canvas for history.
+      if (mobile) await page.getByRole("button", { name: "작업 패널 닫기", exact: true }).click();
+      await page.keyboard.press("Meta+z");
+      if (mobile) {
+        await page.getByRole("button", { name: "작업 패널", exact: true }).click();
+        await openLayerNavigator(page);
+      }
+      await waitForLayerCount(page, 0);
+      if (mobile) await page.getByRole("button", { name: "작업 패널 닫기", exact: true }).click();
+      await page.keyboard.press("Meta+Shift+z");
+      if (mobile) {
+        await page.getByRole("button", { name: "작업 패널", exact: true }).click();
+        await openLayerNavigator(page);
+      }
+      await waitForLayerCount(page, 1);
+      const monitor = await readMonitor(page);
+      invariant(monitor.livingInkInitializes === 0 && monitor.requests.length === 0
+        && monitor.presentations.length === 0 && monitor.canonicalHandoffs.length === 0,
+      "retired Living Ink unexpectedly started a physical worker or full-page handoff");
+      const screenshot = join(SCRATCH, `retired-${viewport.width}.png`);
+      await page.screenshot({ path: screenshot, animations: "disabled" });
+      profiles.push({ viewport, controls: "absent", physicalWorkerInitializes: 0,
+        editableStrokeCount: 1, undoRedo: "passed", screenshot });
+    } catch (cause) {
+      await page.screenshot({ path: join(SCRATCH, `retired-${viewport.width}-failed.png`) });
+      writeFileSync(join(SCRATCH, `retired-${viewport.width}-failed.json`),
+        JSON.stringify({ stored: await readStoredDocument(page), monitor: await readMonitor(page) }, null, 2));
+      throw cause;
+    } finally {
+      await context.close();
+    }
+  }
+  return { status: "ok", schemaVersion: 1, execution: "retired-living-ink-admission",
+    physicalMode: "retired", profiles, evidenceDirectory: SCRATCH } as const;
+}
+
 function prepareScratch(): void {
   mkdirSync(SCRATCH, { recursive: true });
   for (const name of readdirSync(SCRATCH)) {
@@ -2243,6 +2334,12 @@ async function main(): Promise<void> {
     });
     log(`production preview ready @ ${studioUrl}`);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    if (!STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED) {
+      const retired = await runRetiredAdmission(browser, studioUrl);
+      writeFileSync(REPORT_PATH, `${JSON.stringify(retired, null, 2)}\n`);
+      console.log(JSON.stringify(retired, null, 2));
+      return;
+    }
     const positive = await runPositive(browser, studioUrl, diagnostics);
     log("positive native-pointer, canonical handoff, history, and accepted replay observed");
     const corruptedReceipt = await runFailClosed(

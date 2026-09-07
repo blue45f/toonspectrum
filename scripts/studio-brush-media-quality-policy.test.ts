@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
+
 import {
   STUDIO_BRUSH_MEDIA_CASES,
   evaluateStudioBrushMediaCase,
@@ -108,6 +110,12 @@ function metrics(
 }
 
 describe("Studio browser brush-media quality policy", () => {
+  it("uses a selectable representative for every material family", () => {
+    const listed = new Set(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.map((item) => item.id));
+    expect(STUDIO_BRUSH_MEDIA_CASES).toHaveLength(8);
+    for (const policy of STUDIO_BRUSH_MEDIA_CASES) expect(listed.has(policy.id), policy.id).toBe(true);
+  });
+
   it("accepts a visible continuous medium whose pigment accumulates and history is stable", () => {
     const policy = STUDIO_BRUSH_MEDIA_CASES.find((entry) => entry.id === "g-pen-flex")!;
     expect(evaluateStudioBrushMediaCase(policy, metrics(policy.id))).toEqual({
@@ -118,7 +126,7 @@ describe("Studio browser brush-media quality policy", () => {
 
   it("fails obvious pointerup loss, interior holes, pigment removal, and history residue", () => {
     const policy = STUDIO_BRUSH_MEDIA_CASES.find(
-      (entry) => entry.id === "airbrush-grand-soft",
+      (entry) => entry.id === "airbrush",
     )!;
     const result = evaluateStudioBrushMediaCase(policy, metrics(policy.id, {
       settled: frame({
@@ -177,7 +185,7 @@ describe("Studio browser brush-media quality policy", () => {
 
   it("keeps small cross-platform settle and accumulation changes diagnostic-only", () => {
     const policy = STUDIO_BRUSH_MEDIA_CASES.find(
-      (entry) => entry.id === "watercolor-wet-wash",
+      (entry) => entry.id === "watercolor",
     )!;
     const result = evaluateStudioBrushMediaCase(policy, metrics(policy.id, {
       liveToSettled: {

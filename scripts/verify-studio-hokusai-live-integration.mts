@@ -470,7 +470,7 @@ export function validateStudioHokusaiLiveIntegrationResult(candidate: unknown): 
   return issues;
 }
 
-function expectedStaticPreviewDiagnostic(message: string, studioUrl: string): boolean {
+export function expectedStaticPreviewDiagnostic(message: string, studioUrl: string): boolean {
   if (OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path))) return true;
   let previewUrl: URL;
   try {
@@ -498,7 +498,10 @@ function expectedStaticPreviewDiagnostic(message: string, studioUrl: string): bo
         && sourceUrl.origin === previewUrl.origin
         && (sourceUrl.pathname === "/studio"
           || /^\/assets\/[A-Za-z0-9._-]+\.js$/u.test(sourceUrl.pathname))
-        && sourceUrl.search === ""
+        && [...sourceUrl.searchParams].every(([key, value]) => (
+          sourceUrl.pathname === "/studio" && key === "room"
+          && /^work-instant-[a-z0-9]+-[a-z0-9]+$/u.test(value)
+        ))
         && sourceUrl.hash === ""
       ) return true;
     } catch {
@@ -992,6 +995,8 @@ async function selectBrush(
     name: `${brush.brushName} 선택`,
     exact: true,
   }).click();
+  await page.locator('[role="dialog"][data-studio-brush-floating]')
+    .getByRole("button", { name: / 닫기$/u }).click();
   await catalogue.waitFor({ state: "detached" });
   await page.waitForFunction(({ expectedName }) => (
     document.querySelector('[data-studio-brush-active-pill="true"]')

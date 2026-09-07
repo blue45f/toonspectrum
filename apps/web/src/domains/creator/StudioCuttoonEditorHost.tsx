@@ -23491,7 +23491,7 @@ const puppetWarpArmed =
         )
         || strokeSurfaceRoute.kind === "living-ink"
         || hokusaiPinned
-        || pixelDirect
+        || pixelDirect || stampDirect
         || liveInkOverlayStarted
         || wetInkOverlayStarted
         || gpuPin

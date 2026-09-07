@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION,
+  expectedStaticPreviewDiagnostic,
   validateStudioHokusaiLiveIntegrationResult,
   type StudioHokusaiDefaultShelfIntegrationEvidence,
   type StudioHokusaiExplicitInspectorIntegrationEvidence,
@@ -13,6 +14,14 @@ import {
 const HASH_A = `sha256:${"a".repeat(64)}`;
 const HASH_B = `sha256:${"b".repeat(64)}`;
 const HASH_C = `sha256:${"c".repeat(64)}`;
+
+it("recognizes only the known headless graphics fallback on an instant Studio room", () => {
+  const origin = "http://127.0.0.1:5199/studio";
+  expect(expectedStaticPreviewDiagnostic(`No available adapters. @ ${origin}?room=work-instant-abc-123`, origin)).toBe(true);
+  expect(expectedStaticPreviewDiagnostic(`Unexpected render failure @ ${origin}?room=work-instant-abc-123`, origin)).toBe(false);
+  expect(expectedStaticPreviewDiagnostic("No available adapters. @ https://example.com/studio", origin)).toBe(false);
+  expect(expectedStaticPreviewDiagnostic(`No available adapters. @ ${origin}?unexpected=1`, origin)).toBe(false);
+});
 
 function shelfEntry(
   presetId: "pencil" | "charcoal" | "oil",

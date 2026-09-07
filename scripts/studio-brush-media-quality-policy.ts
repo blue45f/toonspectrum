@@ -1,9 +1,9 @@
 export const STUDIO_BRUSH_MEDIA_IDS = [
-  "pencil-4b-rough",
+  "pencil-grain",
   "g-pen-flex",
-  "airbrush-grand-soft",
-  "watercolor-wet-wash",
-  "watercolor-dry-granule",
+  "airbrush",
+  "watercolor",
+  "watercolor--granular",
   "cotton-fiber",
   "oil",
   "highlighter",
@@ -62,7 +62,7 @@ const COMMON_HISTORY_POLICY = {
 export const STUDIO_BRUSH_MEDIA_CASES: readonly StudioBrushMediaCasePolicy[] = [
   {
     ...COMMON_HISTORY_POLICY,
-    id: "pencil-4b-rough",
+    id: "pencil-grain",
     medium: "pencil",
     minimumChangedPixels: 48,
     minimumMeanChannelDelta: 10,
@@ -92,7 +92,7 @@ export const STUDIO_BRUSH_MEDIA_CASES: readonly StudioBrushMediaCasePolicy[] = [
   },
   {
     ...COMMON_HISTORY_POLICY,
-    id: "airbrush-grand-soft",
+    id: "airbrush",
     medium: "airbrush",
     minimumChangedPixels: 240,
     minimumMeanChannelDelta: 6,
@@ -107,7 +107,7 @@ export const STUDIO_BRUSH_MEDIA_CASES: readonly StudioBrushMediaCasePolicy[] = [
   },
   {
     ...COMMON_HISTORY_POLICY,
-    id: "watercolor-wet-wash",
+    id: "watercolor",
     medium: "watercolor",
     minimumChangedPixels: 180,
     minimumMeanChannelDelta: 8,
@@ -122,7 +122,7 @@ export const STUDIO_BRUSH_MEDIA_CASES: readonly StudioBrushMediaCasePolicy[] = [
   },
   {
     ...COMMON_HISTORY_POLICY,
-    id: "watercolor-dry-granule",
+    id: "watercolor--granular",
     medium: "granular-watercolor",
     minimumChangedPixels: 110,
     minimumMeanChannelDelta: 8,
