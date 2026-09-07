@@ -9,6 +9,7 @@ import { useMemo, useRef } from "react";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
+import { summarizeCharacterSlotSupport } from "./character-shaper-slot-support";
 import {
   characterShaperSlotIcon,
   characterSlotDiffersFromBaseline,
@@ -17,7 +18,7 @@ import {
   groupCharacterSlotMetas,
 } from "./character-shaper-ui-model";
 
-import type { CharacterSlotKind } from "./character-shaper-contract";
+import type { CharacterSlotEntry, CharacterSlotKind } from "./character-shaper-contract";
 import type { CharacterShaperSlotRailProps } from "./character-shaper-ui-contract";
 import type { KeyboardEvent } from "react";
 
@@ -28,6 +29,15 @@ export function CharacterShaperSlotRail({ binding, activeSlot, onSelectSlot, ori
   const metas = binding.catalog.slots;
   const groups = useMemo(() => groupCharacterSlotMetas(metas), [metas]);
   const slotIds = useMemo(() => metas.map((meta) => meta.id), [metas]);
+  const entriesBySlot = useMemo(() => {
+    const entries = new Map<CharacterSlotKind, CharacterSlotEntry[]>();
+    for (const entry of binding.catalog.entries) {
+      const current = entries.get(entry.slot);
+      if (current) current.push(entry);
+      else entries.set(entry.slot, [entry]);
+    }
+    return entries;
+  }, [binding.catalog.entries]);
   const vertical = orientation === "vertical";
 
   const focusSlot = (slot: CharacterSlotKind) => {
@@ -95,16 +105,23 @@ export function CharacterShaperSlotRail({ binding, activeSlot, onSelectSlot, ori
             const Icon = characterShaperSlotIcon(meta.icon, meta.id);
             const active = meta.id === activeSlot;
             const changed = characterSlotDiffersFromBaseline(binding.recipe, binding.baselineRecipe, meta.id);
+            const support = summarizeCharacterSlotSupport(
+              entriesBySlot.get(meta.id) ?? [],
+              binding.evaluate,
+              { ready: binding.profile.status === "ready" },
+            );
             const hotkey = characterSlotHotkeyLabel(slotIds.indexOf(meta.id));
+            const supportTitle = support.status === "fully-supported" ? "" : ` · ${support.label}`;
             return (
               <button
                 key={meta.id}
                 type="button"
                 data-character-slot={meta.id}
+                data-character-slot-support={support.status}
                 aria-current={active ? "true" : undefined}
                 aria-keyshortcuts={hotkey ?? undefined}
                 tabIndex={active ? 0 : -1}
-                title={`${meta.label} · ${meta.hint}${hotkey ? ` (${hotkey})` : ""}`}
+                title={`${meta.label} · ${meta.hint}${supportTitle}${hotkey ? ` (${hotkey})` : ""}`}
                 onClick={() => onSelectSlot(meta.id)}
                 className={cn(
                   "relative flex shrink-0 items-center justify-center rounded-xl border text-[0.62rem] font-semibold leading-none",
@@ -124,9 +141,21 @@ export function CharacterShaperSlotRail({ binding, activeSlot, onSelectSlot, ori
                       className="absolute -right-1.5 -top-1 size-2 rounded-full bg-accent ring-2 ring-panel"
                     />
                   ) : null}
+                  {support.status !== "fully-supported" ? (
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "absolute -bottom-1.5 -left-1.5 size-2 rounded-full ring-2 ring-panel",
+                        support.status === "partially-supported" && "bg-warn",
+                        support.status === "unavailable" && "bg-danger",
+                        support.status === "unknown" && "bg-fg-3",
+                      )}
+                    />
+                  ) : null}
                 </span>
                 <span className="max-w-full truncate">{meta.label}</span>
                 {changed ? <span className="sr-only">변경됨</span> : null}
+                {support.status !== "fully-supported" ? <span className="sr-only">{support.label}</span> : null}
                 {vertical && hotkey ? (
                   <kbd
                     aria-hidden
