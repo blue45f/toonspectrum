@@ -1,0 +1,140 @@
+name: One-shot apply PR 907 lint repair v2
+
+on:
+  push:
+    branches:
+      - ops/pr907-apply-lint-20260908-v2
+    paths:
+      - .github/workflows/one-shot-pr907-apply-lint-v2.yml
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: one-shot-pr907-apply-lint-20260908-v2
+  cancel-in-progress: true
+
+jobs:
+  apply-verified-repair:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_PR: "907"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Patch, validate and push the current PR head
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          target_branch="$(gh api "repos/${repo}/pulls/${TARGET_PR}" --jq '.head.ref')"
+          target_state="$(gh api "repos/${repo}/pulls/${TARGET_PR}" --jq '.state')"
+          test "$target_state" = "open"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          apply_repairs() {
+            python - <<'PY'
+          from pathlib import Path
+
+          def load(path: str):
+              p = Path(path)
+              return p, p.read_text(encoding="utf-8")
+
+          def save(path: Path, text: str):
+              with path.open("w", encoding="utf-8", newline="\n") as stream:
+                  stream.write(text)
+
+          p, s = load("apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts")
+          s = s.replace("    let segment = subtract(target, previous);", "    const segment = subtract(target, previous);")
+          s = s.replace("    let segmentLength = length(segment);", "    const segmentLength = length(segment);")
+          save(p, s)
+
+          p, s = load("apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx")
+          hook = "export function useCharacterRuntimeThumbnail(entryId: string): string | null {"
+          hook_comment = "// eslint-disable-next-line react-refresh/only-export-components -- hook shares the recorder singleton store\n"
+          if hook in s and hook_comment + hook not in s:
+              s = s.replace(hook, hook_comment + hook, 1)
+          clear = "export function clearCharacterRuntimeThumbnails(): void {"
+          clear_comment = "// eslint-disable-next-line react-refresh/only-export-components -- teardown shares the recorder singleton store\n"
+          if clear in s and clear_comment + clear not in s:
+              s = s.replace(clear, clear_comment + clear, 1)
+          s = s.replace(
+              "  const ids = useMemo(() => selectedEntryIds(binding), [binding.recipe]);",
+              "  const ids = useMemo(() => selectedEntryIds(binding), [binding]);",
+          )
+          save(p, s)
+
+          p, s = load("apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx")
+          for symbol in ("BadgeCheck", "Box", "FileJson", "SlidersHorizontal"):
+              s = s.replace(f"  {symbol},\n", "")
+          save(p, s)
+
+          p, s = load("apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts")
+          s = s.replace(
+              "  const documentClock = useMemo(() => new Date().toISOString(), [modelId]);",
+              "  const documentClock = useMemo(() => {\n    void modelId;\n    return new Date().toISOString();\n  }, [modelId]);",
+          )
+          save(p, s)
+
+          p, s = load("apps/web/src/domains/creator/studio-production/studio-production-workspace.ts")
+          old = '''export * from "./studio-production-workspace-runtime";\n\nimport {\n  createEmptyProductionWorkspace as createRuntimeProductionWorkspace,\n} from "./studio-production-workspace-runtime";\n\nimport type { ProductionWorkspace } from "./studio-production-workspace-runtime";\n'''
+          new = '''import {\n  createEmptyProductionWorkspace as createRuntimeProductionWorkspace,\n} from "./studio-production-workspace-runtime";\n\nimport type { ProductionWorkspace } from "./studio-production-workspace-runtime";\n\nexport * from "./studio-production-workspace-runtime";\n'''
+          if old in s:
+              s = s.replace(old, new, 1)
+          save(p, s)
+          PY
+          }
+
+          pushed=false
+          for attempt in 1 2 3; do
+            git fetch origin "$target_branch"
+            expected="$(git rev-parse FETCH_HEAD)"
+            git checkout -B pr907-lint-repair "$expected"
+            apply_repairs
+            git diff --check
+            pnpm exec eslint --max-warnings=0 \
+              apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts \
+              apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx \
+              apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx \
+              apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts \
+              apps/web/src/domains/creator/studio-production/studio-production-workspace.ts
+
+            if git diff --quiet; then
+              echo "The verified lint repair is already present."
+              pushed=true
+              break
+            fi
+            git add \
+              apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts \
+              apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx \
+              apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx \
+              apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts \
+              apps/web/src/domains/creator/studio-production/studio-production-workspace.ts
+            git commit -m "fix(lint): repair final integration checks"
+            if git push --force-with-lease=refs/heads/${target_branch}:$expected origin HEAD:"$target_branch"; then
+              pushed=true
+              break
+            fi
+            echo "PR head changed during validation; retrying against the latest head."
+          done
+          test "$pushed" = true
+      - name: Close superseded helper PR and retire branch
+        if: always()
+        run: |
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/pulls/911" -f state=closed >/dev/null 2>&1 || true
+          encoded='ops%2Fpr907-apply-lint-20260908-v2'
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${encoded}" >/dev/null 2>&1 || true
