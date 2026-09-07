@@ -133,6 +133,55 @@ describe("studio semantic identity", () => {
     ]));
   });
 
+  it("preserves the actual invalid confidence cause in a shadow scan", () => {
+    const result = buildStudioSemanticIdentityShadowIndex({
+      workScope: "work:chapter-1",
+      now: () => NOW,
+      candidates: [{
+        semanticId: "panel:invalid-confidence",
+        kind: "panel",
+        reference: writerPanel,
+        confidence: 2,
+      }],
+    });
+
+    expect(result.index.links).toEqual([]);
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        code: "invalid-confidence",
+        semanticId: "panel:invalid-confidence",
+      }),
+    ]);
+  });
+
+  it("preserves invalid reference and timestamp causes instead of reporting ownership collisions", () => {
+    const invalidReference = buildStudioSemanticIdentityShadowIndex({
+      workScope: "work:chapter-1",
+      now: () => NOW,
+      candidates: [{
+        semanticId: "panel:invalid-reference",
+        kind: "panel",
+        reference: {
+          domain: "page-state",
+          entityType: "panel",
+          entityId: "contains whitespace",
+        },
+      }],
+    });
+    const invalidTimestamp = buildStudioSemanticIdentityShadowIndex({
+      workScope: "work:chapter-1",
+      candidates: [{
+        semanticId: "panel:invalid-time",
+        kind: "panel",
+        reference: writerPanel,
+        createdAt: "not-a-date",
+      }],
+    });
+
+    expect(invalidReference.issues[0]).toMatchObject({ code: "invalid-reference" });
+    expect(invalidTimestamp.issues[0]).toMatchObject({ code: "invalid-created-at" });
+  });
+
   it("reports duplicate IDs, competing reference owners and stale stored states", () => {
     const duplicateLink = createStudioIdentityLink({
       semanticId: "panel:duplicate",
