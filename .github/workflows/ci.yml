@@ -629,8 +629,22 @@ jobs:
         run: pnpm run build:bundle
       - name: Verify the shipped filter dialog end to end
         run: pnpm run verify:studio-filter-dialog
+        env:
+          TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR: ${{ runner.temp }}/studio-filter-dialog
       - name: Verify drawing recovery, exact PNG export, and source hydration
         run: pnpm run verify:studio-lifecycle
+        env:
+          TOONSPECTRUM_LIFECYCLE_VERIFY_DIR: ${{ runner.temp }}/studio-lifecycle
+      - name: Preserve filter and lifecycle browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
+        with:
+          name: studio-filter-lifecycle-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/studio-filter-dialog/
+            ${{ runner.temp }}/studio-lifecycle/
+          if-no-files-found: warn
+          retention-days: 7
 
   studio-p5-brush-real-runtime:
     runs-on: ubuntu-24.04

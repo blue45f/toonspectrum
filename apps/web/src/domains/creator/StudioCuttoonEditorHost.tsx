@@ -7731,6 +7731,7 @@ export function StudioCuttoonEditor({
       setPublishProfile,
       setReferenceBoard,
       setReleaseSchedule,
+      setScenarioImageReferenceDocumentState,
       setStudioComments,
       setTagsText,
       setTitle,
