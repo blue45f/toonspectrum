@@ -100,7 +100,11 @@ export function AdminRevenue({ uid }: { uid: string }) {
         />
         <Stat
           label={t("admin.revenue.filterRejected")}
-          value={formatNum(summary.rejectedEvents)}
+          value={`${formatWon(summary.rejectedAmountCents)} · ${formatNum(summary.rejectedEvents)}`}
+        />
+        <Stat
+          label={t("admin.revenue.filterRevoked")}
+          value={`${formatWon(summary.revokedAmountCents)} · ${formatNum(summary.revokedEvents)}`}
         />
         <Stat
           label={t("admin.dashboard.userTotal")}
