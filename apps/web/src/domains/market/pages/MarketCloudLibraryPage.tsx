@@ -9,7 +9,7 @@ import {
   RefreshCw,
   ShieldAlert,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import { marketAuthorityErrorMessage } from "../models/market-authority";
@@ -36,18 +36,16 @@ import {
 } from "@/src/infrastructure/creator-marketplace-client";
 
 const PAGE_SIZE = 50;
-
 type LoadState = "idle" | "loading" | "ready" | "error";
 
 function catalogMessage(item: CreatorMarketplaceCloudLibraryItem): string {
   if (item.catalog.state === "unavailable") {
-    const reason = {
+    return {
       moderated: "관리자 검수로 현재 사용할 수 없음",
       "owner-delisted": "제작자가 공개 목록에서 내림",
       "publisher-unavailable": "제작자 계정을 사용할 수 없음",
       removed: "현재 카탈로그에서 제거됨",
     }[item.catalog.reason];
-    return reason;
   }
   if (item.updateState === "account-confirmed-update-available") {
     const installed = item.confirmation.state === "confirmed"
@@ -67,60 +65,104 @@ export function MarketLibraryPage() {
     "계정에 소장한 마켓 에셋과 Studio 설치 확인, 업데이트 가능 상태를 서버 기준으로 관리하세요.",
   );
 
-  const { ready, status } = useSession();
-  const authenticated = ready && status === "authenticated";
+  const { data: session, ready, status: sessionStatus } = useSession();
+  const userId = ready && sessionStatus === "authenticated"
+    ? session.user.id
+    : null;
   const [view, setView] = useState<CreatorMarketplaceCloudLibraryView>("active");
+  const contextKey = userId ? `${userId}:${view}` : null;
+  const [loadedContextKey, setLoadedContextKey] = useState<string | null>(null);
   const [items, setItems] = useState<readonly CreatorMarketplaceCloudLibraryItem[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-
-  const loadFirstPage = useCallback(async (signal?: AbortSignal) => {
-    if (!authenticated) return;
-    setLoadState("loading");
-    setError(null);
-    try {
-      const page = await listCreatorMarketplaceCloudLibrary({
-        view,
-        limit: PAGE_SIZE,
-      }, signal);
-      if (signal?.aborted) return;
-      setItems(page.items);
-      setCursor(page.nextCursor);
-      setHasMore(page.hasMore);
-      setLoadState("ready");
-    } catch (caught) {
-      if (signal?.aborted) return;
-      setItems([]);
-      setCursor(null);
-      setHasMore(false);
-      setLoadState("error");
-      setError(marketAuthorityErrorMessage(
-        caught,
-        "계정 라이브러리를 불러오지 못했습니다.",
-      ));
-    }
-  }, [authenticated, view]);
+  const generationRef = useRef(0);
+  const firstPageControllerRef = useRef<AbortController | null>(null);
+  const loadMoreControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!ready || !authenticated) {
-      setItems([]);
-      setCursor(null);
-      setHasMore(false);
+    setMessage(null);
+  }, [contextKey]);
+
+  useEffect(() => {
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
+    firstPageControllerRef.current?.abort();
+    loadMoreControllerRef.current?.abort();
+    firstPageControllerRef.current = null;
+    loadMoreControllerRef.current = null;
+    setItems([]);
+    setCursor(null);
+    setHasMore(false);
+    setLoadingMore(false);
+    setPendingItemId(null);
+    setError(null);
+    setLoadedContextKey(contextKey);
+
+    if (!ready || !userId || !contextKey) {
       setLoadState("idle");
-      return;
+      return undefined;
     }
+
     const controller = new AbortController();
-    void loadFirstPage(controller.signal);
-    return () => controller.abort();
-  }, [authenticated, loadFirstPage, ready, reloadToken]);
+    firstPageControllerRef.current = controller;
+    setLoadState("loading");
+    void listCreatorMarketplaceCloudLibrary({ view, limit: PAGE_SIZE }, controller.signal)
+      .then((page) => {
+        if (controller.signal.aborted || generationRef.current !== generation) return;
+        setItems(page.items);
+        setCursor(page.nextCursor);
+        setHasMore(page.hasMore);
+        setLoadState("ready");
+      })
+      .catch((caught: unknown) => {
+        if (controller.signal.aborted || generationRef.current !== generation) return;
+        setLoadState("error");
+        setError(marketAuthorityErrorMessage(
+          caught,
+          "계정 라이브러리를 불러오지 못했습니다.",
+        ));
+      })
+      .finally(() => {
+        if (firstPageControllerRef.current === controller) {
+          firstPageControllerRef.current = null;
+        }
+      });
+
+    return () => {
+      controller.abort();
+      loadMoreControllerRef.current?.abort();
+      if (firstPageControllerRef.current === controller) {
+        firstPageControllerRef.current = null;
+      }
+      if (generationRef.current === generation) generationRef.current += 1;
+    };
+  }, [contextKey, ready, reloadToken, userId, view]);
+
+  const visibleItems = loadedContextKey === contextKey ? items : [];
+  const visibleLoadState: LoadState = !userId
+    ? "idle"
+    : loadedContextKey === contextKey
+      ? loadState
+      : "loading";
 
   async function loadMore(): Promise<void> {
-    if (!authenticated || !cursor || loadingMore) return;
+    if (
+      !userId
+      || !contextKey
+      || loadedContextKey !== contextKey
+      || !cursor
+      || loadingMore
+    ) return;
+    const generation = generationRef.current;
+    const controller = new AbortController();
+    loadMoreControllerRef.current?.abort();
+    loadMoreControllerRef.current = controller;
     setLoadingMore(true);
     setError(null);
     try {
@@ -128,7 +170,12 @@ export function MarketLibraryPage() {
         view,
         limit: PAGE_SIZE,
         cursor,
-      });
+      }, controller.signal);
+      if (
+        controller.signal.aborted
+        || generationRef.current !== generation
+        || loadedContextKey !== contextKey
+      ) return;
       setItems((current) => {
         const known = new Set(current.map((item) => item.id));
         return [...current, ...page.items.filter((item) => !known.has(item.id))];
@@ -136,12 +183,19 @@ export function MarketLibraryPage() {
       setCursor(page.nextCursor);
       setHasMore(page.hasMore);
     } catch (caught) {
+      if (controller.signal.aborted || generationRef.current !== generation) return;
       setError(marketAuthorityErrorMessage(
         caught,
         "추가 소장 에셋을 불러오지 못했습니다.",
       ));
     } finally {
-      setLoadingMore(false);
+      if (
+        generationRef.current === generation
+        && loadMoreControllerRef.current === controller
+      ) {
+        loadMoreControllerRef.current = null;
+        setLoadingMore(false);
+      }
     }
   }
 
@@ -149,13 +203,19 @@ export function MarketLibraryPage() {
     item: CreatorMarketplaceCloudLibraryItem,
     archived: boolean,
   ): Promise<void> {
-    if (pendingItemId) return;
+    if (!userId || !contextKey || pendingItemId) return;
+    const generation = generationRef.current;
     setPendingItemId(item.id);
     setError(null);
     try {
       await setCreatorMarketplaceCloudLibraryArchived(item.id, archived);
-      await loadFirstPage();
+      if (generationRef.current !== generation) return;
+      setMessage(archived
+        ? "계정 라이브러리의 보관 목록으로 이동했습니다. 소장 권한과 로컬 설치는 유지됩니다."
+        : "계정 라이브러리의 소장 목록으로 복원했습니다.");
+      setReloadToken((value) => value + 1);
     } catch (caught) {
+      if (generationRef.current !== generation) return;
       setError(marketAuthorityErrorMessage(
         caught,
         archived
@@ -163,7 +223,7 @@ export function MarketLibraryPage() {
           : "계정 라이브러리로 복원하지 못했습니다.",
       ));
     } finally {
-      setPendingItemId(null);
+      if (generationRef.current === generation) setPendingItemId(null);
     }
   }
 
@@ -179,31 +239,24 @@ export function MarketLibraryPage() {
             <h1 className="text-xl font-bold text-fg sm:text-2xl">내 에셋</h1>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-            소장 권한은 서버 계정 라이브러리를 기준으로 표시합니다. 계정 설치 확인은
-            현재 기기 설치와 다르며, 과거 어느 기기에서든 정확한 릴리스를 설치한 증거입니다.
+            서버 계정 라이브러리를 소장 권한의 기준으로 사용합니다. 계정 설치 확인은
+            현재 기기 설치와 다르며, 어느 기기에서든 정확한 릴리스를 설치한 증거입니다.
           </p>
         </div>
-        <Link
-          href="/market/browse"
-          className={buttonClass({ variant: "outline", size: "sm" })}
-        >
+        <Link href="/market/browse" className={buttonClass({ variant: "outline", size: "sm" })}>
           에셋 더 찾기
           <ArrowRight className="size-3.5" aria-hidden="true" />
         </Link>
       </header>
 
       {!ready ? (
-        <div role="status" className="mt-8 flex items-center justify-center gap-2 rounded-xl border border-line bg-card p-8 text-sm text-fg-2">
-          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-          로그인 세션 확인 중
-        </div>
-      ) : !authenticated ? (
+        <StatusCard icon={LoaderCircle} spin text="로그인 세션 확인 중" />
+      ) : !userId ? (
         <section className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
           <Cloud className="mx-auto size-10 text-fg-3" aria-hidden="true" />
           <h2 className="mt-3 text-base font-bold text-fg">로그인 후 계정 라이브러리를 사용할 수 있어요</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
-            브라우저 localStorage는 소장 권한을 만들지 않습니다. 로그인한 계정에 서버가
-            기록한 항목만 내 에셋에 표시됩니다.
+            브라우저 저장소는 소장 권한을 만들지 않습니다. 로그인 계정에 서버가 기록한 항목만 표시됩니다.
           </p>
         </section>
       ) : (
@@ -231,45 +284,22 @@ export function MarketLibraryPage() {
             <button
               type="button"
               onClick={() => setReloadToken((value) => value + 1)}
-              disabled={loadState === "loading"}
+              disabled={visibleLoadState === "loading"}
               className={buttonClass({ variant: "outline", size: "sm" })}
             >
-              <RefreshCw className={cn("size-3.5", loadState === "loading" && "animate-spin")} aria-hidden="true" />
+              <RefreshCw className={cn("size-3.5", visibleLoadState === "loading" && "animate-spin")} aria-hidden="true" />
               새로고침
             </button>
           </div>
 
-          {error ? (
-            <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-fg">
-              <ShieldAlert className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden="true" />
-              <span>{error}</span>
-            </div>
-          ) : null}
+          {message ? <p role="status" className="mt-4 rounded-xl border border-good/40 bg-good/10 px-4 py-3 text-sm text-good">{message}</p> : null}
+          {error ? <ErrorBanner message={error} /> : null}
 
-          {loadState === "loading" ? (
-            <div role="status" className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {Array.from({ length: 8 }, (_, index) => (
-                <div key={index} aria-hidden="true" className="rounded-xl border border-line bg-card p-4">
-                  <div className="skeleton h-4 w-2/3" />
-                  <div className="skeleton mt-3 h-3 w-full" />
-                  <div className="skeleton mt-2 h-3 w-4/5" />
-                  <div className="skeleton mt-6 h-9 w-full" />
-                </div>
-              ))}
-            </div>
-          ) : loadState === "error" ? (
-            <div className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
-              <ShieldAlert className="mx-auto size-10 text-bad" aria-hidden="true" />
-              <h2 className="mt-3 text-base font-bold text-fg">계정 라이브러리를 확인할 수 없어요</h2>
-              <button
-                type="button"
-                onClick={() => setReloadToken((value) => value + 1)}
-                className={buttonClass({ variant: "solid", size: "sm", className: "mt-4" })}
-              >
-                다시 시도
-              </button>
-            </div>
-          ) : items.length === 0 ? (
+          {visibleLoadState === "loading" ? (
+            <LibrarySkeleton />
+          ) : visibleLoadState === "error" ? (
+            <RetryCard title="계정 라이브러리를 확인할 수 없어요" onRetry={() => setReloadToken((value) => value + 1)} />
+          ) : visibleItems.length === 0 ? (
             <div className="mt-8 rounded-2xl border border-dashed border-line bg-panel/50 p-10 text-center">
               <FolderOpen className="mx-auto size-10 text-fg-3" aria-hidden="true" />
               <h2 className="mt-3 text-base font-bold text-fg">
@@ -278,18 +308,15 @@ export function MarketLibraryPage() {
               <p className="mx-auto mt-2 max-w-md text-sm text-fg-2">
                 {view === "active"
                   ? "마켓 상세에서 계정 라이브러리에 추가한 에셋이 여기에 표시됩니다."
-                  : "목록에서 숨긴 에셋은 소장 권한을 유지한 채 이곳에서 복원할 수 있습니다."}
+                  : "숨긴 에셋은 소장 권한을 유지한 채 이곳에서 복원할 수 있습니다."}
               </p>
             </div>
           ) : (
             <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {items.map((item) => {
+              {visibleItems.map((item) => {
                 const kind = marketKindMeta(item.kind);
                 const KindIcon = kind.icon;
-                const head = item.catalog.state === "available"
-                  ? item.catalog.head
-                  : null;
-                const available = head !== null;
+                const head = item.catalog.state === "available" ? item.catalog.head : null;
                 return (
                   <li key={item.id} className="flex min-w-0 flex-col rounded-xl border border-line bg-card p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -304,9 +331,9 @@ export function MarketLibraryPage() {
                       </div>
                       <span className={cn(
                         "shrink-0 rounded-full px-2 py-1 text-[0.62rem] font-bold",
-                        available ? "bg-good/15 text-good" : "bg-warn/15 text-warn",
+                        head ? "bg-good/15 text-good" : "bg-warn/15 text-warn",
                       )}>
-                        {available ? "사용 가능" : "사용 불가"}
+                        {head ? "사용 가능" : "사용 불가"}
                       </span>
                     </div>
 
@@ -323,10 +350,7 @@ export function MarketLibraryPage() {
 
                     <div className="mt-auto grid gap-2 pt-5">
                       {head ? (
-                        <Link
-                          href={marketStudioResourceHref(head.id)}
-                          className={buttonClass({ variant: "solid", size: "sm", className: "w-full" })}
-                        >
+                        <Link href={marketStudioResourceHref(head.id)} className={buttonClass({ variant: "solid", size: "sm", className: "w-full" })}>
                           <Palette className="size-3.5" aria-hidden="true" />
                           {item.updateState === "account-confirmed-update-available"
                             ? `Studio에서 v${head.resourceVersion} 업데이트`
@@ -359,17 +383,10 @@ export function MarketLibraryPage() {
             </ul>
           )}
 
-          {loadState === "ready" && hasMore ? (
+          {visibleLoadState === "ready" && hasMore ? (
             <div className="mt-8 text-center">
-              <button
-                type="button"
-                onClick={() => void loadMore()}
-                disabled={loadingMore}
-                className={buttonClass({ variant: "outline", size: "md" })}
-              >
-                {loadingMore ? (
-                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-                ) : null}
+              <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className={buttonClass({ variant: "outline", size: "md" })}>
+                {loadingMore ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
                 {loadingMore ? "불러오는 중" : "더 보기"}
               </button>
             </div>
@@ -377,5 +394,50 @@ export function MarketLibraryPage() {
         </>
       )}
     </Container>
+  );
+}
+
+function StatusCard({ icon: Icon, text, spin = false }: { icon: typeof LoaderCircle; text: string; spin?: boolean }) {
+  return (
+    <div role="status" className="mt-8 flex items-center justify-center gap-2 rounded-xl border border-line bg-card p-8 text-sm text-fg-2">
+      <Icon className={cn("size-4", spin && "animate-spin")} aria-hidden="true" />
+      {text}
+    </div>
+  );
+}
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-fg">
+      <ShieldAlert className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden="true" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+function RetryCard({ title, onRetry }: { title: string; onRetry: () => void }) {
+  return (
+    <div className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
+      <ShieldAlert className="mx-auto size-10 text-bad" aria-hidden="true" />
+      <h2 className="mt-3 text-base font-bold text-fg">{title}</h2>
+      <button type="button" onClick={onRetry} className={buttonClass({ variant: "solid", size: "sm", className: "mt-4" })}>
+        다시 시도
+      </button>
+    </div>
+  );
+}
+
+function LibrarySkeleton() {
+  return (
+    <div role="status" className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {Array.from({ length: 8 }, (_, index) => (
+        <div key={index} aria-hidden="true" className="rounded-xl border border-line bg-card p-4">
+          <div className="skeleton h-4 w-2/3" />
+          <div className="skeleton mt-3 h-3 w-full" />
+          <div className="skeleton mt-2 h-3 w-4/5" />
+          <div className="skeleton mt-6 h-9 w-full" />
+        </div>
+      ))}
+    </div>
   );
 }
