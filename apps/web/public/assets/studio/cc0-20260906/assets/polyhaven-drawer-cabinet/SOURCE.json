@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/drawer_cabinet",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "wood",
+      "furniture",
+      "shelf",
+      "drawer",
+      "metal",
+      "modern"
+    ],
+    "date_published": 1598525497,
+    "name": "Drawer Cabinet",
+    "categories": [
+      "furniture"
+    ],
+    "authors": {
+      "Ulan Cabanilla": "All"
+    },
+    "donated": true,
+    "sponsors": [
+      "4714267"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 26406,
+    "texel_density": 1053.7831317512453,
+    "dimensions": [
+      1141.0778760910034,
+      488.08445036411285,
+      1881.253957748413
+    ],
+    "files_hash": "dda532faa842f6046d05e7ffcfddaea897152f78",
+    "description": "Free 4K modern drawer cabinet featuring warm wood drawers and shelves, slim black metal frame, four horizontal drawers, and open shelving.",
+    "category_id": "f4401003-06dc-5a1f-97c1-f7a27a1c88d4",
+    "category": "Furniture/Storage Furniture/Drawers & Dressers",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "download_count": 16362,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/drawer_cabinet.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/drawer_cabinet/drawer_cabinet_2k.gltf",
+      "bytes": 8031,
+      "sha256": "5daedfc7f16b6bef0da212b4904aca449f07a8dbad2ddca18bbfb979caeda31f",
+      "sourceMd5": "1bf5ba7f77dba5fcb71504c061e3e84f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/drawer_cabinet/drawer_cabinet_arm_2k.jpg",
+      "bytes": 382840,
+      "sha256": "b0d86115d9b8d9c85fc9c787c56dc32e573b64a8ae1d3d5a82268f540c820f0b",
+      "sourceMd5": "434369a715fd968e2ef99253ca2a497a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/drawer_cabinet/drawer_cabinet_nor_gl_2k.jpg",
+      "bytes": 337575,
+      "sha256": "5424a0f1e41f3f1ade8c9bd7d04c6baf74e09ee36bf51d4694aee46a7238602d",
+      "sourceMd5": "b9982e0169745395fc37fdc7c3af7626"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/drawer_cabinet/drawer_cabinet_diff_2k.jpg",
+      "bytes": 541585,
+      "sha256": "e877963d22e48a46d58c15af60c7c48690d33881b19fb892f21aea3098119f6b",
+      "sourceMd5": "ecf30786b237f49412c4026e9d9eb7bd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/drawer_cabinet/drawer_cabinet.bin",
+      "bytes": 798852,
+      "sha256": "3460b9fe00ffbe779b7f7f2de3b159c214cfec275c06194add0eebd951ee14e9",
+      "sourceMd5": "1f0d93118e12628d0b79c7dd8d11b80e"
+    }
+  ]
+}

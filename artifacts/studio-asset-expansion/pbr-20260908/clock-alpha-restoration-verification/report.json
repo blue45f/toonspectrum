@@ -1,0 +1,525 @@
+{
+  "schema": "toonstudio-actual-gpu-asset-verification/v2",
+  "startedAt": "2026-09-07T17:52:34.143Z",
+  "completedAt": "2026-09-07T17:52:35.999Z",
+  "origin": "http://127.0.0.1:5229",
+  "manifestPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-manifest.json",
+  "chromeVersion": "152.0.7977.77",
+  "gpu": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+    "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+  },
+  "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+  "helper": "applyStudioBg3dRuntimeAssetQuality",
+  "expectedAssets": 3,
+  "renderedAssets": 3,
+  "passedAssets": 3,
+  "failures": [],
+  "rendererErrors": [],
+  "warnings": [],
+  "contactSheets": [
+    "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models-contact-1.png"
+  ],
+  "results": [
+    {
+      "id": "polyhaven-alarm-clock-01",
+      "url": "/@fs//Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/assets/polyhaven-alarm-clock-01/alarm_clock_01-alpha-restored-v1.glb",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "diagnosticOnly": false,
+      "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+      "meshes": 5,
+      "materialCount": 2,
+      "sourceImages": 7,
+      "textures": [
+        {
+          "name": "alarm_clock_01_diff.png",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "alarm_clock_01_nor_gl.png",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "alarm_clock_01_metal.png-alarm_clock_01_rough.png",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "alarm_clock_01_diff_author_opacity_restored_v1",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "alarm_clock_01_nor_gl",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "alarm_clock_01_metal-alarm_clock_01_rough",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.06582528352737427,
+          -0.0012277960777282715,
+          -0.024242693558335304
+        ],
+        "max": [
+          0.06582528352737427,
+          0.172927588224411,
+          0.04250587522983551
+        ]
+      },
+      "anchor": null,
+      "group": "models",
+      "sourcePath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/assets/polyhaven-alarm-clock-01/alarm_clock_01-alpha-restored-v1.glb",
+      "sourceSha256": "19ae14d02dbb9e58409fb6759781dea6303183b7347e86987c548a677e88da45",
+      "sourceBytes": 12654264,
+      "frames": [
+        {
+          "view": "front",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 104854,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.011530318347416408,
+          "coloredFraction": 0.022784061647624317,
+          "renderedTriangles": 9705,
+          "renderCalls": 6,
+          "cameraPosition": [
+            0,
+            0.22493457847333045,
+            0.3751439129409845
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models/polyhaven-alarm-clock-01-front.png",
+          "sha256": "a56f65b6d4c7419e187248381d799405208b34ff97f33d7def5758c7f3be245c"
+        },
+        {
+          "view": "three-quarter",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 102390,
+          "pixelGatePassed": true,
+          "darkFraction": 0.00016603183904678192,
+          "brightFraction": 0.01569489207930462,
+          "coloredFraction": 0.13976950874108798,
+          "renderedTriangles": 9705,
+          "renderCalls": 6,
+          "cameraPosition": [
+            0.2177921571631587,
+            0.22523687665776293,
+            0.3031510030060144
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models/polyhaven-alarm-clock-01-three-quarter.png",
+          "sha256": "de1ebd0e4c363c30c24d680b9325860e1a95a4d51049541782f9569a01c099d9"
+        },
+        {
+          "view": "back",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 109572,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.027443142408644546,
+          "coloredFraction": 0.04499324644982295,
+          "renderedTriangles": 9705,
+          "renderCalls": 6,
+          "cameraPosition": [
+            0,
+            0.22493457847333045,
+            -0.3568807312694843
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models/polyhaven-alarm-clock-01-back.png",
+          "sha256": "980ee025ad755ef6797315fd0dcb470d143897a463e065427c3b19185307cf13"
+        }
+      ],
+      "validation": {
+        "validator": "Khronos glTF-Validator",
+        "version": "2.0.0-dev.3.10",
+        "numErrors": 0,
+        "numWarnings": 5,
+        "numInfos": 1,
+        "messages": [
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/1/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/1/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/2/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/3/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/textures/4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "polyhaven-vintage-grandfather-clock-01",
+      "url": "/@fs//Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/assets/polyhaven-vintage-grandfather-clock-01/vintage_grandfather_clock_01-alpha-restored-v1.glb",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "diagnosticOnly": false,
+      "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+      "meshes": 4,
+      "materialCount": 2,
+      "sourceImages": 4,
+      "textures": [
+        {
+          "name": "vintage_grandfather_clock_01_diff",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "vintage_grandfather_clock_01_nor_gl",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "vintage_grandfather_clock_01_metal-vintage_grandfather_clock_01_rough",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "vintage_grandfather_clock_01_diff_author_opacity_restored_v1",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.2500464802817314,
+          -0.00006496906280517578,
+          -0.25097261662777115
+        ],
+        "max": [
+          0.375578320058381,
+          2.1905269622802734,
+          0.1756440126084514
+        ]
+      },
+      "anchor": null,
+      "group": "models",
+      "sourcePath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/assets/polyhaven-vintage-grandfather-clock-01/vintage_grandfather_clock_01-alpha-restored-v1.glb",
+      "sourceSha256": "61bb42981384eb36f009003da210390c1e2b183764536c3f98d6746410e7096a",
+      "sourceBytes": 13505372,
+      "frames": [
+        {
+          "view": "front",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 69709,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.000028690699909624295,
+          "coloredFraction": 0.9088926824369881,
+          "renderedTriangles": 8601,
+          "renderCalls": 5,
+          "cameraPosition": [
+            0.0627659198883248,
+            2.507314138240086,
+            3.678343965441267
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models/polyhaven-vintage-grandfather-clock-01-front.png",
+          "sha256": "221e0510688c05719839e558735cb00208899d5f007f0304078763e16e270b60"
+        },
+        {
+          "view": "three-quarter",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 74028,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.9620684065488734,
+          "renderedTriangles": 8601,
+          "renderCalls": 5,
+          "cameraPosition": [
+            2.2739413577785763,
+            2.510383276858495,
+            2.9474225391421798
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models/polyhaven-vintage-grandfather-clock-01-three-quarter.png",
+          "sha256": "6bdff6b0724a860b570ab4db0efb46e4b137f0f30e262c184cb29885ceca71d7"
+        },
+        {
+          "view": "back",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 70228,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.9735148373867973,
+          "renderedTriangles": 8601,
+          "renderCalls": 5,
+          "cameraPosition": [
+            0.0627659198883248,
+            2.507314138240086,
+            -3.7536725694605866
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models/polyhaven-vintage-grandfather-clock-01-back.png",
+          "sha256": "fc7800d35dcb64040f38860ad25f02696da8ea972cba47bd1b5e27defd317408"
+        }
+      ],
+      "validation": {
+        "validator": "Khronos glTF-Validator",
+        "version": "2.0.0-dev.3.10",
+        "numErrors": 0,
+        "numWarnings": 4,
+        "numInfos": 1,
+        "messages": [
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/1/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/1/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/2/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/textures/4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "polyhaven-vintage-telephone-wall-clock",
+      "url": "/@fs//Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/assets/polyhaven-vintage-telephone-wall-clock/vintage_telephone_wall_clock-alpha-restored-v1.glb",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "diagnosticOnly": false,
+      "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+      "meshes": 2,
+      "materialCount": 2,
+      "sourceImages": 5,
+      "textures": [
+        {
+          "name": "vintage_telephone_wall_clock_diff_author_opacity_restored_v1",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "vintage_telephone_wall_clock_nor_gl",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "vintage_telephone_wall_clock_metal-vintage_telephone_wall_clock_rough",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "vintage_telephone_wall_clock_diff",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.17600713670253754,
+          -0.0735805481672287,
+          -3.725290298461914e-8
+        ],
+        "max": [
+          0.16679838299751282,
+          0.427651584148407,
+          0.19256296753883362
+        ]
+      },
+      "anchor": null,
+      "group": "models",
+      "sourcePath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/assets/polyhaven-vintage-telephone-wall-clock/vintage_telephone_wall_clock-alpha-restored-v1.glb",
+      "sourceSha256": "964e8ba577e1519c9e76edc78bea6fe04837b82d3282feec16c19d7d4fc1f95f",
+      "sourceBytes": 17799628,
+      "frames": [
+        {
+          "view": "front",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 108378,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.000027680894646514975,
+          "coloredFraction": 0.7780176788647143,
+          "renderedTriangles": 16248,
+          "renderCalls": 3,
+          "cameraPosition": [
+            -0.00460437685251236,
+            0.5651502579837355,
+            1.117636044072298
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models/polyhaven-vintage-telephone-wall-clock-front.png",
+          "sha256": "77cf66b6606da9cca24446f4ca8339d6bbdd8300060b64aaefa0b4a6d3141376"
+        },
+        {
+          "view": "three-quarter",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 110567,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.000036177159550317907,
+          "coloredFraction": 0.8094368120687004,
+          "renderedTriangles": 16248,
+          "renderCalls": 3,
+          "cameraPosition": [
+            0.6031429680839597,
+            0.5659938187499313,
+            0.9167403808072028
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models/polyhaven-vintage-telephone-wall-clock-three-quarter.png",
+          "sha256": "f16669deb530dc95c32eeb650007c73be15de88c81caec926e4c10c771a37d51"
+        },
+        {
+          "view": "back",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 128309,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.0028213141712584463,
+          "coloredFraction": 0.9735326438519512,
+          "renderedTriangles": 16248,
+          "renderCalls": 3,
+          "cameraPosition": [
+            -0.00460437685251236,
+            0.5651502579837355,
+            -0.9250731137863675
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models/polyhaven-vintage-telephone-wall-clock-back.png",
+          "sha256": "f7ea209cd7b197a94f4482d734386f3672de8a31671dd784668de30040f75cfe"
+        }
+      ],
+      "validation": {
+        "validator": "Khronos glTF-Validator",
+        "version": "2.0.0-dev.3.10",
+        "numErrors": 0,
+        "numWarnings": 2,
+        "numInfos": 1,
+        "messages": [
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/1/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/textures/1"
+          }
+        ]
+      }
+    }
+  ]
+}

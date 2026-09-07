@@ -1,0 +1,711 @@
+{
+  "schema": "toonspectrum.asset-visual-decisions.v1",
+  "reviewedOn": "2026-09-08",
+  "reviewLevel": "contact-sheet-visual-triage",
+  "allAnglesArtisticallyApproved": false,
+  "modelSetCounting": "One source file or set counts as one original, not one per displayed variation.",
+  "assets": [
+    {
+      "id": "polyhaven-plastic-monobloc-chair-01",
+      "sha256": "2eb7cff9260cfac3751bf126727df6867d4c17865d5890ca5e3315c19b9978dd",
+      "decision": "admit",
+      "name": "플라스틱 야외 의자 · Plastic Monobloc Chair 01",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-mid-century-lounge-chair",
+      "sha256": "80c44ed49cb5f8e12303eb13af0e19928cf36877c49035d890dc08332f11d6ef",
+      "decision": "admit",
+      "name": "미드센추리 라운지 의자 · Mid Century Lounge Chair",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-wooden-stool-02",
+      "sha256": "3761ea25ab140ec15d680df25a7a14cdc2f14508a8863072d36455737fb15a88",
+      "decision": "admit",
+      "name": "소박한 원목 스툴 · Wooden Stool 02",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-wooden-stool-01",
+      "sha256": "5a55b1a3c3b9eebdf3bbd806365211105d9257f18a1d1f55769a011088993e1e",
+      "decision": "admit",
+      "name": "빈티지 원형 스툴 · Wooden Stool 01",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-round-wooden-table-01",
+      "sha256": "eebd15abfd75c437c46c638e62b1f391162983b3cd57b1bd7d1faa761ceed8d9",
+      "decision": "admit",
+      "name": "클래식 원목 원탁 · Round Wooden Table 01",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-cassette-player",
+      "sha256": "c8a9c61330874466430e706546ee26641aa7f2fcd5b3b139296ecd1c93069edd",
+      "decision": "admit",
+      "name": "휴대용 카세트 플레이어 · Cassette Player",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Mobile-ready derivative inspected in three GPU views. Duplicate textures removed or ORM maps reduced; original 2K base color and normal retained, with readable silhouette and surface detail.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/mobile-ready-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-chinese-sofa",
+      "sha256": "4df1a1b5aba347669c8bc2faaf0eaaefea0f4a1300af234d40b815ea9aeb8249",
+      "decision": "admit",
+      "name": "중국풍 목제 소파 · Chinese Sofa",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-2.png"
+    },
+    {
+      "id": "polyhaven-painted-wooden-sofa",
+      "sha256": "cd7a34f3e79f6a307a1053a742b19cdd71a6f253ccb7868f0b62c2583adee505",
+      "decision": "admit",
+      "name": "빈티지 페인트 소파 · Painted Wooden Sofa",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-2.png"
+    },
+    {
+      "id": "polyhaven-painted-wooden-bench",
+      "sha256": "ca5300364ec1ab9150743588335657aeff1f5ec425a7a67291e9a5332a381421",
+      "decision": "admit",
+      "name": "등받이 목제 벤치 · Painted Wooden Bench",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-2.png"
+    },
+    {
+      "id": "polyhaven-vintage-cabinet-01",
+      "sha256": "d27f208fd664c3285d6f6195b1b010001b3fc266f9f166f321c14cdd287c1cee",
+      "decision": "admit",
+      "name": "클래식 장식 수납장 · Vintage Cabinet 01",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-2.png"
+    },
+    {
+      "id": "polyhaven-painted-wooden-cabinet",
+      "sha256": "183e5af50fc4a42424c89505e96754f88e0b52e2a8ac586af911c4e967982054",
+      "decision": "admit",
+      "name": "낡은 페인트 수납장 · Painted Wooden Cabinet",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-2.png"
+    },
+    {
+      "id": "polyhaven-vintage-day-bed",
+      "sha256": "0d7acb82ec66bf440f58c40e2a99b6539381c79114970ab82268c1bea3cd1294",
+      "decision": "admit",
+      "name": "쿠션이 놓인 데이베드 · Vintage Day Bed",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-2.png"
+    },
+    {
+      "id": "polyhaven-old-bed-frame",
+      "sha256": "efbb5d76fadf84f14589abab950e1134dc4c187873eed581a1c9003b35ec8010",
+      "decision": "admit",
+      "name": "빈티지 철제 침대 프레임 · Old Bed Frame",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-3.png"
+    },
+    {
+      "id": "polyhaven-desk-lamp-arm-01",
+      "sha256": "86afc750a271afee4e2c69fa624c408446affdf14790dc68643e5fa2a496be98",
+      "decision": "admit",
+      "name": "관절형 작업등 · Desk Lamp Arm 01",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-3.png"
+    },
+    {
+      "id": "polyhaven-street-lamp-02",
+      "sha256": "6b861dba10e1f84d17f2c310ab6cdebc71d72a2c1cdc022f0d0e06dbd41180c4",
+      "decision": "admit",
+      "name": "클래식 벽부등 · Street Lamp 02",
+      "category": "architecture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-3.png"
+    },
+    {
+      "id": "polyhaven-ornate-mirror-01",
+      "sha256": "353abc1d00ca80b97349ebde187eee7d36a26cd62519d922641cffaafd96ca2e",
+      "decision": "admit",
+      "name": "장식 프레임 거울 · Ornate Mirror 01",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-3.png"
+    },
+    {
+      "id": "polyhaven-alarm-clock-01",
+      "sha256": "19ae14d02dbb9e58409fb6759781dea6303183b7347e86987c548a677e88da45",
+      "decision": "admit",
+      "name": "민트색 아날로그 알람시계 · Alarm Clock 01",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Original official opacity mask restored to the glass alpha channel; clock face and hands are now visible in the reviewed GPU views. Geometry, UVs and authored PBR parameters preserved.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-vintage-grandfather-clock-01",
+      "sha256": "61bb42981384eb36f009003da210390c1e2b183764536c3f98d6746410e7096a",
+      "decision": "admit",
+      "name": "클래식 괘종시계 · Vintage Grandfather Clock 01",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Original official opacity mask restored to the glass alpha channel; clock face and hands are now visible in the reviewed GPU views. Geometry, UVs and authored PBR parameters preserved.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-steel-frame-shelves-01",
+      "sha256": "7d35fc786b7fc21bbf06ca0806b8bcf54b0d4af61d47943ee547adff09eae3b3",
+      "decision": "admit",
+      "name": "철제 프레임 선반 · Steel Frame Shelves 01",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-4.png"
+    },
+    {
+      "id": "polyhaven-antique-ceramic-vase-01",
+      "sha256": "7ab42d84be22d219f632012463963d187bb439f94e04d68982be4154c5eec898",
+      "decision": "admit",
+      "name": "푸른 꽃무늬 도자기 화병 · Antique Ceramic Vase 01",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-4.png"
+    },
+    {
+      "id": "polyhaven-ceramic-vase-02",
+      "sha256": "d3905c7a21f1f8a0a57cd137c99754a76031f0d0327412617aac2b3a8a2efc1c",
+      "decision": "admit",
+      "name": "넓은 입구 도자기 화병 · Ceramic Vase 02",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-4.png"
+    },
+    {
+      "id": "polyhaven-brass-vase-03",
+      "sha256": "1d577ac5f121e0e7835cbb7c3a8f9fb7f4a9eaf1c1eb777e18194103a249ac4e",
+      "decision": "admit",
+      "name": "조각 장식 황동 화병 · Brass Vase 03",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-4.png"
+    },
+    {
+      "id": "polyhaven-ceramic-vase-01",
+      "sha256": "d1eac176f297e0cdb56901ac9c262496b9da8c2ef2c3e56918421ef06cbd470e",
+      "decision": "admit",
+      "name": "가느다란 백자 화병 · Ceramic Vase 01",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-4.png"
+    },
+    {
+      "id": "polyhaven-fancy-picture-frame-01",
+      "sha256": "2e4a06144b9bf550482c397b97c83c3e95817c64cab79bf74142c58a88fd52e6",
+      "decision": "admit",
+      "name": "풍경화와 클래식 액자 · Fancy Picture Frame 01",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-4.png"
+    },
+    {
+      "id": "polyhaven-fancy-picture-frame-02",
+      "sha256": "352fbde70684eb745a045d882a4bc91d842580afd517cc6cffa1d8ca5882f157",
+      "decision": "admit",
+      "name": "도시 풍경과 장식 액자 · Fancy Picture Frame 02",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-5.png"
+    },
+    {
+      "id": "polyhaven-potted-plant-01",
+      "sha256": "b9a0ab6e7938354de6605fc78b094ae655ae1fd66e94116a59ec491b14288dc0",
+      "decision": "admit",
+      "name": "테라코타 화분과 관엽식물 · Potted Plant 01",
+      "category": "nature",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-5.png"
+    },
+    {
+      "id": "polyhaven-vintage-suitcase",
+      "sha256": "5f1eab8672b4cd049c5f22d75a4a415a66930dc4e4ec3cdfcb5b67abaea7aedb",
+      "decision": "admit",
+      "name": "빈티지 여행가방 세트 · Vintage Suitcase",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-5.png"
+    },
+    {
+      "id": "polyhaven-vintage-telephone-wall-clock",
+      "sha256": "964e8ba577e1519c9e76edc78bea6fe04837b82d3282feec16c19d7d4fc1f95f",
+      "decision": "admit",
+      "name": "전화기 모양 빈티지 벽시계 · Vintage Telephone Wall Clock",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Original official opacity mask restored to the glass alpha channel; clock face and hands are now visible in the reviewed GPU views. Geometry, UVs and authored PBR parameters preserved.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/clock-alpha-restoration-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-security-camera-01",
+      "sha256": "671ae2c896a64e5aabc54a4c24b52d7417cb84b1fb672096c58f082dfd8169d6",
+      "decision": "admit",
+      "name": "벽걸이 CCTV 카메라 · Security Camera 01",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-5.png"
+    },
+    {
+      "id": "polyhaven-boombox",
+      "sha256": "8dc2ef2b8f989d890cb745cc7153c26d4dc0cac7e073fda6841d3abed033b4e2",
+      "decision": "admit",
+      "name": "안테나가 있는 붐박스 라디오 · Boombox",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-5.png"
+    },
+    {
+      "id": "polyhaven-television-02",
+      "sha256": "1900d15092bb7022588cde712cde48e23a775e57f41979babc16751024597bcc",
+      "decision": "admit",
+      "name": "빈티지 브라운관 TV · Television 02",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-6.png"
+    },
+    {
+      "id": "polyhaven-carved-wooden-plate",
+      "sha256": "5aa322f5a6c0377e263c28b80931b167790e14a461b0957980b2602255ec8729",
+      "decision": "admit",
+      "name": "조각 무늬 나무 접시 · Carved Wooden Plate",
+      "category": "food",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-6.png"
+    },
+    {
+      "id": "polyhaven-brass-goblets",
+      "sha256": "42446e40999a42d8eca8f49d039e55cb0e7304df32272460de1dfb49e23ac7d4",
+      "decision": "admit",
+      "name": "황동 와인잔 식기 세트 · Brass Goblets",
+      "category": "food",
+      "role": "finished-asset",
+      "reason": "Mobile-ready derivative inspected in three GPU views. Duplicate textures removed or ORM maps reduced; original 2K base color and normal retained, with readable silhouette and surface detail.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/mobile-ready-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-russian-food-cans-01",
+      "sha256": "55c67646e834aa3943d654ff46ca20e7fcf426383dbd4b03dfce09c69660d1b2",
+      "decision": "admit",
+      "name": "통조림과 식료품 세트 · Russian Food Cans 01",
+      "category": "food",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-6.png"
+    },
+    {
+      "id": "polyhaven-vintage-electric-kettle",
+      "sha256": "5efd25cb564068b90dd421314b18b170adb2f2344dcf03763759c06c6ad6257e",
+      "decision": "admit",
+      "name": "클래식 전기 주전자 · Vintage Electric Kettle",
+      "category": "food",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-6.png"
+    },
+    {
+      "id": "polyhaven-food-apple-01",
+      "sha256": "cdf893508c7bc06a4c80ba687e575f68eaa450504d90b0256221f24ce8ea7bab",
+      "decision": "admit",
+      "name": "붉은 사과 · Food Apple 01",
+      "category": "food",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-6.png"
+    },
+    {
+      "id": "polyhaven-hamburger-buns",
+      "sha256": "afb6b79df3708441bd820c7ac501caa24f47ac488e2a5176879380c369d840d1",
+      "decision": "admit",
+      "name": "햄버거 번 빵 세트 · Hamburger Buns",
+      "category": "food",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-7.png"
+    },
+    {
+      "id": "polyhaven-korean-fire-extinguisher-01",
+      "sha256": "276a2ffd89219465d81b18522e7b28e18f98e3ba75225ba190195b825c77b173",
+      "decision": "admit",
+      "name": "받침대가 있는 한국형 소화기 · Korean Fire Extinguisher 01",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Mobile-ready derivative inspected in three GPU views. Duplicate textures removed or ORM maps reduced; original 2K base color and normal retained, with readable silhouette and surface detail.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/mobile-ready-verification/models-contact-1.png"
+    },
+    {
+      "id": "polyhaven-fire-hydrant",
+      "sha256": "0c1fab668aec6c6be851658093f57a8c6468ee9a2b46d2b030bd02b780c02aed",
+      "decision": "admit",
+      "name": "거리 소화전 세트 · Fire Hydrant",
+      "category": "outdoor-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-7.png"
+    },
+    {
+      "id": "polyhaven-modern-wooden-cabinet",
+      "sha256": "20e8b14b41e5d2aad1f1c99dc81fc5481a4c60c48d61a9401b635101c288000f",
+      "decision": "admit",
+      "name": "모던 목제 거실 수납장 · Modern Wooden Cabinet",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-7.png"
+    },
+    {
+      "id": "polyhaven-drawer-cabinet",
+      "sha256": "c76e04bef925427d51e87d408480be0d8f5c9a5a025228267c8ade268959687d",
+      "decision": "admit",
+      "name": "선반과 서랍 수납장 · Drawer Cabinet",
+      "category": "furniture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-7.png"
+    },
+    {
+      "id": "polyhaven-signal-flashlight",
+      "sha256": "2ffb4a47a686e59e53406e8cae7615e44ef0c92d9672efdcf7cabcd1aa806524",
+      "decision": "admit",
+      "name": "빈티지 신호용 손전등 · Signal Flashlight",
+      "category": "outdoor-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-7.png"
+    },
+    {
+      "id": "polyhaven-treasure-chest",
+      "sha256": "9ee53aa6ca71f788906f3ca2935015ca3a878f2128339538c34b735c44224036",
+      "decision": "admit",
+      "name": "금속 장식 보물상자 · Treasure Chest",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-8.png"
+    },
+    {
+      "id": "polyhaven-cardboard-box-01",
+      "sha256": "665147c3a970a10c564e921afa17f27c2de3c4f205bcefaa39047bcfcfbfd909",
+      "decision": "admit",
+      "name": "사용감 있는 골판지 상자 · Cardboard Box 01",
+      "category": "pbr-detailed-prop",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-8.png"
+    },
+    {
+      "id": "polyhaven-rock-moss-set-02",
+      "sha256": "ca03c875cfabb5349d300de64675f1133f5233a8929a8dadb829b35ca5f3ea41",
+      "decision": "admit",
+      "name": "회색 이끼 바위 세트 · Rock Moss Set 02",
+      "category": "nature",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-8.png"
+    },
+    {
+      "id": "polyhaven-rock-moss-set-01",
+      "sha256": "864ece45cf6cafeb7fab5ab65704b1810622ba411da2026ebad847a0a08eab2f",
+      "decision": "admit",
+      "name": "황갈색 이끼 바위 세트 · Rock Moss Set 01",
+      "category": "nature",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-8.png"
+    },
+    {
+      "id": "polyhaven-street-rat",
+      "sha256": "94b6d933d42212ab4dde056f298e97392a6db1fe69648a24e43e40e527b63f1e",
+      "decision": "admit",
+      "name": "거리의 쥐 동물 모델 · Street Rat",
+      "category": "nature",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-8.png"
+    },
+    {
+      "id": "polyhaven-dead-tree-trunk-02",
+      "sha256": "c2dffa673da035614941901f8d698a972f716d9bd6652d0d6ab1dad9c29ff2ce",
+      "decision": "admit",
+      "name": "쓰러진 고목 줄기 · Dead Tree Trunk 02",
+      "category": "nature",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-8.png"
+    },
+    {
+      "id": "polyhaven-fern-02",
+      "sha256": "b6334a8d7e3b111020d519310a3c9213ff4316c34c3351b1d028d06b522d68fc",
+      "decision": "admit",
+      "name": "고사리 식물 세트 · Fern 02",
+      "category": "nature",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-9.png"
+    },
+    {
+      "id": "polyhaven-dandelion-01",
+      "sha256": "ee1861c4a68fca4fc0ae4c27f3a50b66b2548c05c5496642759409ea3d8ff6ab",
+      "decision": "exclude",
+      "reason": "Five small plants are spread over 4.214 metres; default framing produces less than 0.2% foreground. Keep as an unadmitted source until split and re-reviewed."
+    },
+    {
+      "id": "polyhaven-large-iron-gate",
+      "sha256": "e862dccae953cd1dbdf9490f5a1422dcd34e2af15799f14aa9ebbdde19ddddb2",
+      "decision": "admit",
+      "name": "양쪽으로 여는 철제 대문 · Large Iron Gate",
+      "category": "architecture",
+      "role": "finished-asset",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-9.png"
+    },
+    {
+      "id": "polyhaven-gate-latch-01",
+      "sha256": "50992ce520fdc24a4230549cac0428a4b8a17d9a165967790e43aa426bb548b6",
+      "decision": "admit",
+      "name": "금속 걸쇠 조립 부품 · Gate Latch 01",
+      "category": "architecture",
+      "role": "assembly-component",
+      "reason": "Actual front, three-quarter and back GPU renders inspected; complete intended silhouette and authored material identity are readable at the reviewed resolution. This does not certify arbitrary close-ups or every viewing angle.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/browser-verification/models-contact-9.png"
+    },
+    {
+      "id": "polyhaven-floor-tiles-02",
+      "sha256": "49c18bbef8d65028f5588b4c6a4d6171603956730901208d8333a100942a3f07",
+      "decision": "admit",
+      "name": "밝은 석재 바닥 타일 · Floor Tiles 02",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-floor-tiles-04",
+      "sha256": "8be0ff7a229bc21fe02110cca39afc8d28d0d87abdddd8aa6e203080eb4b1745",
+      "decision": "admit",
+      "name": "따뜻한 색감의 바닥 타일 · Floor Tiles 04",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-oak-veneer-01",
+      "sha256": "7fcddec46084146432804ffdaf8d472643284d7a24816cb617a28635f54f07c2",
+      "decision": "admit",
+      "name": "오크 무늬목 재질 · Oak Veneer 01",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-wood-table-worn",
+      "sha256": "79c51144e65ecdfca4db8457afc7e4f8d722e768a898f1b8e3c2e58d6184f231",
+      "decision": "admit",
+      "name": "사용감 있는 목재 상판 · Wood Table Worn",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-weathered-brown-planks",
+      "sha256": "9abcf6ec79f033afd24e0e06e1d78c964aa6bcf535a3b56748bffd0cd3f64aa8",
+      "decision": "admit",
+      "name": "풍화된 갈색 나무 널판 · Weathered Brown Planks",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-brown-planks-05",
+      "sha256": "8917591c940d479389355f9045c1da31451e66d8410b286915e9640ae8a1b7fd",
+      "decision": "admit",
+      "name": "밝은 페인트 나무 널판 · Brown Planks 05",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-cracked-concrete-wall",
+      "sha256": "775678d177635d0dbb82f1677a8b915cd161b4a60c311b1b2889aeb263d8b02a",
+      "decision": "admit",
+      "name": "갈라진 콘크리트 벽 · Cracked Concrete Wall",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-grey-plaster",
+      "sha256": "47b621585702fade1c825ea5b849cc5c18eddc3e8c452ce10d39902a607983ea",
+      "decision": "admit",
+      "name": "회색 회벽 · Grey Plaster",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-fabric-leather-02",
+      "sha256": "014551202f79bdf64f84c1a85ed47338fc65240b8b6b6b26fe978fb0cb63c832",
+      "decision": "admit",
+      "name": "황갈색 가죽 재질 · Fabric Leather 02",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-rusty-metal-02",
+      "sha256": "c47b033f7602224a5a49ddba48724de6bb98db0725542b43fe95c68712bba797",
+      "decision": "admit",
+      "name": "옅은 녹이 슨 철판 · Rusty Metal 02",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-rusty-metal-04",
+      "sha256": "f8d0763ef551df07a9fdd1300392e2346b0c621a7ca5c6979fd856004cd430f2",
+      "decision": "admit",
+      "name": "진한 녹이 슨 철판 · Rusty Metal 04",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-brick-4",
+      "sha256": "dc2b6f38096ac4e4a2590804e64e9893db4a81d0e9a30b061c5068b9adb3e25e",
+      "decision": "admit",
+      "name": "붉은 줄눈 벽돌 · Brick 4",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-castle-brick-02-red",
+      "sha256": "9614fd134cd274298988ee135261524dfef4c6e9bc1f88bec8ba9bbe1fb00b6e",
+      "decision": "admit",
+      "name": "거친 적벽돌 벽 · Castle Brick 02 Red",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-leafy-grass",
+      "sha256": "78d938b0a70131fd6430281b5226964de0eb70b397b1550808ecd285dbe0faed",
+      "decision": "exclude",
+      "reason": "At the reviewed contact-sheet scale, saturated fine speckling is less coherent than the accepted grass and forest alternatives. Artistic selection exclusion, not a claim of file corruption."
+    },
+    {
+      "id": "polyhaven-grass-path-2",
+      "sha256": "137574afd21c845126e64586d8b2d05748aa1ce7a718c0c75f2ce4f4a6a145eb",
+      "decision": "admit",
+      "name": "흙이 섞인 잔디 길 · Grass Path 2",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-forest-ground-04",
+      "sha256": "dddc29ea506040590403fc87cc7d59e41503dd9b2361ebf363fafa70ee93b39b",
+      "decision": "admit",
+      "name": "낙엽이 쌓인 숲 바닥 · Forest Ground 04",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-forest-leaves-02",
+      "sha256": "c395e1e6edba3f689fc1cf4c07e0bf14e5f43e016186788241ef787c01a72334",
+      "decision": "admit",
+      "name": "초록 낙엽과 이끼 숲 바닥 · Forest Leaves 02",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-aerial-beach-01",
+      "sha256": "00e229de903ec8f5be92a52bc9b994805ec461678ac00714589312655a4028d5",
+      "decision": "admit",
+      "name": "잔물결이 있는 모래 표면 · Aerial Beach 01",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    },
+    {
+      "id": "polyhaven-sandstone-cracks",
+      "sha256": "64c2c77e1a69cf84386d385efc874cae8185a1661b4c7688560ca877ad95f57c",
+      "decision": "admit",
+      "name": "갈라진 사암 표면 · Sandstone Cracks",
+      "category": "surface-material",
+      "role": "finished-asset",
+      "reason": "Actual decoded 2K surface preview inspected; material identity is readable with no blank or missing image at the reviewed scale.",
+      "evidence": "artifacts/studio-asset-expansion/pbr-20260908/surface-review.png"
+    }
+  ]
+}

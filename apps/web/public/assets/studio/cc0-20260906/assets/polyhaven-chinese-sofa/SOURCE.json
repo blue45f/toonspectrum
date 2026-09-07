@@ -1,0 +1,88 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/chinese_sofa",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "name": "Chinese Sofa",
+    "categories": [
+      "furniture",
+      "seating"
+    ],
+    "type": 2,
+    "tags": [
+      "vintage",
+      "antique",
+      "wooden",
+      "ornate",
+      "traditional",
+      "fancy"
+    ],
+    "authors": {
+      "Kirill Sannikov": "All"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 704,
+    "texel_density": 2196.2444577018523,
+    "dimensions": [
+      2285.4329347610474,
+      968.8513875007629,
+      860.0191126264232
+    ],
+    "date_published": 1720396800,
+    "files_hash": "e526d4fda894dd044639fe0517c0074290b31f41",
+    "description": "Free 8K model of a vintage Chinese wooden sofa, antique and ornate traditional seating with elegant carved legs and a warm lacquered finish.",
+    "category_id": "a995f351-c031-54f6-b317-dc5928df17a3",
+    "category": "Furniture/Seating/Sofas & Couches",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "download_count": 3393,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/chinese_sofa.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/chinese_sofa/chinese_sofa_2k.gltf",
+      "bytes": 2759,
+      "sha256": "9d0e03165ff6e24337309208aa42bde62e26356eeb4da64ebfb35cf12a9b4538",
+      "sourceMd5": "3b73165eadd0b5f3c8b33943f87a01e8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/chinese_sofa/chinese_sofa_nor_gl_2k.jpg",
+      "bytes": 2022444,
+      "sha256": "8d0ad1a57761de60a932d2db1b126050d133c664c3b52b715ab5de1bed682500",
+      "sourceMd5": "2c91f104ab56c20797a95f5dfec32afc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/chinese_sofa/chinese_sofa_arm_2k.jpg",
+      "bytes": 2085806,
+      "sha256": "6696208747252c93e33e41df0b3a69443a2ff350fa7c6869e795d7b70220d4c0",
+      "sourceMd5": "3ce0388141f1db2d958a64344f0ef826"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/chinese_sofa/chinese_sofa_diff_2k.jpg",
+      "bytes": 1986052,
+      "sha256": "6998ffaccbc640c868389a322af753da38489065ed13d218e8e2497bf9d1d6bb",
+      "sourceMd5": "0bb020bf5b6532f57b94e96f587b23ef"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/chinese_sofa/chinese_sofa.bin",
+      "bytes": 29824,
+      "sha256": "5e91e3bc0d8bed2c7260501feca7d24eb355f2477a3ad2ca5e782351616cca4f",
+      "sourceMd5": "6d5166585d031df7e90cb264780ec5b8"
+    }
+  ]
+}

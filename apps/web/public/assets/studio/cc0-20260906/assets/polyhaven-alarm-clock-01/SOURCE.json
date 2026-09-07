@@ -1,0 +1,98 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/alarm_clock_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "date_published": 1628812800,
+    "name": "Alarm Clock 01",
+    "categories": [
+      "props",
+      "decorative",
+      "rigged"
+    ],
+    "type": 2,
+    "tags": [
+      "clock",
+      "time",
+      "alarm",
+      "bedside",
+      "old",
+      "90s",
+      "watch",
+      "blue",
+      "aqua"
+    ],
+    "authors": {
+      "Yann Kervran": "Rigging",
+      "James Ray Cock": "Modeling & Texturing"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 13006,
+    "texel_density": 22492.208160106835,
+    "dimensions": [
+      227.71471738815308,
+      168.41959953308105,
+      174.15538430213928
+    ],
+    "sponsors": [
+      "20953239"
+    ],
+    "files_hash": "286437d3c3b7a8a0cac2022b3d8647ac26026416",
+    "description": "Free 8K rigged model of a retro aqua twin-bell bedside alarm clock with worn metal, Roman numerals, and animatable parts.",
+    "category_id": "bffedad2-e774-5b42-b1eb-a55278b026ee",
+    "category": "Electronics & Appliances/Clocks & Timepieces/Alarm Clocks",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "metal",
+        "glass"
+      ],
+      "rigged": true
+    },
+    "download_count": 47654,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/alarm_clock_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/alarm_clock_01/alarm_clock_01_2k.gltf",
+      "bytes": 10056,
+      "sha256": "d721cd6a93da98ffe1097fe6089b58ff8a83373b6f8c4f16e3dfdd9080d350e6",
+      "sourceMd5": "202132041ed04e89fc7553d2c830a4e6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/alarm_clock_01/alarm_clock_01_nor_gl_2k.jpg",
+      "bytes": 1386574,
+      "sha256": "dcb311b01962916dc43faf9e05a96e98e6e632aa4587e9cd4c9961aea2882398",
+      "sourceMd5": "05f050491ea39bcf1ce4223733095988"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/alarm_clock_01/alarm_clock_01_diff_2k.jpg",
+      "bytes": 1254506,
+      "sha256": "077228e3132c61f92982c06b74fbb59d3e7164c915cdd41577c556322b163a67",
+      "sourceMd5": "e2ad7c72fa00abc90b4870f2f2c66ca7"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/alarm_clock_01/alarm_clock_01_arm_2k.jpg",
+      "bytes": 1752727,
+      "sha256": "ad695b48ecbf07767653632463c4c5d794eb47420de5a459e5723d5c2e49714d",
+      "sourceMd5": "92e8b6b47203b1964a44ebcf65bab6cf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/alarm_clock_01/alarm_clock_01.bin",
+      "bytes": 284408,
+      "sha256": "74b589dc31596fe9350e8ef6d123571955d58cee9955060d831fa0f3055758c6",
+      "sourceMd5": "276d0e4b0863c2d5ab976abaa5ea0451"
+    }
+  ]
+}

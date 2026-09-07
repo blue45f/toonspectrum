@@ -1,0 +1,90 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/round_wooden_table_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "donated": true,
+    "type": 2,
+    "tags": [
+      "vintage",
+      "wooden",
+      "wood",
+      "polish",
+      "circle",
+      "dark",
+      "old"
+    ],
+    "name": "Round Wooden Table 01",
+    "categories": [
+      "furniture",
+      "table"
+    ],
+    "authors": {
+      "Ulan Cabanilla": "All"
+    },
+    "date_published": 1633046400,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 8640,
+    "texel_density": 3073.888077370229,
+    "dimensions": [
+      1399.3489742279053,
+      1399.3489146232605,
+      1005.0213932991028
+    ],
+    "files_hash": "68d8afc5c698ecb2b91c3773864c78f58fa75c5a",
+    "description": "Free 8K model of a vintage round wooden table with a turned pedestal, splayed legs, dark polished finish and subtle surface wear.",
+    "category_id": "dfe0e21f-ebb5-57e6-b76e-1b2c58bae1a3",
+    "category": "Furniture/Tables/Dining Tables",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "download_count": 44662,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/round_wooden_table_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/round_wooden_table_01/round_wooden_table_01_2k.gltf",
+      "bytes": 4089,
+      "sha256": "94960f2003dc9a971b8c8301fba5f44889d8c50e3a6139854f1db67997936555",
+      "sourceMd5": "ea943f07ea534b6a5b5fa434f52e4a7f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/round_wooden_table_01/round_wooden_table_01_nor_gl_2k.jpg",
+      "bytes": 194669,
+      "sha256": "3ab7c0a7bfbccdec9c838abc534e951ccaca7ae0cf2d22ac3d04bff9cc8494cc",
+      "sourceMd5": "04f870c7ea40d0e7484652d0a6d21123"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/round_wooden_table_01/round_wooden_table_01_arm_2k.jpg",
+      "bytes": 441023,
+      "sha256": "4c51574c5e46efbd4edd892017665bfec7df0856d791cc938f3cd610f3847b7f",
+      "sourceMd5": "bf491689dc56350871b7af875e3feb70"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/round_wooden_table_01/round_wooden_table_01_diff_2k.jpg",
+      "bytes": 435742,
+      "sha256": "8420633c215c8ef36adb6db2e9a394b085ccab2b513b247257d0aae02a730624",
+      "sourceMd5": "5a3ff753c828e773cc02fb48d1857365"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/round_wooden_table_01/round_wooden_table_01.bin",
+      "bytes": 242688,
+      "sha256": "c2635368bc86239a73fafdd8bce20b4261155ce7241e95e809a753ed4693f157",
+      "sourceMd5": "b907851fab9d7552cef8a12858acc869"
+    }
+  ]
+}

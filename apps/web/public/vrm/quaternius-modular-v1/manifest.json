@@ -1,0 +1,1225 @@
+{
+  "version": 1,
+  "sourceLicense": "CC0-1.0",
+  "entries": [
+    {
+      "id": "quaternius-modular-male-adventurer",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-adventurer.vrm",
+      "bytes": 1118264,
+      "sha256": "2f4d7ecc2d8e76f15ffaee016b92a7b0153971eea62f01bad4732ab3ecdb7e80",
+      "sourceFbxSha256": "2dd4bf1bc18968fdc5245863c25dfedcb572dbd63ae7581fe27ae4a8a063d6e3",
+      "assembledGlbSha256": "f320cca63c8b69c39c86a2958d983764e13ebbd91a96ababe1546aca741c6873",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 5,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "Adventurer",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.06268352270126343,
+      "meanDiscardedInfluenceMass": 0.0011618636744219189,
+      "verticesWithDiscardedInfluences": 220,
+      "sourceVertexCount": 5330
+    },
+    {
+      "id": "quaternius-modular-male-beach",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-beach.vrm",
+      "bytes": 751404,
+      "sha256": "49a15e78de542000c00e56c9629e00538581895d571d53414ee0cbf2ac156e6d",
+      "sourceFbxSha256": "2ab227a41c6a8a594c61828fd63beec69b0d5f3d23edc2fd5a938e5859322862",
+      "assembledGlbSha256": "47c076261ee171c08d7928301a64384ef3030025df6b1f40794afc5f8ad5c2a9",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "Beach",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.05559329688549042,
+      "meanDiscardedInfluenceMass": 0.00006699362793286852,
+      "verticesWithDiscardedInfluences": 13,
+      "sourceVertexCount": 3399
+    },
+    {
+      "id": "quaternius-modular-male-casual",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-casual.vrm",
+      "bytes": 707820,
+      "sha256": "890d6e6d539683f5181caba8f5916df25fb0dde63622576015a24a27c2f69d3c",
+      "sourceFbxSha256": "a4f84c2b788d2761a711cebd628c1770b7ae5a5a40e7a8faf09dd5c37a8eca7b",
+      "assembledGlbSha256": "90e8181a5f750ce951760cd97f0d5ff553281848f7f8e71cf0e622dfb3e2dc32",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "Casual",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.105318333953619,
+      "meanDiscardedInfluenceMass": 0.00047463476168770237,
+      "verticesWithDiscardedInfluences": 53,
+      "sourceVertexCount": 3199
+    },
+    {
+      "id": "quaternius-modular-male-casual2",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-casual2.vrm",
+      "bytes": 678952,
+      "sha256": "2d11a67e58a67f95ef435880fcdc487737cd984fd8959126d2f9b02bdb5f8b7f",
+      "sourceFbxSha256": "16087f97266eab15cbc154859dc9cb8c0dd068f7adcaa6ad4be685744bd61d49",
+      "assembledGlbSha256": "3b6f7d56c5a753f03730200596f3f30a89206f4d7eb6a084d0ed1c5e22d54c6f",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "Casual2",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.05716322362422943,
+      "meanDiscardedInfluenceMass": 0.00018952833504294134,
+      "verticesWithDiscardedInfluences": 21,
+      "sourceVertexCount": 2964
+    },
+    {
+      "id": "quaternius-modular-male-farmer",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-farmer.vrm",
+      "bytes": 628312,
+      "sha256": "ae5e2562fd56a5b9b68d907a3f3f1ba7cd501c863f6732c592ffe62d21236f11",
+      "sourceFbxSha256": "76d57bf99aa30146b9376ecfc903fefdef67f8a293d82de323e2dd660933a352",
+      "assembledGlbSha256": "e972b35be81dcf1fdb645170686577b812ecc125a82bc8593ea6271ea4c4f67f",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "Farmer",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.05886014178395271,
+      "meanDiscardedInfluenceMass": 0.00016415893445854466,
+      "verticesWithDiscardedInfluences": 30,
+      "sourceVertexCount": 2786
+    },
+    {
+      "id": "quaternius-modular-male-king",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-king.vrm",
+      "bytes": 1204680,
+      "sha256": "39b1d86c14f7bb263031f72e7817db86344c207e1c97d16d2e7562b8e32ee2cc",
+      "sourceFbxSha256": "2f428a56c253e01d48501c8d9a63b967b74357beeac9f830df65f7ba68f51c5b",
+      "assembledGlbSha256": "5a2dd7bb3c6457f411a1d3bcca5d7aafae4b474a25a217c945cd871fa9b44243",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "King",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.07584486901760101,
+      "meanDiscardedInfluenceMass": 0.00047667027509397484,
+      "verticesWithDiscardedInfluences": 102,
+      "sourceVertexCount": 5703
+    },
+    {
+      "id": "quaternius-modular-male-punk",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-punk.vrm",
+      "bytes": 629568,
+      "sha256": "62ef023b0735540d1002836ab42b37f317ca981678f1f78cf436dafd2da38e2e",
+      "sourceFbxSha256": "59b0ee5aa13c02398e818abb6bb9011e2b95bd6b5ae0a8f8014c4a3553434993",
+      "assembledGlbSha256": "6125cd17b2a7c93091e8540573e7df1f15767e2083b29f8345a2565f119377ae",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "Punk",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.06865894235670567,
+      "meanDiscardedInfluenceMass": 0.00033444175157672077,
+      "verticesWithDiscardedInfluences": 41,
+      "sourceVertexCount": 2802
+    },
+    {
+      "id": "quaternius-modular-male-spacesuit",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-spacesuit.vrm",
+      "bytes": 1137232,
+      "sha256": "f8419afaef306ba58c49142fe851b83932e0221b934c9b332b3c40161c0eeafc",
+      "sourceFbxSha256": "9b8f320e3ee853a928a4d3abf646690eeaac5b2918e0d5ef3a31a526c2953548",
+      "assembledGlbSha256": "710bbe3cf4f740dfe5a69278ac4addaf899717b6737fcc9d4a67b5b1009b6c95",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "Spacesuit",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.08097478561103344,
+      "meanDiscardedInfluenceMass": 0.0008472916561177161,
+      "verticesWithDiscardedInfluences": 164,
+      "sourceVertexCount": 5470
+    },
+    {
+      "id": "quaternius-modular-male-suit",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-suit.vrm",
+      "bytes": 770132,
+      "sha256": "2708f41db4bee8c51565566219966e045f4a67f69616eedd02b1c5b2547f83d8",
+      "sourceFbxSha256": "fea0cd877573ec24e8882f3165708a1c6e3ed1aff7b886b3d867820dee916413",
+      "assembledGlbSha256": "71c2480841872a87b70117c25019fbc5c1813572adcf1f87d924b16b9f17b9ed",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "Suit",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.10940040647983551,
+      "meanDiscardedInfluenceMass": 0.00031214076938815326,
+      "verticesWithDiscardedInfluences": 35,
+      "sourceVertexCount": 3432
+    },
+    {
+      "id": "quaternius-modular-male-swat",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-swat.vrm",
+      "bytes": 790964,
+      "sha256": "c3a3a148118c8d838cea784f07884b930f1648146514d33904ff6f8c0813defb",
+      "sourceFbxSha256": "3c5eda6fe78350350363cb1e2ff8be0c7d8a02d58fc60584992b471c04357fa0",
+      "assembledGlbSha256": "6917b5890b7c4024fc0fa7a133c4eaa015e7c0b670adef8f74b5ef5ccac85fd0",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "Swat",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.09958744794130325,
+      "meanDiscardedInfluenceMass": 0.00032545863852380315,
+      "verticesWithDiscardedInfluences": 36,
+      "sourceVertexCount": 3949
+    },
+    {
+      "id": "quaternius-modular-male-worker",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-worker.vrm",
+      "bytes": 602048,
+      "sha256": "7fe01fffae4295a4e22c8ac4a01147a2c1aa6551b558131ff2411b985523f7cf",
+      "sourceFbxSha256": "000eb1269f39e0b10a77c9bd33181c790341480324d72708cc7c22be177c49d6",
+      "assembledGlbSha256": "d79e4773019a23ee1a07df606cffb19bff6c638f8f353dd7db2cffd962720fc4",
+      "binaryChunksPreserved": true,
+      "humanBones": 48,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "sourceName": "Worker",
+      "gender": "male",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones",
+        "two-segment-thumbs"
+      ],
+      "restHierarchyRepairs": [],
+      "maximumRestMatrixDelta": 0,
+      "importedPaletteAlphaRepairs": [],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.06315671652555466,
+      "meanDiscardedInfluenceMass": 0.0002401049018479739,
+      "verticesWithDiscardedInfluences": 30,
+      "sourceVertexCount": 2676
+    },
+    {
+      "id": "quaternius-modular-female-adventurer",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-adventurer.vrm",
+      "bytes": 776756,
+      "sha256": "8d0c9852c219e023d5a8921d89df38665f41299f3b6cb9b360575a16901c91d2",
+      "sourceFbxSha256": "511aff0d19dcae794e2c9e04c4cb50e3b1317a962cce75551a8aa2012819941d",
+      "assembledGlbSha256": "2fa73aebfe6946515aebc73eac988b1a50ff894bb232fa84c04df360d3d3a4fc",
+      "binaryChunksPreserved": true,
+      "humanBones": 50,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "sourceName": "Adventurer",
+      "gender": "female",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones"
+      ],
+      "restHierarchyRepairs": [
+        {
+          "bone": "UpperLeg.L",
+          "previousParent": "Root",
+          "parent": "Hips"
+        },
+        {
+          "bone": "UpperLeg.R",
+          "previousParent": "Root",
+          "parent": "Hips"
+        }
+      ],
+      "maximumRestMatrixDelta": 0.0000133514404296875,
+      "importedPaletteAlphaRepairs": [
+        {
+          "material": "Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown2",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown_02",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Gold",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Green",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Hair_Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "LightGreen",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Skin",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "White",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        }
+      ],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.10667639225721359,
+      "meanDiscardedInfluenceMass": 0.0009733097650956372,
+      "verticesWithDiscardedInfluences": 139,
+      "sourceVertexCount": 3533
+    },
+    {
+      "id": "quaternius-modular-female-casual",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-casual.vrm",
+      "bytes": 729372,
+      "sha256": "8153d87686e2b863f709de9e9ee1316f1d1cf082f629630c57ed9b06711b41a7",
+      "sourceFbxSha256": "2009fc379bee9e3e01ddf440e7a7b4a375b6d9f6989cbb1d6ea79c64eb0714ab",
+      "assembledGlbSha256": "070e5090b817a80c6648c5c4e326809a53b05d9b43808eab1f040d37bb981500",
+      "binaryChunksPreserved": true,
+      "humanBones": 50,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "sourceName": "Casual",
+      "gender": "female",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones"
+      ],
+      "restHierarchyRepairs": [
+        {
+          "bone": "UpperLeg.L",
+          "previousParent": "Root",
+          "parent": "Hips"
+        },
+        {
+          "bone": "UpperLeg.R",
+          "previousParent": "Root",
+          "parent": "Hips"
+        }
+      ],
+      "maximumRestMatrixDelta": 0.0000133514404296875,
+      "importedPaletteAlphaRepairs": [
+        {
+          "material": "Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Grey",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Hair_Blond",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Hair_Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Orange",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Skin",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "White",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        }
+      ],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.09563165158033371,
+      "meanDiscardedInfluenceMass": 0.0008281760183021878,
+      "verticesWithDiscardedInfluences": 117,
+      "sourceVertexCount": 3300
+    },
+    {
+      "id": "quaternius-modular-female-formal",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-formal.vrm",
+      "bytes": 692068,
+      "sha256": "d27837fe87d7907548e55ec6024b32d095c45c1686a3dbae6db6ff80ba1d14e4",
+      "sourceFbxSha256": "32baa84de3935c84d84ef9cb210850fefb548e3ae7ccb3d3ca29bc5a9c0204b7",
+      "assembledGlbSha256": "815a01ff8d365895d87c6a636ce77dad7f8ea51cf68cc9d225e95c0593a3765e",
+      "binaryChunksPreserved": true,
+      "humanBones": 50,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "sourceName": "Formal",
+      "gender": "female",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones"
+      ],
+      "restHierarchyRepairs": [
+        {
+          "bone": "UpperLeg.L",
+          "previousParent": "Root",
+          "parent": "Hips"
+        },
+        {
+          "bone": "UpperLeg.R",
+          "previousParent": "Root",
+          "parent": "Hips"
+        }
+      ],
+      "maximumRestMatrixDelta": 0.0000133514404296875,
+      "importedPaletteAlphaRepairs": [
+        {
+          "material": "Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Gold",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "LimeGreen",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Red",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Skin",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        }
+      ],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.12857628241181374,
+      "meanDiscardedInfluenceMass": 0.0008840436956265915,
+      "verticesWithDiscardedInfluences": 121,
+      "sourceVertexCount": 3196
+    },
+    {
+      "id": "quaternius-modular-female-medieval",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-medieval.vrm",
+      "bytes": 729576,
+      "sha256": "c3dd297ad74a7af8e1a8283e4cd7f0ef7288b747de08e3abeea0ea8ac7ad8f58",
+      "sourceFbxSha256": "3c46289eaaeb19719de8f08d7144b407a27c31bf97805445bfbc5d5e9c40c7cf",
+      "assembledGlbSha256": "5773449367fa4eba0e8b1eac2883297e2881a97a37572aeb14b292406d0c7378",
+      "binaryChunksPreserved": true,
+      "humanBones": 50,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "sourceName": "Medieval",
+      "gender": "female",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones"
+      ],
+      "restHierarchyRepairs": [
+        {
+          "bone": "UpperLeg.L",
+          "previousParent": "Root",
+          "parent": "Hips"
+        },
+        {
+          "bone": "UpperLeg.R",
+          "previousParent": "Root",
+          "parent": "Hips"
+        }
+      ],
+      "maximumRestMatrixDelta": 0.0000133514404296875,
+      "importedPaletteAlphaRepairs": [
+        {
+          "material": "Black",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "DarkBrown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Gold",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "LightBrown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Metal",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Skin",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "White",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        }
+      ],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.12220408767461777,
+      "meanDiscardedInfluenceMass": 0.001074942665425181,
+      "verticesWithDiscardedInfluences": 141,
+      "sourceVertexCount": 3293
+    },
+    {
+      "id": "quaternius-modular-female-punk",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-punk.vrm",
+      "bytes": 672424,
+      "sha256": "63657e5bee3ed9e836cfe64e65a9137248c4a0ef409104c7af6c8647fb3e2578",
+      "sourceFbxSha256": "499cd0eb9895c037fb5ef78444cafc5909899028781aca5ec487b2ce9c4386c1",
+      "assembledGlbSha256": "995646f223ae8c1f2d6f12980c20e366fa1a5223fc37d7d14c88a88eece4d8f4",
+      "binaryChunksPreserved": true,
+      "humanBones": 50,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "sourceName": "Punk",
+      "gender": "female",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones"
+      ],
+      "restHierarchyRepairs": [
+        {
+          "bone": "UpperLeg.L",
+          "previousParent": "Root",
+          "parent": "Hips"
+        },
+        {
+          "bone": "UpperLeg.R",
+          "previousParent": "Root",
+          "parent": "Hips"
+        }
+      ],
+      "maximumRestMatrixDelta": 0.0000133514404296875,
+      "importedPaletteAlphaRepairs": [
+        {
+          "material": "Black",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Grey",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Hair_Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Pink",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Skin",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        }
+      ],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.10218163579702377,
+      "meanDiscardedInfluenceMass": 0.0010609551284032743,
+      "verticesWithDiscardedInfluences": 134,
+      "sourceVertexCount": 3088
+    },
+    {
+      "id": "quaternius-modular-female-scifi",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-scifi.vrm",
+      "bytes": 799668,
+      "sha256": "6ccf6deefc1c5127da7d9648e5a26d1f82391686aebb8fb22fc732fbcf9a4bdd",
+      "sourceFbxSha256": "2ab53ed30dee4d7db84e6aab308604f6df2957113d21d661f52c74cddcefedb7",
+      "assembledGlbSha256": "0ed01da01bc4797b95271a53340fba2ddca1294a9775092d6fccfa7d36ed3421",
+      "binaryChunksPreserved": true,
+      "humanBones": 50,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "sourceName": "SciFi",
+      "gender": "female",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones"
+      ],
+      "restHierarchyRepairs": [
+        {
+          "bone": "UpperLeg.L",
+          "previousParent": "Root",
+          "parent": "Hips"
+        },
+        {
+          "bone": "UpperLeg.R",
+          "previousParent": "Root",
+          "parent": "Hips"
+        }
+      ],
+      "maximumRestMatrixDelta": 0.0000133514404296875,
+      "importedPaletteAlphaRepairs": [
+        {
+          "material": "Black",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Blue",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Hair_Black",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "LightBlue",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Metal",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Skin",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        }
+      ],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.08057845383882523,
+      "meanDiscardedInfluenceMass": 0.0005982397060486726,
+      "verticesWithDiscardedInfluences": 100,
+      "sourceVertexCount": 3656
+    },
+    {
+      "id": "quaternius-modular-female-soldier",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-soldier.vrm",
+      "bytes": 887388,
+      "sha256": "6a4679deb21fb429900e26460846cc9c4cdc0debc8beabd4c4b8f7fcda5508b6",
+      "sourceFbxSha256": "e6911062f42a3ee99ba1a48a75eabea6e3287c59c44d47607c4672080bd37269",
+      "assembledGlbSha256": "df91ad5146e95563980ed060aa2454f7675931cf8ee54d50deea17970f2698df",
+      "binaryChunksPreserved": true,
+      "humanBones": 50,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "sourceName": "Soldier",
+      "gender": "female",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones"
+      ],
+      "restHierarchyRepairs": [
+        {
+          "bone": "UpperLeg.L",
+          "previousParent": "Root",
+          "parent": "Hips"
+        },
+        {
+          "bone": "UpperLeg.R",
+          "previousParent": "Root",
+          "parent": "Hips"
+        }
+      ],
+      "maximumRestMatrixDelta": 0.0000133514404296875,
+      "importedPaletteAlphaRepairs": [
+        {
+          "material": "Black",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Grey",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Hair_Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Skin",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Swat",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        }
+      ],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.1068924181163311,
+      "meanDiscardedInfluenceMass": 0.0010714190527541963,
+      "verticesWithDiscardedInfluences": 165,
+      "sourceVertexCount": 4094
+    },
+    {
+      "id": "quaternius-modular-female-suit",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-suit.vrm",
+      "bytes": 735840,
+      "sha256": "037c8ec7e0ba80a6fed4dd3502dd5b64a7812f63b066acc725c4a4d307663d31",
+      "sourceFbxSha256": "6f9a543c597379e13a16d070a72417713f07df826fbd98c154f0ea24d6a1c537",
+      "assembledGlbSha256": "d6d550e2ed98c611afc39f7f4781596d515ed63dec3bda7fad60c1d9aced331f",
+      "binaryChunksPreserved": true,
+      "humanBones": 50,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "sourceName": "Suit",
+      "gender": "female",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones"
+      ],
+      "restHierarchyRepairs": [
+        {
+          "bone": "UpperLeg.L",
+          "previousParent": "Root",
+          "parent": "Hips"
+        },
+        {
+          "bone": "UpperLeg.R",
+          "previousParent": "Root",
+          "parent": "Hips"
+        }
+      ],
+      "maximumRestMatrixDelta": 0.0000133514404296875,
+      "importedPaletteAlphaRepairs": [
+        {
+          "material": "Black",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Hair_Blond",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Hair_Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Skin",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "White",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        }
+      ],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.11969102919101715,
+      "meanDiscardedInfluenceMass": 0.0010616605412722027,
+      "verticesWithDiscardedInfluences": 148,
+      "sourceVertexCount": 3343
+    },
+    {
+      "id": "quaternius-modular-female-witch",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-witch.vrm",
+      "bytes": 785472,
+      "sha256": "2ab292da54f3ca0fe2576d96b445e0dcad4cf630af75720b08d39f389af2be72",
+      "sourceFbxSha256": "c39e7c69405742ae05d1f30f4d268030d5971679c817426edc822b4a20c35373",
+      "assembledGlbSha256": "7acb6f160106c479aa4e2c9e86863430052442fa3cb8e35d58f6ce2388694eda",
+      "binaryChunksPreserved": true,
+      "humanBones": 50,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "sourceName": "Witch",
+      "gender": "female",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones"
+      ],
+      "restHierarchyRepairs": [
+        {
+          "bone": "UpperLeg.L",
+          "previousParent": "Root",
+          "parent": "Hips"
+        },
+        {
+          "bone": "UpperLeg.R",
+          "previousParent": "Root",
+          "parent": "Hips"
+        }
+      ],
+      "maximumRestMatrixDelta": 0.0000133514404296875,
+      "importedPaletteAlphaRepairs": [
+        {
+          "material": "Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown2",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Gold",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Hair_Black",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Purple",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Skin",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        }
+      ],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.06979213654994965,
+      "meanDiscardedInfluenceMass": 0.000870457152684269,
+      "verticesWithDiscardedInfluences": 141,
+      "sourceVertexCount": 3584
+    },
+    {
+      "id": "quaternius-modular-female-worker",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-worker.vrm",
+      "bytes": 693692,
+      "sha256": "86d5e253ee54c6e9bd2b74a96f2ccd6eb652c6a5f4e97afdbab71ffe6ab2b478",
+      "sourceFbxSha256": "cac9cb16299b43e1ef8e0888f505bd77ce9bb82facacd10af5e84de743b22884",
+      "assembledGlbSha256": "4f9d4c2d331b24ab57407b24396b4d4f1ee1d76f7e3e3df03dc738891d4c154b",
+      "binaryChunksPreserved": true,
+      "humanBones": 50,
+      "skins": 1,
+      "meshes": 4,
+      "animations": 0,
+      "images": 0,
+      "expressions": false,
+      "sourceUrl": "https://quaternius.com/packs/ultimatemodularwomen.html",
+      "sourceName": "Worker",
+      "gender": "female",
+      "style": "stylized-low-poly",
+      "limitations": [
+        "no-facial-expressions",
+        "no-toe-bones"
+      ],
+      "restHierarchyRepairs": [
+        {
+          "bone": "UpperLeg.L",
+          "previousParent": "Root",
+          "parent": "Hips"
+        },
+        {
+          "bone": "UpperLeg.R",
+          "previousParent": "Root",
+          "parent": "Hips"
+        }
+      ],
+      "maximumRestMatrixDelta": 0.0000133514404296875,
+      "importedPaletteAlphaRepairs": [
+        {
+          "material": "Black",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown2",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Brown_02",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "DarkBrown",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Skin",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "White",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Worker_Vest",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        },
+        {
+          "material": "Worker_Yellow",
+          "from": 0,
+          "to": 1,
+          "reason": "opaque source palette alpha=1, contradictory imported Principled alpha=0"
+        }
+      ],
+      "skinningInfluenceLimit": 4,
+      "maximumDiscardedInfluenceMass": 0.1261695772409439,
+      "meanDiscardedInfluenceMass": 0.0009323987636652712,
+      "verticesWithDiscardedInfluences": 126,
+      "sourceVertexCount": 3161
+    }
+  ],
+  "visualReviewed": true,
+  "productionPublished": false,
+  "visualReviewEvidence": {
+    "runtimeReport": "artifacts/studio-asset-expansion/modular-runtime-validation.json",
+    "runtimeReportSha256": "a518c887963b753efe685e437d40f62d8d9d0dc9a38813e7c6e16c596adc4dd3",
+    "reviewedModelCount": 21,
+    "productionPresetCases": 84,
+    "productionPresets": [
+      "default",
+      "wave",
+      "sit",
+      "run"
+    ],
+    "renderer": "Apple M2 Max / ANGLE Metal",
+    "contactSheets": [
+      "artifacts/studio-asset-expansion/previews/modular-v1/contact-1.png",
+      "artifacts/studio-asset-expansion/previews/modular-v1/contact-2.png",
+      "artifacts/studio-asset-expansion/previews/modular-v1/contact-3.png",
+      "artifacts/studio-asset-expansion/previews/modular-v1/contact-4.png"
+    ],
+    "reviewNotes": "artifacts/studio-asset-expansion/MODULAR-RUNTIME-REVIEW.md",
+    "scope": "Final asset hashes matched runtime receipts; all neutral thumbnails and selected production-pose captures were visually reviewed. This is local review, not production publication."
+  }
+}

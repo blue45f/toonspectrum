@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/fabric_leather_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 1,
+    "date_published": 1588892467,
+    "name": "Fabric Leather 02",
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      500,
+      499.9999403953552
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "categories": [
+      "fabric",
+      "leather"
+    ],
+    "files_hash": "bf7a36ee9fa03ad746b3646b5e6306489a7d11d1",
+    "tags": [
+      "leather",
+      "couch",
+      "seat",
+      "upholstery",
+      "stitched",
+      "vintage",
+      "wrinkled",
+      "aged",
+      "creased",
+      "chair"
+    ],
+    "description": "Free 8K leather texture displaying warm brown upholstery with stitched seams, worn creases, wrinkled aged surface and a soft, natural specular sheen.",
+    "sponsors": [
+      "84390067"
+    ],
+    "category_id": "36329517-0f82-5b1e-bf68-aca8b4d1db92",
+    "category": "Textiles & Leather/Leather/Upholstery Leather",
+    "attributes": {
+      "surface_use": "object",
+      "condition": [
+        "worn",
+        "weathered"
+      ],
+      "origin": "man_made"
+    },
+    "download_count": 117177,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/fabric_leather_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_leather_02/fabric_leather_02_diff_2k.jpg",
+      "bytes": 2938354,
+      "sha256": "d2cd2e14face20b152dffd1d59a48d91bbef7b516242bc39c401c09d018e7eb8",
+      "sourceMd5": "32b45ed7c13638babcb9802e0350a625"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_leather_02/fabric_leather_02_rough_2k.jpg",
+      "bytes": 2709020,
+      "sha256": "36af9f3299a221608de05e4a7e2eac59c70f7a725e7de690361d2e1478d1e16f",
+      "sourceMd5": "c93f8111ea81c285954d49134c00a766"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_leather_02/fabric_leather_02_nor_gl_2k.jpg",
+      "bytes": 875379,
+      "sha256": "563b03aa64d8eabc9dac426c7f440550f7239480c68065c180a8bb16f31f746e",
+      "sourceMd5": "3deeccfecf50c2d576e63523c7e7ef5c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_leather_02/fabric_leather_02_ao_2k.jpg",
+      "bytes": 1599809,
+      "sha256": "b743c4ebe13976dac4f90f9501f10cce9683d826a4cb9ea8130702fd2b6d09b1",
+      "sourceMd5": "40de14eaed747d09de89f782010a772b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fabric_leather_02/fabric_leather_02_disp_2k.jpg",
+      "bytes": 379823,
+      "sha256": "7f6c67f74cb0b40636e6da4cc0befcac576320ad91f84417952cf6e506775cd9",
+      "sourceMd5": "700b8e798a347bbca8c910a2ca6f74b5"
+    }
+  ]
+}

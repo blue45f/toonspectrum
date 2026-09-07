@@ -1,0 +1,88 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/grass_path_2",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "grass",
+      "pathway",
+      "path",
+      "ground",
+      "stones",
+      "sidewalk",
+      "rural",
+      "farm"
+    ],
+    "date_published": 1529359200,
+    "name": "Grass Path 2",
+    "categories": [
+      "terrain",
+      "natural",
+      "outdoor"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      1000,
+      1000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "b4f12e39d7b91eb602717bd76dc4ed8a0ab34185",
+    "description": "Free 8K texture of a compacted dirt path with scattered stones and small grass tufts, rough, grainy earth with subtle displacement and worn, patchy areas.",
+    "category_id": "dd06ef8e-5807-534b-b7ac-19fb07264599",
+    "category": "Ground & Terrain/Rocky Ground/Rocky Paths & Trails",
+    "attributes": {
+      "surface_use": "ground",
+      "condition": [
+        "worn"
+      ],
+      "origin": "natural",
+      "setting": "outdoor"
+    },
+    "download_count": 79325,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/grass_path_2.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grass_path_2/grass_path_2_diff_2k.jpg",
+      "bytes": 2788295,
+      "sha256": "e6b353085d0fc0062832e70cfdf1b77f8b886a1fbb303541479e4f99a3b3ee79",
+      "sourceMd5": "e03c3884e3a1f13dc838a4eee9af4dab"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grass_path_2/grass_path_2_rough_2k.jpg",
+      "bytes": 1329811,
+      "sha256": "96bc66d10e0f29ca5d1a9efda7734fd0522b5e0c01ba4a828415176d754667b5",
+      "sourceMd5": "22fa874bdfd9a18f8c541342486493b0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grass_path_2/grass_path_2_nor_gl_2k.jpg",
+      "bytes": 2506245,
+      "sha256": "e25c3e4574021fafb3737c56a2b7373c84f1f0b9bce99b94c2b565b8cd7fd55e",
+      "sourceMd5": "f2496daebc75a5d9bc98ecd0c6a8657d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grass_path_2/grass_path_2_ao_2k.jpg",
+      "bytes": 1364400,
+      "sha256": "cbbafab428de4d73c02b7a45da52ef12ede624feb1eb9610726f1eb3dbba9b7e",
+      "sourceMd5": "c2bddc129eced825d3a4f865cf5ee2cf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/grass_path_2/grass_path_2_disp_2k.jpg",
+      "bytes": 554776,
+      "sha256": "268e3deba029eb286d127435aa0ee28cb671318edd2567fcdf01213a6b7cca77",
+      "sourceMd5": "fda2430b3014a6cf8f8b82cc09912a56"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rusty_metal_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "rust",
+      "old",
+      "weathered",
+      "painted"
+    ],
+    "date_published": 1542071519,
+    "name": "Rusty Metal 02",
+    "categories": [
+      "metal",
+      "man made",
+      "dirty",
+      "wall",
+      "indoor",
+      "outdoor"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      1000,
+      1000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "2595fd56a6313da94557337a298aff4b162e7704",
+    "description": "Free 8K texture of weathered painted metal with orange-brown rust speckles, flaking paint, subtle pitting and a rough, slightly matte finish.",
+    "category_id": "733fc0a1-302e-50f0-bd83-79d7fd8f3f1e",
+    "category": "Metal/Sheet & Corrugated/Flat Sheet",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "rusted",
+        "painted"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "download_count": 210278,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/rusty_metal_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_02/rusty_metal_02_diff_2k.jpg",
+      "bytes": 1952454,
+      "sha256": "4c887dd400ed8a5964377c65e20654262307d6888443eae85feb80cc6e72287a",
+      "sourceMd5": "385195f8de0117418d99dc1d06b7ff38"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_02/rusty_metal_02_rough_2k.jpg",
+      "bytes": 411581,
+      "sha256": "1d0748dfe7754d8b18c1dea5a2dff2da30848787d35abeb916c34b804decca3a",
+      "sourceMd5": "b3cde2ae9c01ae694d19ea0fa5d38bca"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_02/rusty_metal_02_nor_gl_2k.jpg",
+      "bytes": 1307478,
+      "sha256": "a7aa9c3e4b6859c723c8e9dc5b96d7ed6eed863271358a91641c727555da75ce",
+      "sourceMd5": "9d55427ccd90c8f54293232c87e36933"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_02/rusty_metal_02_ao_2k.jpg",
+      "bytes": 2103272,
+      "sha256": "84d6f92cfadd4880dc65f32ab8d00c4b614397f4a04c0a4f9a5a5b2971fa8879",
+      "sourceMd5": "cbec67d9578455551a9386c4a9409055"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_02/rusty_metal_02_disp_2k.jpg",
+      "bytes": 704302,
+      "sha256": "55bc2a20c5d0c49e203613faac765b3b6a2ec4e3f7864b367031647f6ae58f88",
+      "sourceMd5": "1addac9f8554df8d65a05cf5c2ca0947"
+    }
+  ]
+}
