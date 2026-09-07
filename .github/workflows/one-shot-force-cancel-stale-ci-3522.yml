@@ -1,4 +1,4 @@
-name: One-shot force cancel stale CI 3522
+name: One-shot cancel closed PR 918 runs
 
 on:
   push:
@@ -12,21 +12,40 @@ permissions:
   contents: read
 
 jobs:
-  force-cancel:
+  cancel-closed-pr-runs:
     runs-on: windows-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - name: Force cancel the superseded CI run
+      - name: Cancel every unfinished run from the closed duplicate branch
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          gh api --method POST "repos/$env:GITHUB_REPOSITORY/actions/runs/34154573077/force-cancel"
-          for ($attempt = 0; $attempt -lt 30; $attempt++) {
-            $status = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/34154573077" --jq '.status'
-            Write-Host "stale run status: $status"
-            if ($status -eq 'completed') { exit 0 }
+          $PSNativeCommandUseErrorActionPreference = $false
+          $branch = 'integration/all-open-mrs-20260908'
+          $encodedBranch = [uri]::EscapeDataString($branch)
+          $endpoint = "repos/$env:GITHUB_REPOSITORY/actions/runs?branch=$encodedBranch&per_page=100"
+          $runIds = @(gh api --paginate $endpoint --jq '.workflow_runs[] | select(.status != "completed") | .id')
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to list duplicate workflow runs.' }
+
+          foreach ($runId in $runIds) {
+            Write-Host "Cancelling duplicate run $runId"
+            gh api --method POST "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId/cancel" 2>$null
+            if ($LASTEXITCODE -ne 0) {
+              gh api --method POST "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId/force-cancel"
+              if ($LASTEXITCODE -ne 0) { throw "Unable to cancel run $runId" }
+            }
+          }
+
+          for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            $unfinished = @(gh api --paginate $endpoint --jq '.workflow_runs[] | select(.status != "completed") | .id')
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to verify duplicate workflow runs.' }
+            if ($unfinished.Count -eq 0) {
+              Write-Host 'All duplicate runs from closed PR #918 are completed.'
+              exit 0
+            }
+            Write-Host "Still unfinished: $($unfinished -join ', ')"
             Start-Sleep -Seconds 2
           }
-          throw 'Stale CI run did not reach completed state after force-cancel.'
+          throw 'Duplicate PR runs did not terminate in time.'
