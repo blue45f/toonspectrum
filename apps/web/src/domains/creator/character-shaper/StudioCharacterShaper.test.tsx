@@ -17,7 +17,10 @@ vi.mock("../vrm/useStudioVrmPoserController", () => ({
 }));
 
 vi.mock("./useCharacterShaperBinding", () => ({
-  useCharacterShaperBinding: () => ({ busyReason: null }),
+  useCharacterShaperBinding: () => ({
+    busyReason: null,
+    recipe: { slots: {} },
+  }),
 }));
 
 vi.mock("./StudioCharacterShaperDialog", () => ({
