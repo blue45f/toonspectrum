@@ -1,0 +1,152 @@
+name: One-shot Actions queue dedupe
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-actions-queue-dedupe-20260908.yml
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: one-shot-actions-queue-dedupe-20260908
+  cancel-in-progress: true
+
+jobs:
+  dedupe:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Cancel only superseded active workflow runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          SELF_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from __future__ import annotations
+
+          from collections import defaultdict
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+
+          repository = os.environ["GH_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          self_run_id = int(os.environ["SELF_RUN_ID"])
+          active_statuses = {"requested", "waiting", "pending", "queued", "in_progress"}
+
+          def api(path: str, method: str = "GET") -> tuple[int, object]:
+              request = urllib.request.Request(
+                  f"https://api.github.com{path}",
+                  method=method,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "User-Agent": "toonspectrum-actions-queue-dedupe",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      raw = response.read()
+                      return response.status, json.loads(raw) if raw else {}
+              except urllib.error.HTTPError as error:
+                  raw = error.read()
+                  try:
+                      payload: object = json.loads(raw) if raw else {}
+                  except json.JSONDecodeError:
+                      payload = raw.decode("utf-8", errors="replace")
+                  return error.code, payload
+
+          all_runs: list[dict[str, object]] = []
+          for page in range(1, 11):
+              status, payload = api(
+                  f"/repos/{repository}/actions/runs?per_page=100&page={page}"
+              )
+              if status != 200 or not isinstance(payload, dict):
+                  raise SystemExit(f"Unable to list workflow runs: HTTP {status}: {payload}")
+              page_runs = payload.get("workflow_runs", [])
+              if not isinstance(page_runs, list):
+                  raise SystemExit("GitHub returned an invalid workflow_runs payload")
+              all_runs.extend(run for run in page_runs if isinstance(run, dict))
+              if len(page_runs) < 100:
+                  break
+
+          active_runs = [
+              run
+              for run in all_runs
+              if run.get("status") in active_statuses
+              and int(run.get("id", 0)) != self_run_id
+              and run.get("head_branch") != "main"
+          ]
+
+          groups: dict[tuple[object, object, object], list[dict[str, object]]] = defaultdict(list)
+          for run in active_runs:
+              key = (run.get("head_branch"), run.get("workflow_id"), run.get("event"))
+              groups[key].append(run)
+
+          def order(run: dict[str, object]) -> tuple[str, int]:
+              return str(run.get("created_at") or ""), int(run.get("id", 0))
+
+          candidates: list[dict[str, object]] = []
+          keepers: list[dict[str, object]] = []
+          for group in groups.values():
+              if len(group) == 1:
+                  keepers.append(group[0])
+                  continue
+              newest = max(group, key=order)
+              newest_sha = newest.get("head_sha")
+              running_same_sha = [
+                  run
+                  for run in group
+                  if run.get("status") == "in_progress" and run.get("head_sha") == newest_sha
+              ]
+              keeper = max(running_same_sha, key=order) if running_same_sha else newest
+              keepers.append(keeper)
+              candidates.extend(run for run in group if run.get("id") != keeper.get("id"))
+
+          candidates.sort(key=order)
+          print(
+              f"active_non_main={len(active_runs)} groups={len(groups)} "
+              f"keepers={len(keepers)} superseded={len(candidates)}"
+          )
+
+          cancelled = 0
+          raced = 0
+          failures: list[str] = []
+          for run in candidates:
+              run_id = int(run["id"])
+              status, payload = api(
+                  f"/repos/{repository}/actions/runs/{run_id}/cancel",
+                  method="POST",
+              )
+              label = (
+                  f"{run_id} {run.get('head_branch')} / {run.get('name')} "
+                  f"[{run.get('status')}]"
+              )
+              if status == 202:
+                  cancelled += 1
+                  print(f"cancelled: {label}")
+              elif status in {404, 409}:
+                  raced += 1
+                  print(f"already terminal: {label} (HTTP {status})")
+              else:
+                  failures.append(f"{label}: HTTP {status}: {payload}")
+              time.sleep(0.05)
+
+          print(
+              f"summary: cancelled={cancelled} already_terminal={raced} "
+              f"failed={len(failures)}"
+          )
+          if failures:
+              raise SystemExit("Cancellation failures:\n" + "\n".join(failures))
+          PY
