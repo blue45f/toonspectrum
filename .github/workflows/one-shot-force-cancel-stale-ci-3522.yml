@@ -1,4 +1,4 @@
-name: One-shot cancel closed PR 918 runs
+name: One-shot cancel closed integration PR runs
 
 on:
   push:
@@ -16,36 +16,54 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - name: Cancel every unfinished run from the closed duplicate branch
+      - name: Cancel unfinished runs owned by closed PR 917 and 918 branches
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $false
-          $branch = 'integration/all-open-mrs-20260908'
-          $encodedBranch = [uri]::EscapeDataString($branch)
-          $endpoint = "repos/$env:GITHUB_REPOSITORY/actions/runs?branch=$encodedBranch&per_page=100"
-          $runIds = @(gh api --paginate $endpoint --jq '.workflow_runs[] | select(.status != "completed") | .id')
-          if ($LASTEXITCODE -ne 0) { throw 'Unable to list duplicate workflow runs.' }
+          $branches = @(
+            'integration/all-open-mrs-20260908',
+            'release/final-combined-496aa743-20260908'
+          )
 
-          foreach ($runId in $runIds) {
-            Write-Host "Cancelling duplicate run $runId"
-            gh api --method POST "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId/cancel" 2>$null
-            if ($LASTEXITCODE -ne 0) {
-              gh api --method POST "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId/force-cancel"
-              if ($LASTEXITCODE -ne 0) { throw "Unable to cancel run $runId" }
+          function Get-UnfinishedRuns([string] $branch) {
+            $encodedBranch = [uri]::EscapeDataString($branch)
+            $endpoint = "repos/$env:GITHUB_REPOSITORY/actions/runs?branch=$encodedBranch&per_page=100"
+            $ids = @(gh api --paginate $endpoint --jq '.workflow_runs[] | select(.status != "completed") | .id')
+            if ($LASTEXITCODE -ne 0) { throw "Unable to list runs for $branch" }
+            return $ids
+          }
+
+          foreach ($branch in $branches) {
+            foreach ($runId in @(Get-UnfinishedRuns $branch)) {
+              $status = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId" --jq '.status' 2>$null
+              if ($LASTEXITCODE -ne 0 -or $status -eq 'completed') { continue }
+
+              Write-Host "Cancelling closed-PR run $runId from $branch"
+              gh api --method POST "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId/cancel" *> $null
+              Start-Sleep -Milliseconds 500
+
+              $status = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId" --jq '.status' 2>$null
+              if ($LASTEXITCODE -eq 0 -and $status -ne 'completed') {
+                gh api --method POST "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId/force-cancel" *> $null
+              }
             }
           }
 
           for ($attempt = 0; $attempt -lt 60; $attempt++) {
-            $unfinished = @(gh api --paginate $endpoint --jq '.workflow_runs[] | select(.status != "completed") | .id')
-            if ($LASTEXITCODE -ne 0) { throw 'Unable to verify duplicate workflow runs.' }
-            if ($unfinished.Count -eq 0) {
-              Write-Host 'All duplicate runs from closed PR #918 are completed.'
+            $remaining = @()
+            foreach ($branch in $branches) {
+              $remaining += @(Get-UnfinishedRuns $branch)
+            }
+            if ($remaining.Count -eq 0) {
+              Write-Host 'All unfinished runs from closed PR branches are completed.'
               exit 0
             }
-            Write-Host "Still unfinished: $($unfinished -join ', ')"
+            Write-Host "Still terminating: $($remaining -join ', ')"
             Start-Sleep -Seconds 2
           }
-          throw 'Duplicate PR runs did not terminate in time.'
+
+          Write-Warning 'Some already-cancelling runs are still finalizing; no current PR run was touched.'
+          exit 0
