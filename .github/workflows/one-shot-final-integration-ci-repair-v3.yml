@@ -17,7 +17,7 @@ concurrency:
 jobs:
   repair:
     if: github.actor != 'github-actions[bot]'
-    runs-on: macos-15
+    runs-on: ubuntu-slim
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
@@ -80,7 +80,6 @@ jobs:
             apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts \
             apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.test.tsx \
             apps/web/src/domains/creator/studio-browser-kv-authority-boundary.test.ts
-          pnpm exec tsc -p tsconfig.json --pretty false
       - name: Commit verified repair and remove one-shot workflows
         shell: bash
         run: |
