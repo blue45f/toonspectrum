@@ -13,5 +13,5 @@ test("core gates cannot turn green through the removed fast-merge switch", () =>
   ]) assert.ok(source.includes(command), `missing required command: ${command}`);
   assert.ok(source.includes("needs: [lint, typecheck, build, test, test-serial]"));
   assert.ok(source.includes('select(.value.result != "success")'));
-  assert.ok(source.includes("if: ${{ always() }}"));
+  assert.ok(source.includes("if: ${{ !cancelled() }}"));
 });
