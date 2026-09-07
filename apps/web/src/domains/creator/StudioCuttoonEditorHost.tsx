@@ -7483,6 +7483,7 @@ export function StudioCuttoonEditor({
     releaseSchedule,
     publicationAnalytics,
     referenceBoard,
+    scenarioImageReferenceDocument,
     title,
     description,
     tagsText,
