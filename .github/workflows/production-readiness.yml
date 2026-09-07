@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: Reconcile environment variables and deploy production
+        description: Apply missing variables and deploy production (false audits only)
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:
@@ -30,8 +30,18 @@ jobs:
       VERCEL_TELEMETRY_DISABLED: "1"
       PUBLIC_APP_ORIGIN: https://www.toonstudio.cloud
       DATABASE_URL_VALUE: ${{ secrets.DATABASE_URL }}
-      AUTH_SECRET_VALUE: ${{ secrets.AUTH_SECRET }}
-      BETTER_AUTH_SECRET_VALUE: ${{ secrets.BETTER_AUTH_SECRET }}
+      AUTH_SESSION_SECRET_VALUE: ${{ secrets.AUTH_SESSION_SECRET }}
+      AUTH_STATE_SECRET_VALUE: ${{ secrets.AUTH_STATE_SECRET }}
+      GOOGLE_OAUTH_CLIENT_ID_VALUE: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET_VALUE: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      KAKAO_REST_API_KEY_VALUE: ${{ secrets.KAKAO_REST_API_KEY }}
+      KAKAO_OAUTH_CLIENT_ID_VALUE: ${{ secrets.KAKAO_OAUTH_CLIENT_ID }}
+      KAKAO_CLIENT_SECRET_VALUE: ${{ secrets.KAKAO_CLIENT_SECRET }}
+      KAKAO_OAUTH_CLIENT_SECRET_VALUE: ${{ secrets.KAKAO_OAUTH_CLIENT_SECRET }}
+      NAVER_OAUTH_CLIENT_ID_VALUE: ${{ secrets.NAVER_OAUTH_CLIENT_ID }}
+      NAVER_CLIENT_ID_VALUE: ${{ secrets.NAVER_CLIENT_ID }}
+      NAVER_OAUTH_CLIENT_SECRET_VALUE: ${{ secrets.NAVER_OAUTH_CLIENT_SECRET }}
+      NAVER_CLIENT_SECRET_VALUE: ${{ secrets.NAVER_CLIENT_SECRET }}
       OPENAI_API_KEY_VALUE: ${{ secrets.OPENAI_API_KEY }}
       OPENROUTER_API_KEY_VALUE: ${{ secrets.OPENROUTER_API_KEY }}
       BLOB_READ_WRITE_TOKEN_VALUE: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
@@ -64,10 +74,23 @@ jobs:
             echo "::error::GitHub production environment secret VERCEL_TOKEN is missing."
             exit 1
           fi
-          echo "Vercel deployment credential is available."
+          if [[ -z "${VERCEL_PROJECT_ID:-}" || -z "${VERCEL_ORG_ID:-}" ]]; then
+            echo "::error::VERCEL_PROJECT_ID and VERCEL_ORG_ID are both required for the pinned Vercel CLI."
+            exit 1
+          fi
+          echo "Vercel deployment credentials are available."
 
       - name: Reconcile production variables without exposing values
-        run: node scripts/configure-vercel-production.mjs
+        shell: bash
+        env:
+          DEPLOY: ${{ inputs.deploy }}
+        run: |
+          set -euo pipefail
+          if [[ "$DEPLOY" == "true" ]]; then
+            node scripts/configure-vercel-production.mjs
+          else
+            node scripts/configure-vercel-production.mjs --audit-only
+          fi
 
       - name: Install and verify pinned Vercel CLI
         if: ${{ inputs.deploy }}
@@ -84,12 +107,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -n "${VERCEL_PROJECT_ID:-}" ]]; then
-            vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
-          else
-            vercel link --yes --project "$VERCEL_PROJECT_NAME" --token "$VERCEL_TOKEN"
-            vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
-          fi
+          vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
 
       - name: Deploy production
         id: deploy
