@@ -1,0 +1,21 @@
+name: Retire stale feedback PR 882 run
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-preempt-feedback-882.yml
+
+permissions: {}
+
+concurrency:
+  group: feedback-community-refs/pull/882/merge
+  cancel-in-progress: true
+
+jobs:
+  retire:
+    if: ${{ false }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "Retired stale feedback run from closed PR 882."

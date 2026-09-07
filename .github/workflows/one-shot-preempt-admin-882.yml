@@ -1,0 +1,21 @@
+name: Retire stale admin PR 882 run
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-preempt-admin-882.yml
+
+permissions: {}
+
+concurrency:
+  group: admin-hardening-882
+  cancel-in-progress: true
+
+jobs:
+  retire:
+    if: ${{ false }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "Retired stale admin run from closed PR 882."
