@@ -1,13 +1,46 @@
 import { SITE_URL } from "@toonspectrum/core";
 import { useEffect } from "react";
 
-// 라우트별 브라우저 탭 제목을 설정한다. title이 비면 기본 "툰스펙트럼"으로 둔다.
-// SPA라 페이지 전환 시 document.title이 그대로 남는 문제를 페이지마다 보정한다.
+import { useT } from "@/shared/lib/i18n";
+
+const LEGACY_PRODUCT_NAMES = ["툰스펙트럼", "ToonSpectrum"] as const;
+
+/**
+ * Page callers historically supplied a full title with the legacy product suffix.
+ * Normalize that boundary in one place while those callers migrate to page-only titles.
+ */
+export function formatProductTitle(
+  title: string | null | undefined,
+  productName: string,
+): string {
+  const brand = productName.trim() || "툰스튜디오";
+  const rawTitle = title?.trim() ?? "";
+  if (!rawTitle || rawTitle === brand || LEGACY_PRODUCT_NAMES.some((name) => rawTitle === name)) {
+    return brand;
+  }
+
+  const knownNames = [brand, ...LEGACY_PRODUCT_NAMES];
+  let pageTitle = rawTitle;
+  for (const name of knownNames) {
+    const suffix = ` · ${name}`;
+    if (pageTitle.endsWith(suffix)) {
+      pageTitle = pageTitle.slice(0, -suffix.length).trim();
+      break;
+    }
+  }
+
+  return pageTitle ? `${pageTitle} · ${brand}` : brand;
+}
+
+// 라우트별 브라우저 탭 제목을 설정한다. 브랜드명은 현재 로케일의 app.name 한 곳에서 읽는다.
 export function useDocumentTitle(title?: string | null) {
+  const t = useT();
+  const productName = t("app.name");
+
   useEffect(() => {
-    const next = title ? `${title} · 툰스펙트럼` : "툰스펙트럼";
+    const next = formatProductTitle(title, productName);
     if (document.title !== next) document.title = next;
-  }, [title]);
+  }, [productName, title]);
 }
 
 // 라우트별 구조화 데이터(JSON-LD)를 head에 별도 <script type="application/ld+json">로 주입한다.
@@ -86,13 +119,17 @@ export function usePageSocialMeta({
   description,
   type = "website",
   image = `${SITE_URL}/og-web.png`,
-  imageAlt = title,
+  imageAlt,
 }: PageSocialMeta): void {
+  const t = useT();
+  const productName = t("app.name");
+
   useEffect(() => {
     const normalizedPath = canonicalPath.startsWith("/") ? canonicalPath : `/${canonicalPath}`;
     const canonicalUrl = `${SITE_URL}${normalizedPath}`;
-    const safeTitle = title.trim().slice(0, 120);
+    const safeTitle = formatProductTitle(title, productName).slice(0, 120);
     const safeDescription = description.trim().slice(0, 200);
+    const safeImageAlt = (imageAlt?.trim() || safeTitle).slice(0, 160);
     if (!safeTitle || !safeDescription) return;
 
     const snapshots: HeadAttributeSnapshot[] = [];
@@ -102,7 +139,7 @@ export function usePageSocialMeta({
     setHeadAttribute('meta[property="og:description"]', "content", safeDescription, snapshots);
     setHeadAttribute('meta[property="og:url"]', "content", canonicalUrl, snapshots);
     setHeadAttribute('meta[property="og:image"]', "content", image, snapshots);
-    setHeadAttribute('meta[property="og:image:alt"]', "content", imageAlt, snapshots);
+    setHeadAttribute('meta[property="og:image:alt"]', "content", safeImageAlt, snapshots);
     setHeadAttribute('meta[name="twitter:title"]', "content", safeTitle, snapshots);
     setHeadAttribute('meta[name="twitter:description"]', "content", safeDescription, snapshots);
     setHeadAttribute('meta[name="twitter:image"]', "content", image, snapshots);
@@ -113,5 +150,5 @@ export function usePageSocialMeta({
         else element.setAttribute(attribute, previous);
       }
     };
-  }, [canonicalPath, description, image, imageAlt, title, type]);
+  }, [canonicalPath, description, image, imageAlt, productName, title, type]);
 }
