@@ -310,9 +310,9 @@ describe("database integration runner CI policy", () => {
     for (const dependency of coreJob?.needs ?? []) {
       expect(workflow.jobs?.[dependency], dependency).toBeDefined();
     }
-    // Upstream failures and skips are still judged here; only a superseded workflow cancellation
-    // releases the aggregate runner and concurrency slot.
-    expect(coreJob?.if).toBe("${{ !cancelled() }}");
+    // A skipped required check reads as green to branch protection, so the gate must always run
+    // and read the upstream results itself.
+    expect(coreJob?.if).toBe("${{ always() }}");
     expect(coreJob?.services).toBeUndefined();
     expect(usesActions(coreJob)).toEqual([]);
     expect(gateStep?.env?.GATE_RESULTS).toBe("${{ toJSON(needs) }}");
@@ -406,14 +406,15 @@ describe("database integration runner CI policy", () => {
 
     // The release-facing "CI / verify" check is core AND the proof. It needs the five core gates
     // directly rather than the `core` job: a gate job also waits for a runner, and on a saturated
-    // queue that wait alone cost 30 minutes per hop (run 2643). Failed or skipped upstream jobs
-    // still produce a failing verify; only a superseded workflow cancellation releases the gate.
+    // queue that wait alone cost 30 minutes per hop (run 2643). A failed or cancelled upstream job
+    // must still produce a failing verify, never a merge-neutral skipped one, so the gate always
+    // runs and reads every result itself.
     expect(releaseGate?.name).toBe("verify");
     expect(releaseGate?.needs).toEqual([
       ...workflow.jobs.core.needs,
       "studio-3d-runtime",
     ]);
-    expect(releaseGate?.if).toBe("${{ !cancelled() }}");
+    expect(releaseGate?.if).toBe("${{ always() }}");
     expect(releaseGate?.services).toBeUndefined();
     expect(usesActions(releaseGate)).toEqual([]);
     const releaseGateStep = releaseGate?.steps?.find(
