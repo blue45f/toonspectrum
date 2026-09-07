@@ -1,11 +1,12 @@
-name: Retire merged branch check
+name: Retired branch guard tombstone
 
+# One-time protected-branch check for the cleanup branch below.
+# The branch is deleted automatically when PR #862 merges, so this workflow
+# cannot run again during normal repository development.
 on:
-  pull_request:
+  push:
     branches:
-      - main
-    paths:
-      - .github/workflows/retire-merged-branch-core.yml
+      - chore/remove-retire-guard-20260908
 
 permissions:
   contents: read
@@ -15,4 +16,4 @@ jobs:
     if: ${{ false }}
     runs-on: ubuntu-slim
     steps:
-      - run: echo "This branch-retirement PR contains no product-tree changes."
+      - run: echo "Historical one-time branch-retirement guard."
