@@ -1,0 +1,44 @@
+name: Targeted final CI validation
+
+on:
+  push:
+    branches:
+      - ci/validate-final-8f6a8ef9
+    paths:
+      - .github/workflows/targeted-final-ci-validation.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: targeted-final-ci-validation-8f6a8ef9
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify repaired contracts
+        run: |
+          test "$(wc -l < apps/web/src/domains/creator/studio-router/StudioRouter.tsx)" -le 100
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/studio-router/StudioRouter.tsx \
+            apps/web/src/domains/creator/studio-router/useStudioI18nPriorityLoading.ts \
+            apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.test.tsx \
+            apps/web/src/domains/creator/studio-browser-kv-authority-boundary.test.ts
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts \
+            apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.test.tsx \
+            apps/web/src/domains/creator/studio-browser-kv-authority-boundary.test.ts
+          pnpm exec tsc -p tsconfig.json --pretty false
