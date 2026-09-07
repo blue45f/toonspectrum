@@ -45,10 +45,10 @@ const MOBILE_NAV = [
 // 전체 목적지와 읽기 서재는 상단 오버플로 메뉴에서 계속 접근할 수 있다.
 const MOBILE_TABS = [
   { i18n: "nav.home", href: "/", icon: Home, exact: true },
-  { i18n: "nav.discover", href: "/explore", icon: Compass },
-  { i18n: "nav.studio", href: "/studio", icon: Palette },
-  { i18n: "nav.assets", href: "/market", icon: Store },
-  { i18n: "route.me", href: "/me", icon: UserRound },
+  { i18n: "nav.discover", href: "/explore", icon: Compass, exact: false },
+  { i18n: "nav.studio", href: "/studio", icon: Palette, exact: false },
+  { i18n: "nav.assets", href: "/market", icon: Store, exact: false },
+  { i18n: "route.me", href: "/me", icon: UserRound, exact: false },
 ] as const;
 
 interface MobileHeaderNavigationProps {
