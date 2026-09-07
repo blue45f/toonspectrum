@@ -1,10 +1,13 @@
 import { Suspense } from "react";
 
 import { completeStudioAssetInsertion } from "./studio-asset-insertion-outcome";
-import { StudioAssetMenuPanel } from "./studio-page-lazy-ui";
+import {
+  StudioAssetMenuPanel,
+} from "./studio-page-lazy-ui";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { useStudioCommunityMarketplaceInitialView } from "./use-studio-community-marketplace-initial-view";
 
+import type { StudioAsset } from "./studio-asset-library";
 import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
 
 export interface StudioAssetLegacyPanelProps {
@@ -96,7 +99,7 @@ export function StudioAssetLegacyPanel({
         renamingAssetName={renamingAssetName}
         setRenamingAssetName={setRenamingAssetName}
         handleRenameAsset={handleRenameAsset}
-        onUseLocalAsset={(asset) => completeStudioAssetInsertion(
+        onUseLocalAsset={(asset: StudioAsset) => completeStudioAssetInsertion(
           () => addRenderedImage(asset.dataUrl, asset.width, asset.height),
           () => setMenu(null),
         )}

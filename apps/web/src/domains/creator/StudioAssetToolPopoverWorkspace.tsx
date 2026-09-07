@@ -11,9 +11,12 @@ import {
 } from "lucide-react";
 
 import { StudioAssetLegacyPanel } from "./StudioAssetLegacyPanel";
+import { BG_SCENES } from "./studio-bg-scenes";
+import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { StudioAssetToolPopoverBody } from "./StudioAssetToolPopoverBody";
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "./studio-chrome-ui";
 import { preloadStudioAssetMenuPanel } from "./studio-page-lazy-ui";
+import { SCENE_TEMPLATES } from "./studio-scene-templates";
 import {
   buildStudioUnifiedAssetCatalog,
   type StudioUnifiedAssetItem,
@@ -38,17 +41,19 @@ export interface StudioAssetToolPopoverWorkspaceProps {
   readonly toolBelt: StudioToolBeltContentProps;
 }
 
-async function useUnifiedAsset(
+function useUnifiedAsset(
   item: StudioUnifiedAssetItem,
   toolBelt: StudioToolBeltContentProps,
-): Promise<boolean> {
+): boolean | void | Promise<boolean | void> {
   const handlers = toolBelt.stableHandlers;
   switch (item.source.kind) {
     case "background":
       handlers.addBgScene(item.source.value);
       return true;
     case "scene-template":
-      await handlers.addSceneTemplate(item.source.value);
+      // The legacy controller resolves void even when it rejects a placement internally.
+      // Route to its preview/placement surface instead of announcing an insertion here.
+      toolBelt.setMenu("scene");
       return true;
     case "element":
       handlers.addCatalogElement(item.source.value);
@@ -66,6 +71,9 @@ async function useUnifiedAsset(
         item.source.value.width,
         item.source.value.height,
       );
+    case "native-tool":
+      toolBelt.setMenu(item.source.value.menu);
+      return true;
     default:
       throw new Error(`지원하지 않는 통합 에셋 종류입니다: ${item.id}`);
   }
@@ -79,12 +87,28 @@ export function StudioAssetToolPopoverWorkspace({
   }
 
   const items = buildStudioUnifiedAssetCatalog({
-    backgrounds: toolBelt.studioOptionalAssets.bgSceneSections.flatMap(
-      (section) => section.scenes,
-    ),
-    sceneTemplates: toolBelt.sceneTemplates.templates,
+    // Cold asset-menu entry must not depend on users visiting the legacy background/scene tabs.
+    // Stable ids are deduplicated by the unified catalog when the host has already loaded them.
+    backgrounds: [
+      ...BG_SCENES,
+      ...BG_SCENES_EXTRA,
+      ...toolBelt.studioOptionalAssets.bgSceneSections.flatMap(
+        (section) => section.scenes,
+      ),
+    ],
+    sceneTemplates: [
+      ...SCENE_TEMPLATES,
+      ...toolBelt.sceneTemplates.templates,
+    ],
     localAssets: toolBelt.assets,
-  });
+  }).map((item) => item.source.kind === "scene-template"
+    ? {
+        ...item,
+        description: `${item.description} · 장면 도구에서 미리보기 후 배치합니다.`,
+        useMode: "open" as const,
+        useLabel: "장면 도구 열기",
+      }
+    : item);
 
   return (
     <>
@@ -96,21 +120,27 @@ export function StudioAssetToolPopoverWorkspace({
       <StudioMenuSubtabs
         aria-label="에셋 메뉴 구역"
         activeId={toolBelt.menu}
-        onSelect={(id) => {
+        onSelect={(id: string) => {
           if (id === "asset") preloadStudioAssetMenuPanel();
           toolBelt.setMenu(id as StudioMenu);
         }}
         items={ASSET_MENU_ITEMS}
       />
-      <StudioUnifiedAssetWorkspace
-        items={items}
-        legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
-        onUseItem={(item) => useUnifiedAsset(item, toolBelt)}
-        onOpenAi={(prompt) => {
-          if (prompt) toolBelt.setAssetPrompt(prompt);
-          toolBelt.setMenu("aiAssist");
-        }}
-      />
+      {toolBelt.assetTab === "community" ? (
+        <StudioAssetLegacyPanel toolBelt={toolBelt} />
+      ) : (
+        <StudioUnifiedAssetWorkspace
+          items={items}
+          legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
+          onUseItem={(item) => useUnifiedAsset(item, toolBelt)}
+          onOpenAi={(prompt) => {
+            if (prompt) {
+              toolBelt.stableHandlers.applyAiAssistPresetPrompt("background", prompt);
+            }
+            toolBelt.setMenu("aiAssist");
+          }}
+        />
+      )}
     </>
   );
 }

@@ -1,5 +1,5 @@
 import {
-  STUDIO_ELEMENT_ITEMS,
+  listStudioElementLibrary,
   type StudioElementItem,
 } from "./studio-elements-catalog";
 import {
@@ -23,6 +23,7 @@ export type StudioUnifiedAssetCategory =
   | "mine";
 
 export type StudioUnifiedAssetScope = "all" | "studio" | "mine";
+export type StudioUnifiedNativeToolId = "bubble";
 export type StudioUnifiedAssetUseMode = "insert" | "apply" | "open";
 export type StudioUnifiedAssetDiscoverability =
   | "featured"
@@ -44,12 +45,21 @@ export type StudioUnifiedAssetPreview =
   | { readonly kind: "svg"; readonly svg: string }
   | { readonly kind: "none" };
 
+export interface StudioUnifiedNativeTool {
+  readonly id: StudioUnifiedNativeToolId;
+  readonly menu: "bubble";
+  readonly title: string;
+  readonly description: string;
+  readonly keywords: readonly string[];
+}
+
 export type StudioUnifiedAssetSource =
   | { readonly kind: "background"; readonly value: StudioUnifiedBackgroundSource }
   | { readonly kind: "scene-template"; readonly value: SceneTemplate }
   | { readonly kind: "element"; readonly value: StudioElementItem }
   | { readonly kind: "object-3d"; readonly value: StudioObjectInsertItem }
-  | { readonly kind: "local"; readonly value: StudioAsset };
+  | { readonly kind: "local"; readonly value: StudioAsset }
+  | { readonly kind: "native-tool"; readonly value: StudioUnifiedNativeTool };
 
 export interface StudioUnifiedAssetItem {
   readonly id: string;
@@ -74,6 +84,7 @@ export interface BuildStudioUnifiedAssetCatalogInput {
   readonly localAssets?: readonly StudioAsset[];
   readonly elements?: readonly StudioElementItem[];
   readonly objects?: readonly StudioObjectInsertItem[];
+  readonly nativeTools?: readonly StudioUnifiedNativeTool[];
 }
 
 export interface StudioUnifiedAssetSearchInput {
@@ -126,6 +137,23 @@ const ELEMENT_CATEGORY_LABELS: Readonly<Record<string, string>> = Object.freeze(
   effect: "연출 효과",
   pattern: "패턴",
 });
+
+const DEFAULT_NATIVE_TOOLS: readonly StudioUnifiedNativeTool[] = Object.freeze([
+  Object.freeze({
+    id: "bubble",
+    menu: "bubble",
+    title: "편집 가능한 말풍선",
+    description: "대사·꼬리·형태를 계속 수정할 수 있는 네이티브 말풍선 도구입니다.",
+    keywords: Object.freeze([
+      "말풍선",
+      "대사",
+      "speech bubble",
+      "balloon",
+      "꼬리",
+      "텍스트",
+    ]),
+  }),
+]);
 
 function normalize(value: string): string {
   return value.normalize("NFKC").trim().toLocaleLowerCase("ko-KR");
@@ -324,6 +352,28 @@ function objectItem(
   };
 }
 
+function nativeToolItem(
+  tool: StudioUnifiedNativeTool,
+  index: number,
+): StudioUnifiedAssetItem {
+  return {
+    id: `native-tool:${tool.id}`,
+    category: "element",
+    scope: "studio",
+    title: tool.title,
+    description: tool.description,
+    categoryLabel: "제작 도구",
+    keywords: Object.freeze([tool.id, ...tool.keywords, "편집 가능", "네이티브"]),
+    badges: Object.freeze(["편집 가능", "네이티브 도구"]),
+    preview: { kind: "none" },
+    useMode: "open",
+    useLabel: "말풍선 도구 열기",
+    discoverability: "featured",
+    sortPriority: 720 - index,
+    source: { kind: "native-tool", value: tool },
+  };
+}
+
 function localItem(asset: StudioAsset, index: number): StudioUnifiedAssetItem {
   const aiGenerated = asset.kind === "ai" || asset.rights?.sourceKind === "ai-generated";
   const rightsConfirmed = asset.rights?.rightsConfirmed === true;
@@ -358,8 +408,10 @@ function localItem(asset: StudioAsset, index: number): StudioUnifiedAssetItem {
 export function buildStudioUnifiedAssetCatalog(
   input: BuildStudioUnifiedAssetCatalogInput = {},
 ): readonly StudioUnifiedAssetItem[] {
-  const elements = input.elements ?? STUDIO_ELEMENT_ITEMS;
+  // Reuse the production element library view so flattened legacy speech balloons stay hidden.
+  const elements = input.elements ?? listStudioElementLibrary();
   const objects = input.objects ?? listStudioObjectInsertItems();
+  const nativeTools = input.nativeTools ?? DEFAULT_NATIVE_TOOLS;
   const localAssets = [...(input.localAssets ?? [])].sort(
     (left, right) => right.createdAt - left.createdAt,
   );
@@ -367,6 +419,7 @@ export function buildStudioUnifiedAssetCatalog(
     ...(input.backgrounds ?? []).map(backgroundItem),
     ...(input.sceneTemplates ?? []).map(sceneTemplateItem),
     ...localAssets.map(localItem),
+    ...nativeTools.map(nativeToolItem),
     ...elements.map(elementItem),
     ...objects.map(objectItem),
   ];

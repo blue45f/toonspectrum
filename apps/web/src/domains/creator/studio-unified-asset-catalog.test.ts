@@ -79,6 +79,7 @@ function catalog() {
     localAssets: [localAsset],
     elements: [element],
     objects: [object3d],
+    nativeTools: [],
   });
 }
 
@@ -122,5 +123,19 @@ describe("Studio unified asset catalog", () => {
     expect(new Set(highlights.map((item) => item.category))).toEqual(
       new Set(["scene", "element", "3d", "mine"]),
     );
+  });
+
+  it("keeps flattened speech-balloon SVGs hidden and exposes the native editor", () => {
+    const items = buildStudioUnifiedAssetCatalog({
+      backgrounds: [],
+      sceneTemplates: [],
+      localAssets: [],
+      objects: [],
+    });
+    expect(items.some((item) =>
+      item.source.kind === "element" && item.source.value.category === "bubble"
+    )).toBe(false);
+    expect(searchStudioUnifiedAssets(items, { query: "말풍선" })[0]?.source.kind)
+      .toBe("native-tool");
   });
 });
