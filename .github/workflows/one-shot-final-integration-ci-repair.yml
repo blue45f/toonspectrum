@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - name: Apply exact integration repairs
+      - name: Apply idempotent reviewed repairs
         shell: bash
         run: |
           set -euo pipefail
@@ -37,64 +37,57 @@ jobs:
           python <<'PY'
           from pathlib import Path
 
-          def replace_once(path: Path, old: str, new: str, label: str) -> None:
-              text = path.read_text()
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f"{label}: expected exactly one match, found {count}")
-              path.write_text(text.replace(old, new, 1))
-
           router = Path("apps/web/src/domains/creator/studio-router/StudioRouter.tsx")
-          replace_once(
-              router,
-              '''    // The route chunk has already started this request. Calling it again is intentional:
-              // namespace-level deduplication covers the initial locale and a hydrated language change
-              // immediately receives its own core strings. Any partial core failure is retried without
-              // falling back to the legacy full-catalog loader.
-          '''.replace("          ", ""),
-              '''    // The route chunk already started this request; namespace deduplication covers the
-              // initial locale and a hydrated language change, while partial failures retry without
-              // falling back to the legacy full-catalog loader.
-          '''.replace("          ", ""),
-              "StudioRouter seam line budget",
-          )
+          router_text = router.read_text()
+          old_router = '''    // The route chunk has already started this request. Calling it again is intentional:
+            // namespace-level deduplication covers the initial locale and a hydrated language change
+            // immediately receives its own core strings. Any partial core failure is retried without
+            // falling back to the legacy full-catalog loader.
+          '''.replace("          ", "")
+          new_router = '''    // The route chunk already started this request; namespace deduplication covers the
+            // initial locale and a hydrated language change, while partial failures retry without
+            // falling back to the legacy full-catalog loader.
+          '''.replace("          ", "")
+          if old_router in router_text:
+              router.write_text(router_text.replace(old_router, new_router, 1))
+          elif new_router not in router_text:
+              raise SystemExit("StudioRouter seam no longer matches the reviewed line-budget repair")
 
           shaper_test = Path("apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.test.tsx")
-          replace_once(
-              shaper_test,
-              '''vi.mock("./useCharacterShaperBinding", () => ({
+          shaper_text = shaper_test.read_text()
+          old_shaper = '''vi.mock("./useCharacterShaperBinding", () => ({
             useCharacterShaperBinding: () => ({ busyReason: null }),
-          }));'''.replace("          ", ""),
-              '''vi.mock("./useCharacterShaperBinding", () => ({
+          }));'''.replace("          ", "")
+          new_shaper = '''vi.mock("./useCharacterShaperBinding", () => ({
             useCharacterShaperBinding: () => ({
               busyReason: null,
               recipe: { slots: {} },
             }),
-          }));'''.replace("          ", ""),
-              "Character Shaper binding test fixture",
-          )
+          }));'''.replace("          ", "")
+          if old_shaper in shaper_text:
+              shaper_test.write_text(shaper_text.replace(old_shaper, new_shaper, 1))
+          elif new_shaper not in shaper_text:
+              raise SystemExit("Character Shaper binding fixture no longer matches the reviewed contract")
 
           boundary = Path("apps/web/src/domains/creator/studio-browser-kv-authority-boundary.test.ts")
           boundary_text = boundary.read_text()
-          marker = '''const HISTORY_LEGACY_IDB_PROOF =
-            "The default factory accepts only a caller-created legacyRecoveryVault and otherwise selects SQLite, native OPFS, or observable memory-only state.";
-
-          const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze(['''.replace("          ", "")
-          replacement = '''const HISTORY_LEGACY_IDB_PROOF =
-            "The default factory accepts only a caller-created legacyRecoveryVault and otherwise selects SQLite, native OPFS, or observable memory-only state.";
-          const CHARACTER_PLATFORM_LOCAL_DRAFT =
+          constants = '''const CHARACTER_PLATFORM_LOCAL_DRAFT =
             "Versioned and size-bounded local-only Character Platform presets, manifest links, and surface-ink drafts; browser KV never grants server review, approval, publication, or entitlement authority.";
           const CHARACTER_PLATFORM_LOCAL_DRAFT_PROOF =
             "The exact calls are model-scoped or injected and schema/size validated; changing a key or occurrence requires this authority-ratchet review.";
-
-          const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze(['''.replace("          ", "")
-          if boundary_text.count(marker) != 1:
-              raise SystemExit(f"Character Platform allowance constants: expected exactly one marker, found {boundary_text.count(marker)}")
-          boundary_text = boundary_text.replace(marker, replacement, 1)
-
-          allowance_marker = '''  // Injected localStorage-compatible codecs retained outside product authority selection.
           '''.replace("          ", "")
-          allowance_block = '''  // Character Platform local authoring drafts. Exact keys and operation counts remain review-gated.
+          if constants not in boundary_text:
+              marker = '''const HISTORY_LEGACY_IDB_PROOF =
+            "The default factory accepts only a caller-created legacyRecoveryVault and otherwise selects SQLite, native OPFS, or observable memory-only state.";
+          '''.replace("          ", "")
+              if boundary_text.count(marker) != 1:
+                  raise SystemExit(f"Character Platform allowance constants marker count: {boundary_text.count(marker)}")
+              boundary_text = boundary_text.replace(marker, marker + constants, 1)
+
+          first_allowance = '''  allow("apps/web/src/domains/creator/character-platform/presets/character-part-preset-store.ts", "durable-storage-write", '"toonstudio.character-part-presets.v1"', 1, CHARACTER_PLATFORM_LOCAL_DRAFT, CHARACTER_PLATFORM_LOCAL_DRAFT_PROOF),'''
+          if first_allowance not in boundary_text:
+              marker = "  // Injected localStorage-compatible codecs retained outside product authority selection.\n"
+              block = '''  // Character Platform local authoring drafts. Exact keys and operation counts remain review-gated.
             allow("apps/web/src/domains/creator/character-platform/presets/character-part-preset-store.ts", "durable-storage-write", '"toonstudio.character-part-presets.v1"', 1, CHARACTER_PLATFORM_LOCAL_DRAFT, CHARACTER_PLATFORM_LOCAL_DRAFT_PROOF),
             allow("apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink-storage.ts", "local-storage-write", "storageKey(modelKey)", 1, CHARACTER_PLATFORM_LOCAL_DRAFT, CHARACTER_PLATFORM_LOCAL_DRAFT_PROOF),
             allow("apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts", "local-storage-write", "manifestStorageKey(modelId)", 1, CHARACTER_PLATFORM_LOCAL_DRAFT, CHARACTER_PLATFORM_LOCAL_DRAFT_PROOF),
@@ -102,14 +95,19 @@ jobs:
 
             // Injected localStorage-compatible codecs retained outside product authority selection.
           '''.replace("          ", "")
-          if boundary_text.count(allowance_marker) != 1:
-              raise SystemExit(f"Character Platform allowance block: expected exactly one marker, found {boundary_text.count(allowance_marker)}")
-          boundary.write_text(boundary_text.replace(allowance_marker, allowance_block, 1))
+              if boundary_text.count(marker) != 1:
+                  raise SystemExit(f"Character Platform allowance block marker count: {boundary_text.count(marker)}")
+              boundary_text = boundary_text.replace(marker, block, 1)
+          boundary.write_text(boundary_text)
           PY
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
       - name: Verify repaired contracts
         run: |
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/studio-router/StudioRouter.tsx \
+            apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.test.tsx \
+            apps/web/src/domains/creator/studio-browser-kv-authority-boundary.test.ts
           pnpm exec vitest run \
             apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts \
             apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.test.tsx \
@@ -119,7 +117,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git rm .github/workflows/one-shot-final-integration-ci-repair.yml
+          git rm -f --ignore-unmatch \
+            .github/workflows/one-shot-final-integration-ci-repair.yml \
+            .github/workflows/one-shot-final-integration-ci-repair-v2.yml
           git add \
             apps/web/src/domains/creator/studio-router/StudioRouter.tsx \
             apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.test.tsx \
