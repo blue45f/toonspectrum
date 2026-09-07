@@ -1,0 +1,20 @@
+name: Test job-level stale-run preemption
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-job-concurrency-preempt-test.yml
+
+permissions: {}
+
+jobs:
+  retire-marketplace:
+    if: ${{ false }}
+    concurrency:
+      group: marketplace-integrity-refs/pull/883/merge
+      cancel-in-progress: true
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "Intentionally skipped."
