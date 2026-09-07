@@ -77,9 +77,10 @@ jobs:
       - name: Run typecheck
         run: pnpm run typecheck
 
-      - name: Commit verified fixes and remove finalizer
+      - name: Commit and push validated source changes
         run: |
-          rm -f scripts/pr839_finalize.py .github/workflows/pr839-finalize.yml
+          git restore .github/workflows/sonarqube.yml
+          rm -f scripts/pr839_finalize.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
