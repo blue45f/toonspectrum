@@ -31,11 +31,28 @@ export const STUDIO_I18N_DEFERRED_NAMESPACES = STUDIO_I18N_NAMESPACES.filter(
   (namespace) => !CORE_NAMESPACE_SET.has(namespace),
 );
 
+/**
+ * The legacy runtime loader treats any registered `studio.*` entry as proof that a
+ * route-owned Studio loader is managing the catalog. Registering this internal marker
+ * synchronously prevents its old sequential full-catalog loop from racing the priority
+ * loader while the first core network requests are still pending.
+ */
+export const STUDIO_I18N_MANAGED_SENTINEL_KEY =
+  "studio.__priorityLoader.managed";
+const STUDIO_I18N_MANAGED_SENTINEL_VALUE = "managed";
+
+export const STUDIO_I18N_DEFERRED_RETRY_DELAYS_MS = [
+  1_000,
+  4_000,
+] as const;
+
 export interface StudioI18nPriorityLoaderOptions {
   readonly locale?: string;
   readonly fetchImpl?: typeof fetch;
   readonly baseUrl?: string;
   readonly signal?: AbortSignal;
+  /** Test/host override. An empty array disables retry after the first attempt. */
+  readonly deferredRetryDelaysMs?: readonly number[];
 }
 
 export interface StudioI18nLoadReport {
@@ -65,6 +82,21 @@ function resolveStudioAssetLocale(locale: string): string {
   const supported = STUDIO_I18N_ASSET_LOCALES as readonly string[];
   return getLocaleCandidates(locale).find((candidate) => supported.includes(candidate))
     ?? "en";
+}
+
+function registerManagedStudioI18nLocale(
+  requestedLocale: string,
+  assetLocale: string,
+): void {
+  const marker = { [STUDIO_I18N_MANAGED_SENTINEL_KEY]: STUDIO_I18N_MANAGED_SENTINEL_VALUE };
+  registerI18nLocaleEntries(assetLocale, marker);
+  const normalizedRequestedLocale = normalizeLocaleCode(requestedLocale);
+  if (
+    normalizedRequestedLocale
+    && normalizedRequestedLocale !== assetLocale
+  ) {
+    registerI18nLocaleEntries(normalizedRequestedLocale, marker);
+  }
 }
 
 function namespaceLoadKey(
@@ -131,6 +163,11 @@ export async function loadStudioI18nNamespaces(
 ): Promise<StudioI18nLoadReport> {
   const requestedLocale = options.locale ?? getLang();
   const assetLocale = resolveStudioAssetLocale(requestedLocale);
+
+  // This happens before the first await. Route fallbacks that mount while the core
+  // request is pending therefore cannot start the legacy sequential catalog loader.
+  registerManagedStudioI18nLocale(requestedLocale, assetLocale);
+
   const uniqueNamespaces = [...new Set(namespaces)];
   const results = await Promise.all(
     uniqueNamespaces.map(async (namespace) => ({
@@ -192,23 +229,55 @@ export function scheduleStudioI18nDeferredLoad(
   options: StudioI18nPriorityLoaderOptions = {},
 ): () => void {
   let active = true;
+  let idleHandle: number | null = null;
+  let delayHandle: ReturnType<typeof setTimeout> | null = null;
+  const retryDelays = options.deferredRetryDelaysMs
+    ?? STUDIO_I18N_DEFERRED_RETRY_DELAYS_MS;
+
+  const clearDelay = () => {
+    if (delayHandle === null) return;
+    clearTimeout(delayHandle);
+    delayHandle = null;
+  };
+
+  const runAttempt = async (
+    namespaces: readonly StudioI18nNamespace[],
+    attempt: number,
+  ): Promise<void> => {
+    if (!active || options.signal?.aborted || namespaces.length === 0) return;
+    const report = await loadStudioI18nNamespaces(namespaces, options);
+    if (
+      !active
+      || options.signal?.aborted
+      || report.failedNamespaces.length === 0
+      || attempt >= retryDelays.length
+    ) {
+      return;
+    }
+
+    const retryDelay = retryDelays[attempt];
+    if (retryDelay === undefined) return;
+    delayHandle = setTimeout(() => {
+      delayHandle = null;
+      void runAttempt(report.failedNamespaces, attempt + 1);
+    }, retryDelay);
+  };
+
   const run = () => {
-    if (!active || options.signal?.aborted) return;
-    void loadStudioI18nDeferred(options);
+    idleHandle = null;
+    void runAttempt(STUDIO_I18N_DEFERRED_NAMESPACES, 0);
   };
 
   const scheduler = globalThis as typeof globalThis & IdleScheduler;
   if (typeof scheduler.requestIdleCallback === "function") {
-    const handle = scheduler.requestIdleCallback(run, { timeout: 2_000 });
-    return () => {
-      active = false;
-      scheduler.cancelIdleCallback?.(handle);
-    };
+    idleHandle = scheduler.requestIdleCallback(run, { timeout: 2_000 });
+  } else {
+    delayHandle = setTimeout(run, 250);
   }
 
-  const handle: ReturnType<typeof setTimeout> = setTimeout(run, 250);
   return () => {
     active = false;
-    clearTimeout(handle);
+    if (idleHandle !== null) scheduler.cancelIdleCallback?.(idleHandle);
+    clearDelay();
   };
 }
