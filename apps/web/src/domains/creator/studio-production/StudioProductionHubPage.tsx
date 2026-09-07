@@ -54,6 +54,7 @@ export function StudioProductionHubPage(props: {
       if (
         event.defaultPrevented
         || event.isComposing
+        || event.keyCode === 229
         || event.repeat
         || !event.altKey
         || event.ctrlKey

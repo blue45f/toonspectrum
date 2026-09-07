@@ -1,3 +1,5 @@
+import { compareCodeUnitStrings } from "@/shared/lib/compare-code-unit-strings";
+
 import type { CharacterSemanticPassId } from "../../character-shaper/character-shaper-contract";
 
 export const CHARACTER_CANONICAL_MANIFEST_VERSION = 2 as const;
@@ -255,5 +257,5 @@ export function canonicalManifestCapabilityIds(
   if (Object.keys(manifest.morphs).length > 0) capabilities.add("semantic-morphs");
   if (manifest.fitting.sockets.length > 0) capabilities.add("attachment-sockets");
   if (manifest.fitting.colliders.length > 0) capabilities.add("collision-profile");
-  return Object.freeze([...capabilities].sort());
+  return Object.freeze([...capabilities].sort(compareCodeUnitStrings));
 }

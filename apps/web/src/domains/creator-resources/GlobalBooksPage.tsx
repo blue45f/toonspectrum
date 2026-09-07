@@ -256,7 +256,7 @@ export function GlobalBooksPage() {
         <nav className="flex items-center justify-center gap-4" aria-label="글로벌 도서 검색 결과 페이지">
           <button className={RESOURCE_BUTTON} type="button" disabled={page <= 1 || loading} onClick={() => setParams({ q: query, page: String(page - 1) })}>이전</button>
           <span className="text-sm text-fg-2">{page} 페이지</span>
-          <button className={RESOURCE_BUTTON} type="button" disabled={!openLibraryResult.hasMore || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>다음</button>
+          <button className={RESOURCE_BUTTON} type="button" disabled={page >= 20 || !openLibraryResult.hasMore || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>다음</button>
         </nav>
       ) : null}
 

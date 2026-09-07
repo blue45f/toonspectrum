@@ -1,3 +1,5 @@
+import { compareCodeUnitStrings } from "@/shared/lib/compare-code-unit-strings";
+
 export type CharacterQuaternion = readonly [number, number, number, number];
 export type CharacterVector3 = readonly [number, number, number];
 export type CharacterPoseRegion = "head" | "torso" | "left-arm" | "right-arm" | "left-leg" | "right-leg" | "left-hand" | "right-hand";
@@ -190,7 +192,7 @@ export function solveCharacterPoseV2(input: CharacterPoseSolveInput): CharacterP
     ...Object.keys(input.currentBones ?? {}),
     ...Object.keys(input.candidate.bones),
   ]);
-  for (const bone of [...allBones].sort()) {
+  for (const bone of [...allBones].sort(compareCodeUnitStrings)) {
     const region = input.boneRegions?.[bone] ?? characterPoseRegionForBone(bone);
     const current = input.currentBones?.[bone] ?? input.previous?.bones[bone] ?? [0, 0, 0, 1];
     const candidate = input.candidate.bones[bone];

@@ -2,6 +2,7 @@
 
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Group } from "three";
 
 import { useCharacterShaperBinding } from "../../character-shaper/useCharacterShaperBinding";
 import { createCharacterPartPreset } from "../presets/character-part-preset";
@@ -267,5 +268,133 @@ describe("character SQLite persistence", () => {
     fireEvent.click(button);
     await waitFor(() => expect(name.value).toBe(""));
     expect(screen.getByRole("status").textContent).toContain("저장했습니다");
+  });
+});
+
+describe("workbench document and pose actions", () => {
+  function readyWorkbench(overrides: Partial<StudioVrmPoserHost> = {}) {
+    const h = { ...host(), ...overrides } as StudioVrmPoserHost;
+    return renderHook(() => {
+      const binding = useCharacterShaperBinding(h);
+      return useCharacterPlatformWorkbench(h, {
+        ...binding,
+        recipe: { ...binding.recipe, slots: { ...binding.recipe.slots, eyes: "eyes:round" } },
+      });
+    });
+  }
+  it("exports only the connected model manifest and leaves it intact on invalid replacement", async () => {
+    const hook = readyWorkbench(); await act(async () => {});
+    expect(hook.result.current.exportCanonicalManifest()).toBeNull();
+    await act(async () => expect(await hook.result.current.importCanonicalManifest(JSON.stringify(manifest("model-a")))).toBe(true));
+    expect(JSON.parse(hook.result.current.exportCanonicalManifest()!)).toMatchObject({ identity: { assetId: "model-a" } });
+    const saved = await readRow(MANIFEST_NAMESPACE, "model-a");
+    for (const input of ["not JSON", JSON.stringify(manifest("another-model"))]) {
+      await act(async () => expect(await hook.result.current.importCanonicalManifest(input)).toBe(false));
+      expect(hook.result.current.canonicalError).toBeTruthy();
+      expect(await readRow(MANIFEST_NAMESPACE, "model-a")).toBe(saved);
+      expect(JSON.parse(hook.result.current.exportCanonicalManifest()!)).toEqual(JSON.parse(saved!));
+    }
+    await act(async () => hook.result.current.removeCanonicalManifest());
+    expect(hook.result.current.exportCanonicalManifest()).toBeNull();
+    expect(hook.result.current.canonicalError).toBeNull();
+  });
+  it("reports corrupt and wrong-model hydration without promoting either as canonical", async () => {
+    for (const raw of ["broken", JSON.stringify(manifest("wrong-model"))]) {
+      database.rows.set(rowKey(MANIFEST_NAMESPACE, "model-a"), raw);
+      const hook = readyWorkbench();
+      await waitFor(() => expect(hook.result.current.canonicalError).toBeTruthy());
+      expect(hook.result.current.canonicalManifest).toBeNull();
+      expect(await readRow(MANIFEST_NAMESPACE, "model-a")).toBe(raw);
+      hook.unmount();
+    }
+  });
+  it("exports, imports and removes only acknowledged presets and explains rejected input", async () => {
+    const hook = readyWorkbench(); await act(async () => {});
+    await act(async () => expect(await hook.result.current.saveSlotPreset("eyes", "Round eyes")).toBe(true));
+    const exported = JSON.parse(hook.result.current.exportPresets()) as ReturnType<typeof createCharacterPartPreset>[];
+    expect(exported).toHaveLength(1); expect(exported[0].name).toBe("Round eyes");
+    await act(async () => hook.result.current.removePreset(exported[0].presetId));
+    expect(JSON.parse(hook.result.current.exportPresets())).toEqual([]);
+    await act(async () => expect(await hook.result.current.importPresets(JSON.stringify(exported))).toBe(1));
+    expect(JSON.parse(hook.result.current.exportPresets())).toEqual(exported);
+    expect(hook.result.current.notice).toContain("1개");
+    for (const input of ["not JSON", "{}", JSON.stringify(Array(501).fill(exported[0])), "[{}]"]) {
+      await act(async () => expect(await hook.result.current.importPresets(input)).toBe(0));
+      expect(hook.result.current.notice).toBeTruthy();
+      expect(JSON.parse(hook.result.current.exportPresets())).toEqual(exported);
+    }
+    database.set.mockRejectedValueOnce(new Error("Preset write denied"));
+    await act(async () => expect(await hook.result.current.saveSlotPreset("eyes", "Rejected")).toBe(false));
+    expect(hook.result.current.notice).toContain("Preset write denied");
+    database.set.mockRejectedValueOnce(new Error("Import write denied"));
+    await act(async () => expect(await hook.result.current.importPresets(JSON.stringify(exported))).toBe(0));
+    expect(hook.result.current.notice).toContain("Import write denied");
+  });
+  it("passes the current document to the atomic preset commit and preserves its rejection reason", async () => {
+    const commitPreset = vi.fn().mockReturnValue({ ok: false, reason: "Unsupported camera" });
+    const h = host();
+    const hook = renderHook(() => {
+      const binding = useCharacterShaperBinding(h);
+      return useCharacterPlatformWorkbench(h, { ...binding, commitPreset });
+    });
+    await act(async () => {});
+    const preset = createCharacterPartPreset({ presetId: "preset", name: "Atomic", kind: "slot", scope: "personal", document: hook.result.current.document, slot: "eyes" });
+    act(() => expect(hook.result.current.applyPreset(preset)).toBe(false));
+    expect(commitPreset).toHaveBeenCalledWith(preset, hook.result.current.document);
+    expect(hook.result.current.notice).toBe("Unsupported camera");
+    commitPreset.mockReturnValueOnce({ ok: false });
+    act(() => expect(hook.result.current.applyPreset(preset)).toBe(false));
+    expect(hook.result.current.notice).toContain("적용하지 못했습니다");
+    commitPreset.mockReturnValueOnce({ ok: true });
+    act(() => expect(hook.result.current.applyPreset(preset)).toBe(true));
+    expect(hook.result.current.notice).toContain("Atomic 프리셋을 적용했습니다");
+  });
+  it("does not report old-model import or preset save completion in a new scope", async () => {
+    const hook = renderHook(({ id }) => {
+      const h = host(id); const binding = useCharacterShaperBinding(h);
+      return useCharacterPlatformWorkbench(h, { ...binding, recipe: { ...binding.recipe, slots: { ...binding.recipe.slots, eyes: "eyes:round" } } });
+    }, { initialProps: { id: "model-a" } });
+    await act(async () => {});
+    const pending = Promise.withResolvers<void>(); let savingEntered = false;
+    database.set.mockImplementation(async (namespace, key, value) => {
+      if (namespace === CHARACTER_PART_PRESET_SQLITE_NAMESPACE) { savingEntered = true; await pending.promise; }
+      await writeRow(namespace, key, value);
+    });
+    let saving: Promise<boolean>; act(() => { saving = hook.result.current.saveSlotPreset("eyes", "Old model"); });
+    await waitFor(() => expect(savingEntered).toBe(true));
+    hook.rerender({ id: "model-b" }); await act(async () => { pending.resolve(); expect(await saving!).toBe(false); });
+    expect(hook.result.current.notice).toBeNull();
+    const exported = hook.result.current.exportPresets(); const next = Promise.withResolvers<void>(); let importingEntered = false;
+    database.set.mockImplementation(async (namespace, key, value) => {
+      if (namespace === CHARACTER_PART_PRESET_SQLITE_NAMESPACE) { importingEntered = true; await next.promise; }
+      await writeRow(namespace, key, value);
+    });
+    let importing: Promise<number>; act(() => { importing = hook.result.current.importPresets(exported); });
+    await waitFor(() => expect(importingEntered).toBe(true));
+    hook.unmount(); await act(async () => { next.resolve(); expect(await importing!).toBe(0); });
+  });
+  it("rejects empty or unavailable pose edits without calling the host", async () => {
+    const apply = vi.fn();
+    const hook = readyWorkbench({ customBones: { invalid: [1, 2], nonfinite: [0, Number.NaN, 0] }, handlePhotoPoseApply: apply });
+    await act(async () => {}); act(() => expect(hook.result.current.stabilizeCurrentPose()).toBe(false));
+    expect(apply).not.toHaveBeenCalled(); expect(hook.result.current.notice).toContain("먼저 포즈");
+    hook.unmount(); const noHandler = readyWorkbench({ customBones: { spine: [0.1, 0.2, 0.3] } });
+    await act(async () => {}); act(() => expect(noHandler.result.current.stabilizeCurrentPose()).toBe(false));
+  });
+  it("stabilizes selected pose regions with finite Euler output and actual foot-contact data", async () => {
+    const apply = vi.fn();
+    const h = { ...host(), customBones: { spine: [0.1, 0.2, 0.3], leftUpperArm: [0.1, 0.2, 0], malformed: [1, 2] }, handlePhotoPoseApply: apply,
+      vrm: { scene: new Group(), humanoid: { getNormalizedBoneNode: (name: string) => name === "leftFoot" ? { getWorldPosition: (target: { set: (x: number, y: number, z: number) => unknown }) => target.set(0.1, -0.02, 0.3) } : null } },
+    } as unknown as StudioVrmPoserHost;
+    const hook = renderHook(() => useCharacterPlatformWorkbench(h, useCharacterShaperBinding(h))); await act(async () => {});
+    act(() => hook.result.current.setSelectedPoseRegions(["torso"]));
+    expect(hook.result.current.selectedPoseRegions).toEqual(["torso"]);
+    act(() => expect(hook.result.current.stabilizeCurrentPose()).toBe(true));
+    expect(apply).toHaveBeenCalledTimes(1);
+    const value = apply.mock.calls[0][0]; expect(value.sourceName).toBe("현재 포즈 · Pose V2 안정화");
+    expect(Object.keys(value.bones).sort()).toEqual(["leftUpperArm", "spine"]);
+    for (const bone of Object.values(value.bones) as number[][]) { expect(bone).toHaveLength(3); expect(bone.every(Number.isFinite)).toBe(true); }
+    expect(value.bones.leftUpperArm[0]).toBeCloseTo(0.1); expect(value.bones.leftUpperArm[1]).toBeCloseTo(0.2);
+    expect(hook.result.current.notice).toContain("Pose V2 적용");
   });
 });

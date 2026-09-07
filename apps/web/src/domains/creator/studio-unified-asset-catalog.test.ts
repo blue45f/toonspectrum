@@ -84,6 +84,28 @@ function catalog() {
 }
 
 describe("Studio unified asset catalog", () => {
+  it("preserves source indexes for every family's catalog priority", () => {
+    const items = buildStudioUnifiedAssetCatalog({
+      backgrounds: [{ ...backgrounds[0], id: "bg-first" }, { ...backgrounds[0], id: "bg-second" }],
+      sceneTemplates: [sceneTemplate, { ...sceneTemplate, id: "scene-second" }],
+      localAssets: [localAsset, { ...localAsset, id: "local-older", createdAt: 1 }],
+      elements: [element, { ...element, id: "element-second" }],
+      objects: [object3d, { ...object3d, id: "object-second" }],
+      nativeTools: [
+        { id: "bubble", menu: "bubble", title: "Speech bubble", description: "Native bubble tool", keywords: [] },
+      ],
+    });
+    expect(items.every((item) => Number.isFinite(item.sortPriority))).toBe(true);
+    expect(items.find((item) => item.id === "native-tool:bubble")).toBeDefined();
+    for (const [first, second] of [
+      ["background:bg-first", "background:bg-second"], ["scene-template:confession-test", "scene-template:scene-second"],
+      ["local:local-school-logo", "local:local-older"], ["element:effect-rain-test", "element:element-second"],
+      ["3d:obj-prop-chair-test", "3d:object-second"],
+    ]) {
+      expect(items.find((item) => item.id === first)!.sortPriority - items.find((item) => item.id === second)!.sortPriority).toBe(1);
+    }
+  });
+
   it("deduplicates source ids and exposes every discovery family", () => {
     const items = catalog();
     expect(items).toHaveLength(5);

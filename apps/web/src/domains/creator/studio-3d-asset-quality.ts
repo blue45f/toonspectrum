@@ -1,3 +1,5 @@
+import { compareCodeUnitStrings } from "@/shared/lib/compare-code-unit-strings";
+
 export const STUDIO_3D_ASSET_QUALITY_PASSPORT_SCHEMA =
   "toonspectrum.studio-3d-asset-quality-passport" as const;
 export const STUDIO_3D_ASSET_QUALITY_PASSPORT_VERSION = 1 as const;
@@ -437,7 +439,7 @@ function normalizedHardFailures(
     || !renderQa.visualRegressionApproved) {
     failures.add("render_qa_incomplete");
   }
-  return Object.freeze([...failures].sort());
+  return Object.freeze([...failures].sort(compareCodeUnitStrings));
 }
 
 export function buildStudio3dAssetQualityPassport(

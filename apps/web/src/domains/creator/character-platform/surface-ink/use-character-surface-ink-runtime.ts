@@ -72,9 +72,16 @@ export interface CharacterSurfaceInkRuntimeState {
   readonly notice: string | null;
 }
 
-function safeId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return `ink:${crypto.randomUUID()}`;
-  return `ink:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`;
+function safeId(): string | null {
+  try {
+    const random = globalThis.crypto;
+    if (typeof random?.randomUUID === "function") return `ink:${random.randomUUID()}`;
+    if (typeof random?.getRandomValues !== "function") return null;
+    const bytes = random.getRandomValues(new Uint8Array(16));
+    return `ink:${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+  } catch {
+    return null;
+  }
 }
 
 export function useCharacterSurfaceInkRuntime({
@@ -238,8 +245,13 @@ export function useCharacterSurfaceInkRuntime({
         setNotice(cancelled ? "3D 펜선을 취소했습니다." : "선을 조금 더 길게 그려 주세요.");
         return;
       }
+      const strokeId = safeId();
+      if (!strokeId) {
+        setNotice("3D 펜선 식별자를 만들 수 없습니다. 브라우저의 보안 기능을 확인해 주세요.");
+        return;
+      }
       const stroke: CharacterSurfaceInkStroke = Object.freeze({
-        strokeId: safeId(),
+        strokeId,
         meshAssetId: current.meshId,
         topologyRevision: current.topologyRevision,
         anchors: Object.freeze(current.anchors),

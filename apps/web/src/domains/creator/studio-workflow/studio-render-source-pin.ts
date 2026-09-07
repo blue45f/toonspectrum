@@ -1,3 +1,5 @@
+import { compareCodeUnitStrings } from "@/shared/lib/compare-code-unit-strings";
+
 import {
   sameStudioAssetRevision,
   validateStudioAssetReferenceV2,
@@ -112,8 +114,8 @@ function validOptionalRevision(value: number | null): boolean {
 
 function samePanelSet(left: readonly string[], right: readonly string[]): boolean {
   if (left.length !== right.length) return false;
-  const a = [...left].sort();
-  const b = [...right].sort();
+  const a = [...left].sort(compareCodeUnitStrings);
+  const b = [...right].sort(compareCodeUnitStrings);
   return a.every((value, index) => value === b[index]);
 }
 

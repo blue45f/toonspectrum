@@ -1,3 +1,5 @@
+import { compareCodeUnitStrings } from "@/shared/lib/compare-code-unit-strings";
+
 import type { CharacterSlotKind } from "../../character-shaper/character-shaper-contract";
 import type {
   CharacterDocumentV2,
@@ -204,7 +206,7 @@ export function createCharacterPartPreset(
     payload,
     compatibility: Object.freeze({
       topologyFamilies: Object.freeze(input.document.model.topologyFamily ? [input.document.model.topologyFamily] : []),
-      requiredCapabilities: Object.freeze(input.document.compatibility.supported.slice().sort()),
+      requiredCapabilities: Object.freeze(input.document.compatibility.supported.slice().sort(compareCodeUnitStrings)),
       allowPartial: input.document.model.mode === "compatible",
     }),
     tags: Object.freeze((input.tags ?? []).map((tag) => cleanText(tag, 40)).filter(Boolean).slice(0, 32)),
@@ -341,7 +343,7 @@ export function applyCharacterPartPreset(
   return Object.freeze({
     ok: applied.length > 0,
     document: next,
-    applied: Object.freeze([...new Set(applied)].sort()),
+    applied: Object.freeze([...new Set(applied)].sort(compareCodeUnitStrings)),
     skipped: Object.freeze(skipped),
   });
 }

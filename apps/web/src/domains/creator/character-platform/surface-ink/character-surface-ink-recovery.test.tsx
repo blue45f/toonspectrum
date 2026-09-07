@@ -20,7 +20,7 @@ vi.mock("../../studio-local-database-runtime", () => ({
   }) }),
 }));
 beforeEach(() => { db.rows.clear(); db.writes.length = 0; });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const read = () => JSON.parse(db.rows.get(`${CHARACTER_SURFACE_INK_SQLITE_NAMESPACE}:model-a`)!) as CharacterSurfaceInkDocument;
 const status = (document: CharacterSurfaceInkDocument) => document.layers[0]?.strokes[0]?.status;
 
@@ -43,6 +43,56 @@ function fixture() {
 }
 
 describe("surface ink topology on real mesh recovery", () => {
+  async function drawable() {
+    const f = fixture();
+    const capture = f.h.captureRef.current!;
+    const camera = capture.camera as PerspectiveCamera;
+    camera.position.z = 2;
+    camera.updateMatrixWorld();
+    f.scene.updateMatrixWorld(true);
+    const canvas = capture.gl.domElement;
+    canvas.getBoundingClientRect = () => new DOMRect(0, 0, 100, 100);
+    const hook = f.start();
+    await waitFor(() => expect(hook.result.current.strokeCount).toBe(1));
+    act(() => hook.result.current.setActive(true));
+    const draw = () => act(() => {
+      for (const [type, x] of [["pointerdown", 45], ["pointermove", 55], ["pointerup", 55]] as const) {
+        const event = new MouseEvent(type, { button: 0, clientX: x, clientY: 50, bubbles: true, cancelable: true });
+        Object.defineProperties(event, { pointerId: { value: 1 }, pressure: { value: 0.5 } });
+        canvas.dispatchEvent(event);
+      }
+    });
+    return { ...f, hook, draw };
+  }
+
+  it("uses secure random bytes when randomUUID is unavailable and preserves both strokes through history", async () => {
+    const f = await drawable();
+    let sequence = 0;
+    const getRandomValues = vi.fn((bytes: Uint8Array) => bytes.fill(++sequence));
+    vi.stubGlobal("crypto", { getRandomValues });
+    f.draw();
+    f.draw();
+    expect(getRandomValues).toHaveBeenCalledTimes(2);
+    expect(f.hook.result.current.document.layers[0]?.strokes.map((stroke) => stroke.strokeId)).toEqual([
+      "stored-ink", `ink:${"01".repeat(16)}`, `ink:${"02".repeat(16)}`,
+    ]);
+    act(() => f.hook.result.current.undo());
+    expect(f.hook.result.current.strokeCount).toBe(2);
+    act(() => f.hook.result.current.redo());
+    expect(f.hook.result.current.strokeCount).toBe(3);
+    await waitFor(() => expect(JSON.stringify(read())).toBe(JSON.stringify(f.hook.result.current.document)));
+  });
+
+  it("reports unavailable secure randomness without changing existing ink or history", async () => {
+    const f = await drawable();
+    vi.stubGlobal("crypto", undefined);
+    f.draw();
+    expect(f.hook.result.current.document).toEqual(f.document);
+    expect(f.hook.result.current.canUndo).toBe(false);
+    expect(f.hook.result.current.notice).toContain("식별자를 만들 수 없습니다");
+    expect(read()).toEqual(f.document);
+  });
+
   it("reopens the same mesh with the exact saved valid stroke and no new Undo entry", async () => {
     const f = fixture(); const hook = f.start();
     await waitFor(() => expect(hook.result.current.strokeCount).toBe(1));

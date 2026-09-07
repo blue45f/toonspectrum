@@ -416,12 +416,12 @@ export function buildStudioUnifiedAssetCatalog(
     (left, right) => right.createdAt - left.createdAt,
   );
   const candidates = [
-    ...(input.backgrounds ?? []).map(backgroundItem),
-    ...(input.sceneTemplates ?? []).map(sceneTemplateItem),
-    ...localAssets.map(localItem),
-    ...nativeTools.map(nativeToolItem),
-    ...elements.map(elementItem),
-    ...objects.map(objectItem),
+    ...(input.backgrounds ?? []).map((item, index) => backgroundItem(item, index)),
+    ...(input.sceneTemplates ?? []).map((item, index) => sceneTemplateItem(item, index)),
+    ...localAssets.map((item, index) => localItem(item, index)),
+    ...nativeTools.map((item, index) => nativeToolItem(item, index)),
+    ...elements.map((item, index) => elementItem(item, index)),
+    ...objects.map((item, index) => objectItem(item, index)),
   ];
   const unique = new Map<string, StudioUnifiedAssetItem>();
   for (const candidate of candidates) {

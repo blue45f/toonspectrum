@@ -1,3 +1,5 @@
+import { compareCodeUnitStrings } from "@/shared/lib/compare-code-unit-strings";
+
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 
 import type { CharacterShaperBinding } from "../../character-shaper/character-shaper-ui-contract";
@@ -61,7 +63,7 @@ function selectedEntryIds(recipe: CharacterShaperBinding["recipe"]): readonly st
       for (const item of value) if (typeof item === "string" && item.length > 0) ids.add(item);
     }
   }
-  return Object.freeze([...ids].sort());
+  return Object.freeze([...ids].sort(compareCodeUnitStrings));
 }
 
 function thumbnailFor(entryId: string): string | null {

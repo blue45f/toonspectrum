@@ -1,3 +1,5 @@
+import { compareCodeUnitStrings } from "@/shared/lib/compare-code-unit-strings";
+
 import type {
   StudioCharacterBible,
   StudioCharacterBibleEntry,
@@ -418,7 +420,7 @@ export function createStudioCharacterPromptReceiptV2(
   const hardLockedFields = Object.entries(context.locks)
     .filter(([, mode]) => mode === "hard")
     .map(([field]) => field as StudioCharacterBibleField)
-    .sort();
+    .sort(compareCodeUnitStrings);
   return {
     characterId: context.characterId,
     characterVersionId: context.characterVersionId,
