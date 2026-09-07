@@ -1,0 +1,106 @@
+name: Temporary security source snapshot
+
+on:
+  push:
+    branches:
+      - security/code-scanning-audit-20260908
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout remediation target
+        uses: actions/checkout@v4
+        with:
+          ref: release/final-main-merge-4888b061-immutable-20260908
+          fetch-depth: 1
+
+      - name: Package affected sources and nearby tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p snapshot
+          cat > /tmp/security-targets.txt <<'EOF'
+          apps/web/src/domains/creator/vrm/studio-vrm-props.ts
+          apps/web/src/domains/creator/vrm/StudioVrmPhotoPoseScanner.tsx
+          apps/web/src/domains/creator/lettering/studio-dialogue-interchange.ts
+          apps/web/src/domains/creator/StudioAppSettingsPanel.test.tsx
+          apps/web/src/domains/creator/bg3d/studio-bg3d-lt-presets.test.ts
+          apps/web/src/shared/lib/creator-resources.ts
+          apps/web/src/domains/creator/studio-preset-font-loading.test.ts
+          apps/web/src/shared/lib/affiliate.ts
+          packages/core/src/studio-music.ts
+          scripts/studio-research-watch.mjs
+          scripts/studio-competitor-watch.mjs
+          scripts/related-info-parse.mjs
+          scripts/crawlers/_shared.mjs
+          scripts/crawl-helpers.mjs
+          scripts/news-gen.ts
+          scripts/qa-studio-authenticated-browser.mjs
+          scripts/qa-studio-browser-fault-injection.mjs
+          scripts/qa/studio-soak-runner.mjs
+          scripts/audit-studio-brush-semantic-quality.mts
+          scripts/audit-studio-brush-pressure-curves.mts
+          packages/studio-engine-registry/src/renderer-roles.ts
+          apps/api/src/server/creator/works.ts
+          apps/api/src/server/community.ts
+          scripts/verify-vercel-csp.mjs
+          apps/api/src/config/vercel-security-headers.test.ts
+          apps/api/src/modules/catalog/catalog.controller.ts
+          apps/api/src/server/session.ts
+          scripts/upload-toonstudio-3d-assets.test.mjs
+          apps/api/src/modules/creator/studio-voice-ice-policy.service.ts
+          apps/api/src/modules/creator/studio-voice-ice-policy.service.test.ts
+          packages/core/src/search.ts
+          packages/core/src/fortune/fortune-engine.ts
+          apps/api/src/modules/auth/auth.controller.ts
+          scripts/verify-studio-service-worker.mts
+          packages/studio-engine-registry/src/wgsl-sandbox.ts
+          apps/api/src/server/creator-asset-image.ts
+          apps/api/src/csrf-middleware.ts
+          scripts/blender/convert_studio_modular_humanoids_v1.py
+          packages/core/src/content-graph.ts
+          apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink-storage.ts
+          apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts
+          apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql
+          apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts
+          EOF
+          sed -i 's/^          //' /tmp/security-targets.txt
+
+          while IFS= read -r target; do
+            [[ -n "$target" ]] || continue
+            if [[ ! -f "$target" ]]; then
+              echo "::warning file=$target::Target file not found"
+              continue
+            fi
+            install -D "$target" "snapshot/$target"
+            dir="$(dirname "$target")"
+            while IFS= read -r -d '' related; do
+              install -D "$related" "snapshot/$related"
+            done < <(find "$dir" -maxdepth 1 -type f \( -name '*.test.*' -o -name '*.spec.*' \) -print0)
+          done < /tmp/security-targets.txt
+
+          for manifest in \
+            package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.json vitest.config.ts \
+            apps/api/package.json apps/web/package.json packages/core/package.json \
+            packages/studio-engine-registry/package.json; do
+            if [[ -f "$manifest" ]]; then
+              install -D "$manifest" "snapshot/$manifest"
+            fi
+          done
+
+          tar -czf security-source-snapshot.tar.gz -C snapshot .
+          echo "SNAPSHOT_FILE_COUNT=$(find snapshot -type f | wc -l)"
+          echo "SNAPSHOT_BYTES=$(wc -c < security-source-snapshot.tar.gz)"
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-source-snapshot
+          path: security-source-snapshot.tar.gz
+          if-no-files-found: error
+          retention-days: 1
