@@ -26,6 +26,8 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       VERCEL_PROJECT_NAME: toonspectrum
+      VERCEL_CLI_VERSION: "58.9.4"
+      VERCEL_TELEMETRY_DISABLED: "1"
       PUBLIC_APP_ORIGIN: https://www.toonstudio.cloud
       DATABASE_URL_VALUE: ${{ secrets.DATABASE_URL }}
       AUTH_SECRET_VALUE: ${{ secrets.AUTH_SECRET }}
@@ -67,16 +69,26 @@ jobs:
       - name: Reconcile production variables without exposing values
         run: node scripts/configure-vercel-production.mjs
 
+      - name: Install and verify pinned Vercel CLI
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global --no-audit --no-fund "vercel@${VERCEL_CLI_VERSION}"
+          actual_version="$(vercel --version 2>&1 | awk '/Vercel CLI/{version=$NF} END {print version}')"
+          echo "Vercel CLI ${actual_version}"
+          test "$actual_version" = "$VERCEL_CLI_VERSION"
+
       - name: Link the Vercel project
         if: ${{ inputs.deploy }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ -n "${VERCEL_PROJECT_ID:-}" ]]; then
-            npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
+            vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
           else
-            npx --yes vercel@latest link --yes --project "$VERCEL_PROJECT_NAME" --token "$VERCEL_TOKEN"
-            npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
+            vercel link --yes --project "$VERCEL_PROJECT_NAME" --token "$VERCEL_TOKEN"
+            vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
           fi
 
       - name: Deploy production
@@ -85,7 +97,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          deployment_url="$(npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" | tail -n 1)"
+          deployment_url="$(vercel deploy --prod --yes --token "$VERCEL_TOKEN" | tail -n 1)"
           if [[ ! "$deployment_url" =~ ^https:// ]]; then
             echo "::error::Vercel did not return a production deployment URL."
             exit 1
