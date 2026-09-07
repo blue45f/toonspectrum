@@ -17,6 +17,9 @@
  * Pure, deterministic, zero-dependency.
  */
 
+/** Maximum number of saved visibility presets per page. */
+export const STUDIO_LAYER_COMPS_MAX_COUNT = 64;
+
 export interface LayerCompStateItem {
   readonly layerId: string;
   readonly visible: boolean;

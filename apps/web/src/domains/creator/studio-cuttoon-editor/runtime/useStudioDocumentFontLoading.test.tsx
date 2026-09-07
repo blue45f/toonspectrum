@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   STUDIO_DOCUMENT_FONTS_LINK_ID,
   STUDIO_PRESET_FONTS_LINK_ID,
+  ensureStudioDocumentFontStylesheet,
   type StudioFontBearingElementLike,
 } from "../../studio-preset-font-loading";
 import { useStudioDocumentFontLoading } from "./useStudioDocumentFontLoading";
@@ -20,43 +21,25 @@ function deferred() {
 const originalFonts = Object.getOwnPropertyDescriptor(document, "fonts");
 let ready: ReturnType<typeof deferred>;
 let fonts: EventTarget & { ready: Promise<void> };
-let idleCallbacks: Map<number, () => void>;
 
 beforeEach(() => {
-  vi.useFakeTimers();
   ready = deferred();
   fonts = Object.assign(new EventTarget(), { ready: ready.promise });
   Object.defineProperty(document, "fonts", { configurable: true, value: fonts });
-  idleCallbacks = new Map();
-  let nextId = 0;
-  vi.stubGlobal("requestIdleCallback", vi.fn((callback: () => void) => {
-    const id = ++nextId;
-    idleCallbacks.set(id, callback);
-    return id;
-  }));
-  vi.stubGlobal("cancelIdleCallback", vi.fn((id: number) => idleCallbacks.delete(id)));
+
 });
 
 afterEach(() => {
   cleanup();
   document.getElementById(STUDIO_DOCUMENT_FONTS_LINK_ID)?.remove();
-  vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  vi.useRealTimers();
   if (originalFonts) Object.defineProperty(document, "fonts", originalFonts);
   else Reflect.deleteProperty(document, "fonts");
 });
 
-function flushIdle() {
-  const callbacks = [...idleCallbacks.values()];
-  idleCallbacks.clear();
-  act(() => { callbacks.forEach((callback) => callback()); });
-}
-
 function fixture(elements: readonly StudioFontBearingElementLike[] = []) {
   const stageRef = { current: { batchDraw: vi.fn() } };
-  const activeElementsRef = { current: elements };
-  return { elements, activeElementsRef, stageRef };
+  return { elements, stageRef };
 }
 
 function stylesheet(): HTMLLinkElement | null {
@@ -69,19 +52,17 @@ describe("useStudioDocumentFontLoading", () => {
     const originalStage = options.stageRef.current;
     const { unmount } = renderHook(() => useStudioDocumentFontLoading(options));
     expect(stylesheet()).toBeNull();
-    flushIdle();
-    expect(stylesheet()).toBeNull();
     expect(document.getElementById(STUDIO_PRESET_FONTS_LINK_ID)).toBeNull();
     const nextStage = { batchDraw: vi.fn() };
     options.stageRef.current = nextStage;
     await act(async () => { ready.resolve(); await ready.promise; });
     expect(originalStage.batchDraw).not.toHaveBeenCalled();
-    expect(nextStage.batchDraw).toHaveBeenCalledTimes(1);
+    expect(nextStage.batchDraw).not.toHaveBeenCalled();
     act(() => { fonts.dispatchEvent(new Event("loadingdone")); });
-    expect(nextStage.batchDraw).toHaveBeenCalledTimes(2);
+    expect(nextStage.batchDraw).toHaveBeenCalledTimes(1);
     unmount();
     fonts.dispatchEvent(new Event("loadingdone"));
-    expect(nextStage.batchDraw).toHaveBeenCalledTimes(2);
+    expect(nextStage.batchDraw).toHaveBeenCalledTimes(1);
   });
 
   it("updates one stylesheet for late document fonts and repaints when its new href finishes", async () => {
@@ -112,22 +93,25 @@ describe("useStudioDocumentFontLoading", () => {
     expect(document.querySelectorAll(`#${STUDIO_DOCUMENT_FONTS_LINK_ID}`)).toHaveLength(1);
   });
 
-  it("reads the latest active elements when idle preparation finally runs", () => {
-    const options = fixture();
+  it("reuses an existing document stylesheet and schedules its pending ready repaint once", async () => {
+    const href = "https://fonts.googleapis.com/css2?family=Jua&display=swap";
+    ensureStudioDocumentFontStylesheet(href);
+    const link = stylesheet();
+    const options = fixture([{ type: "text", font: "Jua" }]);
     renderHook(() => useStudioDocumentFontLoading(options));
-    options.activeElementsRef.current = [{ type: "text", font: "Jua" }];
-    flushIdle();
-    expect(stylesheet()?.href).toContain("family=Jua");
+    expect(stylesheet()).toBe(link);
+    expect(stylesheet()?.href).toBe(href);
+    await act(async () => { ready.resolve(); await ready.promise; });
+    expect(options.stageRef.current.batchDraw).toHaveBeenCalledTimes(1);
   });
 
-  it("cancels deferred work and pending ready repaint when unmounted before idle", async () => {
+  it("cancels a pending ready repaint and loadingdone listener on unmount", async () => {
     const options = fixture([{ type: "text", font: "Jua" }]);
     const { unmount } = renderHook(() => useStudioDocumentFontLoading(options));
-    const queued = [...idleCallbacks.values()];
+    expect(stylesheet()?.href).toContain("family=Jua");
     unmount();
-    expect(globalThis.cancelIdleCallback).toHaveBeenCalledTimes(1);
-    queued.forEach((callback) => callback());
     await act(async () => { ready.resolve(); await ready.promise; });
+    fonts.dispatchEvent(new Event("loadingdone"));
     expect(options.stageRef.current.batchDraw).not.toHaveBeenCalled();
   });
 
@@ -148,14 +132,10 @@ describe("useStudioDocumentFontLoading", () => {
 
   it("keeps one stylesheet and active listener across StrictMode setup and cleanup", async () => {
     const options = fixture([{ type: "text", font: "Jua" }]);
-    const add = vi.spyOn(fonts, "addEventListener");
     const { unmount } = renderHook(() => useStudioDocumentFontLoading(options), { wrapper: StrictMode });
-    expect(globalThis.requestIdleCallback).toHaveBeenCalledTimes(2);
-    expect(globalThis.cancelIdleCallback).toHaveBeenCalledTimes(1);
     expect(document.querySelectorAll(`#${STUDIO_DOCUMENT_FONTS_LINK_ID}`)).toHaveLength(1);
-    flushIdle();
-    expect(add).toHaveBeenCalledTimes(1);
     await act(async () => { ready.resolve(); await ready.promise; });
+    expect(options.stageRef.current.batchDraw).toHaveBeenCalledTimes(1);
     options.stageRef.current.batchDraw.mockClear();
     act(() => { fonts.dispatchEvent(new Event("loadingdone")); });
     expect(options.stageRef.current.batchDraw).toHaveBeenCalledTimes(1);
@@ -164,18 +144,22 @@ describe("useStudioDocumentFontLoading", () => {
     expect(options.stageRef.current.batchDraw).toHaveBeenCalledTimes(1);
   });
 
-  it.each([false, true])("cleans up timer fallback and font-ready callbacks (idle ran=%s)", async (runIdle) => {
-    vi.stubGlobal("requestIdleCallback", undefined);
-    vi.stubGlobal("cancelIdleCallback", undefined);
-    const options = fixture();
-    const add = vi.spyOn(fonts, "addEventListener");
-    const { unmount } = renderHook(() => useStudioDocumentFontLoading(options));
-    if (runIdle) act(() => { vi.advanceTimersByTime(300); });
-    expect(add).toHaveBeenCalledTimes(runIdle ? 1 : 0);
-    unmount();
-    act(() => { vi.advanceTimersByTime(300); });
+  it("observes non-preset font loads immediately, without waiting for document font preparation", () => {
+    const options = fixture([{ type: "text", font: "Uploaded custom font" }]);
+    renderHook(() => useStudioDocumentFontLoading(options));
+    act(() => { fonts.dispatchEvent(new Event("loadingdone")); });
+    expect(options.stageRef.current.batchDraw).toHaveBeenCalledTimes(1);
+    expect(stylesheet()).toBeNull();
+  });
+
+  it("ignores ready callbacks for a document that no longer uses preset fonts", async () => {
+    const options = fixture([{ type: "text", font: "Jua" }]);
+    const { rerender } = renderHook(
+      ({ elements }) => useStudioDocumentFontLoading({ ...options, elements }),
+      { initialProps: { elements: options.elements } },
+    );
+    rerender({ elements: [{ type: "image" }] });
     await act(async () => { ready.resolve(); await ready.promise; });
-    fonts.dispatchEvent(new Event("loadingdone"));
     expect(options.stageRef.current.batchDraw).not.toHaveBeenCalled();
   });
 });

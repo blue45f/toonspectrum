@@ -158,6 +158,7 @@ import {
   useStudioDocumentSidecarsRuntime,
 } from "./studio-cuttoon-editor/runtime/useStudioDocumentSidecarsRuntime";
 import { useStudioDocumentMutationSetter } from "./studio-cuttoon-editor/runtime/useStudioDocumentMutationSetter";
+import { useStudioMenuPopoverDismiss } from "./studio-cuttoon-editor/runtime/useStudioMenuPopoverDismiss";
 import { useStudioHistoryDurability } from "./studio-cuttoon-editor/runtime/useStudioHistoryDurability";
 import { useStudioHistoryRetention } from "./studio-cuttoon-editor/runtime/useStudioHistoryRetention";
 import { useStudioPageHistorySnapshots } from "./studio-cuttoon-editor/runtime/useStudioPageHistorySnapshots";
@@ -12812,43 +12813,16 @@ export function StudioCuttoonEditor({
     interchangeImportAbortRef.current = null;
   }, []);
 
-  // 내보내기 옵션 팝오버 바깥 클릭시 닫기
-  useEffect(() => {
-    if (!exportMenuOpen) return;
-    const handlePointerDown = (e: PointerEvent) => {
-      const t = e.target as Node | null;
-      if (!t) return;
-      // Panel may portal to body — also accept data-studio-export-menu-panel hits.
-      if (exportMenuRef.current?.contains(t)) return;
-      if ((t as Element).closest?.("[data-studio-export-menu-panel]")) return;
-      setExportMenuOpen(false);
-    };
-    globalThis.addEventListener("pointerdown", handlePointerDown);
-    return () => globalThis.removeEventListener("pointerdown", handlePointerDown);
-  }, [exportMenuOpen]);
-
-  useEffect(() => {
-    if (!projectActionsOpen) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      const t = event.target as Node | null;
-      if (!t) return;
-      if (projectActionsRef.current?.contains(t)) return;
-      if ((t as Element).closest?.("[data-studio-project-actions-menu]")) return;
-      setProjectActionsOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      setProjectActionsOpen(false);
-      projectActionsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    };
-    globalThis.addEventListener("pointerdown", handlePointerDown);
-    globalThis.addEventListener("keydown", handleKeyDown);
-    return () => {
-      globalThis.removeEventListener("pointerdown", handlePointerDown);
-      globalThis.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [projectActionsOpen]);
+  useStudioMenuPopoverDismiss({
+    open: exportMenuOpen, triggerRef: exportMenuRef,
+    panelSelector: "[data-studio-export-menu-panel]",
+    onDismiss: () => setExportMenuOpen(false),
+  });
+  useStudioMenuPopoverDismiss({
+    open: projectActionsOpen, triggerRef: projectActionsRef,
+    panelSelector: "[data-studio-project-actions-menu]",
+    onDismiss: () => setProjectActionsOpen(false),
+  });
 
   // QuickShape 정지-감지 인터벌 — 언마운트 시(다른 페이지 이동 등) 타이머 잔존 방지.
   useEffect(() => {
@@ -14956,7 +14930,7 @@ const puppetWarpArmed =
     },
   ]);
 
-  useStudioDocumentFontLoading({ elements, activeElementsRef, stageRef });
+  useStudioDocumentFontLoading({ elements, stageRef });
 
   // 커스텀 에셋 라이브러리 CRUD — 목록 하이드레이션(세대 펜싱), 큐잉된 저장/삭제/이름 변경,
   // 업로드·삭제 핸들러는 studio-cuttoon-editor/studio-asset-library-mutations.ts 로 추출됐다.

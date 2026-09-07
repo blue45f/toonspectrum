@@ -28,6 +28,7 @@ import { useState } from "react";
 import {
   captureLayerComp,
   planLayerCompsBatchExport,
+  STUDIO_LAYER_COMPS_MAX_COUNT,
   updateLayerCompWithCurrentLayers,
   type StudioLayerComp,
   type StudioLayerCompGroupLike,
@@ -36,7 +37,6 @@ import {
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import { STUDIO_LAYER_COMPS_MAX_COUNT } from "./studio-layer-comps-document";
 
 export interface StudioLayerCompsPanelProps<T extends StudioLayerLikeItem = StudioLayerLikeItem> {
   readonly layers: readonly T[];

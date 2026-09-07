@@ -2,9 +2,7 @@ import { z } from "zod";
 
 import { isEffectivelyLocked, type LayerGroup } from "../studio-layers";
 import type { PageState } from "../studio-page-state";
-import { captureLayerComp, updateLayerCompWithCurrentLayers, type StudioLayerComp } from "./studio-layer-comps";
-
-export const STUDIO_LAYER_COMPS_MAX_COUNT = 64;
+import { captureLayerComp, STUDIO_LAYER_COMPS_MAX_COUNT, updateLayerCompWithCurrentLayers, type StudioLayerComp } from "./studio-layer-comps";
 
 const layerStateSchema = z.object({
   layerId: z.string().min(1).max(160),

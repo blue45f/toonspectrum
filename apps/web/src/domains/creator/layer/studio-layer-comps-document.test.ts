@@ -6,7 +6,7 @@ import { isEffectivelyHidden } from "../studio-layers";
 import type { PageState } from "../studio-page-state";
 import { duplicateMirroredPage, duplicatePageState } from "../studio-pages";
 import { parseStudioProjectFile, serializeStudioProjectFile } from "../studio-project-file";
-import { captureLayerComp } from "./studio-layer-comps";
+import { captureLayerComp, STUDIO_LAYER_COMPS_MAX_COUNT } from "./studio-layer-comps";
 import {
   applyStudioElementLayerComp,
   applyStudioLayerCompTransaction,
@@ -15,7 +15,6 @@ import {
   parseStudioLayerComps,
   planStudioLayerCompApplication,
   remapStudioLayerComps,
-  STUDIO_LAYER_COMPS_MAX_COUNT,
 } from "./studio-layer-comps-document";
 
 const comp = captureLayerComp("선화", [
