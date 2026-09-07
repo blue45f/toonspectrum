@@ -1,0 +1,21 @@
+name: Retire optional finishing run for PR 907
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-preempt-finishing-907.yml
+
+permissions: {}
+
+concurrency:
+  group: studio-finishing-quality-907
+  cancel-in-progress: true
+
+jobs:
+  retire:
+    if: ${{ false }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "Optional finishing run retired so protected core gets runner capacity."
