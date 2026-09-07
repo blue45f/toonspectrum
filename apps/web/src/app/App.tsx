@@ -50,6 +50,10 @@ const TRAFFIC_ANALYTICS_ENABLED =
   && import.meta.env.VITE_TRAFFIC_ANALYTICS_ENABLED !== "false";
 let kmasEntryMergeStarted = false;
 
+function isAdminPath(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
 function useDeferredByScroll(timeoutMs = 6500) {
   const [ready, setReady] = useState(false);
 
@@ -100,9 +104,9 @@ function DeferredBackToTop() {
   );
 }
 
-function useKmasEntryMerge() {
+function useKmasEntryMerge(enabled: boolean) {
   useEffect(() => {
-    if (kmasEntryMergeStarted || import.meta.env.VITE_CATALOG_SOURCE === "static") return;
+    if (!enabled || kmasEntryMergeStarted || import.meta.env.VITE_CATALOG_SOURCE === "static") return;
     kmasEntryMergeStarted = true;
     const run = () => {
       fetch(apiPath("/api/kmas/merge-on-access"), withCsrfProtection({
@@ -123,14 +127,9 @@ function useKmasEntryMerge() {
     }
     const timer = setTimeout(run, 1500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [enabled]);
 }
 
-/**
- * Studio 모바일은 2단 하단 도크와 선택 컨텍스트 바를 직접 소유한다. 그 위에 전역 설정
- * 버튼을 다시 띄우면 375px 화면에서 핵심 도구를 가리므로 모바일에서만 숨긴다. 데스크톱은
- * 테마·언어 접근을 유지한다(클릭 이펙트·BGM 컨트롤은 제거됨).
- */
 function WebFloatingControls() {
   const { pathname } = useLocation();
   const hideOnMobile = isImmersiveMobileRoute(pathname);
@@ -145,10 +144,6 @@ function WebFloatingControls() {
   );
 }
 
-/**
- * Route-level immersive owner: site GNB/footer never flash on /studio (including the
- * lazy StudioPage load gap). Release only when leaving the studio path.
- */
 function StudioRouteImmersiveBridge() {
   const { pathname } = useLocation();
   const acquireImmersiveSurface = useUi((state) => state.acquireImmersiveSurface);
@@ -166,11 +161,6 @@ function StudioRouteImmersiveBridge() {
   return null;
 }
 
-/**
- * --font-serif(Nanum Myeongjo) 소유자 — 웹 크롬 경로에서만 스타일시트를 주입한다.
- * 최초 진입은 main.tsx 가 렌더 전에 처리하므로, 여기는 /studio 에서 웹 라우트로 넘어오는
- * SPA 전환을 덮는 몫이다(멱등이라 겹쳐 불려도 <link>는 하나).
- */
 function SerifWebFontBridge() {
   const { pathname } = useLocation();
 
@@ -181,22 +171,21 @@ function SerifWebFontBridge() {
   return null;
 }
 
-// 웹 앱 — 공유 AppShell 을 BrowserRouter(실 URL/history) 안에서 마운트하고 웹 전용 크롬을 주입한다.
-export default function App() {
+function AppRuntime() {
+  const { pathname } = useLocation();
   const [compatResult, setCompatResult] = useState<BrowserCompatibilityResult | null>(null);
   const [showCompatModal, setShowCompatModal] = useState(false);
   const studioImmersive = useUi((state) => state.immersiveSurface === "studio");
+  const adminChrome = isAdminPath(pathname);
+  const isolatedChrome = studioImmersive || adminChrome;
 
-  useKmasEntryMerge();
+  useKmasEntryMerge(!adminChrome);
 
   useEffect(() => {
-    const res = checkBrowserCompatibility();
-    setCompatResult(res);
-    // 추천 업데이트 대상이고, 세션 내에서 사용자가 아직 닫지 않았을 때 팝업 표시
+    const result = checkBrowserCompatibility();
+    setCompatResult(result);
     const dismissed = sessionStorage.getItem("toonspectrum-compat-dismissed");
-    if (res.recommendUpdate && !dismissed) {
-      setShowCompatModal(true);
-    }
+    if (result.recommendUpdate && !dismissed) setShowCompatModal(true);
   }, []);
 
   const handleCloseCompatModal = () => {
@@ -205,8 +194,8 @@ export default function App() {
   };
 
   return (
-    <BrowserRouter>
-      {TRAFFIC_ANALYTICS_ENABLED ? (
+    <>
+      {TRAFFIC_ANALYTICS_ENABLED && !adminChrome ? (
         <Suspense fallback={null}>
           <TrafficAnalyticsBridge />
         </Suspense>
@@ -214,37 +203,50 @@ export default function App() {
       <StudioRouteImmersiveBridge />
       <SerifWebFontBridge />
       <AppShell
-        header={studioImmersive ? null : <SiteHeader />}
-        footer={studioImmersive ? null : <DeferredFooter />}
-        floatingControls={studioImmersive ? null : <WebFloatingControls />}
-        // Studio owns its shell — hide site skip-to-content chrome too.
+        header={isolatedChrome ? null : <SiteHeader />}
+        footer={isolatedChrome ? null : <DeferredFooter />}
+        floatingControls={isolatedChrome ? null : <WebFloatingControls />}
         showSkipLink={!studioImmersive}
+        showSplash={!adminChrome}
+        showCommandPalette={!adminChrome}
+        showGlobalOverlays={!adminChrome}
+        trackVisit={!adminChrome}
         mainClassName={
           studioImmersive
             ? "min-h-0 h-[100dvh] overflow-hidden outline-none pb-0"
-            : "min-h-screen pb-20 outline-none md:pb-0"
+            : adminChrome
+              ? "min-h-[100dvh] outline-none"
+              : "min-h-screen pb-20 outline-none md:pb-0"
         }
         chromeOverlay={
           <>
             <Suspense fallback={null}>
               <StudioBg3dRetainedOwnerHost />
             </Suspense>
-            {!studioImmersive ? (
+            {!isolatedChrome ? (
               <>
                 <DeferredBackToTop />
                 <DeskCloudHost />
               </>
             ) : null}
-            {compatResult && (
+            {!adminChrome && compatResult ? (
               <BrowserCompatModal
                 isOpen={showCompatModal}
                 onClose={handleCloseCompatModal}
                 missingFeatures={compatResult.missingFeatures}
               />
-            )}
+            ) : null}
           </>
         }
       />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppRuntime />
     </BrowserRouter>
   );
 }

@@ -1,24 +1,12 @@
 import { Command } from "cmdk";
-import {
-  Activity,
-  AlertTriangle,
-  CreditCard,
-  Download,
-  Flag,
-  Gauge,
-  HandCoins,
-  History,
-  LayoutDashboard,
-  Megaphone,
-  MessagesSquare,
-  Receipt,
-  Search,
-  ShieldCheck,
-  Ticket,
-  UsersRound,
-} from "lucide-react";
+import { Download, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import {
+  ADMIN_NAVIGATION_GROUPS,
+  ADMIN_ROUTE_BY_ID,
+} from "../router/admin-route-manifest";
+import { AdminRouteIcon } from "../router/admin-route-icons";
 import {
   adminFetchText,
   downloadAdminFile,
@@ -26,261 +14,181 @@ import {
 import { useAdminToast } from "./use-admin-toast";
 
 import { useT } from "@/shared/lib/i18n";
-import { useRouter } from "@/src/compat/navigation";
+import { usePathname, useRouter } from "@/src/compat/navigation";
 
-interface AdminQuickPaletteProps {
-  userId: string;
-  onSelectTab: (tabKey: string) => void;
-}
-
-export function AdminQuickPalette({
-  userId,
-  onSelectTab,
-}: AdminQuickPaletteProps) {
+export function AdminQuickPalette({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const t = useT();
+  const pathname = usePathname();
   const router = useRouter();
+  const t = useT();
   const { showToast } = useAdminToast();
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    inputRef.current?.focus();
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
   }, [open]);
 
   useEffect(() => {
-    const down = (event: KeyboardEvent) => {
-      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         setOpen((current) => !current);
+      } else if (event.key === "Escape") {
+        setOpen(false);
       }
-      if (event.key === "Escape") setOpen(false);
     };
-    document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const runCommand = (action: () => void) => {
+  const navigate = (path: string) => {
     setOpen(false);
-    action();
+    router.push(path, { scroll: false });
   };
 
-  const handleExport = async (
-    path: string,
-    filename: string,
-    successMessage: string,
-  ) => {
+  const exportCsv = async (path: string, filename: string, success: string) => {
     try {
       const csv = await adminFetchText(path, userId);
       downloadAdminFile(filename, csv, "text/csv;charset=utf-8");
-      showToast(successMessage);
+      showToast(success);
     } catch (error) {
       showToast(
-        "다운로드 실패",
-        error instanceof Error ? error.message : "CSV를 내려받지 못했습니다.",
+        t("admin.palette.downloadFailed"),
+        error instanceof Error ? error.message : t("admin.palette.downloadFailed"),
         "error",
       );
     }
   };
 
-  if (!open) {
-    return (
+  const itemClass =
+    "flex min-h-10 cursor-pointer items-center gap-3 rounded-xl px-3 text-sm text-fg-2 outline-none transition-colors data-[selected=true]:bg-accent/10 data-[selected=true]:text-accent";
+
+  return (
+    <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="hidden items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-1.5 text-xs text-slate-400 backdrop-blur-xl transition-all hover:border-slate-700 hover:text-slate-200 md:flex"
+        className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
         aria-haspopup="dialog"
         aria-expanded={open}
       >
-        <Search className="size-3.5" />
-        <span>{t("admin.palette.trigger")}</span>
-        <kbd className="rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
+        <Search size={14} />
+        <span className="hidden sm:inline">{t("admin.palette.trigger")}</span>
+        <kbd className="hidden rounded border border-line bg-raised px-1.5 py-0.5 font-mono text-[10px] text-fg-3 md:inline">
           ⌘K
         </kbd>
       </button>
-    );
-  }
 
-  const itemClass =
-    "flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-colors data-[selected=true]:bg-indigo-600/20 data-[selected=true]:text-indigo-300 hover:bg-indigo-600/20 hover:text-indigo-300";
+      {open ? (
+        <div
+          className="fixed inset-0 z-[110] flex items-start justify-center bg-canvas/85 p-4 pt-[10vh] backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("admin.palette.trigger")}
+            className="w-full max-w-2xl overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl shadow-canvas"
+          >
+            <Command className="bg-transparent text-fg">
+              <div className="flex items-center gap-2 border-b border-line px-4">
+                <Search className="text-fg-3" size={17} />
+                <Command.Input
+                  ref={inputRef}
+                  placeholder={t("admin.palette.placeholder")}
+                  className="min-h-14 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
+                />
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label={t("admin.shell.closeCommandPalette")}
+                  className="inline-flex size-9 items-center justify-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg"
+                >
+                  <X size={16} />
+                </button>
+              </div>
 
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-start justify-center bg-black/70 p-4 pt-20 backdrop-blur-md"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.currentTarget === event.target) setOpen(false);
-      }}
-    >
-      <div
-        className="animate-in fade-in zoom-in-95 w-full max-w-xl overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl duration-150"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("admin.palette.trigger")}
-      >
-        <Command className="w-full">
-          <div className="flex items-center border-b border-slate-800 px-4">
-            <Search className="mr-2 size-4 text-slate-400" />
-            <Command.Input
-              ref={inputRef}
-              placeholder={t("admin.palette.placeholder")}
-              className="w-full bg-transparent py-4 text-sm text-white placeholder:text-slate-500 focus:outline-none"
-            />
+              <Command.List className="max-h-[65vh] overflow-y-auto p-2">
+                <Command.Empty className="px-4 py-10 text-center text-sm text-fg-3">
+                  {t("admin.palette.empty")}
+                </Command.Empty>
+
+                {ADMIN_NAVIGATION_GROUPS.map((group) => (
+                  <Command.Group
+                    key={group.id}
+                    heading={t(group.labelKey)}
+                    className="mb-2 px-1 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-3"
+                  >
+                    {group.routeIds.map((routeId) => {
+                      const route = ADMIN_ROUTE_BY_ID[routeId];
+                      return (
+                        <Command.Item
+                          key={route.id}
+                          value={`${t(route.labelKey)} ${route.keywords.join(" ")}`}
+                          onSelect={() => navigate(route.path)}
+                          className={itemClass}
+                        >
+                          <AdminRouteIcon icon={route.icon} className="text-fg-3" />
+                          <span>{t(route.labelKey)}</span>
+                        </Command.Item>
+                      );
+                    })}
+                  </Command.Group>
+                ))}
+
+                <Command.Group
+                  heading={t("admin.palette.groupQuick")}
+                  className="border-t border-line px-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-3"
+                >
+                  <Command.Item
+                    value={`${t("admin.palette.exportUsers")} csv members`}
+                    onSelect={() => {
+                      setOpen(false);
+                      void exportCsv(
+                        "/users/export/csv",
+                        "members.csv",
+                        t("admin.members.exportSuccess"),
+                      );
+                    }}
+                    className={itemClass}
+                  >
+                    <Download size={16} className="text-fg-3" />
+                    {t("admin.palette.exportUsers")}
+                  </Command.Item>
+                  <Command.Item
+                    value={`${t("admin.palette.exportRevenue")} csv revenue`}
+                    onSelect={() => {
+                      setOpen(false);
+                      void exportCsv(
+                        "/revenue/export/csv",
+                        "revenue-ledger.csv",
+                        t("admin.palette.exportRevenue"),
+                      );
+                    }}
+                    className={itemClass}
+                  >
+                    <Download size={16} className="text-fg-3" />
+                    {t("admin.palette.exportRevenue")}
+                  </Command.Item>
+                </Command.Group>
+              </Command.List>
+            </Command>
           </div>
-          <Command.List className="max-h-80 space-y-1 overflow-y-auto p-2">
-            <Command.Empty className="py-6 text-center text-xs text-slate-500">
-              {t("admin.palette.empty")}
-            </Command.Empty>
-
-            <Command.Group
-              heading={t("admin.palette.groupNav")}
-              className="px-2 py-1 text-[10px] font-semibold uppercase text-slate-500"
-            >
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("dashboard"))}
-                className={itemClass}
-              >
-                <LayoutDashboard className="size-4 text-indigo-400" />
-                {t("admin.tabs.dashboard")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("traffic"))}
-                className={itemClass}
-              >
-                <Activity className="size-4 text-cyan-400" />
-                {t("admin.tabs.traffic")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("plans"))}
-                className={itemClass}
-              >
-                <CreditCard className="size-4 text-indigo-400" />
-                {t("admin.tabs.plans")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("revenue"))}
-                className={itemClass}
-              >
-                <Receipt className="size-4 text-emerald-400" />
-                {t("admin.tabs.revenue")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("campaigns"))}
-                className={itemClass}
-              >
-                <HandCoins className="size-4 text-emerald-400" />
-                {t("admin.tabs.campaigns")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("promos"))}
-                className={itemClass}
-              >
-                <Ticket className="size-4 text-indigo-400" />
-                {t("admin.tabs.promos")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("announcements"))}
-                className={itemClass}
-              >
-                <Megaphone className="size-4 text-indigo-400" />
-                {t("admin.announcements.title")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("reports"))}
-                className={itemClass}
-              >
-                <Flag className="size-4 text-amber-400" />
-                {t("admin.reports.title")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("security"))}
-                className={itemClass}
-              >
-                <ShieldCheck className="size-4 text-emerald-400" />
-                {t("admin.security.title")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("audit"))}
-                className={itemClass}
-              >
-                <History className="size-4 text-indigo-400" />
-                {t("admin.audit.title")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() =>
-                  runCommand(() =>
-                    router.push("/admin/members", { scroll: false }),
-                  )
-                }
-                className={itemClass}
-              >
-                <UsersRound className="size-4 text-cyan-400" />
-                {t("admin.splitRoutes.members")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() =>
-                  runCommand(() =>
-                    router.push("/admin/community", { scroll: false }),
-                  )
-                }
-                className={itemClass}
-              >
-                <MessagesSquare className="size-4 text-cyan-400" />
-                {t("admin.splitRoutes.community")}
-              </Command.Item>
-            </Command.Group>
-
-            <Command.Group
-              heading={t("admin.palette.groupQuick")}
-              className="mt-2 border-t border-slate-800 px-2 py-1 text-[10px] font-semibold uppercase text-slate-500"
-            >
-              <Command.Item
-                onSelect={() =>
-                  runCommand(() =>
-                    void handleExport(
-                      "/users/export/csv",
-                      "members.csv",
-                      "회원 CSV를 내려받았습니다.",
-                    ),
-                  )
-                }
-                className={itemClass}
-              >
-                <Download className="size-4 text-cyan-400" />
-                {t("admin.palette.exportUsers")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() =>
-                  runCommand(() =>
-                    void handleExport(
-                      "/revenue/export/csv",
-                      "revenue_ledger.csv",
-                      "정산 CSV를 내려받았습니다.",
-                    ),
-                  )
-                }
-                className={itemClass}
-              >
-                <Download className="size-4 text-cyan-400" />
-                {t("admin.palette.exportRevenue")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("ops"))}
-                className={itemClass}
-              >
-                <Gauge className="size-4 text-emerald-400" />
-                {t("admin.ops.benchmarkTitle")}
-              </Command.Item>
-              <Command.Item
-                onSelect={() => runCommand(() => onSelectTab("ops"))}
-                className="flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 transition-colors data-[selected=true]:bg-rose-600/20 data-[selected=true]:text-rose-300 hover:bg-rose-600/20 hover:text-rose-300"
-              >
-                <AlertTriangle className="size-4 text-rose-400" />
-                {t("admin.palette.maintenance")}
-              </Command.Item>
-            </Command.Group>
-          </Command.List>
-        </Command>
-      </div>
-    </div>
+        </div>
+      ) : null}
+    </>
   );
 }

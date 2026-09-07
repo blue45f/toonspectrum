@@ -37,6 +37,8 @@ import adminEnrole from "../../../public/i18n/admin/role/en.json";
 import adminKorole from "../../../public/i18n/admin/role/ko.json";
 import adminEnsecurity from "../../../public/i18n/admin/security/en.json";
 import adminKosecurity from "../../../public/i18n/admin/security/ko.json";
+import adminEnshell from "../../../public/i18n/admin/shell/en.json";
+import adminKoshell from "../../../public/i18n/admin/shell/ko.json";
 import adminEnsplitRoutes from "../../../public/i18n/admin/splitRoutes/en.json";
 import adminKosplitRoutes from "../../../public/i18n/admin/splitRoutes/ko.json";
 import adminEnstats from "../../../public/i18n/admin/stats/en.json";
@@ -70,6 +72,7 @@ export const adminI18nBuiltins = { en: {
   ...adminEnrevenue,
   ...adminEnrole,
   ...adminEnsecurity,
+  ...adminEnshell,
   ...adminEnsplitRoutes,
   ...adminEnstats,
   ...adminEntabs,
@@ -96,6 +99,7 @@ export const adminI18nBuiltins = { en: {
   ...adminKorevenue,
   ...adminKorole,
   ...adminKosecurity,
+  ...adminKoshell,
   ...adminKosplitRoutes,
   ...adminKostats,
   ...adminKotabs,
