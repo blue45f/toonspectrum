@@ -20,7 +20,7 @@ import type {
   CharacterSurfaceInkStroke,
   CharacterTriangleSurface,
 } from "./character-surface-ink";
-import type { BufferAttribute, Object3D, Scene } from "three";
+import type { BufferAttribute, InterleavedBufferAttribute, Object3D, Scene } from "three";
 
 export const CHARACTER_SURFACE_INK_GROUP_NAME = "__toonstudio_character_surface_ink__";
 
@@ -38,7 +38,11 @@ export function characterSurfaceTopologyRevision(modelKey: string, mesh: Mesh): 
   return [modelKey, characterSurfaceObjectPath(mesh), mesh.geometry.attributes.position?.count ?? 0, mesh.geometry.index?.count ?? 0].join(":");
 }
 
-function tuple4(attribute: BufferAttribute | undefined, index: number, fallback: CharacterInkVector4): CharacterInkVector4 {
+function tuple4(
+  attribute: BufferAttribute | InterleavedBufferAttribute | undefined,
+  index: number,
+  fallback: CharacterInkVector4,
+): CharacterInkVector4 {
   return attribute ? [attribute.getX(index), attribute.getY(index), attribute.getZ(index), attribute.getW(index)] : fallback;
 }
 
