@@ -30,8 +30,6 @@ import { gzipSync } from "node:zlib";
 import { chromium } from "playwright";
 import { createServer as createViteServer, type ViteDevServer } from "vite";
 
-import { WEB_VITE_ALIASES } from "./lib/repo-paths.mjs";
-
 import {
   AVATAR_FORGE_PRESETS,
   createAvatarForgeState,
@@ -48,6 +46,8 @@ import {
   type StudioVrmAvatarReferenceCatalogue,
   type StudioVrmAvatarReferenceEmbedding,
 } from "../apps/web/src/domains/creator/vrm/studio-vrm-avatar-reference-recommendation";
+
+import { WEB_VITE_ALIASES } from "./lib/repo-paths.mjs";
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 export const STUDIO_VRM_AVATAR_REFERENCE_ROOT = resolve(SCRIPT_DIRECTORY, "..");
