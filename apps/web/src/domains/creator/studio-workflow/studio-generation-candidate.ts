@@ -34,6 +34,8 @@ export interface StudioGenerationCharacterPinV1 {
 
 export interface StudioGenerationInputSnapshotV1 {
   readonly version: 1;
+  /** Digest of the complete, canonicalized generation input snapshot. */
+  readonly snapshotDigest: string;
   readonly workScope: string;
   readonly localDocumentDigest: string;
   readonly serverRevision: number | null;
@@ -75,6 +77,7 @@ export type StudioGenerationStaleReason =
   | "target-element"
   | "character-version"
   | "character-variant"
+  | "character-prompt"
   | "style-version"
   | "reference-revision"
   | "edit-mask"
@@ -90,10 +93,7 @@ export interface StudioGenerationCurrentContext {
   readonly serverRevision: number | null;
   readonly semanticPanelId: string | null;
   readonly targetElementId: string | null;
-  readonly characterPins: readonly Pick<
-    StudioGenerationCharacterPinV1,
-    "characterId" | "characterVersionId" | "variantIds"
-  >[];
+  readonly characterPins: readonly StudioGenerationCharacterPinV1[];
   readonly styleVersionId: string | null;
   readonly references: readonly StudioGenerationReferenceV1[];
   readonly editMask: StudioAssetReferenceV2 | null;
@@ -112,18 +112,23 @@ export interface StudioGenerationApplicationPlan {
   readonly outputAssetRevisionId: string;
   readonly inputSnapshotDigest: string;
   readonly requiresExplicitStaleConfirmation: boolean;
+  readonly staleReasons: readonly StudioGenerationStaleReason[];
   readonly commands: readonly string[];
 }
 
 export type StudioGenerationCandidateIssueCode =
   | "invalid-id"
+  | "invalid-server-revision"
   | "invalid-timestamp"
   | "invalid-strength"
   | "invalid-output-asset"
   | "invalid-thumbnail-asset"
+  | "invalid-reference-asset"
+  | "invalid-mask-asset"
   | "duplicate-character-pin"
   | "duplicate-reference-role-revision"
   | "missing-document-digest"
+  | "missing-snapshot-digest"
   | "missing-input-snapshot-digest"
   | "candidate-cycle"
   | "parent-missing";
@@ -145,6 +150,10 @@ function validTimestamp(value: string): boolean {
   }
 }
 
+function validRevision(value: number | null): boolean {
+  return value === null || (Number.isSafeInteger(value) && value >= 1);
+}
+
 function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
   if (left.length !== right.length) return false;
   const sortedLeft = [...left].sort();
@@ -156,6 +165,10 @@ function referenceKey(reference: StudioGenerationReferenceV1): string {
   return `${reference.role}:${reference.asset.assetId}:${reference.asset.revisionId}`;
 }
 
+function referenceFingerprint(reference: StudioGenerationReferenceV1): string {
+  return `${referenceKey(reference)}:${reference.strength}`;
+}
+
 function sameNullableAsset(
   left: StudioAssetReferenceV2 | null,
   right: StudioAssetReferenceV2 | null,
@@ -165,8 +178,8 @@ function sameNullableAsset(
 }
 
 function characterPinMap(
-  pins: StudioGenerationCurrentContext["characterPins"],
-): Map<string, StudioGenerationCurrentContext["characterPins"][number]> {
+  pins: readonly StudioGenerationCharacterPinV1[],
+): Map<string, StudioGenerationCharacterPinV1> {
   return new Map(pins.map((pin) => [pin.characterId, pin]));
 }
 
@@ -174,10 +187,22 @@ export function validateStudioGenerationInputSnapshot(
   snapshot: StudioGenerationInputSnapshotV1,
 ): readonly StudioGenerationCandidateIssue[] {
   const issues: StudioGenerationCandidateIssue[] = [];
+  if (!snapshot.snapshotDigest.trim()) {
+    issues.push({
+      code: "missing-snapshot-digest",
+      message: "A generation input snapshot must have its own canonical digest.",
+    });
+  }
   if (!snapshot.localDocumentDigest.trim()) {
     issues.push({
       code: "missing-document-digest",
       message: "A generation input snapshot must pin the local document digest.",
+    });
+  }
+  if (!validRevision(snapshot.serverRevision)) {
+    issues.push({
+      code: "invalid-server-revision",
+      message: "Generation server revision must be null or a positive safe integer.",
     });
   }
   if (!validTimestamp(snapshot.createdAt)) {
@@ -216,7 +241,7 @@ export function validateStudioGenerationInputSnapshot(
     }
     referenceKeys.add(key);
     issues.push(...validateStudioAssetReferenceV2(reference.asset).map((issue) => ({
-      code: "invalid-output-asset" as const,
+      code: "invalid-reference-asset" as const,
       entityId: reference.asset.revisionId,
       message: issue.message,
     })));
@@ -224,7 +249,7 @@ export function validateStudioGenerationInputSnapshot(
   for (const mask of [snapshot.editMask, snapshot.protectMask]) {
     if (mask === null) continue;
     issues.push(...validateStudioAssetReferenceV2(mask).map((issue) => ({
-      code: "invalid-output-asset" as const,
+      code: "invalid-mask-asset" as const,
       entityId: mask.revisionId,
       message: issue.message,
     })));
@@ -302,12 +327,15 @@ export function compareStudioGenerationInputToCurrent(
     if (!sameStringSet(next.variantIds, pin.variantIds)) {
       reasons.add("character-variant");
     }
+    if (next.promptReceiptDigest !== pin.promptReceiptDigest) {
+      reasons.add("character-prompt");
+    }
   }
   if (snapshot.styleVersionId !== current.styleVersionId) {
     reasons.add("style-version");
   }
-  const currentReferenceKeys = new Set(current.references.map(referenceKey));
-  const snapshotReferenceKeys = new Set(snapshot.references.map(referenceKey));
+  const currentReferenceKeys = new Set(current.references.map(referenceFingerprint));
+  const snapshotReferenceKeys = new Set(snapshot.references.map(referenceFingerprint));
   if (
     currentReferenceKeys.size !== snapshotReferenceKeys.size
     || [...snapshotReferenceKeys].some((key) => !currentReferenceKeys.has(key))
@@ -335,7 +363,7 @@ export function planStudioGenerationCandidateApplication(input: {
   if (candidateIssues.length > 0 || snapshotIssues.length > 0) {
     throw new Error("Cannot apply an invalid Studio generation candidate.");
   }
-  if (input.candidate.inputSnapshotDigest !== input.snapshot.localDocumentDigest) {
+  if (input.candidate.inputSnapshotDigest !== input.snapshot.snapshotDigest) {
     throw new Error("Candidate and generation input snapshot digests do not match.");
   }
   if (input.candidate.state !== "ready") {
@@ -356,6 +384,7 @@ export function planStudioGenerationCandidateApplication(input: {
     outputAssetRevisionId: input.candidate.output.revisionId,
     inputSnapshotDigest: input.candidate.inputSnapshotDigest,
     requiresExplicitStaleConfirmation: staleness.stale,
+    staleReasons: staleness.reasons,
     commands: input.mode === "new-layer"
       ? [
           "asset/attach-revision",
