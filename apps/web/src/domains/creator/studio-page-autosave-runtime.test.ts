@@ -43,8 +43,8 @@ function recoveryFixture(options: {
   };
   const comments = options.otherContent ? addStudioCommentThread(createEmptyStudioCommentsDocument(), {
     id: "comment-1", anchor: { type: "page", pageId: page.id },
-    author: { displayName: "Artist" }, body: "복구할 댓글", createdAt: SAVED_AT,
-  }) : createEmptyStudioCommentsDocument();
+    author: { displayName: "Artist" }, body: "복구할 댓글",
+  }, new Date(SAVED_AT)) : createEmptyStudioCommentsDocument();
   const payload = parseStudioAutosave(serializeStudioAutosave({
     version: 2, savedAt: SAVED_AT, pagesList: [page], currentPageId: page.id,
     comments, master: { elements: options.otherContent ? [STROKE] : [] },
