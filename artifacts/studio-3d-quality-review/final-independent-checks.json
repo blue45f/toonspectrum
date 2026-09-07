@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-09-07T18:17:24.163Z",
+  "mobile": {
+    "passed": 51,
+    "failed": 0,
+    "skipped": [
+      {
+        "id": "polyhaven-dandelion-01",
+        "reason": "not-runtime-verified; retained outside the admitted-model gate"
+      }
+    ],
+    "report": "artifacts/studio-asset-expansion/pbr-20260908/mobile-admission-report.json"
+  },
+  "eslint": {
+    "checkedFiles": 17,
+    "errors": 0,
+    "warnings": 0,
+    "strictMaxWarnings": 0
+  },
+  "attachmentRegression": {
+    "tests": 7,
+    "passed": 7
+  },
+  "typecheck": {
+    "command": "node --max-old-space-size=8192 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
+    "exitCode": 2,
+    "defaultHeapAttempt": "4GiB heap OOM, exit134",
+    "currentChangeErrors": 0,
+    "unrelatedArchiveErrors": 34,
+    "unrelatedFiles": [
+      "artifacts/pr830-verification/bg3d-overlap-before33-after38/executed-verifier.mts",
+      "artifacts/pr830-verification/layer-comps-browser34/existing-verifier.mts"
+    ],
+    "log": "artifacts/studio-3d-quality-review/typecheck-final.log"
+  }
+}

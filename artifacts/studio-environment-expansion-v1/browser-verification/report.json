@@ -1,0 +1,2046 @@
+{
+  "schema": "toonstudio-actual-gpu-asset-verification/v2",
+  "startedAt": "2026-09-07T18:00:05.508Z",
+  "completedAt": "2026-09-07T18:00:07.830Z",
+  "origin": "http://127.0.0.1:5229",
+  "manifestPath": "/tmp/toonstudio-env-expansion-gpu.json",
+  "chromeVersion": "152.0.7977.77",
+  "gpu": {
+    "vendor": "Google Inc. (Apple)",
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+    "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+  },
+  "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+  "helper": "applyStudioBg3dRuntimeAssetQuality",
+  "expectedAssets": 6,
+  "renderedAssets": 6,
+  "passedAssets": 6,
+  "failures": [],
+  "rendererErrors": [],
+  "warnings": [],
+  "contactSheets": [
+    "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments-contact-1.png"
+  ],
+  "results": [
+    {
+      "id": "library_reading_room",
+      "url": "/assets/3d/environments/expansion-v1/library_reading_room.glb",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "diagnosticOnly": false,
+      "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+      "meshes": 31,
+      "materialCount": 21,
+      "sourceImages": 20,
+      "textures": [
+        {
+          "name": "potted_plant_04_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_04_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_04_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_legs_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_legs_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_legs_metal-modern_arm_chair_01_legs_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_pillow_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_pillow_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_pillow_metal-modern_arm_chair_01_pillow_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "book_encyclopedia_set_01_cover_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "book_encyclopedia_set_01_cover_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "book_encyclopedia_set_01_cover_metallic-book_encyclopedia_set_01_cover_roughness",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "book_encyclopedia_set_01_paper_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "book_encyclopedia_set_01_paper_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "book_encyclopedia_set_01_paper_roughness",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "white_plaster_02_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "white_plaster_02_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_base",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        }
+      ],
+      "bounds": {
+        "min": [
+          -5,
+          0,
+          -4
+        ],
+        "max": [
+          5,
+          4.400000095367432,
+          4
+        ]
+      },
+      "anchor": null,
+      "group": "environments",
+      "sourcePath": "/Users/hjunkim/WebstormProjects/toonspectrum/apps/web/public/assets/3d/environments/expansion-v1/library_reading_room.glb",
+      "sourceSha256": "2461352f0b60143a21f88e9173f3700efcd919fbbc05b1dbc5e92c087680bc39",
+      "sourceBytes": 23818220,
+      "frames": [
+        {
+          "view": "front",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 132202,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.6207999878973086,
+          "renderedTriangles": 149825,
+          "renderCalls": 32,
+          "cameraPosition": [
+            0,
+            10.449744174024653,
+            21.7098529640551
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/library_reading_room-front.png",
+          "sha256": "5d1bfcec25051d5b0c2eab35292fbbcb3951fc120468c05cae6f7456dfa8bf5a"
+        },
+        {
+          "view": "three-quarter",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 149261,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.5891827068021788,
+          "renderedTriangles": 149825,
+          "renderCalls": 32,
+          "cameraPosition": [
+            12.918241881968967,
+            10.467674852143855,
+            17.439626540658107
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/library_reading_room-three-quarter.png",
+          "sha256": "5e919bd23dd73a0b79cdb4a7e469eaf4560b1a1e4c7bedc3668f503fdc5321c0"
+        },
+        {
+          "view": "back",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 108863,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.0003306908683391051,
+          "coloredFraction": 0.03017554173594334,
+          "renderedTriangles": 149825,
+          "renderCalls": 32,
+          "cameraPosition": [
+            0,
+            10.449744174024653,
+            -21.7098529640551
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/library_reading_room-back.png",
+          "sha256": "d1eb3f116f379ce854016c0bdf36d046c7516151239f12707460c406400fd02a"
+        }
+      ],
+      "validation": {
+        "validator": "Khronos glTF-Validator",
+        "version": "2.0.0-dev.3.10",
+        "numErrors": 0,
+        "numWarnings": 18,
+        "numInfos": 15,
+        "messages": [
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/1/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/1/primitives/1/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/2/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/2/primitives/1/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/3/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/3/primitives/1/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/4/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/4/primitives/1/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/5/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/5/primitives/1/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/6/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/6/primitives/1/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/7/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/7/primitives/1/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/8/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/9/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/10/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/11/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/12/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/13/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/14/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/15/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/15/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/16/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/17/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/17/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/18/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/19/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/20/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/21/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/22/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/23/primitives/0/material"
+          }
+        ]
+      }
+    },
+    {
+      "id": "independent_bookshop",
+      "url": "/assets/3d/environments/expansion-v1/independent_bookshop.glb",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "diagnosticOnly": false,
+      "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+      "meshes": 20,
+      "materialCount": 20,
+      "sourceImages": 20,
+      "textures": [
+        {
+          "name": "marble_01_base",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "marble_01_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "marble_01_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_pot_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_pot_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_pot_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_leaves_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_leaves_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_leaves_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_legs_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_legs_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_legs_metal-modern_arm_chair_01_legs_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_pillow_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_pillow_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "modern_arm_chair_01_pillow_metal-modern_arm_chair_01_pillow_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "white_plaster_02_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "white_plaster_02_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_base",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        }
+      ],
+      "bounds": {
+        "min": [
+          -4.25,
+          0,
+          -4
+        ],
+        "max": [
+          4.25,
+          3.5999999046325684,
+          4.014999866485596
+        ]
+      },
+      "anchor": null,
+      "group": "environments",
+      "sourcePath": "/Users/hjunkim/WebstormProjects/toonspectrum/apps/web/public/assets/3d/environments/expansion-v1/independent_bookshop.glb",
+      "sourceSha256": "bc1986e34e69d53a98550b5afa6e678be36b16fe22b82a2daafccd6acfcd5a43",
+      "sourceBytes": 21020616,
+      "frames": [
+        {
+          "view": "front",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 125041,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.5097288089506642,
+          "renderedTriangles": 88666,
+          "renderCalls": 21,
+          "cameraPosition": [
+            0,
+            9.247944937995005,
+            19.60735515871312
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/independent_bookshop-front.png",
+          "sha256": "f1f98abc44f58766b00d1009af2400b68b571a0b5c9861e57402627afa2d0c45"
+        },
+        {
+          "view": "three-quarter",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 143754,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.4201761342293084,
+          "renderedTriangles": 88666,
+          "renderCalls": 21,
+          "cameraPosition": [
+            11.662707761006669,
+            9.264132919360552,
+            15.752155410601802
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/independent_bookshop-three-quarter.png",
+          "sha256": "69bbe7ae361a1cc8e3efcc2a1164f226648d1448796b1a213fc6fb85d65bcb68"
+        },
+        {
+          "view": "back",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 108853,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.0015158057196402487,
+          "coloredFraction": 0.014147520049975656,
+          "renderedTriangles": 88666,
+          "renderCalls": 21,
+          "cameraPosition": [
+            0,
+            9.247944937995005,
+            -19.592355292227523
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/independent_bookshop-back.png",
+          "sha256": "827b1360a0631a8e84edf0d45d913b24c194c843ae1aad4cda25f9ac7a78d739"
+        }
+      ],
+      "validation": {
+        "validator": "Khronos glTF-Validator",
+        "version": "2.0.0-dev.3.10",
+        "numErrors": 0,
+        "numWarnings": 8,
+        "numInfos": 20,
+        "messages": [
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/1/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/2/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/3/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/3/primitives/1/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/4/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/4/primitives/1/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/5/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/6/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/6/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/7/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/7/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/8/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/8/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/9/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/9/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/10/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/10/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/11/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/11/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/12/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/12/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/13/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/13/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/14/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/15/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/16/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/17/primitives/0/material"
+          }
+        ]
+      }
+    },
+    {
+      "id": "fashion_boutique",
+      "url": "/assets/3d/environments/expansion-v1/fashion_boutique.glb",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "diagnosticOnly": false,
+      "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+      "meshes": 13,
+      "materialCount": 13,
+      "sourceImages": 13,
+      "textures": [
+        {
+          "name": "potted_plant_04_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_04_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_04_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "denmin_fabric_02_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "denmin_fabric_02_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "white_plaster_02_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "white_plaster_02_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "marble_01_base",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "marble_01_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "marble_01_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_base",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        }
+      ],
+      "bounds": {
+        "min": [
+          -4.75,
+          0,
+          -4
+        ],
+        "max": [
+          4.75,
+          3.6500000953674316,
+          4
+        ]
+      },
+      "anchor": null,
+      "group": "environments",
+      "sourcePath": "/Users/hjunkim/WebstormProjects/toonspectrum/apps/web/public/assets/3d/environments/expansion-v1/fashion_boutique.glb",
+      "sourceSha256": "e4d529856c6be1ae13ff684858d85a3fc51ead2eb3dd86ffd1b03367df2f94a5",
+      "sourceBytes": 12516872,
+      "frames": [
+        {
+          "view": "front",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 125019,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.41419304265751605,
+          "renderedTriangles": 63093,
+          "renderCalls": 13,
+          "cameraPosition": [
+            0,
+            9.711595298855716,
+            20.7541980294
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/fashion_boutique-front.png",
+          "sha256": "4bc86224efd739c626a6e64c01f8e5d6b74d31a15d171627fe7db91f5aa0814d"
+        },
+        {
+          "view": "three-quarter",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 140960,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.29142309875141886,
+          "renderedTriangles": 63093,
+          "renderCalls": 13,
+          "cameraPosition": [
+            12.349588486572324,
+            9.728736679090003,
+            16.67194445687264
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/fashion_boutique-three-quarter.png",
+          "sha256": "d628565a633f6bb347ef5d367477f69e98748ca9ca06212e65b29018f00c8faf"
+        },
+        {
+          "view": "back",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 99053,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.00046439784761693234,
+          "coloredFraction": 0.03931228736131162,
+          "renderedTriangles": 63093,
+          "renderCalls": 13,
+          "cameraPosition": [
+            0,
+            9.711595298855716,
+            -20.7541980294
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/fashion_boutique-back.png",
+          "sha256": "050194a01e53481b91b3deb4e86e6926cdb97f8ae2ac140d2bf7e756c6368982"
+        }
+      ],
+      "validation": {
+        "validator": "Khronos glTF-Validator",
+        "version": "2.0.0-dev.3.10",
+        "numErrors": 0,
+        "numWarnings": 9,
+        "numInfos": 10,
+        "messages": [
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/1/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/2/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/3/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/3/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/4/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/4/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/5/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/5/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/6/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/6/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/7/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/7/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/8/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/9/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/10/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/11/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/11/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/12/primitives/0/material"
+          }
+        ]
+      }
+    },
+    {
+      "id": "park_garden_pavilion",
+      "url": "/assets/3d/environments/expansion-v1/park_garden_pavilion.glb",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "diagnosticOnly": false,
+      "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+      "meshes": 14,
+      "materialCount": 14,
+      "sourceImages": 19,
+      "textures": [
+        {
+          "name": "potted_plant_04_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_04_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_04_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_pot_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_pot_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_pot_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_leaves_diff",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_leaves_nor_gl",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "potted_plant_02_leaves_rough",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "coast_sand_rocks_02_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "coast_sand_rocks_02_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "marble_01_base",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "marble_01_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "marble_01_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "concrete_floor_02_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "concrete_floor_02_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_base",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        }
+      ],
+      "bounds": {
+        "min": [
+          -6.667999744415283,
+          0,
+          -5.5
+        ],
+        "max": [
+          6.5,
+          4.565744876861572,
+          5.5
+        ]
+      },
+      "anchor": null,
+      "group": "environments",
+      "sourcePath": "/Users/hjunkim/WebstormProjects/toonspectrum/apps/web/public/assets/3d/environments/expansion-v1/park_garden_pavilion.glb",
+      "sourceSha256": "6cf4b5ba75ded1e8fcfb891e1774420f192a1952c480b6914cd292aab781d0ff",
+      "sourceBytes": 20896920,
+      "frames": [
+        {
+          "view": "front",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 78751,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.8601287602697109,
+          "renderedTriangles": 92171,
+          "renderCalls": 14,
+          "cameraPosition": [
+            -0.0839998722076416,
+            13.099960926021032,
+            28.466022335763803
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/park_garden_pavilion-front.png",
+          "sha256": "5a7b652a0f75a992db4b29793a06c627c93915b74a693d1491682ec91fb6e0f4"
+        },
+        {
+          "view": "three-quarter",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 79973,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.8619158966151076,
+          "renderedTriangles": 92171,
+          "renderCalls": 14,
+          "cameraPosition": [
+            16.854436447917532,
+            13.123471683310896,
+            22.866889032168988
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/park_garden_pavilion-three-quarter.png",
+          "sha256": "1e2dd64fd9ae3cd0f02baa40f4df207a31fe93cc00486d2d0e06787a327c0996"
+        },
+        {
+          "view": "back",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 79491,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.027575448792945115,
+          "coloredFraction": 0.7506887572177983,
+          "renderedTriangles": 92171,
+          "renderCalls": 14,
+          "cameraPosition": [
+            -0.0839998722076416,
+            13.099960926021032,
+            -28.466022335763803
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/park_garden_pavilion-back.png",
+          "sha256": "a1779976f619996c0e36c22f50e06628e0bf7aea36780fdc581b5fc2cc494101"
+        }
+      ],
+      "validation": {
+        "validator": "Khronos glTF-Validator",
+        "version": "2.0.0-dev.3.10",
+        "numErrors": 0,
+        "numWarnings": 8,
+        "numInfos": 6,
+        "messages": [
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/1/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/1/primitives/1/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/2/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/3/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/4/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/5/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/6/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/7/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/8/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/9/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/10/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/11/primitives/0/material"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/12/primitives/0/material"
+          }
+        ]
+      }
+    },
+    {
+      "id": "police_interview_room",
+      "url": "/assets/3d/environments/expansion-v1/police_interview_room.glb",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "diagnosticOnly": false,
+      "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+      "meshes": 12,
+      "materialCount": 12,
+      "sourceImages": 7,
+      "textures": [
+        {
+          "name": "denmin_fabric_02_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "denmin_fabric_02_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "concrete_floor_02_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "concrete_floor_02_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_base",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        }
+      ],
+      "bounds": {
+        "min": [
+          -3.5,
+          -2.9802322387695312e-8,
+          -3
+        ],
+        "max": [
+          3.5,
+          3.3499996662139893,
+          3
+        ]
+      },
+      "anchor": null,
+      "group": "environments",
+      "sourcePath": "/Users/hjunkim/WebstormProjects/toonspectrum/apps/web/public/assets/3d/environments/expansion-v1/police_interview_room.glb",
+      "sourceSha256": "ad031daef47016e60f868a2371b5a7fa74174e4e80b0cd8e5b33c6be28f4bfa0",
+      "sourceBytes": 5305120,
+      "frames": [
+        {
+          "view": "front",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 134175,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.17150735979131732,
+          "renderedTriangles": 34544,
+          "renderCalls": 13,
+          "cameraPosition": [
+            0,
+            7.651218642059029,
+            15.726891641718936
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/police_interview_room-front.png",
+          "sha256": "c61e0cf16eeee77742e2c2ad4f2f998d74afb15c2ed3e71e11d0deba419b4959"
+        },
+        {
+          "view": "three-quarter",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 151650,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0,
+          "coloredFraction": 0.1365776458951533,
+          "renderedTriangles": 34544,
+          "renderCalls": 13,
+          "cameraPosition": [
+            9.358137552364752,
+            7.664207851719275,
+            12.633485695692418
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/police_interview_room-three-quarter.png",
+          "sha256": "39fbdb77b6fb227aa8f250e08b191f4292b888ed2a1341e1ec5b3a8e854502aa"
+        },
+        {
+          "view": "back",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 115003,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.014138761597523542,
+          "coloredFraction": 0.004060763632253071,
+          "renderedTriangles": 34544,
+          "renderCalls": 13,
+          "cameraPosition": [
+            0,
+            7.651218642059029,
+            -15.726891641718936
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/police_interview_room-back.png",
+          "sha256": "db61364369e0f23f9a4588122e9563757096c80ad55c309cdb2749b4b37dac67"
+        }
+      ],
+      "validation": {
+        "validator": "Khronos glTF-Validator",
+        "version": "2.0.0-dev.3.10",
+        "numErrors": 0,
+        "numWarnings": 3,
+        "numInfos": 9,
+        "messages": [
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/1/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/2/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/3/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/4/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/5/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/6/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/7/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/8/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/9/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/10/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/11/primitives/0/material"
+          }
+        ]
+      }
+    },
+    {
+      "id": "science_research_laboratory",
+      "url": "/assets/3d/environments/expansion-v1/science_research_laboratory.glb",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "diagnosticOnly": false,
+      "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+      "meshes": 12,
+      "materialCount": 10,
+      "sourceImages": 7,
+      "textures": [
+        {
+          "name": "concrete_floor_02_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "concrete_floor_02_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "white_plaster_02_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "white_plaster_02_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_base",
+          "width": 1024,
+          "height": 1024,
+          "colorSpace": "srgb",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_nor_gl",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        },
+        {
+          "name": "wood_table_001_rough",
+          "width": 512,
+          "height": 512,
+          "colorSpace": "",
+          "minFilter": 1008,
+          "mipLevels": 0
+        }
+      ],
+      "bounds": {
+        "min": [
+          -5,
+          0,
+          -4
+        ],
+        "max": [
+          5,
+          3.799999952316284,
+          4
+        ]
+      },
+      "anchor": null,
+      "group": "environments",
+      "sourcePath": "/Users/hjunkim/WebstormProjects/toonspectrum/apps/web/public/assets/3d/environments/expansion-v1/science_research_laboratory.glb",
+      "sourceSha256": "43bacb2752e166a8302870cc1feacb354cac302290e8d43ec4ed9cf0dadf8b99",
+      "sourceBytes": 6376868,
+      "frames": [
+        {
+          "view": "front",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 125247,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.00003193689270002475,
+          "coloredFraction": 0.12223047258616973,
+          "renderedTriangles": 74092,
+          "renderCalls": 13,
+          "cameraPosition": [
+            0,
+            10.038311019392216,
+            21.416608008510718
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/science_research_laboratory-front.png",
+          "sha256": "245cd4d9e71dd8758a70cfa087ceefb2b130c1cde77a40b29690279fb286dccd"
+        },
+        {
+          "view": "three-quarter",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 140922,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.00004967286867912746,
+          "coloredFraction": 0.1111040149870141,
+          "renderedTriangles": 74092,
+          "renderCalls": 13,
+          "cameraPosition": [
+            12.74374925538777,
+            10.055999499606315,
+            17.204061494773494
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/science_research_laboratory-three-quarter.png",
+          "sha256": "69e807cca0ad143021338bd4937ae22c4d57922ac30aadb7acf28647a9ae71d4"
+        },
+        {
+          "view": "back",
+          "width": 640,
+          "height": 640,
+          "foregroundPixels": 98445,
+          "pixelGatePassed": true,
+          "darkFraction": 0,
+          "brightFraction": 0.00034537051145309565,
+          "coloredFraction": 0.003606074457819087,
+          "renderedTriangles": 74092,
+          "renderCalls": 13,
+          "cameraPosition": [
+            0,
+            10.038311019392216,
+            -21.416608008510718
+          ],
+          "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/studio-environment-expansion-v1/browser-verification/environments/science_research_laboratory-back.png",
+          "sha256": "c63436096ace65c47ad01f5e7ebe362f6089f46fedf6459cf7f84a7fadfdff70"
+        }
+      ],
+      "validation": {
+        "validator": "Khronos glTF-Validator",
+        "version": "2.0.0-dev.3.10",
+        "numErrors": 0,
+        "numWarnings": 3,
+        "numInfos": 12,
+        "messages": [
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/0/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/1/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/2/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/3/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/4/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/4/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/5/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/5/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/6/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/7/primitives/0/material"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/8/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/9/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/10/primitives/0/attributes/TEXCOORD_0"
+          },
+          {
+            "code": "UNUSED_OBJECT",
+            "message": "This object may be unused.",
+            "severity": 2,
+            "pointer": "/meshes/10/primitives/0/attributes/TEXCOORD_1"
+          },
+          {
+            "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+            "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+            "severity": 1,
+            "pointer": "/meshes/11/primitives/0/material"
+          }
+        ]
+      }
+    }
+  ]
+}
