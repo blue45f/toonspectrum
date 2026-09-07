@@ -20,7 +20,7 @@ function recipe(eyes: string): CharacterRecipe {
     slots: Object.fromEntries(CHARACTER_SLOT_KINDS.map((slot) => [
       slot,
       slot === "accessory" ? [] : slot === "eyes" ? eyes : null,
-    ])) as CharacterRecipe["slots"],
+    ])) as unknown as CharacterRecipe["slots"],
     colors: {
       skin: "#f4c8a8",
       hairBase: "#221a18",
