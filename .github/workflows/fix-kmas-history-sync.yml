@@ -51,25 +51,27 @@ jobs:
           source = source.replace(old_import, new_import)
 
           old_params = '  const [params, setParams] = useSearchParams();'
-          new_params = '''  const [routerParams, setParams] = useSearchParams();
-  const [, refreshHistory] = useReducer((revision: number) => revision + 1, 0);
-  useEffect(() => {
-    let restoreTimer = 0;
-    const restoreFromHistory = () => {
-      window.clearTimeout(restoreTimer);
-      // Browsers restore form-control state late in a history traversal. Render once after that
-      // restoration and read the actual URL so both the controlled form and results follow it.
-      restoreTimer = window.setTimeout(refreshHistory, 0);
-    };
-    window.addEventListener("popstate", restoreFromHistory);
-    return () => {
-      window.clearTimeout(restoreTimer);
-      window.removeEventListener("popstate", restoreFromHistory);
-    };
-  }, []);
-  const params = new URLSearchParams(
-    typeof window === "undefined" ? routerParams.toString() : window.location.search,
-  );'''
+          new_params = '\n'.join((
+              '  const [routerParams, setParams] = useSearchParams();',
+              '  const [, refreshHistory] = useReducer((revision: number) => revision + 1, 0);',
+              '  useEffect(() => {',
+              '    let restoreTimer = 0;',
+              '    const restoreFromHistory = () => {',
+              '      window.clearTimeout(restoreTimer);',
+              '      // Browsers restore form-control state late in a history traversal. Render once after that',
+              '      // restoration and read the actual URL so both the controlled form and results follow it.',
+              '      restoreTimer = window.setTimeout(refreshHistory, 0);',
+              '    };',
+              '    window.addEventListener("popstate", restoreFromHistory);',
+              '    return () => {',
+              '      window.clearTimeout(restoreTimer);',
+              '      window.removeEventListener("popstate", restoreFromHistory);',
+              '    };',
+              '  }, []);',
+              '  const params = new URLSearchParams(',
+              '    typeof window === "undefined" ? routerParams.toString() : window.location.search,',
+              '  );',
+          ))
           if source.count(old_params) != 1:
               raise SystemExit(f'expected one search params declaration, found {source.count(old_params)}')
           source = source.replace(old_params, new_params)
