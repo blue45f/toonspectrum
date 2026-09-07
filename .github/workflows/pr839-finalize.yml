@@ -37,18 +37,6 @@ jobs:
       - name: Add the Vitest V8 coverage provider
         run: pnpm add -Dw @vitest/coverage-v8@4.1.9
 
-      - name: Format changed sources
-        run: |
-          pnpm exec prettier --write \
-            apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.tsx \
-            apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.test.tsx \
-            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.tsx \
-            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.test.tsx \
-            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.boundary.test.ts \
-            apps/web/src/domains/creator/StudioAssetLegacyPanel.test.tsx \
-            vitest.sonar.config.ts \
-            .github/workflows/sonarqube.yml
-
       - name: Run focused coverage and regressions
         run: |
           pnpm exec vitest run \
