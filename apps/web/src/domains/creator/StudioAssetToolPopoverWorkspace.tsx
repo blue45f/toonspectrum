@@ -126,21 +126,18 @@ export function StudioAssetToolPopoverWorkspace({
         }}
         items={ASSET_MENU_ITEMS}
       />
-      {toolBelt.assetTab === "community" ? (
-        <StudioAssetLegacyPanel toolBelt={toolBelt} />
-      ) : (
-        <StudioUnifiedAssetWorkspace
-          items={items}
-          legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
-          onUseItem={(item) => routeUnifiedAsset(item, toolBelt)}
-          onOpenAi={(prompt) => {
-            if (prompt) {
-              toolBelt.stableHandlers.applyAiAssistPresetPrompt("background", prompt);
-            }
-            toolBelt.setMenu("aiAssist");
-          }}
-        />
-      )}
+      <StudioUnifiedAssetWorkspace
+        initialView={toolBelt.assetTab === "community" ? "library" : "discover"}
+        items={items}
+        legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
+        onUseItem={(item) => routeUnifiedAsset(item, toolBelt)}
+        onOpenAi={(prompt) => {
+          if (prompt) {
+            toolBelt.stableHandlers.applyAiAssistPresetPrompt("background", prompt);
+          }
+          toolBelt.setMenu("aiAssist");
+        }}
+      />
     </>
   );
 }
