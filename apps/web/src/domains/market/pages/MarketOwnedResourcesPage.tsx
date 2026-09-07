@@ -72,8 +72,7 @@ export function MarketManagePage() {
   const userId = ready && sessionStatus === "authenticated"
     ? session.user.id
     : null;
-  const contextKey = userId;
-  const [loadedContextKey, setLoadedContextKey] = useState<string | null>(null);
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const [items, setItems] = useState<readonly CreatorMarketplaceOwnedRelease[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +88,7 @@ export function MarketManagePage() {
 
   useEffect(() => {
     setMessage(null);
-  }, [contextKey]);
+  }, [userId]);
 
   useEffect(() => {
     const generation = generationRef.current + 1;
@@ -104,9 +103,9 @@ export function MarketManagePage() {
     setLoadingMore(false);
     setPendingId(null);
     setError(null);
-    setLoadedContextKey(contextKey);
+    setLoadedUserId(userId);
 
-    if (!ready || !userId || !contextKey) {
+    if (!ready || !userId) {
       setLoadState("idle");
       return undefined;
     }
@@ -117,9 +116,10 @@ export function MarketManagePage() {
     void listCreatorMarketplaceOwnedHeads({ limit: PAGE_SIZE }, controller.signal)
       .then((page) => {
         if (controller.signal.aborted || generationRef.current !== generation) return;
+        const nextCursor = page.nextCursor ?? null;
         setItems(page.items);
-        setCursor(page.nextCursor);
-        setHasMore(page.hasMore);
+        setCursor(nextCursor);
+        setHasMore(page.hasMore && nextCursor !== null);
         setLoadState("ready");
       })
       .catch((caught: unknown) => {
@@ -141,45 +141,42 @@ export function MarketManagePage() {
       }
       if (generationRef.current === generation) generationRef.current += 1;
     };
-  }, [contextKey, ready, reloadToken, userId]);
+  }, [ready, reloadToken, userId]);
 
-  const visibleItems = loadedContextKey === contextKey ? items : [];
+  const visibleItems = loadedUserId === userId ? items : [];
   const visibleLoadState: LoadState = !userId
     ? "idle"
-    : loadedContextKey === contextKey
+    : loadedUserId === userId
       ? loadState
       : "loading";
 
   async function loadMore(): Promise<void> {
-    if (
-      !userId
-      || !contextKey
-      || loadedContextKey !== contextKey
-      || !cursor
-      || loadingMore
-    ) return;
+    if (!userId || loadedUserId !== userId || !cursor || loadingMore) return;
     const generation = generationRef.current;
+    const requestCursor = cursor;
     const controller = new AbortController();
     loadMoreControllerRef.current?.abort();
     loadMoreControllerRef.current = controller;
     setLoadingMore(true);
     setError(null);
+
     try {
       const page = await listCreatorMarketplaceOwnedHeads({
         limit: PAGE_SIZE,
-        cursor,
+        cursor: requestCursor,
       }, controller.signal);
       if (
         controller.signal.aborted
         || generationRef.current !== generation
-        || loadedContextKey !== contextKey
+        || loadedUserId !== userId
       ) return;
+      const nextCursor = page.nextCursor ?? null;
       setItems((current) => {
         const known = new Set(current.map((item) => item.resource.id));
         return [...current, ...page.items.filter((item) => !known.has(item.resource.id))];
       });
-      setCursor(page.nextCursor);
-      setHasMore(page.hasMore);
+      setCursor(nextCursor);
+      setHasMore(page.hasMore && nextCursor !== null);
     } catch (caught) {
       if (controller.signal.aborted || generationRef.current !== generation) return;
       setError(marketAuthorityErrorMessage(caught, "추가 게시 에셋을 불러오지 못했습니다."));
@@ -195,12 +192,13 @@ export function MarketManagePage() {
   }
 
   async function toggleListing(item: CreatorMarketplaceOwnedRelease): Promise<void> {
-    if (!userId || !contextKey || pendingId) return;
+    if (!userId || pendingId) return;
     const generation = generationRef.current;
     const record = item.resource;
     const relisting = item.delistedAt !== null;
     setPendingId(record.id);
     setError(null);
+
     try {
       if (relisting) await relistCreatorMarketplaceResource(record.id);
       else await deleteCreatorMarketplaceResource(record.id);
@@ -234,8 +232,8 @@ export function MarketManagePage() {
             <h1 className="text-xl font-bold text-fg sm:text-2xl">판매자 센터</h1>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-            서버가 보유한 패키지 head와 릴리스 상태만 표시합니다. 브라우저 임시 레코드로
-            공개 상태나 immutable 버전을 변경하지 않습니다.
+            서버가 보유한 패키지 head와 릴리스 상태만 표시합니다. 브라우저 임시
+            레코드로 공개 상태나 immutable 버전을 변경하지 않습니다.
           </p>
         </div>
         <Link href="/market/publish" className={buttonClass({ variant: "solid", size: "sm" })}>
@@ -249,7 +247,9 @@ export function MarketManagePage() {
       ) : !userId ? (
         <section className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
           <UserCheck className="mx-auto size-10 text-fg-3" aria-hidden="true" />
-          <h2 className="mt-3 text-base font-bold text-fg">로그인 후 게시한 에셋을 관리할 수 있어요</h2>
+          <h2 className="mt-3 text-base font-bold text-fg">
+            로그인 후 게시한 에셋을 관리할 수 있어요
+          </h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
             로그인하지 않은 브라우저 초안은 판매자 센터의 공개 에셋 수에 포함되지 않습니다.
           </p>
@@ -258,20 +258,34 @@ export function MarketManagePage() {
         <>
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-fg-2">
-              현재 패키지 head <strong className="numeral tnum text-fg">{visibleItems.length}</strong>개 표시
+              현재 패키지 head{" "}
+              <strong className="numeral tnum text-fg">{visibleItems.length}</strong>개 표시
             </p>
             <button
               type="button"
               onClick={() => setReloadToken((value) => value + 1)}
-              disabled={visibleLoadState === "loading"}
+              disabled={visibleLoadState === "loading" || loadingMore}
               className={buttonClass({ variant: "outline", size: "sm" })}
             >
-              <RefreshCw className={cn("size-3.5", visibleLoadState === "loading" && "animate-spin")} aria-hidden="true" />
+              <RefreshCw
+                className={cn(
+                  "size-3.5",
+                  (visibleLoadState === "loading" || loadingMore) && "animate-spin",
+                )}
+                aria-hidden="true"
+              />
               새로고침
             </button>
           </div>
 
-          {message ? <p role="status" className="mt-4 rounded-xl border border-good/40 bg-good/10 px-4 py-3 text-sm text-good">{message}</p> : null}
+          {message ? (
+            <p
+              role="status"
+              className="mt-4 rounded-xl border border-good/40 bg-good/10 px-4 py-3 text-sm text-good"
+            >
+              {message}
+            </p>
+          ) : null}
           {error ? <ErrorBanner message={error} /> : null}
 
           {visibleLoadState === "loading" ? (
@@ -283,9 +297,13 @@ export function MarketManagePage() {
               <PackagePlus className="mx-auto size-10 text-fg-3" aria-hidden="true" />
               <h2 className="mt-3 text-base font-bold text-fg">서버에 게시한 에셋이 없어요</h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-fg-2">
-                Studio에서 준비한 에셋을 서버에 게시하면 공개 상태와 버전을 이곳에서 관리할 수 있습니다.
+                Studio에서 준비한 에셋을 서버에 게시하면 공개 상태와 버전을 이곳에서
+                관리할 수 있습니다.
               </p>
-              <Link href="/market/publish" className={buttonClass({ variant: "solid", size: "sm", className: "mt-4" })}>
+              <Link
+                href="/market/publish"
+                className={buttonClass({ variant: "solid", size: "sm", className: "mt-4" })}
+              >
                 첫 릴리스 게시
               </Link>
             </div>
@@ -299,19 +317,36 @@ export function MarketManagePage() {
                 const KindIcon = kind.icon;
                 const moderated = item.packageModeration.state === "hidden";
                 const publiclyAvailable = !moderated && item.delistedAt === null;
+
                 return (
-                  <li key={record.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <li
+                    key={record.id}
+                    className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
                     <div className="flex min-w-0 flex-1 items-start gap-3.5">
                       <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-raised text-accent">
                         <KindIcon className="size-5" aria-hidden="true" />
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="min-w-0 truncate text-sm font-bold text-fg">{record.name}</h2>
-                          <span className="numeral tnum rounded bg-accent/15 px-1.5 py-0.5 text-[0.62rem] font-bold text-accent">v{record.resourceVersion}</span>
-                          <span className={cn("rounded px-1.5 py-0.5 text-[0.62rem] font-bold", statusMeta.className)}>{statusMeta.label}</span>
+                          <h2 className="min-w-0 truncate text-sm font-bold text-fg">
+                            {record.name}
+                          </h2>
+                          <span className="numeral tnum rounded bg-accent/15 px-1.5 py-0.5 text-[0.62rem] font-bold text-accent">
+                            v{record.resourceVersion}
+                          </span>
+                          <span
+                            className={cn(
+                              "rounded px-1.5 py-0.5 text-[0.62rem] font-bold",
+                              statusMeta.className,
+                            )}
+                          >
+                            {statusMeta.label}
+                          </span>
                         </div>
-                        <p className="mt-1 line-clamp-1 text-xs text-fg-3">{record.description || "설명 없음"}</p>
+                        <p className="mt-1 line-clamp-1 text-xs text-fg-3">
+                          {record.description || "설명 없음"}
+                        </p>
                         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.68rem] text-fg-3">
                           <span>{kind.label}</span>
                           <span>{license.label}</span>
@@ -327,7 +362,9 @@ export function MarketManagePage() {
                         type="button"
                         disabled={moderated || pendingId !== null}
                         onClick={() => void toggleListing(item)}
-                        title={moderated ? "관리자 숨김 상태는 제작자가 변경할 수 없습니다." : undefined}
+                        title={moderated
+                          ? "관리자 숨김 상태는 제작자가 변경할 수 없습니다."
+                          : undefined}
                         className={buttonClass({ variant: "outline", size: "sm" })}
                       >
                         {pendingId === record.id ? (
@@ -339,22 +376,25 @@ export function MarketManagePage() {
                         )}
                         {item.delistedAt ? "재공개" : "공개 목록에서 내리기"}
                       </button>
+
                       {publiclyAvailable ? (
                         <>
-                          <Link href={marketStudioResourceHref(record.id)} className={buttonClass({ variant: "outline", size: "sm" })}>
-                            <Palette className="size-3.5" aria-hidden="true" />
-                            Studio
-                          </Link>
-                          <Link href={`/market/resource/${record.id}`} className={buttonClass({ variant: "ghost", size: "sm" })}>
+                          <Link
+                            href={`/market/resource/${record.id}`}
+                            className={buttonClass({ variant: "ghost", size: "sm" })}
+                          >
                             상세
                             <ArrowUpRight className="size-3.5" aria-hidden="true" />
                           </Link>
+                          <Link
+                            href={marketStudioResourceHref(record.id)}
+                            className={buttonClass({ variant: "ghost", size: "sm" })}
+                          >
+                            <Palette className="size-3.5" aria-hidden="true" />
+                            Studio
+                          </Link>
                         </>
-                      ) : (
-                        <span className="rounded-lg border border-line bg-panel px-3 py-2 text-xs text-fg-3">
-                          재공개 후 상세·Studio 사용 가능
-                        </span>
-                      )}
+                      ) : null}
                     </div>
                   </li>
                 );
@@ -362,10 +402,17 @@ export function MarketManagePage() {
             </ul>
           )}
 
-          {visibleLoadState === "ready" && hasMore ? (
-            <div className="mt-8 text-center">
-              <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className={buttonClass({ variant: "outline", size: "md" })}>
-                {loadingMore ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
+          {hasMore ? (
+            <div className="mt-5 flex justify-center">
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={loadingMore || visibleLoadState !== "ready"}
+                className={buttonClass({ variant: "outline", size: "sm" })}
+              >
+                {loadingMore ? (
+                  <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+                ) : null}
                 {loadingMore ? "불러오는 중" : "더 보기"}
               </button>
             </div>
@@ -378,16 +425,19 @@ export function MarketManagePage() {
 
 function StatusCard() {
   return (
-    <div role="status" className="mt-8 flex items-center justify-center gap-2 rounded-xl border border-line bg-card p-8 text-sm text-fg-2">
-      <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-      로그인 세션 확인 중
+    <div role="status" className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
+      <LoaderCircle className="mx-auto size-8 animate-spin text-accent" aria-hidden="true" />
+      <p className="mt-3 text-sm text-fg-2">계정과 판매자 데이터를 확인하고 있습니다.</p>
     </div>
   );
 }
 
 function ErrorBanner({ message }: { message: string }) {
   return (
-    <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-fg">
+    <div
+      role="alert"
+      className="mt-4 flex items-start gap-2 rounded-xl border border-bad/40 bg-bad/10 px-4 py-3 text-sm text-fg"
+    >
       <ShieldAlert className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden="true" />
       <span>{message}</span>
     </div>
@@ -397,9 +447,13 @@ function ErrorBanner({ message }: { message: string }) {
 function RetryCard({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
-      <ShieldAlert className="mx-auto size-10 text-bad" aria-hidden="true" />
-      <h2 className="mt-3 text-base font-bold text-fg">판매자 데이터를 확인할 수 없어요</h2>
-      <button type="button" onClick={onRetry} className={buttonClass({ variant: "solid", size: "sm", className: "mt-4" })}>
+      <ShieldAlert className="mx-auto size-9 text-bad" aria-hidden="true" />
+      <h2 className="mt-3 text-base font-bold text-fg">판매자 데이터를 불러오지 못했습니다</h2>
+      <button
+        type="button"
+        onClick={onRetry}
+        className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}
+      >
         다시 시도
       </button>
     </div>
@@ -408,12 +462,12 @@ function RetryCard({ onRetry }: { onRetry: () => void }) {
 
 function OwnedSkeleton() {
   return (
-    <div role="status" className="mt-6 divide-y divide-line overflow-hidden rounded-xl border border-line bg-card">
-      {Array.from({ length: 5 }, (_, index) => (
-        <div key={index} aria-hidden="true" className="p-4">
-          <div className="skeleton h-4 w-1/3" />
-          <div className="skeleton mt-3 h-3 w-2/3" />
-        </div>
+    <div aria-hidden="true" className="mt-6 space-y-2">
+      {Array.from({ length: 3 }, (_, index) => (
+        <div
+          key={index}
+          className="h-24 animate-pulse rounded-xl border border-line bg-panel"
+        />
       ))}
     </div>
   );
