@@ -343,6 +343,7 @@ function MenuDropdown({
   };
 
   const openMenu = (focusIntent: MenuOpenFocusIntent) => {
+    preloadStudioMainMenuGroupRuntime(group.id);
     openFocusIntentRef.current = focusIntent;
     setCoords(measureTrigger(buttonRef.current));
     onOpen();
@@ -700,6 +701,7 @@ function MenuDropdown({
           onPointerDown={(e) => {
             // Capture coords before open so the first paint is already positioned.
             if (e.button !== 0) return;
+            preloadStudioMainMenuGroupRuntime(group.id);
             if (!open) setCoords(measureTrigger(buttonRef.current));
           }}
           onKeyDown={(event) => {

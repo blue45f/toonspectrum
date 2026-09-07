@@ -1,3 +1,5 @@
+import { preloadStudioFilterDialog } from "./studio-page-lazy-ui";
+
 /**
  * Warms the runtime a main-menu group is about to need, on hover or focus.
  *
@@ -15,6 +17,7 @@
  */
 export function preloadStudioMainMenuGroupRuntime(groupId: string): void {
   if (groupId !== "filter") return;
+  preloadStudioFilterDialog();
   void import("./render/studio-raster-retouch-preload")
     .then((module) => module.preloadStudioRasterRetouchRuntime())
     .catch(() => undefined);

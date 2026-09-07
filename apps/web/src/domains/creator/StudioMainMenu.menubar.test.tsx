@@ -11,10 +11,19 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createStudioMainMenuPresentation } from "./studio-main-menu-presentation";
+import { preloadStudioFilterDialog } from "./studio-page-lazy-ui";
 import { StudioMainMenu } from "./StudioMainMenu";
 import { StudioToolHintPreferencesProvider } from "./StudioToolHint";
 
 import type { StudioMainMenuGroup } from "./studio-main-menu-model";
+
+vi.mock("./studio-page-lazy-ui", () => ({
+  preloadStudioFilterDialog: vi.fn(),
+}));
+
+vi.mock("./render/studio-raster-retouch-preload", () => ({
+  preloadStudioRasterRetouchRuntime: vi.fn(async () => undefined),
+}));
 
 const GROUPS: readonly StudioMainMenuGroup[] = [
   {
@@ -54,9 +63,31 @@ function openPanelLabels(): string[] {
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
 });
 
 describe("StudioMainMenu menubar interaction", () => {
+  it.each(["focus", "pointerEnter", "pointerDown", "click"] as const)(
+    "preloads the filter dialog on Effects %s without loading it on mount or other menu intent",
+    (intent) => {
+      const onSelect = vi.fn();
+      renderMenu([
+        ...GROUPS,
+        {
+          id: "filter",
+          label: "효과",
+          items: [{ id: "gaussian-blur", label: "가우시안 블러", onSelect }],
+        },
+      ]);
+      expect(preloadStudioFilterDialog).not.toHaveBeenCalled();
+      fireEvent[intent](trigger("파일"), { button: 0 });
+      expect(preloadStudioFilterDialog).not.toHaveBeenCalled();
+      fireEvent[intent](trigger("효과"), { button: 0 });
+      expect(preloadStudioFilterDialog).toHaveBeenCalled();
+      expect(onSelect).not.toHaveBeenCalled();
+    },
+  );
+
   it("switches to a neighbouring menu when its title is clicked while another menu is open", () => {
     renderMenu();
 

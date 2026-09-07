@@ -14,6 +14,7 @@ import {
   StudioShapePickerGrid,
   StudioUnifiedBrushPicker,
   loadStudioBrushStudio,
+  preloadStudioFilterDialog,
 } from "./studio-page-lazy-ui";
 import {
   StudioMobileEditingDock,
@@ -148,6 +149,7 @@ vi.mock("./studio-page-lazy-ui", () => ({
     </section>
   ),
   loadStudioBrushStudio: vi.fn(async () => undefined),
+  preloadStudioFilterDialog: vi.fn(),
 }));
 
 vi.mock("./StudioLineCorrectionControls", () => ({
@@ -1464,6 +1466,39 @@ describe("StudioMobileEditingDock", () => {
     expect(filter.closest("label")?.className).toContain("min-h-11");
     expect(filter.title).toContain("현재 페이지 합성본");
   });
+
+  it.each(["focus", "pointerEnter", "pointerDown"] as const)(
+    "preloads the filter dialog on %s in both mobile rows without selecting a filter",
+    (intent) => {
+      const stableHandlers = createHandlers();
+      render(
+        <StudioMobileEditingDock
+          {...createProps({
+            isMobile: true,
+            selected: { id: "draw-1", type: "draw" } as StudioMobileEditingDockProps["selected"],
+            stableHandlers,
+          })}
+        />,
+      );
+      const context = screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" });
+      const contextFilter = within(context).getByRole("combobox", {
+        name: "현재 페이지 합성본 필터 선택",
+      });
+      expect(preloadStudioFilterDialog).not.toHaveBeenCalled();
+      fireEvent[intent](contextFilter);
+      expect(preloadStudioFilterDialog).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
+      const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
+      const workspaceFilter = within(workspace).getByRole("combobox", {
+        name: "현재 페이지 합성본 필터 선택",
+      });
+      expect(preloadStudioFilterDialog).toHaveBeenCalledTimes(1);
+      fireEvent[intent](workspaceFilter);
+      expect(preloadStudioFilterDialog).toHaveBeenCalledTimes(2);
+      expect(stableHandlers.openStudioFilter).not.toHaveBeenCalled();
+    },
+  );
 
   it("keeps the page-composite filter shortcut for non-drawing selections", () => {
     render(

@@ -4,6 +4,7 @@ import { StudioCrdtDocument } from "./live/studio-crdt-document";
 import { publishStudioCrdtDrawGraphDiff } from "./live/studio-crdt-scene-publisher";
 import {
   discardStudioRetainedStrokeRedo,
+  prepareStudioPendingStrokeCommitPage,
   publishStudioRetainedStrokeHistory,
   restoreStudioRetainedStrokeCommitBatch,
   resumeStudioRetainedStrokeHistory,
@@ -228,5 +229,70 @@ describe("retained stroke history", () => {
     expect(vi.getTimerCount()).toBe(0);
     vi.advanceTimersByTime(5000);
     expect(flush).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts a fresh bounded retry on Redo after the original canonical retries were exhausted", () => {
+    const { undone, queued, context } = retainedRedoFixture();
+    undone.current!.retryCount = 99;
+    context.flushPending.mockImplementation(() => { queued.current = null; return true; });
+    expect(resumeStudioRetainedStrokeHistory(context)).toBe(true);
+    expect(queued.current?.retryCount).toBe(1);
+    vi.advanceTimersByTime(500);
+    expect(context.flushPending).toHaveBeenCalledOnce();
+    expect(queued.current).toBeNull();
+  });
+});
+
+describe("cross-page deferred stroke admission", () => {
+  it("flushes the original page synchronously even while the new pointer is still finishing", () => {
+    const { queued } = retainedRedoFixture();
+    queued.current = { pageId: "page", strokes: [eraser], retryCount: 0, timer: null };
+    const oldBatch = queued.current;
+    const synchronous = { current: false };
+    const committed: StudioRetainedStrokeQueuedBatch[] = [];
+    const flush = vi.fn(() => {
+      // Mirrors the host's drawingRef gate: without the scoped override this defers and returns true.
+      if (!synchronous.current) return true;
+      committed.push(queued.current!);
+      queued.current = null;
+      return true;
+    });
+    expect(prepareStudioPendingStrokeCommitPage(queued, "other-page", synchronous, flush)).toBe(true);
+    expect(committed).toEqual([oldBatch]);
+    expect(queued.current).toBeNull();
+    expect(synchronous.current).toBe(false);
+  });
+
+  it.each([false, true])("retains the old batch when flushing returns %s without releasing it", (result) => {
+    const { queued } = retainedRedoFixture();
+    queued.current = { pageId: "page", strokes: [eraser], retryCount: 4, timer: null };
+    const oldBatch = queued.current;
+    const synchronous = { current: false };
+    expect(prepareStudioPendingStrokeCommitPage(queued, "other-page", synchronous, () => result)).toBe(false);
+    expect(queued.current).toBe(oldBatch);
+    expect(synchronous.current).toBe(false);
+  });
+
+  it("accepts the current page batch installed by a completed flush without replacing its strokes", () => {
+    const { queued } = retainedRedoFixture();
+    queued.current = { pageId: "page", strokes: [eraser], retryCount: 0, timer: null };
+    const incoming = { pageId: "other-page", strokes: [{ ...eraser, id: "newer" }], retryCount: 0, timer: null };
+    expect(prepareStudioPendingStrokeCommitPage(queued, "other-page", { current: false }, () => {
+      queued.current = incoming;
+      return true;
+    })).toBe(true);
+    expect(queued.current).toBe(incoming);
+  });
+
+  it("does not flush a same-page or empty batch and restores an enclosing override on exceptions", () => {
+    const { queued } = retainedRedoFixture();
+    const synchronous = { current: true };
+    const flush = vi.fn(() => { throw new Error("commit failed"); });
+    expect(prepareStudioPendingStrokeCommitPage(queued, "page", synchronous, flush)).toBe(true);
+    queued.current = { pageId: "page", strokes: [eraser], retryCount: 0, timer: null };
+    expect(prepareStudioPendingStrokeCommitPage(queued, "page", synchronous, flush)).toBe(true);
+    expect(flush).not.toHaveBeenCalled();
+    expect(() => prepareStudioPendingStrokeCommitPage(queued, "other-page", synchronous, flush)).toThrow("commit failed");
+    expect(synchronous.current).toBe(true);
   });
 });

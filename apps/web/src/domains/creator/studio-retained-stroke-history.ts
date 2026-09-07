@@ -44,6 +44,26 @@ export type StudioRetainedStrokeUndoneBatch = StudioRetainedStrokeCommitBatch & 
 };
 
 type MutableRef<T> = { current: T };
+
+/** Finish the previous page's batch before accepting a stroke on another page. */
+export function prepareStudioPendingStrokeCommitPage(
+  pending: MutableRef<StudioRetainedStrokeQueuedBatch | null>,
+  pageId: string,
+  synchronousFlush: MutableRef<boolean>,
+  flush: () => boolean,
+): boolean {
+  if (!pending.current || pending.current.pageId === pageId) return true;
+  const previous = synchronousFlush.current;
+  synchronousFlush.current = true;
+  try {
+    if (!flush()) return false;
+    // A callback can report success after scheduling work. Ownership must actually have moved.
+    return pending.current === null || pending.current.pageId === pageId;
+  } finally {
+    synchronousFlush.current = previous;
+  }
+}
+
 type RetainedStrokeRetry = {
   flush: () => boolean;
   retryDelayMs: number;
@@ -99,7 +119,8 @@ export function resumeStudioRetainedStrokeHistory(context: StudioRetainedStrokeR
   if (!publishStudioRetainedStrokeHistory(context.getPages(), batch, "redo", context.publish)) {
     return false;
   }
-  restoreStudioRetainedStrokeCommitBatch(context.pending, batch, {
+  // Explicit Redo starts a fresh bounded retry cycle, including an exhausted original batch.
+  restoreStudioRetainedStrokeCommitBatch(context.pending, { ...batch, retryCount: 0 }, {
     flush: context.flushPending,
     retryDelayMs: context.retryDelayMs,
     maxRetries: context.maxRetries,

@@ -150,6 +150,27 @@ describe("StudioPage optional UI registry", () => {
     expect(registry).toContain("studioColorPopoverPromise ??=");
   });
 
+  it("loads the filter dialog from user intent and shares the registry request with activation", () => {
+    const page = moduleEdges("./StudioCuttoonEditorHost.tsx").source;
+    const registry = moduleEdges("./studio-page-lazy-ui.ts").source;
+    const openStart = page.indexOf("async function openStudioFilter(");
+    const firstAwait = page.indexOf("await ", openStart);
+    const intentPreload = page.indexOf("preloadStudioFilterDialog();", openStart);
+
+    // The only Host references are the import and explicit filter command. In particular, idle
+    // callbacks/timers must not quietly pull the optional dialog back into startup.
+    expect(page.match(/\bpreloadStudioFilterDialog\b/gu)).toHaveLength(2);
+    expect(openStart).toBeGreaterThan(0);
+    expect(intentPreload).toBeGreaterThan(openStart);
+    expect(intentPreload).toBeLessThan(firstAwait);
+    expect(registry).toMatch(
+      /const StudioFilterDialog = lazyRetry\(\s*studioFilterDialogLoader\.load,/u,
+    );
+    expect(registry).toMatch(
+      /function preloadStudioFilterDialog\(\): void \{\s*studioFilterDialogLoader\.preload\(\);\s*\}/u,
+    );
+  });
+
   it("keeps the mobile Inspector modal boundary active while its lazy chunk loads", () => {
     const page = readStudioCuttoonEditorSource();
     const presets = moduleEdges("./studio-mobile-dock-presets.tsx").source;

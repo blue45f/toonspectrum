@@ -5,6 +5,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resolveStudioRasterToolAvailability } from "./render/studio-raster-tool-availability";
+import { preloadStudioFilterDialog } from "./studio-page-lazy-ui";
 import {
   StudioInspectorFilterLauncher,
   StudioInspectorPixelSelectionLauncher,
@@ -18,6 +19,10 @@ const preloadRasterRetouchRuntime = vi.hoisted(() =>
 
 vi.mock("./render/studio-raster-retouch-preload", () => ({
   preloadStudioRasterRetouchRuntime: preloadRasterRetouchRuntime,
+}));
+
+vi.mock("./studio-page-lazy-ui", () => ({
+  preloadStudioFilterDialog: vi.fn(),
 }));
 
 afterEach(() => {
@@ -129,6 +134,43 @@ describe("StudioRasterToolRecoveryPanel", () => {
     fireEvent.change(select, { target: { value: "gaussian-blur" } });
     expect(onSelect).toHaveBeenCalledWith("gaussian-blur");
   });
+
+  it.each(["focus", "pointerEnter", "pointerDown"] as const)(
+    "preloads an available inspector filter on %s without preparing or changing the document",
+    (intent) => {
+      const onSelect = vi.fn();
+      const onRecover = vi.fn();
+      const availability = resolveStudioRasterToolAvailability("filter", {
+        selectedType: "draw",
+        visibleVectorDrawCount: 1,
+        exactRenderableVisibleCount: 1,
+      });
+      const { rerender } = render(
+        <StudioInspectorFilterLauncher
+          availability={availability}
+          onRecover={onRecover}
+          onSelect={onSelect}
+        />,
+      );
+      const select = screen.getByRole("combobox", { name: "현재 페이지 합성본 필터 선택" });
+      expect(preloadStudioFilterDialog).not.toHaveBeenCalled();
+      fireEvent[intent](select);
+      expect(preloadStudioFilterDialog).toHaveBeenCalledTimes(1);
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(onRecover).not.toHaveBeenCalled();
+
+      rerender(
+        <StudioInspectorFilterLauncher
+          availability={availability}
+          busy
+          onRecover={onRecover}
+          onSelect={onSelect}
+        />,
+      );
+      fireEvent[intent](select);
+      expect(preloadStudioFilterDialog).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("deduplicates one shared recovery action across related retouch tools", () => {
     const onRecover = vi.fn();
