@@ -1,0 +1,138 @@
+name: Production readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Reconcile environment variables and deploy production
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-readiness
+  cancel-in-progress: false
+
+jobs:
+  reconcile-and-deploy:
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_PROJECT_NAME: toonspectrum
+      PUBLIC_APP_ORIGIN: https://www.toonstudio.cloud
+      DATABASE_URL_VALUE: ${{ secrets.DATABASE_URL }}
+      AUTH_SECRET_VALUE: ${{ secrets.AUTH_SECRET }}
+      BETTER_AUTH_SECRET_VALUE: ${{ secrets.BETTER_AUTH_SECRET }}
+      OPENAI_API_KEY_VALUE: ${{ secrets.OPENAI_API_KEY }}
+      OPENROUTER_API_KEY_VALUE: ${{ secrets.OPENROUTER_API_KEY }}
+      BLOB_READ_WRITE_TOKEN_VALUE: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      R2_ACCOUNT_ID_VALUE: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID_VALUE: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY_VALUE: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET_VALUE: ${{ secrets.R2_BUCKET }}
+      S3_ENDPOINT_VALUE: ${{ secrets.S3_ENDPOINT }}
+      S3_REGION_VALUE: ${{ secrets.S3_REGION }}
+      S3_ACCESS_KEY_ID_VALUE: ${{ secrets.S3_ACCESS_KEY_ID }}
+      S3_SECRET_ACCESS_KEY_VALUE: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+      S3_BUCKET_VALUE: ${{ secrets.S3_BUCKET }}
+      CREATOR_ASSET_OBJECT_STORAGE_ENDPOINT_VALUE: ${{ secrets.CREATOR_ASSET_OBJECT_STORAGE_ENDPOINT }}
+      CREATOR_ASSET_OBJECT_STORAGE_BUCKET_VALUE: ${{ secrets.CREATOR_ASSET_OBJECT_STORAGE_BUCKET }}
+      CREATOR_ASSET_OBJECT_STORAGE_ACCESS_KEY_ID_VALUE: ${{ secrets.CREATOR_ASSET_OBJECT_STORAGE_ACCESS_KEY_ID }}
+      CREATOR_ASSET_OBJECT_STORAGE_SECRET_ACCESS_KEY_VALUE: ${{ secrets.CREATOR_ASSET_OBJECT_STORAGE_SECRET_ACCESS_KEY }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Validate deployment credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${VERCEL_TOKEN:-}" ]]; then
+            echo "::error::GitHub production environment secret VERCEL_TOKEN is missing."
+            exit 1
+          fi
+          echo "Vercel deployment credential is available."
+
+      - name: Reconcile production variables without exposing values
+        run: node scripts/configure-vercel-production.mjs
+
+      - name: Link the Vercel project
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${VERCEL_PROJECT_ID:-}" ]]; then
+            npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
+          else
+            npx --yes vercel@latest link --yes --project "$VERCEL_PROJECT_NAME" --token "$VERCEL_TOKEN"
+            npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
+          fi
+
+      - name: Deploy production
+        id: deploy
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          deployment_url="$(npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" | tail -n 1)"
+          if [[ ! "$deployment_url" =~ ^https:// ]]; then
+            echo "::error::Vercel did not return a production deployment URL."
+            exit 1
+          fi
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+          echo "Production deployment created: $deployment_url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke-test deployment and production domain
+        if: ${{ inputs.deploy }}
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -euo pipefail
+          check_page() {
+            local url="$1"
+            curl --silent --show-error --fail-with-body \
+              --retry 8 --retry-all-errors --retry-delay 10 \
+              --max-time 30 --output /dev/null "$url"
+          }
+          check_json_api() {
+            local base="$1"
+            local tmp
+            tmp="$(mktemp)"
+            if curl --silent --show-error --fail-with-body \
+              --retry 5 --retry-all-errors --retry-delay 5 \
+              --max-time 30 --output "$tmp" \
+              "$base/api/creator/marketplace/resources?limit=1"; then
+              node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$tmp"
+              rm -f "$tmp"
+              return 0
+            fi
+            if curl --silent --show-error --fail-with-body \
+              --retry 5 --retry-all-errors --retry-delay 5 \
+              --max-time 30 --output "$tmp" \
+              "$base/creator/marketplace/resources?limit=1"; then
+              node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$tmp"
+              rm -f "$tmp"
+              return 0
+            fi
+            rm -f "$tmp"
+            return 1
+          }
+
+          for base in "$DEPLOYMENT_URL" "https://www.toonstudio.cloud"; do
+            check_page "$base/"
+            check_page "$base/market"
+            check_json_api "$base"
+          done
+          echo "Root, market page, and public marketplace API smoke tests passed." >> "$GITHUB_STEP_SUMMARY"
