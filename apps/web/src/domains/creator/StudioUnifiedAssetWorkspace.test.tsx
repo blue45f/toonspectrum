@@ -207,13 +207,14 @@ describe("StudioUnifiedAssetWorkspace", () => {
     expect(screen.getByText("내 창문 소품")).toBeTruthy();
     expect(screen.queryByText("반짝 효과")).toBeNull();
 
+    fireEvent.click(screen.getByRole("button", { name: "초기화" }));
+    expect(screen.getByText("비 오는 밤 학교")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "내 에셋" }));
     fireEvent.click(screen.getByRole("button", { name: "3D 0" }));
     expect(screen.getByText("조건에 맞는 에셋이 없습니다.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "조건 넓히기" }));
     expect(screen.getByText("교실 의자")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "초기화" }));
-    expect(screen.getByText("비 오는 밤 학교")).toBeTruthy();
   });
 
   it("keeps the existing library and marketplace reachable", () => {

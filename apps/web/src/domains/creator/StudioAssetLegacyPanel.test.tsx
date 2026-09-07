@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
 
+import { StudioAssetLegacyPanel } from "./StudioAssetLegacyPanel";
+
 const mocks = vi.hoisted(() => ({
   panelProps: null as Record<string, unknown> | null,
 }));
@@ -31,8 +33,6 @@ vi.mock("./studio-asset-insertion-outcome", () => ({
     return result;
   },
 }));
-
-import { StudioAssetLegacyPanel } from "./StudioAssetLegacyPanel";
 
 function createToolBelt() {
   const setMenu = vi.fn();

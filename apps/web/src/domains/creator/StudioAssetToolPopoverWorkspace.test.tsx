@@ -9,6 +9,8 @@ import type {
 } from "./studio-unified-asset-catalog";
 import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
 
+import { StudioAssetToolPopoverWorkspace } from "./StudioAssetToolPopoverWorkspace";
+
 const mocks = vi.hoisted(() => ({
   catalog: [] as StudioUnifiedAssetItem[],
   preload: vi.fn(),
@@ -51,8 +53,6 @@ vi.mock("./studio-unified-asset-catalog", async (importOriginal) => {
     buildStudioUnifiedAssetCatalog: vi.fn(() => mocks.catalog),
   };
 });
-
-import { StudioAssetToolPopoverWorkspace } from "./StudioAssetToolPopoverWorkspace";
 
 function createItem(source: StudioUnifiedAssetSource): StudioUnifiedAssetItem {
   return {

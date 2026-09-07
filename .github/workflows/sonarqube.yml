@@ -93,6 +93,17 @@ jobs:
         if: steps.secrets.outputs.configured == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Generate changed Studio coverage
+        if: steps.secrets.outputs.configured == 'true'
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/StudioAssetLegacyPanel.test.tsx \
+            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.test.tsx \
+            apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.test.tsx \
+            apps/web/src/domains/creator/studio-unified-asset-catalog.test.ts \
+            apps/web/src/domains/creator/studio-tool-belt-lazy-ui-boundary.test.ts \
+            --config vitest.sonar.config.ts
+
       # SonarCloud Automatic Analysis should be disabled to avoid duplicate scans.
       - name: SonarQube scan
         if: steps.secrets.outputs.configured == 'true'

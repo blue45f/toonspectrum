@@ -55,13 +55,14 @@ const CONTROL =
 export interface StudioUnifiedAssetWorkspaceProps {
   readonly items: readonly StudioUnifiedAssetItem[];
   readonly legacyContent: ReactNode;
+  readonly initialView?: WorkspaceView;
   readonly onUseItem: (
     item: StudioUnifiedAssetItem,
   ) => boolean | void | Promise<boolean | void>;
   readonly onOpenAi: (prompt: string) => void;
 }
 
-type WorkspaceView = "discover" | "library";
+export type WorkspaceView = "discover" | "library";
 type Status = { readonly tone: "success" | "error"; readonly message: string };
 
 function categoryIcon(category: Exclude<StudioUnifiedAssetCategory, "all">) {
@@ -110,11 +111,12 @@ function successMessage(item: StudioUnifiedAssetItem): string {
 export function StudioUnifiedAssetWorkspace({
   items,
   legacyContent,
+  initialView = "discover",
   onUseItem,
   onOpenAi,
 }: StudioUnifiedAssetWorkspaceProps) {
   const searchId = useId();
-  const [view, setView] = useState<WorkspaceView>("discover");
+  const [view, setView] = useState<WorkspaceView>(initialView);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<StudioUnifiedAssetCategory>("all");
   const [scope, setScope] = useState<StudioUnifiedAssetScope>("all");
@@ -138,7 +140,7 @@ export function StudioUnifiedAssetWorkspace({
     });
   }, [category, items, query, scope]);
 
-  async function useItem(item: StudioUnifiedAssetItem): Promise<void> {
+  async function handleUseItem(item: StudioUnifiedAssetItem): Promise<void> {
     if (pendingId) return;
     setPendingId(item.id);
     setStatus(null);
@@ -378,7 +380,7 @@ export function StudioUnifiedAssetWorkspace({
                     <button
                       type="button"
                       disabled={pendingId !== null}
-                      onClick={() => void useItem(item)}
+                      onClick={() => void handleUseItem(item)}
                       aria-label={`${item.title} ${item.useLabel}`}
                       className={cn(
                         "mt-2 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-2 text-[0.65rem] font-bold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50",
