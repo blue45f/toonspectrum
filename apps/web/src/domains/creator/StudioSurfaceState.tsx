@@ -20,6 +20,8 @@ export type StudioSurfaceStateKind =
   | "success"
   | "info";
 
+export type StudioSurfaceStateAnnouncement = "none" | "polite" | "assertive";
+
 const STATE_ICON: Readonly<Record<StudioSurfaceStateKind, LucideIcon>> = {
   empty: SearchX,
   loading: Loader2,
@@ -38,6 +40,19 @@ const STATE_TONE: Readonly<Record<StudioSurfaceStateKind, string>> = {
   info: "border-accent/35 bg-accent-soft/20 text-accent",
 };
 
+const DEFAULT_ANNOUNCEMENT: Readonly<
+  Record<StudioSurfaceStateKind, StudioSurfaceStateAnnouncement>
+> = {
+  // Static empty/info/blocked cards are already discoverable in reading order and should not
+  // re-announce on every render. Callers can opt in when a state changed after user action.
+  empty: "none",
+  info: "none",
+  blocked: "none",
+  loading: "polite",
+  success: "polite",
+  error: "assertive",
+};
+
 export interface StudioSurfaceStateProps {
   state: StudioSurfaceStateKind;
   title: ReactNode;
@@ -45,13 +60,15 @@ export interface StudioSurfaceStateProps {
   icon?: ReactNode;
   action?: ReactNode;
   secondaryAction?: ReactNode;
+  /** Override only when the caller knows this card appeared as a dynamic state change. */
+  announce?: StudioSurfaceStateAnnouncement;
   compact?: boolean;
   className?: string;
 }
 
 /**
- * Studio의 빈 상태·로딩·오류·잠금·완료 안내를 하나의 시각/접근성 문법으로 통일한다.
- * 기존 빈 상태 선택자를 보존해 점진적으로 교체해도 화면과 테스트가 끊기지 않는다.
+ * Studio의 빈 상태·로딩·오류·잠금·완료 안내를 하나의 시각 문법으로 통일한다.
+ * 동적 상태만 기본 공지하고 정적 빈 상태는 읽기 순서에서 자연스럽게 탐색하게 한다.
  */
 export function StudioSurfaceState({
   state,
@@ -60,19 +77,23 @@ export function StudioSurfaceState({
   icon,
   action,
   secondaryAction,
+  announce = DEFAULT_ANNOUNCEMENT[state],
   compact = false,
   className,
 }: StudioSurfaceStateProps): ReactElement {
   const Icon = STATE_ICON[state];
-  const assertive = state === "error";
+  const live = announce === "none" ? undefined : announce;
+  const role = announce === "assertive" ? "alert" : announce === "polite" ? "status" : undefined;
+
   return (
     <section
-      role={assertive ? "alert" : "status"}
-      aria-live={assertive ? "assertive" : "polite"}
-      aria-atomic="true"
+      role={role}
+      aria-live={live}
+      aria-atomic={live ? "true" : undefined}
       aria-busy={state === "loading" ? true : undefined}
       data-studio-surface-state={state}
       data-studio-empty-state={state === "empty" ? "true" : undefined}
+      data-studio-surface-announcement={announce}
       className={cn(
         "relative isolate overflow-hidden rounded-2xl border text-center",
         "shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)]",
