@@ -1,0 +1,49 @@
+name: Prioritize protected core for PR 907
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-prioritize-core-907-windows.yml
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: one-shot-prioritize-core-907-windows
+  cancel-in-progress: true
+
+jobs:
+  cancel-optional-runs:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel optional runner consumers only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          failed=0
+          for run_id in 34155053160 34155050574 34155176092; do
+            body="$(mktemp)"
+            code="$(curl --silent --show-error --output "$body" --write-out '%{http_code}' \
+              --request POST \
+              --header 'Accept: application/vnd.github+json' \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$GH_REPOSITORY/actions/runs/$run_id/cancel")"
+            case "$code" in
+              202) echo "cancelled optional run $run_id" ;;
+              404|409) echo "optional run $run_id already terminal (HTTP $code)" ;;
+              *)
+                echo "::error::Failed to cancel optional run $run_id (HTTP $code): $(cat "$body")"
+                failed=1
+                ;;
+            esac
+            rm -f "$body"
+          done
+          exit "$failed"
