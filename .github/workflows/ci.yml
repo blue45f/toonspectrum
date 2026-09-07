@@ -37,10 +37,10 @@ on:
 permissions:
   contents: read
 
-# PR 은 PR 번호로 묶어 새 커밋이 오면 진행 중 실행을 취소한다. main 푸시는 커밋 SHA 로 묶이므로
-# 서로 간섭하지 않는다 — 커밋마다 어느 커밋이 main 을 깨뜨렸는지 신호가 남아야 한다.
+# PR 는 PR 번호 단위로 묶어 동일 PR의 진행 중인 CI를 취소하고 새 커밋은 새 신호로 갱신합니다.
+# main 푸시는 SHA 단위로 분리해 각 커밋의 변경 신호를 그대로 남겨 둡니다.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Core is backed by executed checks; no fast-merge bypass is permitted.
