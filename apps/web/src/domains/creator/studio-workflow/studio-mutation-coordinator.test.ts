@@ -60,22 +60,27 @@ function envelope(
 
 function durability(existing: StudioMutationReceipt | null = null) {
   const committedByKey = new Map<string, StudioMutationReceipt>();
+  const syncEnvelopeByKey = new Map<string, StudioMutationEnvelopeV2 | null>();
   if (existing) committedByKey.set("idempotency-1", existing);
-  const port: StudioMutationDurabilityPort = {
+  const port: StudioMutationDurabilityPort & {
+    readonly syncEnvelopeByKey: Map<string, StudioMutationEnvelopeV2 | null>;
+  } = {
+    syncEnvelopeByKey,
     findCommittedReceipt: vi.fn(async (key) => committedByKey.get(key) ?? null),
     begin: vi.fn(async () => undefined),
     appendPrepared: vi.fn(async () => undefined),
-    commit: vi.fn(async (record, receipt) => {
+    commit: vi.fn(async (record, receipt, syncEnvelope) => {
+      // The test double mirrors the production contract: receipt and outbox become visible together.
       committedByKey.set(record.idempotencyKey, receipt);
+      syncEnvelopeByKey.set(record.idempotencyKey, syncEnvelope);
     }),
     abort: vi.fn(async () => undefined),
-    enqueueServerSync: vi.fn(async () => undefined),
   };
   return port;
 }
 
 describe("Studio mutation coordinator", () => {
-  it("commits multiple domains as one local sequence and queues one server sync", async () => {
+  it("commits multiple domains as one local sequence and atomically records one server outbox", async () => {
     let pageState = { count: 0 };
     let identityState = { count: 0 };
     const pagePort = createStudioExistingReducerDomainPort({
@@ -98,11 +103,12 @@ describe("Studio mutation coordinator", () => {
       validateProjectedState: (projected) =>
         projected.size === 2 ? [] : ["두 도메인이 함께 준비되어야 합니다."],
     });
-
-    const receipt = await coordinator.execute(envelope([
+    const request = envelope([
       command("command-page", "page-state", "page-state/add-frame"),
       command("command-identity", "identity-index", "identity/link-panel"),
-    ]));
+    ]);
+
+    const receipt = await coordinator.execute(request);
 
     expect(receipt).toMatchObject({
       status: "committed",
@@ -116,7 +122,12 @@ describe("Studio mutation coordinator", () => {
     expect(store.begin).toHaveBeenCalledTimes(1);
     expect(store.appendPrepared).toHaveBeenCalledTimes(1);
     expect(store.commit).toHaveBeenCalledTimes(1);
-    expect(store.enqueueServerSync).toHaveBeenCalledTimes(1);
+    expect(store.commit).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: "idempotency-1" }),
+      receipt,
+      request,
+    );
+    expect(store.syncEnvelopeByKey.get("idempotency-1")).toBe(request);
   });
 
   it("returns an idempotent receipt without preparing or committing again", async () => {
@@ -150,6 +161,7 @@ describe("Studio mutation coordinator", () => {
     expect(receipt.status).toBe("idempotent-replay");
     expect(port.prepare).not.toHaveBeenCalled();
     expect(store.begin).not.toHaveBeenCalled();
+    expect(store.commit).not.toHaveBeenCalled();
   });
 
   it("rejects stale local bases before touching any domain", async () => {
@@ -249,10 +261,33 @@ describe("Studio mutation coordinator", () => {
     expect(identityState).toEqual({ count: 0 });
     expect(store.abort).toHaveBeenCalledTimes(1);
     expect(store.commit).not.toHaveBeenCalled();
-    expect(store.enqueueServerSync).not.toHaveBeenCalled();
   });
 
-  it("does not enqueue server sync for an unsaved draft", async () => {
+  it("rolls back in-memory owners when the atomic durable commit fails", async () => {
+    let pageState = { count: 0 };
+    const port = createStudioExistingReducerDomainPort({
+      domain: "page-state",
+      getSnapshot: () => pageState,
+      reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
+      replaceSnapshot: (snapshot) => { pageState = snapshot; },
+    });
+    const store = durability();
+    vi.mocked(store.commit).mockRejectedValueOnce(new Error("sqlite transaction failed"));
+    const coordinator = createStudioMutationCoordinator({
+      domains: [port],
+      durability: store,
+      getCurrentCoordinates: () => coordinates(),
+    });
+
+    await expect(coordinator.execute(envelope([
+      command("command-page", "page-state", "page-state/add-frame"),
+    ]))).rejects.toThrow("sqlite transaction failed");
+
+    expect(pageState).toEqual({ count: 0 });
+    expect(store.abort).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits a null sync envelope for an unsaved draft", async () => {
     let pageState = { count: 0 };
     const port = createStudioExistingReducerDomainPort({
       domain: "page-state",
@@ -273,6 +308,11 @@ describe("Studio mutation coordinator", () => {
 
     const receipt = await coordinator.execute(draftEnvelope);
     expect(receipt.serverSyncState).toBe("none");
-    expect(store.enqueueServerSync).not.toHaveBeenCalled();
+    expect(store.commit).toHaveBeenCalledWith(
+      expect.any(Object),
+      receipt,
+      null,
+    );
+    expect(store.syncEnvelopeByKey.get("idempotency-1")).toBeNull();
   });
 });
