@@ -47,9 +47,16 @@ function AdminNavigation({
   const t = useT();
 
   return (
-    <nav aria-label={copy.navigation} className="flex-1 overflow-y-auto px-2 py-4">
+    <nav
+      aria-label={copy.navigation}
+      className="flex-1 overflow-y-auto px-2 py-4"
+    >
       {ADMIN_NAVIGATION_GROUPS.map((group) => (
-        <section key={group.id} className="mb-5" aria-labelledby={`admin-nav-${group.id}`}>
+        <section
+          key={group.id}
+          className="mb-5"
+          aria-labelledby={`admin-nav-${group.id}`}
+        >
           <h2
             id={`admin-nav-${group.id}`}
             className={cn(
@@ -81,7 +88,12 @@ function AdminNavigation({
                 >
                   <AdminRouteIcon
                     icon={route.icon}
-                    className={cn("shrink-0", active ? "text-accent" : "text-fg-3 group-hover:text-fg-2")}
+                    className={cn(
+                      "shrink-0",
+                      active
+                        ? "text-accent"
+                        : "text-fg-3 group-hover:text-fg-2",
+                    )}
                   />
                   <span className={cn("truncate", collapsed && "sr-only")}>
                     {t(route.labelKey)}
@@ -122,9 +134,10 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
     candidate.routeIds.includes(route.id),
   );
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(() =>
-    typeof window !== "undefined" &&
-    window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1",
+  const [collapsed, setCollapsed] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1",
   );
 
   useEffect(() => {
@@ -167,19 +180,42 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
             type="button"
             onClick={toggleCollapsed}
             className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl text-xs font-medium text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-            aria-label={collapsed ? copy.expandSidebar : copy.collapseSidebar}
+            aria-label={
+              collapsed ? copy.expandSidebar : copy.collapseSidebar
+            }
           >
-            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            {collapsed ? (
+              <PanelLeftOpen size={16} />
+            ) : (
+              <PanelLeftClose size={16} />
+            )}
             {!collapsed ? <span>{copy.collapseSidebar}</span> : null}
           </button>
-          <div className={cn("mt-1 rounded-xl border border-line bg-card p-3", collapsed && "px-1 text-center")}>
-            <p className={cn("truncate text-xs font-semibold text-fg", collapsed && "sr-only")}>
+          <div
+            className={cn(
+              "mt-1 rounded-xl border border-line bg-card p-3",
+              collapsed && "px-1 text-center",
+            )}
+          >
+            <p
+              className={cn(
+                "truncate text-xs font-semibold text-fg",
+                collapsed && "sr-only",
+              )}
+            >
               {actor.name ?? actor.email ?? actor.id}
             </p>
-            <p className={cn("mt-0.5 truncate text-[11px] text-accent", collapsed && "sr-only")}>
+            <p
+              className={cn(
+                "mt-0.5 truncate text-[11px] text-accent",
+                collapsed && "sr-only",
+              )}
+            >
               {actor.role}
             </p>
-            {collapsed ? <ShieldCheck className="mx-auto text-accent" size={16} /> : null}
+            {collapsed ? (
+              <ShieldCheck className="mx-auto text-accent" size={16} />
+            ) : null}
           </div>
         </div>
       </aside>
@@ -204,7 +240,19 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
                 <X size={18} />
               </button>
             </div>
-            <AdminNavigation collapsed={false} onNavigate={() => setMobileOpen(false)} />
+            <AdminNavigation
+              collapsed={false}
+              onNavigate={() => setMobileOpen(false)}
+            />
+            <div className="border-t border-line p-3">
+              <Link
+                href="/"
+                onClick={() => setMobileOpen(false)}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-card text-sm font-medium text-fg-2 hover:border-line-strong hover:text-fg"
+              >
+                {copy.publicSite} <ExternalLink size={14} />
+              </Link>
+            </div>
           </aside>
         </div>
       ) : null}
@@ -223,7 +271,8 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
             </button>
             <div className="min-w-0">
               <p className="truncate text-[11px] text-fg-3">
-                {copy.breadcrumbRoot} / {group ? copy.groups[group.id] : ""}
+                {copy.breadcrumbRoot} /{" "}
+                {group ? copy.groups[group.id] : ""}
               </p>
               <h1 className="truncate text-base font-semibold text-fg sm:text-lg">
                 {t(route.labelKey)}
@@ -245,10 +294,12 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
             <AdminQuickPalette userId={userId} />
             <Link
               href="/"
-              className="hidden min-h-10 items-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg md:inline-flex"
+              aria-label={copy.openPublicSite}
+              className="inline-flex size-10 items-center justify-center gap-1.5 rounded-xl border border-line bg-card text-xs font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg md:w-auto md:px-3"
               title={copy.openPublicSite}
             >
-              {copy.publicSite} <ExternalLink size={13} />
+              <span className="hidden md:inline">{copy.publicSite}</span>
+              <ExternalLink size={13} />
             </Link>
           </div>
         </header>

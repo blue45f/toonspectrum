@@ -46,8 +46,8 @@ const HAS_DESKCLOUD_MOUNTS = Boolean(
   import.meta.env.VITE_NOTIFYDESK_URL,
 );
 const TRAFFIC_ANALYTICS_ENABLED =
-  import.meta.env.PROD
-  && import.meta.env.VITE_TRAFFIC_ANALYTICS_ENABLED !== "false";
+  import.meta.env.PROD &&
+  import.meta.env.VITE_TRAFFIC_ANALYTICS_ENABLED !== "false";
 let kmasEntryMergeStarted = false;
 
 function isAdminPath(pathname: string): boolean {
@@ -106,27 +106,59 @@ function DeferredBackToTop() {
 
 function useKmasEntryMerge(enabled: boolean) {
   useEffect(() => {
-    if (!enabled || kmasEntryMergeStarted || import.meta.env.VITE_CATALOG_SOURCE === "static") return;
-    kmasEntryMergeStarted = true;
+    if (
+      !enabled ||
+      kmasEntryMergeStarted ||
+      import.meta.env.VITE_CATALOG_SOURCE === "static"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
     const run = () => {
-      fetch(apiPath("/api/kmas/merge-on-access"), withCsrfProtection({
-        method: "POST",
-        cache: "no-store",
-        keepalive: true,
-      })).catch(() => {
+      if (cancelled || kmasEntryMergeStarted) return;
+      // Set the one-shot latch only when the deferred request actually starts.
+      // Cancelling the timer while entering the admin workspace must not prevent
+      // a later public-route visit from starting the merge.
+      kmasEntryMergeStarted = true;
+      fetch(
+        apiPath("/api/kmas/merge-on-access"),
+        withCsrfProtection({
+          method: "POST",
+          cache: "no-store",
+          keepalive: true,
+        }),
+      ).catch(() => {
         kmasEntryMergeStarted = false;
       });
     };
+
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      const handle = (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(run, { timeout: 3000 });
+      const handle = (
+        window as unknown as {
+          requestIdleCallback: (
+            callback: () => void,
+            options?: { timeout: number },
+          ) => number;
+        }
+      ).requestIdleCallback(run, { timeout: 3000 });
       return () => {
+        cancelled = true;
         if ("cancelIdleCallback" in window) {
-          (window as unknown as { cancelIdleCallback: (h: number) => void }).cancelIdleCallback(handle);
+          (
+            window as unknown as {
+              cancelIdleCallback: (callbackHandle: number) => void;
+            }
+          ).cancelIdleCallback(handle);
         }
       };
     }
-    const timer = setTimeout(run, 1500);
-    return () => clearTimeout(timer);
+
+    const timer = window.setTimeout(run, 1500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [enabled]);
 }
 
@@ -146,8 +178,12 @@ function WebFloatingControls() {
 
 function StudioRouteImmersiveBridge() {
   const { pathname } = useLocation();
-  const acquireImmersiveSurface = useUi((state) => state.acquireImmersiveSurface);
-  const releaseImmersiveSurface = useUi((state) => state.releaseImmersiveSurface);
+  const acquireImmersiveSurface = useUi(
+    (state) => state.acquireImmersiveSurface,
+  );
+  const releaseImmersiveSurface = useUi(
+    (state) => state.releaseImmersiveSurface,
+  );
   const onStudioPath = isImmersiveMobileRoute(pathname);
 
   useEffect(() => {
@@ -173,9 +209,12 @@ function SerifWebFontBridge() {
 
 function AppRuntime() {
   const { pathname } = useLocation();
-  const [compatResult, setCompatResult] = useState<BrowserCompatibilityResult | null>(null);
+  const [compatResult, setCompatResult] =
+    useState<BrowserCompatibilityResult | null>(null);
   const [showCompatModal, setShowCompatModal] = useState(false);
-  const studioImmersive = useUi((state) => state.immersiveSurface === "studio");
+  const studioImmersive = useUi(
+    (state) => state.immersiveSurface === "studio",
+  );
   const adminChrome = isAdminPath(pathname);
   const isolatedChrome = studioImmersive || adminChrome;
 

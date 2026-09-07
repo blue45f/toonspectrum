@@ -1,10 +1,14 @@
+import { ExternalLink } from "lucide-react";
 import { Suspense, useEffect } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import type { AdminTabKey } from "../admin-console-model";
 import { loadAdminI18nLocale } from "../admin-i18n-loader";
 import { AdminGateFallback } from "../components/admin-gate";
-import { useAdminGate } from "../components/admin-gate-state";
+import {
+  AdminGateOverrideProvider,
+  useAdminGate,
+} from "../components/admin-gate-state";
 import { AdminToastProvider } from "../components/AdminToast";
 import { AdminShell } from "../shell/AdminShell";
 import { getAdminShellCopy } from "../shell/admin-shell-copy";
@@ -15,60 +19,101 @@ import {
   type AdminRouteId,
 } from "./admin-route-manifest";
 
+import { AuthMenuShell } from "@/domains/auth/components/auth-menu-shell";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
+import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
 
 const AdminDashboard = lazyRetry(
-  () => import("../components/AdminDashboard").then((module) => ({ default: module.AdminDashboard })),
+  () =>
+    import("../components/AdminDashboard").then((module) => ({
+      default: module.AdminDashboard,
+    })),
   "AdminDashboardV2",
 );
 const AdminTraffic = lazyRetry(
-  () => import("../components/AdminTraffic").then((module) => ({ default: module.AdminTraffic })),
+  () =>
+    import("../components/AdminTraffic").then((module) => ({
+      default: module.AdminTraffic,
+    })),
   "AdminTrafficV2",
 );
 const AdminPlans = lazyRetry(
-  () => import("../components/AdminPlans").then((module) => ({ default: module.AdminPlans })),
+  () =>
+    import("../components/AdminPlans").then((module) => ({
+      default: module.AdminPlans,
+    })),
   "AdminPlansV2",
 );
 const AdminRevenue = lazyRetry(
-  () => import("../components/AdminRevenue").then((module) => ({ default: module.AdminRevenue })),
+  () =>
+    import("../components/AdminRevenue").then((module) => ({
+      default: module.AdminRevenue,
+    })),
   "AdminRevenueV2",
 );
 const AdminPromos = lazyRetry(
-  () => import("../components/AdminPromos").then((module) => ({ default: module.AdminPromos })),
+  () =>
+    import("../components/AdminPromos").then((module) => ({
+      default: module.AdminPromos,
+    })),
   "AdminPromosV2",
 );
 const AdminAnnouncements = lazyRetry(
-  () => import("../components/AdminAnnouncements").then((module) => ({ default: module.AdminAnnouncements })),
+  () =>
+    import("../components/AdminAnnouncements").then((module) => ({
+      default: module.AdminAnnouncements,
+    })),
   "AdminAnnouncementsV2",
 );
 const AdminReports = lazyRetry(
-  () => import("../components/AdminReports").then((module) => ({ default: module.AdminReports })),
+  () =>
+    import("../components/AdminReports").then((module) => ({
+      default: module.AdminReports,
+    })),
   "AdminReportsV2",
 );
 const AdminSecurity = lazyRetry(
-  () => import("../components/AdminSecurity").then((module) => ({ default: module.AdminSecurity })),
+  () =>
+    import("../components/AdminSecurity").then((module) => ({
+      default: module.AdminSecurity,
+    })),
   "AdminSecurityV2",
 );
 const AdminAuditLogs = lazyRetry(
-  () => import("../components/AdminAuditLogs").then((module) => ({ default: module.AdminAuditLogs })),
+  () =>
+    import("../components/AdminAuditLogs").then((module) => ({
+      default: module.AdminAuditLogs,
+    })),
   "AdminAuditLogsV2",
 );
 const AdminCampaigns = lazyRetry(
-  () => import("../components/AdminCampaigns").then((module) => ({ default: module.AdminCampaigns })),
+  () =>
+    import("../components/AdminCampaigns").then((module) => ({
+      default: module.AdminCampaigns,
+    })),
   "AdminCampaignsV2",
 );
 const AdminOps = lazyRetry(
-  () => import("../components/AdminOps").then((module) => ({ default: module.AdminOps })),
+  () =>
+    import("../components/AdminOps").then((module) => ({
+      default: module.AdminOps,
+    })),
   "AdminOpsV2",
 );
 const AdminMembersPage = lazyRetry(
-  () => import("../AdminMembersPage").then((module) => ({ default: module.AdminMembersPage })),
+  () =>
+    import("../AdminMembersPage").then((module) => ({
+      default: module.AdminMembersPage,
+    })),
   "AdminMembersPageV2",
 );
 const AdminCommunityPage = lazyRetry(
-  () => import("../AdminCommunityPage").then((module) => ({ default: module.AdminCommunityPage })),
+  () =>
+    import("../AdminCommunityPage").then((module) => ({
+      default: module.AdminCommunityPage,
+    })),
   "AdminCommunityPageV2",
 );
 
@@ -139,14 +184,28 @@ function AdminRouteSurface({
 }
 
 function AdminAuthorizedRouter({ routeId }: { routeId: AdminRouteId }) {
-  const { gate, uid } = useAdminGate();
+  const gateState = useAdminGate();
+  const { gate, uid } = gateState;
   const navigate = useNavigate();
+  const lang = useI18n((state) => state.lang);
+  const copy = getAdminShellCopy(lang);
 
   if (gate.kind !== "admin" || !uid) {
     return (
       <div className="min-h-[100dvh] bg-canvas px-4 py-20 text-fg">
         <div className="mx-auto max-w-xl rounded-2xl border border-line bg-card p-6">
           <AdminGateFallback gate={gate} />
+          {gate.kind !== "loading" ? (
+            <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-5">
+              <AuthMenuShell />
+              <Link
+                href="/"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-line bg-panel px-3 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+              >
+                {copy.publicSite} <ExternalLink size={14} />
+              </Link>
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -157,13 +216,19 @@ function AdminAuthorizedRouter({ routeId }: { routeId: AdminRouteId }) {
   };
 
   return (
-    <AdminToastProvider>
-      <AdminShell actor={gate.me} userId={uid}>
-        <Suspense fallback={<AdminRouteLoading />}>
-          <AdminRouteSurface routeId={routeId} uid={uid} onNavigate={onNavigate} />
-        </Suspense>
-      </AdminShell>
-    </AdminToastProvider>
+    <AdminGateOverrideProvider value={gateState}>
+      <AdminToastProvider>
+        <AdminShell actor={gate.me} userId={uid}>
+          <Suspense fallback={<AdminRouteLoading />}>
+            <AdminRouteSurface
+              routeId={routeId}
+              uid={uid}
+              onNavigate={onNavigate}
+            />
+          </Suspense>
+        </AdminShell>
+      </AdminToastProvider>
+    </AdminGateOverrideProvider>
   );
 }
 
