@@ -1,0 +1,40 @@
+name: One-shot replay PR 900 onto final integration
+
+on:
+  push:
+    branches:
+      - release/final-pr911-df7fdd87-20260908
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-shot-replay-pr900-final
+  cancel-in-progress: false
+
+jobs:
+  replay:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out complete integration history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Replay the two reviewed PR 900 commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git cherry-pick 55ca11c6224656e5bf00f61310b5b7be71360cf4
+          git cherry-pick f79fd9a0eba37679415994563253536f7da31cf4
+          rm .github/workflows/one-shot-replay-pr900.yml
+          git add -A
+          git commit -m "chore(ci): retire completed PR 900 replay workflow"
+
+      - name: Push the lossless combined tree
+        shell: bash
+        run: git push origin HEAD:${GITHUB_REF_NAME}
