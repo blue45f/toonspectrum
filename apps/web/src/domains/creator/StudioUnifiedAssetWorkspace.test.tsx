@@ -154,4 +154,38 @@ describe("StudioUnifiedAssetWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "AI 도구에서 만들기" }));
     expect(onOpenAi).toHaveBeenCalledWith("심해 우주 정거장");
   });
+
+  it("opens the legacy library immediately for marketplace deep links", () => {
+    render(
+      <StudioUnifiedAssetWorkspace
+        initialView="library"
+        items={items}
+        legacyContent={<div data-testid="deep-linked-library">기존 보관함</div>}
+        onUseItem={vi.fn()}
+        onOpenAi={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("deep-linked-library")).toBeTruthy();
+    expect(
+      screen.queryByRole("searchbox", { name: "에셋 통합 검색" }),
+    ).toBeNull();
+  });
+
+  it("reports a rejected safe-use route without a false success message", async () => {
+    render(
+      <StudioUnifiedAssetWorkspace
+        items={items}
+        legacyContent={<div>기존 보관함</div>}
+        onUseItem={vi.fn().mockResolvedValue(false)}
+        onOpenAi={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "교실 의자 3D 도구 열기" }));
+    expect(
+      await screen.findByText("현재 캔버스 상태에서는 이 에셋을 사용할 수 없습니다."),
+    ).toBeTruthy();
+    expect(screen.queryByText("교실 의자 편집 도구를 열었습니다.")).toBeNull();
+  });
 });
