@@ -133,31 +133,26 @@ function useKmasEntryMerge(enabled: boolean) {
       });
     };
 
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      const handle = (
-        window as unknown as {
-          requestIdleCallback: (
-            callback: () => void,
-            options?: { timeout: number },
-          ) => number;
-        }
-      ).requestIdleCallback(run, { timeout: 3000 });
+    const idleCallbacks = window as unknown as {
+      requestIdleCallback?: (
+        callback: () => void,
+        options?: { timeout: number },
+      ) => number;
+      cancelIdleCallback?: (callbackHandle: number) => void;
+    };
+
+    if (typeof idleCallbacks.requestIdleCallback === "function") {
+      const handle = idleCallbacks.requestIdleCallback(run, { timeout: 3000 });
       return () => {
         cancelled = true;
-        if ("cancelIdleCallback" in window) {
-          (
-            window as unknown as {
-              cancelIdleCallback: (callbackHandle: number) => void;
-            }
-          ).cancelIdleCallback(handle);
-        }
+        idleCallbacks.cancelIdleCallback?.(handle);
       };
     }
 
-    const timer = window.setTimeout(run, 1500);
+    const timer = globalThis.setTimeout(run, 1500);
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      globalThis.clearTimeout(timer);
     };
   }, [enabled]);
 }
