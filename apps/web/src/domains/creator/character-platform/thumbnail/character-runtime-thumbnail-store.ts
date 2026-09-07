@@ -53,9 +53,9 @@ function recordThumbnail(record: CharacterRuntimeThumbnailRecord): void {
   publish({ ...state, records, revision: state.revision + 1 });
 }
 
-function selectedEntryIds(binding: CharacterShaperBinding): readonly string[] {
+function selectedEntryIds(recipe: CharacterShaperBinding["recipe"]): readonly string[] {
   const ids = new Set<string>();
-  for (const value of Object.values(binding.recipe.slots)) {
+  for (const value of Object.values(recipe.slots)) {
     if (typeof value === "string" && value.length > 0) ids.add(value);
     else if (Array.isArray(value)) {
       for (const item of value) if (typeof item === "string" && item.length > 0) ids.add(item);
@@ -87,7 +87,7 @@ export function CharacterRuntimeThumbnailRecorder({ h, binding }: {
   const aliveRef = useRef(true);
   const capturedSignatureRef = useRef<string | null>(null);
   const modelId = typeof h.activeModelId === "string" ? h.activeModelId : null;
-  const ids = useMemo(() => selectedEntryIds(binding), [binding.recipe]);
+  const ids = useMemo(() => selectedEntryIds(binding.recipe), [binding.recipe]);
   const signature = useMemo(
     () => `${modelId ?? "none"}|${JSON.stringify(binding.recipe)}|${Boolean(h.transparentBackground)}`,
     [modelId, binding.recipe, h.transparentBackground],
