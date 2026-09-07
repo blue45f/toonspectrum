@@ -12,12 +12,12 @@ permissions:
 
 concurrency:
   group: one-shot-final-integration-ci-repair
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   repair:
     if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
