@@ -1,4 +1,4 @@
-name: Retire optional finishing run for PR 907
+name: Retire failed CI run for PR 907
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: studio-finishing-quality-907
+  group: CI-907
   cancel-in-progress: true
 
 jobs:
@@ -18,4 +18,4 @@ jobs:
     if: ${{ false }}
     runs-on: ubuntu-slim
     steps:
-      - run: echo "Optional finishing run retired so protected core gets runner capacity."
+      - run: echo "The failed PR 907 CI run was retired before applying its lint repair."
