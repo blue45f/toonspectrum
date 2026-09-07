@@ -180,7 +180,7 @@ def main():
                        'verticesWithDiscardedInfluences': sum(value > 1e-6 for value in discarded),
                        'sourceVertexCount': sum(len(obj.data.vertices) for obj in meshes)})
         records.append(record)
-        print('MODULAR_VRM ' + json.dumps(record), flush=True)
+        print('MODULAR_VRM generated', flush=True)
     (PUBLIC / 'manifest.json').write_text(json.dumps({'version': 1, 'sourceLicense': 'CC0-1.0',
         'entries': records, 'visualReviewed': False, 'productionPublished': False}, indent=2) + '\n')
     (PUBLIC / 'LICENSE.txt').write_text('CC0 1.0 Universal (CC0 1.0)\nPublic Domain Dedication\n'
