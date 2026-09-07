@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { StudioAssetRightsManifestResult } from "./studio-asset-rights-manifest";
+import {
+  buildStudioAssetRightsManifest,
+  type StudioAssetRightsManifestResult,
+} from "./studio-asset-rights-manifest";
 import {
   buildStudio3dAssetQualityPassport,
   calculateStudio3dWeightedQualityScore,
@@ -139,12 +142,34 @@ function approvedRefinery(): Studio3dAssetRefineryReceipt {
 }
 
 function rights(
-  readyForPublishPreflight = true
+  readyForPublishPreflight = true,
+  assetVersion = ASSET_VERSION
 ): Pick<StudioAssetRightsManifestResult, "readyForPublishPreflight" | "assets"> {
-  return {
-    readyForPublishPreflight,
-    assets: [{ assetId: ASSET_ID, assetVersion: ASSET_VERSION }],
-  };
+  const result = buildStudioAssetRightsManifest({
+    workId: "work-3d-governance",
+    usages: [{
+      assetId: ASSET_ID,
+      assetVersion,
+      source: { kind: "builtin", id: "catalog:hero-character-001" },
+      scope: ["current-work"],
+      licenseId: "creator-owned",
+      attributionRequired: false,
+      attributionText: "",
+      commercialUse: true,
+      aiTraining: "unknown",
+      redistribution: "unknown",
+      expiresAt: null,
+      pageId: "page-01",
+      elementId: "character-01",
+    }],
+    attestation: {
+      status: "confirmed",
+      reviewedAt: REVIEWED_AT,
+      reviewer: "권리 검수자",
+    },
+    now: Date.parse(REVIEWED_AT),
+  });
+  return { readyForPublishPreflight, assets: result.assets };
 }
 
 describe("studio 3D asset quality passport", () => {
@@ -324,10 +349,7 @@ describe("studio 3D asset refinery and release gate", () => {
       refinery: approvedRefinery(),
       quality: buildStudio3dAssetQualityPassport(qualityInput()),
       supply: evaluateStudio3dAssetSupply(supplyEvidence()),
-      rights: {
-        readyForPublishPreflight: false,
-        assets: [{ assetId: ASSET_ID, assetVersion: "another-version" }],
-      },
+      rights: rights(false, "another-version"),
     });
 
     expect(decision.allowed).toBe(false);
