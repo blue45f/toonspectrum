@@ -12,19 +12,13 @@ permissions:
 
 concurrency:
   group: one-time-merged-branch-cleanup-20260908-0320
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   cleanup:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          fetch-depth: 1
-          persist-credentials: false
-
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -35,8 +29,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/cleanup-merged-branches.mjs --all --apply | tee cleanup-report.json
-          cat cleanup-report.json >> "$GITHUB_STEP_SUMMARY"
+          curl --fail-with-body --silent --show-error \
+            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${{ github.event.repository.default_branch }}/scripts/cleanup-merged-branches.mjs" \
+            -o /tmp/cleanup-merged-branches.mjs
+          node /tmp/cleanup-merged-branches.mjs --all --apply | tee /tmp/cleanup-report.json
+          cat /tmp/cleanup-report.json >> "$GITHUB_STEP_SUMMARY"
 
       - name: Delete one-time launcher branch
         if: ${{ success() }}
