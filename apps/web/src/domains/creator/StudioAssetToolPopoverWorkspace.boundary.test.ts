@@ -22,9 +22,12 @@ describe("StudioAssetToolPopoverWorkspace review boundaries", () => {
     expect(source).not.toContain("setAssetPrompt(prompt)");
   });
 
-  it("keeps community deep links visible without a second discovery click", () => {
-    expect(source).toContain('toolBelt.assetTab === "community"');
+  it("opens community deep links without unmounting unified discovery", () => {
+    expect(source).toContain(
+      'initialView={toolBelt.assetTab === "community" ? "library" : "discover"}',
+    );
     expect(source).toContain("<StudioAssetLegacyPanel toolBelt={toolBelt} />");
+    expect(source).not.toContain('{toolBelt.assetTab === "community" ? (');
   });
 
   it("routes scene templates through their owned preview surface", () => {
