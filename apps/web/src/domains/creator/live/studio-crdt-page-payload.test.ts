@@ -19,6 +19,7 @@ import {
 } from "./studio-crdt-scene-schema";
 
 import type { PageState } from "../studio-page-state";
+import type { StudioCrdtJsonObject } from "./studio-crdt-json-value";
 
 const page: PageState = { id: "page", elements: [], bg: "#fff", bgGrad: null, canvasH: 1080 };
 
@@ -71,6 +72,43 @@ describe("lightweight page payload admission", () => {
     expect(hasSameStudioCrdtPageMetadata(previous, next)).toBe(false);
     expect(hasSameStudioCrdtPageMetadata(previous, { ...previous, layerComps: undefined })).toBe(false);
   });
+
+  const invalidPagePropertyCases: { props: StudioCrdtJsonObject; message: string }[] = [
+    { props: { bgGrad: false, note: false }, message: "페이지 그라데이션이 올바르지 않습니다." },
+    { props: { note: false, hideMaster: "bad" }, message: "페이지의 note 값이 올바르지 않습니다." },
+    { props: { hideMaster: "bad", paperGrainVisible: "bad" }, message: "페이지 마스터 표시 값이 올바르지 않습니다." },
+    { props: { paperGrainVisible: "bad", paperSurface: null }, message: "페이지 종이 결 표시 값이 올바르지 않습니다." },
+    { props: { paperSurface: null, layerComps: null }, message: "페이지 종이 표면 설정이 올바르지 않습니다." },
+    { props: { layerComps: null, drawingAssist: null }, message: "페이지 레이어 콤프가 올바르지 않습니다." },
+    { props: { drawingAssist: null, note: "한".repeat(3000) }, message: "페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다." },
+    { props: { note: "한".repeat(3000) }, message: "페이지 정보가 실시간 동기화 8KiB 한도를 초과했습니다." },
+  ];
+
+  it.each(invalidPagePropertyCases)(
+    "preserves the first invalid field before downstream normalization: $message",
+    ({ props, message }) => {
+      expect(() => validateStudioCrdtPagePayload({
+        version: 1, props: { bg: "#fff", bgGrad: null, canvasH: 1080, ...props },
+      })).toThrow(message);
+    },
+  );
+
+  it("detaches paper and drawing-assist state without changing the serialized page", () => {
+    const drawingAssist = createDefaultStudioDrawingAssistDocument({ canvasWidth: 800, canvasHeight: 1080 });
+    drawingAssist.perspective.points = [{ id: "point", x: 24, y: 80 }];
+    const props = jsonObject({ ...page, drawingAssist, paperSurface: { kind: "washi", seed: 0xff_ff_ff_ff } });
+    if (!props) throw new Error("The drawing-assist fixture must be valid JSON.");
+    delete props.id;
+    delete props.elements;
+    const expected = cloneJsonObject(props);
+    const validated = validateStudioCrdtPagePayload({ version: 1, props });
+    expect(validated.props).toEqual(expected);
+    expect(validated.props.paperSurface).not.toBe(props.paperSurface);
+    expect(validated.props.drawingAssist).not.toBe(props.drawingAssist);
+    drawingAssist.perspective.points[0].x = 99;
+    props.drawingAssist = null;
+    expect(validated.props).toEqual(expected);
+  });
 });
 
 describe("shared CRDT JSON normalization", () => {
@@ -100,5 +138,17 @@ describe("shared CRDT JSON normalization", () => {
     expect(() => cloneJsonObject({ invalid: Number.NaN })).toThrow(/유한하지/u);
     expect(() => cloneJsonObject({ "bad\0key": true })).toThrow(/키/u);
     expect(() => cloneJsonObject({ text: "x".repeat(65_537) })).toThrow(/문자열/u);
+  });
+
+  it("shares the entry budget across siblings and resets it after each successful or rejected clone", () => {
+    const exactLimit = { values: Array.from({ length: 4094 }, () => null) };
+    expect(cloneJsonObject(exactLimit)).toEqual(exactLimit);
+    expect(cloneJsonObject(exactLimit)).toEqual(exactLimit);
+    const overLimit = {
+      first: Array.from({ length: 2047 }, () => null),
+      second: Array.from({ length: 2047 }, () => null),
+    };
+    expect(() => cloneJsonObject(overLimit)).toThrow("장면 확장 데이터가 허용 범위를 벗어났습니다.");
+    expect(cloneJsonObject(exactLimit)).toEqual(exactLimit);
   });
 });

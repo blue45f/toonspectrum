@@ -23,7 +23,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   captureLayerComp,
@@ -44,9 +44,12 @@ export interface StudioLayerCompsPanelProps<T extends StudioLayerLikeItem = Stud
   readonly comps?: readonly StudioLayerComp[];
   readonly activeCompId?: string | null;
   readonly onApplyComp: (comp: StudioLayerComp) => void | Promise<boolean>;
-  readonly onCompsChange?: (nextComps: readonly StudioLayerComp[]) => void | boolean;
+  readonly onCompsChange?: (
+    nextComps: readonly StudioLayerComp[],
+    expectedComps?: readonly StudioLayerComp[],
+  ) => void | boolean | Promise<boolean>;
   /** The editor captures from its flushed document; standalone consumers may use `layers`. */
-  readonly onCaptureComp?: (name: string, compId?: string) => boolean;
+  readonly onCaptureComp?: (name: string, compId?: string) => boolean | Promise<boolean>;
   readonly onBatchExportPlan?: (
     plan: ReturnType<typeof planLayerCompsBatchExport>,
   ) => void;
@@ -69,9 +72,9 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
   const [internalComps, setInternalComps] = useState<readonly StudioLayerComp[]>([]);
   const effectiveComps = comps ?? internalComps;
 
-  const updateComps = (next: readonly StudioLayerComp[]): boolean => {
+  const updateComps = (next: readonly StudioLayerComp[]) => {
     if (onCompsChange) {
-      return onCompsChange(next) !== false;
+      return onCompsChange(next, effectiveComps);
     }
     setInternalComps(next);
     return true;
@@ -81,20 +84,43 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
   const [isCreating, setIsCreating] = useState(false);
   const [editingCompId, setEditingCompId] = useState<string | null>(null);
   const [editNameText, setEditNameText] = useState("");
-  const [applying, setApplying] = useState(false);
-  const [applyError, setApplyError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const operationRef = useRef<object | null>(null);
+  useEffect(() => () => { operationRef.current = null; }, []);
 
-  const handleApplyComp = async (comp: StudioLayerComp) => {
-    if (disabled || applying) return;
-    setApplying(true);
-    setApplyError(null);
+  const runAction = (
+    action: () => void | boolean | Promise<boolean>,
+    errorMessage: string,
+    onSuccess?: () => void,
+  ) => {
+    if (disabled || operationRef.current) return;
+    const operation = {};
+    operationRef.current = operation;
+    setBusy(true);
+    setActionError(null);
+    const finish = (success: boolean) => {
+      if (operationRef.current !== operation) return;
+      if (success) onSuccess?.();
+      operationRef.current = null;
+      setBusy(false);
+    };
+    const fail = () => {
+      if (operationRef.current !== operation) return;
+      setActionError(errorMessage);
+      finish(false);
+    };
     try {
-      await onApplyComp(comp);
+      const result = action();
+      if (typeof result === "boolean" || result === undefined) finish(result !== false);
+      else void result.then((success) => finish(success !== false), fail);
     } catch {
-      setApplyError("콤프를 적용하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
-    } finally {
-      setApplying(false);
+      fail();
     }
+  };
+
+  const handleApplyComp = (comp: StudioLayerComp) => {
+    runAction(() => onApplyComp(comp), "콤프를 적용하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
   };
 
   const handleCreateComp = () => {
@@ -102,56 +128,59 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
     const trimmed = newCompName.trim();
     const defaultName = `콤프 ${effectiveComps.length + 1}`;
     const nameToUse = trimmed || defaultName;
-    const captured = onCaptureComp
-      ? onCaptureComp(nameToUse)
-      : updateComps([...effectiveComps, captureLayerComp(nameToUse, layers, undefined, Date.now(), groups)]);
-    if (!captured) return;
-    setNewCompName("");
-    setIsCreating(false);
+    runAction(
+      () => onCaptureComp
+        ? onCaptureComp(nameToUse)
+        : updateComps([...effectiveComps, captureLayerComp(nameToUse, layers, undefined, Date.now(), groups)]),
+      "콤프를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+      () => { setNewCompName(""); setIsCreating(false); },
+    );
   };
 
   const handleUpdateComp = (compId: string) => {
     const target = effectiveComps.find((c) => c.id === compId);
     if (!target) return;
-    if (onCaptureComp) {
-      onCaptureComp(target.name, target.id);
-      return;
-    }
-    const updated = updateLayerCompWithCurrentLayers(target, layers, groups);
-    updateComps(effectiveComps.map((c) => (c.id === compId ? updated : c)));
+    runAction(
+      () => onCaptureComp
+        ? onCaptureComp(target.name, target.id)
+        : updateComps(effectiveComps.map((c) => c.id === compId
+          ? updateLayerCompWithCurrentLayers(target, layers, groups) : c)),
+      "콤프를 업데이트하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+    );
   };
 
   const handleDeleteComp = (compId: string) => {
-    if (!updateComps(effectiveComps.filter((c) => c.id !== compId))) return;
-    if (editingCompId === compId) {
-      setEditingCompId(null);
-    }
+    runAction(
+      () => updateComps(effectiveComps.filter((c) => c.id !== compId)),
+      "콤프를 삭제하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+      () => { if (editingCompId === compId) setEditingCompId(null); },
+    );
   };
 
   const handleSaveRename = () => {
     if (!editingCompId) return;
     const trimmed = editNameText.trim();
-    if (trimmed) {
-      const saved = updateComps(
+    runAction(
+      () => trimmed ? updateComps(
         effectiveComps.map((c) =>
           c.id === editingCompId ? { ...c, name: trimmed } : c,
         ),
-      );
-      if (!saved) return;
-    }
-    setEditingCompId(null);
+      ) : true,
+      "콤프 이름을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+      () => setEditingCompId(null),
+    );
   };
 
   const handleBatchExport = () => {
-    if (effectiveComps.length === 0 || !onBatchExportPlan) return;
+    if (disabled || operationRef.current || effectiveComps.length === 0 || !onBatchExportPlan) return;
     const plan = planLayerCompsBatchExport(effectiveComps, "webtoon_cut", "png");
     onBatchExportPlan(plan);
   };
 
   return (
     <fieldset
-      disabled={disabled || applying}
-      aria-busy={applying}
+      disabled={disabled || busy}
+      aria-busy={busy}
       aria-label="레이어 콤프"
       className={cn(
         "flex min-w-0 shrink-0 flex-col gap-3 p-3 text-xs bg-slate-900/90 text-slate-100 rounded-lg border border-slate-800 shadow-xl",
@@ -170,7 +199,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
         </div>
         <button
           type="button"
-          onClick={() => setIsCreating(!isCreating)}
+          onClick={() => { if (!disabled && !operationRef.current) setIsCreating(!isCreating); }}
           disabled={effectiveComps.length >= STUDIO_LAYER_COMPS_MAX_COUNT}
           className={buttonClass({
             size: "sm",
@@ -189,7 +218,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
         선화, 밑색, 텍스트 유무, 조명 변화 등 다양한 레이어 표시 상태를 저장하고
         원클릭으로 전환합니다.{onBatchExportPlan ? " 저장한 콤프를 일괄 내보낼 수도 있어요." : null}
       </p>
-      {applyError ? <p role="alert" className="text-red-300">{applyError}</p> : null}
+      {actionError ? <p role="alert" className="text-red-300">{actionError}</p> : null}
 
       {/* Creation Row */}
       {isCreating && (
@@ -202,6 +231,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
             value={newCompName}
             onChange={(e) => setNewCompName(e.target.value)}
             onKeyDown={(e) => {
+              if (disabled || operationRef.current) { e.preventDefault(); e.stopPropagation(); return; }
               if (e.key === "Enter") handleCreateComp();
               if (e.key === "Escape") {
                 e.preventDefault();
@@ -267,6 +297,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                       value={editNameText}
                       onChange={(e) => setEditNameText(e.target.value)}
                       onKeyDown={(e) => {
+                        if (disabled || operationRef.current) { e.preventDefault(); e.stopPropagation(); return; }
                         if (e.key === "Enter") handleSaveRename();
                         if (e.key === "Escape") {
                           e.preventDefault();
@@ -336,6 +367,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                   <button
                     type="button"
                     onClick={() => {
+                      if (disabled || operationRef.current) return;
                       setEditingCompId(comp.id);
                       setEditNameText(comp.name);
                     }}

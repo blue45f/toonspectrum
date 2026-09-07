@@ -24,7 +24,7 @@ import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 
 
-import { chromium, type Page } from "playwright";
+import { chromium, type Browser, type Page } from "playwright";
 
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
 import {
@@ -428,6 +428,7 @@ async function main(): Promise<void> {
   const origin = externalOrigin ?? `http://127.0.0.1:${port}`;
   const url = `${origin}/studio`;
   let child: ChildProcess | null = null;
+  let browser: Browser | null = null;
 
   const results: FilterCaseResult[] = [];
   const browserErrors: { messages: string[]; failedResponses: string[] } = {
@@ -447,7 +448,7 @@ async function main(): Promise<void> {
     });
     log(`preview ready @ ${url}`);
 
-    const browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 1100 },
       locale: "ko-KR",
@@ -785,9 +786,12 @@ async function main(): Promise<void> {
       }
     }
 
-    await browser.close();
   } finally {
-    if (child) await stopChildProcess(child);
+    try {
+      await browser?.close();
+    } finally {
+      if (child) await stopChildProcess(child);
+    }
   }
 
   const report: FilterDialogReport = {

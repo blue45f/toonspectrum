@@ -39,13 +39,13 @@ describe("layer comp capture at the retained stroke boundary", () => {
     });
     const commit = vi.fn(() => true);
     const options = { prepare, getPage: () => current, canMutate: vi.fn(() => true),
-      validatePage: studioPageToCrdtPage, commit, reportError: vi.fn() };
+      validatePage: studioPageToCrdtPage, acquire: vi.fn(async () => true), synchronize: vi.fn<() => Promise<void>>(async () => undefined), release: vi.fn(), commit, reportError: vi.fn() };
     return { options, pendingElement };
   }
 
-  it.each([false, true])("captures a completed stroke from the post-flush page (update=%s)", (update) => {
+  it.each([false, true])("captures a completed stroke from the post-flush page (update=%s)", async (update) => {
     const { options, pendingElement } = fixture();
-    expect(captureStudioLayerCompTransaction({ ...options, name: "즉시 캡처", ...(update ? { compId: comp.id } : {}) })).toBe(true);
+    expect(await captureStudioLayerCompTransaction({ ...options, name: "즉시 캡처", ...(update ? { compId: comp.id } : {}) })).toBe(true);
     expect(options.prepare).toHaveBeenCalledTimes(1);
     expect(options.commit).toHaveBeenCalledTimes(1);
     const [elements, patch, pageId] = options.commit.mock.calls[0] as unknown as [PageState["elements"], { layerComps: typeof comp[] }, string];
@@ -57,59 +57,59 @@ describe("layer comp capture at the retained stroke boundary", () => {
     if (update) expect(captured.name).toBe(comp.name);
   });
 
-  it.each(["rename", "delete"])("keeps a newly flushed stroke during a %s metadata commit", (operation) => {
+  it.each(["rename", "delete"])("keeps a newly flushed stroke during a %s metadata commit", async (operation) => {
     const { options, pendingElement } = fixture();
     const nextComps = operation === "rename" ? [{ ...comp, name: "새 이름" }] : [];
-    expect(changeStudioLayerCompsTransaction({ ...options, nextComps })).toBe(true);
+    expect(await changeStudioLayerCompsTransaction({ ...options, nextComps })).toBe(true);
     expect(options.commit).toHaveBeenCalledWith([pendingElement], { layerComps: nextComps }, "p1");
   });
 
-  it.each(["capture", "metadata"])("does not %s after a rejected retained-stroke flush", (operation) => {
+  it.each(["capture", "metadata"])("does not %s after a rejected retained-stroke flush", async (operation) => {
     const { options } = fixture();
     options.prepare.mockReturnValue(false);
     const result = operation === "capture"
-      ? captureStudioLayerCompTransaction({ ...options, name: "보류" })
-      : changeStudioLayerCompsTransaction({ ...options, nextComps: [] });
+      ? await captureStudioLayerCompTransaction({ ...options, name: "보류" })
+      : await changeStudioLayerCompsTransaction({ ...options, nextComps: [] });
     expect(result).toBe(false);
     expect(options.commit).not.toHaveBeenCalled();
   });
 
-  it("rechecks the mutation gate after preparation and rejects invalid metadata", () => {
+  it("rechecks the mutation gate after preparation and rejects invalid metadata", async () => {
     const { options } = fixture();
     options.canMutate.mockReturnValueOnce(true).mockReturnValue(false);
-    expect(captureStudioLayerCompTransaction({ ...options, name: "보류" })).toBe(false);
+    expect(await captureStudioLayerCompTransaction({ ...options, name: "보류" })).toBe(false);
     expect(options.commit).not.toHaveBeenCalled();
     options.canMutate.mockReturnValue(true);
-    expect(changeStudioLayerCompsTransaction({ ...options, nextComps: [comp, comp] })).toBe(false);
-    expect(captureStudioLayerCompTransaction({ ...options, name: "x".repeat(161) })).toBe(false);
-    expect(captureStudioLayerCompTransaction({ ...options, name: "삭제됨", compId: "removed" })).toBe(false);
+    expect(await changeStudioLayerCompsTransaction({ ...options, nextComps: [comp, comp] })).toBe(false);
+    expect(await captureStudioLayerCompTransaction({ ...options, name: "x".repeat(161) })).toBe(false);
+    expect(await captureStudioLayerCompTransaction({ ...options, name: "삭제됨", compId: "removed" })).toBe(false);
     expect(options.commit).not.toHaveBeenCalled();
   });
 
-  it("rejects capture at the document limit while allowing an existing comp to be updated", () => {
+  it("rejects capture at the document limit while allowing an existing comp to be updated", async () => {
     const comps = Array.from({ length: STUDIO_LAYER_COMPS_MAX_COUNT }, (_, index) => ({
       ...comp, id: `comp-${index}`, layerStates: {},
     }));
     const current: PageState = { ...page, layerComps: comps };
     const { options } = fixture();
     const context = { ...options, prepare: () => true, getPage: () => current };
-    expect(captureStudioLayerCompTransaction({ ...context, name: "65번째 콤프" })).toBe(false);
+    expect(await captureStudioLayerCompTransaction({ ...context, name: "65번째 콤프" })).toBe(false);
     expect(options.commit).not.toHaveBeenCalled();
     expect(options.reportError).toHaveBeenCalledWith("페이지마다 콤프를 64개까지 저장할 수 있어요.");
     expect(current.layerComps).toBe(comps);
-    expect(captureStudioLayerCompTransaction({ ...context, name: "갱신", compId: comps[0].id })).toBe(true);
+    expect(await captureStudioLayerCompTransaction({ ...context, name: "갱신", compId: comps[0].id })).toBe(true);
     expect(options.commit).toHaveBeenCalledExactlyOnceWith([], {
       layerComps: [expect.objectContaining({ id: comps[0].id, layerStates: {}, groupStates: {} }), ...comps.slice(1)],
     }, "p1");
   });
 
-  it.each(["empty", "legacy-layer"])("captures a %s page without guessing absent appearance metadata", (kind) => {
+  it.each(["empty", "legacy-layer"])("captures a %s page without guessing absent appearance metadata", async (kind) => {
     const elements: PageState["elements"] = kind === "empty" ? [] : [{
       id: "legacy", type: "image", x: 0, y: 0, width: 20, height: 30, rotation: 0, src: "",
     }];
     const current: PageState = { ...page, elements };
     const { options } = fixture();
-    expect(captureStudioLayerCompTransaction({
+    expect(await captureStudioLayerCompTransaction({
       ...options, prepare: () => true, getPage: () => current, name: "기본 표시 상태",
     })).toBe(true);
     expect(options.commit).toHaveBeenCalledExactlyOnceWith(elements, {
@@ -135,7 +135,7 @@ describe("layer comp transactions respect the aggregate page wire budget", () =>
   function fixture(current: PageState) {
     return {
       prepare: vi.fn(() => true), getPage: () => current, canMutate: () => true,
-      validatePage: vi.fn(studioPageToCrdtPage), commit: vi.fn(() => true), reportError: vi.fn(),
+      acquire: vi.fn(async () => true), synchronize: vi.fn<() => Promise<void>>(async () => undefined), release: vi.fn(), validatePage: vi.fn(studioPageToCrdtPage), commit: vi.fn(() => true), reportError: vi.fn(),
     };
   }
 
@@ -153,7 +153,7 @@ describe("layer comp transactions respect the aggregate page wire budget", () =>
     return current;
   }
 
-  it.each(["capture", "update"] as const)("rejects a valid 96-layer %s before committing an unsynchronizable comp", (operation) => {
+  it.each(["capture", "update"] as const)("rejects a valid 96-layer %s before committing an unsynchronizable comp", async (operation) => {
     const current: PageState = {
       ...page, layerComps: [emptyComp],
       elements: Array.from({ length: 96 }, (_, index) => ({
@@ -169,7 +169,7 @@ describe("layer comp transactions respect the aggregate page wire budget", () =>
     const before = structuredClone(current);
     const options = fixture(current);
 
-    expect(captureStudioLayerCompTransaction({
+    expect(await captureStudioLayerCompTransaction({
       ...options, name: "추가", ...(operation === "update" ? { compId: emptyComp.id } : {}),
     })).toBe(false);
     expect(options.prepare).toHaveBeenCalledOnce();
@@ -179,7 +179,7 @@ describe("layer comp transactions respect the aggregate page wire budget", () =>
     expect(current).toEqual(before);
   });
 
-  it("measures every comp together with existing page metadata, not each preset separately", () => {
+  it("measures every comp together with existing page metadata, not each preset separately", async () => {
     const first = { ...emptyComp, notes: "x".repeat(3_000) };
     const second = { ...first, id: "second" };
     const current: PageState = { ...page, note: "메".repeat(700), layerComps: [first] };
@@ -188,33 +188,33 @@ describe("layer comp transactions respect the aggregate page wire budget", () =>
     expect(parseStudioLayerComps([first, second])).not.toBeNull();
     expect(() => studioPageToCrdtPage({ ...current, layerComps: [first, second] })).toThrow(/8KiB/u);
     const options = fixture(current);
-    expect(changeStudioLayerCompsTransaction({ ...options, nextComps: [first, second] })).toBe(false);
+    expect(await changeStudioLayerCompsTransaction({ ...options, nextComps: [first, second] })).toBe(false);
     expect(options.commit).not.toHaveBeenCalled();
     expect(current.layerComps).toEqual([first]);
   });
 
-  it("accepts exactly 8192 UTF-8 bytes with normalized guides, paper, escaped text and every page property", () => {
+  it("accepts exactly 8192 UTF-8 bytes with normalized guides, paper, escaped text and every page property", async () => {
     const current = pageAtWireLimit();
     const nextComps = [{ ...emptyComp, name: "y" }];
     const options = fixture(current);
-    expect(changeStudioLayerCompsTransaction({ ...options, nextComps })).toBe(true);
+    expect(await changeStudioLayerCompsTransaction({ ...options, nextComps })).toBe(true);
     expect(options.validatePage).toHaveBeenCalledExactlyOnceWith({ ...current, layerComps: nextComps });
     expect(options.commit).toHaveBeenCalledExactlyOnceWith(current.elements, { layerComps: nextComps }, current.id);
     expect(options.reportError).not.toHaveBeenCalled();
   });
 
-  it.each(["xy", "한"])("rejects an aggregate overflow caused only by renaming to %s", (name) => {
+  it.each(["xy", "한"])("rejects an aggregate overflow caused only by renaming to %s", async (name) => {
     const current = pageAtWireLimit();
     const options = fixture(current);
     const nextComps = [{ ...emptyComp, name }];
     expect(parseStudioLayerComps(nextComps)).not.toBeNull();
     expect(() => studioPageToCrdtPage({ ...current, layerComps: nextComps })).toThrow(/8KiB/u);
-    expect(changeStudioLayerCompsTransaction({ ...options, nextComps })).toBe(false);
+    expect(await changeStudioLayerCompsTransaction({ ...options, nextComps })).toBe(false);
     expect(options.commit).not.toHaveBeenCalled();
     expect(current.layerComps?.[0].name).toBe("x");
   });
 
-  it("checks the post-flush metadata instead of allowing an edit against the stale page budget", () => {
+  it("checks the post-flush metadata instead of allowing an edit against the stale page budget", async () => {
     const before = pageAtWireLimit();
     const latest = { ...before, note: `${before.note}x` };
     let current = before;
@@ -222,18 +222,18 @@ describe("layer comp transactions respect the aggregate page wire budget", () =>
       ...fixture(before), getPage: () => current,
       prepare: vi.fn(() => { current = latest; return true; }),
     };
-    expect(changeStudioLayerCompsTransaction({ ...options, nextComps: [emptyComp] })).toBe(false);
+    expect(await changeStudioLayerCompsTransaction({ ...options, nextComps: [emptyComp] })).toBe(false);
     expect(options.validatePage).toHaveBeenCalledExactlyOnceWith(latest);
     expect(options.commit).not.toHaveBeenCalled();
   });
 
-  it("allows deletion to bring an oversized legacy page back inside the existing wire limit", () => {
+  it("allows deletion to bring an oversized legacy page back inside the existing wire limit", async () => {
     const first = { ...emptyComp, notes: "x".repeat(4_000) };
     const second = { ...first, id: "second" };
     const current: PageState = { ...page, layerComps: [first, second] };
     expect(() => studioPageToCrdtPage(current)).toThrow(/8KiB/u);
     const options = fixture(current);
-    expect(changeStudioLayerCompsTransaction({ ...options, nextComps: [first] })).toBe(true);
+    expect(await changeStudioLayerCompsTransaction({ ...options, nextComps: [first] })).toBe(true);
     expect(options.commit).toHaveBeenCalledExactlyOnceWith(current.elements, { layerComps: [first] }, current.id);
   });
 });
@@ -402,7 +402,7 @@ describe("page-owned layer comp document", () => {
 describe("layer comp lease and atomic document transaction", () => {
   function fixture() {
     let current: PageState | null = {
-      ...page,
+      ...page, layerComps: [comp],
       elements: [{ id: "ink", type: "image", x: 0, y: 0, width: 10, height: 10, rotation: 0, src: "", opacity: 1 }],
     };
     const commit = vi.fn(() => true);
@@ -410,7 +410,7 @@ describe("layer comp lease and atomic document transaction", () => {
     const release = vi.fn();
     const reportError = vi.fn();
     const canMutate = vi.fn(() => true);
-    const options = { comp, getPage: () => current, canMutate, acquire, release, commit, reportError };
+    const options = { comp, getPage: () => current, canMutate, acquire, synchronize: vi.fn<() => Promise<void>>(async () => undefined), release, commit, reportError };
     return { options, setPage: (next: PageState | null) => { current = next; } };
   }
 
@@ -427,6 +427,7 @@ describe("layer comp lease and atomic document transaction", () => {
     const { options, setPage } = fixture();
     setPage({ ...options.getPage()!, groups: [{ id: "folder", name: "선화", hidden: false }] });
     options.comp = { ...comp, groupStates: { folder: { groupId: "folder", visible: false } } };
+    setPage({ ...options.getPage()!, layerComps: [options.comp] });
     expect(await applyStudioLayerCompTransaction(options)).toBe(true);
     expect(options.commit).toHaveBeenCalledTimes(1);
     expect(options.commit).toHaveBeenCalledWith(
@@ -461,6 +462,7 @@ describe("layer comp lease and atomic document transaction", () => {
     if (folder) {
       setPage({ ...options.getPage()!, groups: [{ id: "folder", name: "선화", hidden: false }] });
       options.comp = { ...comp, groupStates: { folder: { groupId: "folder", visible: false } } };
+      setPage({ ...options.getPage()!, layerComps: [options.comp] });
     }
     const room = {
       mode: "server", participant: { sessionId: "self" },
@@ -492,4 +494,214 @@ describe("layer comp lease and atomic document transaction", () => {
     expect(await applyStudioLayerCompTransaction(options)).toBe(false);
     expect(options.release).toHaveBeenCalledTimes(1);
   });
+});
+
+
+describe("layer comp peer metadata races", () => {
+  function fixture() {
+    let current: PageState = {
+      ...page, layerComps: [comp],
+      elements: [{ id: "ink", type: "image", x: 0, y: 0, width: 10, height: 10, rotation: 0, src: "", opacity: 1 }],
+    };
+    let resolveLease!: (allowed: boolean) => void;
+    const options = {
+      prepare: vi.fn(() => true), getPage: () => current, canMutate: vi.fn(() => true),
+      acquire: vi.fn(() => new Promise<boolean>((resolve) => { resolveLease = resolve; })),
+      synchronize: vi.fn<() => Promise<void>>(async () => undefined), release: vi.fn(), commit: vi.fn(() => true), reportError: vi.fn(), validatePage: studioPageToCrdtPage,
+    };
+    return { options, setPage: (next: PageState) => { current = next; },
+      finish: (allowed: boolean) => resolveLease(allowed) };
+  }
+
+  it.each(["capture", "update"] as const)("acquires page ownership before %s and preserves a comp received while waiting", async (operation) => {
+    const { options, setPage, finish } = fixture();
+    const pending = captureStudioLayerCompTransaction({ ...options, name: "내 캡처", compId: operation === "update" ? comp.id : undefined });
+    expect(options.acquire).toHaveBeenCalledExactlyOnceWith(null);
+    expect(options.commit).not.toHaveBeenCalled();
+    const remote = { ...comp, id: "peer-comp", name: "동료의 캡처" };
+    setPage({ ...options.getPage(), layerComps: [comp, remote] });
+    finish(true);
+    expect(await pending).toBe(true);
+    expect(options.commit).toHaveBeenCalledWith(options.getPage().elements, {
+      layerComps: operation === "capture"
+        ? [comp, remote, expect.objectContaining({ name: "내 캡처" })]
+        : [expect.objectContaining({ id: comp.id, layerStates: { ink: expect.objectContaining({ opacity: 1 }) } }), remote],
+    }, page.id);
+    expect(options.release).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["rename", "delete"] as const)("rejects a stale %s snapshot instead of replacing a peer's newly accepted comp", async (operation) => {
+    const { options, setPage, finish } = fixture();
+    const pending = changeStudioLayerCompsTransaction({ ...options,
+      nextComps: operation === "rename" ? [{ ...comp, name: "내 이름" }] : [],
+    });
+    expect(options.acquire).toHaveBeenCalledExactlyOnceWith(null);
+    expect(options.commit).not.toHaveBeenCalled();
+    const remote = { ...comp, id: "peer-comp", name: "동료의 캡처" };
+    setPage({ ...options.getPage(), layerComps: [comp, remote] });
+    finish(true);
+    expect(await pending).toBe(false);
+    expect(options.commit).not.toHaveBeenCalled();
+    expect(options.getPage().layerComps).toEqual([comp, remote]);
+    expect(options.release).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["update", "delete"] as const)("does not apply an obsolete appearance after a peer %s changes the selected comp during lease acquisition", async (operation) => {
+    const { options, setPage, finish } = fixture();
+    const before = options.getPage();
+    const pending = applyStudioLayerCompTransaction({ ...options, comp });
+    expect(options.acquire).toHaveBeenCalledExactlyOnceWith(null);
+    setPage({ ...before, layerComps: operation === "delete" ? [] : [{
+      ...comp, layerStates: { ...comp.layerStates, ink: { ...comp.layerStates.ink, opacity: 0.2 } },
+    }] });
+    expect(options.getPage().elements).toBe(before.elements);
+    expect(options.getPage().groups).toBe(before.groups);
+    finish(true);
+    expect(await pending).toBe(false);
+    expect(options.commit).not.toHaveBeenCalled();
+    expect(options.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an already stale rendered list even when no further peer change happens while acquiring", async () => {
+    const { options, setPage, finish } = fixture();
+    const rendered = options.getPage().layerComps!;
+    const peerComp = { ...comp, id: "peer-comp", name: "동료의 캡처" };
+    setPage({ ...options.getPage(), layerComps: [comp, peerComp] });
+    const pending = changeStudioLayerCompsTransaction({ ...options, expectedComps: rendered, nextComps: [] });
+    finish(true);
+    expect(await pending).toBe(false);
+    expect(options.commit).not.toHaveBeenCalled();
+    expect(options.getPage().layerComps).toEqual([comp, peerComp]);
+    expect(options.release).toHaveBeenCalledOnce();
+  });
+
+  it.each(["capture", "update", "rename", "delete"] as const)("preserves accepted state when a %s page lease is denied", async (operation) => {
+    const { options, finish } = fixture();
+    const before = options.getPage();
+    const pending = operation === "capture" || operation === "update"
+      ? captureStudioLayerCompTransaction({ ...options, name: "내 캡처", compId: operation === "update" ? comp.id : undefined })
+      : changeStudioLayerCompsTransaction({ ...options, nextComps: operation === "rename" ? [{ ...comp, name: "내 이름" }] : [] });
+    finish(false);
+    expect(await pending).toBe(false);
+    expect(options.getPage()).toBe(before);
+    expect(options.commit).not.toHaveBeenCalled();
+    expect(options.release).not.toHaveBeenCalled();
+  });
+
+  it.each(["capture", "rename"] as const)("reports a failed %s lease without committing or releasing unowned resources", async (operation) => {
+    const { options } = fixture();
+    options.acquire.mockRejectedValue(new Error("lease unavailable"));
+    const result = operation === "capture"
+      ? await captureStudioLayerCompTransaction({ ...options, name: "내 캡처" })
+      : await changeStudioLayerCompsTransaction({ ...options, nextComps: [{ ...comp, name: "내 이름" }] });
+    expect(result).toBe(false);
+    expect(options.commit).not.toHaveBeenCalled();
+    expect(options.release).not.toHaveBeenCalled();
+    expect(options.reportError).toHaveBeenCalledOnce();
+  });
+
+  it.each(["page:p1", "element:p1:ink", "layer:p1:folder"].flatMap((resource) =>
+    ["capture", "update", "rename", "delete"].map((operation) => ({ resource, operation }))))(
+    "respects peer $resource before accepting a $operation metadata replacement", async ({ resource, operation }) => {
+      const { options } = fixture();
+      const peerRoom = {
+        mode: "server", participant: { sessionId: "self" },
+        getLocks: () => [{ resource, claimId: "peer-lock", owner: { sessionId: "peer", displayName: "동료" }, leaseUntil: Date.now() + 60_000 }],
+      } as unknown as StudioLiveRoom;
+      const controller = createStudioLiveResourceLeaseController({
+        pageId: "p1", roomRef: { current: peerRoom }, heldResourcesRef: { current: [] },
+        mutationGenerationRef: { current: 0 }, pendingMutationRef: { current: null }, reportError: options.reportError,
+      });
+      options.acquire.mockImplementation(() => controller.beginAsync(null));
+      const result = operation === "capture" || operation === "update"
+        ? await captureStudioLayerCompTransaction({ ...options, name: "내 캡처", compId: operation === "update" ? comp.id : undefined })
+        : await changeStudioLayerCompsTransaction({ ...options, nextComps: operation === "rename" ? [{ ...comp, name: "내 이름" }] : [] });
+      expect(result).toBe(false);
+      expect(options.commit).not.toHaveBeenCalled();
+      expect(options.release).not.toHaveBeenCalled();
+      expect(options.reportError).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(["page-switch", "read-only", "deleted-target", "limit-reached", "commit-rejected"] as const)(
+    "revalidates a prepared capture when $0 happens during its lease", async (change) => {
+      const { options, setPage, finish } = fixture();
+      const pending = captureStudioLayerCompTransaction({ ...options, name: "내 캡처", compId: change === "deleted-target" ? comp.id : undefined });
+      if (change === "page-switch") setPage({ ...options.getPage(), id: "p2" });
+      if (change === "read-only") options.canMutate.mockReturnValue(false);
+      if (change === "deleted-target") setPage({ ...options.getPage(), layerComps: [] });
+      if (change === "limit-reached") setPage({ ...options.getPage(), layerComps: Array.from({ length: 64 }, (_, index) => ({ ...comp, id: `peer-${index}`, layerStates: {} })) });
+      if (change === "commit-rejected") options.commit.mockReturnValue(false);
+      const authoritative = options.getPage();
+      finish(true);
+      expect(await pending).toBe(false);
+      expect(options.getPage()).toBe(authoritative);
+      expect(options.commit).toHaveBeenCalledTimes(change === "commit-rejected" ? 1 : 0);
+      expect(options.release).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(["deleted", "changed"] as const)("rejects an already %s comp before acquiring ownership", async (change) => {
+    const { options, setPage } = fixture();
+    setPage({ ...options.getPage(), layerComps: change === "deleted" ? [] : [{ ...comp, name: "동료가 바꾼 이름" }] });
+    expect(await applyStudioLayerCompTransaction({ ...options, comp })).toBe(false);
+    expect(options.acquire).not.toHaveBeenCalled();
+    expect(options.commit).not.toHaveBeenCalled();
+  });
+
+  it("allows an unchanged selected comp after another comp arrives and does not overwrite that metadata", async () => {
+    const { options, setPage, finish } = fixture();
+    const pending = applyStudioLayerCompTransaction({ ...options, comp });
+    const peerComp = { ...comp, id: "peer-comp" };
+    setPage({ ...options.getPage(), layerComps: [structuredClone(comp), peerComp] });
+    finish(true);
+    expect(await pending).toBe(true);
+    expect(options.commit).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ id: "ink", opacity: 0.7 }),
+    ], {}, page.id);
+    expect(options.getPage().layerComps).toEqual([comp, peerComp]);
+    expect(options.release).toHaveBeenCalledOnce();
+  });
+
+
+  it.each(["capture", "apply"] as const)("keeps the lease until %s synchronization finishes and distinguishes acceptance from delivery failure", async (operation) => {
+    const { options, finish } = fixture();
+    options.synchronize.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("delivery interrupted"));
+    const pending = operation === "capture"
+      ? captureStudioLayerCompTransaction({ ...options, name: "로컬에 수락된 캡처" })
+      : applyStudioLayerCompTransaction({ ...options, comp });
+    finish(true);
+    expect(await pending).toBe(true);
+    expect(options.commit).toHaveBeenCalledOnce();
+    expect(options.synchronize).toHaveBeenCalledTimes(2);
+    expect(options.release).toHaveBeenCalledOnce();
+    expect(options.reportError).toHaveBeenCalledWith(expect.stringContaining("이 기기에 반영됐지만"));
+  });
+
+  it.each(["capture", "apply"] as const)("rejects %s before changing history when the lease-time fresh sync fails", async (operation) => {
+    const { options, finish } = fixture();
+    options.synchronize.mockRejectedValueOnce(new Error("sync unavailable"));
+    const pending = operation === "capture"
+      ? captureStudioLayerCompTransaction({ ...options, name: "미수락 캡처" })
+      : applyStudioLayerCompTransaction({ ...options, comp });
+    finish(true);
+    expect(await pending).toBe(false);
+    expect(options.commit).not.toHaveBeenCalled();
+    expect(options.synchronize).toHaveBeenCalledOnce();
+    expect(options.release).toHaveBeenCalledOnce();
+  });
+
+  it("revalidates the selected comp after the fresh-sync wait as well as the acquisition wait", async () => {
+    const { options, setPage, finish } = fixture();
+    options.synchronize.mockImplementation(async () => {
+      setPage({ ...options.getPage(), layerComps: [] });
+    });
+    const pending = applyStudioLayerCompTransaction({ ...options, comp });
+    finish(true);
+    expect(await pending).toBe(false);
+    expect(options.commit).not.toHaveBeenCalled();
+    expect(options.synchronize).toHaveBeenCalledOnce();
+    expect(options.release).toHaveBeenCalledOnce();
+  });
+
 });

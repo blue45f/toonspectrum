@@ -614,6 +614,10 @@ import {
 } from "./live/studio-live-retained-media-overlay";
 import { createStudioLiveResourceLeaseController } from "./live/createStudioLiveResourceLeaseController";
 import { createStudioLayerCompHandlers } from "./layer/createStudioLayerCompHandlers";
+import {
+  captureStudioLayerCompLeaseRelease,
+  captureStudioLayerCompSynchronization,
+} from "./layer/studio-layer-comp-synchronization";
 import { StudioLiveGesturePreviewPublisher } from "./live/studio-live-gesture-preview-publisher";
 import { decideStudioLiveInkBackend } from "./live/studio-live-ink-backend";
 import {
@@ -26960,8 +26964,19 @@ function clearSelectionForEdit() {
     reportError: setError,
     captureMutationTicket: captureStudioMutationTicket,
     canApplyMutation: canApplyStudioMutation,
+    createSynchronizationBarrier: () => captureStudioLayerCompSynchronization(() => ({
+      document: studioCrdtDocumentRef.current,
+      room: studioLiveRoomRef.current,
+      runtime: studioCrdtSceneRuntimeRef.current,
+    })),
     acquire: beginLiveResourceEditAsync,
-    release: endLiveResourceEdit,
+    captureLeaseRelease: () => captureStudioLayerCompLeaseRelease(() => ({
+      document: studioCrdtDocumentRef.current,
+      room: studioLiveRoomRef.current,
+      pageId: currentPageIdRef.current,
+      generation: studioLiveMutationGenerationRef.current,
+      resources: studioLiveHeldResourcesRef.current,
+    }), endLiveResourceEdit),
   });
   const studioInspectorAsideHandlers = useStudioStableHandlers<StudioInspectorAsideHandlers>({
     ...studioLayerCompHandlers,

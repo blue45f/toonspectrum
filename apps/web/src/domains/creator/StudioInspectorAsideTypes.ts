@@ -78,8 +78,11 @@ import type { Resizable } from "@/src/hooks/use-resizable";
 
 export interface StudioInspectorAsideHandlers {
   onApplyLayerComp: (comp: import("./layer/studio-layer-comps").StudioLayerComp) => Promise<boolean>;
-  onCaptureLayerComp: (name: string, compId?: string) => boolean;
-  onChangeLayerComps: (next: readonly import("./layer/studio-layer-comps").StudioLayerComp[]) => boolean;
+  onCaptureLayerComp: (name: string, compId?: string) => Promise<boolean>;
+  onChangeLayerComps: (
+    next: readonly import("./layer/studio-layer-comps").StudioLayerComp[],
+    expectedComps?: readonly import("./layer/studio-layer-comps").StudioLayerComp[],
+  ) => Promise<boolean>;
   activateCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   activatePixelSelectionToolFromInspector: (
     kind: StudioInspectorPixelSelectionToolId,

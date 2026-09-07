@@ -16,7 +16,7 @@ export const MAX_JSON_STRING_LENGTH = 64 * 1024;
 
 function cloneJson(
   value: StudioCrdtJsonValue,
-  state = { entries: 0 },
+  state: { entries: number },
   depth = 0
 ): StudioCrdtJsonValue {
   if (depth > MAX_JSON_DEPTH || ++state.entries > MAX_JSON_ENTRIES) {
@@ -48,7 +48,7 @@ function cloneJson(
 }
 
 export function cloneJsonObject(value: StudioCrdtJsonObject): StudioCrdtJsonObject {
-  const cloned = cloneJson(value);
+  const cloned = cloneJson(value, { entries: 0 });
   if (!cloned || typeof cloned !== "object" || Array.isArray(cloned)) {
     throw new Error("장면 확장 데이터는 JSON 객체여야 합니다.");
   }

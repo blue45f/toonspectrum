@@ -40,7 +40,7 @@ export const STUDIO_CRDT_PAGE_PROPERTY_KEYS: ReadonlySet<string> = new Set(PAGE_
 
 const STUDIO_CRDT_PAPER_GRAIN_KIND_SET: ReadonlySet<string> = new Set(PAPER_GRAIN_KINDS);
 const STUDIO_CRDT_PAPER_SURFACE_KEYS: ReadonlySet<string> = new Set(["kind", "seed"]);
-const STUDIO_CRDT_PAPER_SURFACE_MAX_SEED = 0xffff_ffff;
+const STUDIO_CRDT_PAPER_SURFACE_MAX_SEED = 0xff_ff_ff_ff;
 const MAX_COORDINATE = 10_000_000;
 const TEXT_ENCODER = new TextEncoder();
 
@@ -106,6 +106,66 @@ function copyStudioAdvancedRulerDocument(
   };
 }
 
+function validateOptionalPageProperties(props: StudioCrdtJsonObject): void {
+  for (const key of ["name", "note", "shotType", "cameraAngle"] as const) {
+    if (key in props && !boundedString(props[key], key === "note" ? 8_192 : 512)) {
+      throw new Error(`페이지의 ${key} 값이 올바르지 않습니다.`);
+    }
+  }
+  if ("hideMaster" in props && typeof props.hideMaster !== "boolean") {
+    throw new Error("페이지 마스터 표시 값이 올바르지 않습니다.");
+  }
+  if ("paperGrainVisible" in props && typeof props.paperGrainVisible !== "boolean") {
+    throw new Error("페이지 종이 결 표시 값이 올바르지 않습니다.");
+  }
+}
+
+function validatePaperSurface(paperSurface: StudioCrdtJsonValue): void {
+  if (
+    paperSurface === null ||
+    typeof paperSurface !== "object" ||
+    Array.isArray(paperSurface) ||
+    Object.keys(paperSurface).length !== STUDIO_CRDT_PAPER_SURFACE_KEYS.size ||
+    !Object.keys(paperSurface).every((key) => STUDIO_CRDT_PAPER_SURFACE_KEYS.has(key)) ||
+    typeof paperSurface.kind !== "string" ||
+    !STUDIO_CRDT_PAPER_GRAIN_KIND_SET.has(paperSurface.kind) ||
+    typeof paperSurface.seed !== "number" ||
+    !Number.isInteger(paperSurface.seed) ||
+    paperSurface.seed < 0 ||
+    paperSurface.seed > STUDIO_CRDT_PAPER_SURFACE_MAX_SEED
+  ) {
+    throw new Error("페이지 종이 표면 설정이 올바르지 않습니다.");
+  }
+}
+
+function normalizeDrawingAssist(value: StudioCrdtJsonValue): StudioCrdtJsonObject {
+  const drawingAssist = parseStudioDrawingAssistDocument(value);
+  if (!drawingAssist) {
+    throw new Error("페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다.");
+  }
+  return {
+    version: drawingAssist.version,
+    perspective: {
+      active: drawingAssist.perspective.active,
+      points: drawingAssist.perspective.points.map((point) => ({
+        id: point.id,
+        x: point.x,
+        y: point.y,
+      })),
+      eyeLevelY: drawingAssist.perspective.eyeLevelY,
+      lockHorizon: drawingAssist.perspective.lockHorizon,
+    },
+    isometric: {
+      active: drawingAssist.isometric.active,
+      angleDeg: drawingAssist.isometric.angleDeg,
+      cellSize: drawingAssist.isometric.cellSize,
+      originX: drawingAssist.isometric.originX,
+      originY: drawingAssist.isometric.originY,
+    },
+    advanced: copyStudioAdvancedRulerDocument(drawingAssist.advanced),
+  };
+}
+
 export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): StudioCrdtPagePayload {
   if (payload.version !== STUDIO_CRDT_PAGE_PAYLOAD_VERSION) {
     throw new Error("지원하지 않는 페이지 페이로드 버전입니다.");
@@ -123,68 +183,15 @@ export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): S
     bgGrad.some((color) => !boundedString(color, 512)))) {
     throw new Error("페이지 그라데이션이 올바르지 않습니다.");
   }
-  for (const key of ["name", "note", "shotType", "cameraAngle"] as const) {
-    if (key in props && !boundedString(props[key], key === "note" ? 8_192 : 512)) {
-      throw new Error(`페이지의 ${key} 값이 올바르지 않습니다.`);
-    }
-  }
-  if ("hideMaster" in props && typeof props.hideMaster !== "boolean") {
-    throw new Error("페이지 마스터 표시 값이 올바르지 않습니다.");
-  }
-  if ("paperGrainVisible" in props && typeof props.paperGrainVisible !== "boolean") {
-    throw new Error("페이지 종이 결 표시 값이 올바르지 않습니다.");
-  }
-  if ("paperSurface" in props) {
-    const paperSurface = props.paperSurface;
-    if (
-      paperSurface === null ||
-      typeof paperSurface !== "object" ||
-      Array.isArray(paperSurface) ||
-      Object.keys(paperSurface).length !== STUDIO_CRDT_PAPER_SURFACE_KEYS.size ||
-      !Object.keys(paperSurface).every((key) => STUDIO_CRDT_PAPER_SURFACE_KEYS.has(key)) ||
-      typeof paperSurface.kind !== "string" ||
-      !STUDIO_CRDT_PAPER_GRAIN_KIND_SET.has(paperSurface.kind) ||
-      typeof paperSurface.seed !== "number" ||
-      !Number.isInteger(paperSurface.seed) ||
-      paperSurface.seed < 0 ||
-      paperSurface.seed > STUDIO_CRDT_PAPER_SURFACE_MAX_SEED
-    ) {
-      throw new Error("페이지 종이 표면 설정이 올바르지 않습니다.");
-    }
-  }
+  validateOptionalPageProperties(props);
+  if ("paperSurface" in props) validatePaperSurface(props.paperSurface);
   if ("layerComps" in props) {
     const layerComps = parseStudioLayerComps(props.layerComps);
     if (!layerComps) throw new Error("페이지 레이어 콤프가 올바르지 않습니다.");
     // The document parser returns detached, finite JSON values and drops unknown fields.
     props.layerComps = layerComps as unknown as StudioCrdtJsonValue;
   }
-  if ("drawingAssist" in props) {
-    const drawingAssist = parseStudioDrawingAssistDocument(props.drawingAssist);
-    if (!drawingAssist) {
-      throw new Error("페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다.");
-    }
-    props.drawingAssist = {
-      version: drawingAssist.version,
-      perspective: {
-        active: drawingAssist.perspective.active,
-        points: drawingAssist.perspective.points.map((point) => ({
-          id: point.id,
-          x: point.x,
-          y: point.y,
-        })),
-        eyeLevelY: drawingAssist.perspective.eyeLevelY,
-        lockHorizon: drawingAssist.perspective.lockHorizon,
-      },
-      isometric: {
-        active: drawingAssist.isometric.active,
-        angleDeg: drawingAssist.isometric.angleDeg,
-        cellSize: drawingAssist.isometric.cellSize,
-        originX: drawingAssist.isometric.originX,
-        originY: drawingAssist.isometric.originY,
-      },
-      advanced: copyStudioAdvancedRulerDocument(drawingAssist.advanced),
-    };
-  }
+  if ("drawingAssist" in props) props.drawingAssist = normalizeDrawingAssist(props.drawingAssist);
   if (TEXT_ENCODER.encode(JSON.stringify({ version: payload.version, props })).byteLength >
     STUDIO_CRDT_PAGE_MAX_BYTES) {
     throw new Error("페이지 정보가 실시간 동기화 8KiB 한도를 초과했습니다.");
