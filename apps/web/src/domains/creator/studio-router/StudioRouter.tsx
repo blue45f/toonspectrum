@@ -69,7 +69,6 @@ export function StudioRouter() {
     pathname: location.pathname,
     search: location.search,
   });
-
   if (resolution.kind === "invalid") {
     return (
       <StudioRouteFailure
