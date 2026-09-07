@@ -25,7 +25,7 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 
-import { REPO_ROOT, WEB_VITE_ALIASES } from "./lib/repo-paths.mjs";
+import { REPO_ROOT, WEB_PUBLIC, WEB_VITE_ALIASES } from "./lib/repo-paths.mjs";
 
 const SCRATCH =
   process.env.TOONSPECTRUM_BG3D_WEBGPU_VERIFY_DIR
@@ -407,6 +407,7 @@ async function main() { // NOSONAR javascript:S3776
     // with configFile disabled so /scripts/*.ts harness modules resolve after the
     // frontend directory migration.
     root: REPO_ROOT,
+    publicDir: WEB_PUBLIC,
     configFile: false,
     envFile: false,
     appType: "custom",

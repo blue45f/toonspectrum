@@ -50,7 +50,7 @@ const studioEditorViewSource = [
   "StudioCuttoonEditorSessionDialogs.tsx",
   "StudioCuttoonEditorContextMenu.tsx",
 ].map((name) =>
-  readFileSync(resolve(`src/domains/creator/studio-cuttoon-editor/${name}`), "utf8"),
+  readFileSync(resolve(`apps/web/src/domains/creator/studio-cuttoon-editor/${name}`), "utf8"),
 ).join("\n");
 const studioShellSource = `${studioPageSource}\n${studioEditorViewSource}`;
 const studioLazyPanelStackSource = readFileSync(

@@ -333,12 +333,10 @@ const MM_PER_INCH = 25.4;
  * Physical output box (trim + bleed) the export is meant to fill, in millimetres.
  *
  * Publishing this makes the density **measured rather than predicted**: at tag time we read the
- * encoded file's own pixel dimensions and divide by the box. That matters because the studio
- * cannot predict the exact output size — the export runs `stage.toCanvas({ pixelRatio:
- * exportScale / effectiveScale })`, and that float division truncates to a pixel count that
- * depends on the editor's current zoom (measured: 1080 px at 3.55× lands on 3833 or 3834
- * depending on `effectiveScale`). A predicted DPI would be off by the same pixel, which is a
- * physical-size error at the print shop. `null` falls back to the published flat DPI.
+ * encoded file's own pixel dimensions and divide by the box. Raster capture now removes viewport
+ * zoom before rendering at the export scale, but fractional output scales still undergo the canvas
+ * integer conversion. Reading the encoded dimensions keeps the density exact for every encoder.
+ * `null` falls back to the published flat DPI.
  */
 export function publishStudioExportPrintBoxMm(
   box: { widthMm: number; heightMm: number } | null

@@ -7,6 +7,7 @@
 # testing
 /coverage
 /test-results/
+/batch_generated/
 /tests/benchmarks/artifacts/
 # Regenerable visual-check renders. The JSON receipts beside them ARE tracked; the PNG sheets are
 # 51MB and are rebuilt by their harnesses on demand.

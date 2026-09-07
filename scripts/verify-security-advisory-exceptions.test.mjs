@@ -52,15 +52,15 @@ function createFixture({
     );
   }
   write(
-    join(root, "src", "app", "App.tsx"),
+    join(root, "apps", "web", "src", "app", "App.tsx"),
     `import { BrowserRouter } from "react-router-dom";\n${runtimeSource}\nexport function App() { return <BrowserRouter><main /></BrowserRouter>; }\n`,
   );
   write(
-    join(root, "src", "app", "main.tsx"),
+    join(root, "apps", "web", "src", "app", "main.tsx"),
     'import { createRoot } from "react-dom/client";\ncreateRoot(document.body).render(null);\n',
   );
   write(
-    join(root, "src", "app", "routes", "AppRouter.tsx"),
+    join(root, "apps", "web", "src", "app", "routes", "AppRouter.tsx"),
     'import { Route, Routes } from "react-router-dom";\nexport function AppRouter() { return <Routes><Route path="/" element={null} /></Routes>; }\n',
   );
   write(
@@ -68,7 +68,7 @@ function createFixture({
     'import react from "@vitejs/plugin-react";\nexport default { plugins: [react()] };\n',
   );
   write(
-    join(root, "index.html"),
+    join(root, "apps", "web", "index.html"),
     '<div id="root"></div><script type="module" src="/src/app/main.tsx"></script>\n',
   );
   if (config) {
@@ -94,6 +94,21 @@ afterEach(() => {
 });
 
 describe("verifySecurityAdvisoryExceptions", () => {
+  it.each([
+    "src/app/App.tsx",
+    "src/app/main.tsx",
+    "src/app/routes/AppRouter.tsx",
+    "index.html",
+  ])("checks %s inside the supplied repository rather than the checkout", (file) => {
+    const root = createFixture();
+    rmSync(join(root, "apps", "web", file));
+    expect(() => verifySecurityAdvisoryExceptions({
+      root,
+      now: new Date("2026-07-31T00:00:00.000Z"),
+      installedRouterPackages: installedPackages(),
+    })).toThrow(`apps/web/${file} must retain`);
+  });
+
   it("accepts only the reviewed Vite Declarative Mode boundary", () => {
     const result = verifySecurityAdvisoryExceptions({
       root: createFixture(),

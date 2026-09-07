@@ -24,7 +24,7 @@ export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", 
 
 /**
  * Root of the Vite frontend package — the directory holding `index.html`, `src/`,
-* and `public/`.
+ * and `public/`.
  */
 export const WEB_ROOT = join(REPO_ROOT, "apps/web");
 
@@ -40,7 +40,7 @@ export const WEB_INDEX_HTML = join(WEB_ROOT, "index.html");
 /** Vite config consumed by the programmatic `createServer`/`build` callers. */
 export const WEB_VITE_CONFIG = join(REPO_ROOT, "vite.config.ts");
 
-/** Production build output directory (`<web root>/dist`). */
+/** Production build output directory (`<repository root>/dist`). */
 export const DIST_DIR = join(REPO_ROOT, "dist");
 
 /**

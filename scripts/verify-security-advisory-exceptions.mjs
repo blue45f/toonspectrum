@@ -12,8 +12,6 @@ import { fileURLToPath } from "node:url";
 
 import { parse as parseYaml } from "yaml";
 
-import { WEB_ROOT } from "./lib/repo-paths.mjs";
-
 export const REVIEWED_REACT_ROUTER_VERSION = "7.18.2";
 export const RSC_ONLY_ADVISORY = "GHSA-qwww-vcr4-c8h2";
 export const EXCEPTION_REVIEW_DEADLINE = "2026-10-31T00:00:00.000Z";
@@ -25,7 +23,6 @@ const REPOSITORY_ROOT = resolve(
 const RUNTIME_SOURCE_ROOTS = Object.freeze([
   join("apps", "web", "src"),
   join("apps", "api", "src"),
-  "lib",
 ]);
 const SOURCE_EXTENSIONS = new Set([
   ".cjs",
@@ -149,6 +146,7 @@ export function verifySecurityAdvisoryExceptions({ // NOSONAR javascript:S3776
   installedRouterPackages,
 } = {}) {
   const errors = [];
+  const webRoot = join(root, "apps", "web");
   const packageJson = readJson(join(root, "package.json"));
   const workspace = parseYaml(
     readFileSync(join(root, "pnpm-workspace.yaml"), "utf8"),
@@ -255,7 +253,7 @@ export function verifySecurityAdvisoryExceptions({ // NOSONAR javascript:S3776
     }
   }
 
-  const appSourcePath = join(WEB_ROOT, "src", "app", "App.tsx");
+  const appSourcePath = join(webRoot, "src", "app", "App.tsx");
   const appSource = existsSync(appSourcePath)
     ? readFileSync(appSourcePath, "utf8")
     : "";
@@ -270,7 +268,7 @@ export function verifySecurityAdvisoryExceptions({ // NOSONAR javascript:S3776
     );
   }
 
-  const mainSourcePath = join(WEB_ROOT, "src", "app", "main.tsx");
+  const mainSourcePath = join(webRoot, "src", "app", "main.tsx");
   const mainSource = existsSync(mainSourcePath)
     ? readFileSync(mainSourcePath, "utf8")
     : "";
@@ -280,7 +278,7 @@ export function verifySecurityAdvisoryExceptions({ // NOSONAR javascript:S3776
     );
   }
 
-  const appRouterSourcePath = join(WEB_ROOT, "src", "app", "routes", "AppRouter.tsx");
+  const appRouterSourcePath = join(webRoot, "src", "app", "routes", "AppRouter.tsx");
   const appRouterSource = existsSync(appRouterSourcePath)
     ? readFileSync(appRouterSourcePath, "utf8")
     : "";
@@ -293,7 +291,7 @@ export function verifySecurityAdvisoryExceptions({ // NOSONAR javascript:S3776
     );
   }
 
-  const indexSourcePath = join(WEB_ROOT, "index.html");
+  const indexSourcePath = join(webRoot, "index.html");
   const indexSource = existsSync(indexSourcePath)
     ? readFileSync(indexSourcePath, "utf8")
     : "";

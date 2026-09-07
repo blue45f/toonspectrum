@@ -44,7 +44,7 @@ import {
 
 const ARCH_DOC = resolve(
   __dirname,
-  "../../../../docs/reference/studio-hybrid-dcc-section6-ids.md",
+  "../../../../../../docs/reference/studio-hybrid-dcc-section6-ids.md",
 );
 
 function extractDocSection6Ids(markdown: string): string[] {

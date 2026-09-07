@@ -111,14 +111,14 @@ test("control-plane workflow changes do not impersonate a runtime deployment", (
 
 test("paths are normalized, deduplicated, and sorted deterministically", () => {
   const classification = classifyStudioChanges([
-    ".\\src\\domains\\creator\\canvas\\StudioCanvas.tsx",
+    ".\\apps\\web\\src\\domains\\creator\\canvas\\StudioCanvas.tsx",
     "apps/web/src/domains/creator/canvas/StudioCanvas.tsx",
-    "  components/studio/brush/studio-brush-runtime.ts  ",
+    "  apps/web/src/domains/creator/brush/studio-brush-runtime.ts  ",
     "",
   ]);
 
   assert.deepEqual(classification.paths, [
-    "apps/web/src/domains/creator/studio/components/brush/studio-brush-runtime.ts",
+    "apps/web/src/domains/creator/brush/studio-brush-runtime.ts",
     "apps/web/src/domains/creator/canvas/StudioCanvas.tsx",
   ]);
   assert.equal(classification.changedCount, 2);

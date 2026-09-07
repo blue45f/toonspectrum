@@ -135,6 +135,13 @@ The recipe defines budgets instead of hard-coding one model class. Default targe
 A source with intentionally open cards can use an audited recipe allowance, but generated hair and
 reference geometry are required to pass with no degenerates and no non-manifold edges.
 
+`quality.sourceNonManifoldAllowances` records that allowance by imported mesh name and requires
+an upgrade source pinned by `provenance.sourceSha256`. Orion preserves 11,996 source edges across
+its body and six face meshes: the VRM export splits UV/material seams and includes open authored
+surfaces. The audit reports the total, the accepted source count, and unexpected edges separately.
+New hair receives no source allowance; additional edges still fail the existing budget. Humanoid
+coverage reads actual VRM bone bindings, including Orion's chest mapped to `mixamorig:Spine2`.
+
 ## CI gates
 
 The Blender workflow performs three layers of verification:

@@ -170,6 +170,7 @@ forbidPaths(
 );
 
 const forbiddenOneOffWorkflows = [
+  "fix-kmas-history-sync.yml",
   "apply-blender-production-migrations.yml",
   "architecture-merge-gate-v3-pr690.yml",
   "finalize-fixed-all-branch-integration.yml",

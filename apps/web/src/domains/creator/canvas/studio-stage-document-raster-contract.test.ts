@@ -27,7 +27,7 @@ import { readFileSync } from "node:fs";
 
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { createStudioRasterExportOrchestration } from "../render/studio-raster-export-orchestration-runtime";
+import { captureStudioRasterAtExportScale, createStudioRasterExportOrchestration } from "../render/studio-raster-export-orchestration-runtime";
 import { readStudioPageCompositionSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { DEFAULT_PAGE_GRADE } from "../studio-page-grade";
 import { planStudioCanvasStageLayout, type StudioViewStageLayout } from "../studio-view-controls";
@@ -670,13 +670,14 @@ describe("every stage raster read goes through a choke point", () => {
       "utf8"
     );
     const reads = runtimeSource.match(/\bstage\.toCanvas\(/gu) ?? [];
-    expect(reads).toHaveLength(6);
+    expect(reads).toHaveLength(1);
+    expect(runtimeSource.match(/captureStudioRasterAtExportScale\(stage,/gu) ?? []).toHaveLength(6);
     expect(runtimeSource.match(/await captureReadyStageForPage\(/gu) ?? []).toHaveLength(6);
     expect(runtimeSource).toMatch(
       /encodeStudioRasterInterchangeAsync\([\s\S]*?\{\s*executionMode:\s*"worker"\s*\}\s*\)/u,
     );
-    // No other Stage geometry may be consulted; `pixelRatio` is the only knob these paths turn.
-    expect(runtimeSource).not.toMatch(/stage\.(width|height|x|y|scaleX|scaleY|rotation)\(/u);
+    // The synchronous capture helper must restore the document transform and the previous view.
+    expect(runtimeSource).toContain("return readStudioStageInDocumentView(stage,");
   });
 
   it("keeps the live canvas on the shared stage-layout planner", () => {
@@ -685,4 +686,25 @@ describe("every stage raster read goes through a choke point", () => {
     // Calling the lower-level planner here would let the live layout diverge from the capture path.
     expect(viewportSource).not.toMatch(/planStudioViewStageLayout\(/u);
   });
+});
+
+
+describe("raster export dimensions across fractional viewport zoom", () => {
+  for (const zoom of [0.37, 0.7, 1.01, 1.3333333333, 5]) {
+    it(`exports 1440x2160 at 2x from a ${zoom}x viewport and restores its geometry`, () => {
+      const stage = createGeometryStage();
+      stage.applyLayout(planStudioCanvasStageLayout({
+        documentWidth: 720,
+        documentHeight: 1080,
+        scale: zoom,
+        canvasFlipH: false,
+        canvasRotation: 0,
+        captureDocumentView: true,
+      }));
+      const previous = stage.currentLayout();
+      const canvas = captureStudioRasterAtExportScale(stage as unknown as Konva.Stage, zoom, 2);
+      expect([canvas.width, canvas.height]).toEqual([1440, 2160]);
+      expect(stage.currentLayout()).toEqual(previous);
+    });
+  }
 });

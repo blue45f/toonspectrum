@@ -29,7 +29,6 @@
 // and belong in the main run. tests/vitest-perf-budget-partition.test.ts pins that every entry
 // exists and really times something.
 export const PERF_BUDGET_TEST_FILES = Object.freeze([
-  "scripts/studio-brush-catalogue-perf-matrix.test.ts",
   "apps/web/src/domains/creator/brush/studio-brush-stamp-engine.test.ts",
   "apps/web/src/domains/creator/brush/studio-dry-media-long-stroke-regression.test.ts",
   "apps/web/src/domains/creator/brush/studio-long-stroke-per-move-cost.test.ts",
@@ -44,4 +43,5 @@ export const PERF_BUDGET_TEST_FILES = Object.freeze([
   "apps/web/src/domains/creator/studio-impasto-relief-shading-v1.perf.test.ts",
   "apps/web/src/domains/creator/studio-living-ink-provider.test.ts",
   "apps/web/src/domains/creator/studio-living-ink-settled-bake-v1.test.ts",
+  "scripts/studio-brush-catalogue-perf-matrix.test.ts",
 ]);

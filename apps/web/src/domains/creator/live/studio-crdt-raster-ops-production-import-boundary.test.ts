@@ -9,7 +9,7 @@ import { STUDIO_RASTER_CRDT_VERSION } from "../../../shared/lib/studio-crdt-rast
 import { STUDIO_RASTER_CRDT_VERSION as liveFacadeVersion } from "./studio-crdt-raster-ops";
 
 const CREATOR_ROOT = fileURLToPath(new URL("..", import.meta.url));
-const LIB_ROOT = fileURLToPath(new URL("../../../../lib", import.meta.url));
+const LIB_ROOT = fileURLToPath(new URL("../../../shared/lib", import.meta.url));
 const TEST_MODULE_IMPORT = /\.test\.tsx?(?:["']|$)/u;
 const PRODUCTION_IMPORT = /^\s*import\s[\s\S]*?from\s+["']([^"']+)["']/gmu;
 

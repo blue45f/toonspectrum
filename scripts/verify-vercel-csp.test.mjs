@@ -10,7 +10,7 @@ const ROOT = new URL("../", import.meta.url);
 
 function fixture() {
   return {
-    html: readFileSync(fileURLToPath(new URL("index.html", ROOT)), "utf8"),
+    html: readFileSync(fileURLToPath(new URL("apps/web/index.html", ROOT)), "utf8"),
     vercelConfig: JSON.parse(
       readFileSync(fileURLToPath(new URL("vercel.json", ROOT)), "utf8"),
     ),

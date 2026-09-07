@@ -164,6 +164,13 @@ jobs:
           --cache-dir "$RUNNER_TEMP/toonstudio-blender-cache"
           --install-addons
 
+      - name: Verify imported source topology and humanoid binding regressions
+        # The semantic binding and source allowance tests use the same installed Blender/VRM
+        # versions as the full authoring pipeline, including negative quality-gate cases.
+        run: >-
+          "$BLENDER_PATH" --background --python-exit-code 1
+          --python tests/blender/blender_quality_regressions.py
+
       - name: Generate the strict reference character package
         run: >-
           "$BLENDER_PATH" --background

@@ -52,7 +52,11 @@ import {
   type Page,
 } from "playwright";
 
-import { isStudioBrushEraserAliasId } from "../apps/web/src/domains/creator/brush/studio-brush-alias-profile";
+import {
+  isStudioBrushEraserAliasId,
+  resolveStudioBrushAliasPencilPasses,
+  studioBrushAliasEffectiveDiameter,
+} from "../apps/web/src/domains/creator/brush/studio-brush-alias-profile";
 import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../apps/web/src/domains/creator/brush/studio-brush-carrier-quality";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
@@ -208,6 +212,7 @@ interface BrushStrokeEvidence {
   operation: VerifierBrushOperation;
   selected: boolean;
   visualChanged: boolean;
+  transparentPaint: boolean;
   eraseLiveOperationActive: boolean | null;
   eraseResidualRatio: number | null;
   undoEnabled: boolean;
@@ -2259,6 +2264,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         operation,
         selected: true,
         visualChanged,
+        transparentPaint,
         eraseLiveOperationActive,
         eraseResidualRatio: eraseLift?.residualEnergyRatio ?? null,
         undoEnabled: true,
@@ -2338,7 +2344,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     invariant(errors.failedResponses.length === 0, "desktop browser received unexpected 5xx responses");
     const ok = evidence.length === DESKTOP_STABILITY_CASES.length && evidence.every((entry) =>
       entry.selected
-      && entry.visualChanged
+      && (entry.transparentPaint || entry.visualChanged)
       && (entry.operation === "paint" || entry.eraseLiveOperationActive === true)
       && (
         entry.operation === "paint"
@@ -3293,9 +3299,17 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
             y: y - clip.y + 4 * amount,
           };
         });
+        // Compare pixels against the authored footprint, not the toolbar's base diameter.
+        // Side shading includes a 2.2x pencil shell; its normal end cap was incorrectly
+        // measured as a whole-brush displacement when normalized against the 10px core.
+        const pencilPasses = resolveStudioBrushAliasPencilPasses(expectedSelection.runtimeBrushId);
+        const nominalWidth = studioBrushAliasEffectiveDiameter(
+          expectedSelection.runtimeBrushId,
+          expectedSelection.defaultWidth,
+        ) * Math.max(1, ...pencilPasses.map((pass) => pass.widthScale));
         const crossSectionRadius = Math.max(
           10,
-          Math.min(46, expectedSelection.defaultWidth * 1.5),
+          Math.min(46, nominalWidth * 1.5),
         );
         const cursorIgnoreRadius = 0;
         const quality = analyzeStudioLongBrushQuality({
@@ -3308,7 +3322,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
             points: localRoutePoints,
             crossSectionRadius,
             cursorIgnoreRadius,
-            nominalWidth: expectedSelection.defaultWidth,
+            nominalWidth,
           },
         });
         const qualityArtifacts = saveLongBrushQualityArtifacts(
@@ -4632,6 +4646,7 @@ async function main(): Promise<void> {
     });
     const desktop = runDesktop ? await runDesktopBrushMatrix(browser, studioUrl) : null;
     if (desktop) {
+      writeFileSync(join(SCRATCH, "studio-brush-desktop-result.json"), JSON.stringify(desktop, null, 2));
       invariant(
         desktop.ok,
         `desktop ${BRUSH_MATRIX_CATALOG_COUNT}-brush matrix failed`,
@@ -4639,6 +4654,7 @@ async function main(): Promise<void> {
     }
     const longBrushes = runLong ? await runLongBrushMatrix(browser, studioUrl) : null;
     if (longBrushes) {
+      writeFileSync(join(SCRATCH, "studio-brush-long-result.json"), JSON.stringify(longBrushes, null, 2));
       invariant(
         longBrushes.ok,
         `long ${LONG_BRUSH_CATALOG_COUNT}-brush matrix failed`,

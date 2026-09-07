@@ -1,3 +1,4 @@
+import { readStudioStageInDocumentView } from "../canvas/studio-stage-document-view";
 import { confirmStudioDestructiveAction } from "../studio-destructive-action-preview";
 import {
   studioExportSplitChoiceRequest,
@@ -44,6 +45,21 @@ export function bakeStudioPageGradeIntoCanvas(
   context.filter = "none";
   drawVignette(context, output.width, output.height, grade.vignette);
   return output;
+}
+
+/** Capture at the requested output scale so the current viewport zoom cannot drop a pixel. */
+export function captureStudioRasterAtExportScale(
+  stage: Konva.Stage,
+  effectiveScale: number,
+  exportScale: number,
+): HTMLCanvasElement {
+  return readStudioStageInDocumentView(stage, {
+    // captureReadyStageForPage has already restored the full document. Authored page dimensions
+    // are integers; undo only the display scale here, including its floating-point roundoff.
+    documentWidth: Math.round(stage.width() / effectiveScale),
+    documentHeight: Math.round(stage.height() / effectiveScale),
+    effectiveScale: exportScale,
+  }, () => stage.toCanvas({ pixelRatio: 1 }));
 }
 
 export interface StudioRasterExportOrchestrationInput {
@@ -135,7 +151,7 @@ export function createStudioRasterExportOrchestration({
       }
       let canvas: HTMLCanvasElement;
       try {
-        const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
+        const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
         canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
       } finally {
         if (backgroundNode) {
@@ -195,7 +211,7 @@ export function createStudioRasterExportOrchestration({
       }
       let canvas: HTMLCanvasElement;
       try {
-        const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
+        const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
         canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
       } finally {
         if (backgroundNode) {
@@ -232,7 +248,7 @@ export function createStudioRasterExportOrchestration({
     setIsExporting(true);
     try {
       const stage = await captureReadyStageForPage(activePage);
-      const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
+      const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
       const canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
       drawWatermarkOnCanvas(canvas, watermarkForExport);
       const { copyCanvasToClipboard } = await import("../export/studio-export");
@@ -303,7 +319,7 @@ export function createStudioRasterExportOrchestration({
       for (const page of pages) {
         setCurrentPageId(page.id);
         const stage = await captureReadyStageForPage(page);
-        const rawPageCanvas = stage.toCanvas({ pixelRatio: scale / effectiveScale });
+        const rawPageCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, scale);
         pageCanvases.push(
           bakeStudioPageGradeIntoCanvas(rawPageCanvas, normalizePageGrade(page.grade))
         );
@@ -394,7 +410,7 @@ export function createStudioRasterExportOrchestration({
         const page = pages[index]!;
         setCurrentPageId(page.id);
         const stage = await captureReadyStageForPage(page);
-        const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
+        const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
         captured.push(
           bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(page.grade))
         );
@@ -424,7 +440,7 @@ export function createStudioRasterExportOrchestration({
     try {
       const page = pages.find((item) => item.id === currentPageId) ?? activePage;
       const stage = await captureReadyStageForPage(page);
-      const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
+      const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
       captured.push(
         bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(page.grade))
       );
