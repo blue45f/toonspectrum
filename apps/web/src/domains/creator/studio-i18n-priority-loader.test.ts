@@ -7,6 +7,7 @@ import { resolveTranslation } from "@/shared/lib/i18n-core";
 
 import {
   preloadStudioI18nCore,
+  retryFailedStudioI18nNamespaces,
   scheduleStudioI18nDeferredLoad,
   STUDIO_I18N_CORE_NAMESPACES,
   STUDIO_I18N_DEFERRED_NAMESPACES,
@@ -103,6 +104,41 @@ describe("Studio priority i18n loader", () => {
     expect(report.loadedNamespaces).toHaveLength(
       STUDIO_I18N_CORE_NAMESPACES.length - 1,
     );
+  });
+
+  it("retries only failed core namespaces after a partial preload", async () => {
+    vi.useFakeTimers();
+    try {
+      const transientNamespace = STUDIO_I18N_CORE_NAMESPACES[0];
+      const attempts = new Map<string, number>();
+      const fetchMock = vi.fn(async (input: string | URL | Request) => {
+        const namespace = namespaceFromUrl(input);
+        const nextAttempt = (attempts.get(namespace) ?? 0) + 1;
+        attempts.set(namespace, nextAttempt);
+        if (namespace === transientNamespace && nextAttempt === 1) {
+          return new Response("temporary", { status: 503 });
+        }
+        return dictionaryResponse(namespace);
+      });
+      const options = {
+        locale: "lo",
+        baseUrl: "/priority-core-retry/",
+        fetchImpl: fetchMock as typeof fetch,
+      } as const;
+
+      const initial = await preloadStudioI18nCore(options);
+      expect(initial.failedNamespaces).toEqual([transientNamespace]);
+      const retrying = retryFailedStudioI18nNamespaces(initial, options, [10]);
+      await vi.advanceTimersByTimeAsync(10);
+      const finalReport = await retrying;
+
+      expect(finalReport.failedNamespaces).toEqual([]);
+      for (const namespace of STUDIO_I18N_CORE_NAMESPACES) {
+        expect(attempts.get(namespace)).toBe(namespace === transientNamespace ? 2 : 1);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("retries only deferred namespaces that fail transiently", async () => {
