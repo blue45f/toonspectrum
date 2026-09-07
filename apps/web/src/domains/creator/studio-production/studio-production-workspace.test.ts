@@ -41,6 +41,18 @@ describe("studio production workspace", () => {
     expect(demo.title).toContain("샘플");
   });
 
+  it("preserves the complete opaque identity after the first scope separator", () => {
+    expect(createEmptyProductionWorkspace("work:series:chapter-1", NOW).title).toBe(
+      "work series:chapter-1 제작 운영",
+    );
+    expect(createEmptyProductionWorkspace("work:series:chapter-2", NOW).title).toBe(
+      "work series:chapter-2 제작 운영",
+    );
+    expect(createEmptyProductionWorkspace("remix:source:revision:7", NOW).title).toBe(
+      "remix source:revision:7 제작 운영",
+    );
+  });
+
   it("resolves local, linked, server, cache and explicit demo modes", () => {
     expect(resolveStudioProductionWorkspaceMode({ scopeKey: "draft" })).toBe("local-draft");
     expect(resolveStudioProductionWorkspaceMode({
