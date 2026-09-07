@@ -8,22 +8,33 @@ import { StudioSurfaceState } from "./StudioSurfaceState";
 afterEach(cleanup);
 
 describe("StudioSurfaceState", () => {
-  it("keeps a static empty state in reading order without announcing every render", () => {
+  it("announces an empty result that appears after search or filtering", () => {
     const { container } = render(
       <StudioSurfaceState
         state="empty"
-        title="항목이 없습니다"
-        description="새 항목을 추가하세요."
+        title="일치하는 항목이 없습니다"
+        description="검색어를 바꿔 보세요."
       />,
     );
 
     const empty = container.querySelector('[data-studio-empty-state="true"]');
-    expect(empty).toBeTruthy();
-    expect(empty?.getAttribute("data-studio-surface-state")).toBe("empty");
+    expect(empty?.getAttribute("data-studio-surface-announcement")).toBe("polite");
+    expect(screen.getByRole("status").textContent).toContain("일치하는 항목이 없습니다");
+  });
+
+  it("lets a permanently static empty card stay in reading order without a live region", () => {
+    const { container } = render(
+      <StudioSurfaceState
+        state="empty"
+        announce="none"
+        title="아직 프로젝트가 없습니다"
+      />,
+    );
+
+    const empty = container.querySelector('[data-studio-empty-state="true"]');
     expect(empty?.getAttribute("data-studio-surface-announcement")).toBe("none");
     expect(empty?.getAttribute("role")).toBeNull();
     expect(empty?.getAttribute("aria-live")).toBeNull();
-    expect(screen.getByText("항목이 없습니다")).not.toBeNull();
   });
 
   it("announces errors assertively and loading as a polite busy status", () => {
