@@ -606,6 +606,16 @@ jobs:
         run: |
           xvfb-run -a --server-args="-screen 0 1920x1200x24" \
             pnpm run verify:studio-bg3d-inapp-editor
+        env:
+          TOONSPECTRUM_BG3D_INAPP_VERIFY_DIR: ${{ runner.temp }}/studio-bg3d-inapp-editor
+      - name: Preserve in-app 3D touch and viewport evidence
+        if: always()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
+        with:
+          name: studio-bg3d-inapp-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-bg3d-inapp-editor/
+          if-no-files-found: warn
+          retention-days: 7
 
   studio-filter-dialog:
     # 상단 필터 메뉴 → StudioFilterDialog → 미리보기 → 적용 → 실행취소를 프로덕션 빌드에서
@@ -626,6 +636,7 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Build for vite preview
+        id: build
         run: pnpm run build:bundle
       - name: Verify the shipped filter dialog end to end
         run: pnpm run verify:studio-filter-dialog
@@ -635,7 +646,12 @@ jobs:
         run: pnpm run verify:studio-lifecycle
         env:
           TOONSPECTRUM_LIFECYCLE_VERIFY_DIR: ${{ runner.temp }}/studio-lifecycle
-      - name: Preserve filter and lifecycle browser evidence
+      - name: Verify AI image reference autosave, recovery, and edit history
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm run verify:studio-ai-image-references
+        env:
+          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/studio-ai-image-references
+      - name: Preserve filter, lifecycle, and AI reference browser evidence
         if: always()
         uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
         with:
@@ -643,6 +659,7 @@ jobs:
           path: |
             ${{ runner.temp }}/studio-filter-dialog/
             ${{ runner.temp }}/studio-lifecycle/
+            ${{ runner.temp }}/studio-ai-image-references/
           if-no-files-found: warn
           retention-days: 7
 

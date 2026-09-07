@@ -25,7 +25,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { chromium, type Browser, type Page } from "playwright";
+import { chromium, type Browser, type Locator, type Page } from "playwright";
 
 import {
   findFreePort,
@@ -45,6 +45,8 @@ const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
 
 /** The minimum comfortable touch target this repository holds mobile controls to. */
 const MIN_TOUCH_TARGET_PX = 44;
+const INAPP_CONTEXT_OPTIONS = Object.freeze({ deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const EXECUTION_ENVIRONMENT = Object.freeze({ platform: process.platform, architecture: process.arch });
 
 interface InAppProfile {
   readonly id: string;
@@ -108,6 +110,7 @@ interface ProfileResult {
     readonly touchStartTarget: string;
     readonly trustedTouchStart: boolean;
   } | null;
+  readonly touchScrollDiagnostics: NativeTouchScrollDiagnostics;
   /** Visible notice/control intersections; each overlap also fails the profile. */
   readonly overlayOverlaps: readonly string[];
   /** Observation: does the left tool rail expose a 3D background entry at this width? */
@@ -121,6 +124,27 @@ interface ProfileResult {
     readonly resourceType: string;
   }[];
   readonly failures: readonly string[];
+}
+
+interface NativeTouchEventSample {
+  type: string;
+  target: string;
+  onHandle: boolean;
+  trusted: boolean;
+  defaultPrevented: boolean;
+  x: number | null;
+  y: number | null;
+  scrollTop: number | null;
+  timestamp: number;
+}
+
+interface NativeTouchScrollDiagnostics {
+  phase: "not-started" | "measure" | "reset-input" | "reset-wait"
+    | "drag-input" | "drag-wait" | "complete";
+  initialGeometry: Awaited<ReturnType<typeof readNativeTouchScrollGeometry>> | null;
+  finalGeometry: Awaited<ReturnType<typeof readNativeTouchScrollGeometry>> | null;
+  events: NativeTouchEventSample[];
+  observationErrors: string[];
 }
 
 function writeJson(fileName: string, value: unknown): void {
@@ -308,12 +332,8 @@ async function readOverlayLegibility(page: Page): Promise<{
   });
 }
 
-/** Proves a finger gesture reaches the scrolling surface instead of the canvas's touch:none. */
-async function verifyNativeTouchScroll(page: Page): Promise<NonNullable<ProfileResult["touchScroll"]>> {
-  const selector = '[data-testid="bg3d-scroll-handle"]';
-  const handle = page.locator(selector);
-  await handle.waitFor({ state: "visible", timeout: 10_000 });
-  const geometry = await handle.evaluate((element) => {
+async function readNativeTouchScrollGeometry(handle: Locator) {
+  return handle.evaluate((element) => {
     const section = element.closest("section");
     if (!section) throw new Error("3D scroll handle has no viewport section");
     const box = element.getBoundingClientRect();
@@ -326,8 +346,26 @@ async function verifyNativeTouchScroll(page: Page): Promise<NonNullable<ProfileR
       width: right - left, height: bottom - top,
       x: (left + right) / 2, y: (top + bottom) / 2,
       scrollTop: section.scrollTop, scrollHeight: section.scrollHeight, clientHeight: section.clientHeight,
+      viewportWidth: innerWidth, viewportHeight: innerHeight, deviceScaleFactor: devicePixelRatio,
+      visualViewportScale: visualViewport?.scale ?? 1,
+      touchAction: getComputedStyle(element).touchAction,
+      sectionTouchAction: getComputedStyle(section).touchAction,
+      sectionOverflowY: getComputedStyle(section).overflowY,
     };
   });
+}
+
+/** Proves a finger gesture reaches the scrolling surface instead of the canvas's touch:none. */
+async function verifyNativeTouchScroll(
+  page: Page,
+  diagnostics: NativeTouchScrollDiagnostics,
+): Promise<NonNullable<ProfileResult["touchScroll"]>> {
+  const selector = '[data-testid="bg3d-scroll-handle"]';
+  const handle = page.locator(selector);
+  diagnostics.phase = "measure";
+  await handle.waitFor({ state: "visible", timeout: 10_000 });
+  const geometry = await readNativeTouchScrollGeometry(handle);
+  diagnostics.initialGeometry = geometry;
   if (Math.min(geometry.width, geometry.height) < MIN_TOUCH_TARGET_PX) {
     throw new Error(`3D scroll handle exposes ${geometry.width}x${geometry.height}px; requires 44x44px`);
   }
@@ -335,16 +373,46 @@ async function verifyNativeTouchScroll(page: Page): Promise<NonNullable<ProfileR
     throw new Error("3D touch-scroll fixture has no overflow to exercise");
   }
 
+  const observation = await page.evaluateHandle((selector) => {
+    const events: NativeTouchEventSample[] = [];
+    const kinds = ["touchstart", "touchmove", "touchend", "touchcancel", "pointerdown", "pointercancel"];
+    const record = (event: Event) => {
+      if (events.length >= 128) return;
+      const target = event.target instanceof Element ? event.target : null;
+      const point = event instanceof TouchEvent ? event.changedTouches[0]
+        : event instanceof PointerEvent ? event : null;
+      const sample: NativeTouchEventSample = {
+        type: event.type, target: target?.getAttribute("data-testid") ?? target?.tagName ?? "unknown",
+        onHandle: target !== null && target.closest(selector) !== null,
+        trusted: event.isTrusted, defaultPrevented: event.defaultPrevented,
+        x: point?.clientX ?? null, y: point?.clientY ?? null,
+        scrollTop: document.querySelector(selector)?.closest("section")?.scrollTop ?? null,
+        timestamp: performance.now(),
+      };
+      events.push(sample);
+      // Observe cancellation by later handlers without changing the dispatched input.
+      queueMicrotask(() => { sample.defaultPrevented = event.defaultPrevented; });
+    };
+    for (const kind of kinds) document.addEventListener(kind, record, { capture: true, passive: true });
+    return {
+      stop() {
+        for (const kind of kinds) document.removeEventListener(kind, record, true);
+        return events;
+      },
+    };
+  }, selector);
   const cdp = await page.context().newCDPSession(page);
   try {
     // The earlier canvas screenshot may reveal its bottom edge. Reset through real touch input,
     // never a scrollTop assignment or wheel event, before measuring the required upward drag.
     if (geometry.scrollTop > 1) {
+      diagnostics.phase = "reset-input";
       await cdp.send("Input.synthesizeScrollGesture", {
         x: geometry.x, y: geometry.y,
         yDistance: geometry.scrollTop + geometry.clientHeight,
         gestureSourceType: "touch", speed: 400,
       });
+      diagnostics.phase = "reset-wait";
       await page.waitForFunction((selector) => (
         document.querySelector(selector)?.closest("section")?.scrollTop === 0
       ), selector, { timeout: 5_000 });
@@ -376,10 +444,12 @@ async function verifyNativeTouchScroll(page: Page): Promise<NonNullable<ProfileR
         element.contains(document.elementFromPoint(x, y))
       ), geometry);
       if (!hitHandle) throw new Error("3D scroll handle center is covered by another element");
+      diagnostics.phase = "drag-input";
       await cdp.send("Input.synthesizeScrollGesture", {
         x: geometry.x, y: geometry.y, yDistance: -180,
         gestureSourceType: "touch", speed: 400,
       });
+      diagnostics.phase = "drag-wait";
       await page.waitForFunction(({ selector, before }) => (
         (document.querySelector(selector)?.closest("section")?.scrollTop ?? 0) > before + 1
       ), { selector, before: scrollTopBefore }, { timeout: 5_000 });
@@ -389,12 +459,23 @@ async function verifyNativeTouchScroll(page: Page): Promise<NonNullable<ProfileR
     if (!touchStart?.onHandle || !touchStart.trusted) {
       throw new Error(`Native touch was not delivered to the 3D scroll handle: ${JSON.stringify(touchStart)}`);
     }
+    diagnostics.phase = "complete";
     return {
       handleWidth: geometry.width, handleHeight: geometry.height, scrollTopBefore,
       scrollTopAfter: await handle.evaluate((element) => element.closest("section")!.scrollTop),
       touchStartTarget: touchStart.target, trustedTouchStart: touchStart.trusted,
     };
   } finally {
+    const [finalGeometry, events] = await Promise.allSettled([
+      readNativeTouchScrollGeometry(handle),
+      observation.evaluate((observer) => observer.stop()),
+    ]);
+    if (finalGeometry.status === "fulfilled") diagnostics.finalGeometry = finalGeometry.value;
+    else diagnostics.observationErrors.push(`final geometry: ${String(finalGeometry.reason)}`);
+    if (events.status === "fulfilled") diagnostics.events = events.value;
+    else diagnostics.observationErrors.push(`touch events: ${String(events.reason)}`);
+    await observation.dispose()
+      .catch((error) => { diagnostics.observationErrors.push(`observation cleanup: ${String(error)}`); });
     await cdp.detach();
   }
 }
@@ -523,9 +604,7 @@ async function runProfile(
   const context = await browser.newContext({
     userAgent: profile.userAgent,
     viewport: { width: profile.width, height: profile.height },
-    deviceScaleFactor: 2,
-    isMobile: true,
-    hasTouch: true,
+    ...INAPP_CONTEXT_OPTIONS,
   });
   const page = await context.newPage();
   const pageErrors: string[] = [];
@@ -554,6 +633,9 @@ async function runProfile(
   let engine: ProfileResult["engine"] = { badge: null, status: null, smallestTouchTargetPx: null };
   let horizontalOverflowPx = 0;
   let touchScroll: ProfileResult["touchScroll"] = null;
+  const touchScrollDiagnostics: NativeTouchScrollDiagnostics = {
+    phase: "not-started", initialGeometry: null, finalGeometry: null, events: [], observationErrors: [],
+  };
   let overlayLegibility: { failures: readonly string[]; overlaps: readonly string[] } =
     { failures: [], overlaps: [] };
   let railEntryVisible = false;
@@ -571,11 +653,13 @@ async function runProfile(
     horizontalOverflowPx = await page.evaluate(() =>
       Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth));
     await page.screenshot({ path: join(SCRATCH, `${profile.id}.png`), fullPage: false });
-    touchScroll = await verifyNativeTouchScroll(page);
+    touchScroll = await verifyNativeTouchScroll(page, touchScrollDiagnostics);
 
     railEntryVisible = await probeRailEntryVisible(page, baseUrl);
   } catch (error) {
     failures.push(`could not drive the 3D editor: ${error instanceof Error ? error.message : String(error)}`);
+    await page.screenshot({ path: join(SCRATCH, `${profile.id}-failure.png`), timeout: 5_000 })
+      .catch((cause) => { touchScrollDiagnostics.observationErrors.push(`failure screenshot: ${String(cause)}`); });
   } finally {
     await context.close();
   }
@@ -609,6 +693,7 @@ async function runProfile(
     engine,
     horizontalOverflowPx,
     touchScroll,
+    touchScrollDiagnostics,
     overlayOverlaps: overlayLegibility.overlaps,
     railEntryVisible,
     pageErrors,
@@ -639,6 +724,9 @@ async function main(): Promise<void> {
     const failures = results.flatMap((result) => result.failures.map((f) => `${result.id}: ${f}`));
     const summary = {
       status: failures.length === 0 ? "ok" : "failed",
+      browserVersion: browser.version(),
+      execution: EXECUTION_ENVIRONMENT,
+      contextOptions: INAPP_CONTEXT_OPTIONS,
       profiles: results,
       failures,
       evidenceDirectory: SCRATCH,
@@ -656,6 +744,8 @@ main().catch((error: unknown) => {
   mkdirSync(SCRATCH, { recursive: true });
   const failure = {
     status: "error",
+    execution: EXECUTION_ENVIRONMENT,
+    contextOptions: INAPP_CONTEXT_OPTIONS,
     message: error instanceof Error ? error.message : String(error),
     evidenceDirectory: SCRATCH,
   };
