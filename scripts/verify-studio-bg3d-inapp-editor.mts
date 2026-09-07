@@ -25,7 +25,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { chromium, type Browser, type Locator, type Page } from "playwright";
+import { chromium, type Browser, type CDPSession, type Locator, type Page } from "playwright";
 
 import {
   findFreePort,
@@ -355,6 +355,27 @@ async function readNativeTouchScrollGeometry(handle: Locator) {
   });
 }
 
+/** Send every native touch point; the scroll assertions still decide whether the page consumed it. */
+async function dispatchNativeTouchDrag(
+  cdp: CDPSession,
+  { x, y, yDistance, speed }: { x: number; y: number; yDistance: number; speed: number },
+): Promise<void> {
+  const steps = Math.max(1, Math.ceil(Math.abs(yDistance) / speed * 60));
+  const intervalMs = Math.abs(yDistance) / speed * 1_000 / steps;
+  const point = (nextY: number) => ({ id: 1, x, y: nextY });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point(y)] });
+  try {
+    for (let step = 1; step <= steps; step += 1) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove", touchPoints: [point(y + yDistance * step / steps)],
+      });
+    }
+  } finally {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  }
+}
+
 /** Proves a finger gesture reaches the scrolling surface instead of the canvas's touch:none. */
 async function verifyNativeTouchScroll(
   page: Page,
@@ -407,10 +428,10 @@ async function verifyNativeTouchScroll(
     // never a scrollTop assignment or wheel event, before measuring the required upward drag.
     if (geometry.scrollTop > 1) {
       diagnostics.phase = "reset-input";
-      await cdp.send("Input.synthesizeScrollGesture", {
+      await dispatchNativeTouchDrag(cdp, {
         x: geometry.x, y: geometry.y,
         yDistance: geometry.scrollTop + geometry.clientHeight,
-        gestureSourceType: "touch", speed: 400,
+        speed: 400,
       });
       diagnostics.phase = "reset-wait";
       await page.waitForFunction((selector) => (
@@ -445,9 +466,9 @@ async function verifyNativeTouchScroll(
       ), geometry);
       if (!hitHandle) throw new Error("3D scroll handle center is covered by another element");
       diagnostics.phase = "drag-input";
-      await cdp.send("Input.synthesizeScrollGesture", {
+      await dispatchNativeTouchDrag(cdp, {
         x: geometry.x, y: geometry.y, yDistance: -180,
-        gestureSourceType: "touch", speed: 400,
+        speed: 400,
       });
       diagnostics.phase = "drag-wait";
       await page.waitForFunction(({ selector, before }) => (
