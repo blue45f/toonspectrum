@@ -54,8 +54,11 @@ export class ErrorBoundary extends Component<Props, State> {
       console.error("화면 렌더 중 오류:", error, info.componentStack);
     }
 
-    if (this.state.analysis?.type === "chunk_load" && !hasAttemptedChunkReload()) {
-      markChunkReloadAttempted();
+    if (
+      this.state.analysis?.type === "chunk_load"
+      && !hasAttemptedChunkReload()
+      && markChunkReloadAttempted()
+    ) {
       this.setState({ autoReloading: true });
       allowStudioProgrammaticReload();
       window.location.reload();
@@ -149,9 +152,8 @@ export class ErrorBoundary extends Component<Props, State> {
         );
       }
 
-      // C. 동적 청크 로딩 오류 — 자동 새로고침을 이미 한 번 시도했다(componentDidCatch).
-      // 여기까지 왔다는 건 새로고침 후에도 같은 문제가 재현됐다는 뜻(진짜 네트워크 단절 등) —
-      // 이제는 자동 재시도 없이 사용자가 직접 판단하게 한다. "다시 시도"는 반드시 전체
+      // C. 동적 청크 로딩 오류 — 자동 새로고침을 이미 시도했거나, 저장소에 재시도 이력을
+      // 남길 수 없어 자동 복구가 중단됐다. 사용자가 직접 판단하게 한다. "다시 시도"는 전체
       // 새로고침이어야 한다(setState로 컴포넌트만 리셋하면 여전히 같은 오래된 index.html을
       // 붙들고 있어 같은 청크 요청이 또 실패한다).
       if (analysis.type === "chunk_load") {
@@ -174,7 +176,7 @@ export class ErrorBoundary extends Component<Props, State> {
             >
               <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
               <p className="text-sm font-medium text-fg">{analysis.message}</p>
-              <p className="mt-1 text-sm text-fg-2">새로고침을 한 번 시도했지만 문제가 이어지고 있어요. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.</p>
+              <p className="mt-1 text-sm text-fg-2">자동으로 복구하지 못했어요. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.</p>
               <div className="mt-5 flex items-center justify-center gap-2">
                 <button
                   type="button"

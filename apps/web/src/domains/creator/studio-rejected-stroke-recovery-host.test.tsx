@@ -52,7 +52,7 @@ describe("restoreStudioRejectedStrokeIntoDocument", () => {
     const outcome = restoreStudioRejectedStrokeIntoDocument(
       record("page-1"),
       "page-1",
-      (finished) => queued.push(finished),
+      (finished) => { queued.push(finished); return true; },
       () => "fresh-id",
     );
     expect(outcome).toEqual({ status: "restored", recordId: "rejected-1", restoredStrokeId: "fresh-id" });
@@ -74,7 +74,7 @@ describe("restoreStudioRejectedStrokeIntoDocument", () => {
 
 describe("useStudioRejectedStrokeRecoveryHost", () => {
   it("registers the restorer for the mount, follows the latest page, and unregisters on unmount", () => {
-    const queue = vi.fn();
+    const queue = vi.fn(() => true);
     const view = renderHook(
       (input: { activePageId: string }) =>
         useStudioRejectedStrokeRecoveryHost({
@@ -106,6 +106,19 @@ describe("useStudioRejectedStrokeRecoveryHost", () => {
       status: "unavailable",
       recordId: "rejected-1",
     });
+  });
+
+  it("keeps the exact recovery record when another page still owns the commit queue", () => {
+    const queue = vi.fn(() => false);
+    renderHook(() => useStudioRejectedStrokeRecoveryHost({
+      activePageId: "page-1", queueDeferredStrokeCommit: queue,
+    }));
+    recordStudioRejectedStroke({ stroke, pageId: "page-1", provider: "페이지 동기화", reason: "busy" });
+    expect(restoreStudioRejectedStroke(stroke.id)).toMatchObject({ status: "refused" });
+    expect(getStudioRejectedStrokeRecords()[0]?.stroke.points).toEqual(stroke.points);
+    queue.mockReturnValue(true);
+    expect(restoreStudioRejectedStroke(stroke.id)).toMatchObject({ status: "restored" });
+    expect(getStudioRejectedStrokeRecords()).toHaveLength(0);
   });
 });
 

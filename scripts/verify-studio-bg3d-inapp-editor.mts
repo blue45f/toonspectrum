@@ -100,12 +100,26 @@ interface ProfileResult {
     readonly smallestTouchTargetPx: number | null;
   };
   readonly horizontalOverflowPx: number;
-  /** Observation, not an assertion: how far each notice crosses the control clusters. */
+  readonly touchScroll: {
+    readonly handleWidth: number;
+    readonly handleHeight: number;
+    readonly scrollTopBefore: number;
+    readonly scrollTopAfter: number;
+    readonly touchStartTarget: string;
+    readonly trustedTouchStart: boolean;
+  } | null;
+  /** Visible notice/control intersections; each overlap also fails the profile. */
   readonly overlayOverlaps: readonly string[];
   /** Observation: does the left tool rail expose a 3D background entry at this width? */
   readonly railEntryVisible: boolean;
   readonly pageErrors: readonly string[];
   readonly consoleErrors: readonly string[];
+  readonly failedHttpResponses: readonly {
+    readonly url: string;
+    readonly status: number;
+    readonly method: string;
+    readonly resourceType: string;
+  }[];
   readonly failures: readonly string[];
 }
 
@@ -114,6 +128,8 @@ function writeJson(fileName: string, value: unknown): void {
 }
 
 async function seedStudioPreferences(page: Page): Promise<void> {
+  // tsx names nested helpers with __name when serializing this file's page callbacks.
+  await page.addInitScript("globalThis.__name ??= (target) => target;");
   await page.addInitScript(({ quickStartKey, mobileHintKey, uiDensityKey }) => {
     try {
       localStorage.setItem(quickStartKey, "1");
@@ -190,17 +206,10 @@ async function readCanvasSignal(page: Page): Promise<ProfileResult["canvas"]> {
 }
 
 /**
- * Measures whether every floating viewport notice paints its own readable surface.
- *
- * At 360px the viewport is roughly 275 CSS px tall and the transform and camera clusters flank it,
- * so a floating notice cannot avoid crossing a control — there is no free band to put one in. What
- * broke readability was never the overlap itself: it was a notice with no surface of its own, so
- * buttons and text rendered through each other and neither could be read. The notices are
- * pointer-transparent, so taps still reach the controls beneath them; the surface is what has to
- * hold. Nothing throws when it does not, which is why it is measured.
- *
- * The overlap is still reported, as an observation, because it is the number that decides whether
- * this layout still works if the chrome grows.
+ * Notices must have a readable surface and leave actual viewport controls unobscured.
+ * Pointer transparency only preserves hit testing: a painted card can still hide its button.
+ * Clip both geometries to the window and scrolling ancestors so offscreen controls and empty
+ * space between a cluster's buttons cannot produce an overlap failure.
  */
 async function readOverlayLegibility(page: Page): Promise<{
   readonly failures: readonly string[];
@@ -209,45 +218,185 @@ async function readOverlayLegibility(page: Page): Promise<{
   return page.evaluate(() => {
     const dialog = document.querySelector('[data-testid="studio-bg3d-dialog"]');
     if (!dialog) return { failures: [], overlaps: [] };
-    const clusters = [...dialog.querySelectorAll('[data-bg3d-viewport-control="true"]')];
+    interface VisibleRect { left: number; top: number; right: number; bottom: number }
+    const clipsOverflow = (overflow: string) => /^(?:auto|scroll|hidden|clip|overlay)$/u.test(overflow);
+    const visibleRects = (element: Element): VisibleRect[] => {
+      const style = getComputedStyle(element);
+      if (style.visibility === "hidden" || style.visibility === "collapse") return [];
+      const clip: VisibleRect = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+      for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+        const ancestorStyle = getComputedStyle(ancestor);
+        if (ancestorStyle.display === "none" || ancestorStyle.contentVisibility === "hidden"
+          || Number(ancestorStyle.opacity) === 0) return [];
+        if (ancestor === element) continue;
+        const clipX = clipsOverflow(ancestorStyle.overflowX);
+        const clipY = clipsOverflow(ancestorStyle.overflowY);
+        if (!clipX && !clipY) continue;
+        const box = ancestor.getBoundingClientRect();
+        // client bounds exclude borders and scrollbars; preserve CSS scaling in the screen rect.
+        const scaleX = ancestor instanceof HTMLElement && ancestor.offsetWidth > 0
+          ? box.width / ancestor.offsetWidth : 1;
+        const scaleY = ancestor instanceof HTMLElement && ancestor.offsetHeight > 0
+          ? box.height / ancestor.offsetHeight : 1;
+        const left = box.left + ancestor.clientLeft * scaleX;
+        const top = box.top + ancestor.clientTop * scaleY;
+        if (clipX) {
+          clip.left = Math.max(clip.left, left);
+          clip.right = Math.min(clip.right, left + ancestor.clientWidth * scaleX);
+        }
+        if (clipY) {
+          clip.top = Math.max(clip.top, top);
+          clip.bottom = Math.min(clip.bottom, top + ancestor.clientHeight * scaleY);
+        }
+      }
+      return [...element.getClientRects()].map((box) => ({
+        left: Math.max(box.left, clip.left), top: Math.max(box.top, clip.top),
+        right: Math.min(box.right, clip.right), bottom: Math.min(box.bottom, clip.bottom),
+      })).filter((box) => box.right > box.left && box.bottom > box.top);
+    };
+    const controls = [...dialog.querySelectorAll(
+      '[data-testid="studio-bg3d-viewport"] :is(button, input, select, textarea, a[href], [role="button"], [role="slider"])',
+    )].map((element) => ({
+      label: element.getAttribute("aria-label") || element.getAttribute("title")
+        || element.textContent?.trim() || element.tagName.toLowerCase(),
+      rects: visibleRects(element),
+    })).filter((control) => control.rects.length > 0);
     const notices = [
-      ["empty-scene guide", '[data-testid="studio-bg3d-empty-scene-guide"] :is(span, div)'],
+      ["empty-scene guide", '[data-testid="studio-bg3d-empty-scene-guide"] > :is(span, div)'],
+      ["shared-character status", '[data-testid="studio-bg3d-shared-characters-status"]'],
       ["shared-stage status", '[data-testid="studio-bg3d-shared-stage-status"]'],
+      ["measurement status", '[data-testid="bg3d-measurement-status"]'],
+      ["surface-snap status", '[data-testid="bg3d-surface-snap-status"]'],
     ] as const;
     const failures: string[] = [];
     const overlaps: string[] = [];
     for (const [label, selector] of notices) {
-      const notice = dialog.querySelector(selector);
-      if (!notice) continue;
-      const box = notice.getBoundingClientRect();
-      if (box.width === 0 || box.height === 0) continue;
-
-      const style = getComputedStyle(notice);
-      const alpha = Number(
-        /rgba?\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*(?:,\s*([\d.]+)\s*)?\)/u
-          .exec(style.backgroundColor)?.[1] ?? "1",
-      );
-      if (style.backgroundColor === "transparent" || alpha < 0.85) {
-        failures.push(
-          `${label} paints no readable surface (background ${style.backgroundColor});`
-          + " controls behind it show through the text",
-        );
-      }
-
-      for (const cluster of clusters) {
-        const other = cluster.getBoundingClientRect();
-        if (other.width === 0 || other.height === 0) continue;
-        const overlapX = Math.min(box.right, other.right) - Math.max(box.left, other.left);
-        const overlapY = Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top);
-        if (overlapX > 1 && overlapY > 1) {
-          overlaps.push(
-            `${label} crosses a control cluster by ${Math.round(overlapX)}x${Math.round(overlapY)}px`,
-          );
+      for (const notice of dialog.querySelectorAll(selector)) {
+        // A linked stage message is text inside the character card already checked above.
+        if (label === "shared-stage status"
+          && notice.closest('[data-testid="studio-bg3d-shared-characters-status"]')) continue;
+        const boxes = visibleRects(notice);
+        if (boxes.length === 0) continue;
+        const background = getComputedStyle(notice).backgroundColor;
+        const slashAlpha = /\/\s*([\d.]+)(%)?\s*\)$/u.exec(background);
+        const rgbaAlpha = /rgba?\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*(?:,\s*([\d.]+)\s*)?\)/u.exec(background);
+        const alpha = slashAlpha
+          ? Number(slashAlpha[1]) / (slashAlpha[2] ? 100 : 1)
+          : Number(rgbaAlpha?.[1] ?? "1");
+        if (background === "transparent" || alpha < 0.85) {
+          failures.push(`${label} paints no readable surface (background ${background});`
+            + " controls behind it show through the text");
+        }
+        for (const control of controls) {
+          let intersection: { width: number; height: number } | null = null;
+          for (const box of boxes) {
+            for (const other of control.rects) {
+              const width = Math.min(box.right, other.right) - Math.max(box.left, other.left);
+              const height = Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top);
+              if (width > 1 && height > 1) intersection = { width, height };
+            }
+          }
+          if (!intersection) continue;
+          const message = `${label} obscures viewport control "${control.label}" by `
+            + `${Math.round(intersection.width)}x${Math.round(intersection.height)}px`;
+          overlaps.push(message);
+          failures.push(message);
         }
       }
     }
     return { failures, overlaps };
   });
+}
+
+/** Proves a finger gesture reaches the scrolling surface instead of the canvas's touch:none. */
+async function verifyNativeTouchScroll(page: Page): Promise<NonNullable<ProfileResult["touchScroll"]>> {
+  const selector = '[data-testid="bg3d-scroll-handle"]';
+  const handle = page.locator(selector);
+  await handle.waitFor({ state: "visible", timeout: 10_000 });
+  const geometry = await handle.evaluate((element) => {
+    const section = element.closest("section");
+    if (!section) throw new Error("3D scroll handle has no viewport section");
+    const box = element.getBoundingClientRect();
+    const clip = section.getBoundingClientRect();
+    const left = Math.max(box.left, clip.left, 0);
+    const top = Math.max(box.top, clip.top, 0);
+    const right = Math.min(box.right, clip.right, innerWidth);
+    const bottom = Math.min(box.bottom, clip.bottom, innerHeight);
+    return {
+      width: right - left, height: bottom - top,
+      x: (left + right) / 2, y: (top + bottom) / 2,
+      scrollTop: section.scrollTop, scrollHeight: section.scrollHeight, clientHeight: section.clientHeight,
+    };
+  });
+  if (Math.min(geometry.width, geometry.height) < MIN_TOUCH_TARGET_PX) {
+    throw new Error(`3D scroll handle exposes ${geometry.width}x${geometry.height}px; requires 44x44px`);
+  }
+  if (geometry.scrollHeight <= geometry.clientHeight + 1) {
+    throw new Error("3D touch-scroll fixture has no overflow to exercise");
+  }
+
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    // The earlier canvas screenshot may reveal its bottom edge. Reset through real touch input,
+    // never a scrollTop assignment or wheel event, before measuring the required upward drag.
+    if (geometry.scrollTop > 1) {
+      await cdp.send("Input.synthesizeScrollGesture", {
+        x: geometry.x, y: geometry.y,
+        yDistance: geometry.scrollTop + geometry.clientHeight,
+        gestureSourceType: "touch", speed: 400,
+      });
+      await page.waitForFunction((selector) => (
+        document.querySelector(selector)?.closest("section")?.scrollTop === 0
+      ), selector, { timeout: 5_000 });
+    }
+    const scrollTopBefore = await handle.evaluate((element) => element.closest("section")!.scrollTop);
+    const touchStarted = page.evaluate((selector) => new Promise<{
+      target: string; onHandle: boolean; trusted: boolean;
+    } | null>((resolve) => {
+      const record = (event: TouchEvent) => {
+        clearTimeout(timer);
+        document.removeEventListener("touchstart", record, true);
+        const target = event.target instanceof Element ? event.target : null;
+        resolve({
+          target: target?.getAttribute("data-testid") ?? target?.tagName ?? "unknown",
+          onHandle: target !== null && target.closest(selector) !== null,
+          trusted: event.isTrusted,
+        });
+      };
+      const timer = setTimeout(() => {
+        document.removeEventListener("touchstart", record, true);
+        resolve(null);
+      }, 5_000);
+      document.addEventListener("touchstart", record, { capture: true, passive: true });
+    }), selector);
+    let touchStart: Awaited<typeof touchStarted>;
+    try {
+      // This second evaluation also completes after the observation listener is installed.
+      const hitHandle = await handle.evaluate((element, { x, y }) => (
+        element.contains(document.elementFromPoint(x, y))
+      ), geometry);
+      if (!hitHandle) throw new Error("3D scroll handle center is covered by another element");
+      await cdp.send("Input.synthesizeScrollGesture", {
+        x: geometry.x, y: geometry.y, yDistance: -180,
+        gestureSourceType: "touch", speed: 400,
+      });
+      await page.waitForFunction(({ selector, before }) => (
+        (document.querySelector(selector)?.closest("section")?.scrollTop ?? 0) > before + 1
+      ), { selector, before: scrollTopBefore }, { timeout: 5_000 });
+    } finally {
+      touchStart = await touchStarted;
+    }
+    if (!touchStart?.onHandle || !touchStart.trusted) {
+      throw new Error(`Native touch was not delivered to the 3D scroll handle: ${JSON.stringify(touchStart)}`);
+    }
+    return {
+      handleWidth: geometry.width, handleHeight: geometry.height, scrollTopBefore,
+      scrollTopAfter: await handle.evaluate((element) => element.closest("section")!.scrollTop),
+      touchStartTarget: touchStart.target, trustedTouchStart: touchStart.trusted,
+    };
+  } finally {
+    await cdp.detach();
+  }
 }
 
 /** Opens the editor's 보기 tab and reads the engine card the artist would actually see. */
@@ -381,9 +530,22 @@ async function runProfile(
   const page = await context.newPage();
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
+  const failedHttpResponses: Array<ProfileResult["failedHttpResponses"][number]> = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
+  page.on("response", (response) => {
+    if (response.status() < 400) return;
+    const request = response.request();
+    const url = new URL(response.url());
+    failedHttpResponses.push({
+      url: `${url.origin}${url.pathname}`,
+      status: response.status(),
+      method: request.method(),
+      resourceType: request.resourceType(),
+    });
   });
 
   const failures: string[] = [];
@@ -391,6 +553,7 @@ async function runProfile(
   let canvas: ProfileResult["canvas"] = { cssWidth: 0, cssHeight: 0, distinctColors: 0 };
   let engine: ProfileResult["engine"] = { badge: null, status: null, smallestTouchTargetPx: null };
   let horizontalOverflowPx = 0;
+  let touchScroll: ProfileResult["touchScroll"] = null;
   let overlayLegibility: { failures: readonly string[]; overlaps: readonly string[] } =
     { failures: [], overlaps: [] };
   let railEntryVisible = false;
@@ -408,6 +571,7 @@ async function runProfile(
     horizontalOverflowPx = await page.evaluate(() =>
       Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth));
     await page.screenshot({ path: join(SCRATCH, `${profile.id}.png`), fullPage: false });
+    touchScroll = await verifyNativeTouchScroll(page);
 
     railEntryVisible = await probeRailEntryVisible(page, baseUrl);
   } catch (error) {
@@ -444,19 +608,23 @@ async function runProfile(
     canvas,
     engine,
     horizontalOverflowPx,
+    touchScroll,
     overlayOverlaps: overlayLegibility.overlaps,
     railEntryVisible,
     pageErrors,
     consoleErrors,
+    failedHttpResponses,
     failures,
   };
 }
 
 async function main(): Promise<void> {
   mkdirSync(SCRATCH, { recursive: true });
-  const port = await findFreePort();
-  const preview = spawnVitePreview({ port, runner: "node-vite-bin", logPath: join(SCRATCH, "preview.log") });
-  const baseUrl = `http://127.0.0.1:${port}`;
+  const externalOrigin = process.env.TOONSPECTRUM_BG3D_INAPP_VERIFY_ORIGIN?.trim().replace(/\/+$/u, "") || null;
+  const port = externalOrigin ? null : await findFreePort();
+  const preview = port === null ? null
+    : spawnVitePreview({ port, runner: "node-vite-bin", logPath: join(SCRATCH, "preview.log") });
+  const baseUrl = externalOrigin ?? `http://127.0.0.1:${port}`;
   let browser: Browser | null = null;
   try {
     await waitForServer(`${baseUrl}/studio`, { timeoutMs: 60_000, requestInit: { method: "GET" } });
@@ -480,7 +648,7 @@ async function main(): Promise<void> {
     if (failures.length > 0) process.exitCode = 1;
   } finally {
     if (browser) await browser.close();
-    await stopChildProcess(preview);
+    if (preview) await stopChildProcess(preview);
   }
 }
 

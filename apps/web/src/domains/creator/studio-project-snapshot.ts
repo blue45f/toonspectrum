@@ -4,6 +4,7 @@ import {
   type StudioAiImageReferenceDocument,
 } from "./ai/studio-ai-image-reference-roles";
 import { studioDrawingAssistHasContent } from "./brush/studio-drawing-assist-document";
+import { parseStudioLayerComps } from "./layer/studio-layer-comps-document";
 import {
   serializeDocumentMaster,
   type DocumentMaster,
@@ -187,6 +188,7 @@ export function studioProjectSnapshotHasMeaningfulContent(
   const settings = snapshot.publishPack.packageSettings;
   return (
     snapshot.pagesList.some((page) => page.elements.length > 0) ||
+    snapshot.pagesList.some((page) => (parseStudioLayerComps(page.layerComps)?.length ?? 0) > 0) ||
     snapshot.pagesList.some((page) =>
       studioDrawingAssistHasContent(page.drawingAssist, {
         canvasWidth: options.canvasWidth,
