@@ -103,10 +103,12 @@ describe("studio version coordinates", () => {
 
   it("reports review, approval and package source mismatches", () => {
     const coordinates = approvedCoordinates();
+    const approval = coordinates.approval;
+    if (approval === null) throw new Error("approved fixture must include an approval");
     const invalid: StudioVersionCoordinates = {
       ...coordinates,
       approval: {
-        ...coordinates.approval!,
+        ...approval,
         reviewSnapshotId: "snapshot-other",
         sourceRevision: 6,
       },
