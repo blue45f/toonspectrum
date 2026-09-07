@@ -91,6 +91,30 @@ export function characterSurfaceSourceMap(scene: Scene): Map<string, Mesh> {
   return values;
 }
 
+/** Call only after the current model has attached to its ready capture scene. */
+export function reconcileCharacterSurfaceInkTopology(
+  document: CharacterSurfaceInkDocument,
+  modelKey: string,
+  scene: Scene,
+): CharacterSurfaceInkDocument {
+  if (document.layers.every((layer) => layer.strokes.length === 0)) return document;
+  const sources = characterSurfaceSourceMap(scene);
+  let changed = false;
+  const layers = document.layers.map((layer) => {
+    let layerChanged = false;
+    const strokes = layer.strokes.map((stroke) => {
+      const source = sources.get(stroke.meshAssetId);
+      const status = source && characterSurfaceTopologyRevision(modelKey, source) === stroke.topologyRevision
+        ? "valid" : "needs-reprojection";
+      if (status === stroke.status) return stroke;
+      changed = layerChanged = true;
+      return Object.freeze({ ...stroke, status });
+    });
+    return layerChanged ? Object.freeze({ ...layer, strokes: Object.freeze(strokes) }) : layer;
+  });
+  return changed ? Object.freeze({ ...document, layers: Object.freeze(layers) }) : document;
+}
+
 export function disposeCharacterSurfaceInkGroup(group: Group): void {
   group.traverse((object) => {
     if (!(object instanceof Mesh)) return;
@@ -124,7 +148,7 @@ export function rebuildCharacterSurfaceInkGroup(scene: Scene, document: Characte
   for (const layer of document.layers) {
     if (!layer.visible) continue;
     for (const stroke of layer.strokes) {
-      if (stroke.status === "orphaned") continue;
+      if (stroke.status !== "valid") continue;
       const source = sources.get(stroke.meshAssetId);
       if (!source) continue;
       const triangles = new Map<number, CharacterTriangleSurface>();

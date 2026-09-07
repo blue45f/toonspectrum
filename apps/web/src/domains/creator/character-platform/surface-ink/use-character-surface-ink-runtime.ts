@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addCharacterSurfaceInkStroke,
   createEmptyCharacterSurfaceInkDocument,
-  markCharacterSurfaceInkTopology,
   removeCharacterSurfaceInkStroke,
 } from "./character-surface-ink";
 import {
@@ -13,6 +12,7 @@ import {
 } from "./character-surface-ink-pointer";
 import {
   disposeCharacterSurfaceInkGroup,
+  reconcileCharacterSurfaceInkTopology,
   rebuildCharacterSurfaceInkGroup,
 } from "./character-surface-ink-three-mesh";
 import {
@@ -110,7 +110,7 @@ export function useCharacterSurfaceInkRuntime({
     setHistoryRevision((value) => value + 1);
     void loadCharacterSurfaceInkDocument(modelKey).then((loaded) => {
       if (!current) return;
-      setDocument(markCharacterSurfaceInkTopology(loaded, modelKey));
+      setDocument(loaded);
       setLoadedModelKey(modelKey);
       setNotice(null);
     }).catch((error: unknown) => {
@@ -129,15 +129,23 @@ export function useCharacterSurfaceInkRuntime({
   }, [document, loadedModelKey, modelKey]);
 
   useEffect(() => {
+    if (loadedModelKey !== modelKey || h.status !== "ready") return;
     const capture = h.captureRef?.current;
     if (!capture?.scene) return;
     const scene = capture.scene as Scene;
+    const modelRoot = h.vrm?.scene;
+    if (modelRoot && scene.getObjectById(modelRoot.id) !== modelRoot) return;
+    const reconciled = reconcileCharacterSurfaceInkTopology(document, modelKey, scene);
+    if (reconciled !== document) {
+      setDocument(reconciled);
+      return;
+    }
     groupRef.current = rebuildCharacterSurfaceInkGroup(scene, document);
     return () => {
       if (groupRef.current) disposeCharacterSurfaceInkGroup(groupRef.current);
       groupRef.current = null;
     };
-  }, [document, h.captureRef, revisionKey]);
+  }, [document, h.captureRef, h.captureSceneGeneration, h.status, h.vrm, loadedModelKey, modelKey, revisionKey]);
 
   const commitDocument = useCallback((next: CharacterSurfaceInkDocument): boolean => {
     if (loadedModelKey !== modelKey) {
@@ -270,14 +278,14 @@ export function useCharacterSurfaceInkRuntime({
 
   const importJson = useCallback((value: string): boolean => {
     try {
-      if (!commitDocument(markCharacterSurfaceInkTopology(parseCharacterSurfaceInkDocument(value), modelKey))) return false;
+      if (!commitDocument(parseCharacterSurfaceInkDocument(value))) return false;
       setNotice("3D 펜선 문서를 불러왔습니다.");
       return true;
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "3D 펜선 문서를 불러오지 못했습니다.");
       return false;
     }
-  }, [commitDocument, modelKey]);
+  }, [commitDocument]);
 
   const setActive = useCallback((next: boolean) => {
     if (next && loadedModelKey !== modelKey) {
