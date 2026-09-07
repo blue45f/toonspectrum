@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   cleanup:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - name: Verify containment and delete the completed branch
