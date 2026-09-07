@@ -127,6 +127,7 @@ import { isStudioCanvasInteractionBlocked } from "./canvas/studio-canvas-cursor"
 import { studioCreationLinkParams } from "./creator-studio-links";
 import type { StudioAppSettings } from "./studio-app-settings";
 import { createStudioAssetLibraryMutations } from "./studio-cuttoon-editor/studio-asset-library-mutations";
+import { publishStudioRetainedStrokeHistory } from "./studio-retained-stroke-history";
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
 import {
   createStudioDeferredStrokeCommitEngine,
@@ -4018,6 +4019,7 @@ export function StudioCuttoonEditor({
     pageId: string;
     strokes: DrawEl[];
     retryCount: number;
+    historyIndex: number;
   } | null>(null);
   const deferredStrokePostprocessClientRef = useRef<StudioStrokePostprocessWorkerClient | null>(null);
   const deferredStrokePostprocessControllersRef = useRef<Map<string, AbortController>>(new Map());
@@ -7725,14 +7727,7 @@ export function StudioCuttoonEditor({
     });
   }
 
-  /**
-   * 복구 배너의 "비우기".
-   *
-   * 이 버튼은 브라우저가 죽었을 때 남은 **유일한 사본**을 localStorage·OPFS·SQLite 에서
-   * 한꺼번에 지운다. 히스토리 커밋이 아니라 ⌘Z 로도 돌아오지 않는데, 예전에는 확인 한 번
-   * 없이 클릭 즉시 실행됐다 — 훨씬 덜 위험한 페이지 삭제에는 확인 모달이 있는데도.
-   * 파괴 승인 seam(되돌릴 수 없음 등급)에 태우고 무엇이 몇 개 사라지는지 먼저 보여준다.
-   */
+  /** Clear recovery through the shared confirmation and durable-authority transaction. */
   async function clearAutosave() {
     await requestStudioAutosaveClear({
       autosaveRecoveryCandidateRef,
@@ -16152,11 +16147,7 @@ const puppetWarpArmed =
     return publishStudioCrdtSceneTransition(previousPages, nextPages, false);
   }
 
-  // 커밋 엔진(HOT PATH) — commit/commitCoalesced/commitPages/지연 획 히스토리 펼치기/
-  // committed-ink 표면 해제는 studio-cuttoon-editor/studio-deferred-stroke-commit.ts 로 추출됐다.
-  // 팩토리는 훅이 아니라 react-compiler 컴파일 경계 밖이며, 이 렌더의 값·ref·헬퍼를 그대로
-  // 주입해 추출 전과 동일한 클로저를 만든다. publishStudioCrdtSceneTransition 은 바로 위에서
-  // 라이브 배선 seam ref 에 발행한 것과 같은 렌더의 클로저다.
+  // The commit engine owns synchronous history and canonical-surface handoff outside the compiler boundary.
   const {
     commit,
     commitCoalesced,
@@ -18152,26 +18143,30 @@ const puppetWarpArmed =
         return;
       }
     }
-    // 커밋 동기화를 기다리는 획이 있으면 먼저 히스토리에 안착시킨다 — 획 하나당 항목 하나로
-    // 들어가므로 아래 일반 undo 가 **마지막 한 획만** 되돌린다(그리고 redo 로 되살아난다).
-    // 예전에는 대기 배치를 통째로 폐기해, 200ms 안에 그은 해칭 40획이 ⌘Z 한 번에 사라졌다.
-    // 저널 조회보다 **먼저** 해야 방금 안착한 획이 최신 항목으로 보인다.
+    // Multiple pending strokes first enter per-stroke history, so Undo removes only the last one.
+    // A single retained stroke keeps its exact pixels while its CRDT visibility is undone.
     // Retained overlay strokes stay out of Konva until idle flush. Flushing them on undo makes
     // redo restore the committed remesh, which can diverge from the still-visible overlay.
     const pendingRetained = pendingStrokeCommitsRef.current;
     if (
       pendingRetained
-      && pendingRetained.strokes.length > 0
+      && pendingRetained.strokes.length === 1
       && pendingRetained.strokes.every((stroke) => (
         studioLiveRetainedMediaOverlaySupportsElement(stroke)
       ))
     ) {
+      if (pendingBatchAwaitsSelectedGpuFinalReceipt(pendingRetained)) return;
+      if (!publishStudioRetainedStrokeHistory(
+        pagesHistoryRef.current[pagesHiRef.current] ?? pages, pendingRetained, "undo",
+        publishStudioCrdtHistoryTransition,
+      )) return;
       const taken = takePendingStrokeCommits();
       if (taken) {
         pendingUndoneStrokeCommitsRef.current = {
           pageId: taken.pageId,
           strokes: taken.strokes,
           retryCount: taken.retryCount,
+          historyIndex: pagesHiRef.current,
         };
         liveRetainedMediaOverlayRendererRef.current.hideSettledPixels();
         if (liveDraftVisualRef.current?.mode === "eraser") {
@@ -18255,7 +18250,11 @@ const puppetWarpArmed =
       releaseStudioHokusaiLivePresentation(hokusaiStroke);
     }
     const undoneRetained = pendingUndoneStrokeCommitsRef.current;
-    if (undoneRetained) {
+    if (undoneRetained && pagesHiRef.current >= undoneRetained.historyIndex) {
+      if (!publishStudioRetainedStrokeHistory(
+        pagesHistoryRef.current[pagesHiRef.current] ?? pages, undoneRetained, "redo",
+        publishStudioCrdtHistoryTransition,
+      )) return;
       pendingUndoneStrokeCommitsRef.current = null;
       setHasUndonePendingOverlay(false);
       setHasPendingOverlayCommit(true);
@@ -23183,6 +23182,7 @@ const puppetWarpArmed =
         globalThis.clearTimeout(pendingBatch.timer);
         pendingBatch.timer = null;
       }
+      liveRetainedMediaOverlayRendererRef.current.discardHiddenSettledStrokes();
       pendingUndoneStrokeCommitsRef.current = null;
       setHasUndonePendingOverlay(false);
       // 이전 획이 아직 대기 배치에 있고 WebGPU 권한을 들고 있으면 아래 진입 가드가 새 표면
