@@ -12,19 +12,25 @@ export interface AcquiredMarketItem {
   resource: CreatorMarketplaceResourceRecord;
 }
 
-const LIBRARY_STORAGE_KEY = "toonspectrum:market:acquired-library";
+/**
+ * This browser cache is written only after the server confirms account acquisition. It is a
+ * presentation cache for legacy detail/sticky components, never an entitlement authority.
+ * The v2 namespace deliberately ignores records created by the previous fail-open implementation.
+ */
+export const MARKET_LIBRARY_STORAGE_KEY =
+  "toonspectrum:market:confirmed-library-cache:v2";
 export const MARKET_LIBRARY_EVENT = "toonspectrum:market:library-changed";
 
 function getStoredLibraryItems(): AcquiredMarketItem[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(LIBRARY_STORAGE_KEY);
+    const raw = localStorage.getItem(MARKET_LIBRARY_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as AcquiredMarketItem[];
       if (Array.isArray(parsed)) return parsed;
     }
   } catch {
-    // storage error
+    // A corrupt or unavailable cache cannot create account entitlement.
   }
   return [];
 }
@@ -32,10 +38,10 @@ function getStoredLibraryItems(): AcquiredMarketItem[] {
 function saveLibraryItems(items: AcquiredMarketItem[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(MARKET_LIBRARY_STORAGE_KEY, JSON.stringify(items));
     window.dispatchEvent(new CustomEvent(MARKET_LIBRARY_EVENT));
   } catch {
-    // quota
+    // Server acquisition has already succeeded; a presentation-cache failure is non-fatal.
   }
 }
 
@@ -61,34 +67,37 @@ export function useMarketLibrary() {
 
   const acquireResource = useCallback(
     async (record: CreatorMarketplaceResourceRecord): Promise<boolean> => {
-      // 1. Try background cloud API acquisition
       try {
+        // The server validates authentication, current package head, moderation and publisher
+        // state. Never write the local cache before this authoritative operation succeeds.
         await acquireCreatorMarketplaceCloudLibraryRelease(record.id);
       } catch {
-        // Safe fallback to client library entitlement
+        return false;
       }
 
-      // 2. Persist local entitlement
       const current = getStoredLibraryItems();
-      const existing = current.find((i) => i.resourceId === record.id);
+      const existing = current.find((item) => item.resourceId === record.id);
       if (existing) {
         if (existing.archived) {
-          existing.archived = false;
-          saveLibraryItems(current);
+          const next = current.map((item) =>
+            item.resourceId === record.id ? { ...item, archived: false } : item,
+          );
+          saveLibraryItems(next);
+          setItems(next);
         }
         return true;
       }
 
       const newItem: AcquiredMarketItem = {
-        id: `lib-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: `lib-cache-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         resourceId: record.id,
         acquiredAt: new Date().toISOString(),
         archived: false,
         resource: record,
       };
-
-      saveLibraryItems([newItem, ...current]);
-      setItems([newItem, ...current]);
+      const next = [newItem, ...current];
+      saveLibraryItems(next);
+      setItems(next);
       return true;
     },
     [],
@@ -96,25 +105,27 @@ export function useMarketLibrary() {
 
   const archiveItem = useCallback((id: string, archived: boolean) => {
     const current = getStoredLibraryItems();
-    const target = current.find((i) => i.id === id || i.resourceId === id);
+    const target = current.find((item) => item.id === id || item.resourceId === id);
     if (!target) return;
-    target.archived = archived;
-    saveLibraryItems(current);
-    setItems([...current]);
+    const next = current.map((item) =>
+      item.id === target.id ? { ...item, archived } : item,
+    );
+    saveLibraryItems(next);
+    setItems(next);
   }, []);
 
   const removeItem = useCallback((id: string) => {
     const current = getStoredLibraryItems();
-    const filtered = current.filter((i) => i.id !== id && i.resourceId !== id);
+    const filtered = current.filter((item) => item.id !== id && item.resourceId !== id);
     saveLibraryItems(filtered);
     setItems(filtered);
   }, []);
 
   return {
     items,
-    activeItems: items.filter((i) => !i.archived),
-    archivedItems: items.filter((i) => i.archived),
-    totalCount: items.filter((i) => !i.archived).length,
+    activeItems: items.filter((item) => !item.archived),
+    archivedItems: items.filter((item) => item.archived),
+    totalCount: items.filter((item) => !item.archived).length,
     isAcquired,
     acquireResource,
     archiveItem,
