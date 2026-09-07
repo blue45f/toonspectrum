@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MarketPublishPage } from "./MarketPublishAuthorityPage";
 
-import type { CreatorMarketplaceResourceIdentity } from "@/shared/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceIdentity, CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { buildCreatorMarketplaceAuthoringManifest, createCreatorMarketplaceAuthoringDraft } from "@/shared/lib/creator-marketplace-authoring-workshop";
 import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-starter-catalog";
@@ -60,7 +60,7 @@ describe("MarketPublishPage authoring release identity", () => {
     await screen.findByRole("heading", { name: "서버 게시가 완료되었습니다" });
     expect(mocks.publish).toHaveBeenCalledWith(expect.objectContaining({
       packageId: parent().packageId, name: "이름을 바꾼 브러시", license: "toonspectrum-standard",
-    }));
+    }), expect.any(AbortSignal));
   });
 
   it("keeps failed lookups unpublished and allows an explicit retry", async () => {
@@ -86,7 +86,7 @@ describe("MarketPublishPage authoring release identity", () => {
     expect(submit().disabled).toBe(true);
     await act(async () => { second.resolve(parent(SECOND_ID)); await second.promise; });
     fireEvent.click(submit());
-    await waitFor(() => expect(mocks.publish).toHaveBeenCalledWith(expect.objectContaining({ packageId: parent(SECOND_ID).packageId })));
+    await waitFor(() => expect(mocks.publish).toHaveBeenCalledWith(expect.objectContaining({ packageId: parent(SECOND_ID).packageId }), expect.any(AbortSignal)));
   });
 
   it("rejects another publisher's target", async () => {
@@ -122,6 +122,77 @@ describe("MarketPublishPage authoring release identity", () => {
     fireEvent.click(submit());
     await screen.findByRole("heading", { name: "서버 게시가 완료되었습니다" });
     expect(mocks.identity).not.toHaveBeenCalled();
-    expect(mocks.publish).toHaveBeenCalledWith(expect.objectContaining({ packageId: expect.stringMatching(/^community\/brush\/[0-9a-f]{32}$/u) }));
+    expect(mocks.publish).toHaveBeenCalledWith(expect.objectContaining({ packageId: expect.stringMatching(/^community\/brush\/[0-9a-f]{32}$/u) }), expect.any(AbortSignal));
+  });
+
+  it("keeps a new source editable when an older publication finishes", async () => {
+    const pending = Promise.withResolvers<CreatorMarketplaceResourceRecord>();
+    mocks.publish.mockReturnValue(pending.promise);
+    render(view()); enter(source(null)); fireEvent.click(submit());
+    const signal = mocks.publish.mock.calls[0]?.[1] as AbortSignal;
+    const next = source(null);
+    enter(next);
+    expect(signal.aborted).toBe(true);
+    expect(submit().disabled).toBe(false);
+    await act(async () => { pending.resolve(CREATOR_MARKETPLACE_STARTER_RECORDS[0]!); await pending.promise; });
+    expect(screen.queryByRole("heading", { name: "서버 게시가 완료되었습니다" })).toBeNull();
+    expect((screen.getByLabelText("공개 Manifest JSON") as HTMLTextAreaElement).value).toBe(next);
+  });
+
+  it("releases the form on account change and ignores the previous account's publication", async () => {
+    const pending = Promise.withResolvers<CreatorMarketplaceResourceRecord>();
+    mocks.publish.mockReturnValue(pending.promise);
+    const page = render(view()); enter(source(null)); fireEvent.click(submit());
+    const signal = mocks.publish.mock.calls[0]?.[1] as AbortSignal;
+    mocks.session.mockReturnValue(session("owner-b")); page.rerender(view());
+    expect(signal.aborted).toBe(true);
+    expect(submit().disabled).toBe(false);
+    await act(async () => { pending.resolve(CREATOR_MARKETPLACE_STARTER_RECORDS[0]!); await pending.promise; });
+    expect(screen.queryByRole("heading", { name: "서버 게시가 완료되었습니다" })).toBeNull();
+    expect(submit().disabled).toBe(false);
+  });
+
+  it("does not let stale errors or finally clear a newer publication", async () => {
+    const first = Promise.withResolvers<CreatorMarketplaceResourceRecord>();
+    const second = Promise.withResolvers<CreatorMarketplaceResourceRecord>();
+    mocks.publish.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    render(view()); enter(source(null)); fireEvent.click(submit());
+    enter(source(null)); fireEvent.click(submit());
+    expect(mocks.publish).toHaveBeenCalledTimes(2);
+    await act(async () => { first.reject(new Error("old request failed")); await first.promise.catch(() => undefined); });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect((screen.getByRole("button", { name: "서버에서 검증·게시 중" }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => { second.resolve(CREATOR_MARKETPLACE_STARTER_RECORDS[0]!); await second.promise; });
+    expect(screen.getByRole("heading", { name: "서버 게시가 완료되었습니다" })).toBeTruthy();
+  });
+
+  it("keeps the latest selected file when an older read resolves last", async () => {
+    const first = Promise.withResolvers<string>();
+    const second = Promise.withResolvers<string>();
+    const older = new File([], "older.json", { type: "application/json" });
+    const newer = new File([], "newer.json", { type: "application/json" });
+    Object.defineProperty(older, "text", { value: () => first.promise });
+    Object.defineProperty(newer, "text", { value: () => second.promise });
+    const page = render(view());
+    const input = page.container.querySelector<HTMLInputElement>("#market-authority-manifest-file")!;
+    fireEvent.change(input, { target: { files: [older] } });
+    fireEvent.change(input, { target: { files: [newer] } });
+    const next = source(null);
+    await act(async () => { second.resolve(next); await second.promise; });
+    await act(async () => { first.resolve(source(null)); await first.promise; });
+    expect((screen.getByLabelText("공개 Manifest JSON") as HTMLTextAreaElement).value).toBe(next);
+    expect(screen.getByText("newer.json")).toBeTruthy();
+  });
+
+  it("ignores a file read error after the user edits the source", async () => {
+    const pending = Promise.withResolvers<string>();
+    const file = new File([], "older.json", { type: "application/json" });
+    Object.defineProperty(file, "text", { value: () => pending.promise });
+    const page = render(view());
+    fireEvent.change(page.container.querySelector("#market-authority-manifest-file")!, { target: { files: [file] } });
+    const next = source(null); enter(next);
+    await act(async () => { pending.reject(new Error("old file failed")); await pending.promise.catch(() => undefined); });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect((screen.getByLabelText("공개 Manifest JSON") as HTMLTextAreaElement).value).toBe(next);
   });
 });

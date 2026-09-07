@@ -7,6 +7,7 @@ import { createCharacterPartPreset } from "../character-platform/presets/charact
 import { useCharacterPlatformWorkbench } from "../character-platform/ui/use-character-platform-workbench";
 
 import { createAvatarForgeState } from "../vrm/studio-vrm-avatar-forge";
+import { applyWardrobeSet, SELECTABLE_WARDROBE_SETS } from "../vrm/studio-vrm-wardrobe";
 
 import { findCharacterSlotEntry, listCharacterSlotEntries } from "./character-shaper-catalog";
 import { applyCharacterIrisTint } from "./character-shaper-iris-tint";
@@ -630,6 +631,134 @@ describe("complete imported presets through the real workbench binding", () => {
     act(() => expect(result.current.workbench.applyPreset(importedPreset(result.current.workbench, { colors: { skin: "#123456", top: null } }))).toBe(false));
     expect(fake.state).toEqual(before);
     expect(result.current.binding.history.length).toBe(1);
+  });
+
+
+  it("equips a top and its saved color together, clears the previous outer layer, and undoes once", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const outer = listCharacterSlotEntries("top").find((entry) => entry.apply.kind === "wardrobe" && entry.apply.slot === "outer" && entry.apply.itemId)!;
+    const top = listCharacterSlotEntries("top").find((entry) => entry.apply.kind === "wardrobe" && entry.apply.slot === "top" && entry.apply.itemId)!;
+    act(() => result.current.binding.commit(outer));
+    const before = structuredClone(fake.state);
+    const previousHistory = result.current.binding.history.length;
+    const preset = importedPreset(result.current.workbench, {
+      slot: "top", selections: [{ entryId: top.id, entryVersion: "1", providerId: "toonstudio-builtin", catalogRevision: "character-slot-catalog-v1" }],
+      colors: { top: "#123456", skin: "#345678" },
+    });
+    act(() => expect(result.current.workbench.applyPreset(preset)).toBe(true));
+    expect(fake.state.wardrobeState.outer).toBeUndefined();
+    expect(fake.state.wardrobeState.top).toMatchObject({ itemId: top.apply.kind === "wardrobe" ? top.apply.itemId : "", color: "#123456", fit: 1, fitMode: "auto", fabricId: "cotton" });
+    expect(fake.state.customColors.body).toBe("#345678");
+    expect(result.current.binding.history.length).toBe(previousHistory + 1);
+    const applied = structuredClone(fake.state);
+    act(() => result.current.binding.undo());
+    expect(fake.state).toEqual(before);
+    act(() => result.current.binding.redo());
+    expect(fake.state).toEqual(applied);
+  });
+
+  it("recolors a real equipped wardrobe set without changing its items, fit or fabric", async () => {
+    const set = SELECTABLE_WARDROBE_SETS.find((item) => item.equips.bottom && item.equips.shoes && (item.equips.top || item.equips.outer))!;
+    // The advanced wardrobe UI equips this exact product set; Shaper currently lists individual garments.
+    const wardrobe = applyWardrobeSet(set);
+    const fake = createFakeHost({ wardrobeState: wardrobe });
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const before = structuredClone(fake.state);
+    const topSlot = wardrobe.outer ? "outer" : "top";
+    const nextColors = { top: "#112233", bottom: "#445566", shoes: "#778899" };
+    act(() => expect(result.current.workbench.applyPreset(importedPreset(result.current.workbench, { colors: nextColors }, "palette"))).toBe(true));
+    expect(fake.state.wardrobeState).toEqual({
+      ...wardrobe,
+      [topSlot]: { ...wardrobe[topSlot], color: nextColors.top },
+      bottom: { ...wardrobe.bottom, color: nextColors.bottom },
+      shoes: { ...wardrobe.shoes, color: nextColors.shoes },
+    });
+    expect(result.current.binding.history.length).toBe(1);
+    const applied = structuredClone(fake.state);
+    act(() => result.current.binding.undo());
+    expect(fake.state).toEqual(before);
+    act(() => result.current.binding.redo());
+    expect(fake.state).toEqual(applied);
+  });
+
+  it("returns to the original outfit while restoring native garment colors in the same preset", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    act(() => result.current.binding.commit(firstWardrobeEntry()));
+    const before = structuredClone(fake.state);
+    const original = entryOf("top:original");
+    const preset = importedPreset(result.current.workbench, { slot: "top", selections: [{ entryId: original.id, entryVersion: "1", providerId: "toonstudio-builtin", catalogRevision: "character-slot-catalog-v1" }], colors: { top: "#234567" } });
+    act(() => expect(result.current.workbench.applyPreset(preset)).toBe(true));
+    expect(fake.state.wardrobeState.top).toBeUndefined();
+    expect(fake.state.wardrobeState.outer).toBeUndefined();
+    expect(fake.state.customColors.tops).toBe("#234567");
+    expect(fake.state.costumeState.hidden).not.toContain("Tops");
+    act(() => result.current.binding.undo());
+    expect(fake.state).toEqual(before);
+  });
+
+  it("edits and resets original hair and skin colors without changing the forge or unrelated colors", () => {
+    const fake = createFakeHost({ customColors: { body: "#111111", hair: "#222222", tops: "#333333" } });
+    const { result } = renderBinding(fake);
+    const initialForge = structuredClone(fake.state.avatarForgeState);
+    act(() => result.current.commitColor("skin", "#445566"));
+    act(() => result.current.commitColor("hairBase", "#778899"));
+    expect(fake.state.customColors).toEqual({ body: "#445566", hair: "#778899", tops: "#333333" });
+    expect(fake.calls.forge).toHaveLength(0);
+    act(() => result.current.commitColor("skin", null));
+    act(() => result.current.commitColor("hairBase", null));
+    expect(fake.state.customColors).toEqual({ tops: "#333333" });
+    expect(fake.state.avatarForgeState).toEqual(initialForge);
+    act(() => result.current.undo());
+    expect(fake.state.customColors).toEqual({ hair: "#778899", tops: "#333333" });
+    act(() => result.current.redo());
+    expect(fake.state.customColors).toEqual({ tops: "#333333" });
+  });
+
+  it.each(["bottom", "shoes"] as const)("edits an equipped %s color without losing garment fitting", (target) => {
+    const set = SELECTABLE_WARDROBE_SETS.find((item) => item.equips.bottom && item.equips.shoes)!;
+    const fake = createFakeHost({ wardrobeState: applyWardrobeSet(set) });
+    const { result } = renderBinding(fake);
+    const before = structuredClone(fake.state.wardrobeState);
+    act(() => result.current.commitColor(target, "#abcdef"));
+    expect(fake.state.wardrobeState).toEqual({ ...before, [target]: { ...before[target], color: "#abcdef" } });
+    expect(result.current.history.length).toBe(1);
+    act(() => result.current.undo());
+    expect(fake.state.wardrobeState).toEqual(before);
+    act(() => result.current.redo());
+    expect(fake.state.wardrobeState[target]?.color).toBe("#abcdef");
+  });
+
+  it("keeps an unsupported shoe-color reset a no-op without discarding redo", () => {
+    const fake = createFakeHost();
+    const { result } = renderBinding(fake);
+    act(() => result.current.commitColor("skin", "#123456"));
+    act(() => result.current.undo());
+    const before = structuredClone(fake.state);
+    act(() => result.current.commitColor("shoes", null));
+    expect(fake.state).toEqual(before);
+    expect(result.current.history.canRedo).toBe(true);
+  });
+
+  it.each(["equipWardrobeItem", "setWardrobeState"])("rejects a missing %s callback before any color/garment/history change", async (method) => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    act(() => result.current.binding.commitColor("skin", "#123456"));
+    act(() => result.current.binding.undo());
+    const before = structuredClone(fake.state);
+    const top = firstWardrobeEntry();
+    delete fake.host[method];
+    const preset = importedPreset(result.current.workbench, { slot: "top", selections: [{ entryId: top.id, entryVersion: "1", providerId: "toonstudio-builtin", catalogRevision: "character-slot-catalog-v1" }], colors: { skin: "#abcdef", top: "#345678" } });
+    act(() => expect(result.current.workbench.applyPreset(preset)).toBe(false));
+    expect(fake.state).toEqual(before);
+    expect(result.current.binding.history.canRedo).toBe(true);
+    expect(result.current.binding.history.length).toBe(0);
+    expect(result.current.workbench.notice).toContain("모든 변경을 적용할 수 있는 편집기");
   });
 
 });

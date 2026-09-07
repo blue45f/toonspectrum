@@ -8,7 +8,7 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import { MarketplaceAuthoringWorkshop } from "../components/MarketplaceAuthoringWorkshop";
@@ -35,6 +35,18 @@ import { getCreatorMarketplaceResourceIdentity, publishCreatorMarketplaceResourc
 
 const MAX_SOURCE_FILE_BYTES = 512 * 1024;
 
+interface MarketSourceRequest {
+  generation: number;
+  controller: AbortController | null;
+}
+
+function invalidateMarketSourceRequest(request: MarketSourceRequest): number {
+  request.generation += 1;
+  request.controller?.abort();
+  request.controller = null;
+  return request.generation;
+}
+
 export function MarketPublishPage() {
   useDocumentTitle("에셋 등록 · 툰스튜디오 에셋");
   useMetaDescription(
@@ -54,7 +66,17 @@ export function MarketPublishPage() {
   const [updateParent, setUpdateParent] = useState<CreatorMarketplaceResourceIdentity | null>(null);
   const [parentError, setParentError] = useState<string | null>(null);
   const [parentLookupAttempt, setParentLookupAttempt] = useState(0);
+  const requestRef = useRef<MarketSourceRequest>({ generation: 0, controller: null });
   const updateTarget = authoringUpdateResourceId(manifestText);
+
+  useLayoutEffect(() => {
+    const request = requestRef.current;
+    invalidateMarketSourceRequest(request);
+    setSubmitting(false);
+    setPublishedRecord(null);
+    setError(null);
+    return () => { invalidateMarketSourceRequest(request); };
+  }, [userId]);
 
   useEffect(() => {
     setUpdateParent(null);
@@ -77,7 +99,13 @@ export function MarketPublishPage() {
     [manifestText, updateParent, updateTarget, userId],
   );
 
+  function beginSourceRequest(): number {
+    setSubmitting(false);
+    return invalidateMarketSourceRequest(requestRef.current);
+  }
+
   async function loadManifestFile(file: File): Promise<void> {
+    const generation = beginSourceRequest();
     setError(null);
     setPublishedRecord(null);
     if (file.size > MAX_SOURCE_FILE_BYTES) {
@@ -89,9 +117,12 @@ export function MarketPublishPage() {
       return;
     }
     try {
-      setManifestText(await file.text());
+      const source = await file.text();
+      if (requestRef.current.generation !== generation) return;
+      setManifestText(source);
       setSourceName(file.name);
     } catch (caught) {
+      if (requestRef.current.generation !== generation) return;
       setError(marketAuthorityErrorMessage(caught, "manifest 파일을 읽지 못했습니다."));
     }
   }
@@ -100,23 +131,32 @@ export function MarketPublishPage() {
     event.preventDefault();
     if (!authenticated || submitting || parsed.state !== "valid") return;
 
+    const generation = beginSourceRequest();
+    const controller = new AbortController();
+    requestRef.current.controller = controller;
     setSubmitting(true);
     setError(null);
     setPublishedRecord(null);
     try {
-      const record = await publishCreatorMarketplaceResource(parsed.manifest);
+      const record = await publishCreatorMarketplaceResource(parsed.manifest, controller.signal);
+      if (requestRef.current.generation !== generation) return;
       setPublishedRecord(record);
     } catch (caught) {
+      if (requestRef.current.generation !== generation) return;
       setError(marketAuthorityErrorMessage(
         caught,
         "서버 게시에 실패했습니다. 에셋은 공개되지 않았습니다.",
       ));
     } finally {
-      setSubmitting(false);
+      if (requestRef.current.generation === generation) {
+        requestRef.current.controller = null;
+        setSubmitting(false);
+      }
     }
   }
 
   function startAnotherRelease(): void {
+    beginSourceRequest();
     setPublishedRecord(null);
     setManifestText("");
     setSourceName(null);
@@ -242,6 +282,7 @@ export function MarketPublishPage() {
                 value={manifestText}
                 spellCheck={false}
                 onChange={(event) => {
+                  beginSourceRequest();
                   setManifestText(event.target.value);
                   setSourceName(null);
                   setPublishedRecord(null);
