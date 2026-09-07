@@ -11,15 +11,13 @@ permissions:
   issues: write
   pull-requests: write
 
-# PR #837 is closed. Reusing its stale Studio music run's exact concurrency
-# key cancels that superseded execution before this cleanup is scheduled.
 concurrency:
   group: studio-music-regression-837
   cancel-in-progress: true
 
 jobs:
   cleanup:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 10
     steps:
       - name: Cancel superseded cleanup attempts
@@ -28,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for run_id in 34144855700 34144949982 34145176176 34145227011; do
+          for run_id in 34144855700 34144949982 34145176176 34145227011 34145332200; do
             response="$(mktemp)"
             status="$(curl --silent --show-error --location \
               --output "${response}" \
