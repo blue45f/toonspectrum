@@ -4,6 +4,7 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { StudioRouteLoading } from "../StudioLazySurfaceFallback";
 import {
   preloadStudioI18nCore,
+  retryFailedStudioI18nNamespaces,
   scheduleStudioI18nDeferredLoad,
 } from "../studio-i18n-priority-loader";
 
@@ -35,12 +36,19 @@ function useStudioI18nPriorityLoading(): void {
   const lang = useI18n((state) => state.lang);
 
   useEffect(() => {
+    const controller = new AbortController();
     // The route chunk has already started this request. Calling it again is intentional:
     // namespace-level deduplication covers the initial locale and a hydrated language change
-    // immediately receives its own core strings.
-    void preloadStudioI18nCore({ locale: lang }).catch(() => undefined);
+    // immediately receives its own core strings. Any partial core failure is retried without
+    // falling back to the legacy full-catalog loader.
+    void preloadStudioI18nCore({
+      locale: lang,
+      signal: controller.signal,
+    }).then((report) => retryFailedStudioI18nNamespaces(
+      report,
+      { locale: lang, signal: controller.signal },
+    )).catch(() => undefined);
 
-    const controller = new AbortController();
     const cancelDeferred = scheduleStudioI18nDeferredLoad({
       locale: lang,
       signal: controller.signal,
