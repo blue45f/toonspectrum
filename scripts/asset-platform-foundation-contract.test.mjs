@@ -40,8 +40,9 @@ describe("asset platform production migration", () => {
       .split("\n");
     expect(manifest[38]).toBe(migrationPath);
     expect(manifest[39]).toBe("apps/api/src/db/migrations/0040_creator_asset_platform_integrity.sql");
-    expect(manifest.at(-1)).toBe("apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql");
-    expect(manifest).toHaveLength(41);
+    expect(manifest[40]).toBe("apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql");
+    expect(manifest.at(-1)).toBe("apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql");
+    expect(manifest).toHaveLength(42);
     expect(new Set(manifest).size).toBe(manifest.length);
   });
 

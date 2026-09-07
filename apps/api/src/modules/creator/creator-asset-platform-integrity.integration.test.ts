@@ -18,10 +18,10 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
   let pool: Pool;
   let owner: string;
 
-  async function migrate(connection: Pool | PoolClient, targetSchema: string, lastMigration = 41) {
+  async function migrate(connection: Pool | PoolClient, targetSchema: string, lastMigration = 42) {
     const manifest = await readFile(new URL("../../../../../scripts/production-database-migrations.manifest", import.meta.url), "utf8");
     for (const path of manifest.trim().split("\n")) {
-      const number = /\/00(39|40|41)_/u.exec(path)?.[1];
+      const number = /\/00(39|40|41|42)_/u.exec(path)?.[1];
       if (!number || Number(number) > lastMigration) continue;
       const migration = await readFile(new URL(`../../../../../${path}`, import.meta.url), "utf8");
       await connection.query(migration.replaceAll("public.", `"${targetSchema}".`));
@@ -55,7 +55,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
     return connection;
   }
 
-  async function fixture(connection: PoolClient, state: "building" | "sealed" | "rejected" = "building", runState = "succeeded") {
+  async function fixture(connection: PoolClient, state: "building" | "sealed" | "rejected" = "building", runState = "succeeded", lineage: { publisherId?: string; packageId?: string; entryId?: string } = {}) {
     const draft = randomUUID();
     const run = randomUUID();
     const set = randomUUID();
@@ -63,13 +63,13 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
     const toolchain = digest();
     const qa = randomUUID();
     await connection.query(`INSERT INTO creator_marketplace_draft
-      (id, "publisherId", "packageId", kind, name) VALUES ($1, $2, $1, 'asset', 'Fixture')`, [draft, owner]);
+      (id, "publisherId", "packageId", kind, name) VALUES ($1, $2, $3, 'asset', 'Fixture')`, [draft, lineage.publisherId ?? owner, lineage.packageId ?? draft]);
     await connection.query(`INSERT INTO creator_asset_processing_run
       (id, "draftId", "entryId", "sourceDigest", "pipelineProfile", "pipelineVersion",
        "toolchainDigest", "idempotencyKey", state, "finishedAt")
-      VALUES ($1, $2, 'entry', $3, 'fixture', 1, $4, $5, $6,
+      VALUES ($1, $2, $7, $3, 'fixture', 1, $4, $5, $6,
         CASE WHEN $6='succeeded' THEN statement_timestamp() ELSE NULL END)`,
-    [run, draft, source, toolchain, digest(), runState]);
+    [run, draft, source, toolchain, digest(), runState, lineage.entryId ?? "entry"]);
     await connection.query(`INSERT INTO creator_asset_artifact_set
       (id, "processingRunId", "entryKind", "sourceDigest", "profileSchemaVersion", descriptor, "descriptorHash", "toolchainDigest")
       VALUES ($1, $2, 'raster-asset', $3, 1, $4, $5, $6)`,
@@ -203,7 +203,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
     return id;
   }
 
-  async function release(connection: PoolClient, ordinal = 1) {
+  async function release(connection: PoolClient, ordinal = 1, bind = true) {
     const source = await fixture(connection, "sealed");
     const id = randomUUID();
     const license = randomUUID();
@@ -215,14 +215,15 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
       minimumStudioVersion: "0.1.0", license: "cc0-1.0", provenance: { origin: "original" }, entries: [{ id: "entry" }] }, digest().slice(7), ordinal, source.draft]);
     await connection.query(`INSERT INTO creator_asset_license_snapshot
       (id, "licenseCode", "policyVersion", capabilities, "legalTextDigest", "capturedAt", "reviewState", "reviewedBy")
-      VALUES ($1, 'cc0-1.0', 1, '{}', $2, statement_timestamp(), 'approved', $3)`, [license, digest(), owner]);
-    await connection.query(`INSERT INTO creator_marketplace_release_artifact_binding
+      VALUES ($1, 'cc0-1.0', 1, '{}', $2, statement_timestamp(), 'pending', NULL)`, [license, digest()]);
+    await connection.query(`UPDATE creator_asset_license_snapshot SET "reviewState"='approved', "reviewedBy"=$2 WHERE id=$1`, [license, owner]);
+    if (bind) await connection.query(`INSERT INTO creator_marketplace_release_artifact_binding
       ("releaseId", "entryId", "artifactSetId", "licenseSnapshotId", "publicPreviewArtifactId", "bindingHash")
       VALUES ($1, 'entry', $2, $3, 'thumb', $4)`, [id, source.set, license, digest()]);
     return { ...source, id, license, packageId: source.draft };
   }
 
-  async function workBinding(connection: PoolClient, selected: Awaited<ReturnType<typeof release>>, overrides: { releaseId?: string; entryId?: string; license?: string; entitlement?: string | null } = {}) {
+  async function workBinding(connection: PoolClient, selected: Awaited<ReturnType<typeof release>>, overrides: { releaseId?: string; entryId?: string; license?: string; entitlement?: string | null; digest?: string } = {}) {
     const work = randomUUID();
     const target = (await connection.query<{ publisherId: string; packageId: string }>(
       'SELECT "publisherId", "packageId" FROM creator_marketplace_resource WHERE id=$1',
@@ -235,7 +236,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
       ("workId", "attachmentId", "assetType", "releaseId", "entryId", "artifactSetId", "selectedArtifactId",
        "expectedContentDigest", "licenseSnapshotId", "entitlementGrantId", "useReceiptId", "qualityProfile")
       VALUES ($1, 'attachment', 'raster', $2, $3, $4, 'source', $5, $6, $7, $1, 'source')`,
-    [work, overrides.releaseId ?? selected.id, overrides.entryId ?? "entry", selected.set, selected.source,
+    [work, overrides.releaseId ?? selected.id, overrides.entryId ?? "entry", selected.set, overrides.digest ?? selected.source,
       overrides.license ?? selected.license, entitlement]);
     return { work, entitlement };
   }
@@ -397,7 +398,8 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
       const license = randomUUID();
       await connection.query(`INSERT INTO creator_asset_license_snapshot
         (id, "licenseCode", "policyVersion", capabilities, "legalTextDigest", "capturedAt", "reviewState")
-        VALUES ($1, 'cc0-1.0', 1, '{}', $2, statement_timestamp(), 'rejected')`, [license, digest()]);
+        VALUES ($1, 'cc0-1.0', 1, '{}', $2, statement_timestamp(), 'pending')`, [license, digest()]);
+      await connection.query(`UPDATE creator_asset_license_snapshot SET "reviewState"='rejected', "reviewedBy"=$2 WHERE id=$1`, [license, owner]);
       await changeDraft(connection, source.draft, "processing", null, null);
       await connection.query("SAVEPOINT review");
       await expect(changeDraft(connection, source.draft, "ready-to-submit", kind === "missing" ? null : kind === "other-draft" ? selected.set : source.set,
@@ -534,4 +536,232 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
       second.release();
     }
   });
+  it.each(["entry", "publisher", "package"] as const)("rejects release bindings from another processing %s", async (kind) => {
+    await transaction(async (connection) => {
+      const selected = await release(connection, 1, false);
+      const publisher = randomUUID();
+      await connection.query('INSERT INTO "user" (id,name) VALUES ($1,\'Other publisher\')', [publisher]);
+      const source = kind === "entry" ? selected : await fixture(connection, "sealed", "succeeded", {
+        publisherId: kind === "publisher" ? publisher : owner,
+        packageId: kind === "package" ? randomUUID() : selected.packageId,
+        entryId: kind === "entry" ? "another-entry" : "entry",
+      });
+      await rejects(connection, `INSERT INTO creator_marketplace_release_artifact_binding
+        ("releaseId","entryId","artifactSetId","licenseSnapshotId","publicPreviewArtifactId","bindingHash")
+        VALUES ($1,$5,$2,$3,'thumb',$4)`, [selected.id, source.set, selected.license, digest(), kind === "entry" ? "another-entry" : "entry"],
+      "creator_marketplace_release_binding_lineage");
+    });
+  });
+
+  it.each(["approved", "rejected"])("rejects direct %s license insertion before pending review", async (state) => {
+    await transaction(async (connection) => {
+      await rejects(connection, `INSERT INTO creator_asset_license_snapshot
+        (id,"licenseCode","policyVersion",capabilities,"legalTextDigest","capturedAt","reviewState","reviewedBy")
+        VALUES ($1,'cc0-1.0',1,'{}',$2,statement_timestamp(),$3,$4)`, [randomUUID(), digest(), state, owner],
+      "creator_asset_license_snapshot_initial_state");
+    });
+  });
+
+  it("rejects an arbitrary work content pin while accepting the selected object's digest", async () => {
+    await transaction(async (connection) => {
+      const selected = await release(connection);
+      await connection.query("SAVEPOINT wrong_digest");
+      await expect(workBinding(connection, selected, { digest: digest() })).rejects.toMatchObject({ constraint: "creator_work_catalog_asset_binding_content_digest" });
+      await connection.query("ROLLBACK TO SAVEPOINT wrong_digest");
+      const accepted = await workBinding(connection, selected);
+      expect((await connection.query('SELECT "expectedContentDigest" FROM creator_work_catalog_asset_binding WHERE "workId"=$1', [accepted.work])).rows[0].expectedContentDigest).toBe(selected.source);
+    });
+  });
+
+  async function rightsEvidence(connection: PoolClient, source: string) {
+    const license = randomUUID();
+    const evidence = randomUUID();
+    await connection.query(`INSERT INTO creator_asset_license_snapshot
+      (id,"licenseCode","policyVersion",capabilities,"legalTextDigest","capturedAt")
+      VALUES ($1,'cc0-1.0',1,'{}',$2,statement_timestamp())`, [license, digest()]);
+    await connection.query(`INSERT INTO creator_asset_rights_evidence
+      (id,"licenseSnapshotId","evidenceType","objectDigest","submittedBy") VALUES ($1,$2,'creator-attestation',$3,$4)`,
+    [evidence, license, source, owner]);
+    return { license, evidence };
+  }
+
+  it.each(["approved", "rejected"])("keeps %s rights evidence immutable, including reparent and late insertion", async (state) => {
+    await transaction(async (connection) => {
+      const source = await fixture(connection);
+      const original = await rightsEvidence(connection, source.source);
+      const target = await rightsEvidence(connection, source.source);
+      await connection.query('UPDATE creator_asset_license_snapshot SET "reviewState"=$2,"reviewedBy"=$3 WHERE id=$1', [original.license, state, owner]);
+      for (const sql of [
+        'UPDATE creator_asset_rights_evidence SET visibility=\'publisher-and-reviewer\' WHERE id=$1',
+        'DELETE FROM creator_asset_rights_evidence WHERE id=$1',
+      ]) await rejects(connection, sql, [original.evidence], "creator_asset_rights_evidence_terminal_immutable");
+      await rejects(connection, 'UPDATE creator_asset_rights_evidence SET "licenseSnapshotId"=$2 WHERE id=$1',
+        [original.evidence, target.license], "creator_asset_rights_evidence_terminal_immutable");
+      await rejects(connection, 'UPDATE creator_asset_rights_evidence SET "licenseSnapshotId"=$2 WHERE id=$1',
+        [target.evidence, original.license], "creator_asset_rights_evidence_terminal_immutable");
+      await rejects(connection, `INSERT INTO creator_asset_rights_evidence
+        (id,"licenseSnapshotId","evidenceType","objectDigest") VALUES ($1,$2,'contract',$3)`,
+      [randomUUID(), original.license, source.source], "creator_asset_rights_evidence_terminal_immutable");
+      expect((await connection.query('SELECT "licenseSnapshotId" FROM creator_asset_rights_evidence WHERE id=$1', [original.evidence])).rows[0].licenseSnapshotId).toBe(original.license);
+    });
+  });
+
+  it("allows pending evidence correction before the one terminal review", async () => {
+    await transaction(async (connection) => {
+      const source = await fixture(connection);
+      const evidence = await rightsEvidence(connection, source.source);
+      await connection.query('UPDATE creator_asset_rights_evidence SET visibility=\'publisher-and-reviewer\' WHERE id=$1', [evidence.evidence]);
+      await connection.query('DELETE FROM creator_asset_rights_evidence WHERE id=$1', [evidence.evidence]);
+      await connection.query('UPDATE creator_asset_license_snapshot SET "reviewState"=\'approved\',"reviewedBy"=$2 WHERE id=$1', [evidence.license, owner]);
+      expect((await connection.query('SELECT "reviewState" FROM creator_asset_license_snapshot WHERE id=$1', [evidence.license])).rows[0].reviewState).toBe("approved");
+    });
+  });
+
+  const deleteObject = `UPDATE creator_asset_storage_object SET state='deleting',"deleteToken"=$2 WHERE digest=$1 AND purpose='derived'`;
+
+  it.each(["building", "sealed"] as const)("keeps referenced %s artifact bytes active during storage cleanup", async (state) => {
+    await transaction(async (connection) => {
+      const source = await fixture(connection, state);
+      const object = source.descriptor.artifacts.find((artifact) => artifact.id === "runtime")!;
+      await rejects(connection, deleteObject, [object.digest, randomUUID()], "creator_asset_storage_object_artifact_retention");
+      expect((await connection.query('SELECT state FROM creator_asset_storage_object WHERE digest=$1', [object.digest])).rows[0].state).toBe("active");
+    });
+  });
+
+  it.each(["deleting", "deleted"])("rejects attaching bytes already %s and permits cleanup after removing building references", async (state) => {
+    await transaction(async (connection) => {
+      const source = await fixture(connection);
+      const original = (await connection.query('DELETE FROM creator_asset_artifact WHERE "artifactSetId"=$1 AND "artifactId"=\'runtime\' RETURNING *', [source.set])).rows[0];
+      await connection.query(deleteObject, [original.objectDigest, randomUUID()]);
+      if (state === "deleted") await connection.query('UPDATE creator_asset_storage_object SET state=\'deleted\',"deleteToken"=NULL,"deletedAt"=statement_timestamp() WHERE digest=$1', [original.objectDigest]);
+      await rejects(connection, 'INSERT INTO creator_asset_artifact SELECT (jsonb_populate_record(NULL::creator_asset_artifact,$1::jsonb)).*',
+        [JSON.stringify(original)], "creator_asset_artifact_storage_active");
+    });
+  });
+
+  it.each(["active", "owner-delisted", "moderation-hold", "rights-suspended", "security-blocked", "revoked"])("retains %s availability instead of erasing its durable state", async (state) => {
+    await transaction(async (connection) => {
+      const source = await release(connection);
+      await connection.query('INSERT INTO creator_marketplace_release_availability ("releaseId",state,"reasonCode") VALUES ($1,$2,$3)',
+        [source.id, state, state === "active" ? null : "review-result"]);
+      await rejects(connection, 'DELETE FROM creator_marketplace_release_availability WHERE "releaseId"=$1', [source.id], "creator_marketplace_release_availability_delete_immutable");
+      expect((await connection.query('SELECT state FROM creator_marketplace_release_availability WHERE "releaseId"=$1', [source.id])).rows[0].state).toBe(state);
+    });
+  });
+
+  it.each(["artifact-first", "cleanup-first"])("serializes active storage admission against cleanup: %s", async (order) => {
+    const first = await client(); const second = await client();
+    try {
+      const source = await fixture(first);
+      const original = (await first.query('DELETE FROM creator_asset_artifact WHERE "artifactSetId"=$1 AND "artifactId"=\'runtime\' RETURNING *', [source.set])).rows[0];
+      const insert = (connection: PoolClient) => connection.query('INSERT INTO creator_asset_artifact SELECT (jsonb_populate_record(NULL::creator_asset_artifact,$1::jsonb)).*', [JSON.stringify(original)]);
+      const remove = (connection: PoolClient) => connection.query(deleteObject, [original.objectDigest, randomUUID()]);
+      const backend = (await second.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!;
+      await first.query("BEGIN");
+      await (order === "artifact-first" ? insert(first) : remove(first));
+      const pending = (order === "artifact-first" ? remove(second) : insert(second))
+        .then(() => ({ accepted: true }), (error: { constraint?: string }) => ({ accepted: false, constraint: error.constraint }));
+      await expect.poll(async () => (await pool.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1', [backend.pid])).rows[0]?.wait_event_type).toBe("Lock");
+      await first.query("COMMIT");
+      expect(await pending).toEqual({ accepted: false, constraint: order === "artifact-first"
+        ? "creator_asset_storage_object_artifact_retention" : "creator_asset_artifact_storage_active" });
+    } finally { await first.query("ROLLBACK"); first.release(); second.release(); }
+  });
+
+  it.each(["release-lineage", "work-pin", "inactive-storage", "valid"] as const)("validates 0042 historical %s without rewriting evidence", async (kind) => {
+    const legacy = `asset_retention_${randomUUID().replaceAll("-", "")}`;
+    const connection = await client();
+    try {
+      await connection.query(`CREATE SCHEMA "${legacy}"`);
+      for (const table of ["user", "creator_work", "creator_marketplace_resource", "creator_asset_storage_object"]) {
+        await connection.query(`CREATE TABLE "${legacy}"."${table}" (LIKE public."${table}" INCLUDING ALL)`);
+      }
+      await migrate(connection, legacy, 41);
+      await connection.query(`SET search_path TO "${legacy}", public`);
+      await connection.query('INSERT INTO "user" (id,name) VALUES ($1,\'Migration fixture\')', [owner]);
+      const selected = await release(connection, 1, kind !== "release-lineage");
+      if (kind === "release-lineage") {
+        const unrelated = await fixture(connection, "sealed");
+        await connection.query(`INSERT INTO creator_marketplace_release_artifact_binding
+          ("releaseId","entryId","artifactSetId","licenseSnapshotId","publicPreviewArtifactId","bindingHash")
+          VALUES ($1,'entry',$2,$3,'thumb',$4)`, [selected.id, unrelated.set, selected.license, digest()]);
+      } else if (kind === "work-pin") {
+        await workBinding(connection, selected, { digest: digest() });
+      } else if (kind === "inactive-storage") {
+        await connection.query(deleteObject, [selected.descriptor.artifacts.find((artifact) => artifact.id === "runtime")!.digest, randomUUID()]);
+      }
+      const snapshot = async () => {
+        const rows: Record<string, unknown[]> = {};
+        for (const table of ["creator_marketplace_release_artifact_binding", "creator_work_catalog_asset_binding", "creator_asset_license_snapshot", "creator_asset_storage_object"]) {
+          rows[table] = (await connection.query(`SELECT * FROM "${table}" ORDER BY 1,2`)).rows;
+        }
+        return rows;
+      };
+      const before = await snapshot();
+      const sql = (await readFile(new URL("../../../../../apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql", import.meta.url), "utf8"))
+        .replaceAll("public.", `"${legacy}".`);
+      if (kind === "valid") {
+        await connection.query(sql);
+      } else {
+        const constraint = { "release-lineage": "creator_marketplace_release_binding_lineage",
+          "work-pin": "creator_work_catalog_asset_binding_content_digest", "inactive-storage": "creator_asset_artifact_storage_active" }[kind];
+        await expect(connection.query(sql)).rejects.toMatchObject({ constraint });
+        await connection.query("ROLLBACK");
+      }
+      expect(await snapshot()).toEqual(before);
+      const triggers = (await connection.query(`SELECT count(*)::int AS count FROM pg_trigger
+        WHERE tgrelid=$1::regclass AND tgname='creator_asset_license_snapshot_insert'`, [`"${legacy}".creator_asset_license_snapshot`])).rows[0].count;
+      expect(triggers).toBe(kind === "valid" ? 1 : 0);
+    } finally {
+      await connection.query("ROLLBACK");
+      await connection.query(`DROP SCHEMA IF EXISTS "${legacy}" CASCADE`);
+      connection.release();
+    }
+  });
+
+  it.each(["review-first", "evidence-first"])("serializes review with rights evidence: %s", async (order) => {
+    const first = await client(); const second = await client();
+    try {
+      const source = await fixture(first);
+      const evidence = await rightsEvidence(first, source.source);
+      const approve = (connection: PoolClient) => connection.query('UPDATE creator_asset_license_snapshot SET "reviewState"=\'approved\',"reviewedBy"=$2 WHERE id=$1', [evidence.license, owner]);
+      const edit = (connection: PoolClient) => connection.query('UPDATE creator_asset_rights_evidence SET visibility=\'publisher-and-reviewer\' WHERE id=$1', [evidence.evidence]);
+      const backend = (await second.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!;
+      await first.query("BEGIN");
+      await (order === "review-first" ? approve(first) : edit(first));
+      const pending = (order === "review-first" ? edit(second) : approve(second))
+        .then(() => ({ accepted: true }), (error: { constraint?: string }) => ({ accepted: false, constraint: error.constraint }));
+      await expect.poll(async () => (await pool.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1', [backend.pid])).rows[0]?.wait_event_type).toBe("Lock");
+      await first.query("COMMIT");
+      expect(await pending).toEqual(order === "review-first"
+        ? { accepted: false, constraint: "creator_asset_rights_evidence_terminal_immutable" } : { accepted: true });
+      expect((await first.query('SELECT "reviewState" FROM creator_asset_license_snapshot WHERE id=$1', [evidence.license])).rows[0].reviewState).toBe("approved");
+    } finally { await first.query("ROLLBACK"); first.release(); second.release(); }
+  });
+
+  it("preserves least-privilege runtime cleanup without exposing artifact evidence", async () => {
+    await transaction(async (connection) => {
+      const role = `asset_cleanup_${randomUUID().replaceAll("-", "")}`;
+      const retained = await fixture(connection, "sealed");
+      const detached = await fixture(connection);
+      const retainedDigest = retained.descriptor.artifacts.find((artifact) => artifact.id === "runtime")!.digest;
+      const detachedDigest = detached.descriptor.artifacts.find((artifact) => artifact.id === "runtime")!.digest;
+      await connection.query('DELETE FROM creator_asset_artifact WHERE "artifactSetId"=$1 AND "artifactId"=\'runtime\'', [detached.set]);
+      await connection.query(`CREATE ROLE "${role}" NOLOGIN`);
+      await connection.query(`GRANT USAGE ON SCHEMA "${schema}" TO "${role}"`);
+      await connection.query(`GRANT SELECT ON creator_asset_storage_object TO "${role}"`);
+      await connection.query(`GRANT UPDATE ("state","deleteToken","updatedAt","deletedAt") ON creator_asset_storage_object TO "${role}"`);
+      await connection.query(`SET LOCAL ROLE "${role}"`);
+      await connection.query("SAVEPOINT private_catalog");
+      await expect(connection.query('SELECT * FROM creator_asset_artifact')).rejects.toMatchObject({ code: "42501" });
+      await connection.query("ROLLBACK TO SAVEPOINT private_catalog");
+      await rejects(connection, deleteObject, [retainedDigest, randomUUID()], "creator_asset_storage_object_artifact_retention");
+      await connection.query(deleteObject, [detachedDigest, randomUUID()]);
+      expect((await connection.query('SELECT state FROM creator_asset_storage_object WHERE digest=$1', [detachedDigest])).rows[0].state).toBe("deleting");
+      expect((await connection.query('SELECT has_function_privilege(current_user,$1,\'EXECUTE\') AS allowed',
+        [`"${schema}".enforce_creator_asset_storage_artifact_retention()`])).rows[0].allowed).toBe(false);
+      await connection.query("RESET ROLE");
+    });
+  });
+
 });
