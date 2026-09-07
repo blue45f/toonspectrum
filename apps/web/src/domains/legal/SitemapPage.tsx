@@ -45,6 +45,16 @@ const SECTIONS: readonly SitemapSection[] = [
     ],
   },
   {
+    title: "리서치",
+    description: "오늘의 영감, 작품·판본·공개 자료 조사",
+    links: [
+      { href: "/now", label: "오늘의 영감", description: "매일 바뀌는 장면 소재와 5컷 미션" },
+      { href: "/research", label: "창작 리서치 데스크", description: "작품·판본·자료·기회를 한 보드로 연결" },
+      { href: "/research/assets", label: "창작 레퍼런스", description: "공개 이용이 확인된 미술·복식·소품 자료" },
+      { href: "/research/books", label: "글로벌 판본 탐색", description: "Open Library·openBD 도서 메타데이터 검색" },
+    ],
+  },
+  {
     title: "배우기",
     description: "제작 강좌, 레퍼런스, 기획과 출판 준비",
     links: [
@@ -52,9 +62,9 @@ const SECTIONS: readonly SitemapSection[] = [
       { href: "/learn/glossary", label: "웹툰 용어 사전", description: "제작 용어와 예시" },
       { href: "/learn/recipes", label: "제작 레시피", description: "연출을 직접 조작하며 학습" },
       { href: "/references", label: "작품 레퍼런스", description: "공식 자료 탐색과 연구 노트" },
-      { href: "/story-lab", label: "스토리 연구실", description: "이야기 구조와 장면 기획" },
+      { href: "/story-lab", label: "스토리 연구실", description: "인물·욕망·갈등 설계" },
       { href: "/opportunities", label: "작가 기회센터", description: "공모·지원사업 찾기" },
-      { href: "/publishing", label: "연재·출판 준비", description: "제출 전 체크리스트" },
+      { href: "/publishing", label: "연재·출판 준비", description: "원고·권리·소개 자료 점검" },
     ],
   },
   {
@@ -91,6 +101,8 @@ const SECTIONS: readonly SitemapSection[] = [
       { href: "/library", label: "읽기 서재", description: "읽기 상태·평가·컬렉션" },
       { href: "/settings", label: "설정", description: "표시·데이터·계정 설정" },
       { href: "/about", label: "서비스 소개", description: "툰스튜디오의 기능과 원칙" },
+      { href: "/about/data", label: "데이터 출처", description: "공급자별 연결·상업 이용 준비 상태" },
+      { href: "/about/crawler", label: "공개 데이터 수집 정책", description: "자동수집 원칙·제외 범위·중지 요청" },
       { href: "/guide", label: "랭킹 산정 방식", description: "데이터와 산식 설명" },
       { href: "/support", label: "문의", description: "서비스 이용 문의" },
       { href: "/contact", label: "광고·제휴", description: "비즈니스 문의 안내" },
@@ -118,8 +130,8 @@ export function SitemapPage() {
           {t("app.name")} 전체 메뉴
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-2">
-          만들기, 작품, 에셋, 배우기와 발견 기능을 목적별로 모았습니다. 상세 작품과 게시물은
-          각 목록에서 선택해 이동할 수 있습니다.
+          만들기, 작품, 에셋, 리서치, 배우기와 발견 기능을 목적별로 모았습니다. 데이터 출처와
+          공개 수집 정책도 함께 확인할 수 있습니다.
         </p>
       </section>
 
