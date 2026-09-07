@@ -9,13 +9,19 @@ import { CaptureBridge } from "./StudioBg3dCaptureBridge";
 import { StudioBg3dCompositionOverlay } from "./StudioBg3dCompositionOverlay";
 import { StudioBg3dEngineRecoveryActions } from "./StudioBg3dEngineRecoveryActions";
 import type { StudioBg3dCompositionGuideMode } from "./studio-bg3d-composition-guide";
-import { lazy as lazyTurntable } from "react";
 import { StudioBg3dViewFrameClear } from "./StudioBg3dViewFrameClear";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
-const StudioBg3dTurntableController = lazyTurntable(() => import("./StudioBg3dTurntableController")
-  .then((module) => ({ default: module.StudioBg3dTurntableController })));
-const StudioBg3dTurntableMotion = lazyTurntable(() => import("./StudioBg3dTurntableMotion")
-  .then((module) => ({ default: module.StudioBg3dTurntableMotion })));
+const StudioBg3dTurntableController = lazyRetry(
+  () => import("./StudioBg3dTurntableController")
+    .then((module) => ({ default: module.StudioBg3dTurntableController })),
+  "StudioBg3dTurntableController",
+);
+const StudioBg3dTurntableMotion = lazyRetry(
+  () => import("./StudioBg3dTurntableMotion")
+    .then((module) => ({ default: module.StudioBg3dTurntableMotion })),
+  "StudioBg3dTurntableMotion",
+);
 
 export function StudioBg3dEditorViewport({ h }) {
   const {
