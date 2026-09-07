@@ -1,0 +1,71 @@
+{
+  "reviewScope": "single-perspective-render-review",
+  "assets": [
+    {
+      "id": "ts-bg3d-library_reading_room-expansion-v1",
+      "sha256": "sha256:2461352f0b60143a21f88e9173f3700efcd919fbbc05b1dbc5e92c087680bc39",
+      "preview": "artifacts/studio-environment-expansion-v1/library_reading_room.png",
+      "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+      "scope": "One authored oblique scene overview, not a multi-angle approval",
+      "reviewedModelSha256": "sha256:2461352f0b60143a21f88e9173f3700efcd919fbbc05b1dbc5e92c087680bc39",
+      "reviewedImageSha256": "sha256:b26cd89704657525659ef4db31914e0b95b7f350f52250d160104eccaabb8b46",
+      "observations": "Visible bound-book shelves, shared six-seat desk, task lamps, reference books supported by the reference desk; clear front circulation. Left-wall label no longer hidden behind shelves.",
+      "visibleStructuralBlocker": false
+    },
+    {
+      "id": "ts-bg3d-independent_bookshop-expansion-v1",
+      "sha256": "sha256:bc1986e34e69d53a98550b5afa6e678be36b16fe22b82a2daafccd6acfcd5a43",
+      "preview": "artifacts/studio-environment-expansion-v1/independent_bookshop.png",
+      "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+      "scope": "One authored oblique scene overview, not a multi-angle approval",
+      "reviewedModelSha256": "sha256:bc1986e34e69d53a98550b5afa6e678be36b16fe22b82a2daafccd6acfcd5a43",
+      "reviewedImageSha256": "sha256:74d163031c49a388c6597517356b6b9c2ff7867df3809b43b0a75fdb86a10d22",
+      "observations": "Offset stepped face-out display islands, partial shopfront glazing, book-lined wall and checkout remain distinct from the library reading layout.",
+      "visibleStructuralBlocker": false
+    },
+    {
+      "id": "ts-bg3d-fashion_boutique-expansion-v1",
+      "sha256": "sha256:e4d529856c6be1ae13ff684858d85a3fc51ead2eb3dd86ffd1b03367df2f94a5",
+      "preview": "artifacts/studio-environment-expansion-v1/fashion_boutique.png",
+      "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+      "scope": "One authored oblique scene overview, not a multi-angle approval",
+      "reviewedModelSha256": "sha256:e4d529856c6be1ae13ff684858d85a3fc51ead2eb3dd86ffd1b03367df2f94a5",
+      "reviewedImageSha256": "sha256:cf3713073618799f34cdb56596147427396b3ed3520b1fb95f4945f13960f8aa",
+      "observations": "Tailored jackets and flared dresses hang from racks; open pleated fitting room, mirror, accessory display and upholstered bench have distinct forms. Garments are stylized set dressing, not skinned wearable assets.",
+      "visibleStructuralBlocker": false
+    },
+    {
+      "id": "ts-bg3d-park_garden_pavilion-expansion-v1",
+      "sha256": "sha256:6cf4b5ba75ded1e8fcfb891e1774420f192a1952c480b6914cd292aab781d0ff",
+      "preview": "artifacts/studio-environment-expansion-v1/park_garden_pavilion.png",
+      "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+      "scope": "One authored oblique scene overview, not a multi-angle approval",
+      "reviewedModelSha256": "sha256:6cf4b5ba75ded1e8fcfb891e1774420f192a1952c480b6914cd292aab781d0ff",
+      "reviewedImageSha256": "sha256:2869771a8b4b3816f73038247f24cd8dc405f9841980f5be0e33aafffdcdb89c",
+      "observations": "Octagonal posts and rafters, deliberate front roof cutaway, bolted slatted benches, pavers, branched trees with individual leaves and planted beds. Oversized duplicate pots removed.",
+      "visibleStructuralBlocker": false
+    },
+    {
+      "id": "ts-bg3d-police_interview_room-expansion-v1",
+      "sha256": "sha256:ad031daef47016e60f868a2371b5a7fa74174e4e80b0cd8e5b33c6be28f4bfa0",
+      "preview": "artifacts/studio-environment-expansion-v1/police_interview_room.png",
+      "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+      "scope": "One authored oblique scene overview, not a multi-angle approval",
+      "reviewedModelSha256": "sha256:ad031daef47016e60f868a2371b5a7fa74174e4e80b0cd8e5b33c6be28f4bfa0",
+      "reviewedImageSha256": "sha256:b2738e4bcc54509a21658eed2a0bc4e18f05b76bfd1cca909434f2c4a7148719",
+      "observations": "Observation glass, security-door hinges and latch, recording device and CCTV are visible; fixed-table floor plates align with the legs and overhead lights have support rails.",
+      "visibleStructuralBlocker": false
+    },
+    {
+      "id": "ts-bg3d-science_research_laboratory-expansion-v1",
+      "sha256": "sha256:43bacb2752e166a8302870cc1feacb354cac302290e8d43ec4ed9cf0dadf8b99",
+      "preview": "artifacts/studio-environment-expansion-v1/science_research_laboratory.png",
+      "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+      "scope": "One authored oblique scene overview, not a multi-angle approval",
+      "reviewedModelSha256": "sha256:43bacb2752e166a8302870cc1feacb354cac302290e8d43ec4ed9cf0dadf8b99",
+      "reviewedImageSha256": "sha256:c75ac15c895556965efd18ea8d57f102dd76efdd6a71ae5e052a42e0ce14ae5d",
+      "observations": "Microscope optics, beakers, clamped flasks, caster stools, fume hood, faucet and safety shower are visible; sink bowl has a real opening through countertop and cabinet.",
+      "visibleStructuralBlocker": false
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import {
   parseStudioCc0Catalog,
   studioCc0AssetUrl,
 } from "./studio-cc0-asset-delivery";
+import { curateStudioCc0Selection, getStudioCc0ReviewStatus } from "./studio-cc0-curation";
 import {
   STUDIO_ORIGINAL_FREE_ASSETS,
   STUDIO_ORIGINAL_FREE_ASSET_PACKAGES,
@@ -32,6 +33,40 @@ describe("CC0 delivery catalog boundary", () => {
     expect(result[0].provider).toBe("Kenney");
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result[0])).toBe(true);
+  });
+  it("keeps old manifests readable while treating missing visual evidence as unreviewed", () => {
+    const result = parseStudioCc0Catalog(manifest([fixture()]));
+    expect(result[0]).toMatchObject({
+      visualReviewed: false, visualReviewLevel: "unreviewed", visualReviewSource: "",
+      curationStatus: "unreviewed", role: "unclassified", style: "unspecified",
+      studioRuntimeVerified: false, allAnglesArtisticallyApproved: false,
+    });
+    expect(getStudioCc0ReviewStatus(result[0])).toBe("unreviewed");
+    expect(curateStudioCc0Selection(result)).toEqual([]);
+  });
+  it("preserves review evidence and roles without upgrading contact-sheet review", () => {
+    const metadata = {style: "stylized-low-poly", visualReviewed: true,
+      visualReviewLevel: "contact-sheet-visual-triage", visualReviewSource: "review-01.pdf#page=1",
+      role: "finished-asset", curationStatus: "selected-after-visual-triage", studioRuntimeVerified: false,
+      allAnglesArtisticallyApproved: false};
+    const result = parseStudioCc0Catalog(manifest([{...fixture(), ...metadata}]));
+    expect(result[0]).toMatchObject(metadata);
+    expect(getStudioCc0ReviewStatus(result[0])).toBe("contact-sheet-reviewed");
+    expect(curateStudioCc0Selection(result)).toEqual(result);
+  });
+  it.each([
+    {visualReviewed: "true"}, {studioRuntimeVerified: 1}, {allAnglesArtisticallyApproved: "yes"},
+    {visualReviewSource: "a".repeat(513)}, {visualReviewLevel: {}}, {curationStatus: "rejected\nselected"},
+  ])("rejects malformed visual metadata instead of treating it as approval: %j", metadata => {
+    expect(() => parseStudioCc0Catalog(manifest([{...fixture(), ...metadata}]))).toThrow();
+  });
+  it("preserves an explicit rejection through parsing and new-selection filtering", () => {
+    const result = parseStudioCc0Catalog(manifest([{...fixture(), visualReviewed: true,
+      visualReviewLevel: "contact-sheet-visual-triage", visualReviewSource: "review-01.pdf#page=1",
+      curationStatus: "rejected"}]));
+    expect(result[0].curationStatus).toBe("rejected");
+    expect(getStudioCc0ReviewStatus(result[0])).toBe("excluded");
+    expect(curateStudioCc0Selection(result)).toEqual([]);
   });
   it.each(["../secret.glb", "assets/../secret.glb", "assets//chair.glb", "assets/%2e%2e/secret.glb", "https://example.com/model.glb", "assets/chair.svg", "assets/chair.glb?token=x"])("rejects unsafe path %s", input => {
     expect(() => studioCc0AssetUrl(input)).toThrow();

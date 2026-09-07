@@ -95,7 +95,7 @@ export function StudioBg3dProceduralStarterPanel({
     } catch {
       setNotice({
         tone: "error",
-        message: "3D 스타터 에셋을 추가하지 못했습니다. 장면 상태를 확인한 뒤 다시 시도해 주세요.",
+        message: "블록아웃 프리셋을 추가하지 못했습니다. 장면 상태를 확인한 뒤 다시 시도해 주세요.",
       });
     }
   };
@@ -109,10 +109,10 @@ export function StudioBg3dProceduralStarterPanel({
             className="flex items-center gap-1.5 text-sm font-bold text-fg"
           >
             <Box size={15} className="shrink-0 text-accent" aria-hidden />
-            절차형 무료 에셋
+            구도용 블록아웃
           </h3>
           <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-            외부 파일 없이 기본 도형으로 생성되어 파츠별로 바로 편집할 수 있습니다.
+            기본 도형으로 공간의 비율과 배치를 잡는 프리셋입니다. 파츠별로 편집해 세부 형태를 다듬을 수 있습니다.
           </p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-good/35 bg-good/10 px-2 py-1 text-[0.62rem] font-bold text-good">
@@ -129,7 +129,7 @@ export function StudioBg3dProceduralStarterPanel({
         <input
           type="search"
           value={query}
-          aria-label="절차형 3D 에셋 검색"
+          aria-label="블록아웃 프리셋 검색"
           placeholder="방, 계단, 가구, 거리…"
           spellCheck={false}
           className="min-h-11 w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-2 text-xs text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
@@ -144,7 +144,7 @@ export function StudioBg3dProceduralStarterPanel({
       <div
         className="mt-2 grid grid-cols-3 gap-1.5"
         role="radiogroup"
-        aria-label="절차형 3D 에셋 카테고리"
+        aria-label="블록아웃 프리셋 카테고리"
       >
         {STUDIO_BG3D_PROCEDURAL_STARTER_CATEGORY_FILTERS.map((option) => (
           <button
@@ -170,7 +170,7 @@ export function StudioBg3dProceduralStarterPanel({
       </div>
 
       <p className="mt-2 text-[0.64rem] font-medium text-fg-3" aria-live="polite">
-        {filteredAssets.length}개 찾음 · WebGL2/WebGPU 공용 · 외부 리소스 0
+        {filteredAssets.length}개 블록아웃 · 파츠별 편집
       </p>
 
       {disabledReason ? (
@@ -202,7 +202,7 @@ export function StudioBg3dProceduralStarterPanel({
 
       {visibleAssets.length === 0 ? (
         <div className="mt-3 rounded-lg border border-dashed border-line bg-card/45 px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
-          검색과 카테고리에 맞는 에셋이 없습니다.
+          검색과 카테고리에 맞는 블록아웃이 없습니다.
           <button
             type="button"
             className="mt-2 min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
@@ -280,7 +280,7 @@ export function StudioBg3dProceduralStarterPanel({
           className="mt-3 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
           onClick={() => setShowAll(true)}
         >
-          에셋 {hiddenCount}개 더 보기
+          블록아웃 {hiddenCount}개 더 보기
         </button>
       ) : showAll && filteredAssets.length > FIRST_PAGE_SIZE ? (
         <button

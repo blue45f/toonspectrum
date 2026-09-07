@@ -6,7 +6,8 @@ import {
   type StudioCc0Asset, type StudioCc0AssetKind,
 } from "./studio-cc0-asset-delivery";
 import {
-  curateStudioCc0Selection, isStudioCc0AssemblyComponent, studioCc0StyleLabel,
+  curateStudioCc0Selection, isStudioCc0AssemblyComponent, isStudioCc0EligibleForNewSelection,
+  studioCc0ReviewLabel, studioCc0StyleLabel,
   type StudioCc0StyleFilter,
 } from "./studio-cc0-curation";
 import { useStudioModalSheet } from "./useStudioModalSheet";
@@ -85,6 +86,7 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pages - 1);
   const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const selectableCount = catalog?.filter(isStudioCc0EligibleForNewSelection).length;
 
   async function insert(asset: StudioCc0Asset): Promise<void> {
     insertController.current?.abort();
@@ -110,13 +112,26 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
     }
   }
   function renderUseButton(asset: StudioCc0Asset) {
-    return asset.kind === "model"
-      ? <a className={`${CONTROL} mt-2 flex items-center justify-center`} href={studioCc0AssetUrl(asset.path)} download={`${asset.id}.glb`}>GLB 받기</a>
-      : <button className={`${CONTROL} mt-2 w-full`} type="button" disabled={inserting !== null} onClick={() => {void insert(asset);}}>{inserting === asset.id ? "검증·삽입 중…" : "캔버스에 삽입"}</button>;
+    if (asset.kind !== "model") {
+      return <button className={`${CONTROL} mt-2 w-full`} type="button" disabled={inserting !== null} onClick={() => {void insert(asset);}}>{inserting === asset.id ? "검증·삽입 중…" : "캔버스에 삽입"}</button>;
+    }
+    if (!asset.original) {
+      return <a className={`${CONTROL} mt-2 flex items-center justify-center`} href={studioCc0AssetUrl(asset.path)} download={`${asset.id}.glb`}>GLB 받기</a>;
+    }
+    const original = asset.original;
+    const originalTextureMiB = Math.ceil(original.estimatedDecodedImageBytes / (1024 * 1024));
+    return <div className="mt-2 space-y-2">
+      <a className={`${CONTROL} flex items-center justify-center text-center`} href={studioCc0AssetUrl(asset.path)} download={`${asset.id}.glb`}>경량본 받기</a>
+      <a className={`${CONTROL} flex items-center justify-center text-center`} href={studioCc0AssetUrl(original.path)} download={`${asset.id}-original.glb`}>고품질 원본 받기</a>
+      <p className="text-[0.65rem] leading-relaxed text-fg-3">{original.visuallyEquivalentToDefault
+        ? "두 파일의 화질은 같습니다. 원본은 중복 텍스처 때문에 메모리를 더 사용합니다."
+        : "경량본은 색상·노멀·형상을 유지하고 ORM 텍스처만 줄였습니다. 경량은 GPU 메모리 기준이며 다운로드 크기는 더 클 수 있습니다."}</p>
+      <p className="text-[0.65rem] leading-relaxed text-fg-3">원본 텍스처는 약 {originalTextureMiB}MiB입니다. 배경 3D 모델 탭에서 고품질 모드를 선택한 뒤 원본 GLB를 가져오세요. 다운로드만으로 모드가 바뀌지는 않습니다.</p>
+    </div>;
   }
   return (
     <details ref={rootRef} className="mb-3 rounded-xl border border-line bg-card/70 p-3" data-studio-cc0-library="true" onToggle={event => {setOpen(event.currentTarget.open); if (!event.currentTarget.open) dismissPreview();}}>
-      <summary className="min-h-11 cursor-pointer rounded-md text-sm font-bold text-fg-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">CC0 원본 에셋 라이브러리 {catalog ? `· ${catalog.length}종` : ""}</summary>
+      <summary className="min-h-11 cursor-pointer rounded-md text-sm font-bold text-fg-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">CC0 원본 에셋 라이브러리 {selectableCount === undefined ? "" : `· ${selectableCount}종`}</summary>
       {open && <div className="mt-2 space-y-3">
         <p className="text-xs leading-relaxed text-fg-3">질감이 있는 PBR 원본과 스타일라이즈 소품을 구분해서 찾습니다. 3D는 GLB를 받은 뒤 모델 가져오기를 사용하세요. 효과·재질 이미지는 캔버스에 바로 삽입합니다.</p>
         <label htmlFor={searchId} className="block text-xs font-semibold text-fg-2">에셋 검색</label>
@@ -130,18 +145,18 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
             <p role="status" className="text-xs text-fg-3">검색 결과 {filtered.length}종 · {currentPage + 1}/{pages}페이지</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{visible.map(asset => <article key={asset.id} className="min-w-0 rounded-lg border border-line bg-panel p-2" data-cc0-asset-id={asset.id}>
               <button type="button" className={`block aspect-square w-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${imageClass(asset)}`} aria-label={`${asset.name} 확대 미리보기`} onClick={() => setPreview(asset)}><img src={studioCc0AssetUrl(asset.previewPath ?? asset.path)} alt="" loading="lazy" decoding="async" width={384} height={384} className="aspect-square w-full rounded-md object-contain" /></button>
-              <p className="mt-1 break-words text-xs font-semibold text-fg-1">{asset.name}</p><p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">{categoryLabel(asset)}<br />{studioCc0StyleLabel(asset)}{isStudioCc0AssemblyComponent(asset) ? " · 조립부품" : ""}<br />{asset.width && asset.height ? `${asset.width}×${asset.height} · ` : ""}<a href={asset.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline">{asset.provider}</a> · CC0</p>{renderUseButton(asset)}
+              <p className="mt-1 break-words text-xs font-semibold text-fg-1">{asset.name}</p><p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">{categoryLabel(asset)}<br />{studioCc0StyleLabel(asset)}{isStudioCc0AssemblyComponent(asset) ? " · 조립부품" : ""}<br />{asset.kind === "model" && <>{studioCc0ReviewLabel(asset)}<br /></>}{asset.width && asset.height ? `${asset.width}×${asset.height} · ` : ""}<a href={asset.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline">{asset.provider}</a> · CC0</p>{renderUseButton(asset)}
             </article>)}</div>
             {filtered.length === 0 && <p className="py-4 text-center text-xs text-fg-3">검색 결과가 없습니다. 검색어나 스타일을 바꾸거나 조립부품 포함을 선택해 주세요.</p>}
             {pages > 1 && <nav className="flex items-center justify-between gap-2" aria-label="에셋 페이지"><button type="button" className={CONTROL} disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>이전</button><span className="text-xs text-fg-3">{currentPage + 1} / {pages}</span><button type="button" className={CONTROL} disabled={currentPage + 1 >= pages} onClick={() => setPage(currentPage + 1)}>다음</button></nav>}
           </>}
         <p role="status" aria-live="polite" className="text-xs leading-relaxed text-fg-2">{notice}</p>
-        <p className="text-[0.65rem] leading-relaxed text-fg-3">1차 시각 검수에서 문제가 확인된 항목은 신규 목록에서 제외하고 조립부품은 별도로 표시합니다. 원본·출처·파일 해시는 보존하며, 기존 작품은 삭제하지 않습니다. 효과는 원본 크기 이내 사용을 권장합니다.</p>
+        <p className="text-[0.65rem] leading-relaxed text-fg-3">3D 소품은 실제 렌더와 미리보기 검수 기록이 있는 항목을 제공합니다. 미검수·제외 판정 모델은 새 선택 목록에서 제외하며, 미리보기 검수는 모든 각도와 확대 상태의 검수를 뜻하지 않습니다. 조립부품은 별도로 표시하고 기존 작품의 원본은 보존합니다.</p>
       </div>}
       {preview && <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-3"><div ref={previewRef} role="dialog" aria-modal="true" aria-labelledby={previewTitleId} tabIndex={-1} className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-xl border border-line bg-panel p-4 shadow-xl">
         <div className="flex items-center justify-between gap-3"><h3 id={previewTitleId} className="text-sm font-bold text-fg-1">{preview.name}</h3><button type="button" data-autofocus="true" className={CONTROL} onClick={dismissPreview}>닫기</button></div>
         <img src={studioCc0AssetUrl(preview.previewPath ?? preview.path)} alt={`${preview.name} 실제 파일 미리보기`} className={`mt-3 max-h-[60dvh] w-full rounded-lg object-contain ${imageClass(preview)}`} />
-        <p className="mt-2 text-xs leading-relaxed text-fg-2">{studioCc0StyleLabel(preview)} · {categoryLabel(preview)} · {preview.provider} · CC0<br />{preview.kind === "model" ? "이 이미지는 해당 GLB의 렌더입니다. 실제 모델은 회전·확대하여 사용할 수 있습니다." : `원본 ${preview.width}×${preview.height}px. 표시 크기는 화면에 맞춰 축소됩니다.`}</p>{renderUseButton(preview)}
+        <p className="mt-2 text-xs leading-relaxed text-fg-2">{studioCc0StyleLabel(preview)} · {categoryLabel(preview)} · {preview.provider} · CC0<br />{preview.kind === "model" ? `${studioCc0ReviewLabel(preview)} · 이 이미지는 해당 GLB의 렌더입니다. 실제 모델은 회전·확대하여 사용할 수 있습니다.` : `원본 ${preview.width}×${preview.height}px. 표시 크기는 화면에 맞춰 축소됩니다.`}</p>{renderUseButton(preview)}
         <p role="status" aria-live="polite" className="mt-2 text-xs leading-relaxed text-fg-2">{notice}</p>
       </div></div>}
     </details>
