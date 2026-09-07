@@ -2,10 +2,8 @@ name: One-shot final catalogue regression repair
 
 on:
   push:
-    branches:
-      - release/final-combined-496aa743-20260908
-    paths:
-      - .github/workflows/one-shot-final-catalog-regression-repair.yml
+    branches: [release/final-combined-496aa743-20260908]
+    paths: [.github/workflows/one-shot-final-catalog-regression-repair.yml]
 
 permissions:
   contents: write
@@ -17,7 +15,7 @@ concurrency:
 jobs:
   repair:
     if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -31,7 +29,7 @@ jobs:
             apps/web/src/domains/creator/bg3d/bg3d-model-library.test.ts
             apps/web/src/domains/creator/bg3d/studio-bg3d-model-mutation-integration.test.ts
             apps/web/src/domains/creator/vrm/vrm-library.test.ts
-      - name: Repair stale assertions
+      - name: Patch reviewed regression contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -43,7 +41,7 @@ jobs:
               text = target.read_text()
               count = text.count(old)
               if count != expected:
-                  raise SystemExit(f"{path}: expected {expected} occurrence(s) of {old!r}, found {count}")
+                  raise SystemExit(f"{path}: expected {expected} occurrence(s), found {count}: {old}")
               target.write_text(text.replace(old, new))
 
           bg3d = "apps/web/src/domains/creator/bg3d/bg3d-model-library.test.ts"
@@ -64,43 +62,31 @@ jobs:
           replace(vrm, "모든 번들 캐릭터가 200KB 이하의 고품질 3D 스튜디오 렌더링 썸네일 실파일을 갖추고 있는지 전수 검사한다.", "모든 번들 캐릭터가 검토된 용량 한도 내 고품질 3D 스튜디오 렌더링 썸네일 실파일을 갖추는지 전수 검사한다.")
           replace(vrm, "backs every bundled character with a high-quality 3D thumbnail (<200KB) and valid sampleVrmThumbnailUrl", "backs every bundled character with a bounded high-quality 3D thumbnail and valid sampleVrmThumbnailUrl")
           replace(vrm, "expect(SAMPLE_VRMS.length).toBe(88);", "expect(SAMPLE_VRMS.length).toBe(113);")
-          replace(
-              vrm,
-              r"/^\/assets\/3d\/characters\/thumbnails\/[a-z0-9_.-]+\.png$/",
-              r"/^\/assets\/3d\/characters\/thumbnails\/(?:[a-z0-9_.-]+\/)*[a-z0-9_.-]+\.png$/",
-              expected=2,
-          )
+          replace(vrm, r"/^\/assets\/3d\/characters\/thumbnails\/[a-z0-9_.-]+\.png$/", r"/^\/assets\/3d\/characters\/thumbnails\/(?:[a-z0-9_.-]+\/)*[a-z0-9_.-]+\.png$/", 2)
           replace(
               vrm,
               '      expect(size, `${sample.id} thumbnail size should be < 200KB`).toBeLessThan(200 * 1024);',
-              '''      const maxThumbnailBytes = sample.thumbnailUrl!.includes("/refined-v1/")
-                ? 320 * 1024
-                : 200 * 1024;
-              expect(
-                size,
-                `${sample.id} thumbnail size should be < ${maxThumbnailBytes / 1024}KB`,
-              ).toBeLessThan(maxThumbnailBytes);'''.replace("              ", ""),
+              '      const maxThumbnailBytes = sample.thumbnailUrl!.includes("/refined-v1/")\n        ? 320 * 1024\n        : 200 * 1024;\n      expect(\n        size,\n        `${sample.id} thumbnail size should be < ${maxThumbnailBytes / 1024}KB`,\n      ).toBeLessThan(maxThumbnailBytes);',
           )
 
-          checks = {
+          repaired = {
               bg3d: ["toHaveLength(18)", "toBe(18)"],
               mutation: ["admissionPolicyKeys?.has(policyKey)", "admissionPolicyKeys.add(policyKey)"],
               vrm: ["toBe(113)", "maxThumbnailBytes", "(?:[a-z0-9_.-]+\\/)*"],
           }
-          for path, required in checks.items():
+          for path, needles in repaired.items():
               text = Path(path).read_text()
-              missing = [needle for needle in required if needle not in text]
+              missing = [needle for needle in needles if needle not in text]
               if missing:
-                  raise SystemExit(f"{path}: missing repaired contracts {missing}")
+                  raise SystemExit(f"{path}: missing {missing}")
           PY
           git diff --check
-      - name: Commit repair and remove one-shot workflow
+      - name: Commit patch and retire workflow
         shell: bash
         run: |
           set -euo pipefail
           git rm .github/workflows/one-shot-final-catalog-regression-repair.yml
-          git add \
-            apps/web/src/domains/creator/bg3d/bg3d-model-library.test.ts \
+          git add apps/web/src/domains/creator/bg3d/bg3d-model-library.test.ts \
             apps/web/src/domains/creator/bg3d/studio-bg3d-model-mutation-integration.test.ts \
             apps/web/src/domains/creator/vrm/vrm-library.test.ts
           git diff --cached --check
