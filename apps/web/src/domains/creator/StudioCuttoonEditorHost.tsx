@@ -11346,7 +11346,7 @@ export function StudioCuttoonEditor({
       flushPendingStrokeCommitsRef.current();
     }, DEFERRED_STROKE_COMMIT_IDLE_MS);
     // This stroke is authoritative on the live surface but intentionally remains outside React
-    // history for 200ms. Arm the close guard in the same discrete input event, then begin the
+    // history until the idle flush. Arm the close guard in the same discrete input event, then begin the
     // durable SQLite/OPFS snapshot at the microtask checkpoint before a browser navigation task
     // can tear down this document and its Dedicated Worker.
     setUnloadGuardArmed(true);

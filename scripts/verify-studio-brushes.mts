@@ -89,7 +89,11 @@ import {
   studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
 } from "../apps/web/src/domains/creator/studio-cc0-mypaint-preset-import-v1";
 
-import { readDurableStudioAutosaveDocument, readDurableStudioAutosaveError } from "./lib/studio-verify-durable-autosave.mjs";
+import {
+  readDurableStudioAutosaveDocument,
+  readDurableStudioAutosaveError,
+  resolveDurableStudioAutosaveModuleUrl,
+} from "./lib/studio-verify-durable-autosave.mjs";
 import {
   enabledStudioHistoryControl,
 } from "./lib/studio-verify-history-controls.mjs";
@@ -133,7 +137,7 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
 ] as const;
 /**
  * Durability timing, both tied to the product's deferred-commit idle flush
- * (DEFERRED_STROKE_COMMIT_IDLE_MS = 200 in StudioPage.tsx). The unload prompt is held BELOW that
+ * (DEFERRED_STROKE_COMMIT_IDLE_MS = 2_000 in StudioCuttoonEditorHost.tsx). The unload prompt is held BELOW that
  * window so the idle flush cannot author the surviving payload and mask a pointerup write that
  * lost its race with teardown; the receipt budget is the ceiling for a write that is supposed to
  * begin at the input event's microtask checkpoint.
@@ -2464,11 +2468,16 @@ interface PersistedStudioDocument {
   pagesList?: Array<{ id?: string; elements?: unknown[] }>;
 }
 
-async function persistedStudioDocument(page: Page): Promise<PersistedStudioDocument | null> {
-  const document = await readDurableStudioAutosaveDocument(page, AUTOSAVE_KEY);
+async function persistedStudioDocument(
+  page: Page,
+  moduleUrl: string | null = null,
+): Promise<PersistedStudioDocument | null> {
+  const document = await readDurableStudioAutosaveDocument(page, AUTOSAVE_KEY, { moduleUrl });
   const error = await readDurableStudioAutosaveError(page);
   if (error) throw new Error(error);
-  return document as PersistedStudioDocument | null;
+  // The shared reader exposes normalized page metadata alongside the complete raw payload.
+  // Durability receipts live in that payload, so returning only the metadata loses their markers.
+  return document ? JSON.parse(document.raw) as PersistedStudioDocument : null;
 }
 
 function drawElementsFromPersistedDocument(
@@ -2680,7 +2689,7 @@ async function waitForPersistedDrawCount(page: Page, expectedCount: number): Pro
   await waitForPersistedDrawElements(
     page,
     (draws) => draws.length >= expectedCount,
-    `SQLite autosave did not reach ${expectedCount} draws`,
+    `durable autosave did not reach ${expectedCount} draws`,
   );
 }
 
@@ -4130,12 +4139,13 @@ function persistedElementIds(
 async function waitForPersistedStudioDocument(
   page: Page,
   timeoutMilliseconds = 8_000,
+  moduleUrl: string | null = null,
 ): Promise<PersistedStudioDocument | null> {
   const deadline = performance.now() + timeoutMilliseconds;
   let lastFailure: unknown = null;
   while (performance.now() < deadline) {
     try {
-      const document = await persistedStudioDocument(page);
+      const document = await persistedStudioDocument(page, moduleUrl);
       if (document) return document;
       lastFailure = null;
     } catch (cause: unknown) {
@@ -4145,7 +4155,7 @@ async function waitForPersistedStudioDocument(
   }
   if (lastFailure instanceof Error) {
     throw new Error(
-      `post-navigation SQLite autosave read failed: ${lastFailure.message}`,
+      `post-navigation durable autosave read failed: ${lastFailure.message}`,
       { cause: lastFailure },
     );
   }
@@ -4170,7 +4180,7 @@ async function waitForEmergencyAutosave(
   }
   if (lastFailure instanceof Error) {
     throw new Error(
-      `pagehide SQLite autosave read failed: ${lastFailure.message}`,
+      `pagehide durable autosave read failed: ${lastFailure.message}`,
       { cause: lastFailure },
     );
   }
@@ -4276,6 +4286,10 @@ async function runDeferredDurabilityAudit(
     // survives teardown must be the one pointerup wrote — a survivor written by pagehide would mean
     // the microtask checkpoint lost its race and durability now rides on the unload handler.
     const knownStrokeIds = [...receiptPayloadIds];
+    // The away route never mounts Studio. Keep the shipped reader URL before navigation clears
+    // resource timing, so recovery still reads the same journal without re-entering the editor.
+    const autosaveModuleUrl = await resolveDurableStudioAutosaveModuleUrl(page);
+    invariant(autosaveModuleUrl, "Studio did not expose its durable autosave session module");
     // Let the first batch leave the deferred window so the navigation below audits one fresh
     // release rather than a batch this audit already proved durable.
     await page.waitForTimeout(400);
@@ -4317,7 +4331,7 @@ async function runDeferredDurabilityAudit(
       `navigation was not immediate after pointerup (${navigationIssuedInMs.toFixed(2)}ms)`,
     );
 
-    const survivor = await waitForPersistedStudioDocument(page);
+    const survivor = await waitForPersistedStudioDocument(page, 8_000, autosaveModuleUrl);
     if (!survivor) {
       log(`durability diagnostic: console messages ${JSON.stringify(errors.messages).slice(0, 800)}`);
     }
