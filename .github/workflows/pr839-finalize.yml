@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: pr839-finalizer
+  cancel-in-progress: true
+
 jobs:
   finalize:
     if: github.actor != 'github-actions[bot]'
@@ -19,7 +23,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: feat/studio-asset-os-foundation
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: pnpm/action-setup@v6
 
@@ -80,6 +84,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit --no-verify -m "fix(studio): complete unified asset validation"
-          git fetch origin feat/studio-asset-os-foundation
-          git rebase origin/feat/studio-asset-os-foundation
           git push origin HEAD:feat/studio-asset-os-foundation
