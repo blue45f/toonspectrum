@@ -37,9 +37,8 @@ function useStudioI18nPriorityLoading(): void {
 
   useEffect(() => {
     const controller = new AbortController();
-    // The route chunk has already started this request. Calling it again is intentional:
-    // namespace-level deduplication covers the initial locale and a hydrated language change
-    // immediately receives its own core strings. Any partial core failure is retried without
+    // The route chunk already started this request; namespace deduplication covers the
+    // initial locale and a hydrated language change, while partial failures retry without
     // falling back to the legacy full-catalog loader.
     void preloadStudioI18nCore({
       locale: lang,
