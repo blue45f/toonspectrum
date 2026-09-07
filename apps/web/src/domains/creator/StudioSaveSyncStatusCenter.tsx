@@ -31,8 +31,8 @@ export interface StudioSaveSyncStatusCenterProps {
 
 function cloudStatusCopy(status: "synced" | "pending" | "offline"): string {
   if (status === "synced") return "최신 상태로 저장됐어요.";
-  if (status === "pending") return "최근 변경을 서버에 저장하는 중이에요.";
-  return "인터넷이 연결되면 자동으로 서버에 저장해요.";
+  if (status === "pending") return "최근 변경을 이 기기에 보관했고 서버 동기화를 기다리고 있어요.";
+  return "인터넷이 연결되면 서버와 다시 동기화할 수 있어요.";
 }
 
 export function StudioSaveSyncStatusCenter({
@@ -50,7 +50,7 @@ export function StudioSaveSyncStatusCenter({
     : status.cloudSyncStatus === "offline"
       ? "오프라인 · 이 기기에 보관 중"
       : status.pendingOperationsCount > 0 || status.cloudSyncStatus === "pending"
-        ? `${status.pendingOperationsCount}개 변경 저장 중`
+        ? `${status.pendingOperationsCount}개 변경 보존 중`
         : "저장됨";
 
   const handleCopyDiagnostics = () => {
@@ -142,7 +142,7 @@ export function StudioSaveSyncStatusCenter({
                   <p className="mt-0.5 leading-relaxed text-fg-3">
                     {cloudStatusCopy(status.cloudSyncStatus)}
                     {status.pendingOperationsCount > 0
-                      ? ` 아직 보내지 않은 변경 ${status.pendingOperationsCount}개가 있어요.`
+                      ? ` 서버에 아직 반영되지 않은 변경 ${status.pendingOperationsCount}개가 있어요.`
                       : ""}
                   </p>
                 </div>
