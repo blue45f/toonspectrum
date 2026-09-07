@@ -1,5 +1,6 @@
 /** Shell metadata only. Do not import page/navigation modules into this table. */
 export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
+  "/now": "오늘의 영감",
   "/research": "창작 리서치 데스크",
   "/research/assets": "창작 레퍼런스",
   "/research/books": "글로벌 만화·도서 판본 탐색",
