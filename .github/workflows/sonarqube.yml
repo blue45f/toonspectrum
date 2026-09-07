@@ -93,6 +93,24 @@ jobs:
         if: steps.secrets.outputs.configured == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Studio entry LCOV coverage
+        if: steps.secrets.outputs.configured == 'true'
+        run: |
+          # Keep the repository lockfile immutable in analysis jobs while pinning the provider
+          # to the installed Vitest major. The production policy/loaders below are the logic
+          # boundaries changed by this PR; route composition is verified by browser CI.
+          pnpm add --workspace-root --save-dev --lockfile=false --ignore-scripts @vitest/coverage-v8@4.1.9
+          pnpm exec vitest run \
+            apps/web/src/app/studio-document-navigation.test.ts \
+            apps/web/src/domains/creator/studio-i18n-priority-loader.test.ts \
+            --coverage.enabled \
+            --coverage.provider=v8 \
+            --coverage.reporter=text-summary \
+            --coverage.reporter=lcov \
+            --coverage.include=apps/web/src/app/studio-document-navigation.ts \
+            --coverage.include=apps/web/src/domains/creator/studio-i18n-priority-loader.ts
+          test -s coverage/lcov.info
+
       # SonarCloud Automatic Analysis should be disabled to avoid duplicate scans.
       - name: SonarQube scan
         if: steps.secrets.outputs.configured == 'true'
