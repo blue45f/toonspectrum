@@ -1,0 +1,781 @@
+{
+  "schema": "toonstudio-acquired-assets/v1",
+  "assets": [
+    {
+      "id": "polyhaven-cassette-player",
+      "name": "Cassette Player",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "table",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/cassette_player",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-08"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": true,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-cassette-player/cassette_player-mobile-v1.glb",
+      "bytes": 3958368,
+      "sha256": "c8a9c61330874466430e706546ee26641aa7f2fcd5b3b139296ecd1c93069edd",
+      "geometrySha256": "652df1331ac10298231eebe3ddd0d1f27d0e07487d106758f08fd2495c62687f",
+      "textureCount": 9,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source"
+      ],
+      "browserRenderVerified": true,
+      "sourceBounds": {
+        "min": [
+          -0.0649944543838501,
+          -0.11076043857230826,
+          -6.450776016278167e-9
+        ],
+        "max": [
+          0.06446599215269089,
+          0.1260574153483193,
+          0.04887988961241213
+        ]
+      },
+      "derivation": {
+        "kind": "mobile-texture-budget",
+        "originalPath": "assets/polyhaven-cassette-player/cassette_player.glb",
+        "originalSha256": "0dfed816e40cd3f905143b89e2503b9a97d10e8c5949a3453b06c13d0e0db828",
+        "geometrySha256": "652df1331ac10298231eebe3ddd0d1f27d0e07487d106758f08fd2495c62687f",
+        "originalBinaryUnchanged": true,
+        "baseColorBytesUnchanged": true,
+        "beforeImageCount": 9,
+        "afterImageCount": 6,
+        "beforeDecodedBytes": 150994944,
+        "afterDecodedBytes": 100663296,
+        "beforeMaxDimension": 2048,
+        "afterMaxDimension": 2048,
+        "operations": [],
+        "beforeAdmission": {
+          "ok": false,
+          "code": "texture-byte-budget-exceeded",
+          "message": "이 기기의 내장 텍스처 용량 기준을 초과했습니다. 텍스처를 압축해 주세요."
+        },
+        "afterAdmission": {
+          "ok": true,
+          "code": "valid",
+          "message": "3D 모델의 무결성·내장 리소스·기기 복잡도 검사를 통과했습니다.",
+          "profile": "mobile",
+          "verifiedSha256": "sha256:c8a9c61330874466430e706546ee26641aa7f2fcd5b3b139296ecd1c93069edd",
+          "cumulativeBytesAfter": 3958368,
+          "usesBasisTextures": false,
+          "requiresBasisTextures": false,
+          "metrics": {
+            "byteSize": 3958368,
+            "jsonByteSize": 4424,
+            "binByteSize": 3953916,
+            "nodes": 2,
+            "meshes": 2,
+            "meshPrimitives": 3,
+            "drawCalls": 3,
+            "triangles": 4830,
+            "materials": 3,
+            "textures": 6,
+            "images": 6,
+            "imageBytes": 2441316,
+            "estimatedDecodedImageBytes": 100663296,
+            "maxImageDimension": 2048,
+            "undeterminedImageDimensions": 0,
+            "lights": 0,
+            "animations": 0,
+            "animationChannels": 0,
+            "animationKeyframes": 0,
+            "animationValues": 0,
+            "skins": 0,
+            "joints": 0,
+            "morphTargets": 0,
+            "accessorElements": 25599,
+            "estimatedDecodedGeometryBytes": 147476
+          }
+        }
+      },
+      "previewPath": "previews/polyhaven-cassette-player.png",
+      "browserVerification": {
+        "checkedAt": "2026-09-07T17:58:32.028Z",
+        "sourceSha256": "c8a9c61330874466430e706546ee26641aa7f2fcd5b3b139296ecd1c93069edd",
+        "gpu": {
+          "vendor": "Google Inc. (Apple)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+        },
+        "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+        "helper": "applyStudioBg3dRuntimeAssetQuality",
+        "decodedTextures": 6,
+        "views": [
+          {
+            "view": "front",
+            "renderedTriangles": 5150,
+            "foregroundPixels": 119102,
+            "pngSha256": "7e9afdcfab7edcf852f9dcb8617a238e00ef1db62aea0fbd0097efdeebd11473"
+          },
+          {
+            "view": "three-quarter",
+            "renderedTriangles": 5150,
+            "foregroundPixels": 118344,
+            "pngSha256": "499cb8ba8bdc327a967f004fb961711b4fcd54c0a3b7e07a3de2a3b50b1a1808"
+          },
+          {
+            "view": "back",
+            "renderedTriangles": 5150,
+            "foregroundPixels": 125055,
+            "pngSha256": "e6098735ab150abcfc98b3189b8bf08e6a68377546102e4f926a205dc9514605"
+          }
+        ],
+        "gltfValidator": {
+          "validator": "Khronos glTF-Validator",
+          "version": "2.0.0-dev.3.10",
+          "numErrors": 0,
+          "numWarnings": 3,
+          "numInfos": 3,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/1/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/1/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/bufferViews/15"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/bufferViews/16"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/bufferViews/17"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "polyhaven-brass-goblets",
+      "name": "Brass Goblets",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "cup",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brass_goblets",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-08"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": true,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-brass-goblets/brass_goblets-mobile-v1.glb",
+      "bytes": 21225868,
+      "sha256": "42446e40999a42d8eca8f49d039e55cb0e7304df32272460de1dfb49e23ac7d4",
+      "geometrySha256": "fd356da802ea6e87d9a746ce1b0ac9dfa7eee4f8abbd0f98e00678f353303ce3",
+      "textureCount": 9,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source"
+      ],
+      "browserRenderVerified": true,
+      "sourceBounds": {
+        "min": [
+          -0.22009959816932678,
+          0.004920527338981628,
+          -0.10252325795590878
+        ],
+        "max": [
+          0.23329506814479828,
+          0.2782983803190291,
+          0.19509071111679077
+        ]
+      },
+      "derivation": {
+        "kind": "mobile-texture-budget",
+        "originalPath": "assets/polyhaven-brass-goblets/brass_goblets.glb",
+        "originalSha256": "aa3e15e1f2d1221df2e784ab584177a58a8d0c85668bd5df22f062e84b6875a8",
+        "geometrySha256": "fd356da802ea6e87d9a746ce1b0ac9dfa7eee4f8abbd0f98e00678f353303ce3",
+        "originalBinaryUnchanged": true,
+        "baseColorBytesUnchanged": true,
+        "beforeImageCount": 9,
+        "afterImageCount": 9,
+        "beforeDecodedBytes": 150994944,
+        "afterDecodedBytes": 113246208,
+        "beforeMaxDimension": 2048,
+        "afterMaxDimension": 2048,
+        "operations": [
+          {
+            "image": "brass_goblet_01_metal-brass_goblet_01_rough",
+            "role": "ORM",
+            "sourceSha256": "c2a1105f90e82f9981b9359cb2fbdb0a4fefb12fc227f86b5133d8fc03e17e02",
+            "exportSha256": "4aa7222ff0645c034ef3bb0cde26168bada54c12ce79abee87376785dc4c211c",
+            "before": {
+              "width": 2048,
+              "height": 2048
+            },
+            "after": {
+              "width": 1024,
+              "height": 1024
+            },
+            "filter": "2x2 byte-space arithmetic average; lossless PNG encoding"
+          },
+          {
+            "image": "brass_goblet_02_metal-brass_goblet_02_rough",
+            "role": "ORM",
+            "sourceSha256": "e420c19baed40df7e2a74c686573793f16298b698a29cb17c1cda8adc1d669e8",
+            "exportSha256": "217a59b9fb6fd9de4b546154e11666e17682dff20475c11f8f188a95c3a05066",
+            "before": {
+              "width": 2048,
+              "height": 2048
+            },
+            "after": {
+              "width": 1024,
+              "height": 1024
+            },
+            "filter": "2x2 byte-space arithmetic average; lossless PNG encoding"
+          },
+          {
+            "image": "brass_goblet_03_metal-brass_goblet_03_rough",
+            "role": "ORM",
+            "sourceSha256": "8e7f162d0d18e8c06b6afa16bfec22ed3c4c4220e07a02f83e23af6141722a32",
+            "exportSha256": "3b39295cc5ee7e8d6fcd12964f8d6cb3f124a514aaab7710230208ede964e6c4",
+            "before": {
+              "width": 2048,
+              "height": 2048
+            },
+            "after": {
+              "width": 1024,
+              "height": 1024
+            },
+            "filter": "2x2 byte-space arithmetic average; lossless PNG encoding"
+          }
+        ],
+        "beforeAdmission": {
+          "ok": false,
+          "code": "texture-byte-budget-exceeded",
+          "message": "이 기기의 내장 텍스처 용량 기준을 초과했습니다. 텍스처를 압축해 주세요."
+        },
+        "afterAdmission": {
+          "ok": true,
+          "code": "valid",
+          "message": "3D 모델의 무결성·내장 리소스·기기 복잡도 검사를 통과했습니다.",
+          "profile": "mobile",
+          "verifiedSha256": "sha256:42446e40999a42d8eca8f49d039e55cb0e7304df32272460de1dfb49e23ac7d4",
+          "cumulativeBytesAfter": 21225868,
+          "usesBasisTextures": false,
+          "requiresBasisTextures": false,
+          "metrics": {
+            "byteSize": 21225868,
+            "jsonByteSize": 5144,
+            "binByteSize": 21220696,
+            "nodes": 3,
+            "meshes": 3,
+            "meshPrimitives": 3,
+            "drawCalls": 3,
+            "triangles": 9600,
+            "materials": 3,
+            "textures": 9,
+            "images": 9,
+            "imageBytes": 15065919,
+            "estimatedDecodedImageBytes": 113246208,
+            "maxImageDimension": 2048,
+            "undeterminedImageDimensions": 0,
+            "lights": 0,
+            "animations": 0,
+            "animationChannels": 0,
+            "animationKeyframes": 0,
+            "animationValues": 0,
+            "skins": 0,
+            "joints": 0,
+            "morphTargets": 0,
+            "accessorElements": 47937,
+            "estimatedDecodedGeometryBytes": 261728
+          }
+        }
+      },
+      "previewPath": "previews/polyhaven-brass-goblets.png",
+      "browserVerification": {
+        "checkedAt": "2026-09-07T17:58:32.308Z",
+        "sourceSha256": "42446e40999a42d8eca8f49d039e55cb0e7304df32272460de1dfb49e23ac7d4",
+        "gpu": {
+          "vendor": "Google Inc. (Apple)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+        },
+        "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+        "helper": "applyStudioBg3dRuntimeAssetQuality",
+        "decodedTextures": 9,
+        "views": [
+          {
+            "view": "front",
+            "renderedTriangles": 9600,
+            "foregroundPixels": 72851,
+            "pngSha256": "1a7b4c87487fb31483deb55f5f9848ffaf23586a6f5868a6acc6ec3deefd8409"
+          },
+          {
+            "view": "three-quarter",
+            "renderedTriangles": 9600,
+            "foregroundPixels": 63557,
+            "pngSha256": "1ab0333e55632168b2d21e08fa0013d77527edfbba6ff3eb8fb7c952be912b9f"
+          },
+          {
+            "view": "back",
+            "renderedTriangles": 9600,
+            "foregroundPixels": 80124,
+            "pngSha256": "07bbe2c17b19d1b07c8402d79fcdf3e27a5353d571608cdd542f0fcde6b97a4e"
+          }
+        ],
+        "gltfValidator": {
+          "validator": "Khronos glTF-Validator",
+          "version": "2.0.0-dev.3.10",
+          "numErrors": 0,
+          "numWarnings": 3,
+          "numInfos": 3,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/bufferViews/14"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/bufferViews/17"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/bufferViews/20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "polyhaven-korean-fire-extinguisher-01",
+      "name": "Korean Fire Extinguisher 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "hydrant",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/korean_fire_extinguisher_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-08"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": true,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-korean-fire-extinguisher-01/korean_fire_extinguisher_01-mobile-v1.glb",
+      "bytes": 10312468,
+      "sha256": "276a2ffd89219465d81b18522e7b28e18f98e3ba75225ba190195b825c77b173",
+      "geometrySha256": "917c5b9e401c11a7422ad7e8d97921b09096ff46b71a1184d5faa0139af1c981",
+      "textureCount": 9,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source"
+      ],
+      "browserRenderVerified": true,
+      "sourceBounds": {
+        "min": [
+          -0.1399787813425064,
+          -3.978568940965488e-8,
+          -0.12324045598506927
+        ],
+        "max": [
+          0.1399787962436676,
+          0.6592506766319275,
+          0.24420279264450073
+        ]
+      },
+      "derivation": {
+        "kind": "mobile-texture-budget",
+        "originalPath": "assets/polyhaven-korean-fire-extinguisher-01/korean_fire_extinguisher_01.glb",
+        "originalSha256": "ca8c2b3febb6a268591df230d2f8851d4d9073d3024a71a15bd531b025ad7441",
+        "geometrySha256": "917c5b9e401c11a7422ad7e8d97921b09096ff46b71a1184d5faa0139af1c981",
+        "originalBinaryUnchanged": true,
+        "baseColorBytesUnchanged": true,
+        "beforeImageCount": 9,
+        "afterImageCount": 9,
+        "beforeDecodedBytes": 150994944,
+        "afterDecodedBytes": 113246208,
+        "beforeMaxDimension": 2048,
+        "afterMaxDimension": 2048,
+        "operations": [
+          {
+            "image": "korean_fire_extinguisher_01_body_metal.png-korean_fire_extinguisher_01_body_rough.png",
+            "role": "ORM",
+            "sourceSha256": "2f5387154f4985ae8103825f05acd1a9c43e3307642f3b74b26db8932346e34c",
+            "exportSha256": "11ba3a9f74eaf7d301456a99a0ed94fc4720793157521944b31ece7bb5b3a984",
+            "before": {
+              "width": 2048,
+              "height": 2048
+            },
+            "after": {
+              "width": 1024,
+              "height": 1024
+            },
+            "filter": "2x2 byte-space arithmetic average; lossless PNG encoding"
+          },
+          {
+            "image": "korean_fire_extinguisher_01_glass_metal-korean_fire_extinguisher_01_glass_rough",
+            "role": "ORM",
+            "sourceSha256": "d618f13b5c84957ae3e3b79f189465f52f9d409e17a0e110ded95adf39dcda62",
+            "exportSha256": "89dc82b45eec80167256065e0faf5ca124abb4c96f9413e554863df2b7969310",
+            "before": {
+              "width": 2048,
+              "height": 2048
+            },
+            "after": {
+              "width": 1024,
+              "height": 1024
+            },
+            "filter": "2x2 byte-space arithmetic average; lossless PNG encoding"
+          },
+          {
+            "image": "korean_fire_extinguisher_01_paper_metal-korean_fire_extinguisher_01_paper_rough",
+            "role": "ORM",
+            "sourceSha256": "b4ea1553ae5a841cc837f92cced525868f0f67d02d72914adba553d3154ce6c5",
+            "exportSha256": "ab837ecf7acf087f2ee975663f0775978384df032abee467f4c91acc1dfe0bd5",
+            "before": {
+              "width": 2048,
+              "height": 2048
+            },
+            "after": {
+              "width": 1024,
+              "height": 1024
+            },
+            "filter": "2x2 byte-space arithmetic average; lossless PNG encoding"
+          }
+        ],
+        "beforeAdmission": {
+          "ok": false,
+          "code": "texture-byte-budget-exceeded",
+          "message": "이 기기의 내장 텍스처 용량 기준을 초과했습니다. 텍스처를 압축해 주세요."
+        },
+        "afterAdmission": {
+          "ok": true,
+          "code": "valid",
+          "message": "3D 모델의 무결성·내장 리소스·기기 복잡도 검사를 통과했습니다.",
+          "profile": "mobile",
+          "verifiedSha256": "sha256:276a2ffd89219465d81b18522e7b28e18f98e3ba75225ba190195b825c77b173",
+          "cumulativeBytesAfter": 10312468,
+          "usesBasisTextures": false,
+          "requiresBasisTextures": false,
+          "metrics": {
+            "byteSize": 10312468,
+            "jsonByteSize": 4912,
+            "binByteSize": 10307528,
+            "nodes": 1,
+            "meshes": 1,
+            "meshPrimitives": 3,
+            "drawCalls": 3,
+            "triangles": 9913,
+            "materials": 3,
+            "textures": 9,
+            "images": 9,
+            "imageBytes": 8231167,
+            "estimatedDecodedImageBytes": 113246208,
+            "maxImageDimension": 2048,
+            "undeterminedImageDimensions": 0,
+            "lights": 0,
+            "animations": 0,
+            "animationChannels": 0,
+            "animationKeyframes": 0,
+            "animationValues": 0,
+            "skins": 0,
+            "joints": 0,
+            "morphTargets": 0,
+            "accessorElements": 50364,
+            "estimatedDecodedGeometryBytes": 279478
+          }
+        }
+      },
+      "previewPath": "previews/polyhaven-korean-fire-extinguisher-01.png",
+      "browserVerification": {
+        "checkedAt": "2026-09-07T17:58:32.541Z",
+        "sourceSha256": "276a2ffd89219465d81b18522e7b28e18f98e3ba75225ba190195b825c77b173",
+        "gpu": {
+          "vendor": "Google Inc. (Apple)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+        },
+        "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+        "helper": "applyStudioBg3dRuntimeAssetQuality",
+        "decodedTextures": 9,
+        "views": [
+          {
+            "view": "front",
+            "renderedTriangles": 10233,
+            "foregroundPixels": 75654,
+            "pngSha256": "8b30dd803bcec3fdd662f84242a36f42cb011d79a68357411956026ec6c8e919"
+          },
+          {
+            "view": "three-quarter",
+            "renderedTriangles": 10233,
+            "foregroundPixels": 78100,
+            "pngSha256": "448ed3e311426c09fa75763770fde977d8a5d279ef6eb9307af97a56bc74fcb3"
+          },
+          {
+            "view": "back",
+            "renderedTriangles": 10233,
+            "foregroundPixels": 75475,
+            "pngSha256": "3e56255eeb9b71138d95a5f6d4200a7a944d9a7bf1043c44b6445d6669d56af7"
+          }
+        ],
+        "gltfValidator": {
+          "validator": "Khronos glTF-Validator",
+          "version": "2.0.0-dev.3.10",
+          "numErrors": 0,
+          "numWarnings": 3,
+          "numInfos": 3,
+          "messages": [
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/0/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/1/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/1/material"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/2/attributes/POSITION"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/2/attributes/NORMAL"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/2/attributes/TEXCOORD_0"
+            },
+            {
+              "code": "BUFFER_VIEW_TARGET_MISSING",
+              "message": "bufferView.target should be set for vertex or index data.",
+              "severity": 3,
+              "pointer": "/meshes/0/primitives/2/indices"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/2/material"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/bufferViews/14"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/bufferViews/17"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/bufferViews/20"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

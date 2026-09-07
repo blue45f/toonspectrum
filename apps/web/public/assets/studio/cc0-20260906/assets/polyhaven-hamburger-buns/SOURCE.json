@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/hamburger_buns",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 2,
+    "name": "Hamburger Buns",
+    "tags": [
+      "baked goods",
+      "bread",
+      "bakery",
+      "bread rolls",
+      "buns"
+    ],
+    "description": "Free 4k model of hamburger buns - realistic golden-brown rolls with soft crumb, subtle browning and high-detail textures.",
+    "authors": {
+      "Alexander Shulha": "All"
+    },
+    "donated": true,
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 11588,
+    "texel_density": 10240.68307381909,
+    "dimensions": [
+      397.2240388393402,
+      113.79648745059967,
+      63.38873411732493
+    ],
+    "date_published": 1773392256,
+    "files_hash": "73e5febb05ae9cc2246560b97feac601a56a1c3e",
+    "categories": [
+      "props",
+      "food",
+      "collection: project_lighthouse"
+    ],
+    "category_id": "d76bdf94-376c-5f98-8163-31b67e008d62",
+    "category": "Food & Kitchen/Prepared Food/Bread & Baked Goods",
+    "collections": [
+      "project_lighthouse"
+    ],
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "food"
+      ]
+    },
+    "download_count": 1349,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/hamburger_buns.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/hamburger_buns/hamburger_buns_2k.gltf",
+      "bytes": 5815,
+      "sha256": "74a5ce910824cea103fcd5a812262d4dfd701135289d1d2a25a50249733ba456",
+      "sourceMd5": "3a150a119f84639e1acd0d26db824de3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/hamburger_buns/hamburger_buns_nor_gl_2k.jpg",
+      "bytes": 2671561,
+      "sha256": "bf13157330876bf91ef7c8854a9196715c77c006e093c05f4aa08a958c18d380",
+      "sourceMd5": "0bb497ed0235d08d7af7121d5b7ec3fe"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/hamburger_buns/hamburger_buns_diff_2k.jpg",
+      "bytes": 2331072,
+      "sha256": "7312d1718f2ba828e6ea13a88028a8d7b03442c1d9f9c66cef1d0b62da38ca0a",
+      "sourceMd5": "1a317a4b278832dfbbccbde463b77501"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/hamburger_buns/hamburger_buns_arm_2k.jpg",
+      "bytes": 2615193,
+      "sha256": "aaeed1dbb6553bde27f85402317c1b7d104a6f8bf27378c00ac2d7965ea8ab7e",
+      "sourceMd5": "935019656d40490f86991b640c49dad1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/hamburger_buns/hamburger_buns.bin",
+      "bytes": 262744,
+      "sha256": "68b7bf0aad373d4a8588120919bbc3d0e20391f330513b884a4df4298cc044db",
+      "sourceMd5": "cedac3719d1d401d48bec2315e88f072"
+    }
+  ]
+}

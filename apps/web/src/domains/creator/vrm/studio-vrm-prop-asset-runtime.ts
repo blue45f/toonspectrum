@@ -33,7 +33,7 @@ interface PropAssetCacheEntry {
   cleanupToken: object | null;
 }
 
-const FIRST_PARTY_PROP_GLTF_URL = /^\/assets\/3d\/[a-z0-9_-]+\.glb$/u;
+const FIRST_PARTY_PROP_GLTF_URL = /^\/assets\/3d\/(?:refined-v8\/)?[a-z0-9_-]+\.glb$/u;
 
 function assertFirstPartyPropUrl(url: string): void {
   if (!FIRST_PARTY_PROP_GLTF_URL.test(url)) {
