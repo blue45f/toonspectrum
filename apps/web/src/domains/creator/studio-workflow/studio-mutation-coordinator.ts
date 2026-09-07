@@ -91,17 +91,18 @@ export interface StudioMutationDurabilityPort {
     record: StudioMutationCommitRecord,
     prepared: readonly StudioPreparedDomainMutation[],
   ) => void | Promise<void>;
+  /**
+   * Atomically commits the durable receipt and, for saved Work/Remix scopes, the server-sync outbox
+   * item represented by `syncEnvelope`. Implementations must not persist one without the other.
+   */
   readonly commit: (
     record: StudioMutationCommitRecord,
     receipt: StudioMutationReceipt,
+    syncEnvelope: StudioMutationEnvelopeV2 | null,
   ) => void | Promise<void>;
   readonly abort: (
     record: StudioMutationCommitRecord,
     cause: unknown,
-  ) => void | Promise<void>;
-  readonly enqueueServerSync: (
-    envelope: StudioMutationEnvelopeV2,
-    receipt: StudioMutationReceipt,
   ) => void | Promise<void>;
 }
 
@@ -397,10 +398,11 @@ export function createStudioMutationCoordinator(
           await port.commit(item.nextSnapshot);
           committed.push(item);
         }
-        await options.durability.commit(record, receipt);
-        if (shouldSync) {
-          await options.durability.enqueueServerSync(envelope, receipt);
-        }
+        await options.durability.commit(
+          record,
+          receipt,
+          shouldSync ? envelope : null,
+        );
         return receipt;
       } catch (error) {
         try {
