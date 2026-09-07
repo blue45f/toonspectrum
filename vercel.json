@@ -9,6 +9,10 @@
       "maxDuration": 60,
       "includeFiles": "{apps/api/dist/**,apps/api/data/catalog.json.gz}"
     },
+    "api/studio-live.js": {
+      "maxDuration": 60,
+      "includeFiles": "{apps/api/dist/**,apps/api/data/catalog.json.gz}"
+    },
     "api/og.js": {
       "maxDuration": 30,
       "includeFiles": "dist/index.html"
@@ -29,6 +33,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/socket.io", "destination": "/api/studio-live" },
+    { "source": "/socket.io/:path*", "destination": "/api/studio-live" },
     { "source": "/api/cover", "destination": "/api/index" },
     { "source": "/title/:slug", "destination": "/api/og?slug=:slug" },
     { "source": "/market", "destination": "/api/og?marketPage=home" },

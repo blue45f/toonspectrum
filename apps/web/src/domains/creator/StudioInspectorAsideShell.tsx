@@ -250,6 +250,7 @@ export function StudioInspectorAsideShell({
             hideTrigger={isMobile}
             pendingRequest={model.commandSearchRequest}
             onRequestHandled={model.onCommandSearchRequestHandled}
+            onReadyChange={model.onCommandSearchHostReadyChange}
             onRequestOpen={() => setRightPanelOpen(true)}
             inspectorContext={{
               hasSelection: inspectorContentMode === "selection",

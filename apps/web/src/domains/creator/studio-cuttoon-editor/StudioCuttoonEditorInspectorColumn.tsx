@@ -452,6 +452,7 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
           <LazyStudioInspectorAside
           commandSearchRequest={commandSearch.request}
           onCommandSearchRequestHandled={commandSearch.handled}
+          onCommandSearchHostReadyChange={commandSearch.onHostReadyChange}
           activeSavedBrushId={activeSavedBrushId}
           advancedRulers={advancedRulers}
           activeSurfaceReviewLocked={activeSurfaceReviewLocked}
