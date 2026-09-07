@@ -1,0 +1,21 @@
+name: Retire stale detached one-shot repair
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-preempt-stale-integration-repair-20260908.yml
+
+permissions: {}
+
+concurrency:
+  group: one-shot-final-integration-ci-repair-v3
+  cancel-in-progress: true
+
+jobs:
+  retire:
+    if: ${{ false }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "This job is intentionally skipped; workflow concurrency retires the detached stale run."
