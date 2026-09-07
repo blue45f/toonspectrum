@@ -1,0 +1,61 @@
+name: Temporary code scanning alert audit
+
+on:
+  push:
+    branches:
+      - security/code-scanning-audit-20260908
+
+permissions:
+  contents: read
+  security-events: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Export all open code scanning alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+
+          gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
+            | jq -s 'add' > audit/open-alerts.json
+
+          gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&ref=refs%2Fheads%2Fmain&per_page=100" \
+            | jq -s 'add' > audit/open-main-alerts.json
+
+          echo "OPEN_ALERT_COUNT=$(jq 'length' audit/open-alerts.json)"
+          echo "OPEN_MAIN_ALERT_COUNT=$(jq 'length' audit/open-main-alerts.json)"
+          echo "AUDIT_BEGIN"
+          jq -r '.[] | [
+            (.number | tostring),
+            (.rule.id // ""),
+            (.rule.security_severity_level // .rule.severity // "unknown"),
+            (.tool.name // ""),
+            (.most_recent_instance.ref // ""),
+            (.most_recent_instance.location.path // ""),
+            ((.most_recent_instance.location.start_line // 0) | tostring),
+            ((.most_recent_instance.location.end_line // 0) | tostring),
+            ((.most_recent_instance.message.text // "") | gsub("[\\r\\n\\t]"; " ")),
+            (.html_url // "")
+          ] | @tsv' audit/open-alerts.json
+          echo "AUDIT_END"
+
+      - name: Upload audit data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-scanning-alert-audit
+          path: audit/*.json
+          if-no-files-found: error
+          retention-days: 1
