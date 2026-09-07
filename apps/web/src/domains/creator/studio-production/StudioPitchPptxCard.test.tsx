@@ -28,12 +28,12 @@ function renderCard() {
 describe("StudioPitchPptxCard", () => {
   it("reverts an empty title without sending an invalid persistence patch", () => {
     const { onChangeSlide, onNotice } = renderCard();
-    const input = screen.getByRole("textbox", { name: "제목" });
+    const input = screen.getByRole("textbox", { name: "제목" }) as HTMLInputElement;
 
     fireEvent.change(input, { target: { value: "   " } });
     fireEvent.blur(input);
 
-    expect(input).toHaveValue("기존 제목");
+    expect(input.value).toBe("기존 제목");
     expect(onChangeSlide).not.toHaveBeenCalled();
     expect(onNotice).toHaveBeenCalledWith("슬라이드 제목은 비워 둘 수 없습니다.");
   });
@@ -54,13 +54,9 @@ describe("StudioPitchPptxCard", () => {
 
   it("exposes bounded native input limits", () => {
     renderCard();
-    expect(screen.getByRole("textbox", { name: "제목" })).toHaveAttribute(
-      "maxlength",
-      String(STUDIO_PITCH_SLIDE_TITLE_MAX_LENGTH),
-    );
-    expect(screen.getByRole("textbox", { name: "본문" })).toHaveAttribute(
-      "maxlength",
-      String(STUDIO_PITCH_SLIDE_BODY_MAX_LENGTH),
-    );
+    const title = screen.getByRole("textbox", { name: "제목" });
+    const body = screen.getByRole("textbox", { name: "본문" });
+    expect(title.getAttribute("maxlength")).toBe(String(STUDIO_PITCH_SLIDE_TITLE_MAX_LENGTH));
+    expect(body.getAttribute("maxlength")).toBe(String(STUDIO_PITCH_SLIDE_BODY_MAX_LENGTH));
   });
 });
