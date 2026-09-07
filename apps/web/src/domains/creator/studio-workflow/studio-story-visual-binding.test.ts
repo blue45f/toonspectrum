@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createEmptyStudioIdentityIndex } from "../studio-foundation/studio-semantic-identity";
+import {
+  createEmptyStudioIdentityIndex,
+  upsertStudioIdentityLink,
+} from "../studio-foundation/studio-semantic-identity";
 
 import {
   analyzeStudioPanelRemovalImpact,
@@ -72,6 +75,50 @@ describe("Studio story visual binding", () => {
       "page-state",
     ]);
     expect(validateStudioPanelBinding(binding(), index)).toEqual([]);
+  });
+
+  it("preserves existing review, motion, and publish references while materializing visuals", () => {
+    const seeded = upsertStudioIdentityLink(
+      createEmptyStudioIdentityIndex("work:episode-1"),
+      {
+        semanticId: "panel-1",
+        kind: "panel",
+        references: [
+          { domain: "comments", entityType: "thread", entityId: "thread-1" },
+          { domain: "motion", entityType: "clip", entityId: "clip-1" },
+          { domain: "publish", entityType: "issue", entityId: "issue-1" },
+        ],
+        source: "legacy-derived",
+        confidence: 0.8,
+        createdAt: NOW,
+      },
+    );
+
+    const index = materializeStudioPanelIdentity(seeded, {
+      semanticPanelId: "panel-1",
+      writerPanelId: "writer-panel-1",
+      comicPageId: "comic-page-1",
+      comicPanelId: "comic-panel-1",
+      drawPageId: "draw-page-1",
+      frameElementId: "frame-1",
+      createdAt: "2026-09-08T00:00:00.000Z",
+    });
+
+    expect(index.links[0]).toMatchObject({
+      source: "legacy-derived",
+      confidence: 0.8,
+      createdAt: NOW,
+    });
+    expect(index.links[0].references.map((reference) => reference.domain)).toEqual(
+      expect.arrayContaining([
+        "comments",
+        "motion",
+        "publish",
+        "writer-room",
+        "comic-graph",
+        "page-state",
+      ]),
+    );
   });
 
   it("distinguishes story, visual, concurrent, detached, and orphaned states", () => {
