@@ -52,11 +52,15 @@ export function characterSurfaceAnchorFromIntersection(
   const surface = characterSurfaceTriangle(mesh, faceIndex);
   if (!surface) return null;
   const local = mesh.worldToLocal(hit.point.clone());
-  const barycentric = new Triangle(
-    new Vector3(...surface.positions[0]),
-    new Vector3(...surface.positions[1]),
-    new Vector3(...surface.positions[2]),
-  ).getBarycoord(local, new Vector3());
+  // Raycasting uses morphed/skinned vertices. Keep the bind-pose triangle helper for ribbons,
+  // whose own SkinnedMesh will apply the skeleton after barycentric interpolation.
+  const vertices = [0, 1, 2].map((corner) => {
+    const offset = faceIndex * 3 + corner;
+    const index = mesh.geometry.index?.getX(offset) ?? offset;
+    return mesh.getVertexPosition(index, new Vector3());
+  });
+  const barycentric = new Triangle(vertices[0], vertices[1], vertices[2])
+    .getBarycoord(local, new Vector3());
   if (!barycentric) return null;
   const normal = hit.face?.normal ?? new Vector3(0, 0, 1);
   const anchor: CharacterSurfaceInkAnchor = {

@@ -85,6 +85,7 @@ function makeBinding(overrides: Partial<CharacterShaperBinding> = {}): Character
     compareActive: false,
     evaluate: vi.fn((): CharacterSlotAvailability => ({ status: "available", reason: null, missing: [] })),
     plan: vi.fn(),
+    commitPreset: vi.fn(),
     commit: vi.fn(),
     clear: vi.fn(() => null),
     remove: vi.fn(() => null),

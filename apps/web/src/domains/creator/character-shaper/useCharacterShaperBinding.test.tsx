@@ -3,12 +3,16 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createCharacterPartPreset } from "../character-platform/presets/character-part-preset";
+import { useCharacterPlatformWorkbench } from "../character-platform/ui/use-character-platform-workbench";
+
 import { createAvatarForgeState } from "../vrm/studio-vrm-avatar-forge";
 
 import { findCharacterSlotEntry, listCharacterSlotEntries } from "./character-shaper-catalog";
 import { applyCharacterIrisTint } from "./character-shaper-iris-tint";
 import { useCharacterShaperBinding } from "./useCharacterShaperBinding";
 
+import type { CharacterPartPresetV1 } from "../character-platform/presets/character-part-preset";
 import type { CharacterCapabilityProfile, CharacterSlotEntry } from "./character-shaper-contract";
 import type { AvatarForgeState } from "../vrm/studio-vrm-avatar-forge";
 import type { PropInstance } from "../vrm/studio-vrm-props";
@@ -50,6 +54,12 @@ vi.mock("./character-shaper-iris-tint", async (importOriginal) => {
   return { ...actual, applyCharacterIrisTint: vi.fn(() => 1) };
 });
 
+vi.mock("../studio-local-database-runtime", () => ({
+  acquireStudioLocalDatabase: async () => ({
+    asAsyncKeyValueStore: () => ({ get: async () => null, set: async () => {}, delete: async () => {} }),
+  }),
+}));
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -60,6 +70,7 @@ interface FakeHostState {
   avatarForgeState: AvatarForgeState;
   wardrobeState: WardrobeState;
   vrmPropItems: PropInstance[];
+  selectedVrmPropUid: string | null;
   costumeState: { hidden: string[]; recolor: Record<string, string> };
   customColors: Record<string, string>;
   activePoseId: string;
@@ -87,6 +98,7 @@ function createFakeHost(overrides: Partial<FakeHostState> = {}): FakeHost {
     avatarForgeState: createAvatarForgeState(),
     wardrobeState: {},
     vrmPropItems: [],
+    selectedVrmPropUid: null,
     costumeState: { hidden: [], recolor: {} },
     customColors: {},
     activePoseId: "ni_weight_left",
@@ -117,6 +129,7 @@ function createFakeHost(overrides: Partial<FakeHostState> = {}): FakeHost {
     get avatarForgeState() { return state.avatarForgeState; },
     get wardrobeState() { return state.wardrobeState; },
     get vrmPropItems() { return state.vrmPropItems; },
+    get selectedVrmPropUid() { return state.selectedVrmPropUid; },
     get costumeState() { return state.costumeState; },
     costumeMeshes: [{ key: "Tops", slot: "tops" }],
     get customColors() { return state.customColors; },
@@ -147,13 +160,15 @@ function createFakeHost(overrides: Partial<FakeHostState> = {}): FakeHost {
     setWardrobeState: (next: WardrobeState) => { state.wardrobeState = next; },
     updateCostume: (next: { hidden: string[]; recolor: Record<string, string> }) => { state.costumeState = next; },
     addVrmProp: (propId: string) => {
-      state.vrmPropItems = [...state.vrmPropItems, { uid: `${propId}#${state.vrmPropItems.length}`, propId } as PropInstance];
+      const uid = `${propId}#${state.vrmPropItems.length}`;
+      state.vrmPropItems = [...state.vrmPropItems, { uid, propId } as PropInstance];
+      state.selectedVrmPropUid = uid;
     },
     removeVrmProp: (uid: string) => {
       state.vrmPropItems = state.vrmPropItems.filter((item) => item.uid !== uid);
     },
     setVrmPropItems: (next: PropInstance[]) => { state.vrmPropItems = next; },
-    setSelectedVrmPropUid: () => undefined,
+    setSelectedVrmPropUid: (uid: string | null) => { state.selectedVrmPropUid = uid; },
     setCustomColors: (next: Record<string, string>) => { state.customColors = next; },
     setExpressionWeights: (next: Record<string, number>) => { state.expressionWeights = next; },
     setActiveExpressionId: (next: string) => { state.activeExpressionId = next; },
@@ -418,4 +433,203 @@ describe("useCharacterShaperBinding", () => {
     expect(result.current.profile.status).toBe("empty");
     expect(result.current.recipe.slots.eyes).toBeNull();
   });
+});
+
+function renderWorkbench(fake: FakeHost) {
+  return renderHook(() => {
+    const binding = useCharacterShaperBinding(fake.host);
+    return { binding, workbench: useCharacterPlatformWorkbench(fake.host, binding) };
+  });
+}
+function importedPreset(workbench: ReturnType<typeof useCharacterPlatformWorkbench>, payload: CharacterPartPresetV1["payload"], kind: CharacterPartPresetV1["kind"] = "character-variant"): CharacterPartPresetV1 {
+  return { ...createCharacterPartPreset({ presetId: "imported", name: "Imported", kind, scope: "personal", document: workbench.document }), payload };
+}
+
+describe("complete imported presets through the real workbench binding", () => {
+  it("applies every accessory, precision value, color and expression in one undoable transaction", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const entries = listCharacterSlotEntries("accessory").filter((entry) => entry.apply.kind === "prop").slice(0, 2);
+    expect(entries).toHaveLength(2);
+    const before = structuredClone(fake.state);
+    const preset = importedPreset(result.current.workbench, {
+      slot: "accessory",
+      selections: entries.map((entry) => ({ entryId: entry.id, entryVersion: "1", providerId: "toonstudio-builtin", catalogRevision: "character-slot-catalog-v1" })),
+      controls: { "face.headWidth": 1.1, "morph.eyeSize": 0.25 },
+      colors: { skin: "#445566", iris: "#112233" },
+      expression: { activeEntryId: "custom", weights: { happy: 0.2, sad: 0.6 } },
+    });
+    let accepted = false;
+    act(() => { accepted = result.current.workbench.applyPreset(preset); });
+    expect(accepted).toBe(true);
+    expect(fake.state.vrmPropItems.map((item) => item.propId)).toEqual(entries.map((entry) => entry.apply.kind === "prop" ? entry.apply.propId : ""));
+    expect(fake.state.avatarForgeState.face.headWidth).toBe(1.1);
+    expect(fake.state.avatarForgeState.semanticFaceMorphs?.eyeSize).toBe(0.25);
+    expect(fake.state.customColors.body).toBe("#445566");
+    expect(result.current.binding.recipe.colors.iris).toBe("#112233");
+    expect(fake.state.activeExpressionId).toBe("custom");
+    expect(fake.state.expressionWeights).toEqual({ happy: 0.2, sad: 0.6 });
+    expect(result.current.binding.history.length).toBe(1);
+    const applied = structuredClone(fake.state);
+    act(() => result.current.binding.undo());
+    expect(fake.state).toEqual(before);
+    act(() => result.current.binding.redo());
+    expect(fake.state).toEqual(applied);
+  });
+
+  it("accepts expression-only presets instead of reporting an empty plan", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const preset = importedPreset(result.current.workbench, { expression: { activeEntryId: null, weights: { sad: 0.4 } } }, "expression");
+    act(() => expect(result.current.workbench.applyPreset(preset)).toBe(true));
+    expect(fake.state.expressionWeights).toEqual({ sad: 0.4 });
+    expect(result.current.binding.history.length).toBe(1);
+  });
+
+  it.each(["full-pose", "partial-pose", "hand-grip", "camera-shot"] as const)("rejects unsupported %s before ancillary changes or redo invalidation", async (kind) => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    act(() => result.current.binding.commitColor("skin", "#123456"));
+    act(() => result.current.binding.undo());
+    const before = structuredClone(fake.state);
+    const preset = importedPreset(result.current.workbench, {
+      colors: { skin: "#abcdef" },
+      ...(kind === "camera-shot" ? { cameraShotId: "shot-a" } : { pose: result.current.workbench.document.pose }),
+    }, kind);
+    act(() => expect(result.current.workbench.applyPreset(preset)).toBe(false));
+    expect(fake.state).toEqual(before);
+    expect(result.current.binding.history.canRedo).toBe(true);
+    expect(result.current.workbench.notice).toMatch(/지원|적용할 수 없/);
+  });
+
+  it("rejects a missing second accessory before applying the first", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const before = structuredClone(fake.state);
+    const preset = importedPreset(result.current.workbench, {
+      slot: "accessory", selections: [firstAccessoryEntry().id, "missing:last"].map((entryId) => ({ entryId, entryVersion: "1", providerId: "toonstudio-builtin", catalogRevision: "character-slot-catalog-v1" })),
+    });
+    act(() => expect(result.current.workbench.applyPreset(preset)).toBe(false));
+    expect(fake.state).toEqual(before);
+    expect(result.current.binding.history.length).toBe(0);
+  });
+
+  it("restores earlier changes when a later host write fails and preserves history", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const before = structuredClone(fake.state);
+    const writeExpression = fake.host.setExpressionWeights;
+    fake.host.setExpressionWeights = vi.fn().mockImplementationOnce(() => { throw new Error("expression rejected"); }).mockImplementation(writeExpression);
+    const preset = importedPreset(result.current.workbench, { controls: { "face.headWidth": 1.1 }, colors: { skin: "#445566" }, expression: { activeEntryId: "custom", weights: { happy: 0.2 } } });
+    act(() => expect(result.current.workbench.applyPreset(preset)).toBe(false));
+    expect(fake.state).toEqual(before);
+    expect(result.current.binding.history.length).toBe(0);
+    expect(result.current.workbench.notice).toContain("expression rejected");
+  });
+
+  it("replaces the complete accessory set and supports clearing it with one undo", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const entries = listCharacterSlotEntries("accessory").filter((entry) => entry.apply.kind === "prop").slice(0, 3);
+    act(() => result.current.binding.commit(entries[0]!));
+    const first = structuredClone(fake.state.vrmPropItems);
+    const selections = entries.slice(1).map((entry) => ({ entryId: entry.id, entryVersion: "1", providerId: "toonstudio-builtin", catalogRevision: "character-slot-catalog-v1" }));
+    act(() => expect(result.current.workbench.applyPreset(importedPreset(result.current.workbench, { slot: "accessory", selections }))).toBe(true));
+    expect(fake.state.vrmPropItems.map((item) => item.propId)).toEqual(entries.slice(1).map((entry) => entry.apply.kind === "prop" ? entry.apply.propId : ""));
+    act(() => result.current.binding.undo());
+    expect(fake.state.vrmPropItems).toEqual(first);
+    act(() => expect(result.current.workbench.applyPreset(importedPreset(result.current.workbench, { slot: "accessory", selections: [] }))).toBe(true));
+    expect(fake.state.vrmPropItems).toEqual([]);
+    act(() => result.current.binding.undo());
+    expect(fake.state.vrmPropItems).toEqual(first);
+  });
+
+  it("merges hair selection, precision and both colors before React updates the host snapshot", async () => {
+    const fake = createFakeHost();
+    const initialForge = fake.state.avatarForgeState;
+    Object.defineProperty(fake.host, "avatarForgeState", { get: () => initialForge });
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const hair = listCharacterSlotEntries("hair").find((entry) => entry.apply.kind === "forge-hair" && entry.apply.hair.style !== "none")!;
+    const preset = importedPreset(result.current.workbench, {
+      slot: "hair", selections: [{ entryId: hair.id, entryVersion: "1", providerId: "toonstudio-builtin", catalogRevision: "character-slot-catalog-v1" }],
+      controls: { "face.headWidth": 1.1 }, colors: { hairBase: "#123456", hairTip: "#654321", skin: "#234567", top: "#345678" },
+    });
+    act(() => expect(result.current.workbench.applyPreset(preset)).toBe(true));
+    expect(fake.state.avatarForgeState.hair.style).toBe(hair.apply.kind === "forge-hair" ? hair.apply.hair.style : "");
+    expect(fake.state.avatarForgeState.hair.baseColor).toBe("#123456");
+    expect(fake.state.avatarForgeState.hair.tipColor).toBe("#654321");
+    expect(fake.state.avatarForgeState.face.headWidth).toBe(1.1);
+    expect(fake.state.customColors).toEqual({ body: "#234567", tops: "#345678" });
+    expect(fake.calls.forge).toHaveLength(1);
+    expect(result.current.binding.history.length).toBe(1);
+  });
+
+  it.each<CharacterPartPresetV1["payload"]>([
+    { controls: { "unknown.value": 1 }, colors: { skin: "#123456" } },
+    { controls: { "face.headWidth": 20 }, colors: { skin: "#123456" } },
+    { colors: { skin: "not-a-color" } },
+    { expression: { activeEntryId: "custom", weights: { unknown: 0.5 } }, colors: { skin: "#123456" } },
+  ])("rejects unsupported values before changing any part: %j", async (payload) => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const before = structuredClone(fake.state);
+    act(() => expect(result.current.workbench.applyPreset(importedPreset(result.current.workbench, payload))).toBe(false));
+    expect(fake.state).toEqual(before);
+    expect(result.current.binding.history.length).toBe(0);
+  });
+
+  it("keeps a capture-busy host unchanged and does not announce success", async () => {
+    const fake = createFakeHost({ isCapturing: true });
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const before = structuredClone(fake.state);
+    act(() => expect(result.current.workbench.applyPreset(importedPreset(result.current.workbench, { colors: { skin: "#123456" } }))).toBe(false));
+    expect(fake.state).toEqual(before);
+    expect(result.current.binding.history.length).toBe(0);
+    expect(result.current.workbench.notice).toContain("캡처");
+  });
+
+  it("surfaces rollback failure without claiming that the original state was restored", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    fake.host.handleAvatarForgeChange = () => { throw new Error("forge write rejected"); };
+    act(() => expect(result.current.workbench.applyPreset(importedPreset(result.current.workbench, { controls: { "face.headWidth": 1.1 }, colors: { skin: "#123456" } }))).toBe(false));
+    expect(result.current.workbench.notice).toContain("이전 상태 복원도 실패");
+    expect(fake.state.customColors.body).toBe("#123456");
+    expect(result.current.binding.history.length).toBe(0);
+  });
+
+
+  it("applies the projected two-handed slot independently of the current inspector hand selector", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    act(() => result.current.binding.setHandSide("left"));
+    const entry = listCharacterSlotEntries("hand-pose").find((item) => item.apply.kind === "hand-pose")!;
+    const selection = { entryId: entry.id, entryVersion: "1", providerId: "toonstudio-builtin", catalogRevision: "character-slot-catalog-v1" };
+    act(() => expect(result.current.workbench.applyPreset(importedPreset(result.current.workbench, { slot: "hand-pose", selections: [selection, { ...selection }] }))).toBe(true));
+    expect(fake.calls.hands.map((call) => call.side)).toEqual(["left", "right"]);
+    expect(result.current.binding.history.length).toBe(1);
+  });
+
+  it("rejects clearing an equipped garment color instead of silently keeping its old color", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    act(() => result.current.binding.commit(firstWardrobeEntry()));
+    const before = structuredClone(fake.state);
+    act(() => expect(result.current.workbench.applyPreset(importedPreset(result.current.workbench, { colors: { skin: "#123456", top: null } }))).toBe(false));
+    expect(fake.state).toEqual(before);
+    expect(result.current.binding.history.length).toBe(1);
+  });
+
 });

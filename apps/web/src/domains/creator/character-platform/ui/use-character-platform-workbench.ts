@@ -7,7 +7,6 @@ import {
 } from "../assets/character-canonical-manifest";
 import { createCharacterRenderGraphPlan } from "../render/character-render-graph";
 import {
-  applyCharacterPartPreset,
   createCharacterPartPreset,
 } from "../presets/character-part-preset";
 import { createCharacterPartPresetStore } from "../presets/character-part-preset-store";
@@ -26,7 +25,6 @@ import type {
 } from "../pose/character-pose-v2";
 import type { CharacterShaperBinding } from "../../character-shaper/character-shaper-ui-contract";
 import type {
-  CharacterHostSnapshot,
   CharacterSlotKind,
 } from "../../character-shaper/character-shaper-contract";
 import type { StudioAsyncKeyValueStore } from "../../studio-local-database";
@@ -224,26 +222,6 @@ function poseConfidence() {
   });
 }
 
-function faceControls(
-  values: Readonly<Record<string, number>>,
-): Partial<CharacterHostSnapshot["forgeFace"]> {
-  const result: Record<string, number> = {};
-  for (const [key, value] of Object.entries(values)) {
-    if (key.startsWith("face.")) result[key.slice(5)] = value;
-  }
-  return result as Partial<CharacterHostSnapshot["forgeFace"]>;
-}
-
-function morphControls(
-  values: Readonly<Record<string, number>>,
-): CharacterHostSnapshot["semanticMorphs"] {
-  const result: Record<string, number> = {};
-  for (const [key, value] of Object.entries(values)) {
-    if (key.startsWith("morph.")) result[key.slice(6)] = value;
-  }
-  return result as CharacterHostSnapshot["semanticMorphs"];
-}
-
 export function useCharacterPlatformWorkbench(
   h: StudioVrmPoserHost,
   binding: CharacterShaperBinding,
@@ -439,58 +417,10 @@ export function useCharacterPlatformWorkbench(
 
   const applyPreset = useCallback(
     (preset: CharacterPartPresetV1): boolean => {
-      const planned = applyCharacterPartPreset(document, preset);
-      if (!planned.ok) {
-        setNotice(
-          planned.skipped.map((item) => item.reason).join(" · ") ||
-            "적용할 수 있는 값이 없습니다.",
-        );
+      const committed = binding.commitPreset(preset, document);
+      if (!committed.ok) {
+        setNotice(committed.reason ?? "프리셋을 적용하지 못했습니다.");
         return false;
-      }
-      const selection = preset.payload.selections?.[0];
-      if (selection) {
-        const entry = binding.catalog.entries.find(
-          (candidate) => candidate.id === selection.entryId,
-        );
-        if (!entry) {
-          setNotice(
-            `프리셋 항목 ${selection.entryId}을 현재 카탈로그에서 찾지 못했습니다.`,
-          );
-          return false;
-        }
-        const committed = binding.commit(entry);
-        if (!committed.ok) {
-          setNotice(committed.reason ?? "프리셋을 적용하지 못했습니다.");
-          return false;
-        }
-      }
-      const faces = faceControls(preset.payload.controls ?? {});
-      if (Object.keys(faces).length > 0) {
-        binding.commitFaceParams(faces, `${preset.name}: 얼굴 조절`);
-      }
-      const morphs = morphControls(preset.payload.controls ?? {});
-      if (Object.keys(morphs).length > 0) {
-        binding.commitSemanticMorphs(morphs, `${preset.name}: 세부 조절`);
-      }
-      for (const [target, color] of Object.entries(
-        preset.payload.colors ?? {},
-      )) {
-        if (
-          [
-            "skin",
-            "hairBase",
-            "hairTip",
-            "iris",
-            "top",
-            "bottom",
-            "shoes",
-          ].includes(target)
-        ) {
-          binding.commitColor(
-            target as keyof typeof binding.recipe.colors,
-            color,
-          );
-        }
       }
       setNotice(`${preset.name} 프리셋을 적용했습니다.`);
       return true;

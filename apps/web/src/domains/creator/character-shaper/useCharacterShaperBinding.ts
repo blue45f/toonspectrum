@@ -43,6 +43,7 @@ import {
   evaluateCharacterSlotEntry,
 } from "./character-shaper-capability";
 import { CHARACTER_SLOT_CATALOG, characterSlotMeta } from "./character-shaper-catalog";
+import { characterPresetWornSlots, planCharacterPresetApplication } from "./character-shaper-preset-plan";
 import { applyCharacterIrisTint } from "./character-shaper-iris-tint";
 import { createEmptyCharacterRecipe, deriveCharacterRecipe } from "./character-shaper-recipe";
 import { useCharacterShaperHistory } from "./useCharacterShaperHistory";
@@ -92,6 +93,7 @@ export interface CharacterShaperHostState {
   readonly forge: AvatarForgeState | null;
   readonly wardrobe: WardrobeState;
   readonly props: readonly PropInstance[];
+  readonly selectedPropUid: string | null;
   readonly costume: CharacterCostumeState | null;
   readonly customColors: Readonly<Record<string, string>>;
   readonly activePoseId: string;
@@ -336,6 +338,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
       forge: host.avatarForgeState ? sanitizeAvatarForgeState(host.avatarForgeState as AvatarForgeState) : null,
       wardrobe: { ...(readRecord<WardrobeEquip>(host.wardrobeState) as WardrobeState) },
       props: [...readProps(host.vrmPropItems)],
+      selectedPropUid: readString(host.selectedVrmPropUid),
       costume: costume ? { hidden: [...costume.hidden], recolor: { ...costume.recolor } } : null,
       customColors: { ...readRecord<string>(host.customColors) },
       activePoseId: typeof host.activePoseId === "string" ? host.activePoseId : "",
@@ -358,6 +361,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     if (state.forge) host.handleAvatarForgeChange?.(state.forge);
     host.setWardrobeState?.({ ...state.wardrobe });
     host.setVrmPropItems?.([...state.props]);
+    host.setSelectedVrmPropUid?.(state.selectedPropUid);
     if (state.costume) {
       host.updateCostume?.({ hidden: [...state.costume.hidden], recolor: { ...state.costume.recolor } });
     }
@@ -420,7 +424,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
   /* Step execution                                                          */
   /* ---------------------------------------------------------------------- */
 
-  const runSteps = useCallback((steps: readonly CharacterApplyStep[]) => {
+  const runSteps = useCallback((steps: readonly CharacterApplyStep[], colorChanges: Partial<CharacterRecipe["colors"]> = {}) => {
     const host = hostRef.current;
     let mergedForge: AvatarForgeState | null = null;
     const forgeDraft = (): AvatarForgeState => {
@@ -537,6 +541,49 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
       }
     }
 
+    const colors = { ...readRecord<string>(host.customColors) };
+    const worn = characterPresetWornSlots(steps, readRecord<WardrobeEquip>(host.wardrobeState) as WardrobeState);
+    let customColorsChanged = false;
+    let colorChanged = false;
+    const setCustom = (key: string, hex: string | null) => {
+      if (hex) colors[key] = hex;
+      else delete colors[key];
+      customColorsChanged = true;
+      colorChanged = true;
+    };
+    const garment = (slots: readonly WardrobeSlot[], fallback: string | null, hex: string | null) => {
+      const equipped = slots.find((slot) => worn.has(slot));
+      if (equipped && hex) {
+        host.updateWardrobeEquip?.(equipped, { color: hex });
+        colorChanged = true;
+      } else if (fallback) setCustom(fallback, hex);
+    };
+    for (const [target, color] of Object.entries(colorChanges)) {
+      const hex = normalizeHex(color);
+      switch (target) {
+        case "iris": nextIris = hex; colorChanged = true; break;
+        case "skin": setCustom("body", hex); break;
+        case "hairBase":
+          if ((mergedForge ?? forgeOfHost(host)).hair.style !== "none" && hex) {
+            const base = forgeDraft();
+            mergedForge = sanitizeAvatarForgeState({ ...base, presetId: undefined, hair: { ...base.hair, baseColor: hex } });
+            colorChanged = true;
+          } else setCustom("hair", hex);
+          break;
+        case "hairTip":
+          if (hex) {
+            const base = forgeDraft();
+            mergedForge = sanitizeAvatarForgeState({ ...base, presetId: undefined, hair: { ...base.hair, tipColor: hex } });
+            colorChanged = true;
+          }
+          break;
+        case "top": garment(["outer", "top"], "tops", hex); break;
+        case "bottom": garment(["bottom"], "bottoms", hex); break;
+        case "shoes": garment(["shoes"], null, hex); break;
+      }
+    }
+    if (customColorsChanged) host.setCustomColors?.(colors);
+
     // One merged Avatar Forge write per commit, exactly as the brief requires.
     if (mergedForge) host.handleAvatarForgeChange?.(mergedForge);
     if (nextIris !== undefined || nextHandPose !== undefined) {
@@ -546,6 +593,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
         ...(nextHandPose === undefined ? {} : { lastHandPoseType: nextHandPose }),
       }));
     }
+    return steps.length > 0 || colorChanged;
   }, []);
 
   /* ---------------------------------------------------------------------- */
@@ -663,61 +711,42 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
 
   const commitColor = useCallback((target: keyof CharacterRecipe["colors"], color: string | null) => {
     if (busyRef.current !== null) return;
-    const host = hostRef.current;
-    const hex = normalizeHex(color);
     const before = captureHostState();
-    const colors = { ...readRecord<string>(host.customColors) };
-    const worn = readRecord<WardrobeEquip>(host.wardrobeState) as WardrobeState;
-    const setCustom = (key: string) => {
-      if (hex) colors[key] = hex;
-      else delete colors[key];
-      host.setCustomColors?.(colors);
-    };
-    const garment = (slots: readonly WardrobeSlot[], fallbackKey: string | null): boolean => {
-      const equipped = slots.find((slot) => worn[slot]);
-      if (equipped && hex) {
-        host.updateWardrobeEquip?.(equipped, { color: hex });
-        return true;
-      }
-      if (fallbackKey === null) return false;
-      setCustom(fallbackKey);
-      return true;
-    };
-
-    let changed = true;
-    switch (target) {
-      case "iris":
-        setSession((current) => ({ ...current, irisColor: hex }));
-        break;
-      case "skin":
-        setCustom("body");
-        break;
-      case "hairBase": {
-        const proceduralHair = forgeOfHost(host).hair.style !== "none";
-        if (proceduralHair && hex) runSteps([{ kind: "forge-hair", hair: { baseColor: hex } }]);
-        else setCustom("hair");
-        break;
-      }
-      case "hairTip":
-        if (hex) runSteps([{ kind: "forge-hair", hair: { tipColor: hex } }]);
-        else changed = false;
-        break;
-      case "top":
-        changed = garment(["outer", "top"], "tops");
-        break;
-      case "bottom":
-        changed = garment(["bottom"], "bottoms");
-        break;
-      case "shoes":
-        changed = garment(["shoes"], null);
-        break;
-      default:
-        changed = false;
-        break;
-    }
-    if (!changed) return;
-    pushHistory(`색: ${COLOR_LABELS[target]}`, before);
+    if (runSteps([], { [target]: color })) pushHistory(`색: ${COLOR_LABELS[target]}`, before);
   }, [captureHostState, runSteps, pushHistory]);
+
+  const commitPreset = useCallback<CharacterShaperBinding["commitPreset"]>((preset, document) => {
+    const blocked = busyRef.current;
+    if (blocked !== null) return { ok: false, reason: blocked };
+    const host = hostRef.current;
+    let prepared: ReturnType<typeof planCharacterPresetApplication>;
+    try {
+      prepared = planCharacterPresetApplication(document, preset, profile, planContext);
+      const missing = prepared.requiredHostMethods.find((name) => typeof host[name] !== "function");
+      if (missing) throw new Error("프리셋의 모든 변경을 적용할 수 있는 편집기가 필요합니다.");
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : "프리셋을 적용할 수 없습니다." };
+    }
+    const before = captureHostState();
+    try {
+      runSteps(prepared.steps, prepared.colors);
+      if (prepared.expression) {
+        host.setActiveExpressionId(prepared.expression.activeEntryId ?? "");
+        host.setExpressionWeights({ ...prepared.expression.weights });
+      }
+      pushHistory(`프리셋: ${preset.name}`, before);
+      return { ok: true, reason: null };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "프리셋을 적용하지 못했습니다.";
+      try {
+        restoreHostState(before);
+      } catch (restoreError) {
+        const detail = restoreError instanceof Error ? restoreError.message : "복원 오류";
+        return { ok: false, reason: `${reason} · 이전 상태 복원도 실패했습니다: ${detail}` };
+      }
+      return { ok: false, reason };
+    }
+  }, [profile, planContext, captureHostState, runSteps, restoreHostState, pushHistory]);
 
   return useMemo<CharacterShaperBinding>(() => ({
     catalog: CHARACTER_SLOT_CATALOG,
@@ -732,6 +761,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     evaluate,
     plan,
     commit,
+    commitPreset,
     clear,
     remove,
     setHandSide,
@@ -755,6 +785,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     evaluate,
     plan,
     commit,
+    commitPreset,
     clear,
     remove,
     setHandSide,

@@ -312,6 +312,10 @@ export function applyCharacterPartPreset(
     applied.push(`colors.${key}`);
   }
 
+  if (preset.payload.expression !== undefined) applied.push("expression");
+  if (preset.payload.pose !== undefined) applied.push("pose");
+  if (preset.payload.cameraShotId !== undefined) applied.push("camera.activeShotId");
+
   const next: CharacterDocumentV2 = Object.freeze({
     ...document,
     recipe: Object.freeze(recipe),
