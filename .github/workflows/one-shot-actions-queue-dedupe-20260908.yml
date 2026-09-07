@@ -18,7 +18,7 @@ concurrency:
 jobs:
   dedupe:
     if: github.actor != 'github-actions[bot]'
-    runs-on: windows-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - name: Cancel only superseded active workflow runs
