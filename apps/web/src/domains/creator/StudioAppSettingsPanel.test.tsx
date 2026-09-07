@@ -171,6 +171,7 @@ describe("StudioAppSettingsPanel", () => {
     expect(html.match(/max-h-\[min\(26rem,50dvh\)\]/g)).toHaveLength(2);
     expect(html).toContain("순서와 표시 상태는 바로 적용됩니다.");
     expect(html).toContain("변경한 설정은 이 기기에 자동으로 저장됩니다.");
+    expect(html).toContain("모든 도구 표시");
   });
 
   it("설정 저장 실패를 현재 창 한정 상태와 재시도 동작으로 분명히 알린다", () => {
@@ -247,7 +248,7 @@ describe("StudioAppSettingsPanel", () => {
       expect(action, label).toContain("pointer-coarse:min-h-11");
       expect(action, label).toContain("pointer-coarse:min-w-11");
     }
-    expect(openingButtonTagByText(html, "추천 도구 구성으로 되돌리기")).toContain("pointer-coarse:min-h-11");
+    expect(openingButtonTagByText(html, "모든 도구 표시")).toContain("pointer-coarse:min-h-11");
     expect(openingButtonTagByText(html, "완료")).toContain("pointer-coarse:min-h-11");
     expect(html.match(/max-h-\[min\(26rem,50dvh\)\]/gu)).toHaveLength(2);
   });
