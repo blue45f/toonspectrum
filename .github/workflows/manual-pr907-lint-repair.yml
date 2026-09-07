@@ -1,0 +1,374 @@
+name: Manual PR 907 lint repair
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      TARGET_BRANCH: release/final-df46fece-20260908-1905
+      EXPECTED_HEAD: e4042d72b6632e8b8b0386465cc2e73c070524eb
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Verify exact failed head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD" || {
+            echo "::error::Expected ${EXPECTED_HEAD}, found ${actual}."
+            exit 1
+          }
+
+      - name: Apply lint-safe module boundaries and small fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one replacement, found {count}")
+              file.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              "apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts",
+              "    let segment = subtract(target, previous);\n    let segmentLength = length(segment);",
+              "    const segment = subtract(target, previous);\n    const segmentLength = length(segment);",
+          )
+
+          workbench = Path(
+              "apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx"
+          )
+          text = workbench.read_text()
+          for unused in ("  BadgeCheck,\n", "  Box,\n", "  FileJson,\n", "  SlidersHorizontal,\n"):
+              if text.count(unused) != 1:
+                  raise SystemExit(f"{workbench}: expected one {unused.strip()} import")
+              text = text.replace(unused, "", 1)
+          workbench.write_text(text)
+
+          hook = "apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts"
+          replace_once(
+              hook,
+              "export function useCharacterPlatformWorkbench(\n",
+              "function documentClockForModel(_modelId: string): string {\n"
+              "  return new Date().toISOString();\n"
+              "}\n\n"
+              "export function useCharacterPlatformWorkbench(\n",
+          )
+          replace_once(
+              hook,
+              "  const documentClock = useMemo(() => new Date().toISOString(), [modelId]);",
+              "  const documentClock = useMemo(\n"
+              "    () => documentClockForModel(modelId),\n"
+              "    [modelId],\n"
+              "  );",
+          )
+
+          workspace = "apps/web/src/domains/creator/studio-production/studio-production-workspace.ts"
+          replace_once(
+              workspace,
+              "export * from \"./studio-production-workspace-runtime\";\n\n"
+              "import {\n"
+              "  createEmptyProductionWorkspace as createRuntimeProductionWorkspace,\n"
+              "} from \"./studio-production-workspace-runtime\";\n\n"
+              "import type { ProductionWorkspace } from \"./studio-production-workspace-runtime\";\n",
+              "import {\n"
+              "  createEmptyProductionWorkspace as createRuntimeProductionWorkspace,\n"
+              "} from \"./studio-production-workspace-runtime\";\n\n"
+              "import type { ProductionWorkspace } from \"./studio-production-workspace-runtime\";\n\n"
+              "export * from \"./studio-production-workspace-runtime\";\n",
+          )
+
+          old_store = Path(
+              "apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx"
+          )
+          if not old_store.exists():
+              raise SystemExit(f"missing {old_store}")
+
+          store = Path(
+              "apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.ts"
+          )
+          recorder = Path(
+              "apps/web/src/domains/creator/character-platform/thumbnail/CharacterRuntimeThumbnailRecorder.tsx"
+          )
+          if store.exists() or recorder.exists():
+              raise SystemExit("thumbnail split targets already exist")
+
+          store.write_text('''import { useSyncExternalStore } from "react";
+
+export interface CharacterRuntimeThumbnailRecord {
+  readonly modelId: string;
+  readonly signature: string;
+  readonly entryIds: ReadonlySet<string>;
+  readonly url: string;
+  readonly createdAt: number;
+}
+
+interface CharacterRuntimeThumbnailState {
+  readonly activeModelId: string | null;
+  readonly records: ReadonlyMap<string, CharacterRuntimeThumbnailRecord>;
+  readonly revision: number;
+}
+
+const listeners = new Set<() => void>();
+let state: CharacterRuntimeThumbnailState = Object.freeze({
+  activeModelId: null,
+  records: new Map(),
+  revision: 0,
+});
+
+function publish(next: CharacterRuntimeThumbnailState): void {
+  state = Object.freeze(next);
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function setCharacterRuntimeThumbnailActiveModel(
+  modelId: string | null,
+): void {
+  if (state.activeModelId === modelId) return;
+  publish({ ...state, activeModelId: modelId, revision: state.revision + 1 });
+}
+
+function revoke(url: string): void {
+  if (
+    typeof URL !== "undefined" &&
+    typeof URL.revokeObjectURL === "function"
+  ) {
+    URL.revokeObjectURL(url);
+  }
+}
+
+export function recordCharacterRuntimeThumbnail(
+  record: CharacterRuntimeThumbnailRecord,
+): void {
+  const records = new Map(state.records);
+  const previous = records.get(record.modelId);
+  if (previous && previous.url !== record.url) revoke(previous.url);
+  records.set(record.modelId, record);
+  const ordered = [...records.values()].sort(
+    (left, right) => right.createdAt - left.createdAt,
+  );
+  for (const stale of ordered.slice(8)) {
+    records.delete(stale.modelId);
+    revoke(stale.url);
+  }
+  publish({ ...state, records, revision: state.revision + 1 });
+}
+
+function thumbnailFor(entryId: string): string | null {
+  const modelId = state.activeModelId;
+  if (!modelId) return null;
+  const record = state.records.get(modelId);
+  return record?.entryIds.has(entryId) ? record.url : null;
+}
+
+export function useCharacterRuntimeThumbnail(entryId: string): string | null {
+  return useSyncExternalStore(subscribe, () => thumbnailFor(entryId), () => null);
+}
+
+export function clearCharacterRuntimeThumbnails(): void {
+  for (const record of state.records.values()) revoke(record.url);
+  publish({
+    activeModelId: null,
+    records: new Map(),
+    revision: state.revision + 1,
+  });
+}
+''')
+
+          recorder.write_text('''import { useEffect, useMemo, useRef } from "react";
+
+import type { CharacterShaperBinding } from "../../character-shaper/character-shaper-ui-contract";
+import type { StudioVrmPoserHost } from "../../vrm/StudioVrmPoserHost";
+import {
+  captureStudioVrmRgba,
+  encodeStudioVrmCapturePngBlob,
+} from "../../vrm/studio-vrm-raster-capture";
+import {
+  recordCharacterRuntimeThumbnail,
+  setCharacterRuntimeThumbnailActiveModel,
+} from "./character-runtime-thumbnail-store";
+
+function selectedEntryIds(binding: CharacterShaperBinding): readonly string[] {
+  const ids = new Set<string>();
+  for (const value of Object.values(binding.recipe.slots)) {
+    if (typeof value === "string" && value.length > 0) ids.add(value);
+    else if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === "string" && item.length > 0) ids.add(item);
+      }
+    }
+  }
+  return Object.freeze([...ids].sort());
+}
+
+export function CharacterRuntimeThumbnailRecorder({
+  h,
+  binding,
+}: {
+  readonly h: StudioVrmPoserHost;
+  readonly binding: CharacterShaperBinding;
+}) {
+  const aliveRef = useRef(true);
+  const capturedSignatureRef = useRef<string | null>(null);
+  const modelId = typeof h.activeModelId === "string" ? h.activeModelId : null;
+  const ids = useMemo(() => selectedEntryIds(binding), [binding]);
+  const signature = useMemo(
+    () =>
+      `${modelId ?? "none"}|${JSON.stringify(binding.recipe)}|${Boolean(
+        h.transparentBackground,
+      )}`,
+    [modelId, binding.recipe, h.transparentBackground],
+  );
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    setCharacterRuntimeThumbnailActiveModel(modelId);
+  }, [modelId]);
+
+  useEffect(() => {
+    if (
+      !modelId ||
+      h.status !== "ready" ||
+      ids.length === 0 ||
+      capturedSignatureRef.current === signature
+    ) {
+      return;
+    }
+    const capture = h.captureRef?.current;
+    if (!capture?.gl || !capture.scene || !capture.camera) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        let release: (() => void) | null = null;
+        try {
+          release =
+            typeof h.acquireVrmCaptureHelperLease === "function"
+              ? h.acquireVrmCaptureHelperLease({ subjectOnly: true })
+              : null;
+          const size = { width: 256, height: 320 };
+          const rgba = captureStudioVrmRgba(
+            capture.gl,
+            capture.scene,
+            capture.camera,
+            size,
+            { alpha: 0 },
+          );
+          const blob = await encodeStudioVrmCapturePngBlob(rgba, size);
+          if (
+            cancelled ||
+            !aliveRef.current ||
+            typeof URL.createObjectURL !== "function"
+          ) {
+            return;
+          }
+          const url = URL.createObjectURL(blob);
+          recordCharacterRuntimeThumbnail(
+            Object.freeze({
+              modelId,
+              signature,
+              entryIds: new Set(ids),
+              url,
+              createdAt: Date.now(),
+            }),
+          );
+          capturedSignatureRef.current = signature;
+        } catch {
+          // Runtime thumbnail is an enhancement; the deterministic SVG remains the safe fallback.
+        } finally {
+          release?.();
+        }
+      })();
+    }, 180);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [h, ids, modelId, signature]);
+
+  return null;
+}
+''')
+          old_store.unlink()
+
+          replace_once(
+              "apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.tsx",
+              'import { CharacterRuntimeThumbnailRecorder } from "../character-platform/thumbnail/character-runtime-thumbnail-store";',
+              'import { CharacterRuntimeThumbnailRecorder } from "../character-platform/thumbnail/CharacterRuntimeThumbnailRecorder";',
+          )
+          replace_once(
+              "apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.test.tsx",
+              'vi.mock("../character-platform/thumbnail/character-runtime-thumbnail-store", () => ({\n  CharacterRuntimeThumbnailRecorder: () => null,\n}));',
+              'vi.mock("../character-platform/thumbnail/CharacterRuntimeThumbnailRecorder", () => ({\n  CharacterRuntimeThumbnailRecorder: () => null,\n}));',
+          )
+          PY
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Fix and verify changed-file lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts
+            apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.ts
+            apps/web/src/domains/creator/character-platform/thumbnail/CharacterRuntimeThumbnailRecorder.tsx
+            apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx
+            apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts
+            apps/web/src/domains/creator/studio-production/studio-production-workspace.ts
+            apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.tsx
+            apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.test.tsx
+          )
+          pnpm exec eslint --fix "${files[@]}"
+          pnpm exec eslint --max-warnings=0 "${files[@]}"
+          git diff --check
+
+      - name: Verify types and focused regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec tsc -p tsconfig.json --pretty false
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/character-shaper/StudioCharacterShaper.test.tsx \
+            apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx
+
+      - name: Commit and push the exact repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "chatgpt-codex-connector[bot]"
+          git config user.email "199175422+chatgpt-codex-connector[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix(ci): resolve final lint violations"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_HEAD"
+          git push origin "HEAD:${TARGET_BRANCH}"
