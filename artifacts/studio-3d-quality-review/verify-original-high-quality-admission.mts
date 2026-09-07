@@ -4,14 +4,14 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  enableStudio3dHighAssetQuality,
-  resetStudio3dAssetQualityMode,
-} from "../../apps/web/src/domains/creator/studio-3d-asset-quality-session.ts";
 import { resolveStudioBg3dDeviceQuality } from "../../apps/web/src/domains/creator/bg3d/studio-bg3d-device-quality.ts";
 import { validateStudioBg3dGlb } from "../../apps/web/src/domains/creator/bg3d/studio-bg3d-glb-validation.ts";
 import { createDefaultStudioBg3dSceneDocument } from "../../apps/web/src/domains/creator/bg3d/studio-bg3d-scene-document.ts";
 import { deriveStudioBg3dSessionGlbValidationPolicy } from "../../apps/web/src/domains/creator/bg3d/studio-bg3d-session-glb-policy.ts";
+import {
+  enableStudio3dHighAssetQuality,
+  resetStudio3dAssetQualityMode,
+} from "../../apps/web/src/domains/creator/studio-3d-asset-quality-session.ts";
 
 const outputDirectory = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(outputDirectory, "../..");
