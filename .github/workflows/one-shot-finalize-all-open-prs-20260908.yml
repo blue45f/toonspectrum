@@ -1,0 +1,124 @@
+name: One-shot finalize all open PRs
+
+on:
+  push:
+    branches:
+      - ops/finalize-all-open-prs-20260908
+    paths:
+      - .github/workflows/one-shot-finalize-all-open-prs-20260908.yml
+
+permissions:
+  actions: write
+  checks: read
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: one-shot-finalize-all-open-prs-20260908
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Repair CI execution state and merge every ready PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          declare -A rerun_requested=()
+
+          mark_ready_and_sync() {
+            local pr="$1"
+            local draft mergeable_state
+            draft="$(gh api "repos/$repo/pulls/$pr" --jq '.draft')"
+            if [[ "$draft" == "true" ]]; then
+              gh pr ready "$pr" --repo "$repo"
+            fi
+
+            mergeable_state="$(gh api "repos/$repo/pulls/$pr" --jq '.mergeable_state')"
+            if [[ "$mergeable_state" == "behind" ]]; then
+              gh api --method PUT "repos/$repo/pulls/$pr/update-branch" >/dev/null || true
+            fi
+          }
+
+          request_failed_reruns() {
+            local checks_json="$1"
+            local run_ids run_id
+            run_ids="$(jq -r '
+              .check_runs[]
+              | select(.app.slug != "vercel")
+              | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure" or .conclusion == "action_required")
+              | .details_url
+              | capture("/actions/runs/(?<id>[0-9]+)(/|$)").id
+            ' <<<"$checks_json" | sort -u)"
+
+            while IFS= read -r run_id; do
+              [[ -z "$run_id" ]] && continue
+              if [[ -z "${rerun_requested[$run_id]:-}" ]]; then
+                gh api --method POST "repos/$repo/actions/runs/$run_id/rerun-failed-jobs" >/dev/null || \
+                  gh api --method POST "repos/$repo/actions/runs/$run_id/rerun" >/dev/null || true
+                rerun_requested[$run_id]=1
+              fi
+            done <<<"$run_ids"
+          }
+
+          for round in $(seq 1 165); do
+            mapfile -t prs < <(gh api "repos/$repo/pulls?state=open&base=main&per_page=100" --jq '.[].number')
+            if (( ${#prs[@]} == 0 )); then
+              echo "No open PRs targeting main remain."
+              exit 0
+            fi
+
+            made_progress=false
+            for pr in "${prs[@]}"; do
+              mark_ready_and_sync "$pr"
+
+              state="$(gh api "repos/$repo/pulls/$pr" --jq '.state')"
+              [[ "$state" != "open" ]] && continue
+
+              sha="$(gh api "repos/$repo/pulls/$pr" --jq '.head.sha')"
+              checks_json="$(gh api -H 'Accept: application/vnd.github+json' "repos/$repo/commits/$sha/check-runs?filter=latest&per_page=100")"
+
+              core_state="$(jq -r '[.check_runs[] | select(.name == "core") | {status, conclusion}] | first // {status:"missing", conclusion:null} | "\(.status):\(.conclusion // "")"' <<<"$checks_json")"
+              failed_count="$(jq '[.check_runs[] | select(.app.slug != "vercel") | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure" or .conclusion == "action_required")] | length' <<<"$checks_json")"
+              pending_count="$(jq '[.check_runs[] | select(.app.slug != "vercel") | select(.status != "completed")] | length' <<<"$checks_json")"
+
+              echo "PR #$pr head=$sha core=$core_state failed=$failed_count pending=$pending_count"
+
+              if (( failed_count > 0 )); then
+                request_failed_reruns "$checks_json"
+                failed_names="$(jq -r '.check_runs[] | select(.app.slug != "vercel") | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure" or .conclusion == "action_required") | "- \(.name): \(.conclusion)"' <<<"$checks_json")"
+                gh pr comment "$pr" --repo "$repo" --body $'CI 실패 실행을 재시도했습니다.\n\n'"$failed_names" >/dev/null || true
+                made_progress=true
+                continue
+              fi
+
+              if [[ "$core_state" == "completed:success" ]]; then
+                title="$(gh api "repos/$repo/pulls/$pr" --jq '.title')"
+                if gh api --method PUT "repos/$repo/pulls/$pr/merge" \
+                  -f merge_method=squash \
+                  -f commit_title="$title (#$pr)" \
+                  --jq '.merged' | grep -qx true; then
+                  echo "Merged PR #$pr."
+                  made_progress=true
+                  continue
+                fi
+
+                gh pr merge "$pr" --repo "$repo" --squash --auto >/dev/null || true
+              fi
+            done
+
+            if [[ "$made_progress" == "false" ]]; then
+              sleep 20
+            else
+              sleep 10
+            fi
+          done
+
+          echo "::error::Open PRs remain after the bounded CI/merge loop."
+          gh api "repos/$repo/pulls?state=open&base=main&per_page=100" --jq '.[] | "#\(.number) \(.title) head=\(.head.sha)"'
+          exit 1
