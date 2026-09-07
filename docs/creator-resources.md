@@ -6,6 +6,7 @@ This slice promotes the existing creator-resource domain into a canonical resear
 
 | Route | Implemented behavior |
 | --- | --- |
+| `/now` | Deterministic KST daily creator spark with 14 original scene themes, object/place/light/sound notes and a five-panel mission |
 | `/research` | Canonical research desk, provider status, local workspace, source export and validated backup restore |
 | `/research/assets` | Alias of the existing Met reference search with strict public-domain filtering |
 | `/research/books` | Unified Open Library free-text search and openBD exact-ISBN lookup, local board save and attribution export |
@@ -14,7 +15,23 @@ This slice promotes the existing creator-resource domain into a canonical resear
 | `/about/crawler` | Public crawler identity, allowed collection channels, prohibited collection and correction/removal routes |
 | Legacy routes | `/creator-hub`, `/creator-hub/references`, `/discover/works` and `/insights/resources` remain available |
 
-The homepage entry now links to the research desk, global edition discovery, creator references and opportunities. No external source image is copied into the repository.
+The homepage entry now links to the daily spark, research desk, global edition discovery, creator references and opportunities. No external source image is copied into the repository.
+
+## Daily creator spark
+
+`/now` rotates through 14 original ToonStudio editorial themes using the Korean calendar date. Each issue contains:
+
+```text
+scene premise
+object
+place
+light
+sound cues
+five-panel exercise
+mood tags
+```
+
+The page links to separately governed Met and Open Library searches but never auto-imports external media. The prompt and exercise copy are original application content; linked search results retain their own provider, source, retrieval time and usage classification.
 
 ## API contract and providers
 
