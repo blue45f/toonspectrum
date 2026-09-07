@@ -1,0 +1,42 @@
+name: One-shot diagnose PR 900 integration conflicts
+
+on:
+  push:
+    branches:
+      - ci/diagnose-pr900-integration-20260908
+    paths:
+      - .github/workflows/one-shot-diagnose-pr900-integration.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Reproduce the final-integration and PR 900 merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            integration/all-open-mrs-20260908 \
+            integration/replay-pr900-20260908
+          git checkout --detach origin/integration/all-open-mrs-20260908
+          set +e
+          git merge --no-commit --no-ff origin/integration/replay-pr900-20260908
+          merge_status=$?
+          set -e
+          echo "MERGE_STATUS=$merge_status"
+          echo "CONFLICTS_BEGIN"
+          git diff --name-only --diff-filter=U | LC_ALL=C sort
+          echo "CONFLICTS_END"
+          echo "UNMERGED_STAGES_BEGIN"
+          git ls-files -u
+          echo "UNMERGED_STAGES_END"
+          git merge --abort || true
