@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioUnifiedAssetWorkspace } from "./StudioUnifiedAssetWorkspace";
@@ -84,6 +90,36 @@ const items: readonly StudioUnifiedAssetItem[] = [
       },
     },
   },
+  {
+    id: "element:spark",
+    category: "element",
+    scope: "studio",
+    title: "반짝 효과",
+    description: "편집 가능한 벡터 효과",
+    categoryLabel: "효과",
+    keywords: ["반짝", "효과"],
+    badges: ["벡터"],
+    preview: {
+      kind: "svg",
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><path d="M16 2L19 13L30 16L19 19L16 30L13 19L2 16L13 13Z"/></svg>',
+    },
+    useMode: "insert",
+    useLabel: "요소 삽입",
+    discoverability: "standard",
+    sortPriority: 70,
+    source: {
+      kind: "element",
+      value: {
+        id: "spark",
+        label: "반짝 효과",
+        category: "effect",
+        keywords: ["반짝", "효과"],
+        width: 32,
+        height: 32,
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><path d="M16 2L19 13L30 16L19 19L16 30L13 19L2 16L13 13Z"/></svg>',
+      },
+    },
+  },
 ];
 
 afterEach(cleanup);
@@ -99,9 +135,12 @@ describe("StudioUnifiedAssetWorkspace", () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole("searchbox", { name: "에셋 통합 검색" }), {
-      target: { value: "의자" },
-    });
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "에셋 통합 검색" }),
+      {
+        target: { value: "의자" },
+      },
+    );
 
     expect(screen.getByText("교실 의자")).toBeTruthy();
     expect(screen.queryByText("비 오는 밤 학교")).toBeNull();
@@ -118,9 +157,63 @@ describe("StudioUnifiedAssetWorkspace", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "교실 의자 3D 도구 열기" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "교실 의자 3D 도구 열기" }),
+    );
     await waitFor(() => expect(onUseItem).toHaveBeenCalledWith(items[1]));
-    expect(await screen.findByText("교실 의자 편집 도구를 열었습니다.")).toBeTruthy();
+    expect(
+      await screen.findByText("교실 의자 편집 도구를 열었습니다."),
+    ).toBeTruthy();
+  });
+
+  it("reports a regular canvas insertion as completed", async () => {
+    const onUseItem = vi.fn().mockResolvedValue(true);
+    render(
+      <StudioUnifiedAssetWorkspace
+        items={items}
+        legacyContent={<div>기존 보관함</div>}
+        onUseItem={onUseItem}
+        onOpenAi={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "비 오는 밤 학교 배경 삽입" }),
+    );
+    await waitFor(() => expect(onUseItem).toHaveBeenCalledWith(items[0]));
+    expect(
+      await screen.findByText("비 오는 밤 학교을(를) 캔버스에 삽입했습니다."),
+    ).toBeTruthy();
+  });
+
+  it("supports quick search, scope and category filtering, and reset", () => {
+    render(
+      <StudioUnifiedAssetWorkspace
+        items={items}
+        legacyContent={<div>기존 보관함</div>}
+        onUseItem={vi.fn()}
+        onOpenAi={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "효과" }));
+    expect(screen.getByText("반짝 효과")).toBeTruthy();
+    expect(screen.queryByText("교실 의자")).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "통합 에셋 검색어 지우기" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "내 에셋" }));
+    expect(screen.getByText("내 창문 소품")).toBeTruthy();
+    expect(screen.queryByText("반짝 효과")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "3D 0" }));
+    expect(screen.getByText("조건에 맞는 에셋이 없습니다.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "조건 넓히기" }));
+    expect(screen.getByText("교실 의자")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "초기화" }));
+    expect(screen.getByText("비 오는 밤 학교")).toBeTruthy();
   });
 
   it("keeps the existing library and marketplace reachable", () => {
@@ -148,10 +241,15 @@ describe("StudioUnifiedAssetWorkspace", () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole("searchbox", { name: "에셋 통합 검색" }), {
-      target: { value: "심해 우주 정거장" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "AI 도구에서 만들기" }));
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "에셋 통합 검색" }),
+      {
+        target: { value: "심해 우주 정거장" },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "AI 도구에서 만들기" }),
+    );
     expect(onOpenAi).toHaveBeenCalledWith("심해 우주 정거장");
   });
 
@@ -160,7 +258,9 @@ describe("StudioUnifiedAssetWorkspace", () => {
       <StudioUnifiedAssetWorkspace
         initialView="library"
         items={items}
-        legacyContent={<div data-testid="deep-linked-library">기존 보관함</div>}
+        legacyContent={
+          <div data-testid="deep-linked-library">기존 보관함</div>
+        }
         onUseItem={vi.fn()}
         onOpenAi={vi.fn()}
       />,
@@ -182,10 +282,16 @@ describe("StudioUnifiedAssetWorkspace", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "교실 의자 3D 도구 열기" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "교실 의자 3D 도구 열기" }),
+    );
     expect(
-      await screen.findByText("현재 캔버스 상태에서는 이 에셋을 사용할 수 없습니다."),
+      await screen.findByText(
+        "현재 캔버스 상태에서는 이 에셋을 사용할 수 없습니다.",
+      ),
     ).toBeTruthy();
-    expect(screen.queryByText("교실 의자 편집 도구를 열었습니다.")).toBeNull();
+    expect(
+      screen.queryByText("교실 의자 편집 도구를 열었습니다."),
+    ).toBeNull();
   });
 });
