@@ -133,9 +133,23 @@ describe("studio semantic identity", () => {
     ]));
   });
 
-  it("reports duplicate IDs, references and stale stored states", () => {
+  it("reports duplicate IDs, competing reference owners and stale stored states", () => {
     const duplicateLink = createStudioIdentityLink({
       semanticId: "panel:duplicate",
+      kind: "panel",
+      references: [writerPanel],
+      source: "native",
+      createdAt: NOW,
+    });
+    const duplicateIdWithDifferentReference = createStudioIdentityLink({
+      semanticId: "panel:duplicate",
+      kind: "panel",
+      references: [comicPanel],
+      source: "native",
+      createdAt: NOW,
+    });
+    const competingReferenceOwner = createStudioIdentityLink({
+      semanticId: "panel:other",
       kind: "panel",
       references: [writerPanel],
       source: "native",
@@ -146,7 +160,8 @@ describe("studio semantic identity", () => {
       workScope: "work:chapter-1",
       links: [
         { ...duplicateLink, state: "orphaned" },
-        { ...duplicateLink },
+        duplicateIdWithDifferentReference,
+        competingReferenceOwner,
       ],
     };
 
