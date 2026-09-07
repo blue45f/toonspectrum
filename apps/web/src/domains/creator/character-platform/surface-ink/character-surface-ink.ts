@@ -233,8 +233,8 @@ export function resampleCharacterInkPositions(
   let carry = 0;
   for (let index = 1; index < positions.length; index += 1) {
     const target = positions[index]!;
-    let segment = subtract(target, previous);
-    let segmentLength = length(segment);
+    const segment = subtract(target, previous);
+    const segmentLength = length(segment);
     if (segmentLength < EPSILON) continue;
     let walked = safeSpacing - carry;
     while (walked <= segmentLength + EPSILON) {

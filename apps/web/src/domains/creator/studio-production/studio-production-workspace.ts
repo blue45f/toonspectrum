@@ -1,10 +1,9 @@
-export * from "./studio-production-workspace-runtime";
-
 import {
   createEmptyProductionWorkspace as createRuntimeProductionWorkspace,
+  type ProductionWorkspace,
 } from "./studio-production-workspace-runtime";
 
-import type { ProductionWorkspace } from "./studio-production-workspace-runtime";
+export * from "./studio-production-workspace-runtime";
 
 function productionWorkspaceTitle(scopeKey: string): string {
   if (scopeKey === "draft") return "새 웹툰 제작 프로젝트";

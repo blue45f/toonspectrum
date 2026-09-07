@@ -245,12 +245,16 @@ function morphControls(
   return result as CharacterHostSnapshot["semanticMorphs"];
 }
 
+function documentClockForModel(_modelId: string): string {
+  return new Date().toISOString();
+}
+
 export function useCharacterPlatformWorkbench(
   h: StudioVrmPoserHost,
   binding: CharacterShaperBinding,
 ): CharacterPlatformWorkbenchState {
   const modelId = activeModelId(h, binding);
-  const documentClock = useMemo(() => new Date().toISOString(), [modelId]);
+  const documentClock = useMemo(() => documentClockForModel(modelId), [modelId]);
   const [canonicalManifest, setCanonicalManifest] =
     useState<CharacterCanonicalManifestV2 | null>(null);
   const [canonicalError, setCanonicalError] = useState<string | null>(null);
