@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   check,
@@ -44,8 +45,12 @@ export const creatorMarketplaceDrafts = pgTable(
     description: text("description").notNull().default(""),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     accessModel: text("accessModel").notNull().default("free"),
-    artifactSetId: text("artifactSetId"),
-    licenseSnapshotId: text("licenseSnapshotId"),
+    artifactSetId: text("artifactSetId").references(
+      (): AnyPgColumn => creatorAssetArtifactSets.id, { onDelete: "restrict" },
+    ),
+    licenseSnapshotId: text("licenseSnapshotId").references(
+      (): AnyPgColumn => creatorAssetLicenseSnapshots.id, { onDelete: "restrict" },
+    ),
     publishedReleaseId: text("publishedReleaseId").references(
       () => creatorMarketplaceResources.id,
       { onDelete: "restrict" },

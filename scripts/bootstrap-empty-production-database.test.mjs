@@ -387,6 +387,7 @@ describe("bootstrap SQL and repository contract", () => {
       "0038_feedback_community",
       "0039_creator_asset_platform_foundation",
       "0040_creator_asset_platform_integrity",
+      "0041_creator_asset_evidence_lineage",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });
