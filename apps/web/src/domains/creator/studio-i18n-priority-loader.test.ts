@@ -3,9 +3,14 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { resolveTranslation } from "@/shared/lib/i18n-core";
+
 import {
   preloadStudioI18nCore,
+  scheduleStudioI18nDeferredLoad,
   STUDIO_I18N_CORE_NAMESPACES,
+  STUDIO_I18N_DEFERRED_NAMESPACES,
+  STUDIO_I18N_MANAGED_SENTINEL_KEY,
 } from "./studio-i18n-priority-loader";
 
 function namespaceFromUrl(input: string | URL | Request): string {
@@ -60,6 +65,25 @@ describe("Studio priority i18n loader", () => {
     await loading;
   });
 
+  it("marks the active locale as priority-managed before network responses settle", async () => {
+    const releases: Array<() => void> = [];
+    const fetchMock = vi.fn((input: string | URL | Request) =>
+      new Promise<Response>((resolve) => {
+        releases.push(() => resolve(dictionaryResponse(namespaceFromUrl(input))));
+      })
+    );
+
+    const loading = preloadStudioI18nCore({
+      locale: "af",
+      baseUrl: "/priority-managed-sentinel/",
+      fetchImpl: fetchMock as typeof fetch,
+    });
+
+    expect(resolveTranslation("af", STUDIO_I18N_MANAGED_SENTINEL_KEY)).toBe("managed");
+    releases.forEach((release) => release());
+    await loading;
+  });
+
   it("isolates a namespace failure instead of rejecting Studio route readiness", async () => {
     const failedNamespace = STUDIO_I18N_CORE_NAMESPACES[0];
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
@@ -79,6 +103,41 @@ describe("Studio priority i18n loader", () => {
     expect(report.loadedNamespaces).toHaveLength(
       STUDIO_I18N_CORE_NAMESPACES.length - 1,
     );
+  });
+
+  it("retries only deferred namespaces that fail transiently", async () => {
+    vi.useFakeTimers();
+    try {
+      const transientNamespace = STUDIO_I18N_DEFERRED_NAMESPACES[0]!;
+      const attempts = new Map<string, number>();
+      const fetchMock = vi.fn(async (input: string | URL | Request) => {
+        const namespace = namespaceFromUrl(input);
+        const nextAttempt = (attempts.get(namespace) ?? 0) + 1;
+        attempts.set(namespace, nextAttempt);
+        if (namespace === transientNamespace && nextAttempt === 1) {
+          return new Response("temporary", { status: 503 });
+        }
+        return dictionaryResponse(namespace);
+      });
+
+      const cancel = scheduleStudioI18nDeferredLoad({
+        locale: "is",
+        baseUrl: "/priority-deferred-retry/",
+        fetchImpl: fetchMock as typeof fetch,
+        deferredRetryDelaysMs: [10],
+      });
+
+      await vi.advanceTimersByTimeAsync(250);
+      expect(attempts.get(transientNamespace)).toBe(1);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(attempts.get(transientNamespace)).toBe(2);
+      for (const namespace of STUDIO_I18N_DEFERRED_NAMESPACES) {
+        expect(attempts.get(namespace)).toBe(namespace === transientNamespace ? 2 : 1);
+      }
+      cancel();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps translation fetches outside the lazy chunk recovery promise", () => {
