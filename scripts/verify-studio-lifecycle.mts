@@ -244,7 +244,8 @@ async function installCleanStudioState(page: Page): Promise<void> {
 
 async function dismissQuickStart(page: Page): Promise<void> {
   const quickstart = page.locator('[data-studio-creative-starter="true"]');
-  if (await quickstart.isVisible({ timeout: 300 }).catch(() => false)) {
+  // The lazy coach can mount after the editor shell; isVisible() does not wait for hydration.
+  if (await quickstart.waitFor({ state: "visible", timeout: 2_000 }).then(() => true, () => false)) {
     await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
 }
@@ -471,6 +472,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
   try {
     await prepareStudio(page, studioUrl);
     await activatePen(page);
+    await dismissQuickStart(page);
     const stage = page.locator(".konvajs-content").first();
     await stage.waitFor({ state: "visible" });
     await page.mouse.move(4, 4);
@@ -522,6 +524,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
 
     await undo.click();
     const redo = await enabledHistoryButton(page, "다시실행");
+    await page.mouse.move(4, 4);
     const undone = await captureStableStage(page, stage);
     writeFileSync(undonePath, undone);
 
