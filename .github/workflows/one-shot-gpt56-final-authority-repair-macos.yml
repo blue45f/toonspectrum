@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: one-shot-gpt56-final-authority-repair-macos-20260908-1836
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   repair:
@@ -29,22 +29,13 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - name: Apply reviewed authority and runtime repairs
+      - name: Apply reviewed authority and unloaded-profile repairs
         shell: bash
         run: |
           set -euo pipefail
           git pull --ff-only origin ci/gpt56-final-authority-repair-20260908-1836
           python3 <<'PY'
           from pathlib import Path
-
-          def replace_once(path: Path, old: str, new: str, label: str) -> None:
-              text = path.read_text()
-              if new in text:
-                  return
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f"{label} marker count: {count}")
-              path.write_text(text.replace(old, new, 1))
 
           boundary = Path("apps/web/src/domains/creator/studio-browser-kv-authority-boundary.test.ts")
           boundary_text = boundary.read_text()
@@ -77,30 +68,14 @@ jobs:
               boundary_text = boundary_text.replace(marker, block, 1)
           boundary.write_text(boundary_text)
 
-          replace_once(
-              Path("apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts"),
-              ': (binding.profile.modelId ?? "unloaded-character");',
-              ': (binding.profile?.modelId ?? "unloaded-character");',
-              "Character Platform unloaded profile fallback",
-          )
-
-          router = Path("apps/web/src/domains/creator/studio-router/StudioRouter.tsx")
-          router_text = router.read_text()
-          separators = [
-              ('from "react-router-dom";\n\nimport { StudioRouteLoading', 'from "react-router-dom";\nimport { StudioRouteLoading'),
-              ('} from "../studio-i18n-priority-loader";\n\nimport { StudioEditorRoute', '} from "../studio-i18n-priority-loader";\nimport { StudioEditorRoute'),
-              ('from "./StudioRouteFallbacks";\n\nimport { useI18n', 'from "./StudioRouteFallbacks";\nimport { useI18n'),
-              ('from "@/shared/lib/lazy-retry";\n\nconst StudioLift3dPage', 'from "@/shared/lib/lazy-retry";\nconst StudioLift3dPage'),
-              ('  "StudioLift3dPage",\n);\n\nconst StudioToolsCompanionPage', '  "StudioLift3dPage",\n);\nconst StudioToolsCompanionPage'),
-              ('  "StudioToolsCompanionPage",\n);\n\nfunction useStudioI18nPriorityLoading', '  "StudioToolsCompanionPage",\n);\nfunction useStudioI18nPriorityLoading'),
-              ('  const lang = useI18n((state) => state.lang);\n\n  useEffect', '  const lang = useI18n((state) => state.lang);\n  useEffect'),
-              ('  }, [lang]);\n}\n\nexport function StudioRouter', '  }, [lang]);\n}\nexport function StudioRouter'),
-          ]
-          for old, new in separators:
-              if old not in router_text:
-                  raise SystemExit(f"StudioRouter compact-seam marker missing: {old!r}")
-              router_text = router_text.replace(old, new, 1)
-          router.write_text(router_text)
+          workbench = Path("apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts")
+          workbench_text = workbench.read_text()
+          old = ': (binding.profile.modelId ?? "unloaded-character");'
+          new = ': (binding.profile?.modelId ?? "unloaded-character");'
+          if old in workbench_text:
+              workbench.write_text(workbench_text.replace(old, new, 1))
+          elif new not in workbench_text:
+              raise SystemExit("Character Platform unloaded-profile fallback marker missing")
           PY
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
@@ -129,8 +104,7 @@ jobs:
             .github/workflows/one-shot-gpt56-final-authority-repair-macos.yml
           git add \
             apps/web/src/domains/creator/studio-browser-kv-authority-boundary.test.ts \
-            apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts \
-            apps/web/src/domains/creator/studio-router/StudioRouter.tsx
+            apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts
           git diff --cached --check
           if git diff --cached --quiet; then
             exit 0
