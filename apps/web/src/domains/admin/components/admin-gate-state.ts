@@ -1,5 +1,6 @@
 import {
   createContext,
+  createElement,
   useContext,
   useEffect,
   useState,
@@ -36,11 +37,7 @@ export function AdminGateOverrideProvider({
   value: AdminGateState;
   children: ReactNode;
 }) {
-  return (
-    <AdminGateOverrideContext.Provider value={value}>
-      {children}
-    </AdminGateOverrideContext.Provider>
-  );
+  return createElement(AdminGateOverrideContext.Provider, { value }, children);
 }
 
 export function useAdminGate(): AdminGateState {
