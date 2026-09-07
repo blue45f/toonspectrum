@@ -757,7 +757,10 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
           waitUntil: "domcontentloaded",
           timeout: 25_000,
         });
-        await page.locator("h1").first().waitFor({ state: "visible", timeout: 25_000 });
+        const readySelector = path === "/studio/projects"
+          ? '[data-studio-production-command-center] input[aria-label="프로젝트 제목"]'
+          : "h1";
+        await page.locator(readySelector).first().waitFor({ state: "visible", timeout: 25_000 });
         if (new URL(page.url()).pathname !== path) throw new Error(`Studio route ${path} navigated to ${page.url()}`);
         await settle(page);
         return "ok" as const;

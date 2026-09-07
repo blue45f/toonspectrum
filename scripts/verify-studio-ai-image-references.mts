@@ -208,6 +208,8 @@ async function runScenario(browser: Browser, origin: string, scenario: Scenario)
       const assets = activePage.locator('[data-studio-tool-popover="asset-group"]');
       await assets.waitFor();
       await assets.getByRole("tab", { name: "내 에셋", exact: true }).click();
+      await assets.getByRole("button", { name: "보관함 · 마켓", exact: true }).click();
+      await assets.getByRole("button", { name: "내 에셋", exact: true }).click();
       await assets.getByLabel("이미지 에셋 업로드", { exact: true }).setInputFiles(resolve("apps/web/public/favicon-32.png"));
       await assets.getByText("favicon-32", { exact: true }).first().waitFor();
       await activePage.keyboard.press("Escape");

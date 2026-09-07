@@ -70,7 +70,7 @@ describe("studio chrome UI", () => {
         onClick={onClick}
       />
     );
-    const button = screen.getByRole("button", { name: "화면 이동", exact: true });
+    const button = screen.getByRole("button", { name: "화면 이동" });
     expect(button.getAttribute("data-studio-rail-tool-id")).toBe("hand");
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
