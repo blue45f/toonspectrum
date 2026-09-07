@@ -1,0 +1,53 @@
+name: One-time merged branch cleanup 20260908-0320
+
+on:
+  push:
+    branches:
+      - chore/cleanup-merged-branches-20260908-0320
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: one-time-merged-branch-cleanup-20260908-0320
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Delete only branches proven merged into the default branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/cleanup-merged-branches.mjs --all --apply | tee cleanup-report.json
+          cat cleanup-report.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete one-time launcher branch
+        if: ${{ success() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/refs/heads/${GITHUB_REF_NAME}"
