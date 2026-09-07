@@ -1,4 +1,4 @@
-name: Isolate final PR 919 runs on slim runner
+name: Prioritize protected CI for final PR 919
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  isolate:
+  prioritize:
     runs-on: ubuntu-slim
     timeout-minutes: 15
     env:
@@ -21,7 +21,7 @@ jobs:
       HELPER_BRANCH: ci/isolate-pr917-slim-20260908
       TARGET_BRANCH: release/final-main-merge-4888b061-immutable-20260908
     steps:
-      - name: Cancel stale branches and duplicate PR 919 runs
+      - name: Preserve only the latest protected CI run for PR 919
         shell: bash
         run: |
           set -euo pipefail
@@ -33,13 +33,12 @@ jobs:
           import time
           import urllib.error
           import urllib.request
-          from collections import defaultdict
 
           repository = os.environ["GH_REPOSITORY"]
           token = os.environ["GH_TOKEN"]
           helper_branch = os.environ["HELPER_BRANCH"]
           target_branch = os.environ["TARGET_BRANCH"]
-          statuses = ("in_progress", "queued", "pending", "waiting", "requested")
+          active_statuses = ("in_progress", "queued", "pending", "waiting", "requested")
 
           def request(path: str, method: str = "GET") -> tuple[int, object]:
               req = urllib.request.Request(
@@ -48,7 +47,7 @@ jobs:
                   headers={
                       "Accept": "application/vnd.github+json",
                       "Authorization": f"Bearer {token}",
-                      "User-Agent": "toonspectrum-pr919-slim-isolator",
+                      "User-Agent": "toonspectrum-pr919-core-prioritizer",
                       "X-GitHub-Api-Version": "2022-11-28",
                   },
               )
@@ -59,12 +58,13 @@ jobs:
               except urllib.error.HTTPError as error:
                   raw = error.read()
                   try:
-                      return error.code, json.loads(raw) if raw else {}
+                      payload: object = json.loads(raw) if raw else {}
                   except json.JSONDecodeError:
-                      return error.code, raw.decode("utf-8", errors="replace")
+                      payload = raw.decode("utf-8", errors="replace")
+                  return error.code, payload
 
           active: dict[int, dict[str, object]] = {}
-          for status_name in statuses:
+          for status_name in active_statuses:
               for page in range(1, 11):
                   status, payload = request(
                       f"/repos/{repository}/actions/runs?status={status_name}&per_page=100&page={page}"
@@ -80,30 +80,32 @@ jobs:
                   if len(runs) < 100:
                       break
 
-          target_by_workflow: dict[int, list[dict[str, object]]] = defaultdict(list)
-          for run in active.values():
-              if run.get("head_branch") == target_branch:
-                  target_by_workflow[int(run.get("workflow_id", 0))].append(run)
-
-          keep: set[int] = set()
-          for runs in target_by_workflow.values():
-              latest = max(
-                  runs,
-                  key=lambda run: (str(run.get("created_at") or ""), int(run.get("id", 0))),
-              )
-              keep.add(int(latest["id"]))
+          target_ci = [
+              run for run in active.values()
+              if run.get("head_branch") == target_branch
+              and run.get("path") == ".github/workflows/ci.yml"
+          ]
+          if not target_ci:
+              raise SystemExit("No active protected CI run found for PR 919")
+          keep_run = max(
+              target_ci,
+              key=lambda run: (str(run.get("created_at") or ""), int(run.get("id", 0))),
+          )
+          keep_id = int(keep_run["id"])
 
           candidates: list[dict[str, object]] = []
           for run_id, run in active.items():
               branch = str(run.get("head_branch") or "")
-              if branch == "main" or branch == helper_branch:
-                  continue
-              if branch == target_branch and run_id in keep:
+              if branch in {"main", helper_branch} or run_id == keep_id:
                   continue
               candidates.append(run)
 
           candidates.sort(key=lambda run: (str(run.get("created_at") or ""), int(run.get("id", 0))))
-          print(json.dumps({"active": len(active), "keep": sorted(keep), "cancel": len(candidates)}))
+          print(json.dumps({
+              "active": len(active),
+              "protectedCiRun": keep_id,
+              "cancellations": len(candidates),
+          }, sort_keys=True))
 
           failures: list[str] = []
           for run in candidates:
@@ -112,15 +114,16 @@ jobs:
                   f"/repos/{repository}/actions/runs/{run_id}/cancel",
                   method="POST",
               )
-              label = f"{run_id} {run.get('head_branch')} {run.get('name')}"
+              label = f"{run_id} {run.get('head_branch')} / {run.get('name')} [{run.get('status')}]"
               if status == 202:
-                  print(f"cancelled {label}")
+                  print(f"cancelled: {label}")
               elif status in {404, 409}:
-                  print(f"terminal {label} HTTP {status}")
+                  print(f"already terminal: {label} (HTTP {status})")
               else:
                   failures.append(f"{label}: HTTP {status}: {payload}")
               time.sleep(0.03)
 
+          print(f"preserved protected CI run {keep_id}; failed cancellations={len(failures)}")
           if failures:
-              raise SystemExit("\n".join(failures))
+              raise SystemExit("Cancellation failures:\n" + "\n".join(failures))
           PY
