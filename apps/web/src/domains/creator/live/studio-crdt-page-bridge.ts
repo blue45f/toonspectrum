@@ -23,18 +23,17 @@ import {
 } from "./studio-crdt-protocol";
 import {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
-  STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   isStudioCrdtPayloadSceneElementType,
   isStudioCrdtTopologyReferencePayload,
   studioCrdtLayerGroupKey,
   validateStudioCrdtLayerGroupPayload,
-  validateStudioCrdtPagePayload,
   validateStudioCrdtSceneElementPayload,
   type StudioCrdtJsonObject,
-  type StudioCrdtJsonValue,
   type StudioCrdtPayloadSceneElementType,
 } from "./studio-crdt-scene-schema";
+import { jsonObject, jsonValue } from "./studio-crdt-json-value";
+import type { StudioCrdtCompatibleOrderedPage } from "./studio-crdt-page-payload";
 
 import type {
   StudioCrdtLayerGroupInput,
@@ -45,9 +44,6 @@ import type {
   StudioCrdtStrokeRecord,
 } from "./studio-crdt-document";
 import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
-import type { StudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
-import type { StudioPaperSurfaceSettings } from "../brush/studio-paper-granulation-runtime";
-import type { StudioLayerComp } from "../layer/studio-layer-comps";
 
 import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
@@ -71,6 +67,8 @@ export {
   studioDrawElementToCrdtStroke,
 } from "./studio-crdt-draw-bridge";
 export type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
+export { studioPageToCrdtPage } from "./studio-crdt-page-payload";
+export type { StudioCrdtCompatibleOrderedPage } from "./studio-crdt-page-payload";
 
 const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
 
@@ -134,34 +132,6 @@ const EXTENSION_KEYS = [
   "layerColor",
   "emeresSourceId",
 ] as const;
-
-function jsonValue(value: unknown): StudioCrdtJsonValue | undefined {
-  if (value === null || typeof value === "boolean" || typeof value === "string") return value;
-  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
-  if (Array.isArray(value)) {
-    const result: StudioCrdtJsonValue[] = [];
-    for (const item of value) {
-      const normalized = jsonValue(item);
-      if (normalized === undefined) return undefined;
-      result.push(normalized);
-    }
-    return result;
-  }
-  if (!value || typeof value !== "object") return undefined;
-  const result: StudioCrdtJsonObject = {};
-  for (const [key, item] of Object.entries(value)) {
-    const normalized = jsonValue(item);
-    if (normalized !== undefined) result[key] = normalized;
-  }
-  return result;
-}
-
-function jsonObject(value: unknown): StudioCrdtJsonObject | undefined {
-  const normalized = jsonValue(value);
-  return normalized && typeof normalized === "object" && !Array.isArray(normalized)
-    ? normalized
-    : undefined;
-}
 
 function studioElementLayerId(element: StudioCrdtCompatibleElement): string {
   const groupId = (element as StudioCrdtCompatibleElement & { groupId?: unknown }).groupId;
@@ -484,41 +454,6 @@ export function studioCrdtElementToSceneElement<
   return element;
 }
 
-const PAGE_PAYLOAD_KEYS = [
-  "bg",
-  "bgGrad",
-  "canvasH",
-  "name",
-  "note",
-  "hideMaster",
-  "shotType",
-  "cameraAngle",
-  "drawingAssist",
-  "paperSurface",
-  "paperGrainVisible",
-  "layerComps",
-] as const;
-
-export interface StudioCrdtCompatibleOrderedPage<
-  TElement extends StudioCrdtCompatibleElement,
-> extends StudioCrdtCompatiblePage<TElement> {
-  bg: string;
-  bgGrad: string[] | null;
-  canvasH: number;
-  name?: string;
-  note?: string;
-  hideMaster?: boolean;
-  shotType?: string;
-  cameraAngle?: string;
-  drawingAssist?: StudioDrawingAssistDocument;
-  paperSurface?: StudioPaperSurfaceSettings;
-  paperGrainVisible?: boolean;
-  layerComps?: readonly StudioLayerComp[];
-  /** Synchronized through the dedicated per-stage CRDT sidecar, never the 8 KiB page envelope. */
-  shared3dStage?: StudioShared3dStagePersistedState;
-  groups?: StudioCrdtCompatibleLayerGroup[];
-}
-
 export function studioLayerGroupToCrdtGroup(
   pageId: string,
   group: StudioCrdtCompatibleLayerGroup
@@ -552,27 +487,6 @@ export function studioCrdtGroupToLayerGroup(
   }
   if (collapsed !== undefined) group.collapsed = collapsed;
   return group;
-}
-
-export function studioPageToCrdtPage<
-  TElement extends StudioCrdtCompatibleElement,
->(page: StudioCrdtCompatibleOrderedPage<TElement>) {
-  const props: StudioCrdtJsonObject = {
-    bg: page.bg,
-    bgGrad: page.bgGrad,
-    canvasH: page.canvasH,
-  };
-  for (const key of PAGE_PAYLOAD_KEYS.slice(3)) {
-    const normalized = jsonValue(page[key]);
-    if (normalized !== undefined) props[key] = normalized;
-  }
-  return {
-    id: page.id,
-    payload: validateStudioCrdtPagePayload({
-      version: STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
-      props,
-    }),
-  };
 }
 
 export interface StudioCrdtPageReconcileResult<TPage> {

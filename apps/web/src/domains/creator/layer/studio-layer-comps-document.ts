@@ -7,7 +7,7 @@ import { captureLayerComp, STUDIO_LAYER_COMPS_MAX_COUNT, updateLayerCompWithCurr
 const layerStateSchema = z.object({
   layerId: z.string().min(1).max(160),
   visible: z.boolean(),
-  opacity: z.number().finite().min(0).max(1),
+  opacity: z.number().min(0).max(1),
   blendMode: z.string().max(80).optional(),
   groupId: z.string().min(1).max(160).optional(),
 });
@@ -41,6 +41,8 @@ interface StudioLayerCompMetadataOptions {
   prepare: () => boolean;
   getPage: () => PageState | null;
   canMutate: () => boolean;
+  /** Use the actual page serializer, including all metadata and its UTF-8 wire budget. */
+  validatePage: (page: PageState) => void;
   commit: (elements: PageState["elements"], patch: { layerComps: StudioLayerComp[] }, pageId: string) => boolean;
   reportError: (message: string) => void;
 }
@@ -48,6 +50,20 @@ interface StudioLayerCompMetadataOptions {
 function prepareLayerCompPage(options: StudioLayerCompMetadataOptions): PageState | null {
   if (!options.canMutate() || !options.prepare() || !options.canMutate()) return null;
   return options.getPage();
+}
+
+function commitLayerCompMetadata(
+  page: PageState,
+  layerComps: StudioLayerComp[],
+  options: StudioLayerCompMetadataOptions,
+): boolean {
+  try {
+    options.validatePage({ ...page, layerComps });
+  } catch {
+    options.reportError("페이지의 콤프 저장 용량을 넘어 변경하지 않았어요. 콤프 개수나 캡처할 레이어를 줄이거나 페이지 메모를 정리해 주세요.");
+    return false;
+  }
+  return options.commit(page.elements, { layerComps }, page.id);
 }
 
 /** Capture/update from the latest committed page, including a just-finished retained stroke. */
@@ -85,7 +101,7 @@ export function captureStudioLayerCompTransaction(options: StudioLayerCompMetada
     options.reportError("콤프 이름이나 레이어 상태가 저장 범위를 벗어났어요. 현재 상태를 확인해 주세요.");
     return false;
   }
-  return options.commit(page.elements, { layerComps: valid }, page.id);
+  return commitLayerCompMetadata(page, valid, options);
 }
 
 /** Rename/delete changes metadata while retaining elements advanced by the preparation flush. */
@@ -99,7 +115,7 @@ export function changeStudioLayerCompsTransaction(options: StudioLayerCompMetada
     options.reportError("레이어 콤프가 저장 범위를 벗어나 변경하지 않았어요.");
     return false;
   }
-  return options.commit(page.elements, { layerComps: valid }, page.id);
+  return commitLayerCompMetadata(page, valid, options);
 }
 
 /** Value projection only. Document changes use the lock-aware transaction below. */
@@ -200,7 +216,7 @@ export async function applyStudioLayerCompTransaction({
     acquired = await acquire(null);
     if (!acquired) return false;
     const current = getPage();
-    if (!canMutate() || !current || current.id !== page.id
+    if (!canMutate() || current?.id !== page.id
       || current.elements !== page.elements || current.groups !== page.groups) {
       reportError("페이지나 레이어 상태가 바뀌어 콤프를 적용하지 않았어요. 현재 상태에서 다시 적용해 주세요.");
       return false;

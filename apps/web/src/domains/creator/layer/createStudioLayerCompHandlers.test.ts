@@ -62,6 +62,31 @@ describe("createStudioLayerCompHandlers", () => {
     expect(options.release).toHaveBeenCalledTimes(1);
   });
 
+  it.each(["capture", "update", "rename"] as const)(
+    "uses the real aggregate page serializer before accepting %s metadata",
+    (operation) => {
+      const { options, handlers, getPage, setPage } = fixture();
+      const current: PageState = {
+        ...getPage(),
+        elements: Array.from({ length: 96 }, (_, index) => ({
+          id: `layer-${index}-${"x".repeat(24)}`, type: "image", x: 0, y: 0,
+          width: 10, height: 10, rotation: 0, src: "",
+        })),
+      };
+      setPage(current);
+      const result = operation === "rename"
+        ? handlers.onChangeLayerComps([{ ...comp, name: "수정", notes: "x".repeat(8_192) }])
+        : handlers.onCaptureLayerComp("추가", operation === "update" ? comp.id : undefined);
+
+      expect(result).toBe(false);
+      expect(options.commit).not.toHaveBeenCalled();
+      expect(options.reportError).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("콤프 저장 용량"));
+      expect(getPage()).toBe(current);
+      expect(options.acquire).not.toHaveBeenCalled();
+      expect(options.captureMutationTicket).not.toHaveBeenCalled();
+    },
+  );
+
   it("keeps rejected retained strokes outside a new transaction", async () => {
     const { options, handlers } = fixture();
     options.prepare.mockReturnValue(false);

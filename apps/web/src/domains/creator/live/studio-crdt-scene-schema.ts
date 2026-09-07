@@ -1,7 +1,11 @@
-import { parseStudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
-import { PAPER_GRAIN_KINDS } from "../brush/studio-paper-texture";
-import { parseStudioLayerComps } from "../layer/studio-layer-comps-document";
-import { copyStudioAdvancedRulerAsJson, type StudioAdvancedRulerDocument } from "../studio-advanced-ruler-document";
+import {
+  boundedString,
+  cloneJsonObject,
+  finiteRange,
+  MAX_JSON_STRING_LENGTH,
+  type StudioCrdtJsonObject,
+  type StudioCrdtJsonValue,
+} from "./studio-crdt-json-value";
 
 import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
@@ -16,10 +20,17 @@ import {
   parseStudioWorkAssetStructuredEditValue,
 } from "@/shared/lib/studio-work-asset-contract";
 
+export type { StudioCrdtJsonObject, StudioCrdtJsonValue } from "./studio-crdt-json-value";
+export {
+  STUDIO_CRDT_PAGE_MAX_BYTES,
+  STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+  STUDIO_CRDT_PAGE_PROPERTY_KEYS,
+  validateStudioCrdtPagePayload,
+  type StudioCrdtPagePayload,
+} from "./studio-crdt-page-payload";
+
 export const STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION = 1 as const;
 export const STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES = 16 * 1024;
-export const STUDIO_CRDT_PAGE_PAYLOAD_VERSION = 1 as const;
-export const STUDIO_CRDT_PAGE_MAX_BYTES = 8 * 1024;
 export const STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION = 1 as const;
 export const STUDIO_CRDT_LAYER_GROUP_MAX_BYTES = 2 * 1024;
 
@@ -45,23 +56,10 @@ export const STUDIO_CRDT_SCENE_ELEMENT_TYPES = [
 export type StudioCrdtPayloadSceneElementType =
   (typeof STUDIO_CRDT_PAYLOAD_SCENE_ELEMENT_TYPES)[number];
 export type StudioCrdtSceneElementType = (typeof STUDIO_CRDT_SCENE_ELEMENT_TYPES)[number];
-export type StudioCrdtJsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | StudioCrdtJsonValue[]
-  | { [key: string]: StudioCrdtJsonValue };
-export type StudioCrdtJsonObject = { [key: string]: StudioCrdtJsonValue };
 
 export interface StudioCrdtSceneElementPayload {
   version: typeof STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION;
   type: StudioCrdtSceneElementType;
-  props: StudioCrdtJsonObject;
-}
-
-export interface StudioCrdtPagePayload {
-  version: typeof STUDIO_CRDT_PAGE_PAYLOAD_VERSION;
   props: StudioCrdtJsonObject;
 }
 
@@ -76,9 +74,6 @@ export interface StudioCrdtLayerGroupPayload {
 
 const MAX_COORDINATE = 10_000_000;
 const MAX_ID_LENGTH = 160;
-const MAX_JSON_DEPTH = 10;
-const MAX_JSON_ENTRIES = 4_096;
-const MAX_JSON_STRING_LENGTH = 64 * 1024;
 const TEXT_ENCODER = new TextEncoder();
 const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
 
@@ -185,15 +180,6 @@ export const STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS: Record<
   reference: ["elementType"],
 };
 
-export const STUDIO_CRDT_PAGE_PROPERTY_KEYS: ReadonlySet<string> = new Set([
-  "bg", "bgGrad", "canvasH", "name", "note", "hideMaster", "shotType", "cameraAngle",
-  "drawingAssist", "paperSurface", "paperGrainVisible", "layerComps",
-]);
-
-const STUDIO_CRDT_PAPER_GRAIN_KIND_SET: ReadonlySet<string> = new Set(PAPER_GRAIN_KINDS);
-const STUDIO_CRDT_PAPER_SURFACE_KEYS: ReadonlySet<string> = new Set(["kind", "seed"]);
-const STUDIO_CRDT_PAPER_SURFACE_MAX_SEED = 0xffff_ffff;
-
 export const STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS: ReadonlySet<string> = new Set([
   "name", "hidden", "locked",
 ]);
@@ -270,72 +256,6 @@ export function isStudioCrdtTopologyReferencePayload(
 ): boolean {
   return isStudioCrdtLegacyReferencePayload(payload) ||
     isStudioCrdtImageAuxiliaryReferencePayload(payload);
-}
-
-function cloneJson(
-  value: StudioCrdtJsonValue,
-  state = { entries: 0 },
-  depth = 0
-): StudioCrdtJsonValue {
-  if (depth > MAX_JSON_DEPTH || ++state.entries > MAX_JSON_ENTRIES) {
-    throw new Error("장면 확장 데이터가 허용 범위를 벗어났습니다.");
-  }
-  if (value === null || typeof value === "boolean") return value;
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new Error("장면 확장 데이터에 유한하지 않은 수가 있습니다.");
-    return value;
-  }
-  if (typeof value === "string") {
-    if (value.length > MAX_JSON_STRING_LENGTH) throw new Error("장면 확장 문자열이 너무 깁니다.");
-    return value;
-  }
-  if (Array.isArray(value)) return value.map((item) => cloneJson(item, state, depth + 1));
-  if (typeof value !== "object") throw new Error("장면 확장 데이터는 JSON 형식이어야 합니다.");
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) {
-    throw new Error("장면 확장 데이터는 일반 JSON 객체여야 합니다.");
-  }
-  const result: StudioCrdtJsonObject = {};
-  for (const [key, item] of Object.entries(value)) {
-    if (!key || key.length > 512 || key.includes("\0")) {
-      throw new Error("장면 확장 데이터 키가 올바르지 않습니다.");
-    }
-    result[key] = cloneJson(item, state, depth + 1);
-  }
-  return result;
-}
-
-function cloneJsonObject(value: StudioCrdtJsonObject): StudioCrdtJsonObject {
-  const cloned = cloneJson(value);
-  if (!cloned || typeof cloned !== "object" || Array.isArray(cloned)) {
-    throw new Error("장면 확장 데이터는 JSON 객체여야 합니다.");
-  }
-  return cloned;
-}
-
-function copyStudioAdvancedRulerDocument(
-  document: StudioAdvancedRulerDocument
-): StudioCrdtJsonObject {
-  // 종별 필드 복사는 문서 모듈이 담당한다 — 새 자(ruler) 종류가 늘어도 이 스키마는 무수정.
-  const rulers: StudioCrdtJsonObject[] = document.rulers.map(
-    (ruler) => copyStudioAdvancedRulerAsJson(ruler) as StudioCrdtJsonObject
-  );
-  return {
-    version: document.version,
-    rulers,
-    activeSnapRulerId: document.activeSnapRulerId,
-    selectedRulerId: document.selectedRulerId,
-  };
-}
-
-function boundedString(value: unknown, maximum = MAX_JSON_STRING_LENGTH): value is string {
-  return typeof value === "string" && value.length <= maximum && !value.includes("\0");
-}
-
-function finiteRange(value: unknown, minimum: number, maximum: number, label: string): void {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
-    throw new Error(`${label} 값이 허용 범위를 벗어났습니다.`);
-  }
 }
 
 /**
@@ -530,92 +450,6 @@ export function validateStudioCrdtSceneElementPayload(
     throw new Error("장면 요소가 실시간 동기화 16KiB 한도를 초과했습니다.");
   }
   return { version: payload.version, type: payload.type, props };
-}
-
-export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): StudioCrdtPagePayload {
-  if (payload.version !== STUDIO_CRDT_PAGE_PAYLOAD_VERSION) {
-    throw new Error("지원하지 않는 페이지 페이로드 버전입니다.");
-  }
-  const props = cloneJsonObject(payload.props);
-  for (const key of Object.keys(props)) {
-    if (!STUDIO_CRDT_PAGE_PROPERTY_KEYS.has(key)) {
-      throw new Error(`페이지의 ${key} 속성은 동기화할 수 없습니다.`);
-    }
-  }
-  if (!boundedString(props.bg, 512)) throw new Error("페이지 배경이 올바르지 않습니다.");
-  finiteRange(props.canvasH, 1, MAX_COORDINATE, "canvasH");
-  const bgGrad = props.bgGrad;
-  if (bgGrad !== null && (!Array.isArray(bgGrad) || bgGrad.length > 32 ||
-    bgGrad.some((color) => !boundedString(color, 512)))) {
-    throw new Error("페이지 그라데이션이 올바르지 않습니다.");
-  }
-  for (const key of ["name", "note", "shotType", "cameraAngle"] as const) {
-    if (key in props && !boundedString(props[key], key === "note" ? 8_192 : 512)) {
-      throw new Error(`페이지의 ${key} 값이 올바르지 않습니다.`);
-    }
-  }
-  if ("hideMaster" in props && typeof props.hideMaster !== "boolean") {
-    throw new Error("페이지 마스터 표시 값이 올바르지 않습니다.");
-  }
-  if ("paperGrainVisible" in props && typeof props.paperGrainVisible !== "boolean") {
-    throw new Error("페이지 종이 결 표시 값이 올바르지 않습니다.");
-  }
-  if ("paperSurface" in props) {
-    const paperSurface = props.paperSurface;
-    if (
-      paperSurface === null ||
-      typeof paperSurface !== "object" ||
-      Array.isArray(paperSurface) ||
-      Object.keys(paperSurface).length !== STUDIO_CRDT_PAPER_SURFACE_KEYS.size ||
-      !Object.keys(paperSurface).every((key) => STUDIO_CRDT_PAPER_SURFACE_KEYS.has(key)) ||
-      typeof paperSurface.kind !== "string" ||
-      !STUDIO_CRDT_PAPER_GRAIN_KIND_SET.has(paperSurface.kind) ||
-      typeof paperSurface.seed !== "number" ||
-      !Number.isInteger(paperSurface.seed) ||
-      paperSurface.seed < 0 ||
-      paperSurface.seed > STUDIO_CRDT_PAPER_SURFACE_MAX_SEED
-    ) {
-      throw new Error("페이지 종이 표면 설정이 올바르지 않습니다.");
-    }
-  }
-  if ("layerComps" in props) {
-    const layerComps = parseStudioLayerComps(props.layerComps);
-    if (!layerComps) throw new Error("페이지 레이어 콤프가 올바르지 않습니다.");
-    // The document parser returns detached, finite JSON values and drops unknown fields.
-    props.layerComps = layerComps as unknown as StudioCrdtJsonValue;
-  }
-  if ("drawingAssist" in props) {
-    const drawingAssist = parseStudioDrawingAssistDocument(props.drawingAssist);
-    if (!drawingAssist) {
-      throw new Error("페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다.");
-    }
-    props.drawingAssist = {
-      version: drawingAssist.version,
-      perspective: {
-        active: drawingAssist.perspective.active,
-        points: drawingAssist.perspective.points.map((point) => ({
-          id: point.id,
-          x: point.x,
-          y: point.y,
-        })),
-        eyeLevelY: drawingAssist.perspective.eyeLevelY,
-        lockHorizon: drawingAssist.perspective.lockHorizon,
-      },
-      isometric: {
-        active: drawingAssist.isometric.active,
-        angleDeg: drawingAssist.isometric.angleDeg,
-        cellSize: drawingAssist.isometric.cellSize,
-        originX: drawingAssist.isometric.originX,
-        originY: drawingAssist.isometric.originY,
-      },
-      advanced: copyStudioAdvancedRulerDocument(drawingAssist.advanced),
-    };
-  }
-  if (TEXT_ENCODER.encode(JSON.stringify({ version: payload.version, props })).byteLength >
-    STUDIO_CRDT_PAGE_MAX_BYTES) {
-    throw new Error("페이지 정보가 실시간 동기화 8KiB 한도를 초과했습니다.");
-  }
-  return { version: payload.version, props };
 }
 
 export function validateStudioCrdtLayerGroupPayload(

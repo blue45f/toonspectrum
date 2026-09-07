@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { captureLayerComp } from "./studio-layer-comps";
@@ -179,9 +179,11 @@ describe("StudioLayerCompsPanel", () => {
     const comp = captureLayerComp("완성본", sampleLayers, "comp-1");
     const onApplyComp = vi.fn(async () => true);
     render(<StudioLayerCompsPanel layers={sampleLayers} comps={[comp]} onApplyComp={onApplyComp} />);
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^완성본 표시 레이어/u })); });
+    fireEvent.click(screen.getByRole("button", { name: /^완성본 표시 레이어/u }));
     expect(onApplyComp).toHaveBeenCalledExactlyOnceWith(comp);
-    expect((screen.getByRole("group", { name: "레이어 콤프" }) as HTMLFieldSetElement).disabled).toBe(false);
+    await waitFor(() => {
+      expect((screen.getByRole("group", { name: "레이어 콤프" }) as HTMLFieldSetElement).disabled).toBe(false);
+    });
   });
 
   it("announces a rejected apply, re-enables controls, and clears the error when retrying", async () => {
@@ -197,10 +199,10 @@ describe("StudioLayerCompsPanel", () => {
     await act(async () => { reject(new Error("lease request failed")); });
     expect(screen.getByRole("alert").textContent).toBe("콤프를 적용하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
     expect(panel.disabled).toBe(false);
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "적용" })); });
+    fireEvent.click(screen.getByRole("button", { name: "적용" }));
     expect(onApplyComp).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(panel.disabled).toBe(false);
+    await waitFor(() => { expect(panel.disabled).toBe(false); });
   });
 
   it("does not save a 65th comp if the page reaches its limit while its name is being typed", () => {

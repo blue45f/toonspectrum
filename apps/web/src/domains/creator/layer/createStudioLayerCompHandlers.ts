@@ -4,6 +4,7 @@ import {
   changeStudioLayerCompsTransaction,
   type StudioLayerCompTransactionOptions,
 } from "./studio-layer-comps-document";
+import { studioPageToCrdtPage } from "../live/studio-crdt-page-payload";
 
 import type { StudioLayerComp } from "./studio-layer-comps";
 import type { PageState } from "../studio-page-state";
@@ -28,9 +29,9 @@ export function createStudioLayerCompHandlers<Ticket>(
 ) {
   return {
     onCaptureLayerComp: (name: string, compId?: string): boolean =>
-      captureStudioLayerCompTransaction({ ...options, name, compId }),
+      captureStudioLayerCompTransaction({ ...options, name, compId, validatePage: studioPageToCrdtPage }),
     onChangeLayerComps: (nextComps: readonly StudioLayerComp[]): boolean =>
-      changeStudioLayerCompsTransaction({ ...options, nextComps }),
+      changeStudioLayerCompsTransaction({ ...options, nextComps, validatePage: studioPageToCrdtPage }),
     onApplyLayerComp: (comp: StudioLayerComp): Promise<boolean> => {
       if (!options.prepare()) return Promise.resolve(false);
       // Capture after retained strokes flush so that their commit cannot invalidate this edit.

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createStudioLiveResourceLeaseController } from "../live/createStudioLiveResourceLeaseController";
+import { studioPageToCrdtPage } from "../live/studio-crdt-page-bridge";
+import { STUDIO_CRDT_PAGE_MAX_BYTES } from "../live/studio-crdt-scene-schema";
 import type { StudioLiveRoom } from "../live/studio-live-collaboration-room";
+import { createDefaultStudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
 import { isEffectivelyHidden } from "../studio-layers";
 import type { PageState } from "../studio-page-state";
 import { duplicateMirroredPage, duplicatePageState } from "../studio-pages";
@@ -35,7 +38,8 @@ describe("layer comp capture at the retained stroke boundary", () => {
       return true;
     });
     const commit = vi.fn(() => true);
-    const options = { prepare, getPage: () => current, canMutate: vi.fn(() => true), commit, reportError: vi.fn() };
+    const options = { prepare, getPage: () => current, canMutate: vi.fn(() => true),
+      validatePage: studioPageToCrdtPage, commit, reportError: vi.fn() };
     return { options, pendingElement };
   }
 
@@ -84,7 +88,7 @@ describe("layer comp capture at the retained stroke boundary", () => {
 
   it("rejects capture at the document limit while allowing an existing comp to be updated", () => {
     const comps = Array.from({ length: STUDIO_LAYER_COMPS_MAX_COUNT }, (_, index) => ({
-      ...comp, id: `comp-${index}`,
+      ...comp, id: `comp-${index}`, layerStates: {},
     }));
     const current: PageState = { ...page, layerComps: comps };
     const { options } = fixture();
@@ -125,6 +129,115 @@ describe("layer comp capture at the retained stroke boundary", () => {
   });
 });
 
+describe("layer comp transactions respect the aggregate page wire budget", () => {
+  const emptyComp = captureLayerComp("x", [], "empty-comp", 1);
+
+  function fixture(current: PageState) {
+    return {
+      prepare: vi.fn(() => true), getPage: () => current, canMutate: () => true,
+      validatePage: vi.fn(studioPageToCrdtPage), commit: vi.fn(() => true), reportError: vi.fn(),
+    };
+  }
+
+  function pageAtWireLimit(): PageState {
+    const current: PageState = {
+      ...page, layerComps: [emptyComp], name: "한글 페이지", note: "메모\\\"\n",
+      bgGrad: ["#fff", "#111"], hideMaster: true, shotType: "와이드", cameraAngle: "로우",
+      paperSurface: { kind: "washi", seed: 1 }, paperGrainVisible: true,
+      drawingAssist: createDefaultStudioDrawingAssistDocument({ canvasWidth: 800, canvasHeight: 1080 }),
+    };
+    const bytes = new TextEncoder().encode(JSON.stringify(studioPageToCrdtPage(current).payload)).byteLength;
+    current.note += "x".repeat(STUDIO_CRDT_PAGE_MAX_BYTES - bytes);
+    expect(new TextEncoder().encode(JSON.stringify(studioPageToCrdtPage(current).payload)).byteLength)
+      .toBe(STUDIO_CRDT_PAGE_MAX_BYTES);
+    return current;
+  }
+
+  it.each(["capture", "update"] as const)("rejects a valid 96-layer %s before committing an unsynchronizable comp", (operation) => {
+    const current: PageState = {
+      ...page, layerComps: [emptyComp],
+      elements: Array.from({ length: 96 }, (_, index) => ({
+        id: `layer-${index}-${"x".repeat(24)}`, type: "image", x: 0, y: 0,
+        width: 10, height: 10, rotation: 0, src: "", opacity: 0.75, blendMode: "multiply",
+      })),
+    };
+    const oversized = captureLayerComp("형식상 유효", current.elements.map((element) => ({
+      id: element.id, visible: true, opacity: 0.75, blendMode: "multiply",
+    })), "oversized", 1);
+    expect(parseStudioLayerComps([oversized])).not.toBeNull();
+    expect(() => studioPageToCrdtPage({ ...current, layerComps: [oversized] })).toThrow(/8KiB/u);
+    const before = structuredClone(current);
+    const options = fixture(current);
+
+    expect(captureStudioLayerCompTransaction({
+      ...options, name: "추가", ...(operation === "update" ? { compId: emptyComp.id } : {}),
+    })).toBe(false);
+    expect(options.prepare).toHaveBeenCalledOnce();
+    expect(options.validatePage).toHaveBeenCalledOnce();
+    expect(options.commit).not.toHaveBeenCalled();
+    expect(options.reportError).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("콤프 저장 용량"));
+    expect(current).toEqual(before);
+  });
+
+  it("measures every comp together with existing page metadata, not each preset separately", () => {
+    const first = { ...emptyComp, notes: "x".repeat(3_000) };
+    const second = { ...first, id: "second" };
+    const current: PageState = { ...page, note: "메".repeat(700), layerComps: [first] };
+    expect(() => studioPageToCrdtPage(current)).not.toThrow();
+    expect(() => studioPageToCrdtPage({ ...current, layerComps: [second] })).not.toThrow();
+    expect(parseStudioLayerComps([first, second])).not.toBeNull();
+    expect(() => studioPageToCrdtPage({ ...current, layerComps: [first, second] })).toThrow(/8KiB/u);
+    const options = fixture(current);
+    expect(changeStudioLayerCompsTransaction({ ...options, nextComps: [first, second] })).toBe(false);
+    expect(options.commit).not.toHaveBeenCalled();
+    expect(current.layerComps).toEqual([first]);
+  });
+
+  it("accepts exactly 8192 UTF-8 bytes with normalized guides, paper, escaped text and every page property", () => {
+    const current = pageAtWireLimit();
+    const nextComps = [{ ...emptyComp, name: "y" }];
+    const options = fixture(current);
+    expect(changeStudioLayerCompsTransaction({ ...options, nextComps })).toBe(true);
+    expect(options.validatePage).toHaveBeenCalledExactlyOnceWith({ ...current, layerComps: nextComps });
+    expect(options.commit).toHaveBeenCalledExactlyOnceWith(current.elements, { layerComps: nextComps }, current.id);
+    expect(options.reportError).not.toHaveBeenCalled();
+  });
+
+  it.each(["xy", "한"])("rejects an aggregate overflow caused only by renaming to %s", (name) => {
+    const current = pageAtWireLimit();
+    const options = fixture(current);
+    const nextComps = [{ ...emptyComp, name }];
+    expect(parseStudioLayerComps(nextComps)).not.toBeNull();
+    expect(() => studioPageToCrdtPage({ ...current, layerComps: nextComps })).toThrow(/8KiB/u);
+    expect(changeStudioLayerCompsTransaction({ ...options, nextComps })).toBe(false);
+    expect(options.commit).not.toHaveBeenCalled();
+    expect(current.layerComps?.[0].name).toBe("x");
+  });
+
+  it("checks the post-flush metadata instead of allowing an edit against the stale page budget", () => {
+    const before = pageAtWireLimit();
+    const latest = { ...before, note: `${before.note}x` };
+    let current = before;
+    const options = {
+      ...fixture(before), getPage: () => current,
+      prepare: vi.fn(() => { current = latest; return true; }),
+    };
+    expect(changeStudioLayerCompsTransaction({ ...options, nextComps: [emptyComp] })).toBe(false);
+    expect(options.validatePage).toHaveBeenCalledExactlyOnceWith(latest);
+    expect(options.commit).not.toHaveBeenCalled();
+  });
+
+  it("allows deletion to bring an oversized legacy page back inside the existing wire limit", () => {
+    const first = { ...emptyComp, notes: "x".repeat(4_000) };
+    const second = { ...first, id: "second" };
+    const current: PageState = { ...page, layerComps: [first, second] };
+    expect(() => studioPageToCrdtPage(current)).toThrow(/8KiB/u);
+    const options = fixture(current);
+    expect(changeStudioLayerCompsTransaction({ ...options, nextComps: [first] })).toBe(true);
+    expect(options.commit).toHaveBeenCalledExactlyOnceWith(current.elements, { layerComps: [first] }, current.id);
+  });
+});
+
 describe("page-owned layer comp document", () => {
   it("restores hidden flags and opacity for every captured element in one document result", () => {
     const elements = [
@@ -157,6 +270,9 @@ describe("page-owned layer comp document", () => {
     [{ ...comp, layerStates: { ink: { layerId: "other", visible: true, opacity: 1 } } }],
     [{ ...comp, layerStates: { ink: { layerId: "ink", visible: "false", opacity: 1 } } }],
     [{ ...comp, layerStates: { ink: { layerId: "ink", visible: false, opacity: 2 } } }],
+    ...[Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY].map((opacity) => [
+      { ...comp, layerStates: { ink: { layerId: "ink", visible: false, opacity } } },
+    ]),
     [{ ...comp, groupStates: { folder: { groupId: "other", visible: true } } }],
     [{ ...comp, groupStates: { folder: { groupId: "folder", visible: "false" } } }],
     Array.from({ length: STUDIO_LAYER_COMPS_MAX_COUNT + 1 }, (_, index) => ({ ...comp, id: `comp-${index}` })),
