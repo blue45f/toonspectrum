@@ -28,7 +28,7 @@ export function characterSurfacePointerIntersection(
   scene.traverse((object) => {
     if (object instanceof Mesh && object.visible && object.userData.toonstudioSurfaceInk !== true) targets.push(object);
   });
-  return raycaster.intersectObjects(targets, false).find((hit) => hit.faceIndex !== undefined) ?? null;
+  return raycaster.intersectObjects(targets, false).find((hit) => hit.faceIndex != null) ?? null;
 }
 
 export function characterSurfaceAnchorFromIntersection(
@@ -36,9 +36,10 @@ export function characterSurfaceAnchorFromIntersection(
   modelKey: string,
   pressure: number,
 ): CharacterSurfaceInkAnchor | null {
-  if (!(hit.object instanceof Mesh) || hit.faceIndex === undefined) return null;
+  if (!(hit.object instanceof Mesh) || hit.faceIndex == null) return null;
   const mesh = hit.object;
-  const surface = characterSurfaceTriangle(mesh, hit.faceIndex);
+  const faceIndex = hit.faceIndex;
+  const surface = characterSurfaceTriangle(mesh, faceIndex);
   if (!surface) return null;
   const local = mesh.worldToLocal(hit.point.clone());
   const barycentric = new Triangle(
@@ -52,7 +53,7 @@ export function characterSurfaceAnchorFromIntersection(
     meshAssetId: characterSurfaceObjectPath(mesh),
     topologyRevision: characterSurfaceTopologyRevision(modelKey, mesh),
     primitiveIndex: 0,
-    triangleIndex: hit.faceIndex,
+    triangleIndex: faceIndex,
     barycentric: [barycentric.x, barycentric.y, barycentric.z],
     localNormal: [normal.x, normal.y, normal.z],
     localTangent: [1, 0, 0],
