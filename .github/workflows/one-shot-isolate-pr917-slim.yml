@@ -1,5 +1,5 @@
 name: Prioritize protected CI for final PR 919
-# Triggered for final head c93fdb96d55cda7aa0f982b8f6796d71f2d9e2cb.
+# Triggered for final head 3965326a8254b579d5d948f822a4609acadc94f1.
 
 on:
   push:
