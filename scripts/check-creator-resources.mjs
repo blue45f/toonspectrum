@@ -12,7 +12,9 @@ const output = mkdtempSync(path.join(tmpdir(), "toonstudio-resources-"));
 let failed = 0;
 try {
   const tsc = require.resolve("typescript/lib/tsc.js");
-  const result = spawnSync(process.execPath, [tsc, "--strict", "--skipLibCheck", "--target", "es2022", "--module", "commonjs", "--lib", "es2023,dom,dom.iterable", "--outDir", output, "tests/creator-resources-cases.ts", "tests/creator-resource-workflow-cases.ts", "tests/creator-workspace-persistence-cases.ts"], { cwd: root, stdio: "inherit" });
+  const typescriptMajor = Number.parseInt(require("typescript/package.json").version.split(".")[0] ?? "0", 10);
+  const configIsolationArgs = typescriptMajor >= 6 ? ["--ignoreConfig"] : [];
+  const result = spawnSync(process.execPath, [tsc, ...configIsolationArgs, "--strict", "--skipLibCheck", "--target", "es2022", "--module", "commonjs", "--lib", "es2023,dom,dom.iterable", "--outDir", output, "tests/creator-resources-cases.ts", "tests/creator-resource-workflow-cases.ts", "tests/creator-workspace-persistence-cases.ts"], { cwd: root, stdio: "inherit" });
   if (result.status !== 0) throw new Error("Creator resources typecheck failed");
   const { creatorResourceCases } = require(path.join(output, "tests/creator-resources-cases.js"));
   const { creatorResourceWorkflowCases } = require(path.join(output, "tests/creator-resource-workflow-cases.js"));
