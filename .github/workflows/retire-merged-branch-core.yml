@@ -1,0 +1,22 @@
+name: Retired branch guard tombstone
+
+# This workflow can emit the required `core` check name only for PR #862.
+# After that PR, changing this file produces a differently named skipped check
+# and therefore cannot satisfy the protected branch's required `core` context.
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/retire-merged-branch-core.yml
+
+permissions:
+  contents: read
+
+jobs:
+  retirement_guard:
+    name: ${{ github.event.pull_request.number == 862 && 'core' || 'retirement-guard-disabled' }}
+    if: ${{ false }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "Historical one-time branch-retirement guard."
