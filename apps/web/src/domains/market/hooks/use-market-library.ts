@@ -1,8 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import type {
+  CreatorMarketplaceAcquireReceipt,
+  CreatorMarketplaceCloudLibraryItem,
+  CreatorMarketplaceCloudLibraryPage,
+} from "@/shared/lib/creator-marketplace-cloud-library-contract";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { acquireCreatorMarketplaceCloudLibraryRelease } from "@/src/infrastructure/creator-marketplace-client";
+import { CreatorMarketplaceResourceRecordSchema } from "@/shared/lib/creator-marketplace-resource-contract";
+import { useSession } from "@/src/compat/auth-session-store";
+import {
+  acquireCreatorMarketplaceCloudLibraryRelease,
+  listCreatorMarketplaceCloudLibrary,
+} from "@/src/infrastructure/creator-marketplace-client";
 
 export interface AcquiredMarketItem {
   id: string;
@@ -12,109 +22,249 @@ export interface AcquiredMarketItem {
   resource: CreatorMarketplaceResourceRecord;
 }
 
-const LIBRARY_STORAGE_KEY = "toonspectrum:market:acquired-library";
+const CACHE_PREFIX = "toonspectrum:market:confirmed-library-cache:v3:";
+const MAX_HYDRATION_PAGES = 20;
+export const MARKET_LIBRARY_STORAGE_KEY = CACHE_PREFIX;
 export const MARKET_LIBRARY_EVENT = "toonspectrum:market:library-changed";
 
-function getStoredLibraryItems(): AcquiredMarketItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(LIBRARY_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as AcquiredMarketItem[];
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch {
-    // storage error
-  }
-  return [];
+function cacheKey(userId: string): string {
+  return `${CACHE_PREFIX}${encodeURIComponent(userId)}`;
 }
 
-function saveLibraryItems(items: AcquiredMarketItem[]): void {
+function parseStoredItem(value: unknown): AcquiredMarketItem | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<AcquiredMarketItem>;
+  const parsedResource = CreatorMarketplaceResourceRecordSchema.safeParse(candidate.resource);
+  if (
+    !parsedResource.success
+    || typeof candidate.id !== "string"
+    || typeof candidate.resourceId !== "string"
+    || typeof candidate.acquiredAt !== "string"
+    || typeof candidate.archived !== "boolean"
+  ) return null;
+  return {
+    id: candidate.id,
+    resourceId: candidate.resourceId,
+    acquiredAt: candidate.acquiredAt,
+    archived: candidate.archived,
+    resource: parsedResource.data,
+  };
+}
+
+function getStoredLibraryItems(userId: string | null): AcquiredMarketItem[] {
+  if (typeof window === "undefined" || !userId) return [];
+  try {
+    const raw = localStorage.getItem(cacheKey(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.flatMap((value) => {
+          const item = parseStoredItem(value);
+          return item ? [item] : [];
+        })
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLibraryItems(userId: string, items: readonly AcquiredMarketItem[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(items));
-    window.dispatchEvent(new CustomEvent(MARKET_LIBRARY_EVENT));
+    localStorage.setItem(cacheKey(userId), JSON.stringify(items));
+    window.dispatchEvent(new CustomEvent(MARKET_LIBRARY_EVENT, {
+      detail: { userId },
+    }));
   } catch {
-    // quota
+    // The account operation already succeeded; a presentation-cache failure is non-fatal.
   }
 }
 
+function collectReleaseIds(
+  target: Set<string>,
+  item: CreatorMarketplaceCloudLibraryItem,
+): void {
+  if (item.addedFrom.releaseId) target.add(item.addedFrom.releaseId);
+  if (item.catalog.state === "available") target.add(item.catalog.head.id);
+  if (item.confirmation.state === "confirmed" && item.confirmation.releaseId) {
+    target.add(item.confirmation.releaseId);
+  }
+}
+
+async function listAllLibraryItems(
+  signal: AbortSignal,
+): Promise<readonly CreatorMarketplaceCloudLibraryItem[]> {
+  const items: CreatorMarketplaceCloudLibraryItem[] = [];
+  let cursor: string | undefined;
+  for (let pageIndex = 0; pageIndex < MAX_HYDRATION_PAGES; pageIndex += 1) {
+    const page: CreatorMarketplaceCloudLibraryPage =
+      await listCreatorMarketplaceCloudLibrary({
+        view: "all",
+        limit: 50,
+        cursor,
+      }, signal);
+    items.push(...page.items);
+    const nextCursor = page.nextCursor ?? null;
+    if (!page.hasMore || !nextCursor) break;
+    cursor = nextCursor;
+  }
+  return items;
+}
+
+/**
+ * Compatibility hook for detail and sticky-market UI.
+ *
+ * Entitlement is always hydrated from the active account's cloud library. The local cache contains
+ * only full records acquired in this browser so legacy card views can render them; it never creates
+ * ownership, is scoped by account, and is ignored until the server hydration succeeds.
+ */
 export function useMarketLibrary() {
-  const [items, setItems] = useState<AcquiredMarketItem[]>(getStoredLibraryItems);
+  const { data: session, ready, status } = useSession();
+  const userId = ready && status === "authenticated"
+    ? (session.user.id ?? null)
+    : null;
+  const userIdRef = useRef<string | null>(userId);
+  const generationRef = useRef(0);
+  const [items, setItems] = useState<AcquiredMarketItem[]>([]);
+  const [releaseIds, setReleaseIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [serverItemCount, setServerItemCount] = useState(0);
+  const [loading, setLoading] = useState(Boolean(userId));
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const onUpdate = () => {
-      setItems(getStoredLibraryItems());
+    userIdRef.current = userId;
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
+    const controller = new AbortController();
+    setItems(getStoredLibraryItems(userId));
+    setReleaseIds(new Set());
+    setServerItemCount(0);
+    setHydrated(false);
+    setLoading(Boolean(userId));
+
+    if (!userId) {
+      setLoading(false);
+      return () => controller.abort();
+    }
+
+    void listAllLibraryItems(controller.signal)
+      .then((cloudItems) => {
+        if (controller.signal.aborted || generationRef.current !== generation) return;
+        const nextReleaseIds = new Set<string>();
+        for (const item of cloudItems) collectReleaseIds(nextReleaseIds, item);
+        setReleaseIds(nextReleaseIds);
+        setServerItemCount(cloudItems.length);
+        setHydrated(true);
+      })
+      .catch(() => {
+        if (controller.signal.aborted || generationRef.current !== generation) return;
+        setReleaseIds(new Set());
+        setServerItemCount(0);
+        setHydrated(false);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && generationRef.current === generation) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [userId]);
+
+  useEffect(() => {
+    const onUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: unknown }>).detail;
+      if (detail?.userId !== userIdRef.current || !userIdRef.current) return;
+      setItems(getStoredLibraryItems(userIdRef.current));
+    };
+    const onStorage = (event: StorageEvent) => {
+      const activeUserId = userIdRef.current;
+      if (!activeUserId || event.key !== cacheKey(activeUserId)) return;
+      setItems(getStoredLibraryItems(activeUserId));
     };
     window.addEventListener(MARKET_LIBRARY_EVENT, onUpdate);
-    window.addEventListener("storage", onUpdate);
+    window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener(MARKET_LIBRARY_EVENT, onUpdate);
-      window.removeEventListener("storage", onUpdate);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
   const isAcquired = useCallback(
-    (resourceId: string) => items.some((item) => item.resourceId === resourceId),
-    [items],
+    (resourceId: string) => hydrated && releaseIds.has(resourceId),
+    [hydrated, releaseIds],
   );
 
   const acquireResource = useCallback(
     async (record: CreatorMarketplaceResourceRecord): Promise<boolean> => {
-      // 1. Try background cloud API acquisition
+      const activeUserId = userIdRef.current;
+      const generation = generationRef.current;
+      if (!activeUserId) return false;
+
+      let receipt: CreatorMarketplaceAcquireReceipt;
       try {
-        await acquireCreatorMarketplaceCloudLibraryRelease(record.id);
+        receipt = await acquireCreatorMarketplaceCloudLibraryRelease(record.id);
       } catch {
-        // Safe fallback to client library entitlement
+        return false;
       }
+      if (
+        userIdRef.current !== activeUserId
+        || generationRef.current !== generation
+      ) return false;
 
-      // 2. Persist local entitlement
-      const current = getStoredLibraryItems();
-      const existing = current.find((i) => i.resourceId === record.id);
-      if (existing) {
-        if (existing.archived) {
-          existing.archived = false;
-          saveLibraryItems(current);
-        }
-        return true;
-      }
+      setReleaseIds((current) => new Set([...current, record.id]));
+      setHydrated(true);
+      setServerItemCount((current) => current + (receipt.changed ? 1 : 0));
 
-      const newItem: AcquiredMarketItem = {
-        id: `lib-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        resourceId: record.id,
-        acquiredAt: new Date().toISOString(),
-        archived: false,
-        resource: record,
-      };
-
-      saveLibraryItems([newItem, ...current]);
-      setItems([newItem, ...current]);
+      const current = getStoredLibraryItems(activeUserId);
+      const existing = current.find((item) => item.resourceId === record.id);
+      const next = existing
+        ? current.map((item) => item.resourceId === record.id
+            ? { ...item, id: receipt.libraryItemId, archived: false, resource: record }
+            : item)
+        : [{
+            id: receipt.libraryItemId,
+            resourceId: record.id,
+            acquiredAt: receipt.updatedAt,
+            archived: false,
+            resource: record,
+          }, ...current];
+      saveLibraryItems(activeUserId, next);
+      setItems(next);
       return true;
     },
     [],
   );
 
   const archiveItem = useCallback((id: string, archived: boolean) => {
-    const current = getStoredLibraryItems();
-    const target = current.find((i) => i.id === id || i.resourceId === id);
+    const activeUserId = userIdRef.current;
+    if (!activeUserId) return;
+    const current = getStoredLibraryItems(activeUserId);
+    const target = current.find((item) => item.id === id || item.resourceId === id);
     if (!target) return;
-    target.archived = archived;
-    saveLibraryItems(current);
-    setItems([...current]);
+    const next = current.map((item) =>
+      item.id === target.id ? { ...item, archived } : item,
+    );
+    saveLibraryItems(activeUserId, next);
+    setItems(next);
   }, []);
 
   const removeItem = useCallback((id: string) => {
-    const current = getStoredLibraryItems();
-    const filtered = current.filter((i) => i.id !== id && i.resourceId !== id);
-    saveLibraryItems(filtered);
-    setItems(filtered);
+    const activeUserId = userIdRef.current;
+    if (!activeUserId) return;
+    const current = getStoredLibraryItems(activeUserId);
+    const next = current.filter((item) => item.id !== id && item.resourceId !== id);
+    saveLibraryItems(activeUserId, next);
+    setItems(next);
   }, []);
 
   return {
     items,
-    activeItems: items.filter((i) => !i.archived),
-    archivedItems: items.filter((i) => i.archived),
-    totalCount: items.filter((i) => !i.archived).length,
+    activeItems: items.filter((item) => !item.archived),
+    archivedItems: items.filter((item) => item.archived),
+    totalCount: serverItemCount,
+    loading,
+    hydrated,
     isAcquired,
     acquireResource,
     archiveItem,
