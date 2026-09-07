@@ -1,55 +1,18 @@
 name: SonarQube
 
+# Reuse the coverage produced by CI's three test shards. Running this workflow
+# independently would scan before those reports exist and report 0% coverage.
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '**/*lock*'
-      - '**/data/catalog*.json*'
-      - '**/qa-results/**'
-      - '**/*.glb'
-      - '**/*.wasm'
-      - '**/public/**/*.svg'
-      - '**/public/**/*.ico'
-      - '**/public/**/*.avif'
-      - '**/public/**/*.webp'
-      - '**/public/**/*.jpeg'
-      - '**/public/**/*.jpg'
-      - '**/public/**/*.png'
-      - '**/public/assets/**'
-      - '**/i18n/**/*.json'
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '**/*lock*'
-      - '**/data/catalog*.json*'
-      - '**/qa-results/**'
-      - '**/*.glb'
-      - '**/*.wasm'
-      - '**/public/**/*.svg'
-      - '**/public/**/*.ico'
-      - '**/public/**/*.avif'
-      - '**/public/**/*.webp'
-      - '**/public/**/*.jpeg'
-      - '**/public/**/*.jpg'
-      - '**/public/**/*.png'
-      - '**/public/assets/**'
-      - '**/i18n/**/*.json'
-  workflow_dispatch:
+  workflow_call:
+    secrets:
+      SONAR_HOST_URL:
+        required: false
+      SONAR_TOKEN:
+        required: false
 
 permissions:
   contents: read
-  pull-requests: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 jobs:
   sonarqube:
@@ -92,6 +55,20 @@ jobs:
       - name: Install dependencies
         if: steps.secrets.outputs.configured == 'true'
         run: pnpm install --frozen-lockfile
+
+      - name: Download coverage from every CI shard
+        if: steps.secrets.outputs.configured == 'true'
+        uses: actions/download-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
+        with:
+          pattern: sonar-coverage-*
+          path: coverage
+
+      - name: Require all three nonempty coverage reports
+        if: steps.secrets.outputs.configured == 'true'
+        run: |
+          for shard in 1 2 3; do
+            test -s "coverage/sonar-coverage-$shard/lcov.info"
+          done
 
       # SonarCloud Automatic Analysis should be disabled to avoid duplicate scans.
       - name: SonarQube scan

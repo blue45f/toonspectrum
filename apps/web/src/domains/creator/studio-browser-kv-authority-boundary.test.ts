@@ -386,6 +386,10 @@ const HISTORY_LEGACY_IDB =
   "Explicit pages-history emergency adapter only; the product factory cannot construct or infer this IndexedDB authority.";
 const HISTORY_LEGACY_IDB_PROOF =
   "The default factory accepts only a caller-created legacyRecoveryVault and otherwise selects SQLite, native OPFS, or observable memory-only state.";
+const CHARACTER_PLATFORM_LOCAL_DRAFT =
+  "Versioned and size-bounded local-only Character Platform presets, manifest links, and surface-ink drafts; browser KV never grants server review, approval, publication, or entitlement authority.";
+const CHARACTER_PLATFORM_LOCAL_DRAFT_PROOF =
+  "The exact calls are model-scoped or injected and schema/size validated; changing a key or occurrence requires this authority-ratchet review.";
 
 const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   // Deletion-only cleanup of browser compatibility remnants.
@@ -427,6 +431,12 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   // Presentation state for one viewer's own overlay — no room, document, or peer data is stored.
   allow("apps/web/src/domains/creator/live/studio-live-viewport-preferences.ts", "local-storage-write", "\"toonspectrum:studio-live:viewport-preferences:v1\"", 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/studio-workspaces.ts", "durable-storage-write", "studioWorkspaceStorageKey(userId)", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
+
+  // Character Platform local authoring drafts. Exact keys and operation counts remain review-gated.
+  allow("apps/web/src/domains/creator/character-platform/presets/character-part-preset-store.ts", "durable-storage-write", '"toonstudio.character-part-presets.v1"', 1, CHARACTER_PLATFORM_LOCAL_DRAFT, CHARACTER_PLATFORM_LOCAL_DRAFT_PROOF),
+  allow("apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink-storage.ts", "local-storage-write", "storageKey(modelKey)", 1, CHARACTER_PLATFORM_LOCAL_DRAFT, CHARACTER_PLATFORM_LOCAL_DRAFT_PROOF),
+  allow("apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts", "local-storage-write", "manifestStorageKey(modelId)", 1, CHARACTER_PLATFORM_LOCAL_DRAFT, CHARACTER_PLATFORM_LOCAL_DRAFT_PROOF),
+  allow("apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts", "local-storage-cleanup", "manifestStorageKey(modelId)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
 
   // Injected localStorage-compatible codecs retained outside product authority selection.
   allow("apps/web/src/domains/creator/studio-animatic-timeline.ts", "durable-storage-write", "studioAnimaticStorageKey(document.workScope)", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),

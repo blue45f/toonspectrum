@@ -8,7 +8,6 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { build as viteBuild, defineConfig, type Plugin } from "vite";
 
 import { createStudioManualChunks } from "./apps/web/config/vite-manual-chunks";
-
 import {
   planStudioServiceWorkerPrecache,
   studioServiceWorkerBuildId,
@@ -415,6 +414,9 @@ export default defineConfig(({ mode }) => ({
       },
     },
     rolldownOptions: {
+      // Inline immutable imported values beyond conditionals to reduce the compressed graph
+      // without changing chunk ownership, lazy boundaries or property side-effect assumptions.
+      optimization: { inlineConst: { mode: "all" } },
       output: {
         manualChunks: createStudioManualChunks({
           isInitialIconModule,

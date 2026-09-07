@@ -47,7 +47,7 @@ import { getTitleDetail as getTitleDetailFromLib } from "../../server/title";
 // 컴파일해 상대 require 로 런타임 해석되도록(bare 패키지 지정자는 plain-node 가 .ts exports 를 못 풀어 부적합).
 
 import type { AgeRating, PlatformId, ReadState, SerialStatus, Title, WorkType } from "../../../../web/src/shared/lib/types";
-import type { OnModuleInit } from "@nestjs/common";
+import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 
 type QueryRecord = Record<string, string>;
 
@@ -125,11 +125,12 @@ type ReadStateMap = Record<string, ReadState>;
 type RatingMap = Record<string, number>;
 
 @Injectable()
-export class CatalogService implements OnModuleInit {
+export class CatalogService implements OnModuleInit, OnModuleDestroy {
   private readonly ingestConfig = normalizeCatalogIngestConfig();
   private ingestInProgress: Promise<CatalogIngestRunResult> | null = null;
   private consecutiveIngestFailures = 0;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private destroyed = false;
   private kmasSiteAccessLogged = false;
 
   async onModuleInit() {
@@ -154,6 +155,12 @@ export class CatalogService implements OnModuleInit {
     // 갱신 감지 폴링: 파일 모드는 mtime/size 스탯 비교(무비용)라 항상 켠다.
     // 레거시 FORCE_DB 모드에서만 기존 DB 해시 폴링이 동작한다(refreshCatalogIfChanged 내부 분기).
     this.startCatalogRefreshPoll();
+  }
+
+  onModuleDestroy() {
+    this.destroyed = true;
+    if (this.refreshTimer) clearInterval(this.refreshTimer);
+    this.refreshTimer = null;
   }
 
   async mergeKmasOnSiteAccess(options: KmasMergeOptions = {}): Promise<KmasSiteAccessMergeResult & { generatedAt: string }> {
@@ -211,10 +218,10 @@ export class CatalogService implements OnModuleInit {
   // 재시작 없이 메모리 카탈로그를 갱신한다. 파일 모드는 스탯 폴링, 레거시 DB 모드는 id 폴링.
   private startCatalogRefreshPoll() {
     const seconds = this.ingestConfig.refreshPollSeconds;
-    if (!seconds) return; // 0 = 비활성
+    if (this.destroyed || !seconds) return; // 0 = 비활성; 늦게 끝난 초기화도 종료를 되돌리지 않음
     if (this.refreshTimer) clearInterval(this.refreshTimer);
     this.refreshTimer = setInterval(() => {
-      if (this.ingestInProgress) return; // ingest 중엔 건너뜀(곧 in-process 갱신됨)
+      if (this.destroyed || this.ingestInProgress) return; // ingest 중엔 건너뜀(곧 in-process 갱신됨)
       void refreshCatalogIfChanged()
         .then((r) => {
           if (r.reloaded) {
