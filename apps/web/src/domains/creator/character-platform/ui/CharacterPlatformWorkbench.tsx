@@ -15,13 +15,14 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { createCharacterExportPreflight, formatCharacterBytes } from "../export/character-export-preflight";
 import { STUDIO_FOCUS_RING } from "../../studio-panel-ui";
+import { isCharacterShaperTypingTarget, pushCharacterShaperKeyLayer } from "../../character-shaper/character-shaper-ui-model";
 import { useCharacterPlatformWorkbench } from "./use-character-platform-workbench";
 
 import type { CharacterSlotKind } from "../../character-shaper/character-shaper-contract";
 import type { CharacterShaperBinding } from "../../character-shaper/character-shaper-ui-contract";
 import type { StudioVrmPoserHost } from "../../vrm/StudioVrmPoserHost";
 import type { CharacterPoseRegion } from "../pose/character-pose-v2";
-import type { ChangeEvent, ReactNode } from "react";
+import type { ChangeEvent, ReactNode, RefObject } from "react";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -128,8 +129,16 @@ export function CharacterPlatformWorkbench({ h, binding }: {
   const [presetSlot, setPresetSlot] = useState<CharacterSlotKind>("eyes");
   const [presetName, setPresetName] = useState("");
   const [savingPreset, setSavingPreset] = useState(false);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const savingPresetRef = useRef(false);
   const workbench = useCharacterPlatformWorkbench(h, binding);
+  const drawing = open && workbench.surfaceInk.active;
+  const ownerDialogRef = h.dialogRef as RefObject<HTMLElement | null> | undefined;
+
+  useEffect(() => {
+    // Escape the app's stacking context while remaining inside the poser's focus boundary.
+    setPortalRoot(ownerDialogRef?.current ?? document.body);
+  }, [ownerDialogRef]);
 
   const captureCanvas = h.captureRef?.current?.gl?.domElement as HTMLCanvasElement | undefined;
   const exportSize = useMemo(() => ({
@@ -156,14 +165,50 @@ export function CharacterPlatformWorkbench({ h, binding }: {
   useEffect(() => {
     if (!open) return;
     panelRef.current?.focus({ preventScroll: true });
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      close();
+  }, [open, drawing]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent): boolean => {
+      if (event.defaultPrevented || event.isComposing) return false;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (drawing) workbench.surfaceInk.setActive(false);
+        else close();
+        return true;
+      } else if (event.key === "Tab" && !drawing) {
+        const panel = panelRef.current;
+        if (!panel) return false;
+        const controls = Array.from(panel.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        )).filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0);
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        const active = document.activeElement;
+        if (!first || !last) {
+          event.preventDefault();
+          panel.focus();
+        } else if (event.shiftKey && (active === first || active === panel || !panel.contains(active))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (active === last || active === panel || !panel.contains(active))) {
+          event.preventDefault();
+          first.focus();
+        }
+        return true;
+      } else if ((drawing || tab === "ink") && (event.metaKey || event.ctrlKey) && !event.altKey && !isCharacterShaperTypingTarget(event.target)) {
+        const key = event.key.toLowerCase();
+        if (key !== "z" && key !== "y") return false;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (key === "y" || event.shiftKey) workbench.surfaceInk.redo();
+        else workbench.surfaceInk.undo();
+        return true;
+      }
+      return false;
     };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
+    return pushCharacterShaperKeyLayer(onKeyDown, window);
   });
 
   const requestImport = (target: ImportTarget) => {
@@ -359,15 +404,18 @@ export function CharacterPlatformWorkbench({ h, binding }: {
     </div>
   );
 
-  const panel = open ? createPortal(
+  const panel = open ? (
     <>
-      <div aria-hidden className="fixed inset-0 z-[94] bg-black/25" onPointerDown={close} />
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} className="fixed inset-y-2 right-2 z-[95] flex w-[min(31rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.04_0.01_70/0.65)] outline-none">
+      {!drawing ? <div aria-hidden className="fixed inset-0 z-[94] bg-black/25" onPointerDown={close} /> : null}
+      <div ref={panelRef} role="dialog" aria-modal={!drawing} data-studio-vrm-child-tool="true" data-studio-vrm-child-history={drawing || tab === "ink" ? "surface-ink" : undefined} aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} className={cn("fixed right-2 z-[95] flex w-[min(31rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.04_0.01_70/0.65)] outline-none", drawing ? "bottom-2" : "inset-y-2")}>
         <header className="flex items-center gap-3 border-b border-line px-3 py-2.5">
           <div className="min-w-0 flex-1"><p className="text-[0.62rem] font-bold tracking-wide text-accent">CHARACTER PLATFORM V2</p><h2 id={titleId} className="truncate text-base font-bold text-fg">캐릭터 품질 워크벤치</h2><p id={descriptionId} className="sr-only">공식 캐릭터, 파츠 프리셋, Pose 2.0, 3D 펜선, 렌더 패스를 관리합니다.</p></div>
           <button type="button" aria-label="캐릭터 품질 워크벤치 닫기" className={ICON_BUTTON} onClick={close}><X size={17} aria-hidden /></button>
         </header>
-        <div role="tablist" aria-label="캐릭터 품질 기능" className="grid grid-cols-5 gap-1 border-b border-line px-2 py-2">
+        {drawing ? <div className="flex items-center gap-3 p-3">
+          <p className="min-w-0 flex-1 text-[0.68rem] leading-relaxed text-fg-3">캐릭터 표면에 그리세요. 그리기를 종료하면 펜선 도구로 돌아갑니다.</p>
+          <button type="button" className={PRIMARY_BUTTON} onClick={() => workbench.surfaceInk.setActive(false)}>그리기 종료</button>
+        </div> : <><div role="tablist" aria-label="캐릭터 품질 기능" className="grid grid-cols-5 gap-1 border-b border-line px-2 py-2">
           {TABS.map((item) => {
             const Icon = item.icon;
             return <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={cn("flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[0.62rem] font-semibold", STUDIO_FOCUS_RING, tab === item.id ? "bg-accent-soft text-accent" : "text-fg-3 hover:bg-raised hover:text-fg")}><Icon size={15} aria-hidden /><span className="truncate">{item.label}</span></button>;
@@ -375,15 +423,14 @@ export function CharacterPlatformWorkbench({ h, binding }: {
         </div>
         <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
           {tab === "quality" ? qualityPanel : tab === "presets" ? presetsPanel : tab === "pose" ? posePanel : tab === "ink" ? inkPanel : renderPanel}
-        </div>
+        </div></>}
         {workbench.notice ? <p role="status" className="border-t border-line bg-card px-3 py-2 text-[0.68rem] font-semibold text-accent">{workbench.notice}</p> : null}
         <input ref={fileInputRef} type="file" accept="application/json,.json" tabIndex={-1} aria-label="캐릭터 품질 데이터 파일 선택" className="sr-only" onChange={onFileChange} />
       </div>
-    </>,
-    document.body,
+    </>
   ) : null;
 
-  return (
+  return portalRoot ? createPortal(
     <>
       <button ref={triggerRef} type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} className={cn("fixed bottom-20 right-4 z-[90] inline-flex min-h-11 items-center gap-2 rounded-full border border-accent/55 bg-panel/95 px-4 text-[0.72rem] font-bold text-accent shadow-lg backdrop-blur hover:bg-accent-soft", STUDIO_FOCUS_RING)}>
         <Gauge size={16} aria-hidden />
@@ -391,6 +438,6 @@ export function CharacterPlatformWorkbench({ h, binding }: {
         <span className="rounded-full bg-accent px-1.5 py-0.5 text-[0.58rem] text-on-accent">V2</span>
       </button>
       {panel}
-    </>
-  );
+    </>, portalRoot,
+  ) : null;
 }
