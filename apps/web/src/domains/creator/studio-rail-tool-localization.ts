@@ -7,6 +7,8 @@
  * 다르게 불리는 일을 막을 수 있다.
  */
 
+import "./studio-rail-groups.css";
+
 import { studioRailToolLabel, type StudioRailToolId } from "./studio-app-settings";
 
 /** 번역기가 키를 못 찾으면 키 문자열을 그대로 돌려준다. 그 경우엔 원문을 지켜야 한다. */
