@@ -82,7 +82,7 @@ CREATE TABLE public."creator_asset_upload_session" (
   "logicalRole" text NOT NULL,
   "protocol" text NOT NULL DEFAULT 'tus',
   "state" text NOT NULL DEFAULT 'reserved',
-  "quarantinePath" text NOT NULL UNIQUE,
+  "quarantinePath" text NOT NULL,
   "expectedByteLength" bigint NOT NULL,
   "actualByteLength" bigint,
   "declaredContentType" text NOT NULL,
@@ -95,6 +95,7 @@ CREATE TABLE public."creator_asset_upload_session" (
   "finalizedAt" timestamptz,
   "createdAt" timestamptz NOT NULL DEFAULT statement_timestamp(),
   "updatedAt" timestamptz NOT NULL DEFAULT statement_timestamp(),
+  CONSTRAINT "creator_asset_upload_session_path_unique" UNIQUE ("quarantinePath"),
   CONSTRAINT "creator_asset_upload_session_protocol_check"
     CHECK ("protocol" IN ('tus', 'server-multipart')),
   CONSTRAINT "creator_asset_upload_session_state_check"
@@ -130,7 +131,7 @@ CREATE TABLE public."creator_asset_processing_run" (
   "pipelineProfile" text NOT NULL,
   "pipelineVersion" integer NOT NULL,
   "toolchainDigest" text NOT NULL,
-  "idempotencyKey" text NOT NULL UNIQUE,
+  "idempotencyKey" text NOT NULL,
   "state" text NOT NULL DEFAULT 'queued',
   "currentStep" text,
   "requestedBy" text REFERENCES public."user"("id") ON DELETE SET NULL,
@@ -138,6 +139,7 @@ CREATE TABLE public."creator_asset_processing_run" (
   "createdAt" timestamptz NOT NULL DEFAULT statement_timestamp(),
   "startedAt" timestamptz,
   "finishedAt" timestamptz,
+  CONSTRAINT "creator_asset_processing_run_idempotency_unique" UNIQUE ("idempotencyKey"),
   CONSTRAINT "creator_asset_processing_run_digest_check"
     CHECK ("sourceDigest" ~ '^sha256:[a-f0-9]{64}$'
       AND "toolchainDigest" ~ '^sha256:[a-f0-9]{64}$'
@@ -202,17 +204,18 @@ CREATE INDEX "idx_creator_asset_processing_step_lease"
 
 CREATE TABLE public."creator_asset_artifact_set" (
   "id" text PRIMARY KEY,
-  "processingRunId" text NOT NULL UNIQUE
+  "processingRunId" text NOT NULL
     REFERENCES public."creator_asset_processing_run"("id") ON DELETE RESTRICT,
   "entryKind" text NOT NULL,
   "sourceDigest" text NOT NULL,
   "profileSchemaVersion" integer NOT NULL,
   "descriptor" jsonb NOT NULL,
-  "descriptorHash" text NOT NULL UNIQUE,
+  "descriptorHash" text NOT NULL,
   "state" text NOT NULL DEFAULT 'building',
   "toolchainDigest" text NOT NULL,
   "createdAt" timestamptz NOT NULL DEFAULT statement_timestamp(),
   "sealedAt" timestamptz,
+  CONSTRAINT "creator_asset_artifact_set_run_unique" UNIQUE ("processingRunId"),
   CONSTRAINT "creator_asset_artifact_set_kind_check"
     CHECK ("entryKind" IN ('raster-asset', 'vector-asset', '3d-asset', '3d-scene', 'material', 'hdri')),
   CONSTRAINT "creator_asset_artifact_set_digest_check"
@@ -230,6 +233,8 @@ CREATE TABLE public."creator_asset_artifact_set" (
     CHECK (("state" = 'sealed' AND "sealedAt" IS NOT NULL)
       OR ("state" <> 'sealed' AND "sealedAt" IS NULL))
 );
+CREATE UNIQUE INDEX "creator_asset_artifact_set_descriptor_hash_unique"
+  ON public."creator_asset_artifact_set" ("descriptorHash");
 CREATE INDEX "idx_creator_asset_artifact_set_source"
   ON public."creator_asset_artifact_set" ("sourceDigest", "state");
 
@@ -384,7 +389,7 @@ CREATE TABLE public."creator_marketplace_release_artifact_binding" (
   "licenseSnapshotId" text NOT NULL
     REFERENCES public."creator_asset_license_snapshot"("id") ON DELETE RESTRICT,
   "publicPreviewArtifactId" text NOT NULL,
-  "bindingHash" text NOT NULL UNIQUE,
+  "bindingHash" text NOT NULL,
   "createdAt" timestamptz NOT NULL DEFAULT statement_timestamp(),
   CONSTRAINT "creator_marketplace_release_artifact_binding_pkey"
     PRIMARY KEY ("releaseId", "entryId"),
@@ -396,6 +401,9 @@ CREATE TABLE public."creator_marketplace_release_artifact_binding" (
   CONSTRAINT "creator_marketplace_release_artifact_binding_entry_check"
     CHECK (length("entryId") BETWEEN 1 AND 160 AND "entryId" !~ '[[:cntrl:]]')
 );
+
+CREATE UNIQUE INDEX "creator_marketplace_release_artifact_binding_hash_unique"
+  ON public."creator_marketplace_release_artifact_binding" ("bindingHash");
 
 CREATE TABLE public."creator_marketplace_release_availability" (
   "releaseId" text PRIMARY KEY
@@ -435,9 +443,10 @@ CREATE TABLE public."creator_marketplace_entitlement_grant" (
   "validFrom" timestamptz NOT NULL,
   "validUntil" timestamptz,
   "existingWorkSurvives" boolean NOT NULL DEFAULT false,
-  "sourceEventId" text NOT NULL UNIQUE,
+  "sourceEventId" text NOT NULL,
   "revokedAt" timestamptz,
   "createdAt" timestamptz NOT NULL DEFAULT statement_timestamp(),
+  CONSTRAINT "creator_marketplace_entitlement_source_event_unique" UNIQUE ("sourceEventId"),
   CONSTRAINT "creator_marketplace_entitlement_subject_check"
     CHECK ("subjectType" IN ('user', 'organization')
       AND length("subjectId") BETWEEN 1 AND 160 AND "subjectId" !~ '[[:cntrl:]]'),
@@ -481,13 +490,14 @@ CREATE TABLE public."creator_work_catalog_asset_binding" (
     REFERENCES public."creator_asset_license_snapshot"("id") ON DELETE RESTRICT,
   "entitlementGrantId" text
     REFERENCES public."creator_marketplace_entitlement_grant"("id") ON DELETE SET NULL,
-  "useReceiptId" text NOT NULL UNIQUE,
+  "useReceiptId" text NOT NULL,
   "qualityProfile" text NOT NULL,
   "state" text NOT NULL DEFAULT 'active',
   "insertedBy" text REFERENCES public."user"("id") ON DELETE SET NULL,
   "insertedAt" timestamptz NOT NULL DEFAULT statement_timestamp(),
   "lastResolvedAt" timestamptz,
   CONSTRAINT "creator_work_catalog_asset_binding_pkey" PRIMARY KEY ("workId", "attachmentId"),
+  CONSTRAINT "creator_work_catalog_asset_binding_receipt_unique" UNIQUE ("useReceiptId"),
   CONSTRAINT "creator_work_catalog_asset_binding_artifact_fkey"
     FOREIGN KEY ("artifactSetId", "selectedArtifactId")
     REFERENCES public."creator_asset_artifact"("artifactSetId", "artifactId") ON DELETE RESTRICT,

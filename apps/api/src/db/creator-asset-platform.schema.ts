@@ -235,6 +235,11 @@ export const creatorAssetUploadSessions = pgTable(
         and ${table.finalizedAt} is not null
       )`,
     ),
+    check(
+      "creator_asset_upload_session_timestamp_check",
+      sql`${table.updatedAt} >= ${table.createdAt}
+        and ${table.expiresAt} > ${table.createdAt}`,
+    ),
   ],
 );
 
@@ -438,6 +443,10 @@ export const creatorAssetArtifacts = pgTable(
       "creator_asset_artifact_metrics_check",
       sql`${table.metrics} is null or jsonb_typeof(${table.metrics}) = 'object'`,
     ),
+    check(
+      "creator_asset_artifact_source_role_check",
+      sql`${table.role} <> 'source-original' or ${table.purpose} = 'source'`,
+    ),
   ],
 );
 
@@ -573,6 +582,11 @@ export const creatorMarketplaceReleaseAvailability = pgTable(
     check(
       "creator_marketplace_release_availability_revision_check",
       sql`${table.revision} between 1 and 2147483647`,
+    ),
+    check(
+      "creator_marketplace_release_availability_reason_check",
+      sql`(${table.state} = 'active' and ${table.reasonCode} is null)
+        or (${table.state} <> 'active' and length(${table.reasonCode}) between 1 and 120)`,
     ),
   ],
 );
