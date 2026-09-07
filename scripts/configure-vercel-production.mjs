@@ -2,7 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
-import { extname, join, relative, resolve } from "node:path";
+import { extname, join, resolve } from "node:path";
 import process from "node:process";
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
