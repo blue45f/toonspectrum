@@ -1,0 +1,141 @@
+name: One-shot PR900 catalogue regression repair
+
+on:
+  push:
+    branches:
+      - feat/studio-3d-quality-expansion-20260908
+    paths:
+      - .github/workflows/one-shot-pr900-catalog-regression-repair.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-shot-pr900-catalog-regression-repair
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/studio-3d-quality-expansion-20260908
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Repair stale catalogue assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one replacement, found {count}")
+              target.write_text(text.replace(old, new, 1))
+
+          bg3d_test = "apps/web/src/domains/creator/bg3d/bg3d-model-library.test.ts"
+          replace_once(
+              bg3d_test,
+              '''  it("ships only the twelve audited CC0 environment samples as verified insertable entries", () => {
+            expect(SAMPLE_BG3D_MODELS).toHaveLength(12);
+            expect(SAMPLE_BG3D_MODEL_ENTRIES).toHaveLength(12);
+            expect(new Set(SAMPLE_BG3D_MODELS.map((sample) => sample.id)).size).toBe(12);
+          '''.replace("          ", ""),
+              '''  it("ships all eighteen audited CC0 environment samples as verified insertable entries", () => {
+            expect(SAMPLE_BG3D_MODELS).toHaveLength(18);
+            expect(SAMPLE_BG3D_MODEL_ENTRIES).toHaveLength(18);
+            expect(new Set(SAMPLE_BG3D_MODELS.map((sample) => sample.id)).size).toBe(18);
+          '''.replace("          ", ""),
+          )
+
+          mutation_test = "apps/web/src/domains/creator/bg3d/studio-bg3d-model-mutation-integration.test.ts"
+          replace_once(
+              mutation_test,
+              '''    expectInOrder(cachedBranch, [
+                  "assertStudioBg3dModelPlacementAdmission({",
+                  "if (!cached.admittedProfiles.has(policy.profile))",
+                  "admitStoredBg3dModelForRendering(args.record.id",
+                  "cached.admittedProfiles.add(policy.profile)",
+                ]);'''.replace("              ", ""),
+              '''    expectInOrder(cachedBranch, [
+                  "assertStudioBg3dModelPlacementAdmission({",
+                  "if (!cached.admissionPolicyKeys?.has(policyKey))",
+                  "admitStoredBg3dModelForRendering(args.record.id",
+                  "cached.admissionPolicyKeys ??= new Set<string>()",
+                  "cached.admissionPolicyKeys.add(policyKey)",
+                  "cached.admittedProfiles.add(policy.profile)",
+                ]);'''.replace("              ", ""),
+          )
+
+          vrm_test = "apps/web/src/domains/creator/vrm/vrm-library.test.ts"
+          replace_once(
+              vrm_test,
+              '''  // 모든 번들 캐릭터가 200KB 이하의 고품질 3D 스튜디오 렌더링 썸네일 실파일을 갖추고 있는지 전수 검사한다.
+              it("backs every bundled character with a high-quality 3D thumbnail (<200KB) and valid sampleVrmThumbnailUrl", () => {
+                expect(SAMPLE_VRMS.length).toBe(88);
+              '''.replace("              ", ""),
+              '''  // 모든 번들 캐릭터는 고품질 3D 썸네일을 가진다. 기존 파일은 200KB,
+              // 검토된 refined-v1 재렌더링은 화질 보존을 위해 320KB까지 허용한다.
+              it("backs every bundled character with a bounded high-quality 3D thumbnail and valid sampleVrmThumbnailUrl", () => {
+                expect(SAMPLE_VRMS.length).toBe(113);
+              '''.replace("              ", ""),
+          )
+          target = Path(vrm_test)
+          text = target.read_text()
+          old_regex = r'/^\/assets\/3d\/characters\/thumbnails\/[a-z0-9_.-]+\.png$/'
+          new_regex = r'/^\/assets\/3d\/characters\/thumbnails\/(?:[a-z0-9_.-]+\/)*[a-z0-9_.-]+\.png$/'
+          regex_count = text.count(old_regex)
+          if regex_count != 2:
+              raise SystemExit(f"{vrm_test}: expected two thumbnail regex assertions, found {regex_count}")
+          text = text.replace(old_regex, new_regex)
+          old_size = '''      expect(size, `${sample.id} thumbnail size should be < 200KB`).toBeLessThan(200 * 1024);'''
+          new_size = '''      const maxThumbnailBytes = sample.thumbnailUrl!.includes("/refined-v1/")
+                ? 320 * 1024
+                : 200 * 1024;
+              expect(
+                size,
+                `${sample.id} thumbnail size should be < ${maxThumbnailBytes / 1024}KB`,
+              ).toBeLessThan(maxThumbnailBytes);'''.replace("              ", "")
+          if text.count(old_size) != 1:
+              raise SystemExit(f"{vrm_test}: stale thumbnail size assertion not found exactly once")
+          target.write_text(text.replace(old_size, new_size, 1))
+          PY
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Format and verify focused regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --write \
+            apps/web/src/domains/creator/bg3d/bg3d-model-library.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-model-mutation-integration.test.ts \
+            apps/web/src/domains/creator/vrm/vrm-library.test.ts
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/bg3d/bg3d-model-library.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-model-mutation-integration.test.ts \
+            apps/web/src/domains/creator/vrm/vrm-library.test.ts
+      - name: Commit verified repair and retire one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/one-shot-pr900-catalog-regression-repair.yml
+          git add \
+            apps/web/src/domains/creator/bg3d/bg3d-model-library.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-model-mutation-integration.test.ts \
+            apps/web/src/domains/creator/vrm/vrm-library.test.ts
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test(studio): align catalogue regressions with expanded assets"
+          git push origin HEAD:feat/studio-3d-quality-expansion-20260908
