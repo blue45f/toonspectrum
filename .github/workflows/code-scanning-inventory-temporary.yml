@@ -1,0 +1,87 @@
+name: Temporary encrypted code-scanning inventory
+
+on:
+  push:
+    branches:
+      - fix/code-scanning-alerts-20260908
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Read open code-scanning alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          gh api --paginate --slurp \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "/repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
+            > alerts-pages.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          pages = json.loads(Path('alerts-pages.json').read_text(encoding='utf-8'))
+          alerts = [alert for page in pages for alert in page]
+          Path('alerts.json').write_text(
+              json.dumps(alerts, ensure_ascii=False, separators=(',', ':')),
+              encoding='utf-8',
+          )
+          PY
+          rm -f alerts-pages.json
+
+      - name: Encrypt inventory before upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          cat > public.pem <<'PEM'
+          -----BEGIN PUBLIC KEY-----
+          MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAx2XtAmNErPradWA7UDyw
+          6KRWLaxL3A/bt6pSmRmYQ5bEMXOufF2Az9+7LE3OoA7yGxnAGkPBeVMgx1tW9ErT
+          PruhyZqELTWbIstSkBpQDQBuSPC5CA6CbPr1Oo9XHMfFLmSLVus/WHTCIaVGwXbP
+          iw/pXD3OWCH4Dx7CosxoX4+u0a24GwaI5w7fY+4PnOECE0bUNGUmpSVjRe8ASRmY
+          4U9a6uS6/ow1EezJCfZyAsVir4JMtkBp0MGfzsChiWadY31+LmX/gzoR8EeU3Vir
+          YxkXrS9925s26GHmtTyxZOldrbKvcnZn3ZUfw1sM/UgOEyKQoVFa7RGcVOYDLh5O
+          lKO2qNoI1ATqdUzgm6OOz3XaIq8PKUw1aNmgR3ay2KCnnXqlO+i0N6G3yfc8qFXd
+          PYUl95Tq4d2BXFv73ok2cokgQ85BVaJgMqhNFotaPsNj2aDl5IheKUVuzyGk7aQq
+          LesNqfyi3qfWRWOPxO2w6Uw32mLJFU1KPv2hEf6sfjRLAgMBAAE=
+          -----END PUBLIC KEY-----
+          PEM
+          openssl rand -out key.bin 32
+          openssl rand -out iv.bin 16
+          key_hex="$(xxd -p -c 256 key.bin)"
+          iv_hex="$(xxd -p -c 256 iv.bin)"
+          openssl enc -aes-256-cbc \
+            -K "$key_hex" \
+            -iv "$iv_hex" \
+            -in alerts.json \
+            -out alerts.enc
+          cat key.bin iv.bin > envelope.bin
+          openssl pkeyutl -encrypt \
+            -pubin \
+            -inkey public.pem \
+            -pkeyopt rsa_padding_mode:oaep \
+            -pkeyopt rsa_oaep_md:sha256 \
+            -in envelope.bin \
+            -out envelope.enc
+          tar -czf encrypted-report.tgz alerts.enc envelope.enc
+          rm -f alerts.json alerts.enc envelope.bin envelope.enc key.bin iv.bin public.pem
+
+      - name: Upload encrypted inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-code-scanning-inventory
+          path: encrypted-report.tgz
+          if-no-files-found: error
+          retention-days: 1
