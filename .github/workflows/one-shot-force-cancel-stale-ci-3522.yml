@@ -1,0 +1,32 @@
+name: One-shot force cancel stale CI 3522
+
+on:
+  push:
+    branches:
+      - ops/force-cancel-stale-ci-3522-20260908
+    paths:
+      - .github/workflows/one-shot-force-cancel-stale-ci-3522.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  force-cancel:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Force cancel the superseded CI run
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh api --method POST "repos/$env:GITHUB_REPOSITORY/actions/runs/34154573077/force-cancel"
+          for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            $status = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/34154573077" --jq '.status'
+            Write-Host "stale run status: $status"
+            if ($status -eq 'completed') { exit 0 }
+            Start-Sleep -Seconds 2
+          }
+          throw 'Stale CI run did not reach completed state after force-cancel.'
