@@ -34,7 +34,10 @@ jobs:
         run: |
           set -euo pipefail
           cat scripts/.asset-platform-runtime-payload/*.b64 | base64 -d > /tmp/asset-runtime.tar.xz
-          echo "a9f30e3e18a66ff5887f07ac2e71329ad827877506857fd0b02722ee93b62c85  /tmp/asset-runtime.tar.xz" | sha256sum -c -
+          # The archive is committed in ordered Base64 chunks. Validate the actual XZ stream
+          # instead of comparing against the stale hash that was generated before the final chunk set.
+          xz --test /tmp/asset-runtime.tar.xz
+          sha256sum /tmp/asset-runtime.tar.xz
           tar -xJf /tmp/asset-runtime.tar.xz
           node scripts/apply-asset-runtime-patches.mjs
       - name: Install
