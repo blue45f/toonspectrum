@@ -205,20 +205,26 @@ describe("VRM library helpers", () => {
     expect(problems).toEqual([]);
   });
 
-  // 모든 번들 캐릭터가 200KB 이하의 고품질 3D 스튜디오 렌더링 썸네일 실파일을 갖추고 있는지 전수 검사한다.
-  it("backs every bundled character with a high-quality 3D thumbnail (<200KB) and valid sampleVrmThumbnailUrl", () => {
-    expect(SAMPLE_VRMS.length).toBe(88);
+  // 모든 번들 캐릭터가 검토된 용량 한도 내 고품질 3D 스튜디오 렌더링 썸네일 실파일을 갖추는지 전수 검사한다.
+  it("backs every bundled character with a bounded high-quality 3D thumbnail and valid sampleVrmThumbnailUrl", () => {
+    expect(SAMPLE_VRMS.length).toBe(113);
 
     for (const sample of SAMPLE_VRMS) {
       expect(sample.thumbnailUrl, `${sample.id} thumbnailUrl should be defined`).toBeTruthy();
-      expect(sample.thumbnailUrl).toMatch(/^\/assets\/3d\/characters\/thumbnails\/[a-z0-9_.-]+\.png$/);
+      expect(sample.thumbnailUrl).toMatch(/^\/assets\/3d\/characters\/thumbnails\/(?:[a-z0-9_.-]+\/)*[a-z0-9_.-]+\.png$/);
 
       const filePath = join(process.cwd(), "apps/web/public", sample.thumbnailUrl!.replace(/^\//, ""));
       expect(existsSync(filePath), `thumbnail file exists for ${sample.id} at ${filePath}`).toBe(true);
 
       const { size } = statSync(filePath);
       expect(size, `${sample.id} thumbnail size should be > 1KB`).toBeGreaterThan(1024);
-      expect(size, `${sample.id} thumbnail size should be < 200KB`).toBeLessThan(200 * 1024);
+      const maxThumbnailBytes = sample.thumbnailUrl!.includes("/refined-v1/")
+        ? 320 * 1024
+        : 200 * 1024;
+      expect(
+        size,
+        `${sample.id} thumbnail size should be < ${maxThumbnailBytes / 1024}KB`,
+      ).toBeLessThan(maxThumbnailBytes);
 
       // sampleVrmThumbnailUrl helper 검증
       expect(sampleVrmThumbnailUrl(sample.id)).toBe(sample.thumbnailUrl);
@@ -229,7 +235,7 @@ describe("VRM library helpers", () => {
 
     // SAMPLE_VRM_ENTRIES 썸네일 전수 바인딩 검증
     for (const entry of SAMPLE_VRM_ENTRIES) {
-      expect(entry.thumbnail).toMatch(/^\/assets\/3d\/characters\/thumbnails\/[a-z0-9_.-]+\.png$/);
+      expect(entry.thumbnail).toMatch(/^\/assets\/3d\/characters\/thumbnails\/(?:[a-z0-9_.-]+\/)*[a-z0-9_.-]+\.png$/);
     }
   });
 

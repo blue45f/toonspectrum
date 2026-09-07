@@ -104,8 +104,10 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
     );
     expectInOrder(cachedBranch, [
       "assertStudioBg3dModelPlacementAdmission({",
-      "if (!cached.admittedProfiles.has(policy.profile))",
+      "if (!cached.admissionPolicyKeys?.has(policyKey))",
       "admitStoredBg3dModelForRendering(args.record.id",
+      "cached.admissionPolicyKeys ??= new Set<string>()",
+      "cached.admissionPolicyKeys.add(policyKey)",
       "cached.admittedProfiles.add(policy.profile)",
     ]);
     expect(cachedBranch.match(/assertStudioBg3dModelPlacementAdmission/gu)).toHaveLength(1);
