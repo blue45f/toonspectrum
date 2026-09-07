@@ -1,5 +1,6 @@
 import {
   Compass,
+  GitCompareArrows,
   Library,
   PackagePlus,
   Palette,
@@ -36,6 +37,12 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
       label: "내 에셋",
       icon: Library,
       active: pathname === "/market/library",
+    },
+    {
+      href: "/market/compare",
+      label: "에셋 비교",
+      icon: GitCompareArrows,
+      active: pathname === "/market/compare",
     },
     {
       href: "/market/manage",

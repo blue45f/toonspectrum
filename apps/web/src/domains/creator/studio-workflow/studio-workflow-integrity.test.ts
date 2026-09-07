@@ -228,6 +228,48 @@ describe("Studio workflow integrity", () => {
     ]));
   });
 
+  it("blocks publishing an otherwise approved work with a malformed render source pin", () => {
+    const input: Parameters<typeof evaluateStudioWorkflowIntegrity>[0] = {
+      versionCoordinates: approvedCoordinates(),
+      identityIndex: identity(),
+      characterBible: characterBible(),
+      review: reviewBundle(),
+      publishSource: { serverRevision: 42, contentDigest: "digest-r42" },
+      sceneRenderReceipts: [{
+        version: 1,
+        id: "render-1",
+        sourceSceneAssetId: "",
+        sourceSceneRevisionId: "scene-1:r1",
+        sourceSceneContentHash: HASH,
+        engine: "three",
+        cameraId: "camera-1",
+        poseRevisionId: null,
+        lightingRevisionId: null,
+        renderPresetId: "preset-1",
+        output: asset(),
+        depth: null,
+        normal: null,
+        objectIdMask: null,
+        renderedAt: NOW,
+      }],
+    };
+    const report = evaluateStudioWorkflowIntegrity(input);
+
+    expect(report.canPublish).toBe(false);
+    expect(report.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: "sceneRenderReceipts[0].sceneReceipt.sourceSceneAssetId",
+        blocks: ["publish"],
+      }),
+    ]));
+    expect(evaluateStudioWorkflowIntegrity({
+      ...input,
+      sceneRenderReceipts: input.sceneRenderReceipts?.map((receipt) => ({
+        ...receipt, sourceSceneAssetId: "scene-1",
+      })),
+    }).canPublish).toBe(true);
+  });
+
   it("blocks publish on unknown commercial rights", () => {
     const report = evaluateStudioWorkflowIntegrity({
       versionCoordinates: approvedCoordinates(),

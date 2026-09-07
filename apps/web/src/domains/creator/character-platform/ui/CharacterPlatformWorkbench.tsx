@@ -1,14 +1,10 @@
 import {
-  BadgeCheck,
-  Box,
   Download,
-  FileJson,
   Gauge,
   Layers,
   PenLine,
   Save,
   ShieldCheck,
-  SlidersHorizontal,
   Trash2,
   Upload,
   WandSparkles,
@@ -131,6 +127,8 @@ export function CharacterPlatformWorkbench({ h, binding }: {
   const [importTarget, setImportTarget] = useState<ImportTarget>("manifest");
   const [presetSlot, setPresetSlot] = useState<CharacterSlotKind>("eyes");
   const [presetName, setPresetName] = useState("");
+  const [savingPreset, setSavingPreset] = useState(false);
+  const savingPresetRef = useRef(false);
   const workbench = useCharacterPlatformWorkbench(h, binding);
 
   const captureCanvas = h.captureRef?.current?.gl?.domElement as HTMLCanvasElement | undefined;
@@ -181,8 +179,8 @@ export function CharacterPlatformWorkbench({ h, binding }: {
       try {
         const maximum = importTarget === "manifest" ? 512 * 1024 : 4 * 1024 * 1024;
         const text = await readTextFile(file, maximum);
-        if (importTarget === "manifest") workbench.importCanonicalManifest(text);
-        else if (importTarget === "presets") workbench.importPresets(text);
+        if (importTarget === "manifest") await workbench.importCanonicalManifest(text);
+        else if (importTarget === "presets") await workbench.importPresets(text);
         else workbench.surfaceInk.importJson(text);
       } catch (error) {
         window.alert(error instanceof Error ? error.message : "파일을 읽지 못했습니다.");
@@ -190,10 +188,20 @@ export function CharacterPlatformWorkbench({ h, binding }: {
     })();
   };
 
-  const savePreset = () => {
-    const name = presetName.normalize("NFKC").trim().replace(/\s+/gu, " ");
-    if (!name) return;
-    if (workbench.saveSlotPreset(presetSlot, name)) setPresetName("");
+  const savePreset = async () => {
+    const submittedName = presetName;
+    const name = submittedName.normalize("NFKC").trim().replace(/\s+/gu, " ");
+    if (!name || savingPresetRef.current) return;
+    savingPresetRef.current = true;
+    setSavingPreset(true);
+    try {
+      if (await workbench.saveSlotPreset(presetSlot, name)) {
+        setPresetName((current) => current === submittedName ? "" : current);
+      }
+    } finally {
+      savingPresetRef.current = false;
+      setSavingPreset(false);
+    }
   };
 
   const qualityPanel = (
@@ -249,7 +257,7 @@ export function CharacterPlatformWorkbench({ h, binding }: {
         <label className="block text-[0.68rem] font-semibold text-fg-2">이름
           <input value={presetName} maxLength={60} onChange={(event) => setPresetName(event.currentTarget.value)} placeholder="예: 차가운 고양이 눈" className={cn("mt-1 h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm", STUDIO_FOCUS_RING)} />
         </label>
-        <button type="button" className={PRIMARY_BUTTON} disabled={!presetName.trim() || !hasSlotSelection(binding, presetSlot)} onClick={savePreset}><Save size={14} aria-hidden />현재 파츠 저장</button>
+        <button type="button" className={PRIMARY_BUTTON} disabled={savingPreset || !presetName.trim() || !hasSlotSelection(binding, presetSlot)} onClick={savePreset}><Save size={14} aria-hidden />현재 파츠 저장</button>
       </Section>
       <Section title={`내 프리셋 · ${workbench.presets.length}개`}>
         <div className="flex flex-wrap gap-2">

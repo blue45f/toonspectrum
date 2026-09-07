@@ -2,14 +2,24 @@ import { createEmptyCharacterSurfaceInkDocument } from "./character-surface-ink"
 
 import type { CharacterSurfaceInkAnchor, CharacterSurfaceInkDocument } from "./character-surface-ink";
 
-const STORAGE_PREFIX = "toonstudio.character-surface-ink.v1:";
+export const CHARACTER_SURFACE_INK_SQLITE_NAMESPACE = "studio-character-surface-ink-v12";
+const pending = new Map<string, Promise<unknown>>();
 const MAX_STORED_BYTES = 4 * 1024 * 1024;
 const MAX_LAYERS = 32;
 const MAX_STROKES = 2_000;
 const MAX_ANCHORS = 100_000;
 
-function storageKey(modelKey: string): string {
-  return `${STORAGE_PREFIX}${modelKey}`;
+function enqueue<T>(modelKey: string, operation: () => Promise<T>): Promise<T> {
+  const result = (pending.get(modelKey) ?? Promise.resolve()).then(operation, operation);
+  pending.set(modelKey, result);
+  const retire = () => { if (pending.get(modelKey) === result) pending.delete(modelKey); };
+  void result.then(retire, retire);
+  return result;
+}
+
+async function acquireInkStorage() {
+  const { acquireStudioLocalDatabase } = await import("../../studio-local-database-runtime");
+  return (await acquireStudioLocalDatabase()).asAsyncKeyValueStore(CHARACTER_SURFACE_INK_SQLITE_NAMESPACE);
 }
 
 function isFiniteTuple(value: unknown, length: number): boolean {
@@ -54,16 +64,14 @@ export function parseCharacterSurfaceInkDocument(raw: string | null): CharacterS
   return document as CharacterSurfaceInkDocument;
 }
 
-export function loadCharacterSurfaceInkDocument(modelKey: string): CharacterSurfaceInkDocument {
-  if (typeof window === "undefined") return createEmptyCharacterSurfaceInkDocument();
-  return parseCharacterSurfaceInkDocument(window.localStorage.getItem(storageKey(modelKey)));
+export function loadCharacterSurfaceInkDocument(modelKey: string): Promise<CharacterSurfaceInkDocument> {
+  return enqueue(modelKey, async () => parseCharacterSurfaceInkDocument(await (await acquireInkStorage()).get(modelKey)));
 }
 
-export function saveCharacterSurfaceInkDocument(modelKey: string, document: CharacterSurfaceInkDocument): void {
-  if (typeof window === "undefined") return;
+export async function saveCharacterSurfaceInkDocument(modelKey: string, document: CharacterSurfaceInkDocument): Promise<void> {
   const serialized = JSON.stringify(document);
   if (new TextEncoder().encode(serialized).byteLength > MAX_STORED_BYTES) {
-    throw new Error("3D 펜선 저장 공간이 가득 찼습니다.");
+    return Promise.reject(new Error("3D 펜선 저장 공간이 가득 찼습니다."));
   }
-  window.localStorage.setItem(storageKey(modelKey), serialized);
+  return enqueue(modelKey, async () => (await acquireInkStorage()).set(modelKey, serialized));
 }

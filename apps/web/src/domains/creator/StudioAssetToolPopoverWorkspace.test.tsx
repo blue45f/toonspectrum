@@ -120,6 +120,30 @@ beforeEach(() => {
 });
 
 describe("StudioAssetToolPopoverWorkspace", () => {
+  it.each([
+    ["background", false], ["element", false],
+    ["background", true], ["element", true],
+  ] as const)("reports the actual %s insertion outcome: %s", async (kind, accepted) => {
+    const source: StudioUnifiedAssetSource = kind === "background"
+      ? { kind, value: { id: "bg", label: "배경", genre: "학원" } }
+      : { kind, value: {
+          id: "element", label: "요소", category: "shape", keywords: [],
+          width: 10, height: 10, svg: '<svg xmlns="http://www.w3.org/2000/svg"/>',
+        } };
+    mocks.catalog = [createItem(source)];
+    const { toolBelt, stableHandlers } = createToolBelt();
+    const insert = kind === "background" ? stableHandlers.addBgScene : stableHandlers.addCatalogElement;
+    insert.mockReturnValue(accepted);
+    render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
+    fireEvent.click(await screen.findByRole("button", { name: /테스트 에셋/ }));
+    if (accepted) {
+      expect(await screen.findByText("테스트 에셋을(를) 캔버스에 삽입했습니다.")).toBeTruthy();
+    } else {
+      expect(await screen.findByText("현재 캔버스 상태에서는 이 에셋을 사용할 수 없습니다.")).toBeTruthy();
+      expect(screen.queryByText("테스트 에셋을(를) 캔버스에 삽입했습니다.")).toBeNull();
+    }
+  });
+
   it("keeps the workspace mounted while legacy asset tabs switch", async () => {
     const first = createToolBelt({ assetTab: "community" });
     const { rerender } = render(

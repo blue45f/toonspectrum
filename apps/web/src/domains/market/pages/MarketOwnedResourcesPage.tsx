@@ -119,7 +119,7 @@ export function MarketManagePage() {
     setLoadingMore(false);
   }, []);
 
-  const loadFirstPage = useCallback(async () => {
+  const loadFirstPage = useCallback(async (confirmation: string | null = null) => {
     invalidateRequests();
     const generation = generationRef.current;
     setLoadedUserId(userId);
@@ -128,7 +128,7 @@ export function MarketManagePage() {
     setHasMore(false);
     setPendingId(null);
     setError(null);
-    setMessage(null);
+    setMessage(confirmation);
 
     if (!ready || !userId) {
       setLoadState("idle");
@@ -233,10 +233,9 @@ export function MarketManagePage() {
       if (relisting) await relistCreatorMarketplaceResource(record.id);
       else await deleteCreatorMarketplaceResource(record.id);
       if (generationRef.current !== generation) return;
-      setMessage(relisting
+      await loadFirstPage(relisting
         ? `“${record.name}”을(를) 공개 목록에 다시 올렸습니다.`
         : `“${record.name}”을(를) 공개 목록에서 내렸습니다. 기존 릴리스 이력은 유지됩니다.`);
-      await loadFirstPage();
     } catch (caught) {
       if (generationRef.current !== generation) return;
       setError(marketAuthorityErrorMessage(

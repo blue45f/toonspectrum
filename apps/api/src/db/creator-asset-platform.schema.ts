@@ -437,7 +437,8 @@ export const creatorAssetArtifacts = pgTable(
     check(
       "creator_asset_artifact_dimensions_check",
       sql`(${table.width} is null and ${table.height} is null)
-        or (${table.width} between 1 and 65536 and ${table.height} between 1 and 65536)`,
+        or (${table.width} is not null and ${table.height} is not null
+          and ${table.width} between 1 and 65536 and ${table.height} between 1 and 65536)`,
     ),
     check(
       "creator_asset_artifact_metrics_check",
@@ -529,6 +530,9 @@ export const creatorMarketplaceReleaseArtifactBindings = pgTable(
       name: "creator_marketplace_release_artifact_binding_pkey",
       columns: [table.releaseId, table.entryId],
     }),
+    unique("creator_marketplace_release_artifact_binding_entry_unique").on(
+      table.releaseId, table.entryId, table.artifactSetId, table.licenseSnapshotId,
+    ),
     uniqueIndex("creator_marketplace_release_artifact_binding_hash_unique").on(
       table.bindingHash,
     ),
@@ -648,6 +652,7 @@ export const creatorMarketplaceEntitlementGrants = pgTable(
           (${table.releasePolicy} = 'exact' and ${table.releaseId} is not null
             and ${table.minimumOrdinal} is null and ${table.maximumOrdinal} is null)
           or (${table.releasePolicy} = 'range' and ${table.releaseId} is null
+            and ${table.minimumOrdinal} is not null and ${table.maximumOrdinal} is not null
             and ${table.minimumOrdinal} between 1 and 2147483647
             and ${table.maximumOrdinal} between ${table.minimumOrdinal} and 2147483647)
           or (${table.releasePolicy} = 'package-head' and ${table.releaseId} is null
@@ -725,6 +730,16 @@ export const creatorWorkCatalogAssetBindings = pgTable(
       foreignColumns: [
         creatorAssetArtifacts.artifactSetId,
         creatorAssetArtifacts.artifactId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "creator_work_catalog_asset_binding_release_entry_fkey",
+      columns: [table.releaseId, table.entryId, table.artifactSetId, table.licenseSnapshotId],
+      foreignColumns: [
+        creatorMarketplaceReleaseArtifactBindings.releaseId,
+        creatorMarketplaceReleaseArtifactBindings.entryId,
+        creatorMarketplaceReleaseArtifactBindings.artifactSetId,
+        creatorMarketplaceReleaseArtifactBindings.licenseSnapshotId,
       ],
     }).onDelete("restrict"),
     index("idx_creator_work_catalog_asset_binding_release").on(

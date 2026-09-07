@@ -87,16 +87,14 @@ function routeUnifiedAsset(
   const handlers = toolBelt.stableHandlers;
   switch (item.source.kind) {
     case "background":
-      handlers.addBgScene(item.source.value);
-      return true;
+      return handlers.addBgScene(item.source.value);
     case "scene-template":
       // The legacy controller resolves void even when it rejects a placement internally.
       // Route to its preview/placement surface instead of announcing an insertion here.
       toolBelt.setMenu("scene");
       return true;
     case "element":
-      handlers.addCatalogElement(item.source.value);
-      return true;
+      return handlers.addCatalogElement(item.source.value);
     case "object-3d":
       toolBelt.setMenu(null);
       handlers.openStudioObjectInsert({

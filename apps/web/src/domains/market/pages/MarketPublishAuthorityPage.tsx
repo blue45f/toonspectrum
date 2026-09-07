@@ -8,18 +8,19 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import { MarketplaceAuthoringWorkshop } from "../components/MarketplaceAuthoringWorkshop";
 import {
   marketAuthorityErrorMessage,
+  authoringUpdateResourceId,
   parseAuthoritativeMarketManifest,
 } from "../models/market-authority";
 import { marketKindMeta, marketLicenseMeta } from "../models/market-kind";
 import { marketStudioResourceHref } from "../models/market-studio-handoff";
 
-import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceIdentity, CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -30,7 +31,7 @@ import {
   useDocumentTitle,
   useMetaDescription,
 } from "@/src/hooks/use-document-title";
-import { publishCreatorMarketplaceResource } from "@/src/infrastructure/creator-marketplace-client";
+import { getCreatorMarketplaceResourceIdentity, publishCreatorMarketplaceResource } from "@/src/infrastructure/creator-marketplace-client";
 
 const MAX_SOURCE_FILE_BYTES = 512 * 1024;
 
@@ -40,8 +41,9 @@ export function MarketPublishPage() {
     "Studio 저작 초안을 이어서 편집하고, 검증 가능한 manifest만 서버 공개 릴리스로 게시하세요.",
   );
 
-  const { ready, status } = useSession();
+  const { data: session, ready, status } = useSession();
   const authenticated = ready && status === "authenticated";
+  const userId = authenticated ? session.user.id : null;
   const fileButtonRef = useRef<HTMLButtonElement>(null);
   const [manifestText, setManifestText] = useState("");
   const [sourceName, setSourceName] = useState<string | null>(null);
@@ -49,9 +51,30 @@ export function MarketPublishPage() {
   const [error, setError] = useState<string | null>(null);
   const [publishedRecord, setPublishedRecord] =
     useState<CreatorMarketplaceResourceRecord | null>(null);
+  const [updateParent, setUpdateParent] = useState<CreatorMarketplaceResourceIdentity | null>(null);
+  const [parentError, setParentError] = useState<string | null>(null);
+  const [parentLookupAttempt, setParentLookupAttempt] = useState(0);
+  const updateTarget = authoringUpdateResourceId(manifestText);
+
+  useEffect(() => {
+    setUpdateParent(null);
+    setParentError(null);
+    if (!userId || !updateTarget) return;
+    let current = true;
+    const controller = new AbortController();
+    void getCreatorMarketplaceResourceIdentity(updateTarget, controller.signal).then((parent) => {
+      if (parent.publisherId !== userId) throw new Error("본인이 게시한 에셋만 업데이트할 수 있습니다.");
+      if (current) setUpdateParent(parent);
+    }).catch((caught: unknown) => {
+      if (current) setParentError(marketAuthorityErrorMessage(caught, "업데이트할 기존 에셋을 확인하지 못했습니다."));
+    });
+    return () => { current = false; controller.abort(); };
+  }, [userId, updateTarget, parentLookupAttempt]);
+
   const parsed = useMemo(
-    () => parseAuthoritativeMarketManifest(manifestText),
-    [manifestText],
+    () => parseAuthoritativeMarketManifest(manifestText,
+      updateParent?.id === updateTarget && updateParent?.publisherId === userId ? updateParent : null),
+    [manifestText, updateParent, updateTarget, userId],
   );
 
   async function loadManifestFile(file: File): Promise<void> {
@@ -243,6 +266,16 @@ export function MarketPublishPage() {
               >
                 {parsed.message}
               </div>
+
+              {parentError && updateTarget ? (
+                <div role="alert" className="mt-3 rounded-lg border border-warn/40 p-3 text-xs text-fg-2">
+                  <p>{parentError}</p>
+                  <button type="button" className={buttonClass({ variant: "ghost", size: "sm", className: "mt-2" })}
+                    onClick={() => setParentLookupAttempt((attempt) => attempt + 1)}>
+                    업데이트 대상 다시 확인
+                  </button>
+                </div>
+              ) : null}
 
               {error ? (
                 <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-fg">

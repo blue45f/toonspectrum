@@ -37,3 +37,4 @@ apps/api/src/db/migrations/0036_traffic_analytics_relations.sql
 apps/api/src/db/migrations/0037_creator_marketplace_3d_asset_parity.sql
 apps/api/src/db/migrations/0038_feedback_community.sql
 apps/api/src/db/migrations/0039_creator_asset_platform_foundation.sql
+apps/api/src/db/migrations/0040_creator_asset_platform_integrity.sql

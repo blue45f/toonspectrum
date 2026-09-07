@@ -2,12 +2,14 @@ import {
   CREATOR_MARKETPLACE_RUNTIME_BY_KIND,
   CreatorMarketplacePortablePayloadSchema,
   CreatorMarketplaceResourceManifestSchema,
+  CreatorMarketplaceResourceIdentitySchema,
   canonicalizeCreatorMarketplaceJson,
   creatorMarketplaceJsonByteSize,
   type CreatorMarketplaceJsonValue,
   type CreatorMarketplaceResourceEngine,
   type CreatorMarketplaceResourceLicense,
   type CreatorMarketplaceResourceManifest,
+  type CreatorMarketplaceResourceIdentity,
 } from "@/shared/lib/creator-marketplace-resource-contract";
 
 export type MarketManifestParseResult =
@@ -140,24 +142,43 @@ function sha256Hex(value: string): string {
   return Array.from(hash, (word) => word.toString(16).padStart(8, "0")).join("");
 }
 
-function authoringPackageId(title: string): string {
-  const normalizedTitle = title.normalize("NFKC").trim().toLowerCase();
-  const slug = normalizedTitle
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "")
-    .slice(0, 64) || "brush";
-  const digest = sha256Hex(`brush\u0000${normalizedTitle}`);
-  return `community/brush/${slug}-${digest.slice(0, 12)}`;
+function authoringPackageId(draftId: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u.test(draftId)) {
+    throw new Error("초안 식별자가 없습니다. 워크숍에서 저작 초안을 다시 내보내 주세요.");
+  }
+  return `community/brush/${sha256Hex(`brush\u0000${draftId}`).slice(0, 32)}`;
 }
 
-function authoringLicense(value: unknown): CreatorMarketplaceResourceLicense {
+function authoringLicense(rights: Record<string, unknown>): CreatorMarketplaceResourceLicense {
+  const value = rights.license === "free" || rights.license === "commercial"
+    ? "toonspectrum-standard" : rights.license;
   if (
     value === "toonspectrum-standard"
     || value === "cc0-1.0"
     || value === "cc-by-4.0"
     || value === "cc-by-nc-4.0"
-  ) return value;
-  return "toonspectrum-standard";
+  ) {
+    if (value !== "cc-by-nc-4.0" && rights.commercialUse !== true) {
+      throw new Error("상업 이용을 허용하지 않은 초안을 상업 이용 가능한 사용권으로 게시할 수 없습니다. 선택한 권리에 맞는 공개 manifest를 내보내 주세요.");
+    }
+    if (value !== "toonspectrum-standard" && rights.redistribution !== true) {
+      throw new Error("재배포를 허용하지 않은 초안을 재배포 가능한 사용권으로 게시할 수 없습니다. 선택한 권리에 맞는 공개 manifest를 내보내 주세요.");
+    }
+    return value;
+  }
+  throw new Error("개인 사용·사용자 정의 등 지원하지 않는 사용권은 자동 변환할 수 없습니다. 선택한 권리에 맞는 공개 manifest를 내보내 주세요.");
+}
+
+export function authoringUpdateResourceId(source: string): string | null {
+  try {
+    const value: unknown = JSON.parse(source);
+    if (!isRecord(value) || value.format !== "toonspectrum.creator-marketplace-authoring"
+      || value.schemaVersion !== 2 || !isRecord(value.release) || value.release.mode !== "update") return null;
+    const id = CreatorMarketplaceResourceIdentitySchema.shape.id.safeParse(value.release.previousResourceId);
+    return id.success ? id.data : null;
+  } catch {
+    return null;
+  }
 }
 
 function authoringEngines(value: unknown): CreatorMarketplaceResourceEngine[] {
@@ -199,6 +220,7 @@ function authoringBrushSnapshot(value: Record<string, unknown>): CreatorMarketpl
 
 function convertAuthoringEnvelope(
   value: Record<string, unknown>,
+  updateParent: CreatorMarketplaceResourceIdentity | null,
 ): CreatorMarketplaceResourceManifest {
   if (
     value.format !== "toonspectrum.creator-marketplace-authoring"
@@ -226,6 +248,20 @@ function convertAuthoringEnvelope(
   const title = boundedText(text(resource.title), 80);
   if (!title) throw new Error("워크숍 에셋 이름을 입력해 주세요.");
   const release = isRecord(value.release) ? value.release : {};
+  let packageId: string;
+  if (release.mode === "update") {
+    const parentId = CreatorMarketplaceResourceIdentitySchema.shape.id.safeParse(release.previousResourceId);
+    if (!parentId.success) throw new Error("업데이트할 기존 릴리스 식별자를 확인해 주세요.");
+    if (!updateParent || updateParent.id !== parentId.data) {
+      throw new Error("업데이트할 기존 에셋을 서버에서 확인한 뒤 게시할 수 있습니다.");
+    }
+    if (updateParent.kind !== resource.kind) throw new Error("업데이트 대상과 초안의 에셋 종류가 다릅니다.");
+    packageId = updateParent.packageId;
+  } else if (release.mode === "new") {
+    packageId = authoringPackageId(text(resource.draftId));
+  } else {
+    throw new Error("새 에셋 또는 기존 에셋 업데이트 중 게시 방식을 선택해 주세요.");
+  }
   const compatibility = isRecord(value.compatibility) ? value.compatibility : {};
   const technical = isRecord(value.technical) ? value.technical : {};
   const payload = CreatorMarketplacePortablePayloadSchema.parse({
@@ -245,7 +281,7 @@ function convertAuthoringEnvelope(
 
   return CreatorMarketplaceResourceManifestSchema.parse({
     schemaVersion: 1,
-    packageId: authoringPackageId(title),
+    packageId,
     name: title,
     description,
     ...(releaseNotes ? { releaseNotes } : {}),
@@ -253,8 +289,8 @@ function convertAuthoringEnvelope(
     resourceVersion: text(release.version) || "1.0.0",
     minimumStudioVersion: text(compatibility.minAppVersion) || "1.0.0",
     tags: uniqueTags(resource.tags),
-    license: authoringLicense(rights.license),
-    attributionText: "",
+    license: authoringLicense(rights),
+    attributionText: text(rights.attributionText),
     containsAi: technical.containsAi === true,
     rightsConfirmed: true,
     provenance: { origin: "original", authoredByPublisher: true },
@@ -281,6 +317,7 @@ function convertAuthoringEnvelope(
  */
 export function parseAuthoritativeMarketManifest(
   source: string,
+  updateParent: CreatorMarketplaceResourceIdentity | null = null,
 ): MarketManifestParseResult {
   const normalized = source.trim();
   if (!normalized) {
@@ -313,7 +350,7 @@ export function parseAuthoritativeMarketManifest(
 
   if (isRecord(value) && value.format === "toonspectrum.creator-marketplace-authoring") {
     try {
-      const manifest = convertAuthoringEnvelope(value);
+      const manifest = convertAuthoringEnvelope(value, updateParent);
       return {
         state: "valid",
         manifest,

@@ -88,6 +88,7 @@ export function useCharacterSurfaceInkRuntime({
 }): CharacterSurfaceInkRuntimeState {
   const [active, setActiveState] = useState(false);
   const [document, setDocument] = useState<CharacterSurfaceInkDocument>(() => createEmptyCharacterSurfaceInkDocument());
+  const [loadedModelKey, setLoadedModelKey] = useState<string | null>(null);
   const [style, setStyleState] = useState<CharacterSurfaceInkStyle>(DEFAULT_STYLE);
   const [notice, setNotice] = useState<string | null>(null);
   const [historyRevision, setHistoryRevision] = useState(0);
@@ -101,25 +102,31 @@ export function useCharacterSurfaceInkRuntime({
   useEffect(() => { styleRef.current = style; }, [style]);
 
   useEffect(() => {
+    let current = true;
     setActiveState(false);
+    setLoadedModelKey(null);
+    setDocument(createEmptyCharacterSurfaceInkDocument());
     historyRef.current = { past: [], future: [] };
     setHistoryRevision((value) => value + 1);
-    try {
-      setDocument(markCharacterSurfaceInkTopology(loadCharacterSurfaceInkDocument(modelKey), modelKey));
+    void loadCharacterSurfaceInkDocument(modelKey).then((loaded) => {
+      if (!current) return;
+      setDocument(markCharacterSurfaceInkTopology(loaded, modelKey));
+      setLoadedModelKey(modelKey);
       setNotice(null);
-    } catch (error) {
-      setDocument(createEmptyCharacterSurfaceInkDocument());
-      setNotice(error instanceof Error ? error.message : "3D 펜선을 읽지 못했습니다.");
-    }
+    }).catch((error: unknown) => {
+      if (current) setNotice(error instanceof Error ? error.message : "3D 펜선을 읽지 못했습니다.");
+    });
+    return () => { current = false; };
   }, [modelKey]);
 
   useEffect(() => {
-    try {
-      saveCharacterSurfaceInkDocument(modelKey, document);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "3D 펜선을 저장하지 못했습니다.");
-    }
-  }, [document, modelKey]);
+    if (loadedModelKey !== modelKey) return;
+    let current = true;
+    void saveCharacterSurfaceInkDocument(modelKey, document).catch((error: unknown) => {
+      if (current) setNotice(`3D 펜선이 저장되지 않았습니다: ${error instanceof Error ? error.message : "SQLite 저장 실패"}`);
+    });
+    return () => { current = false; };
+  }, [document, loadedModelKey, modelKey]);
 
   useEffect(() => {
     const capture = h.captureRef?.current;
@@ -132,13 +139,18 @@ export function useCharacterSurfaceInkRuntime({
     };
   }, [document, h.captureRef, revisionKey]);
 
-  const commitDocument = useCallback((next: CharacterSurfaceInkDocument) => {
+  const commitDocument = useCallback((next: CharacterSurfaceInkDocument): boolean => {
+    if (loadedModelKey !== modelKey) {
+      setNotice("저장된 3D 펜선을 읽은 뒤 편집할 수 있습니다.");
+      return false;
+    }
     historyRef.current.past.push(documentRef.current);
     if (historyRef.current.past.length > 80) historyRef.current.past.shift();
     historyRef.current.future = [];
     setDocument(next);
     setHistoryRevision((value) => value + 1);
-  }, []);
+    return true;
+  }, [loadedModelKey, modelKey]);
 
   useEffect(() => {
     if (!active) return;
@@ -248,7 +260,7 @@ export function useCharacterSurfaceInkRuntime({
 
   const clear = useCallback(() => {
     if (documentRef.current.layers.every((layer) => layer.strokes.length === 0)) return;
-    commitDocument(createEmptyCharacterSurfaceInkDocument());
+    if (!commitDocument(createEmptyCharacterSurfaceInkDocument())) return;
     setNotice("모든 3D 펜선을 지웠습니다.");
   }, [commitDocument]);
 
@@ -258,7 +270,7 @@ export function useCharacterSurfaceInkRuntime({
 
   const importJson = useCallback((value: string): boolean => {
     try {
-      commitDocument(markCharacterSurfaceInkTopology(parseCharacterSurfaceInkDocument(value), modelKey));
+      if (!commitDocument(markCharacterSurfaceInkTopology(parseCharacterSurfaceInkDocument(value), modelKey))) return false;
       setNotice("3D 펜선 문서를 불러왔습니다.");
       return true;
     } catch (error) {
@@ -268,9 +280,13 @@ export function useCharacterSurfaceInkRuntime({
   }, [commitDocument, modelKey]);
 
   const setActive = useCallback((next: boolean) => {
+    if (next && loadedModelKey !== modelKey) {
+      setNotice("저장된 3D 펜선을 읽은 뒤 편집할 수 있습니다.");
+      return;
+    }
     setActiveState(next);
     setNotice(next ? "뷰포트의 캐릭터 표면에 직접 그리세요." : null);
-  }, []);
+  }, [loadedModelKey, modelKey]);
 
   const setStyle = useCallback((patch: Partial<CharacterSurfaceInkStyle>) => {
     setStyleState((current) => Object.freeze({ ...current, ...patch }));

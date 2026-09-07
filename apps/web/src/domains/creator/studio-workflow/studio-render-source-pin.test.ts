@@ -87,6 +87,35 @@ function motionSource(): StudioMotionSourcePinV1 {
 }
 
 describe("Studio render source pins", () => {
+  it.each([
+    ["sourceSceneAssetId", ""],
+    ["sourceSceneRevisionId", "bad revision"],
+    ["sourceSceneContentHash", "sha256:truncated"],
+    ["cameraId", ""],
+    ["poseRevisionId", "bad pose"],
+    ["lightingRevisionId", "bad lighting"],
+    ["renderPresetId", ""],
+    ["engine", "unknown"],
+    ["version", 2],
+  ])("rejects an invalid rendered scene source field: %s", (field, value) => {
+    const receipt = { ...sceneReceipt(), [field]: value } as StudioRenderedSceneReceiptV1;
+    expect(validateStudioRenderedSceneReceipt(receipt)).not.toEqual([]);
+  });
+
+  it("rejects a receipt from another scene even when its revision and bytes match", () => {
+    const receipt = { ...sceneReceipt(), sourceSceneAssetId: "another-scene" };
+    expect(compareStudioSceneReceiptToSource({ source: scene(), receipt })).toEqual({
+      stale: true,
+      reasons: ["scene-asset"],
+    });
+  });
+
+  it("accepts explicitly unpinned optional pose and lighting revisions", () => {
+    expect(validateStudioRenderedSceneReceipt({
+      ...sceneReceipt(), poseRevisionId: null, lightingRevisionId: null,
+    })).toEqual([]);
+  });
+
   it("validates an embedded 3d source and matching render receipt", () => {
     expect(validateStudioEmbeddedSceneReference(scene())).toEqual([]);
     expect(validateStudioRenderedSceneReceipt(sceneReceipt())).toEqual([]);

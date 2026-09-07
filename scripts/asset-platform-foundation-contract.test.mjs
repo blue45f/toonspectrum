@@ -38,8 +38,9 @@ describe("asset platform production migration", () => {
     const manifest = read("scripts/production-database-migrations.manifest")
       .trim()
       .split("\n");
-    expect(manifest.at(-1)).toBe(migrationPath);
-    expect(manifest).toHaveLength(39);
+    expect(manifest[38]).toBe(migrationPath);
+    expect(manifest.at(-1)).toBe("apps/api/src/db/migrations/0040_creator_asset_platform_integrity.sql");
+    expect(manifest).toHaveLength(40);
     expect(new Set(manifest).size).toBe(manifest.length);
   });
 

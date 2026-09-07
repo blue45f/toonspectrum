@@ -61,9 +61,9 @@ function document(eyes: string) {
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
-  getItem(key: string): string | null { return this.values.get(key) ?? null; }
-  setItem(key: string, value: string): void { this.values.set(key, value); }
-  removeItem(key: string): void { this.values.delete(key); }
+  async get(key: string): Promise<string | null> { return this.values.get(key) ?? null; }
+  async set(key: string, value: string): Promise<void> { this.values.set(key, value); }
+  async delete(key: string): Promise<void> { this.values.delete(key); }
 }
 
 describe("character part presets", () => {
@@ -101,10 +101,10 @@ describe("character part presets", () => {
     expect(target.recipe.slots.eyes?.entryId).toBe("eyes:round");
   });
 
-  it("persists bounded presets and replaces them by stable id", () => {
+  it("persists bounded presets and replaces them by stable id", async () => {
     const storage = new MemoryStorage();
-    const store = createCharacterPartPresetStore(() => storage);
-    store.refresh();
+    const store = createCharacterPartPresetStore(async () => storage);
+    await store.refresh();
     const first = createCharacterPartPreset({
       presetId: "eyes:one",
       name: "첫 눈",
@@ -114,14 +114,14 @@ describe("character part presets", () => {
       slot: "eyes",
       now: "2026-09-08T00:00:00.000Z",
     });
-    store.save(first);
-    store.save({ ...first, name: "수정된 눈" });
+    await store.save(first);
+    await store.save({ ...first, name: "수정된 눈" });
     expect(store.getSnapshot().presets).toHaveLength(1);
     expect(store.getSnapshot().presets[0]?.name).toBe("수정된 눈");
     expect(store.getSnapshot().presets[0]?.version).toBe(2);
 
-    const reloaded = createCharacterPartPresetStore(() => storage);
-    reloaded.refresh();
+    const reloaded = createCharacterPartPresetStore(async () => storage);
+    await reloaded.refresh();
     expect(reloaded.list({ slot: "eyes", text: "수정" })).toHaveLength(1);
   });
 });

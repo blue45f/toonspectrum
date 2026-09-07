@@ -72,12 +72,12 @@ function saveLibraryItems(userId: string, items: readonly AcquiredMarketItem[]):
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(cacheKey(userId), JSON.stringify(items));
-    window.dispatchEvent(new CustomEvent(MARKET_LIBRARY_EVENT, {
-      detail: { userId },
-    }));
   } catch {
     // The account operation already succeeded; a presentation-cache failure is non-fatal.
   }
+  window.dispatchEvent(new CustomEvent(MARKET_LIBRARY_EVENT, {
+    detail: { userId },
+  }));
 }
 
 function collectReleaseIds(
@@ -129,66 +129,67 @@ export function useMarketLibrary() {
   const [releaseIds, setReleaseIds] = useState<ReadonlySet<string>>(() => new Set());
   const [serverItemCount, setServerItemCount] = useState(0);
   const [loading, setLoading] = useState(Boolean(userId));
-  const [hydrated, setHydrated] = useState(false);
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
+  const hydrated = userId !== null && hydratedUserId === userId;
 
   useEffect(() => {
     userIdRef.current = userId;
-    const generation = generationRef.current + 1;
-    generationRef.current = generation;
-    const controller = new AbortController();
+    const generation = ++generationRef.current;
+    let controller: AbortController | null = null;
     setItems(getStoredLibraryItems(userId));
     setReleaseIds(new Set());
     setServerItemCount(0);
-    setHydrated(false);
+    setHydratedUserId(null);
     setLoading(Boolean(userId));
 
-    if (!userId) {
-      setLoading(false);
-      return () => controller.abort();
-    }
+    if (!userId) return;
 
-    void listAllLibraryItems(controller.signal)
-      .then((cloudItems) => {
-        if (controller.signal.aborted || generationRef.current !== generation) return;
-        const nextReleaseIds = new Set<string>();
-        for (const item of cloudItems) collectReleaseIds(nextReleaseIds, item);
-        setReleaseIds(nextReleaseIds);
-        setServerItemCount(cloudItems.length);
-        setHydrated(true);
-      })
-      .catch(() => {
-        if (controller.signal.aborted || generationRef.current !== generation) return;
-        setReleaseIds(new Set());
-        setServerItemCount(0);
-        setHydrated(false);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted && generationRef.current === generation) {
-          setLoading(false);
-        }
-      });
+    const hydrate = () => {
+      controller?.abort();
+      const request = new AbortController();
+      controller = request;
+      setItems(getStoredLibraryItems(userId));
+      setLoading(true);
+      // An event only invalidates this account's cache; only the API can confirm ownership.
+      void listAllLibraryItems(request.signal)
+        .then((cloudItems) => {
+          if (request.signal.aborted || generationRef.current !== generation) return;
+          const nextReleaseIds = new Set<string>();
+          for (const item of cloudItems) collectReleaseIds(nextReleaseIds, item);
+          setReleaseIds(nextReleaseIds);
+          setServerItemCount(cloudItems.length);
+          setHydratedUserId(userId);
+        })
+        .catch(() => {
+          if (request.signal.aborted || generationRef.current !== generation) return;
+          setReleaseIds(new Set());
+          setServerItemCount(0);
+          setHydratedUserId(null);
+        })
+        .finally(() => {
+          if (!request.signal.aborted && generationRef.current === generation) {
+            setLoading(false);
+          }
+        });
+    };
 
-    return () => controller.abort();
-  }, [userId]);
-
-  useEffect(() => {
     const onUpdate = (event: Event) => {
       const detail = (event as CustomEvent<{ userId?: unknown }>).detail;
-      if (detail?.userId !== userIdRef.current || !userIdRef.current) return;
-      setItems(getStoredLibraryItems(userIdRef.current));
+      if (detail?.userId === userId) hydrate();
     };
     const onStorage = (event: StorageEvent) => {
-      const activeUserId = userIdRef.current;
-      if (!activeUserId || event.key !== cacheKey(activeUserId)) return;
-      setItems(getStoredLibraryItems(activeUserId));
+      if (event.key === cacheKey(userId)) hydrate();
     };
     window.addEventListener(MARKET_LIBRARY_EVENT, onUpdate);
     window.addEventListener("storage", onStorage);
+    hydrate();
     return () => {
+      controller?.abort();
+      generationRef.current += 1;
       window.removeEventListener(MARKET_LIBRARY_EVENT, onUpdate);
       window.removeEventListener("storage", onStorage);
     };
-  }, []);
+  }, [userId]);
 
   const isAcquired = useCallback(
     (resourceId: string) => hydrated && releaseIds.has(resourceId),
@@ -213,7 +214,7 @@ export function useMarketLibrary() {
       ) return false;
 
       setReleaseIds((current) => new Set([...current, record.id]));
-      setHydrated(true);
+      setHydratedUserId(activeUserId);
       setServerItemCount((current) => current + (receipt.changed ? 1 : 0));
 
       const current = getStoredLibraryItems(activeUserId);
@@ -258,11 +259,12 @@ export function useMarketLibrary() {
     setItems(next);
   }, []);
 
+  const visibleItems = hydrated ? items : [];
   return {
-    items,
-    activeItems: items.filter((item) => !item.archived),
-    archivedItems: items.filter((item) => item.archived),
-    totalCount: serverItemCount,
+    items: visibleItems,
+    activeItems: visibleItems.filter((item) => !item.archived),
+    archivedItems: visibleItems.filter((item) => item.archived),
+    totalCount: hydrated ? serverItemCount : 0,
     loading,
     hydrated,
     isAcquired,

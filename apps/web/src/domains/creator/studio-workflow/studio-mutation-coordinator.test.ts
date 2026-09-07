@@ -80,6 +80,74 @@ function durability(existing: StudioMutationReceipt | null = null) {
 }
 
 describe("Studio mutation coordinator", () => {
+  it.each(["duplicate", "stale", "failed-first"] as const)(
+    "serializes concurrent requests through durable completion: %s",
+    async (scenario) => {
+      let pageState = { count: 0 };
+      let sequence = 0;
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const port = createStudioExistingReducerDomainPort({
+        domain: "page-state",
+        getSnapshot: () => pageState,
+        reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
+        replaceSnapshot: (snapshot) => { pageState = snapshot; },
+      });
+      const store = durability();
+      const persist = store.commit;
+      let commits = 0;
+      const commit = vi.fn<StudioMutationDurabilityPort["commit"]>(async (...args) => {
+        commits += 1;
+        if (commits === 1) {
+          entered.resolve();
+          await release.promise;
+          if (scenario === "failed-first") throw new Error("first write failed");
+        }
+        if (await store.findCommittedReceipt(args[0].idempotencyKey)) {
+          throw new Error("duplicate durable receipt");
+        }
+        await persist(...args);
+        sequence = args[1].localSequence;
+      });
+      const coordinator = createStudioMutationCoordinator({
+        domains: [port],
+        durability: { ...store, commit },
+        getCurrentCoordinates: () => coordinates(sequence),
+      });
+      const first = envelope([command("command-page", "page-state", "page-state/add-frame")]);
+      const second = scenario === "duplicate" ? first : {
+        ...first,
+        mutationId: "mutation-2",
+        transactionId: "transaction-2",
+        idempotencyKey: "idempotency-2",
+      };
+      const results = Promise.allSettled([
+        coordinator.execute(first),
+        coordinator.execute(second),
+      ]);
+      await entered.promise;
+      release.resolve();
+      const [a, b] = await results;
+
+      expect(pageState.count).toBe(1);
+      expect(sequence).toBe(1);
+      if (scenario === "duplicate") {
+        expect(a).toMatchObject({ status: "fulfilled", value: { status: "committed" } });
+        expect(b).toMatchObject({ status: "fulfilled", value: { status: "idempotent-replay" } });
+        expect(commit).toHaveBeenCalledOnce();
+        expect(store.abort).not.toHaveBeenCalled();
+      } else if (scenario === "stale") {
+        expect(a.status).toBe("fulfilled");
+        expect(b).toMatchObject({ status: "rejected", reason: expect.any(StudioMutationConflictError) });
+        expect(commit).toHaveBeenCalledOnce();
+      } else {
+        expect(a).toMatchObject({ status: "rejected", reason: new Error("first write failed") });
+        expect(b).toMatchObject({ status: "fulfilled", value: { status: "committed" } });
+        expect(store.abort).toHaveBeenCalledOnce();
+      }
+    },
+  );
+
   it("commits multiple domains as one local sequence and atomically records one server outbox", async () => {
     let pageState = { count: 0 };
     let identityState = { count: 0 };

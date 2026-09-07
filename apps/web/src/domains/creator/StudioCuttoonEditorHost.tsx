@@ -18805,22 +18805,23 @@ const puppetWarpArmed =
     if (!canApplyStudioMutation(mutationTicket)) return;
     addEl({ id: uid(), type: "text", ...createSfxTextConfig(preset, cx - 110, cy - 50) });
   }
-  function addBgScene(bg: StudioBgScene) {
-    setMenu(null);
+  function addBgScene(bg: StudioBgScene): boolean {
     // 토스 WebView(교차 출처)에서 root-relative /assets 가 404 → resolveAssetUrl 로 배포 오리진에 절대화.
     // svgToDataUrl 결과(data: URL)나 웹(동일 출처)에선 무변경(no-op).
     const src = resolveAssetUrl(bg.imgSrc || svgToDataUrl(bg.svg || ""));
     if (selected?.type === "frame") {
-      patchEl(selected.id, { bg: src } as Partial<El>);
+      if (!patchEl(selected.id, { bg: src } as Partial<El>)) return false;
+      setMenu(null);
       setTool("select");
-      return;
+      return true;
     }
     // 패널이 있으면 한 번 클릭으로 모든 패널에 배경을 깔아 바로 웹툰 느낌(쉽게). 개별 변경은 패널 선택 후.
     const frames = elements.filter((e) => e.type === "frame");
     if (frames.length > 0) {
-      commit(elements.map((e) => (e.type === "frame" ? ({ ...e, bg: src } as El) : e)));
+      if (!commit(elements.map((e) => (e.type === "frame" ? ({ ...e, bg: src } as El) : e)))) return false;
+      setMenu(null);
       setTool("select");
-      return;
+      return true;
     }
     const el = createStudio2dCanvasImage(bg, {
       id: uid(),
@@ -18828,9 +18829,11 @@ const puppetWarpArmed =
       canvasWidth: CANVAS_W,
       canvasHeight: canvasH,
     });
-    commit([el, ...elements]);
+    if (!commit([el, ...elements])) return false;
+    setMenu(null);
     setSelectedId(el.id);
     setTool("select");
+    return true;
   }
 
   // AI로 생성된 배경 이미지를 삽입 — addBgScene과 동일한 배치 정책(선택된 프레임이 있으면 그 칸만,
@@ -20108,9 +20111,8 @@ const puppetWarpArmed =
     markStudioDocumentChanged,
   });
 
-  function addCatalogElement(item: { svg: string; width: number; height: number; label: string }) {
-    setMenu(null);
-    addEl(
+  function addCatalogElement(item: { svg: string; width: number; height: number; label: string }): boolean {
+    const accepted = addEl(
       createCanvasImageElement({
         id: uid(),
         src: svgToDataUrl(item.svg),
@@ -20122,6 +20124,8 @@ const puppetWarpArmed =
         placement: nextAssetInsertionPlacement(),
       })
     );
+    if (accepted) setMenu(null);
+    return accepted;
   }
 
   /** Elements 3D object rail / canvas drop → production BG3D or VRM with one-shot seed. */

@@ -312,108 +312,116 @@ export function createStudioMutationCoordinator(
 ) {
   const ports = new Map(options.domains.map((port) => [port.domain, port]));
 
-  return {
-    async execute(envelope: StudioMutationEnvelopeV2): Promise<StudioMutationReceipt> {
-      const existing = await options.durability.findCommittedReceipt(envelope.idempotencyKey);
-      if (existing) {
-        return { ...existing, status: "idempotent-replay" };
-      }
+  async function executeMutation(envelope: StudioMutationEnvelopeV2): Promise<StudioMutationReceipt> {
+    const existing = await options.durability.findCommittedReceipt(envelope.idempotencyKey);
+    if (existing) {
+      return { ...existing, status: "idempotent-replay" };
+    }
 
-      const current = options.getCurrentCoordinates();
-      const envelopeIssues = validateStudioMutationEnvelope(
-        envelope,
-        current,
-        options.domains,
+    const current = options.getCurrentCoordinates();
+    const envelopeIssues = validateStudioMutationEnvelope(
+      envelope,
+      current,
+      options.domains,
+    );
+    if (envelopeIssues.length > 0) {
+      throw new StudioMutationConflictError(envelopeIssues);
+    }
+
+    const commandsByDomain = new Map<StudioMutationDomain, StudioDomainCommand[]>();
+    for (const command of envelope.commands) {
+      const commands = commandsByDomain.get(command.domain) ?? [];
+      commands.push(command);
+      commandsByDomain.set(command.domain, commands);
+    }
+
+    const prepared: StudioPreparedDomainMutation[] = [];
+    for (const [domain, commands] of commandsByDomain) {
+      const port = ports.get(domain);
+      if (!port) {
+        throw new StudioMutationConflictError([{
+          code: "missing-domain-port",
+          domain,
+          message: `No mutation port is registered for ${domain}.`,
+        }]);
+      }
+      const result = await port.prepare(port.getSnapshot(), commands);
+      if (result.domain !== domain) {
+        throw new Error(`Mutation port ${domain} prepared ${result.domain}.`);
+      }
+      prepared.push(result);
+    }
+
+    const projected = new Map(prepared.map((item) => [item.domain, item]));
+    const invariantIssues = await options.validateProjectedState?.(projected, envelope) ?? [];
+    if (invariantIssues.length > 0) {
+      throw new StudioMutationConflictError(invariantIssues.map((message) => ({
+        code: "cross-domain-invariant" as const,
+        message,
+      })));
+    }
+
+    const record: StudioMutationCommitRecord = {
+      mutationId: envelope.mutationId,
+      transactionId: envelope.transactionId,
+      idempotencyKey: envelope.idempotencyKey,
+      workScope: workScopeKey(envelope.workScope),
+      baseLocalSequence: current.local.sequence,
+      nextLocalSequence: current.local.sequence + 1,
+      commandCount: envelope.commands.length,
+      domains: prepared.map((item) => item.domain),
+      createdAt: envelope.createdAt,
+    };
+    const shouldSync = envelope.workScope.kind !== "draft";
+    const receipt: StudioMutationReceipt = {
+      mutationId: envelope.mutationId,
+      transactionId: envelope.transactionId,
+      status: "committed",
+      localSequence: record.nextLocalSequence,
+      serverSyncState: shouldSync ? "queued" : "none",
+      affectedSemanticIds: distinct([
+        ...envelope.affectedSemanticIds,
+        ...envelope.commands.flatMap((command) => command.affectedSemanticIds),
+      ]),
+      committedDomains: prepared.filter((item) => item.changed).map((item) => item.domain),
+    };
+
+    await options.durability.begin(record);
+    const committed: StudioPreparedDomainMutation[] = [];
+    try {
+      await options.durability.appendPrepared(record, prepared);
+      for (const item of prepared) {
+        if (!item.changed) continue;
+        const port = ports.get(item.domain);
+        if (!port) throw new Error(`Mutation port disappeared: ${item.domain}`);
+        await port.commit(item.nextSnapshot);
+        committed.push(item);
+      }
+      await options.durability.commit(
+        record,
+        receipt,
+        shouldSync ? envelope : null,
       );
-      if (envelopeIssues.length > 0) {
-        throw new StudioMutationConflictError(envelopeIssues);
-      }
-
-      const commandsByDomain = new Map<StudioMutationDomain, StudioDomainCommand[]>();
-      for (const command of envelope.commands) {
-        const commands = commandsByDomain.get(command.domain) ?? [];
-        commands.push(command);
-        commandsByDomain.set(command.domain, commands);
-      }
-
-      const prepared: StudioPreparedDomainMutation[] = [];
-      for (const [domain, commands] of commandsByDomain) {
-        const port = ports.get(domain);
-        if (!port) {
-          throw new StudioMutationConflictError([{
-            code: "missing-domain-port",
-            domain,
-            message: `No mutation port is registered for ${domain}.`,
-          }]);
-        }
-        const result = await port.prepare(port.getSnapshot(), commands);
-        if (result.domain !== domain) {
-          throw new Error(`Mutation port ${domain} prepared ${result.domain}.`);
-        }
-        prepared.push(result);
-      }
-
-      const projected = new Map(prepared.map((item) => [item.domain, item]));
-      const invariantIssues = await options.validateProjectedState?.(projected, envelope) ?? [];
-      if (invariantIssues.length > 0) {
-        throw new StudioMutationConflictError(invariantIssues.map((message) => ({
-          code: "cross-domain-invariant" as const,
-          message,
-        })));
-      }
-
-      const record: StudioMutationCommitRecord = {
-        mutationId: envelope.mutationId,
-        transactionId: envelope.transactionId,
-        idempotencyKey: envelope.idempotencyKey,
-        workScope: workScopeKey(envelope.workScope),
-        baseLocalSequence: current.local.sequence,
-        nextLocalSequence: current.local.sequence + 1,
-        commandCount: envelope.commands.length,
-        domains: prepared.map((item) => item.domain),
-        createdAt: envelope.createdAt,
-      };
-      const shouldSync = envelope.workScope.kind !== "draft";
-      const receipt: StudioMutationReceipt = {
-        mutationId: envelope.mutationId,
-        transactionId: envelope.transactionId,
-        status: "committed",
-        localSequence: record.nextLocalSequence,
-        serverSyncState: shouldSync ? "queued" : "none",
-        affectedSemanticIds: distinct([
-          ...envelope.affectedSemanticIds,
-          ...envelope.commands.flatMap((command) => command.affectedSemanticIds),
-        ]),
-        committedDomains: prepared.filter((item) => item.changed).map((item) => item.domain),
-      };
-
-      await options.durability.begin(record);
-      const committed: StudioPreparedDomainMutation[] = [];
+      return receipt;
+    } catch (error) {
       try {
-        await options.durability.appendPrepared(record, prepared);
-        for (const item of prepared) {
-          if (!item.changed) continue;
-          const port = ports.get(item.domain);
-          if (!port) throw new Error(`Mutation port disappeared: ${item.domain}`);
-          await port.commit(item.nextSnapshot);
-          committed.push(item);
-        }
-        await options.durability.commit(
-          record,
-          receipt,
-          shouldSync ? envelope : null,
-        );
-        return receipt;
-      } catch (error) {
-        try {
-          await rollbackCommittedDomains(committed, ports);
-        } catch (rollbackError) {
-          await options.durability.abort(record, rollbackError);
-          throw rollbackError;
-        }
-        await options.durability.abort(record, error);
-        throw error;
+        await rollbackCommittedDomains(committed, ports);
+      } catch (rollbackError) {
+        await options.durability.abort(record, rollbackError);
+        throw rollbackError;
       }
+      await options.durability.abort(record, error);
+      throw error;
+    }
+  }
+
+  let executionTail: Promise<void> = Promise.resolve();
+  return {
+    execute(envelope: StudioMutationEnvelopeV2): Promise<StudioMutationReceipt> {
+      // Include receipt lookup and rollback so a losing write cannot restore over a later commit.
+      const result = executionTail.then(() => executeMutation(envelope));
+      executionTail = result.then(() => undefined, () => undefined);
+      return result;
     },
   };
 }

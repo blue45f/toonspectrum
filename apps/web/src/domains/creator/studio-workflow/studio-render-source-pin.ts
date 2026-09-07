@@ -58,6 +58,7 @@ export interface StudioMotionRenderReceiptV1 {
 }
 
 export type StudioRenderStaleReason =
+  | "scene-asset"
   | "scene-revision"
   | "scene-content-hash"
   | "engine"
@@ -94,6 +95,7 @@ export interface StudioRenderSourceIssue {
 }
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,239}$/u;
+const SHA256 = /^sha256:[a-f0-9]{64}$/u;
 
 function validTimestamp(value: string): boolean {
   if (!Number.isFinite(Date.parse(value))) return false;
@@ -152,6 +154,30 @@ export function validateStudioRenderedSceneReceipt(
       message: "Rendered scene receipt identifier or timestamp is invalid.",
     });
   }
+  for (const field of [
+    "sourceSceneAssetId", "sourceSceneRevisionId", "cameraId", "renderPresetId",
+    "poseRevisionId", "lightingRevisionId",
+  ] as const) {
+    const value = receipt[field];
+    if (value === null && (field === "poseRevisionId" || field === "lightingRevisionId")) continue;
+    if (typeof value === "string" && SAFE_ID.test(value)) continue;
+    issues.push({
+      code: "invalid-id",
+      path: `sceneReceipt.${field}`,
+      message: "Rendered scene source identifier is invalid.",
+    });
+  }
+  if (
+    receipt.version !== 1
+    || (receipt.engine !== "three" && receipt.engine !== "babylon")
+    || !SHA256.test(receipt.sourceSceneContentHash)
+  ) {
+    issues.push({
+      code: "invalid-source-asset",
+      path: "sceneReceipt",
+      message: "Rendered scene receipt must pin a supported source format, engine, and canonical sha256 digest.",
+    });
+  }
   for (const [path, asset] of [
     ["output", receipt.output],
     ["depth", receipt.depth],
@@ -175,6 +201,9 @@ export function compareStudioSceneReceiptToSource(input: {
   readonly receipt: StudioRenderedSceneReceiptV1;
 }): StudioRenderStaleness {
   const reasons = new Set<StudioRenderStaleReason>();
+  if (input.receipt.sourceSceneAssetId !== input.source.sceneAsset.assetId) {
+    reasons.add("scene-asset");
+  }
   if (input.receipt.sourceSceneRevisionId !== input.source.sceneAsset.revisionId) {
     reasons.add("scene-revision");
   }

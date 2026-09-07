@@ -5,15 +5,12 @@ import {
 
 import type { CharacterPartPresetV1, CharacterPresetScope } from "./character-part-preset";
 
-export const CHARACTER_PART_PRESET_STORAGE_KEY = "toonstudio.character-part-presets.v1";
+import type { StudioAsyncKeyValueStore } from "../../studio-local-database";
+
+export const CHARACTER_PART_PRESET_SQLITE_NAMESPACE = "studio-character-part-presets-v12";
+export const CHARACTER_PART_PRESET_STORAGE_KEY = "library-v1";
 const MAX_PRESETS = 500;
 const MAX_SERIALIZED_BYTES = 2 * 1024 * 1024;
-
-export interface CharacterPresetStorageLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem?(key: string): void;
-}
 
 export interface CharacterPartPresetStoreSnapshot {
   readonly presets: readonly CharacterPartPresetV1[];
@@ -32,11 +29,11 @@ export interface CharacterPartPresetQuery {
 export interface CharacterPartPresetStore {
   getSnapshot(): CharacterPartPresetStoreSnapshot;
   subscribe(listener: () => void): () => void;
-  refresh(): void;
+  refresh(): Promise<void>;
   list(query?: CharacterPartPresetQuery): readonly CharacterPartPresetV1[];
-  save(preset: CharacterPartPresetV1): CharacterPartPresetStoreSnapshot;
-  remove(presetId: string): CharacterPartPresetStoreSnapshot;
-  clear(): CharacterPartPresetStoreSnapshot;
+  save(preset: CharacterPartPresetV1): Promise<CharacterPartPresetStoreSnapshot>;
+  remove(presetId: string): Promise<CharacterPartPresetStoreSnapshot>;
+  clear(): Promise<CharacterPartPresetStoreSnapshot>;
 }
 
 const EMPTY_SNAPSHOT: CharacterPartPresetStoreSnapshot = Object.freeze({
@@ -92,57 +89,51 @@ function queryPresets(
   }));
 }
 
+async function acquirePresetStorage(): Promise<StudioAsyncKeyValueStore> {
+  const { acquireStudioLocalDatabase } = await import("../../studio-local-database-runtime");
+  return (await acquireStudioLocalDatabase()).asAsyncKeyValueStore(CHARACTER_PART_PRESET_SQLITE_NAMESPACE);
+}
+
 export function createCharacterPartPresetStore(
-  storageFactory: () => CharacterPresetStorageLike | null,
+  storageFactory: () => Promise<StudioAsyncKeyValueStore> = acquirePresetStorage,
 ): CharacterPartPresetStore {
   const listeners = new Set<() => void>();
   let snapshot = EMPTY_SNAPSHOT;
+  let tail: Promise<unknown> = Promise.resolve();
 
+  const enqueue = <T>(operation: () => Promise<T>): Promise<T> => {
+    const result = tail.then(operation, operation);
+    tail = result;
+    return result;
+  };
   const publish = (next: CharacterPartPresetStoreSnapshot): CharacterPartPresetStoreSnapshot => {
     snapshot = Object.freeze(next);
     for (const listener of listeners) listener();
     return snapshot;
   };
-
-  const persist = (presets: readonly CharacterPartPresetV1[]): CharacterPartPresetStoreSnapshot => {
+  const failure = (error: unknown): CharacterPartPresetStoreSnapshot => publish({
+    ...snapshot,
+    status: "error",
+    message: error instanceof Error ? error.message : "프리셋 SQLite 저장소를 사용하지 못했습니다.",
+    revision: snapshot.revision + 1,
+  });
+  const ready = (presets: readonly CharacterPartPresetV1[]) => publish({
+    presets: sortPresets(presets), status: "ready", message: null, revision: snapshot.revision + 1,
+  });
+  const mutate = (update: (presets: readonly CharacterPartPresetV1[]) => readonly CharacterPartPresetV1[]) => enqueue(async () => {
     try {
-      const storage = storageFactory();
-      if (!storage) throw new Error("이 환경에서는 프리셋을 저장할 수 없습니다.");
+      const storage = await storageFactory();
+      const presets = update(parseStored(await storage.get(CHARACTER_PART_PRESET_STORAGE_KEY)));
       const serialized = JSON.stringify(presets);
       if (new TextEncoder().encode(serialized).byteLength > MAX_SERIALIZED_BYTES) {
         throw new Error("프리셋 저장 공간이 가득 찼습니다. 사용하지 않는 프리셋을 삭제해 주세요.");
       }
-      storage.setItem(CHARACTER_PART_PRESET_STORAGE_KEY, serialized);
-      return publish({
-        presets: sortPresets(presets),
-        status: "ready",
-        message: null,
-        revision: snapshot.revision + 1,
-      });
+      await storage.set(CHARACTER_PART_PRESET_STORAGE_KEY, serialized);
+      return ready(presets);
     } catch (error) {
-      return publish({
-        ...snapshot,
-        status: "error",
-        message: error instanceof Error ? error.message : "프리셋을 저장하지 못했습니다.",
-        revision: snapshot.revision + 1,
-      });
+      return failure(error);
     }
-  };
-
-  const refresh = (): void => {
-    try {
-      const storage = storageFactory();
-      const presets = storage ? parseStored(storage.getItem(CHARACTER_PART_PRESET_STORAGE_KEY)) : Object.freeze([]);
-      publish({ presets, status: "ready", message: null, revision: snapshot.revision + 1 });
-    } catch (error) {
-      publish({
-        presets: Object.freeze([]),
-        status: "error",
-        message: error instanceof Error ? error.message : "프리셋을 읽지 못했습니다.",
-        revision: snapshot.revision + 1,
-      });
-    }
-  };
+  });
 
   return Object.freeze({
     getSnapshot: () => snapshot,
@@ -150,34 +141,40 @@ export function createCharacterPartPresetStore(
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    refresh,
+    refresh: () => enqueue(async () => {
+      try {
+        const storage = await storageFactory();
+        ready(parseStored(await storage.get(CHARACTER_PART_PRESET_STORAGE_KEY)));
+      } catch (error) {
+        failure(error);
+      }
+    }),
     list(query: CharacterPartPresetQuery = {}) {
       return queryPresets(snapshot.presets, query);
     },
     save(presetInput: CharacterPartPresetV1) {
       const preset = parseCharacterPartPresetV1(presetInput);
-      const existing = snapshot.presets.find((item) => item.presetId === preset.presetId);
-      const nextPreset: CharacterPartPresetV1 = existing
-        ? Object.freeze({
-            ...preset,
-            version: existing.version + 1,
-            createdAt: existing.createdAt,
-            updatedAt: new Date().toISOString(),
-          })
-        : preset;
-      const next = [nextPreset, ...snapshot.presets.filter((item) => item.presetId !== preset.presetId)].slice(0, MAX_PRESETS);
-      return persist(next);
+      return mutate((presets) => {
+        const existing = presets.find((item) => item.presetId === preset.presetId);
+        const nextPreset: CharacterPartPresetV1 = existing
+          ? Object.freeze({
+              ...preset,
+              version: existing.version + 1,
+              createdAt: existing.createdAt,
+              updatedAt: new Date().toISOString(),
+            })
+          : preset;
+        return [nextPreset, ...presets.filter((item) => item.presetId !== preset.presetId)].slice(0, MAX_PRESETS);
+      });
     },
-    remove(presetId: string) {
-      return persist(snapshot.presets.filter((item) => item.presetId !== presetId));
-    },
-    clear() {
+    remove: (presetId: string) => mutate((presets) => presets.filter((item) => item.presetId !== presetId)),
+    clear: () => enqueue(async () => {
       try {
-        storageFactory()?.removeItem?.(CHARACTER_PART_PRESET_STORAGE_KEY);
-      } catch {
-        return publish({ ...snapshot, status: "error", message: "프리셋을 지우지 못했습니다.", revision: snapshot.revision + 1 });
+        await (await storageFactory()).delete(CHARACTER_PART_PRESET_STORAGE_KEY);
+        return ready([]);
+      } catch (error) {
+        return failure(error);
       }
-      return publish({ presets: Object.freeze([]), status: "ready", message: null, revision: snapshot.revision + 1 });
-    },
+    }),
   });
 }

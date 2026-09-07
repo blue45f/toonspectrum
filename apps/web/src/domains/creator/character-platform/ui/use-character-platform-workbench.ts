@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Euler, Quaternion, Vector3 } from "three";
 
 import { createCharacterCompatibilityReport } from "../compatibility/character-compatibility-report";
@@ -29,12 +29,12 @@ import type {
   CharacterHostSnapshot,
   CharacterSlotKind,
 } from "../../character-shaper/character-shaper-contract";
+import type { StudioAsyncKeyValueStore } from "../../studio-local-database";
 import type { StudioVrmPoserHost } from "../../vrm/StudioVrmPoserHost";
 
-const PRESET_STORE = createCharacterPartPresetStore(
-  () => (typeof window === "undefined" ? null : window.localStorage),
-);
-const MANIFEST_STORAGE_PREFIX = "toonstudio.character-canonical-manifest.v2:";
+const PRESET_STORE = createCharacterPartPresetStore();
+const MANIFEST_SQLITE_NAMESPACE = "studio-character-canonical-manifests-v12";
+let manifestTail: Promise<unknown> = Promise.resolve();
 
 const ALL_POSE_REGIONS: readonly CharacterPoseRegion[] = Object.freeze([
   "head",
@@ -62,43 +62,42 @@ export interface CharacterPlatformWorkbenchState {
   ) => void;
   readonly surfaceInk: ReturnType<typeof useCharacterSurfaceInkRuntime>;
   readonly notice: string | null;
-  readonly importCanonicalManifest: (json: string) => boolean;
-  readonly removeCanonicalManifest: () => void;
+  readonly importCanonicalManifest: (json: string) => Promise<boolean>;
+  readonly removeCanonicalManifest: () => Promise<void>;
   readonly exportCanonicalManifest: () => string | null;
-  readonly saveSlotPreset: (slot: CharacterSlotKind, name: string) => boolean;
+  readonly saveSlotPreset: (slot: CharacterSlotKind, name: string) => Promise<boolean>;
   readonly applyPreset: (preset: CharacterPartPresetV1) => boolean;
-  readonly removePreset: (presetId: string) => void;
+  readonly removePreset: (presetId: string) => Promise<void>;
   readonly exportPresets: () => string;
-  readonly importPresets: (json: string) => number;
+  readonly importPresets: (json: string) => Promise<number>;
   readonly stabilizeCurrentPose: () => boolean;
 }
 
-function manifestStorageKey(modelId: string): string {
-  return `${MANIFEST_STORAGE_PREFIX}${modelId}`;
+function withManifestStorage<T>(operation: (storage: StudioAsyncKeyValueStore) => Promise<T>): Promise<T> {
+  const run = async () => {
+    const { acquireStudioLocalDatabase } = await import("../../studio-local-database-runtime");
+    return operation((await acquireStudioLocalDatabase()).asAsyncKeyValueStore(MANIFEST_SQLITE_NAMESPACE));
+  };
+  const result = manifestTail.then(run, run);
+  manifestTail = result.then(() => undefined, () => undefined);
+  return result;
 }
 
-function readManifest(modelId: string): CharacterCanonicalManifestV2 | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(manifestStorageKey(modelId));
-  if (!raw) return null;
-  const parsed = parseCharacterCanonicalManifestV2(JSON.parse(raw));
-  if (parsed.identity.assetId !== modelId) {
-    throw new Error(
-      `매니페스트 대상 ${parsed.identity.assetId}과 현재 모델 ${modelId}이 다릅니다.`,
-    );
-  }
-  return parsed;
+function readManifest(modelId: string): Promise<CharacterCanonicalManifestV2 | null> {
+  return withManifestStorage(async (storage) => {
+    const raw = await storage.get(modelId);
+    if (!raw) return null;
+    const parsed = parseCharacterCanonicalManifestV2(JSON.parse(raw));
+    if (parsed.identity.assetId !== modelId) {
+      throw new Error(`매니페스트 대상 ${parsed.identity.assetId}과 현재 모델 ${modelId}이 다릅니다.`);
+    }
+    return parsed;
+  });
 }
 
-function saveManifest(
-  modelId: string,
-  manifest: CharacterCanonicalManifestV2,
-): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(
-    manifestStorageKey(modelId),
-    JSON.stringify(manifest),
-  );
+function saveManifest(modelId: string, manifest: CharacterCanonicalManifestV2): Promise<void> {
+  const serialized = JSON.stringify(manifest);
+  return withManifestStorage((storage) => storage.set(modelId, serialized));
 }
 
 function activeModelId(
@@ -250,7 +249,9 @@ export function useCharacterPlatformWorkbench(
   binding: CharacterShaperBinding,
 ): CharacterPlatformWorkbenchState {
   const modelId = activeModelId(h, binding);
-  const documentClock = useMemo(() => new Date().toISOString(), [modelId]);
+  const scopeRef = useRef({ active: false });
+  const manifestGenerationRef = useRef(0);
+  const documentClock = useMemo(() => ({ modelId, createdAt: new Date().toISOString() }), [modelId]);
   const [canonicalManifest, setCanonicalManifest] =
     useState<CharacterCanonicalManifestV2 | null>(null);
   const [canonicalError, setCanonicalError] = useState<string | null>(null);
@@ -265,20 +266,22 @@ export function useCharacterPlatformWorkbench(
   );
 
   useEffect(() => {
-    PRESET_STORE.refresh();
+    void PRESET_STORE.refresh();
   }, []);
   useEffect(() => {
-    try {
-      setCanonicalManifest(readManifest(modelId));
-      setCanonicalError(null);
-    } catch (error) {
-      setCanonicalManifest(null);
-      setCanonicalError(
-        error instanceof Error
-          ? error.message
-          : "공식 캐릭터 매니페스트를 읽지 못했습니다.",
-      );
-    }
+    const scope = { active: true };
+    scopeRef.current = scope;
+    const generation = ++manifestGenerationRef.current;
+    setCanonicalManifest(null);
+    setCanonicalError(null);
+    void readManifest(modelId).then((manifest) => {
+      if (scope.active && generation === manifestGenerationRef.current) setCanonicalManifest(manifest);
+    }).catch((error: unknown) => {
+      if (scope.active && generation === manifestGenerationRef.current) {
+        setCanonicalError(error instanceof Error ? error.message : "공식 캐릭터 매니페스트를 읽지 못했습니다.");
+      }
+    });
+    return () => { scope.active = false; };
   }, [modelId]);
 
   const compatibility = useMemo(
@@ -309,7 +312,7 @@ export function useCharacterPlatformWorkbench(
             ? h.insertBackgroundColor
             : "#ffffff",
         revision: binding.history.length,
-        now: documentClock,
+        now: documentClock.createdAt,
       }),
     [
       binding.history.length,
@@ -353,7 +356,9 @@ export function useCharacterPlatformWorkbench(
   );
 
   const importCanonicalManifest = useCallback(
-    (json: string): boolean => {
+    async (json: string): Promise<boolean> => {
+      const scope = scopeRef.current;
+      const generation = ++manifestGenerationRef.current;
       try {
         const parsed = parseCharacterCanonicalManifestV2(JSON.parse(json));
         if (parsed.identity.assetId !== modelId) {
@@ -361,12 +366,15 @@ export function useCharacterPlatformWorkbench(
             `현재 모델 식별자는 ${modelId}입니다. 매니페스트의 assetId를 확인해 주세요.`,
           );
         }
-        saveManifest(modelId, parsed);
+        await saveManifest(modelId, parsed);
+        if (!scope.active) return false;
         setCanonicalManifest(parsed);
+        if (generation !== manifestGenerationRef.current) return false;
         setCanonicalError(null);
         setNotice("공식 캐릭터 매니페스트를 연결했습니다.");
         return true;
       } catch (error) {
+        if (!scope.active || generation !== manifestGenerationRef.current) return false;
         const message =
           error instanceof Error
             ? error.message
@@ -379,17 +387,27 @@ export function useCharacterPlatformWorkbench(
     [modelId],
   );
 
-  const removeCanonicalManifest = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(manifestStorageKey(modelId));
+  const removeCanonicalManifest = useCallback(async () => {
+    const scope = scopeRef.current;
+    const generation = ++manifestGenerationRef.current;
+    try {
+      await withManifestStorage((storage) => storage.delete(modelId));
+      if (!scope.active) return;
+      setCanonicalManifest(null);
+      if (generation !== manifestGenerationRef.current) return;
+      setCanonicalError(null);
+      setNotice("공식 캐릭터 연결을 해제하고 호환 모드로 전환했습니다.");
+    } catch (error) {
+      if (!scope.active || generation !== manifestGenerationRef.current) return;
+      const message = error instanceof Error ? error.message : "공식 캐릭터 연결을 해제하지 못했습니다.";
+      setCanonicalError(message);
+      setNotice(message);
     }
-    setCanonicalManifest(null);
-    setCanonicalError(null);
-    setNotice("공식 캐릭터 연결을 해제하고 호환 모드로 전환했습니다.");
   }, [modelId]);
 
   const saveSlotPreset = useCallback(
-    (slot: CharacterSlotKind, name: string): boolean => {
+    async (slot: CharacterSlotKind, name: string): Promise<boolean> => {
+      const scope = scopeRef.current;
       try {
         const preset = createCharacterPartPreset({
           presetId: `${slot}:${Date.now().toString(36)}`,
@@ -399,13 +417,15 @@ export function useCharacterPlatformWorkbench(
           document,
           slot,
         });
-        const result = PRESET_STORE.save(preset);
+        const result = await PRESET_STORE.save(preset);
+        if (!scope.active) return false;
         if (result.status === "error") {
           throw new Error(result.message ?? "프리셋을 저장하지 못했습니다.");
         }
         setNotice(`${preset.name} 프리셋을 저장했습니다.`);
         return true;
       } catch (error) {
+        if (!scope.active) return false;
         setNotice(
           error instanceof Error
             ? error.message
@@ -482,7 +502,8 @@ export function useCharacterPlatformWorkbench(
     () => JSON.stringify(PRESET_STORE.getSnapshot().presets, null, 2),
     [],
   );
-  const importPresets = useCallback((json: string): number => {
+  const importPresets = useCallback(async (json: string): Promise<number> => {
+    const scope = scopeRef.current;
     try {
       const values: unknown = JSON.parse(json);
       if (!Array.isArray(values) || values.length > 500) {
@@ -490,7 +511,8 @@ export function useCharacterPlatformWorkbench(
       }
       let count = 0;
       for (const value of values) {
-        const result = PRESET_STORE.save(value as CharacterPartPresetV1);
+        const result = await PRESET_STORE.save(value as CharacterPartPresetV1);
+        if (!scope.active) return 0;
         if (result.status === "error") {
           throw new Error(result.message ?? "프리셋 저장에 실패했습니다.");
         }
@@ -499,6 +521,7 @@ export function useCharacterPlatformWorkbench(
       setNotice(`프리셋 ${count}개를 불러왔습니다.`);
       return count;
     } catch (error) {
+      if (!scope.active) return 0;
       setNotice(
         error instanceof Error
           ? error.message
@@ -601,8 +624,8 @@ export function useCharacterPlatformWorkbench(
       canonicalManifest ? JSON.stringify(canonicalManifest, null, 2) : null,
     saveSlotPreset,
     applyPreset,
-    removePreset: (presetId: string) => {
-      PRESET_STORE.remove(presetId);
+    removePreset: async (presetId: string) => {
+      await PRESET_STORE.remove(presetId);
     },
     exportPresets,
     importPresets,
