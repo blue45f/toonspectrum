@@ -23,33 +23,49 @@ jobs:
         uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Build code-only source archive
+      - name: Build compact runtime archive
         shell: bash
         run: |
           set -euo pipefail
-          manifest="${RUNNER_TEMP}/code-files.txt"
-          : > "${manifest}"
-          for root in apps/api/src apps/web/src packages scripts; do
-            if [[ -d "${root}" ]]; then
-              find "${root}" -type f \
-                \( -name '*.ts' -o -name '*.tsx' -o -name '*.mts' -o -name '*.cts' \
-                   -o -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.json' \
-                   -o -name '*.sql' -o -name '*.py' -o -name '*.md' -o -name '*.yaml' \
-                   -o -name '*.yml' -o -name '*.toml' -o -name '*.graphql' \) \
-                -print0 >> "${manifest}"
-            fi
+          archive="${RUNNER_TEMP}/toonspectrum-runtime-source.tar.gz"
+          candidates=(
+            apps/api/src/app.module.ts
+            apps/api/src/main.ts
+            apps/api/src/config
+            apps/api/src/db
+            apps/api/src/modules/creator
+            apps/api/src/modules/creator-marketplace
+            apps/api/src/infrastructure/supabase-object-storage
+            apps/api/package.json
+            apps/api/tsconfig.json
+            apps/web/src/domains/creator
+            apps/web/src/shared/lib
+            apps/web/package.json
+            apps/web/tsconfig.json
+            scripts/bootstrap-empty-production-database.mjs
+            scripts/run-production-database-migrations.mjs
+            scripts/run-production-database-migrations.test.mjs
+            scripts/production-database-migrations.manifest
+            package.json
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            turbo.json
+            tsconfig.json
+            vitest.config.ts
+            drizzle.config.ts
+          )
+          existing=()
+          for path in "${candidates[@]}"; do
+            [[ -e "${path}" ]] && existing+=("${path}")
           done
-          for file in package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.json \
-                      vitest.config.ts eslint.config.mjs drizzle.config.ts; do
-            [[ -f "${file}" ]] && printf '%s\0' "${file}" >> "${manifest}"
-          done
-          tar --null --files-from="${manifest}" -czf "${RUNNER_TEMP}/toonspectrum-code-source.tar.gz"
-          test -s "${RUNNER_TEMP}/toonspectrum-code-source.tar.gz"
+          tar -czf "${archive}" "${existing[@]}"
+          test -s "${archive}"
+          du -h "${archive}"
       - name: Upload source archive
         uses: actions/upload-artifact@v6
         with:
-          name: toonspectrum-asset-platform-code-${{ github.sha }}
-          path: ${{ runner.temp }}/toonspectrum-code-source.tar.gz
+          name: toonspectrum-asset-platform-runtime-${{ github.sha }}
+          path: ${{ runner.temp }}/toonspectrum-runtime-source.tar.gz
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
