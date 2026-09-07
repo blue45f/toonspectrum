@@ -1,0 +1,128 @@
+name: Temporary code scanning autofix batch
+
+on:
+  push:
+    branches:
+      - security/code-scanning-audit-20260908
+
+permissions:
+  contents: write
+  security-events: write
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_REF: refs/heads/security/code-scanning-remediation-20260908
+      API_VERSION: "2026-03-10"
+    steps:
+      - name: Generate, poll, and commit available autofixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p autofix
+
+          gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: ${API_VERSION}" \
+            "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&ref=refs%2Fheads%2Fmain&per_page=100" \
+            | jq -s 'add' > autofix/open-alerts.json
+
+          jq -r '.[].number' autofix/open-alerts.json | sort -n > autofix/alert-numbers.txt
+          : > autofix/generation.tsv
+          : > autofix/status.tsv
+          : > autofix/commit.tsv
+
+          while IFS= read -r number; do
+            [[ -n "$number" ]] || continue
+            endpoint="repos/${GITHUB_REPOSITORY}/code-scanning/alerts/${number}/autofix"
+            if response=$(gh api --method POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: ${API_VERSION}" \
+                "$endpoint" 2>&1); then
+              status=$(jq -r '.status // "accepted"' <<<"$response" 2>/dev/null || printf 'accepted')
+              description=$(jq -r '.description // ""' <<<"$response" 2>/dev/null | tr '\r\n\t' '   ' || true)
+              printf '%s\t%s\t%s\n' "$number" "$status" "$description" >> autofix/generation.tsv
+            else
+              printf '%s\terror\t%s\n' "$number" "$(tr '\r\n\t' '   ' <<<"$response")" >> autofix/generation.tsv
+            fi
+          done < autofix/alert-numbers.txt
+
+          for round in $(seq 1 90); do
+            pending=0
+            : > autofix/status.tsv
+            while IFS= read -r number; do
+              [[ -n "$number" ]] || continue
+              endpoint="repos/${GITHUB_REPOSITORY}/code-scanning/alerts/${number}/autofix"
+              if response=$(gh api \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "X-GitHub-Api-Version: ${API_VERSION}" \
+                  "$endpoint" 2>&1); then
+                status=$(jq -r '.status // "unknown"' <<<"$response" 2>/dev/null || printf 'unknown')
+                description=$(jq -r '.description // ""' <<<"$response" 2>/dev/null | tr '\r\n\t' '   ' || true)
+              else
+                status="error"
+                description=$(tr '\r\n\t' '   ' <<<"$response")
+              fi
+              printf '%s\t%s\t%s\n' "$number" "$status" "$description" >> autofix/status.tsv
+              case "$status" in
+                pending|processing|queued|unknown) pending=$((pending + 1)) ;;
+              esac
+            done < autofix/alert-numbers.txt
+
+            echo "AUTOFIX_POLL_ROUND=${round} PENDING=${pending}"
+            if [[ "$pending" -eq 0 ]]; then
+              break
+            fi
+            sleep 10
+          done
+
+          awk -F '\t' '$2 == "success" {print $1}' autofix/status.tsv | sort -n > autofix/successful.txt
+          awk -F '\t' '$2 != "success" {print}' autofix/status.tsv > autofix/unavailable.tsv
+
+          while IFS= read -r number; do
+            [[ -n "$number" ]] || continue
+            endpoint="repos/${GITHUB_REPOSITORY}/code-scanning/alerts/${number}/autofix/commits"
+            message="fix(security): apply CodeQL autofix for alert #${number}"
+            committed=false
+            for attempt in 1 2 3; do
+              if response=$(gh api --method POST \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "X-GitHub-Api-Version: ${API_VERSION}" \
+                  "$endpoint" \
+                  -f target_ref="$TARGET_REF" \
+                  -f message="$message" 2>&1); then
+                sha=$(jq -r '.sha // ""' <<<"$response" 2>/dev/null || true)
+                printf '%s\tcommitted\t%s\n' "$number" "$sha" >> autofix/commit.tsv
+                committed=true
+                break
+              fi
+              if [[ "$attempt" -lt 3 ]]; then sleep 5; fi
+            done
+            if [[ "$committed" != true ]]; then
+              printf '%s\terror\t%s\n' "$number" "$(tr '\r\n\t' '   ' <<<"$response")" >> autofix/commit.tsv
+            fi
+          done < autofix/successful.txt
+
+          echo "OPEN_ALERTS=$(wc -l < autofix/alert-numbers.txt)"
+          echo "AUTOFIX_SUCCESS=$(wc -l < autofix/successful.txt)"
+          echo "AUTOFIX_COMMITTED=$(awk -F '\t' '$2 == "committed" {count++} END {print count+0}' autofix/commit.tsv)"
+          echo "AUTOFIX_COMMIT_ERRORS=$(awk -F '\t' '$2 == "error" {count++} END {print count+0}' autofix/commit.tsv)"
+          echo "AUTOFIX_UNAVAILABLE=$(wc -l < autofix/unavailable.tsv)"
+          echo "AUTOFIX_COMMIT_RESULTS_BEGIN"
+          cat autofix/commit.tsv
+          echo "AUTOFIX_COMMIT_RESULTS_END"
+          echo "AUTOFIX_UNAVAILABLE_BEGIN"
+          cat autofix/unavailable.tsv
+          echo "AUTOFIX_UNAVAILABLE_END"
+
+      - name: Upload autofix report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-scanning-autofix-report
+          path: autofix
+          if-no-files-found: error
+          retention-days: 1
