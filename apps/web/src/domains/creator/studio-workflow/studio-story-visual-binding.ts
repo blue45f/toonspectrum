@@ -1,6 +1,7 @@
 import {
   upsertStudioIdentityLink,
   validateStudioIdentityIndex,
+  type StudioDomainReference,
   type StudioIdentityIndexV1,
 } from "../studio-foundation/studio-semantic-identity";
 
@@ -175,6 +176,34 @@ export function createStudioPanelMaterializationPlan(input: {
   };
 }
 
+function materializedPanelReferences(input: {
+  readonly writerPanelId: string;
+  readonly comicPageId: string;
+  readonly comicPanelId: string;
+  readonly drawPageId: string;
+  readonly frameElementId: string;
+}): readonly StudioDomainReference[] {
+  return [
+    {
+      domain: "writer-room",
+      entityType: "panel",
+      entityId: input.writerPanelId,
+    },
+    {
+      domain: "comic-graph",
+      entityType: "panel",
+      pageId: input.comicPageId,
+      entityId: input.comicPanelId,
+    },
+    {
+      domain: "page-state",
+      entityType: "frame",
+      pageId: input.drawPageId,
+      entityId: input.frameElementId,
+    },
+  ];
+}
+
 export function materializeStudioPanelIdentity(
   index: StudioIdentityIndexV1,
   input: {
@@ -191,30 +220,25 @@ export function materializeStudioPanelIdentity(
     throw new Error("Panel identity materialization requires a canonical UTC timestamp.");
   }
   const plan = createStudioPanelMaterializationPlan(input);
+  const existing = index.links.find((link) => link.semanticId === plan.semanticPanelId);
+  if (existing && existing.kind !== "panel") {
+    throw new Error(`Semantic identity ${existing.semanticId} is not a panel.`);
+  }
+  if (existing?.state === "deleted") {
+    throw new Error(`Deleted semantic panel ${existing.semanticId} cannot be materialized.`);
+  }
   const next = upsertStudioIdentityLink(index, {
     semanticId: plan.semanticPanelId,
     kind: "panel",
+    // Keep comments, motion clips, publish issues and any imported references already attached to
+    // this semantic panel. upsertStudioIdentityLink canonicalizes and de-duplicates the union.
     references: [
-      {
-        domain: "writer-room",
-        entityType: "panel",
-        entityId: input.writerPanelId,
-      },
-      {
-        domain: "comic-graph",
-        entityType: "panel",
-        pageId: input.comicPageId,
-        entityId: input.comicPanelId,
-      },
-      {
-        domain: "page-state",
-        entityType: "frame",
-        pageId: input.drawPageId,
-        entityId: input.frameElementId,
-      },
+      ...(existing?.references ?? []),
+      ...materializedPanelReferences(input),
     ],
-    source: "native",
-    createdAt: input.createdAt,
+    source: existing?.source ?? "native",
+    ...(existing?.confidence === undefined ? {} : { confidence: existing.confidence }),
+    createdAt: existing?.createdAt ?? input.createdAt,
   });
   const issues = validateStudioIdentityIndex(next);
   if (issues.length > 0) {
