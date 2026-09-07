@@ -113,14 +113,14 @@ describe("studio inspector layout", () => {
       expect.objectContaining({
         id: "text-align",
         focusTarget: "element.text-align",
-        path: "선택 항목 › 글자 › 문단",
+        path: "대상 › 글자 › 문단",
       }),
     ]);
     expect(filterStudioInspectorActions(textActions, "글꼴")).toEqual([
       expect.objectContaining({
         id: "typography",
         focusTarget: "element.typography",
-        path: "선택 항목 › 글자 › 글꼴",
+        path: "대상 › 글자 › 글꼴",
       }),
     ]);
     expect(textActions).toContainEqual(expect.objectContaining({
