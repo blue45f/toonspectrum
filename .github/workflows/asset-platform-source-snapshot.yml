@@ -1,0 +1,49 @@
+name: Asset platform source snapshot
+
+on:
+  push:
+    branches:
+      - feat/asset-platform-foundation
+    paths:
+      - .github/workflows/asset-platform-source-snapshot.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: asset-platform-source-snapshot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Build source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude='**/node_modules' \
+            --exclude=.turbo \
+            --exclude='**/.turbo' \
+            --exclude=dist \
+            --exclude='**/dist' \
+            --exclude=coverage \
+            --exclude='**/coverage' \
+            -czf "${RUNNER_TEMP}/toonspectrum-source.tar.gz" .
+          test -s "${RUNNER_TEMP}/toonspectrum-source.tar.gz"
+      - name: Upload source archive
+        uses: actions/upload-artifact@v6
+        with:
+          name: toonspectrum-asset-platform-source-${{ github.sha }}
+          path: ${{ runner.temp }}/toonspectrum-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
