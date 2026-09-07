@@ -44,6 +44,28 @@ replace_once(
     "onClick={() => void handleUseItem(item)}",
 )
 
+workspace_test = "apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.test.tsx"
+replace_once(
+    workspace_test,
+    '''    fireEvent.click(screen.getByRole("button", { name: "3D 0" }));
+    expect(screen.getByText("조건에 맞는 에셋이 없습니다.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "조건 넓히기" }));
+    expect(screen.getByText("교실 의자")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "초기화" }));
+    expect(screen.getByText("비 오는 밤 학교")).toBeTruthy();
+''',
+    '''    fireEvent.click(screen.getByRole("button", { name: "초기화" }));
+    expect(screen.getByText("비 오는 밤 학교")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "내 에셋" }));
+    fireEvent.click(screen.getByRole("button", { name: "3D 0" }));
+    expect(screen.getByText("조건에 맞는 에셋이 없습니다.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "조건 넓히기" }));
+    expect(screen.getByText("교실 의자")).toBeTruthy();
+''',
+)
+
 sonar_properties = Path("sonar-project.properties")
 sonar_text = sonar_properties.read_text(encoding="utf-8")
 if "sonar.javascript.lcov.reportPaths=" not in sonar_text:
