@@ -18,16 +18,9 @@ concurrency:
 
 jobs:
   dedupe:
-    name: Dedupe on ${{ matrix.runner }}
-    runs-on: ${{ matrix.runner }}
+    name: Preserve latest protected CI
+    runs-on: windows-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        runner:
-          - ubuntu-slim
-          - windows-latest
-          - macos-15
     steps:
       - name: Preserve only main and the newest required CI for each open PR
         shell: bash
