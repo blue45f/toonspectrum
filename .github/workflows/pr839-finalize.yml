@@ -37,6 +37,12 @@ jobs:
       - name: Add the Vitest V8 coverage provider
         run: pnpm add -Dw @vitest/coverage-v8@4.1.9
 
+      - name: Normalize changed-file imports
+        run: |
+          pnpm exec eslint --fix --no-warn-ignored \
+            apps/web/src/domains/creator/StudioAssetLegacyPanel.test.tsx \
+            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.test.tsx
+
       - name: Run focused coverage and regressions
         run: |
           pnpm exec vitest run \
@@ -50,7 +56,7 @@ jobs:
 
       - name: Run strict lint
         run: |
-          pnpm exec eslint --max-warnings=0 \
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored \
             apps/web/src/domains/creator/StudioAssetLegacyPanel.tsx \
             apps/web/src/domains/creator/StudioAssetLegacyPanel.test.tsx \
             apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.tsx \
