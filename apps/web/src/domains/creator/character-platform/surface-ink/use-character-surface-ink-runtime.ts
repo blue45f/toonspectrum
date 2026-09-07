@@ -94,7 +94,6 @@ export function useCharacterSurfaceInkRuntime({
   const [historyRevision, setHistoryRevision] = useState(0);
   const historyRef = useRef<{ past: CharacterSurfaceInkDocument[]; future: CharacterSurfaceInkDocument[] }>({ past: [], future: [] });
   const activeStrokeRef = useRef<ActiveStroke | null>(null);
-  const groupRef = useRef<Group | null>(null);
   const documentRef = useRef(document);
   const styleRef = useRef(style);
 
@@ -134,18 +133,34 @@ export function useCharacterSurfaceInkRuntime({
     if (!capture?.scene) return;
     const scene = capture.scene as Scene;
     const modelRoot = h.vrm?.scene;
-    if (modelRoot && scene.getObjectById(modelRoot.id) !== modelRoot) return;
-    const reconciled = reconcileCharacterSurfaceInkTopology(document, modelKey, scene);
-    if (reconciled !== document) {
-      setDocument(reconciled);
-      return;
-    }
-    groupRef.current = rebuildCharacterSurfaceInkGroup(scene, document);
-    return () => {
-      if (groupRef.current) disposeCharacterSurfaceInkGroup(groupRef.current);
-      groupRef.current = null;
+    let group: Group | null = null;
+    const clearGroup = () => {
+      if (!group) return;
+      disposeCharacterSurfaceInkGroup(group);
+      group = null;
+      h.texturePaintInvalidateRef?.current?.();
     };
-  }, [document, h.captureRef, h.captureSceneGeneration, h.status, h.vrm, loadedModelKey, modelKey, revisionKey]);
+    const rebuild = () => {
+      clearGroup();
+      if (modelRoot && scene.getObjectById(modelRoot.id) !== modelRoot) return;
+      const reconciled = reconcileCharacterSurfaceInkTopology(document, modelKey, scene);
+      if (reconciled !== document) {
+        setDocument(reconciled);
+        return;
+      }
+      group = rebuildCharacterSurfaceInkGroup(scene, document);
+      h.texturePaintInvalidateRef?.current?.();
+    };
+    // R3F can attach the primitive after the host becomes ready without replacing the capture scene.
+    modelRoot?.addEventListener("added", rebuild);
+    modelRoot?.addEventListener("removed", clearGroup);
+    rebuild();
+    return () => {
+      modelRoot?.removeEventListener("added", rebuild);
+      modelRoot?.removeEventListener("removed", clearGroup);
+      clearGroup();
+    };
+  }, [document, h.captureRef, h.captureSceneGeneration, h.status, h.texturePaintInvalidateRef, h.vrm, loadedModelKey, modelKey, revisionKey]);
 
   const commitDocument = useCallback((next: CharacterSurfaceInkDocument): boolean => {
     if (loadedModelKey !== modelKey) {

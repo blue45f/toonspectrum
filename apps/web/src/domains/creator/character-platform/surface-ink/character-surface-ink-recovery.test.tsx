@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Scene } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -121,5 +122,71 @@ describe("surface ink topology on real mesh recovery", () => {
     hook.rerender({ revisionKey: "pose-only" });
     await waitFor(() => expect(hook.result.current.document).toEqual(f.document));
     expect(f.rendered()).toBe(1);
+  });
+
+  it("restores when R3F attaches the ready model later without another host generation", async () => {
+    const f = fixture(); f.root.removeFromParent();
+    const hook = f.start();
+    await waitFor(() => expect(hook.result.current.strokeCount).toBe(1));
+    expect(f.rendered()).toBe(0);
+    act(() => { f.scene.add(f.root); });
+    expect(f.rendered()).toBe(1);
+    expect(hook.result.current.document).toEqual(f.document);
+    expect(hook.result.current.canUndo).toBe(false);
+    act(() => { f.root.removeFromParent(); });
+    expect(f.rendered()).toBe(0);
+    act(() => { f.scene.add(f.root); });
+    expect(f.rendered()).toBe(1);
+  });
+
+  it("does not rebuild into a foreign scene or after its effect is disposed", async () => {
+    const f = fixture(); f.root.removeFromParent(); const otherScene = new Scene();
+    const hook = f.start();
+    await waitFor(() => expect(hook.result.current.strokeCount).toBe(1));
+    act(() => { otherScene.add(f.root); });
+    expect(f.rendered()).toBe(0);
+    expect(hook.result.current.document).toEqual(f.document);
+    hook.unmount();
+    act(() => { f.scene.add(f.root); });
+    expect(f.rendered()).toBe(0);
+  });
+
+  it("keeps one ribbon owner across StrictMode, revision changes and scene replacement", async () => {
+    const f = fixture();
+    const hook = renderHook(({ revisionKey }) => useCharacterSurfaceInkRuntime({ h: f.h, modelKey: "model-a", revisionKey }), { initialProps: { revisionKey: "r1" }, wrapper: StrictMode });
+    await waitFor(() => expect(f.rendered()).toBe(1));
+    const oldGroup = f.scene.getObjectByName(CHARACTER_SURFACE_INK_GROUP_NAME)!;
+    hook.rerender({ revisionKey: "r2" });
+    expect(oldGroup.parent).toBeNull();
+    expect(f.scene.children.filter((child) => child.name === CHARACTER_SURFACE_INK_GROUP_NAME)).toHaveLength(1);
+    const nextScene = new Scene();
+    f.h.captureRef.current!.scene = nextScene;
+    f.h.captureSceneGeneration = 2;
+    hook.rerender({ revisionKey: "r2" });
+    expect(f.rendered()).toBe(0);
+    act(() => { nextScene.add(f.root); });
+    expect(nextScene.getObjectByName(CHARACTER_SURFACE_INK_GROUP_NAME)?.children).toHaveLength(1);
+    hook.unmount();
+    expect(nextScene.getObjectByName(CHARACTER_SURFACE_INK_GROUP_NAME)).toBeUndefined();
+    act(() => { f.scene.add(f.root); });
+    expect(f.rendered()).toBe(0);
+  });
+
+  it("requests a demand-rendered frame after restore, ink history changes and cleanup", async () => {
+    const f = fixture();
+    const presentedRibbonCounts: number[] = [];
+    f.h.texturePaintInvalidateRef = { current: () => presentedRibbonCounts.push(f.rendered()) };
+    const hook = f.start();
+    await waitFor(() => expect(hook.result.current.strokeCount).toBe(1));
+    expect(presentedRibbonCounts.at(-1)).toBe(1);
+    act(() => { hook.result.current.clear(); });
+    expect(presentedRibbonCounts.at(-1)).toBe(0);
+    act(() => { hook.result.current.undo(); });
+    expect(presentedRibbonCounts.at(-1)).toBe(1);
+    act(() => { hook.result.current.redo(); });
+    expect(presentedRibbonCounts.at(-1)).toBe(0);
+    act(() => { hook.result.current.undo(); });
+    hook.unmount();
+    expect(presentedRibbonCounts.at(-1)).toBe(0);
   });
 });
