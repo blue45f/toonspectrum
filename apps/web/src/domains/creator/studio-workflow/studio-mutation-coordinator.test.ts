@@ -193,11 +193,12 @@ describe("Studio mutation coordinator", () => {
 
   it("does not commit when a cross-domain invariant fails", async () => {
     const state = { count: 0 };
+    const replaceSnapshot = vi.fn();
     const port = createStudioExistingReducerDomainPort({
       domain: "page-state",
       getSnapshot: () => state,
       reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
-      replaceSnapshot: vi.fn(),
+      replaceSnapshot,
     });
     const store = durability();
     const coordinator = createStudioMutationCoordinator({
@@ -210,7 +211,7 @@ describe("Studio mutation coordinator", () => {
     await expect(coordinator.execute(envelope([
       command("command-page", "page-state", "page-state/add-frame"),
     ]))).rejects.toBeInstanceOf(StudioMutationConflictError);
-    expect(port.commit).not.toHaveBeenCalled();
+    expect(replaceSnapshot).not.toHaveBeenCalled();
     expect(store.begin).not.toHaveBeenCalled();
   });
 
