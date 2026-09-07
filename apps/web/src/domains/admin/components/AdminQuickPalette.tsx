@@ -17,7 +17,13 @@ import { useAdminToast } from "./use-admin-toast";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { usePathname, useRouter } from "@/src/compat/navigation";
 
-export function AdminQuickPalette({ userId }: { userId: string }) {
+interface AdminQuickPaletteProps {
+  userId: string;
+  /** Legacy tab callback retained while the previous AdminPage remains in the source tree. */
+  onSelectTab?: (tabKey: string) => void;
+}
+
+export function AdminQuickPalette({ userId }: AdminQuickPaletteProps) {
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const pathname = usePathname();
