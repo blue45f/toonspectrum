@@ -41,7 +41,7 @@ export interface StudioAssetToolPopoverWorkspaceProps {
   readonly toolBelt: StudioToolBeltContentProps;
 }
 
-function useUnifiedAsset(
+function routeUnifiedAsset(
   item: StudioUnifiedAssetItem,
   toolBelt: StudioToolBeltContentProps,
 ): boolean | void | Promise<boolean | void> {
@@ -132,7 +132,7 @@ export function StudioAssetToolPopoverWorkspace({
         <StudioUnifiedAssetWorkspace
           items={items}
           legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
-          onUseItem={(item) => useUnifiedAsset(item, toolBelt)}
+          onUseItem={(item) => routeUnifiedAsset(item, toolBelt)}
           onOpenAi={(prompt) => {
             if (prompt) {
               toolBelt.stableHandlers.applyAiAssistPresetPrompt("background", prompt);
