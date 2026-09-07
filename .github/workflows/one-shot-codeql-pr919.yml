@@ -1,4 +1,4 @@
-name: One-shot inspect PR 919 CodeQL alert
+name: One-shot inspect root Vitest diagnostics
 
 on:
   push:
@@ -8,35 +8,27 @@ on:
       - .github/workflows/one-shot-codeql-pr919.yml
 
 permissions:
+  actions: read
   contents: read
-  security-events: read
 
 jobs:
   inspect:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Print open CodeQL alerts for PR 919
+      - name: Download and print preserved root Vitest outputs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p diagnostics
-          gh api --paginate \
-            -H 'Accept: application/vnd.github+json' \
-            "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&pr=919&per_page=100" \
-            > diagnostics/codeql-alerts.json
-          jq -r '.[] | [
-            ("number=" + (.number|tostring)),
-            ("rule=" + .rule.id),
-            ("severity=" + (.rule.security_severity_level // .rule.severity // "unknown")),
-            ("path=" + .most_recent_instance.location.path),
-            ("line=" + (.most_recent_instance.location.start_line|tostring)),
-            ("message=" + .most_recent_instance.message.text)
-          ] | join(" | ")' diagnostics/codeql-alerts.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: codeql-pr919-alerts
-          path: diagnostics/codeql-alerts.json
-          if-no-files-found: error
+          gh run download 34171085839 --repo "$GITHUB_REPOSITORY" --dir diagnostics
+          find diagnostics -type f -maxdepth 3 -print -exec wc -c {} \;
+          for file in diagnostics/root-vitest-diagnostic-*/shard-*.exit; do
+            echo "EXIT_FILE=$file VALUE=$(cat "$file")"
+          done
+          for file in diagnostics/root-vitest-diagnostic-*/shard-*.log; do
+            echo "===== BEGIN $file ====="
+            cat "$file"
+            echo "===== END $file ====="
+          done
