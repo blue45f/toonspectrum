@@ -22,12 +22,13 @@ describe("StudioSaveSyncStatusCenter", () => {
     expect(screen.getByRole("button", { name: "저장 상태 열기: 저장됨" })).not.toBeNull();
   });
 
-  it("explains pending work as changes being saved", () => {
+  it("describes uncheckpointed work as locally preserved, not active server saving", () => {
     let journal = createEmptyOperationJournal("doc-1");
     journal = appendCanvasOperation(journal, "stroke", "선화 작화", {});
 
     render(<StudioSaveSyncStatusCenter journal={journal} />);
-    expect(screen.getByText("1개 변경 저장 중")).not.toBeNull();
+    expect(screen.getByText("1개 변경 보존 중")).not.toBeNull();
+    expect(screen.queryByText(/서버에 저장하는 중/u)).toBeNull();
   });
 
   it("makes offline safety explicit", () => {
@@ -49,18 +50,17 @@ describe("StudioSaveSyncStatusCenter", () => {
       />
     );
 
-    const pill = screen.getByRole("button", { name: /저장 상태 열기/u });
-    fireEvent.click(pill);
+    fireEvent.click(screen.getByRole("button", { name: /저장 상태 열기/u }));
 
     expect(screen.getByRole("dialog", { name: "저장 상태 상세" })).not.toBeNull();
     expect(screen.getByText("이 기기")).not.toBeNull();
     expect(screen.getByText("서버")).not.toBeNull();
     expect(screen.getByText("복구")).not.toBeNull();
+    expect(screen.getByText(/서버 동기화를 기다리고 있어요/u)).not.toBeNull();
     expect(screen.getByText("고급 진단 보기")).not.toBeNull();
     expect(screen.getByText("로컬 저장 방식")).not.toBeNull();
 
-    const checkpointButton = screen.getByRole("button", { name: "복구 지점 만들기" });
-    fireEvent.click(checkpointButton);
+    fireEvent.click(screen.getByRole("button", { name: "복구 지점 만들기" }));
     expect(onForceCheckpoint).toHaveBeenCalledTimes(1);
   });
 });
