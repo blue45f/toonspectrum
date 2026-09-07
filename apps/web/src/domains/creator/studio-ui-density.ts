@@ -107,8 +107,9 @@ export function studioUiDensityAllows(
     );
   }
 
-  // 표준 작업: keep the complete webtoon workflow while folding AI/3D-heavy launch chrome.
-  if (region === "toolbar-ai" || region === "toolbar-reference") return false;
+  // 표준 작업: keep the complete webtoon workflow and honor tools the user explicitly exposed.
+  // AI launch chrome remains folded; reference is visible only when its tool id is in visibleIds.
+  if (region === "toolbar-ai") return false;
   return true;
 }
 
