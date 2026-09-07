@@ -1,13 +1,19 @@
 /**
- * Studio Save & Sync Status Center (저장 및 동기화 상태 센터)
- *
- * CLIP STUDIO PAINT Ver.5.0.0 & External Review TS-SAVE-007 / TS-UX-008 Parity:
- * - Persistent real-time monitor for local OPFS/SQLite durability, uncommitted operation journal count,
- *   recovery checkpoints, and cloud synchronization status.
- * - Non-intrusive status pill with expandable diagnostic popover.
+ * Studio save status: plain-language safety first, implementation diagnostics on demand.
  */
 
-import { CheckCircle2, Clock, Cloud, CloudOff, Copy, Database, HardDrive, RefreshCw, X } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock,
+  Cloud,
+  CloudOff,
+  Copy,
+  Database,
+  HardDrive,
+  RefreshCw,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -23,6 +29,12 @@ export interface StudioSaveSyncStatusCenterProps {
   readonly onForceCheckpoint?: () => void;
 }
 
+function cloudStatusCopy(status: "synced" | "pending" | "offline"): string {
+  if (status === "synced") return "최신 상태로 저장됐어요.";
+  if (status === "pending") return "최근 변경을 서버에 저장하는 중이에요.";
+  return "인터넷이 연결되면 자동으로 서버에 저장해요.";
+}
+
 export function StudioSaveSyncStatusCenter({
   journal,
   isOnline = true,
@@ -33,6 +45,13 @@ export function StudioSaveSyncStatusCenter({
   const [copied, setCopied] = useState(false);
 
   const status = resolveSaveSyncStatus(journal, isOnline, isOpfsActive);
+  const saveLabel = !status.localDurable
+    ? "저장 확인 필요"
+    : status.cloudSyncStatus === "offline"
+      ? "오프라인 · 이 기기에 보관 중"
+      : status.pendingOperationsCount > 0 || status.cloudSyncStatus === "pending"
+        ? `${status.pendingOperationsCount}개 변경 저장 중`
+        : "저장됨";
 
   const handleCopyDiagnostics = () => {
     const report = formatRecoveryDiagnostics(journal, status);
@@ -43,132 +62,151 @@ export function StudioSaveSyncStatusCenter({
     }
   };
 
-  const getStatusColor = () => {
-    if (!status.localDurable) return "bg-danger";
-    if (status.cloudSyncStatus === "offline") return "bg-warning";
-    if (status.pendingOperationsCount > 0) return "bg-accent";
-    return "bg-success";
-  };
+  const StatusIcon = !status.localDurable
+    ? TriangleAlert
+    : status.cloudSyncStatus === "offline"
+      ? CloudOff
+      : status.pendingOperationsCount > 0 || status.cloudSyncStatus === "pending"
+        ? Clock
+        : CheckCircle2;
+
+  const statusTone = !status.localDurable
+    ? "text-danger"
+    : status.cloudSyncStatus === "offline"
+      ? "text-warning"
+      : status.pendingOperationsCount > 0 || status.cloudSyncStatus === "pending"
+        ? "text-accent"
+        : "text-success";
 
   return (
     <div data-studio-save-sync-status-center className="relative inline-block text-xs">
-      {/* Compact Status Pill */}
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        aria-label="저장 및 동기화 상태 열기"
-        className="flex items-center gap-1.5 rounded-full border border-line bg-card/90 px-2.5 py-1 text-[0.68rem] font-medium text-fg shadow-sm backdrop-blur hover:bg-raised transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        aria-haspopup="dialog"
+        aria-label={`저장 상태 열기: ${saveLabel}`}
+        className="flex min-h-8 items-center gap-1.5 rounded-full border border-line bg-card/90 px-2.5 py-1 text-[0.75rem] font-medium text-fg shadow-sm backdrop-blur transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent pointer-coarse:min-h-11"
       >
-        <span className={`inline-block size-2 rounded-full ${getStatusColor()}`} aria-hidden />
-        <span>
-          {status.pendingOperationsCount > 0
-            ? `${status.pendingOperationsCount}개 작업 보존 중`
-            : "저장 완료"}
-        </span>
+        <StatusIcon className={`size-3.5 ${statusTone}`} aria-hidden />
+        <span>{saveLabel}</span>
       </button>
 
-      {/* Popover Card */}
-      {open && (
+      {open ? (
         <div
           role="dialog"
-          aria-label="저장 및 동기화 상태 상세"
-          className="absolute right-0 top-full z-50 mt-1.5 w-80 rounded-xl border border-line bg-card p-3.5 shadow-xl text-fg"
+          aria-label="저장 상태 상세"
+          className="absolute right-0 top-full z-50 mt-1.5 w-[min(22rem,calc(100vw-1rem))] rounded-xl border border-line bg-card p-3.5 text-fg shadow-xl"
         >
           <div className="flex items-center justify-between border-b border-line/50 pb-2">
-            <span className="font-semibold text-fg-2">저장 및 동기화 상태</span>
+            <div>
+              <p className="font-semibold text-fg">저장 상태</p>
+              <p className="mt-0.5 text-[0.72rem] text-fg-3">
+                내 작업이 어디까지 안전하게 보관됐는지 확인해요.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="닫기"
-              className="rounded p-0.5 text-fg-3 hover:text-fg"
+              aria-label="저장 상태 닫기"
+              className="grid min-h-8 min-w-8 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             >
-              <X className="size-3.5" />
+              <X className="size-4" aria-hidden />
             </button>
           </div>
 
-          <div className="mt-2.5 space-y-2 text-[0.68rem]">
-            <div className="flex items-center justify-between rounded-lg bg-panel/60 p-2">
-              <div className="flex items-center gap-2">
-                <Database className="size-4 text-accent" />
+          <div className="mt-3 space-y-2 text-[0.75rem]">
+            <section className="rounded-lg bg-panel/60 p-2.5">
+              <div className="flex items-start gap-2">
+                <HardDrive className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
                 <div>
-                  <div className="font-semibold">로컬 지속성 (OPFS)</div>
-                  <div className="text-[0.62rem] text-fg-3">
-                    {status.localDurable ? "정상 활성화 (Crash Safe)" : "비활성화 (메모리 전용)"}
-                  </div>
+                  <p className="font-semibold text-fg">이 기기</p>
+                  <p className="mt-0.5 leading-relaxed text-fg-3">
+                    {status.localDurable
+                      ? "최근 작업을 이 기기에 안전하게 보관하고 있어요."
+                      : "이 기기에 복구 가능한 작업을 남기지 못하고 있어요. 이 화면을 닫기 전에 프로젝트를 내보내 주세요."}
+                  </p>
                 </div>
               </div>
-              {status.localDurable ? (
-                <CheckCircle2 className="size-4 text-success" />
-              ) : (
-                <span className="text-[0.62rem] text-danger font-semibold">위험</span>
-              )}
-            </div>
+            </section>
 
-            <div className="flex items-center justify-between rounded-lg bg-panel/60 p-2">
-              <div className="flex items-center gap-2">
-                <HardDrive className="size-4 text-accent" />
-                <div>
-                  <div className="font-semibold">작업 단위 저널 (Journal)</div>
-                  <div className="text-[0.62rem] text-fg-3">
-                    총 {journal.lastSequence}개 동작 / {status.pendingOperationsCount}개 미체크포인트
-                  </div>
-                </div>
-              </div>
-              <span className="font-mono text-fg-2">#{journal.lastSequence}</span>
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg bg-panel/60 p-2">
-              <div className="flex items-center gap-2">
+            <section className="rounded-lg bg-panel/60 p-2.5">
+              <div className="flex items-start gap-2">
                 {status.cloudSyncStatus === "offline" ? (
-                  <CloudOff className="size-4 text-warning" />
+                  <CloudOff className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
                 ) : (
-                  <Cloud className="size-4 text-accent" />
+                  <Cloud className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
                 )}
                 <div>
-                  <div className="font-semibold">클라우드 동기화</div>
-                  <div className="text-[0.62rem] text-fg-3">
-                    {status.cloudSyncStatus === "synced" && "최신 상태로 동기화됨"}
-                    {status.cloudSyncStatus === "pending" && "동기화 대기 중"}
-                    {status.cloudSyncStatus === "offline" && "오프라인 (로컬 보존 중)"}
-                  </div>
+                  <p className="font-semibold text-fg">서버</p>
+                  <p className="mt-0.5 leading-relaxed text-fg-3">
+                    {cloudStatusCopy(status.cloudSyncStatus)}
+                    {status.pendingOperationsCount > 0
+                      ? ` 아직 보내지 않은 변경 ${status.pendingOperationsCount}개가 있어요.`
+                      : ""}
+                  </p>
                 </div>
               </div>
-              <span className="text-[0.62rem] uppercase font-semibold text-fg-3">
-                {status.cloudSyncStatus}
-              </span>
-            </div>
+            </section>
 
-            <div className="flex items-center gap-1 text-[0.62rem] text-fg-3 pt-1">
-              <Clock className="size-3" />
-              <span>
-                마지막 체크포인트: {new Date(status.lastCheckpointAt).toLocaleTimeString()}
-              </span>
-            </div>
+            <section className="rounded-lg bg-panel/60 p-2.5">
+              <div className="flex items-start gap-2">
+                <Clock className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+                <div>
+                  <p className="font-semibold text-fg">복구</p>
+                  <p className="mt-0.5 leading-relaxed text-fg-3">
+                    마지막 복구 지점은 {new Date(status.lastCheckpointAt).toLocaleTimeString()}에 만들어졌어요.
+                  </p>
+                </div>
+              </div>
+            </section>
           </div>
 
-          <div className="mt-3 flex items-center justify-end gap-1.5 border-t border-line/50 pt-2">
-            {onForceCheckpoint && (
+          <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-line/50 pt-3">
+            {onForceCheckpoint ? (
               <button
                 type="button"
                 onClick={onForceCheckpoint}
-                className="flex items-center gap-1 rounded bg-raised px-2 py-1 text-[0.65rem] font-medium text-fg-2 hover:bg-accent-soft hover:text-accent"
+                className="flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[0.72rem] font-semibold text-fg-2 hover:bg-accent-soft hover:text-accent pointer-coarse:min-h-11"
               >
-                <RefreshCw className="size-3" />
-                <span>체크포인트 생성</span>
+                <RefreshCw className="size-3.5" aria-hidden />
+                <span>복구 지점 만들기</span>
               </button>
-            )}
-            <button
-              type="button"
-              onClick={handleCopyDiagnostics}
-              className="flex items-center gap-1 rounded bg-raised px-2 py-1 text-[0.65rem] font-medium text-fg-2 hover:bg-accent-soft hover:text-accent"
-            >
-              <Copy className="size-3" />
-              <span>{copied ? "복사됨!" : "진단 정보 복사"}</span>
-            </button>
+            ) : null}
           </div>
+
+          <details className="mt-3 rounded-lg border border-line bg-panel/35">
+            <summary className="cursor-pointer px-2.5 py-2 text-[0.72rem] font-semibold text-fg-2">
+              고급 진단 보기
+            </summary>
+            <div className="space-y-2 border-t border-line/60 px-2.5 py-2 text-[0.68rem] text-fg-3">
+              <p className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-1.5">
+                  <Database className="size-3.5" aria-hidden />
+                  로컬 저장 방식
+                </span>
+                <span>{status.localDurable ? "OPFS" : "메모리 전용"}</span>
+              </p>
+              <p className="flex items-center justify-between gap-3">
+                <span>최근 작업 번호</span>
+                <span className="font-mono">#{journal.lastSequence}</span>
+              </p>
+              <p className="flex items-center justify-between gap-3">
+                <span>복구 지점 이후 변경</span>
+                <span>{status.pendingOperationsCount}개</span>
+              </p>
+              <button
+                type="button"
+                onClick={handleCopyDiagnostics}
+                className="mt-1 flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2.5 font-semibold text-fg-2 hover:bg-raised pointer-coarse:min-h-11"
+              >
+                <Copy className="size-3.5" aria-hidden />
+                <span>{copied ? "진단 정보를 복사했어요" : "진단 정보 복사"}</span>
+              </button>
+            </div>
+          </details>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
