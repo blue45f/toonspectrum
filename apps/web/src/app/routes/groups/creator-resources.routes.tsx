@@ -5,6 +5,7 @@ import { defineAppRoutes } from "../app-route-definition";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const CreatorHubPage = lazyRetry(() => import("@/src/domains/creator-resources/CreatorHubPage").then((module) => ({ default: module.CreatorHubPage })), "CreatorHubPage");
+const NowPage = lazyRetry(() => import("@/src/domains/creator-resources/NowPage").then((module) => ({ default: module.NowPage })), "NowPage");
 const OpportunitiesPage = lazyRetry(() => import("@/src/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.OpportunitiesPage })), "OpportunitiesPage");
 const ReferencesPage = lazyRetry(() => import("@/src/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.ReferencesPage })), "ReferencesPage");
 const WorksPage = lazyRetry(() => import("@/src/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.WorksPage })), "WorksPage");
@@ -15,6 +16,7 @@ const PublishingPage = lazyRetry(() => import("@/src/domains/creator-resources/P
 const SourcesPage = lazyRetry(() => import("@/src/domains/creator-resources/SourcesPage").then((module) => ({ default: module.SourcesPage })), "SourcesPage");
 
 export const creatorResourcesRoutes = defineAppRoutes([
+  { id: "resources-now", path: "/now", element: <NowPage /> },
   { id: "research-home", path: "/research", element: <CreatorHubPage /> },
   { id: "research-assets", path: "/research/assets", element: <ReferencesPage /> },
   { id: "research-books", path: "/research/books", element: <GlobalBooksPage /> },
