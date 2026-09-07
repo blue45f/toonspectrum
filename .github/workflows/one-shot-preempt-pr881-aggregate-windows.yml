@@ -1,0 +1,21 @@
+name: Retire stale PR 881 aggregate repair Windows
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-preempt-pr881-aggregate-windows.yml
+
+permissions: {}
+
+concurrency:
+  group: one-shot-pr881-aggregate-repair-windows-20260908
+  cancel-in-progress: true
+
+jobs:
+  retire:
+    if: ${{ false }}
+    runs-on: windows-latest
+    steps:
+      - run: echo "Retired stale PR 881 aggregate repair."
