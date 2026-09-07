@@ -14,9 +14,11 @@ export default mergeConfig(
         include: [
           "apps/web/src/domains/creator/StudioAssetLegacyPanel.tsx",
           "apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.tsx",
+          "apps/web/src/domains/creator/StudioUnifiedAssetToolPopoverContent.tsx",
           "apps/web/src/domains/creator/StudioUnifiedAssetWorkspace.tsx",
           "apps/web/src/domains/creator/studio-tool-belt-lazy-ui.ts",
           "apps/web/src/domains/creator/studio-unified-asset-catalog.ts",
+          "apps/web/src/domains/creator/studio-unified-asset-lazy-ui.ts",
         ],
       },
     },
