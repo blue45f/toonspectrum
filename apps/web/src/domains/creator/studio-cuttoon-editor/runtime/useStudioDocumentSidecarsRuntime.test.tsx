@@ -3,18 +3,26 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { appendStudioAiOperation } from "../../ai/studio-ai-provenance";
+import { hydrateStudioAiImageReferenceDocument } from "../../ai/studio-ai-image-reference-roles";
+import { StudioCrdtDocument } from "../../live/studio-crdt-document";
+import { publishStudioCrdtDrawGraphDiff } from "../../live/studio-crdt-scene-publisher";
+import { addStudioCommentReply, addStudioCommentThread, createEmptyStudioCommentsDocument } from "../../studio-comments";
 import { createStudioHistoryJournal } from "../../studio-history-journal";
 import { addStudioReleaseScheduleItem } from "../../studio-release-schedule";
 import { DEFAULT_STUDIO_REFERENCE_BOARD_ITEM_VIEW } from "../../studio-reference-board";
-import { discardStudioRetainedStrokeRedo } from "../../studio-retained-stroke-history";
+import { discardStudioRetainedStrokeRedo, resumeStudioRetainedStrokeHistory, undoStudioRetainedStrokeHistory } from "../../studio-retained-stroke-history";
+import { StudioWorkAssetHydrator } from "../../studio-work-asset-hydrator";
 import { createStudioDeferredStrokeCommitEngine } from "../studio-deferred-stroke-commit";
 
 import { useStudioDocumentSidecarsRuntime } from "./useStudioDocumentSidecarsRuntime";
+import { useStudioCommentDocumentsRuntime } from "./useStudioCommentDocumentsRuntime";
+import { useStudioDocumentAccessRuntime } from "./useStudioDocumentAccessRuntime";
 
 import type { StudioPageHistoryJournal } from "../../history/studio-page-sidecars-controller";
 import type { DrawEl } from "../../studio-element-model";
+import type { PageState } from "../../studio-page-state";
 import type { StudioReferenceBoardItem } from "../../studio-reference-board";
-import type { StudioRetainedStrokeUndoneBatch } from "../../studio-retained-stroke-history";
+import type { StudioRetainedStrokeQueuedBatch, StudioRetainedStrokeUndoneBatch } from "../../studio-retained-stroke-history";
 import type { StudioDeferredStrokeCommitEngineContext } from "../studio-deferred-stroke-commit";
 
 afterEach(cleanup);
@@ -145,5 +153,166 @@ describe("retained redo across document sidecar edits", () => {
     expect(editor.result.current.master.elements).toHaveLength(1);
     expect(editor.undone.current).toBeNull();
     expect(editor.discardPixels).toHaveBeenCalledExactlyOnceWith([stroke.id]);
+  });
+});
+
+function commentAndImageReferenceFixture() {
+  const undone = { current: null as StudioRetainedStrokeUndoneBatch | null };
+  const pending = { current: { pageId: "page", strokes: [stroke], retryCount: 0, timer: null } as StudioRetainedStrokeQueuedBatch | null };
+  const discardPixels = vi.fn();
+  const onAcceptedMutation = () => { discardStudioRetainedStrokeRedo(undone, discardPixels); };
+  const hydrator = new StudioWorkAssetHydrator(null);
+  const options = {
+    announce: vi.fn(), getProjectSnapshot: () => ({}), instantWorkId: "instant", liveRoomQueryParam: null,
+    remixId: null, reportError: vi.fn(), sessionDisplayName: null, setStudioWorkAssetLimitExceeded: vi.fn(),
+    setStudioWorkAssetReferences: vi.fn(), studioAuthUserId: null, studioCrdtDocument: null,
+    studioCrdtDocumentRef: { current: null }, studioCrdtReconciledDocument: null,
+    studioCrdtSceneRuntimeRef: { current: null }, studioWorkAssetHydrator: hydrator, workId: null,
+    onAcceptedMutation,
+  };
+  const hook = renderHook(() => {
+    const access = useStudioDocumentAccessRuntime(options);
+    const comments = useStudioCommentDocumentsRuntime({ markStudioDocumentChanged: access.markStudioDocumentChanged, onAcceptedMutation });
+    return { ...access, ...comments };
+  });
+  act(() => {
+    hook.result.current.setStudioCommentsState(addStudioCommentThread(createEmptyStudioCommentsDocument(), {
+      id: "thread", anchor: { type: "page", pageId: "page" }, author: { displayName: "Editor" }, body: "Original comment",
+    }));
+    hook.result.current.setScenarioImageReferenceDocumentState(hydrateStudioAiImageReferenceDocument({ version: 1, references: [
+      { id: "reference", role: "character", asset: { assetId: "asset" }, label: "Original reference" },
+    ] }));
+  });
+  const document = new StudioCrdtDocument();
+  const older = { ...stroke, id: "older" };
+  const pages = [{ id: "page", elements: [older], bg: "#fff", bgGrad: null, canvasH: 1080 }];
+  publishStudioCrdtDrawGraphDiff(document, [], [{ ...pages[0], elements: [older, stroke] }]);
+  const publish = vi.fn((before: readonly PageState[], after: readonly PageState[]) => {
+    publishStudioCrdtDrawGraphDiff(document, before, after, { registerNewDraws: false });
+    return true;
+  });
+  const context = {
+    undone, pending, getPages: () => pages, getHistoryIndex: () => 0, isBlocked: () => false, publish,
+    persist: vi.fn(), onUndone: vi.fn(), onResumed: vi.fn(), getActivePageId: () => "page",
+    flushPending: () => false, showOverlay: vi.fn(), showEraser: vi.fn(), retryDelayMs: 500, maxRetries: 0,
+  };
+  expect(undoStudioRetainedStrokeHistory(context)).toBe(true);
+  expect(document.getStroke(stroke.id, true)?.deleted).toBe(true);
+  publish.mockClear();
+  return { ...hook, context, document, discardPixels, dispose: () => { hook.unmount(); hydrator.dispose(); document.destroy(); } };
+}
+
+type CommentAndReferenceRuntime = ReturnType<typeof commentAndImageReferenceFixture>["result"]["current"];
+const commentAndReferenceEdits: Array<[string, (runtime: CommentAndReferenceRuntime) => void]> = [
+  ["comment creation", runtime => { runtime.setStudioComments(previous => addStudioCommentThread(previous, {
+    id: "new-comment", anchor: { type: "page", pageId: "page" }, author: { displayName: "Editor" }, body: "New comment",
+  })); }],
+  ["comment reply", runtime => { runtime.setStudioComments(previous => addStudioCommentReply(previous, "thread", {
+    id: "reply", author: { displayName: "Editor" }, body: "Reply",
+  })); }],
+  ["AI reference addition", runtime => { runtime.setScenarioImageReferenceDocument(previous => ({ ...previous, references: [
+    ...previous.references, { id: "second", role: "style", asset: { assetId: "second-asset" } },
+  ] })); }],
+  ["AI reference edit", runtime => { runtime.setScenarioImageReferenceDocument(previous => ({ ...previous, references: previous.references.map(reference => ({ ...reference, guidance: "Keep the silhouette" })) })); }],
+  ["AI reference removal", runtime => { runtime.setScenarioImageReferenceDocument(previous => ({ ...previous, references: [] })); }],
+];
+
+describe("retained Undo followed by persisted comments or AI references", () => {
+  it("keeps retained Redo across raw project restoration", () => {
+    const editor = commentAndImageReferenceFixture();
+    try {
+      const generation = editor.result.current.studioRevisionProjectGenerationRef.current;
+      act(() => {
+        editor.result.current.setStudioCommentsState(createEmptyStudioCommentsDocument());
+        editor.result.current.setScenarioImageReferenceDocumentState(hydrateStudioAiImageReferenceDocument(null));
+      });
+      expect(editor.result.current.studioComments.threads).toEqual([]);
+      expect(editor.result.current.scenarioImageReferenceDocument.references).toEqual([]);
+      expect(editor.result.current.studioRevisionProjectGenerationRef.current).toBe(generation);
+      expect(editor.discardPixels).not.toHaveBeenCalled();
+      expect(resumeStudioRetainedStrokeHistory(editor.context)).toBe(true);
+      expect(editor.document.getStrokes().map(value => value.id)).toEqual(["older", stroke.id]);
+    } finally { editor.dispose(); }
+  });
+
+  it("keeps retained Redo for unchanged values and a reply to a missing thread", () => {
+    const editor = commentAndImageReferenceFixture();
+    try {
+      const generation = editor.result.current.studioRevisionProjectGenerationRef.current;
+      act(() => {
+        expect(editor.result.current.setStudioComments(value => value)).toBe(true);
+        expect(editor.result.current.setScenarioImageReferenceDocument(value => value)).toBe(true);
+        expect(editor.result.current.setStudioComments(value => addStudioCommentReply(value, "missing", {
+          id: "reply", author: { displayName: "Editor" }, body: "No longer applicable",
+        }))).toBe(true);
+      });
+      expect(editor.result.current.studioRevisionProjectGenerationRef.current).toBe(generation);
+      expect(editor.discardPixels).not.toHaveBeenCalled();
+      expect(resumeStudioRetainedStrokeHistory(editor.context)).toBe(true);
+    } finally { editor.dispose(); }
+  });
+
+  it("composes two accepted replies before React renders without restoring the discarded branch", () => {
+    const editor = commentAndImageReferenceFixture();
+    try {
+      const generation = editor.result.current.studioRevisionProjectGenerationRef.current;
+      act(() => {
+        for (const id of ["first", "second"]) {
+          expect(editor.result.current.setStudioComments(value => addStudioCommentReply(value, "thread", {
+            id, author: { displayName: "Editor" }, body: id,
+          }))).toBe(true);
+        }
+      });
+      expect(editor.result.current.studioComments.threads[0]?.replies.map(value => value.id)).toEqual(["first", "second"]);
+      expect(editor.result.current.studioRevisionProjectGenerationRef.current).toBe(generation + 2);
+      expect(editor.discardPixels).toHaveBeenCalledExactlyOnceWith([stroke.id]);
+      expect(resumeStudioRetainedStrokeHistory(editor.context)).toBe(false);
+    } finally { editor.dispose(); }
+  });
+
+  it("keeps the branch and generation when comment validation rejects a duplicate message", () => {
+    const editor = commentAndImageReferenceFixture();
+    try {
+      const generation = editor.result.current.studioRevisionProjectGenerationRef.current;
+      expect(() => editor.result.current.setStudioComments(value => addStudioCommentReply(value, "thread", {
+        id: "thread", author: { displayName: "Editor" }, body: "Duplicate",
+      }))).toThrow("이미 사용 중인 댓글 또는 답글 ID예요.");
+      expect(editor.result.current.studioComments.threads[0]?.replies).toEqual([]);
+      expect(editor.result.current.studioRevisionProjectGenerationRef.current).toBe(generation);
+      expect(editor.discardPixels).not.toHaveBeenCalled();
+      expect(resumeStudioRetainedStrokeHistory(editor.context)).toBe(true);
+    } finally { editor.dispose(); }
+  });
+
+  it.each(commentAndReferenceEdits)("does not resurrect undone ink after accepted %s", (_name, edit) => {
+    const editor = commentAndImageReferenceFixture();
+    try {
+      const generation = editor.result.current.studioRevisionProjectGenerationRef.current;
+      act(() => edit(editor.result.current));
+      expect(resumeStudioRetainedStrokeHistory(editor.context)).toBe(false);
+      expect(editor.document.getStrokes().map(value => value.id)).toEqual(["older"]);
+      expect(editor.document.getStroke(stroke.id, true)?.deleted).toBe(true);
+      expect(editor.context.publish).not.toHaveBeenCalled();
+      expect(editor.discardPixels).toHaveBeenCalledExactlyOnceWith([stroke.id]);
+      expect(editor.result.current.studioRevisionProjectGenerationRef.current).toBe(generation + 1);
+    } finally { editor.dispose(); }
+  });
+
+  it.each(commentAndReferenceEdits)("preserves the document and retained Redo when saving rejects %s", (_name, edit) => {
+    const editor = commentAndImageReferenceFixture();
+    try {
+      const comments = editor.result.current.studioComments;
+      const references = editor.result.current.scenarioImageReferenceDocument;
+      const generation = editor.result.current.studioRevisionProjectGenerationRef.current;
+      editor.result.current.documentSaveInFlightRef.current = true;
+      act(() => edit(editor.result.current));
+      expect(editor.result.current.studioComments).toBe(comments);
+      expect(editor.result.current.scenarioImageReferenceDocument).toBe(references);
+      expect(editor.result.current.studioRevisionProjectGenerationRef.current).toBe(generation);
+      expect(editor.discardPixels).not.toHaveBeenCalled();
+      editor.result.current.documentSaveInFlightRef.current = false;
+      expect(resumeStudioRetainedStrokeHistory(editor.context)).toBe(true);
+      expect(editor.document.getStrokes().map(value => value.id)).toEqual(["older", stroke.id]);
+    } finally { editor.dispose(); }
   });
 });

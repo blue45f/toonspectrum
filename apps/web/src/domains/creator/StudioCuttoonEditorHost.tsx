@@ -5,6 +5,7 @@ import { createStudio2dCanvasImage } from "./studio-2d-source-size";
  */
 import { Command } from "lucide-react";
 import {
+  Suspense,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -384,7 +385,7 @@ import {
   DIALOGUE_LOCALE_PRESETS,
   SOURCE_LOCALE,
 } from "./lettering/studio-dialogue-translate";
-import { StudioAiSuperSuiteModal } from "./ai/StudioAiSuperSuiteModal";
+import { studioAiSuperSuiteModalLoader } from "./ai/studio-ai-super-suite-loader";
 import { StudioWebtoonAssistantModal } from "./assistant/StudioWebtoonAssistantModal";
 import {
   loadStudioPsdExportModule,
@@ -1419,10 +1420,13 @@ import { useIsMobile } from "@/src/hooks/use-media-query";
 import { useResizable } from "@/src/hooks/use-resizable";
 import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
 import { useT } from "@/shared/lib/i18n";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-asset-contract";
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
+
+const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
 
 export function StudioCuttoonEditor({
   remixId,
@@ -1733,6 +1737,7 @@ export function StudioCuttoonEditor({
     setDocumentReloadRequired,
     setDraftCollaboration,
     setScenarioImageReferenceDocument,
+    setScenarioImageReferenceDocumentState,
     setSharedDocumentScope,
     setStudioLiveEditsDurablyProtected,
     setWorkHydrated,
@@ -1764,6 +1769,7 @@ export function StudioCuttoonEditor({
     workHydrationUnsupportedFormat,
   } = useStudioDocumentAccessRuntime({
     announce: (message) => announceDrawingShortcut(message),
+    onAcceptedMutation: invalidatePendingRetainedRedo,
     getProjectSnapshot: () => currentStudioProjectSnapshot(),
     instantWorkId,
     liveRoomQueryParam,
@@ -1928,7 +1934,7 @@ export function StudioCuttoonEditor({
     studioTeamCommentsSyncing,
     studioTeamUnreadCommentIds,
     studioTeamUnreadCommentIdsRef,
-  } = useStudioCommentDocumentsRuntime({ markStudioDocumentChanged });
+  } = useStudioCommentDocumentsRuntime({ markStudioDocumentChanged, onAcceptedMutation: invalidatePendingRetainedRedo });
   const activePageIndex = Math.max(0, pages.findIndex((p) => p.id === currentPageId));
   // useMemo: 폴백 리터럴이 렌더마다 새 객체가 되지 않도록(memo 자식 prop 안정성).
   const activePage = useMemo(
@@ -6399,7 +6405,8 @@ export function StudioCuttoonEditor({
   const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
   const [webtoonAssistantOpen, setWebtoonAssistantOpen] = useState(false);
-  const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState(false);
+  // null defers the first load; false keeps an already requested dialog's drafts mounted.
+  const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState<boolean | null>(null);
   // useMemo: 패널 스택 memo 자식 prop 안정성(패널 닫힘 시 빈 배열 상수, 열림 시 pages 기준 재계산).
   const continuityScenes = useMemo(() => continuityOpen || productionInsightsOpen
     ? pages.flatMap((page, pageIndex) =>
@@ -26474,7 +26481,7 @@ function clearSelectionForEdit() {
     setReleaseSchedule(normalizeReleaseSchedule(projectData.releaseSchedule));
     setPublicationAnalytics(publicationAnalyticsDocument);
     setReferenceBoard(normalizeStudioReferenceBoardDocument(projectData.referenceBoard));
-    setScenarioImageReferenceDocument(
+    setScenarioImageReferenceDocumentState(
       hydrateStudioAiImageReferenceDocument(projectData.aiImageReferences),
     );
     return true;
@@ -27411,7 +27418,10 @@ function clearSelectionForEdit() {
           return false;
         }
         setAssetsLoaded(true);
-        setScenarioImageReferenceDocument(application.document);
+        if (!setScenarioImageReferenceDocument(application.document)) {
+          await deleteStudioAssetMutation(saved.id).catch(() => undefined);
+          return false;
+        }
         setScenarioError(null);
         setError(null);
         setBg3dOpen(false);
@@ -29423,15 +29433,26 @@ function clearSelectionForEdit() {
           canvasWidth={CANVAS_W}
           canvasHeight={canvasH}
         />
-        <StudioAiSuperSuiteModal
-          open={aiSuperSuiteOpen}
-          onClose={() => setAiSuperSuiteOpen(false)}
-          onApplyPrompt={(prompt) => {
-            setAiBgPrompt(prompt);
-            setAiAssistTool("background");
-            setAiSuperSuiteOpen(false);
-          }}
-        />
+        {aiSuperSuiteOpen !== null ? (
+          <Suspense fallback={aiSuperSuiteOpen ? (
+            <div className="fixed inset-0 z-[120] grid place-items-center bg-bg/80 p-4 backdrop-blur-sm" role="status">
+              <div className="rounded-xl border border-line bg-panel px-4 py-3 text-sm font-semibold text-fg shadow-xl">
+                AI 웹툰 레시피 도구를 여는 중…
+                <button type="button" className="ml-3 min-h-11 rounded-lg border border-line px-3" onClick={() => setAiSuperSuiteOpen(false)}>열기 취소</button>
+              </div>
+            </div>
+          ) : null}>
+            <StudioAiSuperSuiteModal
+              open={aiSuperSuiteOpen}
+              onClose={() => setAiSuperSuiteOpen(false)}
+              onApplyPrompt={(prompt) => {
+                setAiBgPrompt(prompt);
+                setAiAssistTool("background");
+                setAiSuperSuiteOpen(false);
+              }}
+            />
+          </Suspense>
+        ) : null}
       </StudioDccWorkbenchRoute>
     </StudioFilterDialogIntentContext>
   );
