@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/brick_4",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "red",
+      "moss",
+      "urban",
+      "city",
+      "damp",
+      "wet"
+    ],
+    "date_published": 1529359200,
+    "name": "Brick 4",
+    "categories": [
+      "wall",
+      "man made",
+      "dirty",
+      "outdoor",
+      "brick"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      500,
+      500
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "e38995ecc649eb71f1b8dde6b34c86f0f8005da3",
+    "description": "Free 8K texture of weathered red brick with damp, mossy mortar, chipped rough faces and subtle grime - aged urban outdoor wall material.",
+    "sponsors": [
+      "201346459"
+    ],
+    "category_id": "9ef0955b-87fa-5826-aa87-98b047ad9143",
+    "category": "Brick & Block/Clay Brick/Running-Bond",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "mossy"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "download_count": 135701,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/brick_4.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_4/brick_4_diff_2k.jpg",
+      "bytes": 1317342,
+      "sha256": "372740c306520ddc317fd4d3fc4c2fc89c3d23f62ccb8aa1e0aefc4cab3fd17b",
+      "sourceMd5": "367a1196b68efa3bbb40ca1404d7ac34"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_4/brick_4_rough_2k.jpg",
+      "bytes": 1353007,
+      "sha256": "00fa4bb8822daaf0531c539d1d67d7947ed4bfe4e12726ae775691c62410bf2b",
+      "sourceMd5": "730905c771f0ed64b431fa57197efd10"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_4/brick_4_nor_gl_2k.jpg",
+      "bytes": 1322757,
+      "sha256": "d23d401ab7d62537f4e4c0463ca40a9dc56053fc821bb988cbb9018649591028",
+      "sourceMd5": "63ddf407d2a3c41a51b56f70cf45431d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_4/brick_4_ao_2k.jpg",
+      "bytes": 759056,
+      "sha256": "290e49a1926b5e612d201e489eafff9681e2f3d6cc0e900174aa8ba5e45b0aa9",
+      "sourceMd5": "12dccc0b54d8151f20d23f2ae0344f89"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_4/brick_4_disp_2k.jpg",
+      "bytes": 769753,
+      "sha256": "8d58aa9141f07fa7621751c15c325e0a84037cd9e15435a2c83f3c526d30ab25",
+      "sourceMd5": "29b730bb8a73e896d244bf2747c00088"
+    }
+  ]
+}

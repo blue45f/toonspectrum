@@ -1,0 +1,98 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/vintage_day_bed",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 2,
+    "name": "Vintage Day Bed",
+    "categories": [
+      "collection: project_lighthouse",
+      "furniture",
+      "bed",
+      "seating"
+    ],
+    "category": "Furniture/Beds",
+    "tags": [
+      "old",
+      "vintage",
+      "antique",
+      "wooden",
+      "couch",
+      "bench",
+      "sofa-bed",
+      "matress",
+      "chaise"
+    ],
+    "description": "Free 8K model of a vintage day bed with worn carved wood, sagging cushion, laced pillow, and a draped floral quilt, rich in aged textures and detail.",
+    "authors": {
+      "Aron Łyczek": "All"
+    },
+    "donated": true,
+    "category_id": "51157f97-6c7b-5c3c-9b53-c48dd454ee74",
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 2715,
+    "texel_density": 1736.976216712533,
+    "dimensions": [
+      1972.5552201271057,
+      854.77614402771,
+      1127.3465404283343
+    ],
+    "files_hash": "18d7bb12a9c6a6290dae8a32f015167d5d41c29e",
+    "date_published": 1783036800,
+    "collections": [
+      "project_lighthouse"
+    ],
+    "attributes": {
+      "material": [
+        "wood",
+        "fabric"
+      ],
+      "condition": [
+        "worn"
+      ]
+    },
+    "download_count": 1772,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/vintage_day_bed.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/vintage_day_bed/vintage_day_bed_2k.gltf",
+      "bytes": 2791,
+      "sha256": "1ba8b83ffb698649e67cccdf70a2386e860a94be6222bd94fe39a9422f37220a",
+      "sourceMd5": "665ddf5fba4966d47ea851eacf175d80"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_day_bed/vintage_day_bed_nor_gl_2k.jpg",
+      "bytes": 3298837,
+      "sha256": "3e5de86318a6c095f90248dc672233a6175539454f5e3bf4ca4199ac6021592b",
+      "sourceMd5": "2d90879331addc16bfb5e86ee71072bb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_day_bed/vintage_day_bed_diff_2k.jpg",
+      "bytes": 2915898,
+      "sha256": "1233f9c2578d305196c20104af66b16cd979427a0eda880106b027e88d346e78",
+      "sourceMd5": "c9c553f50b151ab1db321a9d7f7c3cd1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_day_bed/vintage_day_bed_arm_2k.jpg",
+      "bytes": 2509885,
+      "sha256": "855bc16659865387308fcf16c87ea5483424455c1f846e89886122a55debd92d",
+      "sourceMd5": "4e246ffb4467353b4b163156dba26422"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/vintage_day_bed/vintage_day_bed.bin",
+      "bytes": 80292,
+      "sha256": "08172858c3f9d4225780013e4e9afd01bb9db42e17001fc6c790a183227ecf07",
+      "sourceMd5": "845d084810f5361db23508b3903a0d45"
+    }
+  ]
+}

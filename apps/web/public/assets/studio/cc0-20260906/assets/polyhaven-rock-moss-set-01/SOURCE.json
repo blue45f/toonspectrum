@@ -1,0 +1,96 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/rock_moss_set_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "donated": true,
+    "date_published": 1625069057,
+    "name": "Rock Moss Set 01",
+    "type": 2,
+    "authors": {
+      "Kless Gyzen": "All"
+    },
+    "categories": [
+      "rocks",
+      "nature",
+      "collection: pine_forest"
+    ],
+    "tags": [
+      "rocks",
+      "outdoor",
+      "stones",
+      "pebbles",
+      "rock",
+      "dirt"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 63127,
+    "texel_density": 606.028316455845,
+    "dimensions": [
+      8004.603862762451,
+      6948.764801025391,
+      1768.319845199585
+    ],
+    "sponsors": [
+      "82322099"
+    ],
+    "files_hash": "3d61828e10ef81512a639c8064c9a51a75165b5a",
+    "description": "Free 8K set of mossy forest rocks: six weathered stones with varied silhouettes, earthy textures, subtle green moss, dirt and realistic erosion.",
+    "category_id": "75be0f95-5fbf-5ce3-94a8-4b929bf42fb6",
+    "category": "Nature/Rocks & Stone/Stone Sets",
+    "collections": [
+      "pine_forest"
+    ],
+    "attributes": {
+      "condition": [
+        "weathered"
+      ],
+      "material": [
+        "stone"
+      ]
+    },
+    "download_count": 83366,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/rock_moss_set_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/rock_moss_set_01/rock_moss_set_01_2k.gltf",
+      "bytes": 9987,
+      "sha256": "794beaf2f4dc0ab155114f286049dc912a8f3287520965ca8bf6bb0d821ae3e2",
+      "sourceMd5": "c45cebb55c848a11233126f691557ca0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_moss_set_01/rock_moss_set_01.bin",
+      "bytes": 1466380,
+      "sha256": "de8360e6175879aaf02c171911069cf5f1852547f9ca7f10e440085dbcc3315e",
+      "sourceMd5": "207a51c9f56d34732e9814bbf9cc07b1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rock_moss_set_01/rock_moss_set_01_diff_2k.jpg",
+      "bytes": 649415,
+      "sha256": "bdee6da8baba67bd7e85e414e669cd46aab9afaf755114fb5163f0e68775c3d6",
+      "sourceMd5": "d3e1292c9e34bd6b4a236698a1b41290"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rock_moss_set_01/rock_moss_set_01_nor_gl_2k.jpg",
+      "bytes": 840957,
+      "sha256": "f11c238a203eebd5e82da3a50468040a78d25fd2e46783c4ad79b1022b144c0d",
+      "sourceMd5": "88be6d9cf2927a09182e2bfccc9b8b56"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/rock_moss_set_01/rock_moss_set_01_rough_2k.jpg",
+      "bytes": 293827,
+      "sha256": "a05a8bd9f2563cf55b738484b894671df7b2391aa02d66451366c5ad38077cd2",
+      "sourceMd5": "f7b3045b503fbde038598f8586ac25ef"
+    }
+  ]
+}

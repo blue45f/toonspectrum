@@ -1,0 +1,422 @@
+{
+  "schema": "toonstudio-acquired-assets/v1",
+  "assets": [
+    {
+      "id": "polyhaven-alarm-clock-01",
+      "name": "Alarm Clock 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "clock",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/alarm_clock_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-08"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": true,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-alarm-clock-01/alarm_clock_01-alpha-restored-v1.glb",
+      "bytes": 12654264,
+      "sha256": "19ae14d02dbb9e58409fb6759781dea6303183b7347e86987c548a677e88da45",
+      "geometrySha256": "889f8110da9652cf31ef4f4e0f928ac38a6ec763063afe2ef9d6fb6fb5771b4c",
+      "textureCount": 6,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source"
+      ],
+      "browserRenderVerified": true,
+      "sourceBounds": {
+        "min": [
+          -0.06582528352737427,
+          -0.0012277960777282715,
+          -0.024242693558335304
+        ],
+        "max": [
+          0.06582528352737427,
+          0.172927588224411,
+          0.04250587522983551
+        ]
+      },
+      "derivation": {
+        "kind": "author-opacity-restoration",
+        "originalPath": "assets/polyhaven-alarm-clock-01/alarm_clock_01.glb",
+        "originalSha256": "849813c07266af0a039bf934b8a2d32f8a7e2ac0b40bc2426cdebcd2b007e05e",
+        "geometrySha256": "889f8110da9652cf31ef4f4e0f928ac38a6ec763063afe2ef9d6fb6fb5771b4c",
+        "originalBinaryUnchanged": true,
+        "changedMaterial": "alarm_clock_01_Glass",
+        "changedProperty": "baseColorTexture alpha only",
+        "opacitySource": {
+          "apiUrl": "https://api.polyhaven.com/files/alarm_clock_01",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/alarm_clock_01/alarm_clock_01_opacity_2k.png",
+          "role": "opacity",
+          "md5": "fefcc95457f9e6549a4b8950c1ce818e",
+          "sha256": "e97255b47225f348e55a85da25aaa4c12d73f3cdfdcd3f783cacf6601b64f279",
+          "bytes": 44813,
+          "localPath": "_source/polyhaven-alarm-clock-01/alpha-restoration-v1/alarm_clock_01_opacity_2k.png"
+        },
+        "restoredTextureSha256": "2b37eab709829e5576852f8265a5f8970e219757dfbbcddd219b8408a8307a2c",
+        "width": 2048,
+        "height": 2048,
+        "alphaMin": 4,
+        "alphaMax": 255,
+        "nonOpaquePixels": 152652
+      },
+      "previewPath": "previews/polyhaven-alarm-clock-01.png",
+      "browserVerification": {
+        "checkedAt": "2026-09-07T17:52:35.317Z",
+        "sourceSha256": "19ae14d02dbb9e58409fb6759781dea6303183b7347e86987c548a677e88da45",
+        "gpu": {
+          "vendor": "Google Inc. (Apple)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+        },
+        "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+        "helper": "applyStudioBg3dRuntimeAssetQuality",
+        "decodedTextures": 6,
+        "views": [
+          {
+            "view": "front",
+            "renderedTriangles": 9705,
+            "foregroundPixels": 104854,
+            "pngSha256": "a56f65b6d4c7419e187248381d799405208b34ff97f33d7def5758c7f3be245c"
+          },
+          {
+            "view": "three-quarter",
+            "renderedTriangles": 9705,
+            "foregroundPixels": 102390,
+            "pngSha256": "de1ebd0e4c363c30c24d680b9325860e1a95a4d51049541782f9569a01c099d9"
+          },
+          {
+            "view": "back",
+            "renderedTriangles": 9705,
+            "foregroundPixels": 109572,
+            "pngSha256": "980ee025ad755ef6797315fd0dcb470d143897a463e065427c3b19185307cf13"
+          }
+        ],
+        "gltfValidator": {
+          "validator": "Khronos glTF-Validator",
+          "version": "2.0.0-dev.3.10",
+          "numErrors": 0,
+          "numWarnings": 5,
+          "numInfos": 1,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/1/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/3/primitives/0/material"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/textures/4"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "polyhaven-vintage-grandfather-clock-01",
+      "name": "Vintage Grandfather Clock 01",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "clock",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/vintage_grandfather_clock_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-08"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": true,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-vintage-grandfather-clock-01/vintage_grandfather_clock_01-alpha-restored-v1.glb",
+      "bytes": 13505372,
+      "sha256": "61bb42981384eb36f009003da210390c1e2b183764536c3f98d6746410e7096a",
+      "geometrySha256": "93bdda0c43e8cea4dcc60328ac3f9ab1d1dc51965281f423ca5de8e2943914d2",
+      "textureCount": 3,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source"
+      ],
+      "browserRenderVerified": true,
+      "sourceBounds": {
+        "min": [
+          -0.2500464802817314,
+          -0.00006496906280517578,
+          -0.25097261662777115
+        ],
+        "max": [
+          0.375578320058381,
+          2.1905269622802734,
+          0.1756440126084514
+        ]
+      },
+      "derivation": {
+        "kind": "author-opacity-restoration",
+        "originalPath": "assets/polyhaven-vintage-grandfather-clock-01/vintage_grandfather_clock_01.glb",
+        "originalSha256": "ee9b1516915a6f514dae33cc014fb93a7e10197a3cf9601257e49ede86dc0d0c",
+        "geometrySha256": "93bdda0c43e8cea4dcc60328ac3f9ab1d1dc51965281f423ca5de8e2943914d2",
+        "originalBinaryUnchanged": true,
+        "changedMaterial": "vintage_grandfather_clock_01_glass",
+        "changedProperty": "baseColorTexture alpha only",
+        "opacitySource": {
+          "apiUrl": "https://api.polyhaven.com/files/vintage_grandfather_clock_01",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/vintage_grandfather_clock_01/vintage_grandfather_clock_01_opacity_2k.png",
+          "role": "opacity",
+          "md5": "23f1b8e62bcd1c4ed832d3fe4643788d",
+          "sha256": "53c73641833eb8d99d1661177be981073baccbbeda03e8550fb37fa12dbfeb5c",
+          "bytes": 24989,
+          "localPath": "_source/polyhaven-vintage-grandfather-clock-01/alpha-restoration-v1/vintage_grandfather_clock_01_opacity_2k.png"
+        },
+        "restoredTextureSha256": "66f4ea61e929854036042e280d0f00dee86161f6221dca34296a9ecb26cf3501",
+        "width": 2048,
+        "height": 2048,
+        "alphaMin": 0,
+        "alphaMax": 255,
+        "nonOpaquePixels": 57387
+      },
+      "previewPath": "previews/polyhaven-vintage-grandfather-clock-01.png",
+      "browserVerification": {
+        "checkedAt": "2026-09-07T17:52:35.577Z",
+        "sourceSha256": "61bb42981384eb36f009003da210390c1e2b183764536c3f98d6746410e7096a",
+        "gpu": {
+          "vendor": "Google Inc. (Apple)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+        },
+        "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+        "helper": "applyStudioBg3dRuntimeAssetQuality",
+        "decodedTextures": 4,
+        "views": [
+          {
+            "view": "front",
+            "renderedTriangles": 8601,
+            "foregroundPixels": 69709,
+            "pngSha256": "221e0510688c05719839e558735cb00208899d5f007f0304078763e16e270b60"
+          },
+          {
+            "view": "three-quarter",
+            "renderedTriangles": 8601,
+            "foregroundPixels": 74028,
+            "pngSha256": "6bdff6b0724a860b570ab4db0efb46e4b137f0f30e262c184cb29885ceca71d7"
+          },
+          {
+            "view": "back",
+            "renderedTriangles": 8601,
+            "foregroundPixels": 70228,
+            "pngSha256": "fc7800d35dcb64040f38860ad25f02696da8ea972cba47bd1b5e27defd317408"
+          }
+        ],
+        "gltfValidator": {
+          "validator": "Khronos glTF-Validator",
+          "version": "2.0.0-dev.3.10",
+          "numErrors": 0,
+          "numWarnings": 4,
+          "numInfos": 1,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/1/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/1/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/2/primitives/0/material"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/textures/4"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "polyhaven-vintage-telephone-wall-clock",
+      "name": "Vintage Telephone Wall Clock",
+      "kind": "model",
+      "category": "pbr-detailed-prop",
+      "style": "pbr-detailed",
+      "selectionTerm": "telephone",
+      "license": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/vintage_telephone_wall_clock",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-08"
+      },
+      "visualReviewed": false,
+      "studioRuntimeVerified": true,
+      "curationStatus": "candidate",
+      "path": "assets/polyhaven-vintage-telephone-wall-clock/vintage_telephone_wall_clock-alpha-restored-v1.glb",
+      "bytes": 17799628,
+      "sha256": "964e8ba577e1519c9e76edc78bea6fe04837b82d3282feec16c19d7d4fc1f95f",
+      "geometrySha256": "e27b18d25787be2378025a90e03a7982bd279ecb6e96cc968c26e80bb4ec719a",
+      "textureCount": 4,
+      "technicalChecks": [
+        "official-API-checksum",
+        "self-contained-GLB",
+        "finite-positions",
+        "accessor-bounds",
+        "native-2K-source"
+      ],
+      "browserRenderVerified": true,
+      "sourceBounds": {
+        "min": [
+          -0.17600713670253754,
+          -0.0735805481672287,
+          -3.725290298461914e-8
+        ],
+        "max": [
+          0.16679838299751282,
+          0.427651584148407,
+          0.19256296753883362
+        ]
+      },
+      "derivation": {
+        "kind": "author-opacity-restoration",
+        "originalPath": "assets/polyhaven-vintage-telephone-wall-clock/vintage_telephone_wall_clock.glb",
+        "originalSha256": "f1d4bf0b56a68e58745c9450f2742eb4888fa078edecefa5fc83bd23cdde112d",
+        "geometrySha256": "e27b18d25787be2378025a90e03a7982bd279ecb6e96cc968c26e80bb4ec719a",
+        "originalBinaryUnchanged": true,
+        "changedMaterial": "vintage_telephone_wall_clock_glass",
+        "changedProperty": "baseColorTexture alpha only",
+        "opacitySource": {
+          "apiUrl": "https://api.polyhaven.com/files/vintage_telephone_wall_clock",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/vintage_telephone_wall_clock/vintage_telephone_wall_clock_alpha_2k.png",
+          "role": "Alpha",
+          "md5": "3ba71cbd609bb8c2b5953831db370a10",
+          "sha256": "434a0ee396e35a6527b79c94d790fe4b7e22ec280687548e85e965acd19febe9",
+          "bytes": 523195,
+          "localPath": "_source/polyhaven-vintage-telephone-wall-clock/alpha-restoration-v1/vintage_telephone_wall_clock_alpha_2k.png"
+        },
+        "restoredTextureSha256": "26ccabbd1b1b615ea1e014c68ccfc8f253bae8b760dd954f626c4533421d8a41",
+        "width": 2048,
+        "height": 2048,
+        "alphaMin": 66,
+        "alphaMax": 255,
+        "nonOpaquePixels": 514381
+      },
+      "previewPath": "previews/polyhaven-vintage-telephone-wall-clock.png",
+      "browserVerification": {
+        "checkedAt": "2026-09-07T17:52:35.875Z",
+        "sourceSha256": "964e8ba577e1519c9e76edc78bea6fe04837b82d3282feec16c19d7d4fc1f95f",
+        "gpu": {
+          "vendor": "Google Inc. (Apple)",
+          "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+          "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+        },
+        "lighting": "RoomEnvironment PMREM IBL + hemisphere + three directional lights; authored materials preserved",
+        "helper": "applyStudioBg3dRuntimeAssetQuality",
+        "decodedTextures": 4,
+        "views": [
+          {
+            "view": "front",
+            "renderedTriangles": 16248,
+            "foregroundPixels": 108378,
+            "pngSha256": "77cf66b6606da9cca24446f4ca8339d6bbdd8300060b64aaefa0b4a6d3141376"
+          },
+          {
+            "view": "three-quarter",
+            "renderedTriangles": 16248,
+            "foregroundPixels": 110567,
+            "pngSha256": "f16669deb530dc95c32eeb650007c73be15de88c81caec926e4c10c771a37d51"
+          },
+          {
+            "view": "back",
+            "renderedTriangles": 16248,
+            "foregroundPixels": 128309,
+            "pngSha256": "f7ea209cd7b197a94f4482d734386f3672de8a31671dd784668de30040f75cfe"
+          }
+        ],
+        "gltfValidator": {
+          "validator": "Khronos glTF-Validator",
+          "version": "2.0.0-dev.3.10",
+          "numErrors": 0,
+          "numWarnings": 2,
+          "numInfos": 1,
+          "messages": [
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/0/material"
+            },
+            {
+              "code": "MESH_PRIMITIVE_GENERATED_TANGENT_SPACE",
+              "message": "Material requires a tangent space but the mesh primitive does not provide it. Runtime-generated tangent space may be non-portable across implementations.",
+              "severity": 1,
+              "pointer": "/meshes/0/primitives/1/material"
+            },
+            {
+              "code": "UNUSED_OBJECT",
+              "message": "This object may be unused.",
+              "severity": 2,
+              "pointer": "/textures/1"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

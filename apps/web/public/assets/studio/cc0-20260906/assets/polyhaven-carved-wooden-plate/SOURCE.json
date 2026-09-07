@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/carved_wooden_plate",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Carved Wooden Plate",
+    "categories": [
+      "props",
+      "decorative",
+      "dishes"
+    ],
+    "type": 2,
+    "tags": [
+      "vintage",
+      "wood",
+      "antique",
+      "carved",
+      "hand made",
+      "crafted",
+      "fruitbowl",
+      "plate"
+    ],
+    "authors": {
+      "Jan Martens": "All"
+    },
+    "info": null,
+    "date_published": 1698451200,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 2112,
+    "texel_density": 17162.439008936908,
+    "dimensions": [
+      271.8309164047241,
+      268.7795162200928,
+      38.11051766388118
+    ],
+    "files_hash": "39a0c6ebce60b891533dad0fc0ed42be6b255bf1",
+    "description": "Free 8K model, hand-carved antique wooden plate with shallow bowl, visible tool marks, knotty grain and carved geometric border.",
+    "category_id": "24c79735-ce8c-5dc0-b30a-5018b8b7167c",
+    "category": "Food & Kitchen/Tableware/Plates",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "download_count": 6464,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/carved_wooden_plate.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/carved_wooden_plate/carved_wooden_plate_2k.gltf",
+      "bytes": 2836,
+      "sha256": "f456a068bef31ee6510b5ee3077a5380d34c04a8fcc1f9f3f2776f4f64400206",
+      "sourceMd5": "cad726680f59f1e6f368a1ae594d5cfa"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/carved_wooden_plate/carved_wooden_plate_nor_gl_2k.jpg",
+      "bytes": 1859515,
+      "sha256": "527718d0aac0353e916a45e3a4b02aedb6423035de4a6a9a36efbb619f15e431",
+      "sourceMd5": "45a39e088c4ae126349e78669b06d0ab"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/carved_wooden_plate/carved_wooden_plate_diff_2k.jpg",
+      "bytes": 1766314,
+      "sha256": "83c8f8f3372adaf00692f6a1e88567bf69d74d44f94d81362513e7467bdc247a",
+      "sourceMd5": "eadec5f52689f3382bc71da670fc2b8f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/carved_wooden_plate/carved_wooden_plate_arm_2k.jpg",
+      "bytes": 1586665,
+      "sha256": "55f0b5d77b7dadd137bb5a2b33b0add07f030c55acc81ed15a742c176640603f",
+      "sourceMd5": "3f34954ee9955ee7df165bf38432c075"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/carved_wooden_plate/carved_wooden_plate.bin",
+      "bytes": 52160,
+      "sha256": "4a605b576b1e79968f668c8624733e2e0fff073ae9fc1107b55ad4d976b99787",
+      "sourceMd5": "70499c8019359d859577d9f7eef46091"
+    }
+  ]
+}

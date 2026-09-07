@@ -1,0 +1,112 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/fancy_picture_frame_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "art",
+      "vintage",
+      "old",
+      "dutch",
+      "painting",
+      "oil",
+      "antique",
+      "fancy",
+      "frame",
+      "picture"
+    ],
+    "name": "Fancy Picture Frame 02",
+    "categories": [
+      "decorative",
+      "wall decoration"
+    ],
+    "date_published": 1631232000,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 35102,
+    "texel_density": 7611.923857905008,
+    "dimensions": [
+      660.5590283870697,
+      89.04315833933651,
+      771.0452079772949
+    ],
+    "files_hash": "53929893cbeaef7e3bce4784bfbf8afa2cd7bcca",
+    "description": "Free 8K model: ornate antique gold gilt frame with carved rococo flourishes, worn patina and an inset Dutch oil painting of gabled canal houses.",
+    "authors": {
+      "Rob Tuytel": "Scan & Painting",
+      "Rico Cilliers": "modeling"
+    },
+    "category_id": "120bc7c7-4121-53e5-848a-89f3cb7cbf51",
+    "category": "Decor & Art/Wall Decor/Picture Frames & Art",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "download_count": 28080,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/fancy_picture_frame_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/fancy_picture_frame_02/fancy_picture_frame_02_2k.gltf",
+      "bytes": 5085,
+      "sha256": "2e365c648d78755442ed0673cd4dc648a03ebb0584da882214ecbced09c8d9f2",
+      "sourceMd5": "5a61a25a449f95daf82f781624ee0be5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fancy_picture_frame_02/fancy_picture_frame_02_nor_gl_2k.jpg",
+      "bytes": 1019316,
+      "sha256": "df5f0ca03df47437eb6cb9efefe9228326c507613bcdf005862ce09c6471f0e6",
+      "sourceMd5": "f4a5999fd7e0e8cb056745919be146fb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/fancy_picture_frame_02/fancy_picture_frame_02.bin",
+      "bytes": 825908,
+      "sha256": "cc94201d75e5934dce90f3adfe7ab19e63f163bd22e22bf8e594ca8f29ef459e",
+      "sourceMd5": "352cff9f333720063a5948aaffc9d0f3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fancy_picture_frame_02/fancy_picture_frame_02_rough_2k.jpg",
+      "bytes": 675877,
+      "sha256": "b7a2bb39756e45c969ba06148fcede64dd7be76b7a0fde64a312b2f2963fe8c2",
+      "sourceMd5": "5e8cecd97d97d417f19cc1a72248bf49"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fancy_picture_frame_02/fancy_picture_frame_02_diff_2k.jpg",
+      "bytes": 796246,
+      "sha256": "baf519889eecd41336174a9a656d15bd65db6e5c4418ad46a8a7496a04cbb3bf",
+      "sourceMd5": "79b21893b2f3f8a50cf54a1931486cd8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fancy_picture_frame_02/fancy_picture_frame_02_canvas_rough_2k.jpg",
+      "bytes": 350054,
+      "sha256": "8258f663ac25d13e296a10506c506499bfa2851962e0c89bb83321c8995ec507",
+      "sourceMd5": "271e63e0c741fcb337def4012203952f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fancy_picture_frame_02/fancy_picture_frame_02_canvas_nor_gl_2k.jpg",
+      "bytes": 181655,
+      "sha256": "dbb01b95e14af71ca5ed4ac0f56e25e925207c4626af83faa4a4a7b77e896352",
+      "sourceMd5": "ba1f815bfa9c95f5b135e18e97f0f092"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fancy_picture_frame_02/fancy_picture_frame_02_canvas_diff_2k.jpg",
+      "bytes": 388701,
+      "sha256": "91e52f33d426019e6a42c9b58969bd25859823cbef11ba16997fc106cb751576",
+      "sourceMd5": "c54b6368bcd532187efbe35ea39d4574"
+    }
+  ]
+}

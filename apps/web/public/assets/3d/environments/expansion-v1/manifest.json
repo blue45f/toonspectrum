@@ -1,0 +1,766 @@
+{
+  "version": "expansion-v1",
+  "assets": [
+    {
+      "id": "ts-bg3d-library_reading_room-expansion-v1",
+      "generator": "scripts/blender/generate_studio_environment_expansion_v1.py",
+      "license": "CC0-1.0",
+      "sourceModels": [
+        {
+          "id": "polyhaven-modern-arm-chair-01",
+          "sourceUrl": "https://polyhaven.com/a/modern_arm_chair_01",
+          "license": "CC0-1.0",
+          "sourceTriangles": 8916,
+          "deliveredTriangles": 8916
+        },
+        {
+          "id": "polyhaven-book-encyclopedia-set-01",
+          "sourceUrl": "https://polyhaven.com/a/book_encyclopedia_set_01",
+          "license": "CC0-1.0",
+          "sourceTriangles": 67306,
+          "deliveredTriangles": 16000
+        },
+        {
+          "id": "polyhaven-potted-plant-04",
+          "sourceUrl": "https://polyhaven.com/a/potted_plant_04",
+          "license": "CC0-1.0",
+          "sourceTriangles": 8929,
+          "deliveredTriangles": 8929
+        }
+      ],
+      "sourceMaterials": [
+        {
+          "material": "Warm oak",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Walnut",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Limestone",
+          "id": "marble_01",
+          "sourceUrl": "https://polyhaven.com/a/marble_01",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Concrete",
+          "id": "concrete_floor_02",
+          "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Ivory plaster",
+          "id": "white_plaster_02",
+          "sourceUrl": "https://polyhaven.com/a/white_plaster_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Upholstery",
+          "id": "denmin_fabric_02",
+          "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+          "license": "CC0-1.0"
+        }
+      ],
+      "semanticParts": [
+        "six-seat shared reading table",
+        "individual desk lamps",
+        "high multi-level bound-book shelves",
+        "reference desk",
+        "clerestory windows",
+        "open front circulation"
+      ],
+      "studioRuntimeVerified": false,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "single-perspective-render-reviewed",
+      "metrics": [
+        {
+          "bytes": 23818220,
+          "nodes": 24,
+          "triangles": 149261,
+          "drawCalls": 31,
+          "materials": 21,
+          "textures": 22,
+          "images": 20
+        },
+        "2461352f0b60143a21f88e9173f3700efcd919fbbc05b1dbc5e92c087680bc39"
+      ],
+      "byteSize": 23818220,
+      "sha256": "sha256:2461352f0b60143a21f88e9173f3700efcd919fbbc05b1dbc5e92c087680bc39",
+      "bounds": [
+        10,
+        4.4,
+        8
+      ],
+      "camera": {
+        "position": [
+          12.2,
+          9.2,
+          13.8
+        ],
+        "target": [
+          0,
+          1.4,
+          0
+        ],
+        "fovDegrees": 44
+      },
+      "url": "/assets/3d/environments/expansion-v1/library_reading_room.glb",
+      "fileName": "library_reading_room.glb",
+      "thumbnailUrl": "/assets/3d/environments/expansion-v1/thumbnails/library_reading_room.png",
+      "name": "도서관 열람실",
+      "theme": "education",
+      "description": "중앙 공동 열람대, 개별 조명, 2층 높이 서가와 조용한 창가 좌석을 갖춘 도서관",
+      "tags": [
+        "library",
+        "reading room",
+        "books",
+        "도서관",
+        "열람실"
+      ],
+      "visualReviewed": true,
+      "visualReviewSource": "/assets/3d/environments/expansion-v1/thumbnails/library_reading_room.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+        "scope": "One authored oblique scene overview, not a multi-angle approval",
+        "reviewedModelSha256": "sha256:2461352f0b60143a21f88e9173f3700efcd919fbbc05b1dbc5e92c087680bc39",
+        "reviewedImageSha256": "sha256:b26cd89704657525659ef4db31914e0b95b7f350f52250d160104eccaabb8b46",
+        "observations": "Visible bound-book shelves, shared six-seat desk, task lamps, reference books supported by the reference desk; clear front circulation. Left-wall label no longer hidden behind shelves.",
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-independent_bookshop-expansion-v1",
+      "generator": "scripts/blender/generate_studio_environment_expansion_v1.py",
+      "license": "CC0-1.0",
+      "sourceModels": [
+        {
+          "id": "polyhaven-modern-arm-chair-01",
+          "sourceUrl": "https://polyhaven.com/a/modern_arm_chair_01",
+          "license": "CC0-1.0",
+          "sourceTriangles": 8916,
+          "deliveredTriangles": 8916
+        },
+        {
+          "id": "polyhaven-potted-plant-02",
+          "sourceUrl": "https://polyhaven.com/a/potted_plant_02",
+          "license": "CC0-1.0",
+          "sourceTriangles": 69806,
+          "deliveredTriangles": 15998
+        }
+      ],
+      "sourceMaterials": [
+        {
+          "material": "Warm oak",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Walnut",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Limestone",
+          "id": "marble_01",
+          "sourceUrl": "https://polyhaven.com/a/marble_01",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Concrete",
+          "id": "concrete_floor_02",
+          "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Ivory plaster",
+          "id": "white_plaster_02",
+          "sourceUrl": "https://polyhaven.com/a/white_plaster_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Upholstery",
+          "id": "denmin_fabric_02",
+          "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+          "license": "CC0-1.0"
+        }
+      ],
+      "semanticParts": [
+        "offset three-tier display islands",
+        "face-out new releases",
+        "checkout register",
+        "book-lined shopfront window",
+        "full-height bound-book shelves",
+        "reading nook"
+      ],
+      "studioRuntimeVerified": false,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "single-perspective-render-reviewed",
+      "metrics": [
+        {
+          "bytes": 21020616,
+          "nodes": 18,
+          "triangles": 88478,
+          "drawCalls": 20,
+          "materials": 20,
+          "textures": 22,
+          "images": 20
+        },
+        "bc1986e34e69d53a98550b5afa6e678be36b16fe22b82a2daafccd6acfcd5a43"
+      ],
+      "byteSize": 21020616,
+      "sha256": "sha256:bc1986e34e69d53a98550b5afa6e678be36b16fe22b82a2daafccd6acfcd5a43",
+      "bounds": [
+        8.5,
+        3.6,
+        8.015
+      ],
+      "camera": {
+        "position": [
+          11.5,
+          8.8,
+          13
+        ],
+        "target": [
+          0,
+          1.25,
+          0
+        ],
+        "fovDegrees": 44
+      },
+      "url": "/assets/3d/environments/expansion-v1/independent_bookshop.glb",
+      "fileName": "independent_bookshop.glb",
+      "thumbnailUrl": "/assets/3d/environments/expansion-v1/thumbnails/independent_bookshop.png",
+      "name": "독립 서점",
+      "theme": "retail",
+      "description": "계단식 신간 진열, 전면 쇼윈도, 벽면 서가와 계산대로 구성된 골목 독립 서점",
+      "tags": [
+        "bookshop",
+        "retail",
+        "books",
+        "서점",
+        "책방"
+      ],
+      "visualReviewed": true,
+      "visualReviewSource": "/assets/3d/environments/expansion-v1/thumbnails/independent_bookshop.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+        "scope": "One authored oblique scene overview, not a multi-angle approval",
+        "reviewedModelSha256": "sha256:bc1986e34e69d53a98550b5afa6e678be36b16fe22b82a2daafccd6acfcd5a43",
+        "reviewedImageSha256": "sha256:74d163031c49a388c6597517356b6b9c2ff7867df3809b43b0a75fdb86a10d22",
+        "observations": "Offset stepped face-out display islands, partial shopfront glazing, book-lined wall and checkout remain distinct from the library reading layout.",
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-fashion_boutique-expansion-v1",
+      "generator": "scripts/blender/generate_studio_environment_expansion_v1.py",
+      "license": "CC0-1.0",
+      "sourceModels": [
+        {
+          "id": "polyhaven-potted-plant-04",
+          "sourceUrl": "https://polyhaven.com/a/potted_plant_04",
+          "license": "CC0-1.0",
+          "sourceTriangles": 8929,
+          "deliveredTriangles": 8929
+        }
+      ],
+      "sourceMaterials": [
+        {
+          "material": "Warm oak",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Walnut",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Limestone",
+          "id": "marble_01",
+          "sourceUrl": "https://polyhaven.com/a/marble_01",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Concrete",
+          "id": "concrete_floor_02",
+          "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Ivory plaster",
+          "id": "white_plaster_02",
+          "sourceUrl": "https://polyhaven.com/a/white_plaster_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Upholstery",
+          "id": "denmin_fabric_02",
+          "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Fashion fabric 0",
+          "id": "denmin_fabric_02",
+          "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Fashion fabric 1",
+          "id": "denmin_fabric_02",
+          "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Fashion fabric 2",
+          "id": "denmin_fabric_02",
+          "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Fashion fabric 3",
+          "id": "denmin_fabric_02",
+          "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+          "license": "CC0-1.0"
+        }
+      ],
+      "semanticParts": [
+        "eight shaped garments with hangers and jacket buttons",
+        "twin brass garment racks",
+        "open pleated fitting room",
+        "full length mirror",
+        "accessory display plinths",
+        "upholstered waiting bench"
+      ],
+      "studioRuntimeVerified": false,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "single-perspective-render-reviewed",
+      "metrics": [
+        {
+          "bytes": 12516872,
+          "nodes": 13,
+          "triangles": 63093,
+          "drawCalls": 13,
+          "materials": 13,
+          "textures": 21,
+          "images": 13
+        },
+        "e4d529856c6be1ae13ff684858d85a3fc51ead2eb3dd86ffd1b03367df2f94a5"
+      ],
+      "byteSize": 12516872,
+      "sha256": "sha256:e4d529856c6be1ae13ff684858d85a3fc51ead2eb3dd86ffd1b03367df2f94a5",
+      "bounds": [
+        9.5,
+        3.65,
+        8
+      ],
+      "camera": {
+        "position": [
+          12.5,
+          9,
+          13.5
+        ],
+        "target": [
+          0,
+          1.3,
+          0
+        ],
+        "fovDegrees": 44
+      },
+      "url": "/assets/3d/environments/expansion-v1/fashion_boutique.glb",
+      "fileName": "fashion_boutique.glb",
+      "thumbnailUrl": "/assets/3d/environments/expansion-v1/thumbnails/fashion_boutique.png",
+      "name": "패션 부티크",
+      "theme": "retail",
+      "description": "입체 재킷과 드레스 행거, 곡선 피팅룸, 거울과 중앙 액세서리 진열대가 있는 의류 매장",
+      "tags": [
+        "fashion",
+        "boutique",
+        "fitting room",
+        "옷가게",
+        "부티크"
+      ],
+      "visualReviewed": true,
+      "visualReviewSource": "/assets/3d/environments/expansion-v1/thumbnails/fashion_boutique.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+        "scope": "One authored oblique scene overview, not a multi-angle approval",
+        "reviewedModelSha256": "sha256:e4d529856c6be1ae13ff684858d85a3fc51ead2eb3dd86ffd1b03367df2f94a5",
+        "reviewedImageSha256": "sha256:cf3713073618799f34cdb56596147427396b3ed3520b1fb95f4945f13960f8aa",
+        "observations": "Tailored jackets and flared dresses hang from racks; open pleated fitting room, mirror, accessory display and upholstered bench have distinct forms. Garments are stylized set dressing, not skinned wearable assets.",
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-park_garden_pavilion-expansion-v1",
+      "generator": "scripts/blender/generate_studio_environment_expansion_v1.py",
+      "license": "CC0-1.0",
+      "sourceModels": [
+        {
+          "id": "polyhaven-potted-plant-04",
+          "sourceUrl": "https://polyhaven.com/a/potted_plant_04",
+          "license": "CC0-1.0",
+          "sourceTriangles": 8929,
+          "deliveredTriangles": 8929
+        },
+        {
+          "id": "polyhaven-potted-plant-02",
+          "sourceUrl": "https://polyhaven.com/a/potted_plant_02",
+          "license": "CC0-1.0",
+          "sourceTriangles": 69806,
+          "deliveredTriangles": 15998
+        }
+      ],
+      "sourceMaterials": [
+        {
+          "material": "Warm oak",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Walnut",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Limestone",
+          "id": "marble_01",
+          "sourceUrl": "https://polyhaven.com/a/marble_01",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Concrete",
+          "id": "concrete_floor_02",
+          "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Ivory plaster",
+          "id": "white_plaster_02",
+          "sourceUrl": "https://polyhaven.com/a/white_plaster_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Upholstery",
+          "id": "denmin_fabric_02",
+          "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Garden soil",
+          "id": "coast_sand_rocks_02",
+          "sourceUrl": "https://polyhaven.com/a/coast_sand_rocks_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Roof charcoal",
+          "id": "concrete_floor_02",
+          "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+          "license": "CC0-1.0"
+        }
+      ],
+      "semanticParts": [
+        "octagonal post-and-rafter pavilion",
+        "rear standing seam roof with front architectural cutaway",
+        "stone plinth and stepped entry",
+        "central table",
+        "bolted timber-slat benches",
+        "paved pedestrian route",
+        "branched deciduous trees with individual leaves and grass planting beds"
+      ],
+      "studioRuntimeVerified": false,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "single-perspective-render-reviewed",
+      "metrics": [
+        {
+          "bytes": 20896920,
+          "nodes": 13,
+          "triangles": 92171,
+          "drawCalls": 14,
+          "materials": 14,
+          "textures": 21,
+          "images": 19
+        },
+        "6cf4b5ba75ded1e8fcfb891e1774420f192a1952c480b6914cd292aab781d0ff"
+      ],
+      "byteSize": 20896920,
+      "sha256": "sha256:6cf4b5ba75ded1e8fcfb891e1774420f192a1952c480b6914cd292aab781d0ff",
+      "bounds": [
+        13.168,
+        4.56574,
+        11
+      ],
+      "camera": {
+        "position": [
+          15,
+          10.8,
+          16
+        ],
+        "target": [
+          0,
+          1.2,
+          0
+        ],
+        "fovDegrees": 46
+      },
+      "url": "/assets/3d/environments/expansion-v1/park_garden_pavilion.glb",
+      "fileName": "park_garden_pavilion.glb",
+      "thumbnailUrl": "/assets/3d/environments/expansion-v1/thumbnails/park_garden_pavilion.png",
+      "name": "공원 정자와 산책로",
+      "theme": "urban",
+      "description": "목조 정자, 분절된 지붕, 원형 휴게 데크, 나무 벤치와 곡선 화단이 이어지는 공원",
+      "tags": [
+        "park",
+        "pavilion",
+        "garden",
+        "공원",
+        "정자",
+        "야외"
+      ],
+      "visualReviewed": true,
+      "visualReviewSource": "/assets/3d/environments/expansion-v1/thumbnails/park_garden_pavilion.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+        "scope": "One authored oblique scene overview, not a multi-angle approval",
+        "reviewedModelSha256": "sha256:6cf4b5ba75ded1e8fcfb891e1774420f192a1952c480b6914cd292aab781d0ff",
+        "reviewedImageSha256": "sha256:2869771a8b4b3816f73038247f24cd8dc405f9841980f5be0e33aafffdcdb89c",
+        "observations": "Octagonal posts and rafters, deliberate front roof cutaway, bolted slatted benches, pavers, branched trees with individual leaves and planted beds. Oversized duplicate pots removed.",
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-police_interview_room-expansion-v1",
+      "generator": "scripts/blender/generate_studio_environment_expansion_v1.py",
+      "license": "CC0-1.0",
+      "sourceModels": [],
+      "sourceMaterials": [
+        {
+          "material": "Warm oak",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Walnut",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Limestone",
+          "id": "marble_01",
+          "sourceUrl": "https://polyhaven.com/a/marble_01",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Concrete",
+          "id": "concrete_floor_02",
+          "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Ivory plaster",
+          "id": "white_plaster_02",
+          "sourceUrl": "https://polyhaven.com/a/white_plaster_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Upholstery",
+          "id": "denmin_fabric_02",
+          "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+          "license": "CC0-1.0"
+        }
+      ],
+      "semanticParts": [
+        "framed observation glass",
+        "hinged security door with latch and vision panel",
+        "fixed interview table with floor anchors",
+        "two tubular steel chairs",
+        "recorder and case folder",
+        "security camera",
+        "acoustic wall battens"
+      ],
+      "studioRuntimeVerified": false,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "single-perspective-render-reviewed",
+      "metrics": [
+        {
+          "bytes": 5305120,
+          "nodes": 12,
+          "triangles": 34356,
+          "drawCalls": 12,
+          "materials": 12,
+          "textures": 7,
+          "images": 7
+        },
+        "ad031daef47016e60f868a2371b5a7fa74174e4e80b0cd8e5b33c6be28f4bfa0"
+      ],
+      "byteSize": 5305120,
+      "sha256": "sha256:ad031daef47016e60f868a2371b5a7fa74174e4e80b0cd8e5b33c6be28f4bfa0",
+      "bounds": [
+        7,
+        3.35,
+        6
+      ],
+      "camera": {
+        "position": [
+          9.5,
+          7,
+          10.2
+        ],
+        "target": [
+          0,
+          1.15,
+          0
+        ],
+        "fovDegrees": 44
+      },
+      "url": "/assets/3d/environments/expansion-v1/police_interview_room.glb",
+      "fileName": "police_interview_room.glb",
+      "thumbnailUrl": "/assets/3d/environments/expansion-v1/thumbnails/police_interview_room.png",
+      "name": "경찰 조사실",
+      "theme": "urban",
+      "description": "관찰창, 보안문, 고정 대면 책상, 녹음 장치와 CCTV를 갖춘 차분한 조사 공간",
+      "tags": [
+        "police",
+        "interview",
+        "investigation",
+        "경찰",
+        "조사실"
+      ],
+      "visualReviewed": true,
+      "visualReviewSource": "/assets/3d/environments/expansion-v1/thumbnails/police_interview_room.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+        "scope": "One authored oblique scene overview, not a multi-angle approval",
+        "reviewedModelSha256": "sha256:ad031daef47016e60f868a2371b5a7fa74174e4e80b0cd8e5b33c6be28f4bfa0",
+        "reviewedImageSha256": "sha256:b2738e4bcc54509a21658eed2a0bc4e18f05b76bfd1cca909434f2c4a7148719",
+        "observations": "Observation glass, security-door hinges and latch, recording device and CCTV are visible; fixed-table floor plates align with the legs and overhead lights have support rails.",
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-science_research_laboratory-expansion-v1",
+      "generator": "scripts/blender/generate_studio_environment_expansion_v1.py",
+      "license": "CC0-1.0",
+      "sourceModels": [],
+      "sourceMaterials": [
+        {
+          "material": "Warm oak",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Walnut",
+          "id": "wood_table_001",
+          "sourceUrl": "https://polyhaven.com/a/wood_table_001",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Limestone",
+          "id": "marble_01",
+          "sourceUrl": "https://polyhaven.com/a/marble_01",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Concrete",
+          "id": "concrete_floor_02",
+          "sourceUrl": "https://polyhaven.com/a/concrete_floor_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Ivory plaster",
+          "id": "white_plaster_02",
+          "sourceUrl": "https://polyhaven.com/a/white_plaster_02",
+          "license": "CC0-1.0"
+        },
+        {
+          "material": "Upholstery",
+          "id": "denmin_fabric_02",
+          "sourceUrl": "https://polyhaven.com/a/denmin_fabric_02",
+          "license": "CC0-1.0"
+        }
+      ],
+      "semanticParts": [
+        "open knee-space central research island",
+        "raised-sash fume hood and extraction duct",
+        "two detailed optical microscopes",
+        "graduated beakers and retort-clamped flasks",
+        "sink and faucet",
+        "five-caster laboratory stools",
+        "safety shower and pull handle"
+      ],
+      "studioRuntimeVerified": false,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "single-perspective-render-reviewed",
+      "metrics": [
+        {
+          "bytes": 6376868,
+          "nodes": 12,
+          "triangles": 69568,
+          "drawCalls": 12,
+          "materials": 10,
+          "textures": 7,
+          "images": 7
+        },
+        "43bacb2752e166a8302870cc1feacb354cac302290e8d43ec4ed9cf0dadf8b99"
+      ],
+      "byteSize": 6376868,
+      "sha256": "sha256:43bacb2752e166a8302870cc1feacb354cac302290e8d43ec4ed9cf0dadf8b99",
+      "bounds": [
+        10,
+        3.8,
+        8
+      ],
+      "camera": {
+        "position": [
+          12.5,
+          9.1,
+          14
+        ],
+        "target": [
+          0,
+          1.25,
+          0
+        ],
+        "fovDegrees": 44
+      },
+      "url": "/assets/3d/environments/expansion-v1/science_research_laboratory.glb",
+      "fileName": "science_research_laboratory.glb",
+      "thumbnailUrl": "/assets/3d/environments/expansion-v1/thumbnails/science_research_laboratory.png",
+      "name": "과학 연구 실험실",
+      "theme": "education",
+      "description": "중앙 실험대, 흄 후드, 현미경, 유리 기구, 개수대와 안전 샤워를 갖춘 연구실",
+      "tags": [
+        "science",
+        "laboratory",
+        "research",
+        "과학실",
+        "실험실",
+        "연구실"
+      ],
+      "visualReviewed": true,
+      "visualReviewSource": "/assets/3d/environments/expansion-v1/thumbnails/science_research_laboratory.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Cycles CPU / AgX / 24 samples",
+        "scope": "One authored oblique scene overview, not a multi-angle approval",
+        "reviewedModelSha256": "sha256:43bacb2752e166a8302870cc1feacb354cac302290e8d43ec4ed9cf0dadf8b99",
+        "reviewedImageSha256": "sha256:c75ac15c895556965efd18ea8d57f102dd76efdd6a71ae5e052a42e0ce14ae5d",
+        "observations": "Microscope optics, beakers, clamped flasks, caster stools, fume hood, faucet and safety shower are visible; sink bowl has a real opening through countertop and cabinet.",
+        "visibleStructuralBlocker": false
+      }
+    }
+  ]
+}

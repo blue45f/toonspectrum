@@ -1,0 +1,89 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/ceramic_vase_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "pot",
+      "clean",
+      "tall",
+      "modern",
+      "fancy",
+      "decor"
+    ],
+    "name": "Ceramic Vase 01",
+    "categories": [
+      "vases",
+      "containers",
+      "decorative"
+    ],
+    "authors": {
+      "James Ray Cock": "All"
+    },
+    "date_published": 1623767601,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 2548,
+    "texel_density": 12083.371395475848,
+    "dimensions": [
+      204.87193763256073,
+      206.37669414281845,
+      401.379804010503
+    ],
+    "files_hash": "989b1a754be36032e5d643c9c333a08e218c65cf",
+    "description": "Free 8K Ceramic Vase 01 - a tall, modern glossy white pot with an elegant fluted rim and clean lines; a fancy decorative vase/container for stylish interiors.",
+    "category_id": "bda68bac-fe45-5d4f-aab6-ea0162d45774",
+    "category": "Decor & Art/Vases & Vessels/Ceramic Vases",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "ceramic"
+      ]
+    },
+    "download_count": 19608,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/ceramic_vase_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/ceramic_vase_01/ceramic_vase_01_2k.gltf",
+      "bytes": 2706,
+      "sha256": "294f6c19f128ed5fa99225f02e00bdd5867cbc1f717fe98e8e09f3ae3191fb52",
+      "sourceMd5": "98390349d15e8312ee4b2cabd71acac4"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/ceramic_vase_01/ceramic_vase_01_diff_2k.jpg",
+      "bytes": 110174,
+      "sha256": "fc1451c0cef35d5a47995f2d0c720bfcd8c3fcc987c1d965f41c1aae2d91099c",
+      "sourceMd5": "1319c32a8430caff72d94c192657fa00"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/ceramic_vase_01/ceramic_vase_01_arm_2k.jpg",
+      "bytes": 200281,
+      "sha256": "cc2d1700280bb2aa09f4961f18a75eb81ffc502247654be809b87d0822a5d7b7",
+      "sourceMd5": "5d65f25df66e4b19362126f9cb315caf"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/ceramic_vase_01/ceramic_vase_01_nor_gl_2k.jpg",
+      "bytes": 121367,
+      "sha256": "eb55418810a3a385658c8dda3da2fec3daba1990be1477728cda9778868de70a",
+      "sourceMd5": "2d27b76672cc0983b0ba6ccea8c1b2fd"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/ceramic_vase_01/ceramic_vase_01.bin",
+      "bytes": 272656,
+      "sha256": "56ffadcafff3f56538d04b0b43c06c9704baeec2ac3ec286ef01c313c82906f0",
+      "sourceMd5": "73f8a0f911f2d377e3b925b0ae9c7d4c"
+    }
+  ]
+}

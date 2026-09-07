@@ -1,0 +1,84 @@
+[
+  {
+    "id": "quaternius-female-peasant",
+    "sex": "Female",
+    "outfit": "Peasant",
+    "hair": "Hair_Buns",
+    "sourceBase": "artifacts/studio-asset-expansion/source-extracted/Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Female_FullBody.gltf",
+    "sourceOutfit": "artifacts/studio-asset-expansion/source-extracted/Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Female_Peasant.gltf",
+    "sourceHair": "artifacts/studio-asset-expansion/source-extracted/Universal Base Characters[Standard]/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)/Hair_Buns.gltf",
+    "sourceRestMatrixMaxDifference": 0.0,
+    "headBindTransfer": "identical-bind-pose",
+    "bones": 65,
+    "meshCount": 8,
+    "bytes": 8127868,
+    "corrections": [
+      "Corrected official glTF URI typo in memory: T_Eye_Normal_png.png"
+    ],
+    "expressions": false,
+    "kneeUnderlayer": false,
+    "notes": "Original clothing and head skin weights preserved; body cropped to buried neck seam; basecolor/normal textures limited to 1024px, ORM/roughness to 512px. No source clips in these free source GLTFs."
+  },
+  {
+    "id": "quaternius-male-peasant",
+    "sex": "Male",
+    "outfit": "Peasant",
+    "hair": "Hair_SimpleParted",
+    "sourceBase": "artifacts/studio-asset-expansion/source-extracted/Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Male_FullBody.gltf",
+    "sourceOutfit": "artifacts/studio-asset-expansion/source-extracted/Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Male_Peasant.gltf",
+    "sourceHair": "artifacts/studio-asset-expansion/source-extracted/Universal Base Characters[Standard]/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)/Hair_SimpleParted.gltf",
+    "sourceRestMatrixMaxDifference": 0.20979623531457037,
+    "headBindTransfer": "weighted-source-to-target",
+    "bones": 65,
+    "meshCount": 8,
+    "bytes": 9973760,
+    "corrections": [
+      "Corrected official glTF URI typo in memory: T_Hair_1_Normal_png.png",
+      "Corrected official glTF URI typo in memory: T_Eye_Normal_png.png"
+    ],
+    "expressions": false,
+    "kneeUnderlayer": false,
+    "notes": "Original clothing and head skin weights preserved; body cropped to buried neck seam; basecolor/normal textures limited to 1024px, ORM/roughness to 512px. No source clips in these free source GLTFs."
+  },
+  {
+    "id": "quaternius-female-ranger",
+    "sex": "Female",
+    "outfit": "Ranger",
+    "hair": "Hair_BuzzedFemale",
+    "sourceBase": "artifacts/studio-asset-expansion/source-extracted/Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Female_FullBody.gltf",
+    "sourceOutfit": "artifacts/studio-asset-expansion/source-extracted/Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Female_Ranger.gltf",
+    "sourceHair": "artifacts/studio-asset-expansion/source-extracted/Universal Base Characters[Standard]/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)/Hair_BuzzedFemale.gltf",
+    "sourceRestMatrixMaxDifference": 0.0,
+    "headBindTransfer": "identical-bind-pose",
+    "bones": 65,
+    "meshCount": 14,
+    "bytes": 14226196,
+    "corrections": [
+      "Corrected official glTF URI typo in memory: T_Eye_Normal_png.png"
+    ],
+    "expressions": false,
+    "kneeUnderlayer": true,
+    "notes": "Original clothing and head skin weights preserved; body cropped to buried neck seam; basecolor/normal textures limited to 1024px, ORM/roughness to 512px. No source clips in these free source GLTFs."
+  },
+  {
+    "id": "quaternius-male-ranger",
+    "sex": "Male",
+    "outfit": "Ranger",
+    "hair": "Hair_Buzzed",
+    "sourceBase": "artifacts/studio-asset-expansion/source-extracted/Universal Base Characters[Standard]/Base Characters/Godot - UE/Superhero_Male_FullBody.gltf",
+    "sourceOutfit": "artifacts/studio-asset-expansion/source-extracted/Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Outfits/Male_Ranger.gltf",
+    "sourceHair": "artifacts/studio-asset-expansion/source-extracted/Universal Base Characters[Standard]/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)/Hair_Buzzed.gltf",
+    "sourceRestMatrixMaxDifference": 0.20979623531457037,
+    "headBindTransfer": "weighted-source-to-target",
+    "bones": 65,
+    "meshCount": 14,
+    "bytes": 11508772,
+    "corrections": [
+      "Corrected official glTF URI typo in memory: T_Hair_1_Normal_png.png",
+      "Corrected official glTF URI typo in memory: T_Eye_Normal_png.png"
+    ],
+    "expressions": false,
+    "kneeUnderlayer": true,
+    "notes": "Original clothing and head skin weights preserved; body cropped to buried neck seam; basecolor/normal textures limited to 1024px, ORM/roughness to 512px. No source clips in these free source GLTFs."
+  }
+]

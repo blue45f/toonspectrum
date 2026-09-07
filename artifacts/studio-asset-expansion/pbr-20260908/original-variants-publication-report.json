@@ -1,0 +1,82 @@
+{
+  "schema": "toonspectrum.cc0-original-variants-publication.v1",
+  "recordedAt": "2026-09-07T18:44:02.591Z",
+  "parentPublicationReport": "publication-report.json",
+  "parentPublicationReportSha256": "3ea31635a0bb8d47be0d080e042baeb4a6ef9e326263d05d97bc465793b3b3d7",
+  "beforeManifestSha256": "ae52f81a6bc6f14f1684ecf1aeeb157c293b552ee6b9e6e8226e8669e976a7c6",
+  "afterManifestSha256": "eb6959ec56eedb64073a022e632886c8822c9d194d18f40dcdcbd4511b2d62bc",
+  "catalogCount": 1212,
+  "addedCatalogItems": 0,
+  "addedOriginalVariants": 3,
+  "primaryManifestUnchanged": true,
+  "originalEvidence": "mobile-ready-manifest.json derivation.originalPath/originalSha256",
+  "productionPublished": false,
+  "originals": [
+    {
+      "id": "polyhaven-cassette-player",
+      "path": "assets/polyhaven-cassette-player/cassette_player.glb",
+      "bytes": 3958756,
+      "sha256": "0dfed816e40cd3f905143b89e2503b9a97d10e8c5949a3453b06c13d0e0db828",
+      "estimatedDecodedImageBytes": 150994944,
+      "licenseId": "CC0-1.0",
+      "sourceUrl": "https://polyhaven.com/a/cassette_player",
+      "visuallyEquivalentToDefault": true,
+      "stagePath": "artifacts/studio-asset-expansion/pbr-20260908/assets/polyhaven-cassette-player/cassette_player.glb",
+      "publicPath": "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-cassette-player/cassette_player.glb",
+      "byteExactStageCopy": true,
+      "rights": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/cassette_player",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-08"
+      }
+    },
+    {
+      "id": "polyhaven-brass-goblets",
+      "path": "assets/polyhaven-brass-goblets/brass_goblets.glb",
+      "bytes": 17272720,
+      "sha256": "aa3e15e1f2d1221df2e784ab584177a58a8d0c85668bd5df22f062e84b6875a8",
+      "estimatedDecodedImageBytes": 150994944,
+      "licenseId": "CC0-1.0",
+      "sourceUrl": "https://polyhaven.com/a/brass_goblets",
+      "visuallyEquivalentToDefault": false,
+      "stagePath": "artifacts/studio-asset-expansion/pbr-20260908/assets/polyhaven-brass-goblets/brass_goblets.glb",
+      "publicPath": "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-brass-goblets/brass_goblets.glb",
+      "byteExactStageCopy": true,
+      "rights": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/brass_goblets",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-08"
+      }
+    },
+    {
+      "id": "polyhaven-korean-fire-extinguisher-01",
+      "path": "assets/polyhaven-korean-fire-extinguisher-01/korean_fire_extinguisher_01.glb",
+      "bytes": 5474548,
+      "sha256": "ca8c2b3febb6a268591df230d2f8851d4d9073d3024a71a15bd531b025ad7441",
+      "estimatedDecodedImageBytes": 150994944,
+      "licenseId": "CC0-1.0",
+      "sourceUrl": "https://polyhaven.com/a/korean_fire_extinguisher_01",
+      "visuallyEquivalentToDefault": false,
+      "stagePath": "artifacts/studio-asset-expansion/pbr-20260908/assets/polyhaven-korean-fire-extinguisher-01/korean_fire_extinguisher_01.glb",
+      "publicPath": "apps/web/public/assets/studio/cc0-20260906/assets/polyhaven-korean-fire-extinguisher-01/korean_fire_extinguisher_01.glb",
+      "byteExactStageCopy": true,
+      "rights": {
+        "id": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "provider": "Poly Haven",
+        "sourceUrl": "https://polyhaven.com/a/korean_fire_extinguisher_01",
+        "commercialUse": true,
+        "redistributionAllowed": true,
+        "checkedOn": "2026-09-08"
+      }
+    }
+  ]
+}

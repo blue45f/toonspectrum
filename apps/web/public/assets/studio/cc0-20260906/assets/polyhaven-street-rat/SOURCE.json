@@ -1,0 +1,97 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/street_rat",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Street Rat",
+    "type": 2,
+    "authors": {
+      "Sean Buckley": "All"
+    },
+    "info": null,
+    "date_published": 1693785600,
+    "categories": [
+      "nature",
+      "creature",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "rat",
+      "mouse",
+      "animal",
+      "vermin",
+      "rodent",
+      "alleyway",
+      "pest",
+      "feral"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 14286,
+    "texel_density": 69522.93943774853,
+    "dimensions": [
+      32.26977214217186,
+      148.4108306467533,
+      34.03247334063053
+    ],
+    "sponsors": [
+      "78546118",
+      "111686399"
+    ],
+    "files_hash": "7d499946dd91cfc66cb4e0ec8825012643ee832c",
+    "description": "Free 8K model of a realistic street rat with dense dark fur, glossy black eyes, detailed whiskers, ears and claws, and gritty, lifelike feral character.",
+    "category_id": "4226eda2-01e8-5dd3-a216-5d09f58c4fe7",
+    "category": "Nature/Wildlife/Mammals",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ]
+    },
+    "download_count": 46996,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/street_rat.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/street_rat/street_rat_2k.gltf",
+      "bytes": 2770,
+      "sha256": "cd7ffb879ccda224e28e954164a8832eee0c0e0231dc0b7634b8e830c759da1e",
+      "sourceMd5": "f406a0f1b91fe66e91328e3f1ca67236"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/street_rat/street_rat.bin",
+      "bytes": 1365280,
+      "sha256": "8b7a6b9bba805537b2009a5e3f7678558edc8a365fb8e5ee2af8dc7ed0bf9f56",
+      "sourceMd5": "f7cf930cf7af0c11283938250bdeb197"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/street_rat/street_rat_diff_2k.jpg",
+      "bytes": 1823103,
+      "sha256": "834646d350d4f8b4598cd800ae78b67ac6fa6cd08b7fa1b3257a8221e46b5e8c",
+      "sourceMd5": "89777e7b58b204cc4d2d89094b0b27b4"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/street_rat/street_rat_nor_gl_2k.jpg",
+      "bytes": 2965543,
+      "sha256": "d057615fe4063b6d34495f1e7fc6b404e5ff415ad102f25daddd2b93fd7755f3",
+      "sourceMd5": "ba6f38e35d23e380abfead7a390b7bce"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/street_rat/street_rat_arm_2k.jpg",
+      "bytes": 3528311,
+      "sha256": "dde382f2b3c8b2c2ad68d9ede589ac060f1f8209a12ba8366992801bc31a6dec",
+      "sourceMd5": "78c39e3890dea5020944c52c56bb1e01"
+    }
+  ]
+}

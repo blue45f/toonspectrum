@@ -1,0 +1,3200 @@
+{
+  "version": 1,
+  "browser": "152.0.7977.77",
+  "status": "passed",
+  "entries": [
+    {
+      "id": "quaternius-modular-male-adventurer",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-adventurer.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 15,
+      "deformation": {
+        "leftUpperArm": 0.37050993083709993,
+        "rightLowerLeg": 0.36377124655515153,
+        "head": 0.07070913564067181
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.014940569839896806,
+          -0.2600414715211655
+        ],
+        "max": [
+          0.3408329322911685,
+          1.8562015042015954,
+          0.26794142353164585
+        ]
+      },
+      "renderedTriangles": 10202,
+      "foregroundPixels": 79860,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8414098682704585,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.014940569839896806,
+              -0.2600414715211655
+            ],
+            "max": [
+              0.3408329322911685,
+              1.8562015042015954,
+              0.26794142353164585
+            ]
+          },
+          "renderedTriangles": 10202,
+          "foregroundPixels": 79860,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-adventurer-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8463252516140437,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3366338927898803,
+              -0.006516769889392581,
+              -0.26506226562930973
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.26910278525126347
+            ]
+          },
+          "renderedTriangles": 10202,
+          "foregroundPixels": 64338,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-adventurer-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9078530474288276,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.19219645872548563,
+              -0.2716972986569636
+            ],
+            "max": [
+              0.3504292438493475,
+              1.7749477301491046,
+              0.48903916294385474
+            ]
+          },
+          "renderedTriangles": 10202,
+          "foregroundPixels": 97030,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-adventurer-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8805749246278669,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.1383027198405292,
+              -0.3522074273123239
+            ],
+            "max": [
+              0.32529150924503347,
+              1.8452770137651116,
+              0.7579059815097605
+            ]
+          },
+          "renderedTriangles": 10202,
+          "foregroundPixels": 86762,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-adventurer-studio-run.png"
+        }
+      ],
+      "sha256": "2f4d7ecc2d8e76f15ffaee016b92a7b0153971eea62f01bad4732ab3ecdb7e80",
+      "thumbnailSha256": "cdc9f25f397d93cfa75f82f4223ffcd5e5ce91e2e9dfc1bbdbed6b81df982272"
+    },
+    {
+      "id": "quaternius-modular-male-beach",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-beach.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 12,
+      "deformation": {
+        "leftUpperArm": 0.37237931709893657,
+        "rightLowerLeg": 0.3665214079472756,
+        "head": 0.06945501702918135
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.018147495080642072,
+          -0.08137886275499197
+        ],
+        "max": [
+          0.3408329322911685,
+          1.8771130637884876,
+          0.2708149113580684
+        ]
+      },
+      "renderedTriangles": 6578,
+      "foregroundPixels": 70901,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8455419351996316,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.018147495080642072,
+              -0.08137886275499197
+            ],
+            "max": [
+              0.3408329322911685,
+              1.8771130637884876,
+              0.2708149113580684
+            ]
+          },
+          "renderedTriangles": 6578,
+          "foregroundPixels": 70901,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-beach-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8463252516140437,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3366338927898888,
+              -0.010546472622922087,
+              -0.09418994233316051
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.27202129175442574
+            ]
+          },
+          "renderedTriangles": 6578,
+          "foregroundPixels": 57880,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-beach-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9102974467003331,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.18965719408519605,
+              -0.10805679404046115
+            ],
+            "max": [
+              0.3504292438493475,
+              1.802148659837456,
+              0.48388577074510297
+            ]
+          },
+          "renderedTriangles": 6578,
+          "foregroundPixels": 84117,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-beach-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8854721976140406,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.1322272379478308,
+              -0.3431411930157251
+            ],
+            "max": [
+              0.32529150924503347,
+              1.8713915888103883,
+              0.7604650247793088
+            ]
+          },
+          "renderedTriangles": 6578,
+          "foregroundPixels": 75018,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-beach-studio-run.png"
+        }
+      ],
+      "sha256": "49a15e78de542000c00e56c9629e00538581895d571d53414ee0cbf2ac156e6d",
+      "thumbnailSha256": "4e4b2f5b4b50314caf89c9819795f656d9c7bddcb9d6ea68b2646bfea36c0912"
+    },
+    {
+      "id": "quaternius-modular-male-casual",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-casual.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 10,
+      "deformation": {
+        "leftUpperArm": 0.37237931709893657,
+        "rightLowerLeg": 0.3638928264043616,
+        "head": 0.0657934191090851
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.014933937619081426,
+          -0.08897795297313373
+        ],
+        "max": [
+          0.3408329322911685,
+          1.866159167840475,
+          0.2683712844941174
+        ]
+      },
+      "renderedTriangles": 6206,
+      "foregroundPixels": 74068,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8455419351996316,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.014933937619081426,
+              -0.08897795297313373
+            ],
+            "max": [
+              0.3408329322911685,
+              1.866159167840475,
+              0.2683712844941174
+            ]
+          },
+          "renderedTriangles": 6206,
+          "foregroundPixels": 74068,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-casual-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8463252516140437,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3489904511288985,
+              -0.007866578933428198,
+              -0.09722560038717588
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.26946057634950044
+            ]
+          },
+          "renderedTriangles": 6206,
+          "foregroundPixels": 59652,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-casual-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9102974467003331,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.1920047863782997,
+              -0.10933811915905284
+            ],
+            "max": [
+              0.3504292438493475,
+              1.785491685765026,
+              0.4838857997304278
+            ]
+          },
+          "renderedTriangles": 6206,
+          "foregroundPixels": 87471,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-casual-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8854721976140406,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.1332594683581988,
+              -0.3431411930157251
+            ],
+            "max": [
+              0.32529150924503347,
+              1.856200320136173,
+              0.7579667269749439
+            ]
+          },
+          "renderedTriangles": 6206,
+          "foregroundPixels": 79609,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-casual-studio-run.png"
+        }
+      ],
+      "sha256": "890d6e6d539683f5181caba8f5916df25fb0dde63622576015a24a27c2f69d3c",
+      "thumbnailSha256": "624a41a46323510b2eb32b8bb11940d0df3e6425f797d48742233a53aa2abacd"
+    },
+    {
+      "id": "quaternius-modular-male-casual2",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-casual2.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 10,
+      "deformation": {
+        "leftUpperArm": 0.37237931709893657,
+        "rightLowerLeg": 0.36222836476302256,
+        "head": 0.10444830384237996
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.012164055376558652,
+          -0.1633427351329711
+        ],
+        "max": [
+          0.3408329322911685,
+          1.856509443487254,
+          0.26786389392433757
+        ]
+      },
+      "renderedTriangles": 5776,
+      "foregroundPixels": 70060,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8455419351996316,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.012164055376558652,
+              -0.1633427351329711
+            ],
+            "max": [
+              0.3408329322911685,
+              1.856509443487254,
+              0.26786389392433757
+            ]
+          },
+          "renderedTriangles": 5776,
+          "foregroundPixels": 70060,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-casual2-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8463252516140437,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3366338927898888,
+              -0.005091462498442287,
+              -0.1720446394687124
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.2690382541452397
+            ]
+          },
+          "renderedTriangles": 5776,
+          "foregroundPixels": 53756,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-casual2-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9102974467003331,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.19462959312181233,
+              -0.183954387640196
+            ],
+            "max": [
+              0.3504292438493475,
+              1.775750805870364,
+              0.47943133925859704
+            ]
+          },
+          "renderedTriangles": 5776,
+          "foregroundPixels": 85783,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-casual2-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8854721976140406,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.1356909918479697,
+              -0.3431411930157251
+            ],
+            "max": [
+              0.32529150924503347,
+              1.8465168147764255,
+              0.7571348650708962
+            ]
+          },
+          "renderedTriangles": 5776,
+          "foregroundPixels": 74747,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-casual2-studio-run.png"
+        }
+      ],
+      "sha256": "2d11a67e58a67f95ef435880fcdc487737cd984fd8959126d2f9b02bdb5f8b7f",
+      "thumbnailSha256": "822955290b1557ffe28dc1fac7a2037bb9f6d0ae7100cd2141947a65484bb145"
+    },
+    {
+      "id": "quaternius-modular-male-farmer",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-farmer.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 12,
+      "deformation": {
+        "leftUpperArm": 0.37237931709893657,
+        "rightLowerLeg": 0.36161532304947575,
+        "head": 0.10131284019853899
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.011143434720234366,
+          -0.10864714326564028
+        ],
+        "max": [
+          0.3408329322911685,
+          1.8555659627840648,
+          0.2678030068033989
+        ]
+      },
+      "renderedTriangles": 5476,
+      "foregroundPixels": 72234,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8455419351996316,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.011143434720234366,
+              -0.10864714326564028
+            ],
+            "max": [
+              0.3408329322911685,
+              1.8555659627840648,
+              0.2678030068033989
+            ]
+          },
+          "renderedTriangles": 5476,
+          "foregroundPixels": 72234,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-farmer-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8463252516140437,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3366338927898803,
+              -0.00373713323010598,
+              -0.12024692328601623
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.26898757527050804
+            ]
+          },
+          "renderedTriangles": 5476,
+          "foregroundPixels": 58277,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-farmer-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9102974467003331,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.19559675747664523,
+              -0.1344859863520383
+            ],
+            "max": [
+              0.3504292438493475,
+              1.775917197006651,
+              0.49207197706749006
+            ]
+          },
+          "renderedTriangles": 5476,
+          "foregroundPixels": 89506,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-farmer-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8854721976140406,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.1408277809322559,
+              -0.35436272195107077
+            ],
+            "max": [
+              0.32529150924503347,
+              1.8462230367477603,
+              0.75682834827049
+            ]
+          },
+          "renderedTriangles": 5476,
+          "foregroundPixels": 75901,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-farmer-studio-run.png"
+        }
+      ],
+      "sha256": "ae5e2562fd56a5b9b68d907a3f3f1ba7cd501c863f6732c592ffe62d21236f11",
+      "thumbnailSha256": "3f5c76ed0602314c5e57023a4d9ceee21b4f3ae109586490b6e32240fd399e1b"
+    },
+    {
+      "id": "quaternius-modular-male-king",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-king.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 13,
+      "deformation": {
+        "leftUpperArm": 0.37237931709893657,
+        "rightLowerLeg": 0.3613257240764821,
+        "head": 0.07378188829985587
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.013003582558508385,
+          -0.08589691328949432
+        ],
+        "max": [
+          0.3408329322911685,
+          1.9031597679695464,
+          0.2630383654724384
+        ]
+      },
+      "renderedTriangles": 11110,
+      "foregroundPixels": 63522,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8455419351996316,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.013003582558508385,
+              -0.08589691328949432
+            ],
+            "max": [
+              0.3408329322911685,
+              1.9031597679695464,
+              0.2630383654724384
+            ]
+          },
+          "renderedTriangles": 11110,
+          "foregroundPixels": 63522,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-king-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8463252516140437,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3366338978061165,
+              -0.006503604137782592,
+              -0.09006665681902508
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.26463258549299973
+            ]
+          },
+          "renderedTriangles": 11110,
+          "foregroundPixels": 54246,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-king-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9102974467003331,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.19780690196332862,
+              -0.10373318936191711
+            ],
+            "max": [
+              0.3504292438493475,
+              1.8186062473916254,
+              0.53664445830951
+            ]
+          },
+          "renderedTriangles": 11110,
+          "foregroundPixels": 76297,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-king-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8854721976140406,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.13786054015660265,
+              -0.3619653399835632
+            ],
+            "max": [
+              0.32529150924503347,
+              1.8904999790518906,
+              0.7457860256924675
+            ]
+          },
+          "renderedTriangles": 11110,
+          "foregroundPixels": 70839,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-king-studio-run.png"
+        }
+      ],
+      "sha256": "39b1d86c14f7bb263031f72e7817db86344c207e1c97d16d2e7562b8e32ee2cc",
+      "thumbnailSha256": "156b6f980f82ab2826a0af6e65a8d971a3c016569077e0b6546e06024aeebb04"
+    },
+    {
+      "id": "quaternius-modular-male-punk",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-punk.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 13,
+      "deformation": {
+        "leftUpperArm": 0.37073938798331035,
+        "rightLowerLeg": 0.3638928264043616,
+        "head": 0.10022799716791163
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.014933937619081426,
+          -0.15494310581592696
+        ],
+        "max": [
+          0.3408329322911685,
+          1.9652691498512294,
+          0.2683712844941174
+        ]
+      },
+      "renderedTriangles": 5500,
+      "foregroundPixels": 63269,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8418500629790987,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.014933937619081426,
+              -0.15494310581592696
+            ],
+            "max": [
+              0.3408329322911685,
+              1.9652691498512294,
+              0.2683712844941174
+            ]
+          },
+          "renderedTriangles": 5500,
+          "foregroundPixels": 63269,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-punk-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8463252516140437,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3366338927898888,
+              -0.007866578936750192,
+              -0.17034288356006355
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.26946057634950044
+            ]
+          },
+          "renderedTriangles": 5500,
+          "foregroundPixels": 55813,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-punk-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9078530474288276,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.1920047863782997,
+              -0.18467140440138968
+            ],
+            "max": [
+              0.3504292438493475,
+              1.8834745832955597,
+              0.4764117882170392
+            ]
+          },
+          "renderedTriangles": 5500,
+          "foregroundPixels": 74498,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-punk-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8818337262638952,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.13325946835608315,
+              -0.3431411930157251
+            ],
+            "max": [
+              0.32529150924503347,
+              1.9546710025818337,
+              0.7579667269749439
+            ]
+          },
+          "renderedTriangles": 5500,
+          "foregroundPixels": 65549,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-punk-studio-run.png"
+        }
+      ],
+      "sha256": "62ef023b0735540d1002836ab42b37f317ca981678f1f78cf436dafd2da38e2e",
+      "thumbnailSha256": "211ba6c67a3bfad8e545650f79448d9585807b903e0dfe0345be05ed70bf0753"
+    },
+    {
+      "id": "quaternius-modular-male-spacesuit",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-spacesuit.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 13,
+      "deformation": {
+        "leftUpperArm": 0.37237931709893657,
+        "rightLowerLeg": 0.35960664863327774,
+        "head": 0.09056900865746705
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.013232766529995249,
+          -0.13531553969729632
+        ],
+        "max": [
+          0.3408329322911685,
+          1.8858324347666555,
+          0.25497267367409554
+        ]
+      },
+      "renderedTriangles": 10558,
+      "foregroundPixels": 70909,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8455419351996316,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.013232766529995249,
+              -0.13531553969729632
+            ],
+            "max": [
+              0.3408329322911685,
+              1.8858324347666555,
+              0.25497267367409554
+            ]
+          },
+          "renderedTriangles": 10558,
+          "foregroundPixels": 70909,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-spacesuit-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8463252516140437,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3409485123295191,
+              -0.0061560251453083685,
+              -0.14581872278912456
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.25598579539890987
+            ]
+          },
+          "renderedTriangles": 10558,
+          "foregroundPixels": 57633,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-spacesuit-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9102974467003331,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.19844191328573635,
+              -0.15895102363413519
+            ],
+            "max": [
+              0.3504292438493475,
+              1.8039201412266417,
+              0.4995096113945099
+            ]
+          },
+          "renderedTriangles": 10558,
+          "foregroundPixels": 87906,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-spacesuit-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8854721976140406,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.13479007982229732,
+              -0.3442457098920796
+            ],
+            "max": [
+              0.32529150924503347,
+              1.8750268955010958,
+              0.742173093114197
+            ]
+          },
+          "renderedTriangles": 10558,
+          "foregroundPixels": 76822,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-spacesuit-studio-run.png"
+        }
+      ],
+      "sha256": "f8419afaef306ba58c49142fe851b83932e0221b934c9b332b3c40161c0eeafc",
+      "thumbnailSha256": "6c6eef6e20b7efd476deddd8fac3700e677d0d5fda2e7df9797dee52ef203a7f"
+    },
+    {
+      "id": "quaternius-modular-male-suit",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-suit.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 10,
+      "deformation": {
+        "leftUpperArm": 0.37073939014354435,
+        "rightLowerLeg": 0.36216964422735065,
+        "head": 0.08059810230128008
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.012066304973987418,
+          -0.08077555114836571
+        ],
+        "max": [
+          0.3408329322911685,
+          1.8558902295297695,
+          0.2683712844941174
+        ]
+      },
+      "renderedTriangles": 6634,
+      "foregroundPixels": 72494,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8418500661834633,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.012066304973987418,
+              -0.08077555114836571
+            ],
+            "max": [
+              0.3408329322911685,
+              1.8558902295297695,
+              0.2683712844941174
+            ]
+          },
+          "renderedTriangles": 6634,
+          "foregroundPixels": 72494,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-suit-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8427678626959886,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3366338978060846,
+              -0.00499353055596923,
+              -0.09366910552554254
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.26946057634950044
+            ]
+          },
+          "renderedTriangles": 6634,
+          "foregroundPixels": 58156,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-suit-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9068107987200807,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.19472222374412224,
+              -0.10614842350329601
+            ],
+            "max": [
+              0.3504292438493475,
+              1.775122516283682,
+              0.47943137698022115
+            ]
+          },
+          "renderedTriangles": 6634,
+          "foregroundPixels": 86148,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-suit-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8818337365830878,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.13577680315660612,
+              -0.3431411930157251
+            ],
+            "max": [
+              0.32529150924503347,
+              1.8455687366681999,
+              0.7571055082864251
+            ]
+          },
+          "renderedTriangles": 6634,
+          "foregroundPixels": 71890,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-suit-studio-run.png"
+        }
+      ],
+      "sha256": "2708f41db4bee8c51565566219966e045f4a67f69616eedd02b1c5b2547f83d8",
+      "thumbnailSha256": "a1b41b92f984c1631838884e6f9ddc190909c4fcf3aae42e38fe113cf4ee99d8"
+    },
+    {
+      "id": "quaternius-modular-male-swat",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-swat.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 9,
+      "deformation": {
+        "leftUpperArm": 0.37237931709893657,
+        "rightLowerLeg": 0.3603371822441125,
+        "head": 0.07691055928159425
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.011704305830281918,
+          -0.080823740653408
+        ],
+        "max": [
+          0.3408329322911685,
+          1.8524015822651312,
+          0.25918435073394286
+        ]
+      },
+      "renderedTriangles": 7754,
+      "foregroundPixels": 66392,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8455419351996316,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.011704305830281918,
+              -0.080823740653408
+            ],
+            "max": [
+              0.3408329322911685,
+              1.8524015822651312,
+              0.25918435073394286
+            ]
+          },
+          "renderedTriangles": 7754,
+          "foregroundPixels": 66392,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-swat-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8463252516140437,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3641670713887407,
+              -0.0051901196307909715,
+              -0.09142076802757214
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.26035325115052566
+            ]
+          },
+          "renderedTriangles": 7754,
+          "foregroundPixels": 53063,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-swat-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9102974467003331,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.19738229776194327,
+              -0.10484415091039506
+            ],
+            "max": [
+              0.3504292438493475,
+              1.771545523158018,
+              0.5101394027787199
+            ]
+          },
+          "renderedTriangles": 7754,
+          "foregroundPixels": 88688,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-swat-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8854721976140406,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.13572596866833359,
+              -0.3515286743386401
+            ],
+            "max": [
+              0.32529150924503347,
+              1.842327478355071,
+              0.748856197942664
+            ]
+          },
+          "renderedTriangles": 7754,
+          "foregroundPixels": 79137,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-swat-studio-run.png"
+        }
+      ],
+      "sha256": "c3a3a148118c8d838cea784f07884b930f1648146514d33904ff6f8c0813defb",
+      "thumbnailSha256": "4e4d0b39137165d4e9546419e4e78eb390a8b7949e3033a8086f5924df11a51c"
+    },
+    {
+      "id": "quaternius-modular-male-worker",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-male-worker.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 48,
+      "skinnedMeshes": 13,
+      "deformation": {
+        "leftUpperArm": 0.37237931709893657,
+        "rightLowerLeg": 0.3635911829529121,
+        "head": 0.0940997232592787
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.38640953571641945,
+          -0.014432091589040987,
+          -0.09795440879136733
+        ],
+        "max": [
+          0.3408329322911685,
+          1.862718789486309,
+          0.2679991978990402
+        ]
+      },
+      "renderedTriangles": 5240,
+      "foregroundPixels": 75287,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8455419351996316,
+          "rightHand": [
+            -0.2755383123228793,
+            1.0373783855347645,
+            0.12391118840128205
+          ],
+          "rightShoulder": [
+            -0.15904112958377137,
+            1.429314040133442,
+            0.06029820257253121
+          ],
+          "modelBounds": {
+            "min": [
+              -0.38640953571641945,
+              -0.014432091589040987,
+              -0.09795440879136733
+            ],
+            "max": [
+              0.3408329322911685,
+              1.862718789486309,
+              0.2679991978990402
+            ]
+          },
+          "renderedTriangles": 5240,
+          "foregroundPixels": 75287,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-worker-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8463252516140437,
+          "rightHand": [
+            -0.30340037896057515,
+            1.808325592303535,
+            0.08537235249067626
+          ],
+          "rightShoulder": [
+            -0.15378375448879822,
+            1.4318642232786605,
+            0.043661938620702626
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3366338927898888,
+              -0.007032001128144136,
+              -0.10948844355263908
+            ],
+            "max": [
+              0.34991680701852146,
+              2.075732477196912,
+              0.2691508732521862
+            ]
+          },
+          "renderedTriangles": 5240,
+          "foregroundPixels": 60468,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-worker-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9102974467003331,
+          "rightHand": [
+            -0.26608991176732943,
+            0.9480843654898745,
+            0.04820315973055088
+          ],
+          "rightShoulder": [
+            -0.15556883733687002,
+            1.349087019639157,
+            0.048203159730550886
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3531078906061371,
+              0.19248034752913362,
+              -0.12260635327502045
+            ],
+            "max": [
+              0.3504292438493475,
+              1.7807977951148828,
+              0.491894085288899
+            ]
+          },
+          "renderedTriangles": 5240,
+          "foregroundPixels": 90893,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-worker-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.8854721976140406,
+          "rightHand": [
+            -0.2535846498888636,
+            1.1127033288334987,
+            0.318825992402261
+          ],
+          "rightShoulder": [
+            -0.1523509054722084,
+            1.42125715041871,
+            0.06164663225090894
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3411338642092734,
+              0.137940853098032,
+              -0.3521901868316516
+            ],
+            "max": [
+              0.32529150924503347,
+              1.8519315850866325,
+              0.7578160106233933
+            ]
+          },
+          "renderedTriangles": 5240,
+          "foregroundPixels": 80974,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-male-worker-studio-run.png"
+        }
+      ],
+      "sha256": "7fe01fffae4295a4e22c8ac4a01147a2c1aa6551b558131ff2411b985523f7cf",
+      "thumbnailSha256": "d97bc36608fa16b4d49bab1c410aeddf2a442677ac110614a79900eb948884c9"
+    },
+    {
+      "id": "quaternius-modular-female-adventurer",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-adventurer.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 50,
+      "skinnedMeshes": 16,
+      "deformation": {
+        "leftUpperArm": 0.3824164694036716,
+        "rightLowerLeg": 0.36246798144328657,
+        "head": 0.06642965622825472
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.34517038092538543,
+          -0.006088641382588732,
+          -0.19865834891142456
+        ],
+        "max": [
+          0.29873718537165206,
+          1.8278617308810312,
+          0.23976386090000767
+        ]
+      },
+      "renderedTriangles": 6800,
+      "foregroundPixels": 78524,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8704575494350597,
+          "rightHand": [
+            -0.25879621014625376,
+            0.9901970775995674,
+            0.13205130100923318
+          ],
+          "rightShoulder": [
+            -0.12358144290995865,
+            1.4407441960660194,
+            0.06046222653714037
+          ],
+          "modelBounds": {
+            "min": [
+              -0.34517038092538543,
+              -0.006088641382588732,
+              -0.19865834891142456
+            ],
+            "max": [
+              0.29873718537165206,
+              1.8278617308810312,
+              0.23976386090000767
+            ]
+          },
+          "renderedTriangles": 6800,
+          "foregroundPixels": 78524,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-adventurer-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8609827816618243,
+          "rightHand": [
+            -0.2933317865379089,
+            1.8742363813974872,
+            0.09505584316268967
+          ],
+          "rightShoulder": [
+            -0.11813629761592889,
+            1.4426832930494247,
+            0.04712515588534378
+          ],
+          "modelBounds": {
+            "min": [
+              -0.33525770030533925,
+              -0.006345846208784011,
+              -0.2030406951628645
+            ],
+            "max": [
+              0.3116806541157511,
+              2.102682727546088,
+              0.2415632314217559
+            ]
+          },
+          "renderedTriangles": 6800,
+          "foregroundPixels": 58962,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-adventurer-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9336355496697712,
+          "rightHand": [
+            -0.24910417056741085,
+            0.8993462283026896,
+            0.049446957488068564
+          ],
+          "rightShoulder": [
+            -0.12084632618014496,
+            1.3601392709930709,
+            0.04944695748806856
+          ],
+          "modelBounds": {
+            "min": [
+              -0.31436706826217264,
+              0.25445654034860593,
+              -0.20836197375615645
+            ],
+            "max": [
+              0.31054860783128047,
+              1.7468448773889143,
+              0.5341974295528897
+            ]
+          },
+          "renderedTriangles": 6800,
+          "foregroundPixels": 97318,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-adventurer-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.9088056190221064,
+          "rightHand": [
+            -0.2342074252812237,
+            1.0791380590112811,
+            0.35733788976672154
+          ],
+          "rightShoulder": [
+            -0.11669356673983897,
+            1.4327692961877294,
+            0.06065624365829337
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3010515278361292,
+              0.14316604579706033,
+              -0.37402271842016377
+            ],
+            "max": [
+              0.28743364666629945,
+              1.8178644593403654,
+              0.7699106053151905
+            ]
+          },
+          "renderedTriangles": 6800,
+          "foregroundPixels": 82984,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-adventurer-studio-run.png"
+        }
+      ],
+      "sha256": "8d0c9852c219e023d5a8921d89df38665f41299f3b6cb9b360575a16901c91d2",
+      "thumbnailSha256": "2fd44ef722042c5705da7f00f8a8e158ce64161dcdff3317f3031887b0be352d"
+    },
+    {
+      "id": "quaternius-modular-female-casual",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-casual.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 50,
+      "skinnedMeshes": 9,
+      "deformation": {
+        "leftUpperArm": 0.38265307952678673,
+        "rightLowerLeg": 0.3695974763977569,
+        "head": 0.08463533180137177
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.34543018790134994,
+          -0.014730401333028059,
+          -0.09513387789728242
+        ],
+        "max": [
+          0.2989721395683942,
+          1.8436839354804826,
+          0.2518204154135215
+        ]
+      },
+      "renderedTriangles": 6396,
+      "foregroundPixels": 69097,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8709881763906133,
+          "rightHand": [
+            -0.25879621014625376,
+            0.9901970775995674,
+            0.13205130100923318
+          ],
+          "rightShoulder": [
+            -0.12358144290995865,
+            1.4407441960660194,
+            0.06046222653714037
+          ],
+          "modelBounds": {
+            "min": [
+              -0.34543018790134994,
+              -0.014730401333028059,
+              -0.09513387789728242
+            ],
+            "max": [
+              0.2989721395683942,
+              1.8436839354804826,
+              0.2518204154135215
+            ]
+          },
+          "renderedTriangles": 6396,
+          "foregroundPixels": 69097,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-casual-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8615237417258568,
+          "rightHand": [
+            -0.2933317865379089,
+            1.8742363813974872,
+            0.09505584316268967
+          ],
+          "rightShoulder": [
+            -0.11813629761592889,
+            1.4426832930494247,
+            0.04712515588534378
+          ],
+          "modelBounds": {
+            "min": [
+              -0.33511330168653486,
+              -0.006057535017979892,
+              -0.1059535242427472
+            ],
+            "max": [
+              0.3119075935508726,
+              2.1031083627231895,
+              0.25350756016096027
+            ]
+          },
+          "renderedTriangles": 6396,
+          "foregroundPixels": 53350,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-casual-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9341894986984651,
+          "rightHand": [
+            -0.24910417056741085,
+            0.8993462283026896,
+            0.049446957488068564
+          ],
+          "rightShoulder": [
+            -0.12084632618014496,
+            1.3601392709930709,
+            0.04944695748806856
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3145903738925977,
+              0.24319266636972908,
+              -0.11849432212337874
+            ],
+            "max": [
+              0.31077184173186856,
+              1.7633508924852594,
+              0.5364195585643368
+            ]
+          },
+          "renderedTriangles": 6396,
+          "foregroundPixels": 83623,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-casual-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.9093867496855841,
+          "rightHand": [
+            -0.2342074252812237,
+            1.0791380590112811,
+            0.35733788976672154
+          ],
+          "rightShoulder": [
+            -0.11669356673983897,
+            1.4327692961877294,
+            0.06065624365829337
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3012751078366158,
+              0.1482861678876149,
+              -0.38006226758538614
+            ],
+            "max": [
+              0.28759545129370045,
+              1.8342524644791245,
+              0.783119035585857
+            ]
+          },
+          "renderedTriangles": 6396,
+          "foregroundPixels": 73577,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-casual-studio-run.png"
+        }
+      ],
+      "sha256": "8153d87686e2b863f709de9e9ee1316f1d1cf082f629630c57ed9b06711b41a7",
+      "thumbnailSha256": "5451f3779844b42e7a0217013537086e9655c2b9f4567b4186cceeeb5dcf8714"
+    },
+    {
+      "id": "quaternius-modular-female-formal",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-formal.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 50,
+      "skinnedMeshes": 10,
+      "deformation": {
+        "leftUpperArm": 0.38416090596899427,
+        "rightLowerLeg": 0.3692297502901782,
+        "head": 0.0809108460009452
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.3451702491011712,
+          -0.007809207026797096,
+          -0.11367838531110605
+        ],
+        "max": [
+          0.29873705494182934,
+          1.8443961045660928,
+          0.23701019442344368
+        ]
+      },
+      "renderedTriangles": 6130,
+      "foregroundPixels": 71348,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8743911167392706,
+          "rightHand": [
+            -0.25879621014625376,
+            0.9901970775995674,
+            0.13205130100923318
+          ],
+          "rightShoulder": [
+            -0.12358144290995865,
+            1.4407441960660194,
+            0.06046222653714037
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3451702491011712,
+              -0.007809207026797096,
+              -0.11367838531110605
+            ],
+            "max": [
+              0.29873705494182934,
+              1.8443961045660928,
+              0.23701019442344368
+            ]
+          },
+          "renderedTriangles": 6130,
+          "foregroundPixels": 71348,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-formal-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8656248298929442,
+          "rightHand": [
+            -0.2933317865379089,
+            1.8742363813974872,
+            0.09505584316268967
+          ],
+          "rightShoulder": [
+            -0.11813629761592889,
+            1.4426832930494247,
+            0.04712515588534378
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3352577028416483,
+              -0.0038804577494427946,
+              -0.12553172974871749
+            ],
+            "max": [
+              0.31168052431057824,
+              2.102682675634865,
+              0.23856696449730713
+            ]
+          },
+          "renderedTriangles": 6130,
+          "foregroundPixels": 55504,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-formal-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9365935289870011,
+          "rightHand": [
+            -0.24910417056741085,
+            0.8993462283026896,
+            0.049446957488068564
+          ],
+          "rightShoulder": [
+            -0.12084632618014496,
+            1.3601392709930709,
+            0.04944695748806856
+          ],
+          "modelBounds": {
+            "min": [
+              -0.31436693883224853,
+              0.24428743272873155,
+              -0.13802908199183891
+            ],
+            "max": [
+              0.3105484784141932,
+              1.7647144052354182,
+              0.5349862554410331
+            ]
+          },
+          "renderedTriangles": 6130,
+          "foregroundPixels": 86072,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-formal-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.9134351330148557,
+          "rightHand": [
+            -0.2342074252812237,
+            1.0791380590112811,
+            0.35733788976672154
+          ],
+          "rightShoulder": [
+            -0.11669356673983897,
+            1.4327692961877294,
+            0.06065624365829337
+          ],
+          "modelBounds": {
+            "min": [
+              -0.30105139945106285,
+              0.15254230616424497,
+              -0.38022383214111877
+            ],
+            "max": [
+              0.2874335595170705,
+              1.8349010021641383,
+              0.7686960169674415
+            ]
+          },
+          "renderedTriangles": 6130,
+          "foregroundPixels": 75231,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-formal-studio-run.png"
+        }
+      ],
+      "sha256": "d27837fe87d7907548e55ec6024b32d095c45c1686a3dbae6db6ff80ba1d14e4",
+      "thumbnailSha256": "1e4396680424ef61638be134af1b32b518c87fca52ac76b741c03a4f18e5565e"
+    },
+    {
+      "id": "quaternius-modular-female-medieval",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-medieval.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 50,
+      "skinnedMeshes": 14,
+      "deformation": {
+        "leftUpperArm": 0.38416093975701837,
+        "rightLowerLeg": 0.3698226117465279,
+        "head": 0.09217425693311579
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.34517038092538543,
+          -0.008772963734901983,
+          -0.11534150325718956
+        ],
+        "max": [
+          0.29873718537165206,
+          1.8777129089339035,
+          0.2367055707705143
+        ]
+      },
+      "renderedTriangles": 6404,
+      "foregroundPixels": 82141,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8743911912427044,
+          "rightHand": [
+            -0.25879621014625376,
+            0.9901970775995674,
+            0.13205130100923318
+          ],
+          "rightShoulder": [
+            -0.12358144290995865,
+            1.4407441960660194,
+            0.06046222653714037
+          ],
+          "modelBounds": {
+            "min": [
+              -0.34517038092538543,
+              -0.008772963734901983,
+              -0.11534150325718956
+            ],
+            "max": [
+              0.29873718537165206,
+              1.8777129089339035,
+              0.2367055707705143
+            ]
+          },
+          "renderedTriangles": 6404,
+          "foregroundPixels": 82141,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-medieval-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8656249083118076,
+          "rightHand": [
+            -0.2933317865379089,
+            1.8742363813974872,
+            0.09505584316268967
+          ],
+          "rightShoulder": [
+            -0.11813629761592889,
+            1.4426832930494247,
+            0.04712515588534378
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3352576953096914,
+              -0.004846215427293532,
+              -0.12439735502167115
+            ],
+            "max": [
+              0.3116806541157511,
+              2.102682727546088,
+              0.23831537548104803
+            ]
+          },
+          "renderedTriangles": 6404,
+          "foregroundPixels": 65564,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-medieval-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9365936158579311,
+          "rightHand": [
+            -0.24910417056741085,
+            0.8993462283026896,
+            0.049446957488068564
+          ],
+          "rightShoulder": [
+            -0.12084632618014496,
+            1.3601392709930709,
+            0.04944695748806856
+          ],
+          "modelBounds": {
+            "min": [
+              -0.31436706826217264,
+              0.24337476323431373,
+              -0.13578832318636877
+            ],
+            "max": [
+              0.31054860783128047,
+              1.7974784061155316,
+              0.5713202193968449
+            ]
+          },
+          "renderedTriangles": 6404,
+          "foregroundPixels": 95916,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-medieval-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.9134352206698314,
+          "rightHand": [
+            -0.2342074252812237,
+            1.0791380590112811,
+            0.35733788976672154
+          ],
+          "rightShoulder": [
+            -0.11669356673983897,
+            1.4327692961877294,
+            0.06065624365829337
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3010515278361292,
+              0.15169518443661142,
+              -0.39237745292665904
+            ],
+            "max": [
+              0.28743364666629945,
+              1.868271529136448,
+              0.7683327741212274
+            ]
+          },
+          "renderedTriangles": 6404,
+          "foregroundPixels": 86625,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-medieval-studio-run.png"
+        }
+      ],
+      "sha256": "c3dd297ad74a7af8e1a8283e4cd7f0ef7288b747de08e3abeea0ea8ac7ad8f58",
+      "thumbnailSha256": "0c8c20d90a259bb32c5a271ee33adf8429ef2f5aebe89697402e3459003e47e9"
+    },
+    {
+      "id": "quaternius-modular-female-punk",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-punk.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 50,
+      "skinnedMeshes": 13,
+      "deformation": {
+        "leftUpperArm": 0.38416093975701837,
+        "rightLowerLeg": 0.37023448781413404,
+        "head": 0.08654523957381768
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.34517038092538543,
+          -0.006774415810353292,
+          -0.12011769266141004
+        ],
+        "max": [
+          0.29873718537165206,
+          1.9597501368827555,
+          0.23643672438622004
+        ]
+      },
+      "renderedTriangles": 5956,
+      "foregroundPixels": 63244,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8743911912427044,
+          "rightHand": [
+            -0.25879621014625376,
+            0.9901970775995674,
+            0.13205130100923318
+          ],
+          "rightShoulder": [
+            -0.12358144290995865,
+            1.4407441960660194,
+            0.06046222653714037
+          ],
+          "modelBounds": {
+            "min": [
+              -0.34517038092538543,
+              -0.006774415810353292,
+              -0.12011769266141004
+            ],
+            "max": [
+              0.29873718537165206,
+              1.9597501368827555,
+              0.23643672438622004
+            ]
+          },
+          "renderedTriangles": 5956,
+          "foregroundPixels": 63244,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-punk-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8656249083118076,
+          "rightHand": [
+            -0.2933317865379089,
+            1.8742363813974872,
+            0.09505584316268967
+          ],
+          "rightShoulder": [
+            -0.11813629761592889,
+            1.4426832930494247,
+            0.04712515588534378
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3352576953096914,
+              -0.004371046545674003,
+              -0.13515561903118628
+            ],
+            "max": [
+              0.3116806541157511,
+              2.102682727546088,
+              0.23859975933402258
+            ]
+          },
+          "renderedTriangles": 5956,
+          "foregroundPixels": 55060,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-punk-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9365936158579311,
+          "rightHand": [
+            -0.24910417056741085,
+            0.8993462283026896,
+            0.049446957488068564
+          ],
+          "rightShoulder": [
+            -0.12084632618014496,
+            1.3601392709930709,
+            0.04944695748806856
+          ],
+          "modelBounds": {
+            "min": [
+              -0.31436706826217264,
+              0.24381041126629277,
+              -0.14844383075653456
+            ],
+            "max": [
+              0.31054860783128047,
+              1.8782203986553945,
+              0.5310523789867015
+            ]
+          },
+          "renderedTriangles": 5956,
+          "foregroundPixels": 73690,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-punk-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.9134352206698314,
+          "rightHand": [
+            -0.2342074252812237,
+            1.0791380590112811,
+            0.35733788976672154
+          ],
+          "rightShoulder": [
+            -0.11669356673983897,
+            1.4327692961877294,
+            0.06065624365829337
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3010515278361292,
+              0.1446467757747566,
+              -0.3753772762502425
+            ],
+            "max": [
+              0.28743364666629945,
+              1.9495301110444034,
+              0.7715031189253341
+            ]
+          },
+          "renderedTriangles": 5956,
+          "foregroundPixels": 63876,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-punk-studio-run.png"
+        }
+      ],
+      "sha256": "63657e5bee3ed9e836cfe64e65a9137248c4a0ef409104c7af6c8647fb3e2578",
+      "thumbnailSha256": "1f6edb7210bb10b6dfc86a818180d2a26374279badd0ec2ed86c1e3474d67ca5"
+    },
+    {
+      "id": "quaternius-modular-female-scifi",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-scifi.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 50,
+      "skinnedMeshes": 15,
+      "deformation": {
+        "leftUpperArm": 0.38416093975701837,
+        "rightLowerLeg": 0.3698226212057504,
+        "head": 0.0841613808190342
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.34517038092538543,
+          -0.008772947480808901,
+          -0.09486883550900455
+        ],
+        "max": [
+          0.29873718537165206,
+          1.8544299506829367,
+          0.23670557013031807
+        ]
+      },
+      "renderedTriangles": 6998,
+      "foregroundPixels": 70262,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8743911912427044,
+          "rightHand": [
+            -0.25879621014625376,
+            0.9901970775995674,
+            0.13205130100923318
+          ],
+          "rightShoulder": [
+            -0.12358144290995865,
+            1.4407441960660194,
+            0.06046222653714037
+          ],
+          "modelBounds": {
+            "min": [
+              -0.34517038092538543,
+              -0.008772947480808901,
+              -0.09486883550900455
+            ],
+            "max": [
+              0.29873718537165206,
+              1.8544299506829367,
+              0.23670557013031807
+            ]
+          },
+          "renderedTriangles": 6998,
+          "foregroundPixels": 70262,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-scifi-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8656249083118076,
+          "rightHand": [
+            -0.2933317865379089,
+            1.8742363813974872,
+            0.09505584316268967
+          ],
+          "rightShoulder": [
+            -0.11813629761592889,
+            1.4426832930494247,
+            0.04712515588534378
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3352576953096914,
+              -0.004846231072928415,
+              -0.10614008534081198
+            ],
+            "max": [
+              0.3116806541157511,
+              2.102682727546088,
+              0.2383153749523093
+            ]
+          },
+          "renderedTriangles": 6998,
+          "foregroundPixels": 55282,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-scifi-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9365936158579311,
+          "rightHand": [
+            -0.24910417056741085,
+            0.8993462283026896,
+            0.049446957488068564
+          ],
+          "rightShoulder": [
+            -0.12084632618014496,
+            1.3601392709930709,
+            0.04944695748806856
+          ],
+          "modelBounds": {
+            "min": [
+              -0.31436706826217264,
+              0.24337474867347814,
+              -0.1180867481781599
+            ],
+            "max": [
+              0.31054860783128047,
+              1.7741732042247902,
+              0.5386963659484023
+            ]
+          },
+          "renderedTriangles": 6998,
+          "foregroundPixels": 80771,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-scifi-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.9134352206698314,
+          "rightHand": [
+            -0.2342074252812237,
+            1.0791380590112811,
+            0.35733788976672154
+          ],
+          "rightShoulder": [
+            -0.11669356673983897,
+            1.4327692961877294,
+            0.06065624365829337
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3010515278361292,
+              0.15169518075117475,
+              -0.3746404006003084
+            ],
+            "max": [
+              0.28743364666629945,
+              1.8448971239622929,
+              0.7683327787071312
+            ]
+          },
+          "renderedTriangles": 6998,
+          "foregroundPixels": 74709,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-scifi-studio-run.png"
+        }
+      ],
+      "sha256": "6ccf6deefc1c5127da7d9648e5a26d1f82391686aebb8fb22fc732fbcf9a4bdd",
+      "thumbnailSha256": "8e108d0f4929a878d94b6fdd5a9133da0efd91b03c1b633e91d308d8b86d8c52"
+    },
+    {
+      "id": "quaternius-modular-female-soldier",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-soldier.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 50,
+      "skinnedMeshes": 11,
+      "deformation": {
+        "leftUpperArm": 0.380491028885282,
+        "rightLowerLeg": 0.36246798144328657,
+        "head": 0.06861227327409104
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.34517049380465004,
+          -0.006088641382588732,
+          -0.07726421001720171
+        ],
+        "max": [
+          0.29873730066201865,
+          1.8300925436450686,
+          0.23976386090000767
+        ]
+      },
+      "renderedTriangles": 7900,
+      "foregroundPixels": 62967,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8662725727877966,
+          "rightHand": [
+            -0.25879621014625376,
+            0.9901970775995674,
+            0.13205130100923318
+          ],
+          "rightShoulder": [
+            -0.12358144290995865,
+            1.4407441960660194,
+            0.06046222653714037
+          ],
+          "modelBounds": {
+            "min": [
+              -0.34517049380465004,
+              -0.006088641382588732,
+              -0.07726421001720171
+            ],
+            "max": [
+              0.29873730066201865,
+              1.8300925436450686,
+              0.23976386090000767
+            ]
+          },
+          "renderedTriangles": 7900,
+          "foregroundPixels": 62967,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-soldier-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8581621892940705,
+          "rightHand": [
+            -0.2933317865379089,
+            1.8742363813974872,
+            0.09505584316268967
+          ],
+          "rightShoulder": [
+            -0.11813629761592889,
+            1.4426832930494247,
+            0.04712515588534378
+          ],
+          "modelBounds": {
+            "min": [
+              -0.33525770530114535,
+              -0.006345846020007757,
+              -0.07527018443393221
+            ],
+            "max": [
+              0.3116807699375077,
+              2.1026827200509,
+              0.2415632314217559
+            ]
+          },
+          "renderedTriangles": 7900,
+          "foregroundPixels": 47261,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-soldier-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.933635563053497,
+          "rightHand": [
+            -0.24910417056741085,
+            0.8993462283026896,
+            0.049446957488068564
+          ],
+          "rightShoulder": [
+            -0.12084632618014496,
+            1.3601392709930709,
+            0.04944695748806856
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3143671843260385,
+              0.25445654034860593,
+              -0.08798793734734711
+            ],
+            "max": [
+              0.3105487238933555,
+              1.750415697611767,
+              0.5632823879460352
+            ]
+          },
+          "renderedTriangles": 7900,
+          "foregroundPixels": 87423,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-soldier-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.9046209825740574,
+          "rightHand": [
+            -0.2342074252812237,
+            1.0791380590112811,
+            0.35733788976672154
+          ],
+          "rightShoulder": [
+            -0.11669356673983897,
+            1.4327692961877294,
+            0.06065624365829337
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3010516423724652,
+              0.14316604153010887,
+              -0.3823053352782142
+            ],
+            "max": [
+              0.2874336553356911,
+              1.820627059236691,
+              0.7699106053151905
+            ]
+          },
+          "renderedTriangles": 7900,
+          "foregroundPixels": 74400,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-soldier-studio-run.png"
+        }
+      ],
+      "sha256": "6a4679deb21fb429900e26460846cc9c4cdc0debc8beabd4c4b8f7fcda5508b6",
+      "thumbnailSha256": "07f84e1e69233757a932e9f6eeb01f5ca518e95bac8588d350c56c55cee1b7ba"
+    },
+    {
+      "id": "quaternius-modular-female-suit",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-suit.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 50,
+      "skinnedMeshes": 10,
+      "deformation": {
+        "leftUpperArm": 0.3804910281939106,
+        "rightLowerLeg": 0.37363056520733795,
+        "head": 0.08461608000966983
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.34517038092538543,
+          -0.010022724862023573,
+          -0.09547969658816519
+        ],
+        "max": [
+          0.29873718537165206,
+          1.8435210970835834,
+          0.25318058379245945
+        ]
+      },
+      "renderedTriangles": 6494,
+      "foregroundPixels": 72398,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8662725727016296,
+          "rightHand": [
+            -0.25879621014625376,
+            0.9901970775995674,
+            0.13205130100923318
+          ],
+          "rightShoulder": [
+            -0.12358144290995865,
+            1.4407441960660194,
+            0.06046222653714037
+          ],
+          "modelBounds": {
+            "min": [
+              -0.34517038092538543,
+              -0.010022724862023573,
+              -0.09547969658816519
+            ],
+            "max": [
+              0.29873718537165206,
+              1.8435210970835834,
+              0.25318058379245945
+            ]
+          },
+          "renderedTriangles": 6494,
+          "foregroundPixels": 72398,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-suit-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8581621850629357,
+          "rightHand": [
+            -0.2933317865379089,
+            1.8742363813974872,
+            0.09505584316268967
+          ],
+          "rightShoulder": [
+            -0.11813629761592889,
+            1.4426832930494247,
+            0.04712515588534378
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3352576953096914,
+              -0.005381297534820283,
+              -0.10633667225208787
+            ],
+            "max": [
+              0.3116806541157511,
+              2.102682727546088,
+              0.25429761878455787
+            ]
+          },
+          "renderedTriangles": 6494,
+          "foregroundPixels": 55842,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-suit-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9291454215021742,
+          "rightHand": [
+            -0.24910417056741085,
+            0.8993462283026896,
+            0.049446957488068564
+          ],
+          "rightShoulder": [
+            -0.12084632618014496,
+            1.3601392709930709,
+            0.04944695748806856
+          ],
+          "modelBounds": {
+            "min": [
+              -0.31436706826217264,
+              0.23562965460352592,
+              -0.11878589280537416
+            ],
+            "max": [
+              0.31054860783128047,
+              1.7631879470817051,
+              0.5363993180370282
+            ]
+          },
+          "renderedTriangles": 6494,
+          "foregroundPixels": 87356,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-suit-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.904620973316644,
+          "rightHand": [
+            -0.2342074252812237,
+            1.0791380590112811,
+            0.35733788976672154
+          ],
+          "rightShoulder": [
+            -0.11669356673983897,
+            1.4327692961877294,
+            0.06065624365829337
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3010515278361292,
+              0.1490274121905284,
+              -0.3800155297779006
+            ],
+            "max": [
+              0.28743364666629945,
+              1.8340896472043786,
+              0.7885664449336934
+            ]
+          },
+          "renderedTriangles": 6494,
+          "foregroundPixels": 75971,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-suit-studio-run.png"
+        }
+      ],
+      "sha256": "037c8ec7e0ba80a6fed4dd3502dd5b64a7812f63b066acc725c4a4d307663d31",
+      "thumbnailSha256": "f700d99915ccdf36428aa5069b46f0c7ab3105fc550f917d72f343d3501244bc"
+    },
+    {
+      "id": "quaternius-modular-female-witch",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-witch.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 50,
+      "skinnedMeshes": 13,
+      "deformation": {
+        "leftUpperArm": 0.38420171546053405,
+        "rightLowerLeg": 0.3699278803695768,
+        "head": 0.13771691296613495
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.3453128458287762,
+          -0.0092668240676349,
+          -0.22666644443907905
+        ],
+        "max": [
+          0.298877887769585,
+          2.047506717618109,
+          0.319100270370858
+        ]
+      },
+      "renderedTriangles": 6900,
+      "foregroundPixels": 66705,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.874481357035442,
+          "rightHand": [
+            -0.25879621014625376,
+            0.9901970775995674,
+            0.13205130100923318
+          ],
+          "rightShoulder": [
+            -0.12358144290995865,
+            1.4407441960660194,
+            0.06046222653714037
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3453128458287762,
+              -0.0092668240676349,
+              -0.22666644443907905
+            ],
+            "max": [
+              0.298877887769585,
+              2.047506717618109,
+              0.319100270370858
+            ]
+          },
+          "renderedTriangles": 6900,
+          "foregroundPixels": 66705,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-witch-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8657204458950698,
+          "rightHand": [
+            -0.2933317865379089,
+            1.8742363813974872,
+            0.09505584316268967
+          ],
+          "rightShoulder": [
+            -0.11813629761592889,
+            1.4426832930494247,
+            0.04712515588534378
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3523392544678277,
+              -0.00484618522688044,
+              -0.23985321955892236
+            ],
+            "max": [
+              0.31182036423015225,
+              2.1027472474104525,
+              0.3037749009746534
+            ]
+          },
+          "renderedTriangles": 6900,
+          "foregroundPixels": 63865,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-witch-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9366977562722208,
+          "rightHand": [
+            -0.24910417056741085,
+            0.8993462283026896,
+            0.049446957488068564
+          ],
+          "rightShoulder": [
+            -0.12084632618014496,
+            1.3601392709930709,
+            0.04944695748806856
+          ],
+          "modelBounds": {
+            "min": [
+              -0.31450688368840685,
+              0.2409886702870465,
+              -0.256207435262781
+            ],
+            "max": [
+              0.310688418548666,
+              1.9621253084324195,
+              0.5363398830025241
+            ]
+          },
+          "renderedTriangles": 6900,
+          "foregroundPixels": 80135,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-witch-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.9135407976414176,
+          "rightHand": [
+            -0.2342074252812237,
+            1.0791380590112811,
+            0.35733788976672154
+          ],
+          "rightShoulder": [
+            -0.11669356673983897,
+            1.4327692961877294,
+            0.06065624365829337
+          ],
+          "modelBounds": {
+            "min": [
+              -0.30118873892865095,
+              0.15169536660653873,
+              -0.3845719863669441
+            ],
+            "max": [
+              0.299182661883172,
+              2.0332294744497066,
+              0.7714293513446426
+            ]
+          },
+          "renderedTriangles": 6900,
+          "foregroundPixels": 70469,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-witch-studio-run.png"
+        }
+      ],
+      "sha256": "2ab292da54f3ca0fe2576d96b445e0dcad4cf630af75720b08d39f389af2be72",
+      "thumbnailSha256": "ca37050446deb8113dd5595fff561cdb31d26e2f9e2e89639e4ac68be9d9c405"
+    },
+    {
+      "id": "quaternius-modular-female-worker",
+      "url": "/vrm/quaternius-modular-v1/quaternius-modular-female-worker.vrm",
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      },
+      "humanBones": 50,
+      "skinnedMeshes": 12,
+      "deformation": {
+        "leftUpperArm": 0.38416093975701837,
+        "rightLowerLeg": 0.37363056520733795,
+        "head": 0.0960787744640127
+      },
+      "images": 0,
+      "animations": 0,
+      "expressions": 0,
+      "modelBounds": {
+        "min": [
+          -0.34517038092538543,
+          -0.010022724862023573,
+          -0.08774844642101193
+        ],
+        "max": [
+          0.29873718537165206,
+          1.8590609084976097,
+          0.25318058379245945
+        ]
+      },
+      "renderedTriangles": 6084,
+      "foregroundPixels": 72038,
+      "builtinPoses": [
+        {
+          "poseId": "default",
+          "maxVertexDelta": 0.8743911912427044,
+          "rightHand": [
+            -0.25879621014625376,
+            0.9901970775995674,
+            0.13205130100923318
+          ],
+          "rightShoulder": [
+            -0.12358144290995865,
+            1.4407441960660194,
+            0.06046222653714037
+          ],
+          "modelBounds": {
+            "min": [
+              -0.34517038092538543,
+              -0.010022724862023573,
+              -0.08774844642101193
+            ],
+            "max": [
+              0.29873718537165206,
+              1.8590609084976097,
+              0.25318058379245945
+            ]
+          },
+          "renderedTriangles": 6084,
+          "foregroundPixels": 72038,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-worker-studio-default.png"
+        },
+        {
+          "poseId": "wave",
+          "maxVertexDelta": 0.8656249083118076,
+          "rightHand": [
+            -0.2933317865379089,
+            1.8742363813974872,
+            0.09505584316268967
+          ],
+          "rightShoulder": [
+            -0.11813629761592889,
+            1.4426832930494247,
+            0.04712515588534378
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3352576953096914,
+              -0.005381297535036592,
+              -0.09840716268291305
+            ],
+            "max": [
+              0.3116806541157511,
+              2.102682727546088,
+              0.25429761878455787
+            ]
+          },
+          "renderedTriangles": 6084,
+          "foregroundPixels": 56582,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-worker-studio-wave.png"
+        },
+        {
+          "poseId": "sit",
+          "maxVertexDelta": 0.9365936158579311,
+          "rightHand": [
+            -0.24910417056741085,
+            0.8993462283026896,
+            0.049446957488068564
+          ],
+          "rightShoulder": [
+            -0.12084632618014496,
+            1.3601392709930709,
+            0.04944695748806856
+          ],
+          "modelBounds": {
+            "min": [
+              -0.31436706826217264,
+              0.23562965460352592,
+              -0.1104587784000346
+            ],
+            "max": [
+              0.31054860783128047,
+              1.7772492770295591,
+              0.5359437745602149
+            ]
+          },
+          "renderedTriangles": 6084,
+          "foregroundPixels": 85590,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-worker-studio-sit.png"
+        },
+        {
+          "poseId": "run",
+          "maxVertexDelta": 0.9134352206698314,
+          "rightHand": [
+            -0.2342074252812237,
+            1.0791380590112811,
+            0.35733788976672154
+          ],
+          "rightShoulder": [
+            -0.11669356673983897,
+            1.4327692961877294,
+            0.06065624365829337
+          ],
+          "modelBounds": {
+            "min": [
+              -0.3010515278361292,
+              0.14902741219035376,
+              -0.37797714978383945
+            ],
+            "max": [
+              0.28743364666629945,
+              1.8485445387341308,
+              0.7885664449336934
+            ]
+          },
+          "renderedTriangles": 6084,
+          "foregroundPixels": 76105,
+          "preview": "artifacts/studio-asset-expansion/previews/modular-v1/quaternius-modular-female-worker-studio-run.png"
+        }
+      ],
+      "sha256": "86d5e253ee54c6e9bd2b74a96f2ccd6eb652c6a5f4e97afdbab71ffe6ab2b478",
+      "thumbnailSha256": "fe9dcdacc534bd03618494840afef1bd433a2e1625dd9482954c22e5e2248b99"
+    }
+  ],
+  "errors": []
+}
