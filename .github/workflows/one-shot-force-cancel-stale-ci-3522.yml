@@ -11,59 +11,85 @@ permissions:
   actions: write
   contents: read
 
+concurrency:
+  group: one-shot-cancel-closed-integration-pr-runs
+  cancel-in-progress: true
+
 jobs:
   cancel-closed-pr-runs:
-    runs-on: windows-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Cancel unfinished runs owned by closed PR 917 and 918 branches
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $false
-          $branches = @(
-            'integration/all-open-mrs-20260908',
-            'release/final-combined-496aa743-20260908'
+          set -euo pipefail
+          python3 <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          branches = (
+              "integration/all-open-mrs-20260908",
+              "release/final-combined-496aa743-20260908",
           )
-
-          function Get-UnfinishedRuns([string] $branch) {
-            $encodedBranch = [uri]::EscapeDataString($branch)
-            $endpoint = "repos/$env:GITHUB_REPOSITORY/actions/runs?branch=$encodedBranch&per_page=100"
-            $ids = @(gh api --paginate $endpoint --jq '.workflow_runs[] | select(.status != "completed") | .id')
-            if ($LASTEXITCODE -ne 0) { throw "Unable to list runs for $branch" }
-            return $ids
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "closed-pr-run-cleanup",
           }
 
-          foreach ($branch in $branches) {
-            foreach ($runId in @(Get-UnfinishedRuns $branch)) {
-              $status = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId" --jq '.status' 2>$null
-              if ($LASTEXITCODE -ne 0 -or $status -eq 'completed') { continue }
+          def api(path: str, method: str = "GET"):
+              request = urllib.request.Request(
+                  f"https://api.github.com/repos/{repo}/{path}",
+                  headers=headers,
+                  method=method,
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      payload = response.read()
+                      return json.loads(payload) if payload else None
+              except urllib.error.HTTPError as error:
+                  if error.code in (409, 422):
+                      return None
+                  raise
 
-              Write-Host "Cancelling closed-PR run $runId from $branch"
-              gh api --method POST "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId/cancel" *> $null
-              Start-Sleep -Milliseconds 500
+          def unfinished(branch: str):
+              query = urllib.parse.urlencode({"branch": branch, "per_page": 100})
+              payload = api(f"actions/runs?{query}") or {}
+              return [
+                  run["id"]
+                  for run in payload.get("workflow_runs", [])
+                  if run.get("status") != "completed"
+              ]
 
-              $status = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId" --jq '.status' 2>$null
-              if ($LASTEXITCODE -eq 0 -and $status -ne 'completed') {
-                gh api --method POST "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId/force-cancel" *> $null
-              }
-            }
-          }
+          for branch in branches:
+              for run_id in unfinished(branch):
+                  current = api(f"actions/runs/{run_id}") or {}
+                  if current.get("status") == "completed":
+                      continue
+                  print(f"Cancelling closed-PR run {run_id} from {branch}")
+                  api(f"actions/runs/{run_id}/cancel", "POST")
+                  time.sleep(0.5)
+                  current = api(f"actions/runs/{run_id}") or {}
+                  if current.get("status") != "completed":
+                      api(f"actions/runs/{run_id}/force-cancel", "POST")
 
-          for ($attempt = 0; $attempt -lt 60; $attempt++) {
-            $remaining = @()
-            foreach ($branch in $branches) {
-              $remaining += @(Get-UnfinishedRuns $branch)
-            }
-            if ($remaining.Count -eq 0) {
-              Write-Host 'All unfinished runs from closed PR branches are completed.'
-              exit 0
-            }
-            Write-Host "Still terminating: $($remaining -join ', ')"
-            Start-Sleep -Seconds 2
-          }
+          for _ in range(60):
+              remaining = [run_id for branch in branches for run_id in unfinished(branch)]
+              if not remaining:
+                  print("All unfinished runs from closed PR branches are completed.")
+                  raise SystemExit(0)
+              print("Still terminating:", ", ".join(map(str, remaining)))
+              time.sleep(2)
 
-          Write-Warning 'Some already-cancelling runs are still finalizing; no current PR run was touched.'
-          exit 0
+          print("Some cancelling runs are still finalizing; current PR #919 was not touched.")
+          PY
