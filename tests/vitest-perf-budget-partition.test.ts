@@ -3,15 +3,20 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import rootConfig from "../vitest.config";
 import { PERF_BUDGET_TEST_FILES } from "../vitest.perf-budget-files.mjs";
+import serialConfig from "../vitest.perf.config";
+import { CPU_REFERENCE_TEST_FILES, SERIAL_TEST_FILES } from "../vitest.serial-test-files.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const CATALOGUE_TIMING_TEST = "scripts/studio-brush-catalogue-perf-matrix.test.ts";
 const CATALOGUE_TIMING_HELPER = "scripts/studio-brush-catalogue-perf-matrix.ts";
 const CATALOGUE_TIMING_CALL = /\bevaluateStudioBrushCataloguePaint(?:PerfMatrix|PerfRow|Soak)\s*\(/u;
 
-function measuresWallClock(source: string): boolean {
+function measuresExecutionTime(source: string): boolean {
   return source.includes("performance.now(")
+    || source.includes("process.cpuUsage(")
+    || source.includes("process.threadCpuUsage(")
     || source.includes("evaluateStudioCalibrated")
     || (source.includes('from "./studio-brush-catalogue-perf-matrix"')
       && CATALOGUE_TIMING_CALL.test(source));
@@ -24,17 +29,17 @@ function measuresWallClock(source: string): boolean {
  * otherwise a deterministic test would be quietly moved out of the parallel run for no reason,
  * or a renamed budget test would fall back into the main run and start flaking again.
  */
-describe("wall-clock budget partition", () => {
+describe("execution-time budget partition", () => {
   it("lists only files that exist", () => {
     const missing = PERF_BUDGET_TEST_FILES.filter((file) => !existsSync(path.join(root, file)));
     expect(missing, "renamed or deleted — update vitest.perf-budget-files.mjs").toEqual([]);
   });
 
-  it("lists only files that measure wall-clock time", () => {
+  it("lists only files that measure execution time", () => {
     // The clock can be owned by a shared helper. Both calibrated budgets and the catalogue
     // matrix are live measurements even though the test does not call performance.now itself.
     const notTimed = PERF_BUDGET_TEST_FILES.filter((file) =>
-      !measuresWallClock(readFileSync(path.join(root, file), "utf8")));
+      !measuresExecutionTime(readFileSync(path.join(root, file), "utf8")));
     expect(
       notTimed,
       "neither a direct clock nor a known timing helper — this belongs in the main run",
@@ -59,7 +64,7 @@ describe("wall-clock budget partition", () => {
     expect(PERF_BUDGET_TEST_FILES).toContain(CATALOGUE_TIMING_TEST);
     const source = readFileSync(path.join(root, CATALOGUE_TIMING_TEST), "utf8");
     const helper = readFileSync(path.join(root, CATALOGUE_TIMING_HELPER), "utf8");
-    expect(measuresWallClock(source)).toBe(true);
+    expect(measuresExecutionTime(source)).toBe(true);
     expect(helper).toContain("performance.now(");
     expect(source).toMatch(/evaluateStudioBrushCataloguePaintSoak\s*\(/u);
   });
@@ -69,8 +74,8 @@ describe("wall-clock budget partition", () => {
       'import { detectStudioBrushSoakMonotonicDegradation } from "./studio-brush-catalogue-perf-matrix";',
       "detectStudioBrushSoakMonotonicDegradation([10, 10, 10]);",
     ].join("\n");
-    expect(measuresWallClock(deterministicOnly)).toBe(false);
-    expect(measuresWallClock("expect(geometry.length).toBe(42);")).toBe(false);
+    expect(measuresExecutionTime(deterministicOnly)).toBe(false);
+    expect(measuresExecutionTime("expect(geometry.length).toBe(42);")).toBe(false);
   });
 
   it("keeps the list sorted so additions diff cleanly", () => {
@@ -79,5 +84,24 @@ describe("wall-clock budget partition", () => {
 
   it("does not list itself or any other partition bookkeeping", () => {
     expect(PERF_BUDGET_TEST_FILES.some((file) => file.startsWith("tests/"))).toBe(false);
+  });
+});
+
+describe("mandatory serial test partition", () => {
+  it("collects every moved test exactly once in the serial lane", () => {
+    expect(new Set(SERIAL_TEST_FILES).size).toBe(SERIAL_TEST_FILES.length);
+    expect(serialConfig.test?.include).toEqual([...SERIAL_TEST_FILES]);
+    for (const file of SERIAL_TEST_FILES) {
+      expect(existsSync(path.join(root, file)), file).toBe(true);
+      expect(rootConfig.test?.exclude, file).toContain(file);
+      expect(serialConfig.test?.exclude, file).not.toContain(file);
+    }
+  });
+
+  it("keeps exhaustive output references separate from elapsed-time budgets", () => {
+    expect([...CPU_REFERENCE_TEST_FILES]).toEqual([...CPU_REFERENCE_TEST_FILES].sort());
+    for (const file of CPU_REFERENCE_TEST_FILES) {
+      expect(PERF_BUDGET_TEST_FILES, file).not.toContain(file);
+    }
   });
 });

@@ -105,6 +105,8 @@ jobs:
       - run: pnpm run build
       - run: pnpm run check:studio-bundle
       - run: pnpm run build:all
+      - name: Verify the isolated Vercel API artifact starts and serves its read routes
+        run: node scripts/verify-api-serverless-build.mjs
       - name: Verify Cloudflare realtime Worker packaging
         run: |
           pnpm exec wrangler deploy \
@@ -300,7 +302,19 @@ jobs:
       # 않아 각 러너가 전체 스위트를 중복 실행한다. shard 옵션을 스크립트에 직접 전달한다.
       - name: Run this shard of the root Vitest suite with per-file progress
         timeout-minutes: 20
-        run: pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }}
+      - name: Preserve this shard's coverage for SonarQube
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
+        with:
+          name: sonar-coverage-${{ matrix.shard }}
+          path: coverage/shard-${{ matrix.shard }}/lcov.info
+          if-no-files-found: error
+          retention-days: 7
+
+  sonarqube:
+    needs: test
+    uses: ./.github/workflows/sonarqube.yml
+    secrets: inherit
 
   test-serial:
     # 조용한 러너 한 대가 필요한 검사들. 벽시계 예산 테스트는 4 worker 와 경쟁하면 코드가 아니라
@@ -319,7 +333,7 @@ jobs:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Run the wall-clock perf-budget pass one file at a time
+      - name: Run timing budgets and exhaustive CPU references one file at a time
         run: pnpm run test:perf
       # The root Vitest run intentionally skips Redis without a disposable target.
       # This runner owns a password-protected loopback container and always removes it.

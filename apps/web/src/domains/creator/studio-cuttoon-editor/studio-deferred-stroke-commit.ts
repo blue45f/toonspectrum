@@ -1,5 +1,6 @@
 
 import { requireStudioDrawingPointerTransport } from "../brush/studio-drawing-pointer-transport";
+import { studioLayerCompPageAdmissionError } from "../layer/studio-layer-comp-page-admission";
 import {
   releaseStudioGpuPendingAuthorityPrefix,
   type StudioGpuPendingDrawAuthority,
@@ -136,6 +137,7 @@ export interface StudioDeferredStrokeCommitEngineContext extends Pick<
   readonly noteStudioHistoryRetention: (
     appended: StudioPagesHistoryAppendResult<PageState>
   ) => void;
+  readonly onHistoryBranch: () => void;
   readonly pageEditLocked: boolean;
   readonly pendingGpuDrawAuthoritiesRef:
     MutableRefObject<StudioGpuPendingDrawAuthority[]>;
@@ -243,6 +245,7 @@ export function createStudioDeferredStrokeCommitEngine(
     liveRetainedMediaOverlayRendererRef,
     masterEditMode,
     noteStudioHistoryRetention,
+    onHistoryBranch,
     pageEditLocked,
     pages,
     pagesHiRef,
@@ -353,6 +356,16 @@ export function createStudioDeferredStrokeCommitEngine(
     if (pageEditLocked) {
       setError("이 페이지는 검토 잠금 상태예요. 페이지 검토에서 잠금을 해제한 뒤 편집해 주세요.");
       return false;
+    }
+    if (commitTargetPage) {
+      const admissionError = studioLayerCompPageAdmissionError(
+        commitTargetPage,
+        { ...commitTargetPage, ...extraPatch },
+      );
+      if (admissionError) {
+        setError(admissionError);
+        return false;
+      }
     }
     if (!advancedFillApplyingRef.current) {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
@@ -478,6 +491,7 @@ export function createStudioDeferredStrokeCommitEngine(
       currentHistoryIndex,
       nextPages
     );
+    onHistoryBranch();
     recordStudioHistoryTransition({
       mutationKind: "elements.commit",
       previousPages: commitBasePages,
@@ -541,6 +555,14 @@ export function createStudioDeferredStrokeCommitEngine(
       setError("이 페이지는 검토 잠금 상태예요. 페이지 검토에서 잠금을 해제한 뒤 편집해 주세요.");
       return;
     }
+    const admissionError = studioLayerCompPageAdmissionError(
+      commitTargetPage,
+      { ...commitTargetPage, elements: resolved },
+    );
+    if (admissionError) {
+      setError(admissionError);
+      return;
+    }
     if (!advancedFillApplyingRef.current) {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
@@ -568,6 +590,7 @@ export function createStudioDeferredStrokeCommitEngine(
       nextHistoryIndex = appended.historyIndex;
       noteStudioHistoryRetention(appended);
     }
+    onHistoryBranch();
     recordStudioHistoryTransition({
       mutationKind: "elements.coalesced-commit",
       previousPages: commitBasePages,
@@ -907,6 +930,19 @@ export function createStudioDeferredStrokeCommitEngine(
       setError("현재 획을 마친 뒤 페이지 구성을 변경할 수 있어요.");
       return false;
     }
+    // Reject before flushing another accepted stroke or invalidating resource work. Rebasing below
+    // changes element bodies only, so this is the same metadata that the final page set will carry.
+    const pagesBeforeFlush = pagesHistoryRef.current[pagesHiRef.current] ?? pages;
+    for (const nextPage of nextPages) {
+      const admissionError = studioLayerCompPageAdmissionError(
+        pagesBeforeFlush.find((page) => page.id === nextPage.id),
+        nextPage,
+      );
+      if (admissionError) {
+        setError(admissionError);
+        return false;
+      }
+    }
     // Page-level operations can run in the same task as a released deferred stroke. Flush first,
     // then project that exact batch into the caller's stale render-derived page set. Most page
     // operations must preserve the just-finished ink even when they intentionally create a new
@@ -963,6 +999,7 @@ export function createStudioDeferredStrokeCommitEngine(
       currentHistoryIndex,
       resolvedPages
     );
+    onHistoryBranch();
     recordStudioHistoryTransition({
       mutationKind: "pages.commit",
       previousPages: currentPages,
