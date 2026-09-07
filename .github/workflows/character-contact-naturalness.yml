@@ -19,7 +19,7 @@ on:
       - apps/web/src/domains/creator/vrm/StudioVrmGripContactRefine.tsx
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: character-contact-naturalness-${{ github.ref }}
@@ -44,76 +44,3 @@ jobs:
           node-version: 24
       - name: Verify contact, rollback, replay and portrait math
         run: node --experimental-strip-types --test scripts/verify-character-contact-naturalness.mjs
-
-  asset-platform-completion:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/asset-platform-foundation' && github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: feat/asset-platform-foundation
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Materialize runtime implementation
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat scripts/.asset-platform-runtime-payload/*.b64 | base64 -d > /tmp/asset-runtime.tar.xz
-          xz --test /tmp/asset-runtime.tar.xz
-          sha256sum /tmp/asset-runtime.tar.xz
-          tar -xJf /tmp/asset-runtime.tar.xz
-          node scripts/apply-asset-runtime-patches.mjs
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Format runtime files
-        run: |
-          pnpm exec prettier --write \
-            apps/api/src/modules/creator-marketplace/creator-asset-runtime.contract.ts \
-            apps/api/src/modules/creator-marketplace/creator-asset-runtime.adapters.ts \
-            apps/api/src/modules/creator-marketplace/creator-asset-runtime.service.ts \
-            apps/api/src/modules/creator-marketplace/creator-asset-runtime.controller.ts \
-            apps/api/src/modules/creator-marketplace/creator-asset-runtime.module.ts \
-            apps/api/src/modules/creator-marketplace/creator-asset-runtime.test.ts \
-            apps/web/src/shared/lib/creator-asset-runtime-client.ts \
-            apps/web/src/components/CreatorAssetRuntimeWorkbench.tsx \
-            apps/api/src/modules/creator-marketplace/creator-marketplace.module.ts \
-            apps/web/src/domains/market/pages/MarketPublishPage.tsx \
-            scripts/apply-asset-runtime-patches.mjs \
-            tools/asset-pipeline/runtime-worker.mjs \
-            docs/creator-asset-runtime.md \
-            tools/asset-pipeline/README.md
-      - name: Validate materialized runtime
-        run: |
-          node --check tools/asset-pipeline/runtime-worker.mjs
-          python3 -m py_compile tools/asset-pipeline/blender_pipeline.py
-          pnpm exec vitest run apps/api/src/modules/creator-marketplace/creator-asset-runtime.test.ts
-          pnpm --filter @toonspectrum/api typecheck
-          pnpm --filter @toonspectrum/web typecheck
-      - name: Keep only product sources and push
-        shell: bash
-        run: |
-          set -euo pipefail
-          git show origin/main:.github/workflows/character-contact-naturalness.yml > .github/workflows/character-contact-naturalness.yml
-          rm -f \
-            .github/workflows/asset-platform-autopatch.yml \
-            .github/workflows/asset-platform-fix-round-2.yml \
-            .github/workflows/asset-platform-source-snapshot.yml \
-            .github/workflows/asset-platform-runtime-completion.yml \
-            scripts/asset-platform-fix-round-2.mjs \
-            scripts/asset-platform-runtime-complete.mjs \
-            scripts/apply-asset-runtime-patches.mjs
-          rm -rf \
-            scripts/.asset-platform-runtime-parts \
-            scripts/.asset-platform-runtime-safe \
-            scripts/.asset-platform-runtime-payload \
-            tools/asset-pipeline/__pycache__
-          git add -A
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "feat(asset-platform): complete runtime delivery pipeline"
-          git push origin HEAD:feat/asset-platform-foundation
