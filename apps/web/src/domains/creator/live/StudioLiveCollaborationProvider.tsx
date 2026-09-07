@@ -43,6 +43,7 @@ export type StudioCrdtAuthoritativeSaveBarrier = (
 ) => Promise<StudioCrdtAuthoritativeAckBarrierResult>;
 
 export interface StudioCrdtSceneGraphRuntime {
+  flushAndWaitForDelivery: (timeoutMs?: number) => Promise<void>;
   publish: typeof import("./studio-crdt-scene-publisher").publishStudioCrdtSceneGraphDiff;
   reconcileHistory: typeof import( "./studio-crdt-history").reconcileStudioCrdtSceneGraphHistory;
   reconcilePages: typeof import("./studio-crdt-page-bridge").reconcileStudioCrdtSceneGraphPages;
@@ -676,6 +677,11 @@ export function StudioLiveCollaborationProvider({
           onCrdtDocumentChange?.(
             crdtDocument,
             {
+              flushAndWaitForDelivery: async (timeoutMs) => {
+                if (cancelled || crdtBinding !== readyBinding) throw new Error("공동 편집 원고가 변경되었습니다.");
+                await readyBinding.flushAndWaitForDelivery(timeoutMs);
+                if (cancelled || crdtBinding !== readyBinding) throw new Error("공동 편집 원고가 변경되었습니다.");
+              },
               publish: scenePublisherModule.publishStudioCrdtSceneGraphDiff,
               reconcileHistory: sceneHistoryModule.reconcileStudioCrdtSceneGraphHistory,
               reconcilePages: scenePageBridgeModule.reconcileStudioCrdtSceneGraphPages,

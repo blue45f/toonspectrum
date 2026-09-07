@@ -1,5 +1,9 @@
 /** Shell metadata only. Do not import page/navigation modules into this table. */
 export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
+  "/now": "오늘의 영감",
+  "/research": "창작 리서치 데스크",
+  "/research/assets": "창작 레퍼런스",
+  "/research/books": "글로벌 만화·도서 판본 탐색",
   "/creator-hub": "창작 허브",
   "/opportunities": "작가 기회센터",
   "/creator-hub/references": "창작 레퍼런스",
@@ -8,4 +12,6 @@ export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
   "/discover/works": "만화·작법서 탐색",
   "/publishing": "연재·출판 준비실",
   "/insights/resources": "공식 자료·API 안내",
+  "/about/data": "데이터 출처·상업 이용 준비",
+  "/about/crawler": "공개 데이터 수집 정책",
 };

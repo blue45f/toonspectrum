@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { usePageSocialMeta } from "./use-document-title";
+import {
+  formatProductTitle,
+  useDocumentTitle,
+  usePageSocialMeta,
+} from "./use-document-title";
+
+import { useI18n } from "@/shared/lib/i18n";
 
 function MetaProbe({ path, title }: { path: string; title: string }) {
   usePageSocialMeta({
@@ -13,6 +19,11 @@ function MetaProbe({ path, title }: { path: string; title: string }) {
     type: "article",
     imageAlt: "창작 마켓 공유 카드",
   });
+  return null;
+}
+
+function TitleProbe({ title }: { title?: string }) {
+  useDocumentTitle(title);
   return null;
 }
 
@@ -31,9 +42,32 @@ function installHeadFixtures(): void {
   `;
 }
 
+beforeEach(() => {
+  useI18n.setState({ lang: "ko" });
+});
+
 afterEach(() => {
   cleanup();
   document.head.innerHTML = "";
+  document.title = "";
+});
+
+describe("formatProductTitle", () => {
+  it("replaces legacy product suffixes without duplicating the canonical brand", () => {
+    expect(formatProductTitle("먹선 브러시 · 툰스펙트럼", "툰스튜디오"))
+      .toBe("먹선 브러시 · 툰스튜디오");
+    expect(formatProductTitle("먹선 브러시 · 툰스튜디오", "툰스튜디오"))
+      .toBe("먹선 브러시 · 툰스튜디오");
+    expect(formatProductTitle("ToonSpectrum", "툰스튜디오"))
+      .toBe("툰스튜디오");
+  });
+});
+
+describe("useDocumentTitle", () => {
+  it("uses the localized canonical product name", () => {
+    render(<TitleProbe title="창작 마켓" />);
+    expect(document.title).toBe("창작 마켓 · 툰스튜디오");
+  });
 });
 
 describe("usePageSocialMeta", () => {
@@ -46,7 +80,7 @@ describe("usePageSocialMeta", () => {
     expect(document.querySelector('meta[property="og:type"]')?.getAttribute("content"))
       .toBe("article");
     expect(document.querySelector('meta[property="og:title"]')?.getAttribute("content"))
-      .toBe("먹선 브러시 · 툰스펙트럼");
+      .toBe("먹선 브러시 · 툰스튜디오");
     expect(document.querySelector('meta[name="twitter:description"]')?.getAttribute("content"))
       .toBe("창작 리소스를 실제 Studio 호환성과 함께 탐색합니다.");
   });
