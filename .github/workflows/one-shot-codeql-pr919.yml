@@ -1,4 +1,4 @@
-name: One-shot inspect root Vitest diagnostics
+name: One-shot summarize root Vitest diagnostics
 
 on:
   push:
@@ -16,19 +16,46 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Download and print preserved root Vitest outputs
+      - name: Download and summarize preserved root Vitest outputs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p diagnostics
           gh run download 34171085839 --repo "$GITHUB_REPOSITORY" --dir diagnostics
-          find diagnostics -type f -maxdepth 3 -print -exec wc -c {} \;
-          for file in diagnostics/root-vitest-diagnostic-*/shard-*.exit; do
-            echo "EXIT_FILE=$file VALUE=$(cat "$file")"
-          done
-          for file in diagnostics/root-vitest-diagnostic-*/shard-*.log; do
-            echo "===== BEGIN $file ====="
-            cat "$file"
-            echo "===== END $file ====="
-          done
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('diagnostics')
+          for exit_file in sorted(root.glob('root-vitest-diagnostic-*/shard-*.exit')):
+              print(f'EXIT {exit_file.name}={exit_file.read_text(errors="replace").strip()}')
+
+          trigger = re.compile(
+              r'(FAIL|failed|AssertionError|Unhandled|Error:|Test Files|Tests\s|expected|received|\b×\b|\b❯\b|ELIFECYCLE|Command failed|Timed out|timeout)',
+              re.IGNORECASE,
+          )
+          for log_file in sorted(root.glob('root-vitest-diagnostic-*/shard-*.log')):
+              lines = log_file.read_text(errors='replace').splitlines()
+              indexes = {i for i, line in enumerate(lines) if trigger.search(line)}
+              expanded = sorted({j for i in indexes for j in range(max(0, i - 3), min(len(lines), i + 5))})
+              print(f'===== {log_file.name} lines={len(lines)} matches={len(indexes)} =====')
+              if expanded:
+                  previous = None
+                  emitted = 0
+                  for j in expanded:
+                      if emitted >= 260:
+                          print('... MATCH OUTPUT TRUNCATED ...')
+                          break
+                      if previous is not None and j > previous + 1:
+                          print('---')
+                      print(f'{j + 1}: {lines[j]}')
+                      previous = j
+                      emitted += 1
+              else:
+                  print('NO_FAILURE_PATTERN_FOUND')
+              print('----- FINAL 80 LINES -----')
+              start = max(0, len(lines) - 80)
+              for j in range(start, len(lines)):
+                  print(f'{j + 1}: {lines[j]}')
+          PY
