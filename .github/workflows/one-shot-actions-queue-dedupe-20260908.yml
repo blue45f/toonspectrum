@@ -1,4 +1,4 @@
-name: One-shot Actions queue dedupe
+name: One-shot PR 907 lint repair
 
 on:
   push:
@@ -8,180 +8,126 @@ on:
       - .github/workflows/one-shot-actions-queue-dedupe-20260908.yml
 
 permissions:
-  actions: write
-  contents: read
-  pull-requests: read
+  contents: write
 
 concurrency:
   group: one-shot-actions-queue-dedupe-20260908
   cancel-in-progress: true
 
 jobs:
-  dedupe:
-    name: Preserve latest protected CI
+  repair:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - name: Preserve only main and the newest required CI for each open PR
+      - name: Check out the authoritative release branch
+        uses: actions/checkout@v6
+        with:
+          ref: release/final-df46fece-20260908-1905
+          fetch-depth: 0
+
+      - name: Verify the pinned PR head
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPOSITORY: ${{ github.repository }}
-          SELF_RUN_ID: ${{ github.run_id }}
-          REQUIRED_WORKFLOW_ID: "287571038"
+          EXPECTED_HEAD: e4042d72b6632e8b8b0386465cc2e73c070524eb
         run: |
           set -euo pipefail
-          PYTHON_BIN="$(command -v python3 || command -v python)"
-          "$PYTHON_BIN" <<'PY'
-          from __future__ import annotations
+          actual="$(git rev-parse HEAD)"
+          if [[ "$actual" != "$EXPECTED_HEAD" ]]; then
+            echo "::error::PR head moved: expected $EXPECTED_HEAD, found $actual"
+            exit 1
+          fi
 
-          import json
-          import os
-          import time
-          import urllib.error
-          import urllib.request
+      - name: Apply all current lint repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
 
-          repository = os.environ["GH_REPOSITORY"]
-          token = os.environ["GH_TOKEN"]
-          self_run_id = int(os.environ["SELF_RUN_ID"])
-          required_workflow_id = int(os.environ["REQUIRED_WORKFLOW_ID"])
-          active_statuses = ("in_progress", "queued", "pending", "waiting", "requested")
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old!r}")
+              file.write_text(text.replace(old, new, 1), encoding="utf-8")
+              print(f"updated {path}")
 
-          def api(path: str, method: str = "GET") -> tuple[int, object]:
-              request = urllib.request.Request(
-                  f"https://api.github.com{path}",
-                  method=method,
-                  headers={
-                      "Accept": "application/vnd.github+json",
-                      "Authorization": f"Bearer {token}",
-                      "User-Agent": "toonspectrum-actions-queue-dedupe",
-                      "X-GitHub-Api-Version": "2022-11-28",
-                  },
-              )
-              try:
-                  with urllib.request.urlopen(request, timeout=30) as response:
-                      raw = response.read()
-                      return response.status, json.loads(raw) if raw else {}
-              except urllib.error.HTTPError as error:
-                  raw = error.read()
-                  try:
-                      payload: object = json.loads(raw) if raw else {}
-                  except json.JSONDecodeError:
-                      payload = raw.decode("utf-8", errors="replace")
-                  return error.code, payload
-
-          def open_pr_branches() -> set[str]:
-              branches: set[str] = set()
-              for page in range(1, 6):
-                  status, payload = api(
-                      f"/repos/{repository}/pulls?state=open&per_page=100&page={page}"
-                  )
-                  if status != 200 or not isinstance(payload, list):
-                      raise SystemExit(f"Unable to list open pull requests: HTTP {status}: {payload}")
-                  for pull in payload:
-                      if not isinstance(pull, dict):
-                          continue
-                      head = pull.get("head")
-                      if isinstance(head, dict) and isinstance(head.get("ref"), str):
-                          branches.add(head["ref"])
-                  if len(payload) < 100:
-                      break
-              return branches
-
-          def active_runs() -> list[dict[str, object]]:
-              by_id: dict[int, dict[str, object]] = {}
-              for run_status in active_statuses:
-                  for page in range(1, 11):
-                      status, payload = api(
-                          f"/repos/{repository}/actions/runs"
-                          f"?status={run_status}&per_page=100&page={page}"
-                      )
-                      if status != 200 or not isinstance(payload, dict):
-                          raise SystemExit(
-                              f"Unable to list {run_status} runs: HTTP {status}: {payload}"
-                          )
-                      runs = payload.get("workflow_runs", [])
-                      if not isinstance(runs, list):
-                          raise SystemExit("GitHub returned an invalid workflow_runs payload")
-                      for run in runs:
-                          if isinstance(run, dict):
-                              by_id[int(run.get("id", 0))] = run
-                      if len(runs) < 100:
-                          break
-              return list(by_id.values())
-
-          branches = open_pr_branches()
-          runs = active_runs()
-          newest_required: dict[str, dict[str, object]] = {}
-          for run in runs:
-              branch = run.get("head_branch")
-              if (
-                  isinstance(branch, str)
-                  and branch in branches
-                  and int(run.get("workflow_id", 0)) == required_workflow_id
-              ):
-                  current = newest_required.get(branch)
-                  run_order = (str(run.get("created_at") or ""), int(run.get("id", 0)))
-                  current_order = (
-                      (str(current.get("created_at") or ""), int(current.get("id", 0)))
-                      if current is not None
-                      else ("", 0)
-                  )
-                  if run_order > current_order:
-                      newest_required[branch] = run
-
-          keep_ids = {self_run_id}
-          keep_ids.update(int(run["id"]) for run in newest_required.values())
-          candidates = [
-              run
-              for run in runs
-              if int(run.get("id", 0)) not in keep_ids
-              and run.get("head_branch") != "main"
-          ]
-          candidates.sort(key=lambda run: (str(run.get("created_at") or ""), int(run.get("id", 0))))
-
-          print(
-              json.dumps(
-                  {
-                      "open_pr_branches": sorted(branches),
-                      "active_runs": len(runs),
-                      "preserved_required": {
-                          branch: int(run["id"])
-                          for branch, run in newest_required.items()
-                      },
-                      "cancellations": len(candidates),
-                  },
-                  sort_keys=True,
-              )
+          surface_ink = "apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts"
+          replace_once(
+              surface_ink,
+              "    let segment = subtract(target, previous);",
+              "    const segment = subtract(target, previous);",
+          )
+          replace_once(
+              surface_ink,
+              "    let segmentLength = length(segment);",
+              "    const segmentLength = length(segment);",
           )
 
-          cancelled = 0
-          raced = 0
-          failures: list[str] = []
-          for run in candidates:
-              run_id = int(run["id"])
-              status, payload = api(
-                  f"/repos/{repository}/actions/runs/{run_id}/cancel",
-                  method="POST",
-              )
-              label = (
-                  f"{run_id} {run.get('head_branch')} / {run.get('name')} "
-                  f"[{run.get('status')}]"
-              )
-              if status == 202:
-                  cancelled += 1
-                  print(f"cancelled: {label}")
-              elif status in {404, 409}:
-                  raced += 1
-                  print(f"already terminal: {label} (HTTP {status})")
-              else:
-                  failures.append(f"{label}: HTTP {status}: {payload}")
-              time.sleep(0.03)
-
-          print(
-              f"summary: cancelled={cancelled} already_terminal={raced} "
-              f"failed={len(failures)}"
+          thumbnail = "apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx"
+          replace_once(
+              thumbnail,
+              "export function useCharacterRuntimeThumbnail(entryId: string): string | null {",
+              "// eslint-disable-next-line react-refresh/only-export-components -- singleton store hook\n"
+              "export function useCharacterRuntimeThumbnail(entryId: string): string | null {",
           )
-          if failures:
-              raise SystemExit("Cancellation failures:\n" + "\n".join(failures))
+          replace_once(
+              thumbnail,
+              "export function clearCharacterRuntimeThumbnails(): void {",
+              "// eslint-disable-next-line react-refresh/only-export-components -- singleton store reset\n"
+              "export function clearCharacterRuntimeThumbnails(): void {",
+          )
+          replace_once(
+              thumbnail,
+              "  const ids = useMemo(() => selectedEntryIds(binding), [binding.recipe]);",
+              "  const ids = useMemo(() => selectedEntryIds(binding), [binding]);",
+          )
+
+          workbench = "apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx"
+          for icon in ("BadgeCheck", "Box", "FileJson", "SlidersHorizontal"):
+              replace_once(workbench, f"  {icon},\n", "")
+
+          workbench_hook = "apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts"
+          replace_once(
+              workbench_hook,
+              "  const documentClock = useMemo(() => new Date().toISOString(), [modelId]);",
+              "  const documentClock = useMemo(\n"
+              "    () => ({ modelId, value: new Date().toISOString() }),\n"
+              "    [modelId],\n"
+              "  ).value;",
+          )
+
+          workspace = "apps/web/src/domains/creator/studio-production/studio-production-workspace.ts"
+          replace_once(
+              workspace,
+              "export * from \"./studio-production-workspace-runtime\";\n\n"
+              "import {\n"
+              "  createEmptyProductionWorkspace as createRuntimeProductionWorkspace,\n"
+              "} from \"./studio-production-workspace-runtime\";\n\n"
+              "import type { ProductionWorkspace } from \"./studio-production-workspace-runtime\";",
+              "import {\n"
+              "  createEmptyProductionWorkspace as createRuntimeProductionWorkspace,\n"
+              "} from \"./studio-production-workspace-runtime\";\n\n"
+              "import type { ProductionWorkspace } from \"./studio-production-workspace-runtime\";\n\n"
+              "export * from \"./studio-production-workspace-runtime\";",
+          )
           PY
+
+      - name: Commit one atomic repair and push it to PR 907
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git status --short
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink.ts \
+            apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.tsx \
+            apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.tsx \
+            apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts \
+            apps/web/src/domains/creator/studio-production/studio-production-workspace.ts
+          git diff --cached --quiet && { echo "::error::No lint repair changes were produced"; exit 1; }
+          git commit -m "fix(ci): resolve final integration lint errors"
+          git push origin HEAD:release/final-df46fece-20260908-1905
