@@ -9,11 +9,9 @@ export function useStudioDeferredCommandSearch(
   openInspector: () => void,
 ) {
   const [request, setRequest] = useState<StudioCommandSearchRequest | null>(null);
-  const [hostReady, setHostReady] = useState(false);
 
   useEffect(() => {
-    // Opening the sheet can still suspend; transfer requests only once its host subscribes.
-    if (!isMobile || hostReady) return;
+    if (!isMobile || inspectorOpen) return;
     const open = (next: StudioCommandSearchRequest) => {
       setRequest(next);
       openInspector();
@@ -33,12 +31,12 @@ export function useStudioDeferredCommandSearch(
       unsubscribe();
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [isMobile, hostReady, openInspector]);
+  }, [isMobile, inspectorOpen, openInspector]);
 
   useEffect(() => {
     // Closing the sheet during its lazy load cancels the intent; reopening must not replay it.
     if (!isMobile || !inspectorOpen) setRequest(null);
   }, [isMobile, inspectorOpen]);
 
-  return { request, handled: () => setRequest(null), onHostReadyChange: setHostReady };
+  return { request, handled: () => setRequest(null) };
 }

@@ -117,39 +117,8 @@ origin입니다. `realtime.toonstudio.cloud`는 DNS zone·custom hostname·TLS�
 사용하지 않습니다. Cloudflare는 presence, comment invalidation, screen-share signaling을
 역할별 ticket으로 처리하며 raster pixel, 작품 ACL, 음성 media 권위가 아닙니다.
 
-로그인한 사용자가 저장된 작품을 다시 편집하고 서버에 저장하려면 CRDT 변경을 영속 저장하는
-Socket.IO 권위 서버가 필요합니다. Cloudflare presence나 local/P2P 전달은 이 저장 확인을
-대신하지 않습니다. 아래 native Vercel 경로 또는 별도 Nest 호스트를 명시적으로 구성하며,
-자동으로 확인을 생략하거나 Cloudflare 권위를 변경하지 않습니다.
-
-### 같은 Vercel 프로젝트의 native WebSocket 함수
-
-[현재 Vercel WebSocket 문서](https://vercel.com/docs/functions/websockets)는 Fluid Compute에서
-Node `http.Server` export와 WebSocket 전용 Socket.IO 클라이언트를 지원합니다.
-`api/studio-live.js`는 별도 native 서버를 export하고 `/socket.io` rewrite만 담당합니다.
-기존 `api/index.js`와 `/api/*` HTTP 경로는 그대로 유지됩니다.
-
-```env
-# 서버 환경. API_RUNTIME_ROLE=full을 studio-live로 바꾸지 않습니다.
-STUDIO_LIVE_VERCEL_ENABLED=true
-STUDIO_LIVE_CLUSTER_ADAPTER=postgres
-STUDIO_LIVE_POSTGRES_URL=postgresql://USER:PASSWORD@DIRECT_HOST/DATABASE?sslmode=verify-full&channel_binding=require
-STUDIO_LIVE_POSTGRES_POOL_MAX=2
-# Vite 빌드에서만 공개되는 실제 같은 프로젝트 origin
-VITE_STUDIO_LIVE_ORIGIN=https://www.toonstudio.cloud
-```
-
-이 경로는 opt-in이나 PostgreSQL adapter 설정이 없으면 503으로 거절하며 memory adapter로
-폴백하지 않습니다. 일반 HTTP 함수는 이 별도 LISTEN 풀을 만들지 않습니다. 기존 migration과
-최소권한 runtime role, 정확한 Origin allowlist, 같은 세션 인증 설정을 먼저 확인해야 합니다.
-이 문서와 로컬 테스트는 원격 환경변수를 설정하거나 운영 배포를 활성화하지 않습니다.
-
-함수의 현재 `maxDuration`은 60초이며 Vercel은 함수 수명이 끝나면 연결을 닫습니다. 재연결은
-다른 인스턴스나 새 배포에 도착할 수 있으므로 PostgreSQL cluster adapter가 필요합니다.
-활성화 검증은 실제 upgrade 경로·인증/Origin 거절·두 인스턴스 전달·연결 만료 후 재동기화·
-ACK 이후 저장/재열기를 포함합니다. LISTEN용 direct PostgreSQL 연결은 인스턴스당 기본 2개이므로
-DB의 전체 연결 예산도 확인합니다. 초기화 실패는 해당 인스턴스에서 다시 초기화하지 않으며,
-새 인스턴스가 새 자원으로 시작합니다. 종료 시 열린 연결과 adapter 풀을 정리합니다.
+아래 Render/Socket.IO 경로는 CRDT fanout·lock에 별도 long-running Nest host가 필요할
+때의 선택형 폴백입니다. 현재 Cloudflare 권위를 무시하고 자동 활성하지 않습니다.
 
 `render.yaml`의 Nest 프로세스는 전체 모듈 그래프를 재사용하지만
 `API_RUNTIME_ROLE=studio-live`가 공개 표면을 다음으로 제한합니다.
@@ -164,8 +133,8 @@ DB의 전체 연결 예산도 확인합니다. 초기화 실패는 해당 인스
 
 ### 실시간 협업 Socket.IO를 별도 장기 실행 서버에 배포할 때
 
-일반 `api/index.js` 진입점은 PostgreSQL Socket.IO adapter를 장착하지 않습니다.
-별도 호스트를 선택하면 SPA의 HTTP API가 Vercel에 남아 있어도 실시간 협업만 OCI/Render/Fly의 Nest
+Vercel serverless 진입점은 WebSocket 수명주기를 유지하지 않으며 PostgreSQL Socket.IO adapter도
+장착하지 않습니다. SPA의 HTTP API가 Vercel에 남아 있어도 실시간 협업만 OCI/Render/Fly의 Nest
 서버로 보낼 수 있도록 프런트 빌드에 별도 origin을 지정합니다.
 
 ```env

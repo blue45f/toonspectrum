@@ -220,7 +220,6 @@ export interface StudioInspectorAsideProps {
   commandSearchRequest?: import("./studio-help-center-channel").StudioCommandSearchRequest | null;
   layerComps?: readonly import("./layer/studio-layer-comps").StudioLayerComp[];
   onCommandSearchRequestHandled?: () => void;
-  onCommandSearchHostReadyChange?: (ready: boolean) => void;
   activeSavedBrushId: string | null;
   advancedRulers: StudioAdvancedRulerDocument;
   activeSurfaceReviewLocked: boolean;
