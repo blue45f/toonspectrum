@@ -34,7 +34,6 @@ const StudioToolsCompanionPage = lazyRetry(
 
 function useStudioI18nPriorityLoading(): void {
   const lang = useI18n((state) => state.lang);
-
   useEffect(() => {
     const controller = new AbortController();
     // The route chunk already started this request; namespace deduplication covers the
