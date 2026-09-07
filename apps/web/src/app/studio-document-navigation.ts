@@ -62,8 +62,9 @@ function findAnchor(target: EventTarget | null): HTMLAnchorElement | null {
 }
 
 /**
- * Captures ordinary same-tab anchor clicks before React Router. Programmatic
- * navigation remains protected by StudioCrossOriginIsolationGate as a fallback.
+ * Handles ordinary same-tab anchor clicks after component/React click handlers have
+ * had a chance to validate or cancel the transition. Programmatic navigation remains
+ * protected by StudioCrossOriginIsolationGate as a fallback.
  */
 export function installStudioDocumentNavigationBridge(
   documentLike: Document = document,
@@ -89,12 +90,13 @@ export function installStudioDocumentNavigationBridge(
     if (!useDocumentNavigation) return;
 
     event.preventDefault();
-    event.stopPropagation();
     locationLike.assign(anchor.href);
   };
 
-  documentLike.addEventListener("click", handleClick, true);
+  // React delegates bubbling click events to the root. A document bubble listener runs
+  // afterwards, so component guards can call preventDefault() before we force a reload.
+  documentLike.addEventListener("click", handleClick);
   return () => {
-    documentLike.removeEventListener("click", handleClick, true);
+    documentLike.removeEventListener("click", handleClick);
   };
 }
