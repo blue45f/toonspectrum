@@ -30,6 +30,8 @@ import { gzipSync } from "node:zlib";
 import { chromium } from "playwright";
 import { createServer as createViteServer, type ViteDevServer } from "vite";
 
+import { WEB_VITE_ALIASES } from "./lib/repo-paths.mjs";
+
 import {
   AVATAR_FORGE_PRESETS,
   createAvatarForgeState,
@@ -375,7 +377,7 @@ async function startHarnessServer(modelBytes: Uint8Array): Promise<Readonly<{
     appType: "custom",
     logLevel: "warn",
     resolve: {
-      alias: { "@": STUDIO_VRM_AVATAR_REFERENCE_ROOT },
+      alias: [...WEB_VITE_ALIASES],
     },
     define: {
       "process.env": JSON.stringify({ NODE_ENV: "production" }),

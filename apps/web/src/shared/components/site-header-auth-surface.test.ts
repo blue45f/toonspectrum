@@ -9,9 +9,9 @@ import { describe, expect, it } from "vitest";
  */
 describe("site header auth surface", () => {
   it("exposes a single canonical session auth control and never remounts Firebase member auth", () => {
-    const header = readFileSync(join(process.cwd(), "components/site-header.tsx"), "utf8");
+    const header = readFileSync(join(process.cwd(), "apps/web/src/shared/components/site-header.tsx"), "utf8");
 
-    expect(header).toMatch(/import\s+\{\s*AuthMenuShell\s*\}\s+from\s+"\.\/auth\/auth-menu-shell"/);
+    expect(header).toMatch(/import\s+\{\s*AuthMenuShell\s*\}\s+from\s+"\.\.\/\.\.\/domains\/auth\/components\/auth-menu-shell"/);
     expect(header).toMatch(/<AuthMenuShell\s*\/>/);
 
     expect(header).not.toMatch(/MemberAuth/);

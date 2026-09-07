@@ -25,7 +25,7 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 
-import { REPO_ROOT } from "./lib/repo-paths.mjs";
+import { REPO_ROOT, WEB_VITE_ALIASES } from "./lib/repo-paths.mjs";
 
 const SCRATCH =
   process.env.TOONSPECTRUM_BG3D_WEBGPU_VERIFY_DIR
@@ -411,6 +411,7 @@ async function main() { // NOSONAR javascript:S3776
     envFile: false,
     appType: "custom",
     logLevel: "error",
+    resolve: { alias: [...WEB_VITE_ALIASES] },
     server: { host: "127.0.0.1", port, strictPort: true },
     // Pre-bundle what the VRM probe reaches through a dynamic import. Discovering these mid-run
     // makes Vite re-optimize and invalidate the module graph the page is already executing, which

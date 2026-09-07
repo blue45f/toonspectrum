@@ -28,7 +28,7 @@ describeBrowser("real Chromium SUT sqlite-wasm Worker fixture", () => {
   beforeAll(async () => {
     const { createServer } = await import("vite");
     vite = await createServer({
-      root: resolve(import.meta.dirname, "../../.."),
+      root: resolve(import.meta.dirname, "../../../../.."),
       logLevel: "error",
       server: { host: "127.0.0.1", port: 0 },
     });

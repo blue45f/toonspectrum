@@ -42,3 +42,15 @@ export const WEB_VITE_CONFIG = join(REPO_ROOT, "vite.config.ts");
 
 /** Production build output directory (`<web root>/dist`). */
 export const DIST_DIR = join(REPO_ROOT, "dist");
+
+/**
+ * Product Vite resolve.alias entries for harnesses that set `configFile: false`
+ * while still loading app modules that import `@/…` (same order as root vite.config.ts).
+ * Longer `@/shared` / `@/domains` / `@/src` finds must stay ahead of bare `@`.
+ */
+export const WEB_VITE_ALIASES = Object.freeze([
+  Object.freeze({ find: "@/shared", replacement: join(WEB_SRC, "shared") }),
+  Object.freeze({ find: "@/domains", replacement: join(WEB_SRC, "domains") }),
+  Object.freeze({ find: "@/src", replacement: WEB_SRC }),
+  Object.freeze({ find: "@", replacement: WEB_ROOT }),
+]);

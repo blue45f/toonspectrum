@@ -12,7 +12,7 @@ const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 // 패딩/검색 폭 원복, EN 라벨 재장문화)을 막는다.
 describe("header width budget", () => {
   it("keeps desktop nav links text-only with the narrow lg padding", () => {
-    const header = read("components/site-header.tsx");
+    const header = read("apps/web/src/shared/components/site-header.tsx");
 
     // 항목별 아이콘 박스(xl:grid)는 폭 예산상 데스크탑 내비에 되살릴 수 없다
     expect(header).not.toContain("xl:grid");
@@ -22,7 +22,7 @@ describe("header width budget", () => {
   });
 
   it("narrows the search trigger in the lg band and guards the hint with truncate", () => {
-    const header = read("components/site-header.tsx");
+    const header = read("apps/web/src/shared/components/site-header.tsx");
 
     expect(header).toContain("sm:w-48 sm:justify-between lg:w-40 xl:w-56");
     expect(header).toContain("hidden truncate sm:inline");
