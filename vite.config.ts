@@ -404,6 +404,8 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     outDir: path.resolve(repositoryRoot, "dist"),
+    // The workspace output lives outside apps/web; discard obsolete hashed bundles each build.
+    emptyOutDir: true,
     // CI reads this graph to enforce the mobile Studio's initial-JS budgets and lazy-only engines.
     manifest: true,
     modulePreload: {

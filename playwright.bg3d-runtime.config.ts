@@ -26,7 +26,7 @@ export default defineConfig({
   outputDir: "test-results/bg3d-runtime",
   reporter: [
     ["list"],
-    ["html", { outputFolder: "playwright-report/bg3d-runtime", open: "never" }],
+    ["html", { outputFolder: "test-results/bg3d-runtime-report", open: "never" }],
     ["json", { outputFile: "test-results/bg3d-runtime-results.json" }],
     ["./scripts/studio-bg3d-runtime-reporter.ts"],
   ],

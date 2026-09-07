@@ -67,6 +67,7 @@ export function useStudioDocumentSidecarsRuntime({
   const {
     characterBible,
     hydrateStudioSidecarDocuments,
+    hydrateStudioSidecarSource,
     restoreStudioSidecarDocument,
     setCharacterBible,
     setWriterRoom,
@@ -157,6 +158,7 @@ export function useStudioDocumentSidecarsRuntime({
     aiProvenance,
     characterBible,
     hydrateStudioSidecarDocuments,
+    hydrateStudioSidecarSource,
     master,
     masterEditMode,
     masterEditModeRef,

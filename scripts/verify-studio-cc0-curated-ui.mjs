@@ -11,6 +11,7 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
 import { verifyCc0InsertionCancellation } from './studio-cc0-lifecycle-checks.mjs';
+import { WEB_PUBLIC } from './lib/repo-paths.mjs';
 
 const root = process.cwd();
 const output = path.resolve(process.argv[2] ?? '/tmp/studio-cc0-ui');
@@ -39,14 +40,15 @@ createRoot(document.getElementById('root')!).render(<main style={{maxWidth:720,m
 let server, browser;
 const errors=[], steps=[];
 try {
-  server = await createServer({root,server:{host:'127.0.0.1',port:5189,strictPort:true,open:false}});
+  server = await createServer({root,publicDir:WEB_PUBLIC,optimizeDeps:{entries:[path.join(root,entryName)]},server:{host:'127.0.0.1',port:5189,strictPort:true,open:false}});
   await server.listen();
   browser = await chromium.launch({headless:true,args:['--disable-dev-shm-usage']});
   const context = await browser.newContext({viewport:{width:1000,height:1100},acceptDownloads:true});
   const page = await context.newPage();
   page.on('pageerror', error=>errors.push(String(error)));
-  await page.goto('http://127.0.0.1:5189/'+htmlName,{waitUntil:'networkidle'});
+  await page.goto('http://127.0.0.1:5189/'+htmlName,{waitUntil:'domcontentloaded',timeout:120_000});
   const panel=page.locator('[data-studio-cc0-library]');
+  await panel.waitFor({state:'visible',timeout:120_000});
   assert.equal(await panel.locator('article').count(),0,'closed library must not build every tile');
   await panel.locator('summary').click();
   await panel.locator('article').first().waitFor();

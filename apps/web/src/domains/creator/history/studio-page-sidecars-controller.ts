@@ -98,15 +98,21 @@ export function useStudioSidecarDocuments({
     return true;
   }
 
-  function hydrateStudioSidecarDocuments(input: {
+  // A source snapshot is already authorized by the document loader. It must hydrate even while
+  // editing is locked, and must not mark the freshly loaded document as a local mutation.
+  function hydrateStudioSidecarSource(input: {
     readonly characterBible: StudioCharacterBible;
     readonly writerRoom: StudioWriterRoomDocument;
   }): void {
-    if (!markStudioDocumentChanged()) return;
     characterBibleRef.current = input.characterBible;
     writerRoomRef.current = input.writerRoom;
     setCharacterBibleState(input.characterBible);
     setWriterRoomState(input.writerRoom);
+  }
+
+  function hydrateStudioSidecarDocuments(input: Parameters<typeof hydrateStudioSidecarSource>[0]): void {
+    if (!markStudioDocumentChanged()) return;
+    hydrateStudioSidecarSource(input);
   }
 
   return {
@@ -121,5 +127,6 @@ export function useStudioSidecarDocuments({
     recordStudioSidecarHistoryEntry,
     restoreStudioSidecarDocument,
     hydrateStudioSidecarDocuments,
+    hydrateStudioSidecarSource,
   };
 }

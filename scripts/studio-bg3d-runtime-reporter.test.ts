@@ -107,7 +107,7 @@ describe("BG3D production verification configuration", () => {
     expect(source).toContain('mode: "on"');
     expect(source).toContain("screenshots: false");
     expect(source).toContain('screenshot: "only-on-failure"');
-    expect(source).toContain('outputFolder: "playwright-report/bg3d-runtime"');
+    expect(source).toContain('outputFolder: "test-results/bg3d-runtime-report"');
     expect(source).toContain('"./scripts/studio-bg3d-runtime-reporter.ts"');
     expect(source).toContain('globalSetup: "./scripts/studio-bg3d-runtime-setup.mts"');
   });

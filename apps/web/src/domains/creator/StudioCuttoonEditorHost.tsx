@@ -1848,6 +1848,7 @@ export function StudioCuttoonEditor({
     aiProvenance,
     characterBible,
     hydrateStudioSidecarDocuments,
+    hydrateStudioSidecarSource,
     master,
     masterEditMode,
     masterEditModeRef,
@@ -14497,6 +14498,10 @@ const puppetWarpArmed =
     if (isExporting) setMasterEditMode(false);
   }, [isExporting, setMasterEditMode]);
 
+  // Sidecar commands change identity as their editing authority changes. Applying a server
+  // snapshot is an effect event; a render must not abort and restart the source-document request.
+  const hydrateSourceSidecarsFromEffect = useEffectEvent(hydrateStudioSidecarSource);
+
   // 기존 작품 로드 또는 리믹스 대상 로드.
   useEffect(() => {
     // Route/server hydration establishes a different document authority than a downloaded JSON.
@@ -14691,7 +14696,7 @@ const puppetWarpArmed =
         const hydratedWriterRoom = remixId
           ? createEmptyStudioWriterRoomDocument()
           : normalizeStudioWriterRoomDocument(doc?.writerRoom);
-        hydrateStudioSidecarDocuments({
+        hydrateSourceSidecarsFromEffect({
           characterBible: hydratedCharacterBible,
           writerRoom: hydratedWriterRoom,
         });
@@ -14748,7 +14753,6 @@ const puppetWarpArmed =
     advancedFillTouchPanRef,
     collaborationAccessRef,
     commitStudioHistoryJournal,
-    hydrateStudioSidecarDocuments,
     pagesHistoryCommandJournalRef,
     referenceBoardLatestRequestedRef,
     remixId,

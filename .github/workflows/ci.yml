@@ -615,6 +615,8 @@ jobs:
         run: pnpm run build:bundle
       - name: Verify the shipped filter dialog end to end
         run: pnpm run verify:studio-filter-dialog
+      - name: Verify drawing recovery, exact PNG export, and source hydration
+        run: pnpm run verify:studio-lifecycle
 
   studio-p5-brush-real-runtime:
     runs-on: ubuntu-24.04

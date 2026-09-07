@@ -66,9 +66,10 @@ try {
     const context = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 1 });
     const page = await context.newPage();
     watch(page);
-    await page.goto(`${devOrigin}/${htmlName}`, { waitUntil: "load" });
+    // Cold Vite compilation can outlast interaction deadlines; wait for the actual component.
+    await page.goto(`${devOrigin}/${htmlName}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
     const palette = page.locator('[data-studio-subtool-palette="true"]');
-    await palette.waitFor({ state: "visible" });
+    await palette.waitFor({ state: "visible", timeout: 120_000 });
     assert.equal(await palette.getByRole("tab").count(), 6);
     assert.equal(await palette.getByRole("option").count(), 3);
     const firstTab = palette.getByRole("tab").first();

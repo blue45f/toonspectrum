@@ -106,7 +106,7 @@ jobs:
           name: bg3d-production-runtime-${{ github.run_attempt }}
           path: |
             test-results/
-            playwright-report/bg3d-runtime/
+            test-results/bg3d-runtime-report/
             ${{ runner.temp }}/bg3d-runtime.log
           if-no-files-found: warn
           retention-days: 7
