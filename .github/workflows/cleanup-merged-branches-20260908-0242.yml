@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   cleanup:
-    runs-on: ubuntu-slim
+    runs-on: macos-15
     timeout-minutes: 10
     steps:
       - name: Verify immutable heads and delete only absorbed branches
