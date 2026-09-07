@@ -93,6 +93,10 @@ jobs:
         if: steps.secrets.outputs.configured == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Install V8 coverage provider for this scan
+        if: steps.secrets.outputs.configured == 'true'
+        run: pnpm add -Dw @vitest/coverage-v8@4.1.9 --lockfile=false
+
       - name: Generate changed Studio coverage
         if: steps.secrets.outputs.configured == 'true'
         run: |
