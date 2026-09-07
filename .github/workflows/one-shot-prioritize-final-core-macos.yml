@@ -1,4 +1,4 @@
-name: Retire macOS queue cancellation helper
+name: Extract compact PR 919 failures on macOS
 
 on:
   push:
@@ -7,15 +7,60 @@ on:
     paths:
       - .github/workflows/one-shot-prioritize-final-core-macos.yml
 
-permissions: {}
+permissions:
+  actions: read
+  contents: read
 
 concurrency:
-  group: one-shot-prioritize-final-core-macos
+  group: one-shot-extract-pr919-failures-macos
   cancel-in-progress: true
 
 jobs:
-  retire:
-    if: ${{ false }}
+  extract:
     runs-on: macos-15
+    timeout-minutes: 10
     steps:
-      - run: echo "Dynamic macOS queue cancellation is retired."
+      - name: Download and filter failed job logs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for job_id in 101887845638 101887845365; do
+            echo "===== JOB ${job_id} ====="
+            curl --fail --location --silent --show-error \
+              --header 'Accept: application/vnd.github+json' \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/${GH_REPOSITORY}/actions/jobs/${job_id}/logs" \
+              --output "job-${job_id}.log"
+            JOB_ID="${job_id}" python3 <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          job_id = os.environ["JOB_ID"]
+          lines = Path(f"job-{job_id}.log").read_text(encoding="utf-8", errors="replace").splitlines()
+          patterns = [
+              re.compile(r"(?:^|\s)FAIL(?:\s|$)", re.I),
+              re.compile(r"AssertionError|Unhandled Error|Test Files|Tests\s+\d|ERR_|ELIFECYCLE"),
+              re.compile(r"\.test\.(?:ts|tsx|js|jsx|mjs)"),
+              re.compile(r"expected .* (?:to|but)|received|timed out|timeout", re.I),
+          ]
+          selected = set()
+          for index, line in enumerate(lines):
+              if any(pattern.search(line) for pattern in patterns):
+                  selected.update(range(max(0, index - 5), min(len(lines), index + 9)))
+          ordered = sorted(selected)[-900:]
+          print(f"log_lines={len(lines)} selected_lines={len(ordered)}")
+          previous = -2
+          for index in ordered:
+              if index > previous + 1:
+                  print("...")
+              print(lines[index])
+              previous = index
+          print("===== RAW TAIL =====")
+          print("\n".join(lines[-160:]))
+          PY
+          done
