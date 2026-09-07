@@ -22,9 +22,7 @@ const CONTENT_TYPE_PATTERN =
 
 const SafeIdSchema = z.string().min(1).max(160).regex(SAFE_ID_PATTERN);
 const IsoTimestampSchema = z.string().datetime({ offset: true });
-export const CreatorAssetDigestSchema = z
-  .string()
-  .regex(SHA256_PATTERN);
+export const CreatorAssetDigestSchema = z.string().regex(SHA256_PATTERN);
 
 export const CREATOR_ASSET_DRAFT_STATES = [
   "editing",
@@ -50,18 +48,52 @@ export type CreatorAssetDraftState = z.infer<
 const DRAFT_TRANSITIONS: Readonly<
   Record<CreatorAssetDraftState, ReadonlySet<CreatorAssetDraftState>>
 > = Object.freeze({
-  editing: new Set(["uploading", "processing", "abandoned"]),
-  uploading: new Set(["editing", "processing", "needs-fix", "abandoned"]),
-  processing: new Set(["needs-fix", "ready-to-submit", "abandoned"]),
-  "needs-fix": new Set(["editing", "uploading", "processing", "abandoned"]),
-  "ready-to-submit": new Set(["editing", "in-review", "abandoned"]),
-  "in-review": new Set(["changes-requested", "approved", "rejected"]),
-  "changes-requested": new Set(["editing", "processing", "in-review", "abandoned"]),
-  approved: new Set(["publishing", "changes-requested"]),
-  publishing: new Set(["published", "approved"]),
-  published: new Set(),
-  rejected: new Set(["editing", "abandoned"]),
-  abandoned: new Set(),
+  editing: new Set<CreatorAssetDraftState>([
+    "uploading",
+    "processing",
+    "abandoned",
+  ]),
+  uploading: new Set<CreatorAssetDraftState>([
+    "editing",
+    "processing",
+    "needs-fix",
+    "abandoned",
+  ]),
+  processing: new Set<CreatorAssetDraftState>([
+    "needs-fix",
+    "ready-to-submit",
+    "abandoned",
+  ]),
+  "needs-fix": new Set<CreatorAssetDraftState>([
+    "editing",
+    "uploading",
+    "processing",
+    "abandoned",
+  ]),
+  "ready-to-submit": new Set<CreatorAssetDraftState>([
+    "editing",
+    "in-review",
+    "abandoned",
+  ]),
+  "in-review": new Set<CreatorAssetDraftState>([
+    "changes-requested",
+    "approved",
+    "rejected",
+  ]),
+  "changes-requested": new Set<CreatorAssetDraftState>([
+    "editing",
+    "processing",
+    "in-review",
+    "abandoned",
+  ]),
+  approved: new Set<CreatorAssetDraftState>([
+    "publishing",
+    "changes-requested",
+  ]),
+  publishing: new Set<CreatorAssetDraftState>(["published", "approved"]),
+  published: new Set<CreatorAssetDraftState>(),
+  rejected: new Set<CreatorAssetDraftState>(["editing", "abandoned"]),
+  abandoned: new Set<CreatorAssetDraftState>(),
 });
 
 export function canTransitionCreatorAssetDraft(
@@ -76,7 +108,9 @@ export function assertCreatorAssetDraftTransition(
   next: CreatorAssetDraftState,
 ): void {
   if (!canTransitionCreatorAssetDraft(current, next)) {
-    throw new Error(`invalid creator asset draft transition: ${current} -> ${next}`);
+    throw new Error(
+      `invalid creator asset draft transition: ${current} -> ${next}`,
+    );
   }
 }
 
@@ -176,7 +210,12 @@ const CreatorAssetMetricsSchema = z
     drawCalls: z.number().int().min(0).max(100_000).optional(),
     materials: z.number().int().min(0).max(10_000).optional(),
     textures: z.number().int().min(0).max(10_000).optional(),
-    decodedBytes: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+    decodedBytes: z
+      .number()
+      .int()
+      .min(0)
+      .max(Number.MAX_SAFE_INTEGER)
+      .optional(),
   })
   .strict();
 
@@ -258,13 +297,14 @@ export const CreatorAssetArtifactSetDescriptorSchema = z
         message: "게시 가능한 Artifact Set에는 대표 썸네일이 필요합니다.",
       });
     }
-    const runtimeRoles = new Set([
-      "runtime-proxy",
-      "runtime-default",
-      "runtime-high",
-      "runtime-mobile",
-      "master",
-    ]);
+    const runtimeRoles: ReadonlySet<CreatorAssetArtifactDescriptor["role"]> =
+      new Set([
+        "runtime-proxy",
+        "runtime-default",
+        "runtime-high",
+        "runtime-mobile",
+        "master",
+      ]);
     if (!set.artifacts.some((artifact) => runtimeRoles.has(artifact.role))) {
       context.addIssue({
         code: "custom",
@@ -277,9 +317,7 @@ export type CreatorAssetArtifactSetDescriptor = z.infer<
   typeof CreatorAssetArtifactSetDescriptorSchema
 >;
 
-export function canonicalizeCreatorAssetArtifactSet(
-  value: unknown,
-): string {
+export function canonicalizeCreatorAssetArtifactSet(value: unknown): string {
   const parsed = CreatorAssetArtifactSetDescriptorSchema.parse(value);
   return canonicalizeCreatorMarketplaceJson(
     parsed as unknown as CreatorMarketplaceJsonValue,
@@ -289,8 +327,14 @@ export function canonicalizeCreatorAssetArtifactSet(
 export async function creatorAssetPlatformSha256(
   value: string | Uint8Array,
 ): Promise<`sha256:${string}`> {
-  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  const sourceBytes =
+    typeof value === "string" ? new TextEncoder().encode(value) : value;
+  const digestInput = new ArrayBuffer(sourceBytes.byteLength);
+  new Uint8Array(digestInput).set(sourceBytes);
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    digestInput,
+  );
   const hex = Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
@@ -300,7 +344,9 @@ export async function creatorAssetPlatformSha256(
 export async function hashCreatorAssetArtifactSet(
   value: unknown,
 ): Promise<`sha256:${string}`> {
-  return creatorAssetPlatformSha256(canonicalizeCreatorAssetArtifactSet(value));
+  return creatorAssetPlatformSha256(
+    canonicalizeCreatorAssetArtifactSet(value),
+  );
 }
 
 export const CreatorAssetLicenseCapabilitiesSchema = z
@@ -553,11 +599,14 @@ export function resolveCreatorMarketplaceEntitlement(
     ) {
       continue;
     }
-    if (!grantIncludesRelease(grant, request.releaseId, request.releaseOrdinal)) {
+    if (
+      !grantIncludesRelease(grant, request.releaseId, request.releaseOrdinal)
+    ) {
       continue;
     }
     sawMatchingVersion = true;
-    const expired = grant.validUntil !== null && Date.parse(grant.validUntil) < now;
+    const expired =
+      grant.validUntil !== null && Date.parse(grant.validUntil) < now;
     if (expired) {
       if (request.existingWorkReference && grant.existingWorkSurvives) {
         return {
@@ -609,7 +658,10 @@ export function resolveCreatorMarketplaceEntitlement(
   }
   if (sawMatchingVersion) {
     return {
-      code: request.accessModel === "paid" ? "require-purchase" : "require-subscription",
+      code:
+        request.accessModel === "paid"
+          ? "require-purchase"
+          : "require-subscription",
       allowed: false,
       grantId: null,
       reason: "해당 권리가 만료되었거나 현재 사용 범위와 맞지 않습니다.",
