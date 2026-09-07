@@ -40,6 +40,18 @@ describe("Studio document navigation boundary", () => {
     expect(shouldUseStudioDocumentNavigation({ ...base, anchorTarget: "_blank" })).toBe(false);
   });
 
+  it("waits for component click guards before forcing document navigation", () => {
+    const bridgeSource = readFileSync(
+      path.resolve(process.cwd(), "apps/web/src/app/studio-document-navigation.ts"),
+      "utf8",
+    );
+
+    expect(bridgeSource).toContain('addEventListener("click", handleClick)');
+    expect(bridgeSource).toContain('removeEventListener("click", handleClick)');
+    expect(bridgeSource).not.toContain('addEventListener("click", handleClick, true)');
+    expect(bridgeSource).not.toContain("event.stopPropagation()");
+  });
+
   it("installs the boundary bridge inside the BrowserRouter-owned app content", () => {
     const appSource = readFileSync(
       path.resolve(process.cwd(), "apps/web/src/app/App.tsx"),
