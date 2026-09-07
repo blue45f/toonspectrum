@@ -10,9 +10,13 @@ permissions:
   contents: read
   security-events: read
 
+concurrency:
+  group: temporary-code-scanning-inventory-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   inventory:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 10
     steps:
       - name: Read open code-scanning alerts
@@ -27,7 +31,7 @@ jobs:
             -H 'X-GitHub-Api-Version: 2022-11-28' \
             "/repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
             > alerts-pages.json
-          python3 - <<'PY'
+          python - <<'PY'
           import json
           from pathlib import Path
 
