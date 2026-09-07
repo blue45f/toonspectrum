@@ -24,7 +24,6 @@ const StudioLift3dPage = lazyRetry(
   })),
   "StudioLift3dPage",
 );
-
 const StudioToolsCompanionPage = lazyRetry(
   () => import("../StudioToolsCompanionPage").then((module) => ({
     default: module.StudioToolsCompanionPage,
