@@ -137,6 +137,31 @@ describe("character SQLite persistence", () => {
     expect(await loadCharacterSurfaceInkDocument("ink-a")).toEqual(ink("second"));
   });
 
+  it.each(["strokes", "layers", "coordinates"] as const)("rejects unreloadable ink %s before replacing its durable row", async (kind) => {
+    const previous = ink("preserved");
+    await saveCharacterSurfaceInkDocument("bounded", previous);
+    const layer = previous.layers[0]!;
+    const stroke = layer.strokes[0]!;
+    const candidate: CharacterSurfaceInkDocument = kind === "layers"
+      ? { ...previous, layers: Array.from({ length: 33 }, (_, i) => ({ ...layer, layerId: String(i), strokes: [] })) }
+      : { ...previous, layers: [{ ...layer, strokes: kind === "strokes"
+        ? Array.from({ length: 2_001 }, (_, i) => ({ ...stroke, strokeId: String(i), anchors: [] }))
+        : [{ ...stroke, anchors: [{ ...stroke.anchors[0]!, barycentric: [Number.NaN, 0, 0] }] }] }] };
+    await expect(saveCharacterSurfaceInkDocument("bounded", candidate)).rejects.toThrow("3D 펜선");
+    expect(database.set).toHaveBeenCalledTimes(1);
+    expect(await loadCharacterSurfaceInkDocument("bounded")).toEqual(previous);
+    await saveCharacterSurfaceInkDocument("bounded", ink("repaired"));
+    expect(await loadCharacterSurfaceInkDocument("bounded")).toEqual(ink("repaired"));
+  });
+
+  it("saves and reloads ink at the existing 2000 stroke limit", async () => {
+    const previous = ink("limit");
+    const layer = previous.layers[0]!;
+    const candidate = { ...previous, layers: [{ ...layer, strokes: Array.from({ length: 2_000 }, (_, i) => ({ ...layer.strokes[0]!, strokeId: String(i), anchors: [] })) }] };
+    await saveCharacterSurfaceInkDocument("at-limit", candidate);
+    expect(await loadCharacterSurfaceInkDocument("at-limit")).toEqual(candidate);
+  });
+
   it("never saves the initial empty ink over delayed hydration and discards an old model read", async () => {
     const oldRead = Promise.withResolvers<string | null>();
     database.get.mockImplementation((namespace, key) => key === "model-a" ? oldRead.promise : readRow(namespace, key));

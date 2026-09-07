@@ -26,6 +26,7 @@ export interface CharacterPartPresetCompatibility {
 export interface CharacterPartPresetPayload {
   readonly slot?: CharacterSlotKind;
   readonly selections?: readonly CharacterSlotSelectionV2[];
+  readonly handPose?: CharacterDocumentV2["recipe"]["handPose"];
   readonly controls?: Readonly<Record<string, number>>;
   readonly colors?: Readonly<Record<string, string | null>>;
   readonly expression?: CharacterDocumentV2["expression"];
@@ -106,14 +107,15 @@ function cloneSelection(value: CharacterSlotSelectionV2): CharacterSlotSelection
   });
 }
 
+function cloneHandPose(handPose: CharacterDocumentV2["recipe"]["handPose"]): CharacterDocumentV2["recipe"]["handPose"] {
+  return Object.freeze({
+    ...(handPose.left ? { left: cloneSelection(handPose.left) } : {}),
+    ...(handPose.right ? { right: cloneSelection(handPose.right) } : {}),
+  });
+}
+
 function selectionForSlot(document: CharacterDocumentV2, slot: CharacterSlotKind): readonly CharacterSlotSelectionV2[] {
   if (slot === "accessory") return document.recipe.accessories.map(cloneSelection);
-  if (slot === "hand-pose") {
-    const values = [document.recipe.handPose.left, document.recipe.handPose.right].filter(
-      (value): value is CharacterSlotSelectionV2 => value !== undefined,
-    );
-    return values.map(cloneSelection);
-  }
   const value = document.recipe.slots[slot as keyof CharacterDocumentV2["recipe"]["slots"]];
   return value ? [cloneSelection(value)] : [];
 }
@@ -177,7 +179,8 @@ export function createCharacterPartPreset(
   const now = input.now ?? new Date().toISOString();
   const payload: CharacterPartPresetPayload = Object.freeze({
     slot: input.slot,
-    selections: input.slot ? Object.freeze(selectionForSlot(input.document, input.slot)) : undefined,
+    selections: input.slot && input.slot !== "hand-pose" ? Object.freeze(selectionForSlot(input.document, input.slot)) : undefined,
+    handPose: input.slot === "hand-pose" ? cloneHandPose(input.document.recipe.handPose) : undefined,
     controls: input.includeControls === false ? undefined : controlsForSlot(input.document, input.slot),
     colors: input.includeColors === false ? undefined : colorsForPreset(input.document, input.slot),
     expression: input.kind === "expression" ? input.document.expression : undefined,
@@ -228,6 +231,9 @@ export function isCharacterPartPresetV1(value: unknown): value is CharacterPartP
   if (value.sourceModel.topologyFamily !== null && !isString(value.sourceModel.topologyFamily)) return false;
   if (!isRecord(value.payload)) return false;
   if (value.payload.selections !== undefined && (!Array.isArray(value.payload.selections) || !value.payload.selections.every(validateSelection))) return false;
+  if (value.payload.handPose !== undefined && (value.payload.slot !== "hand-pose"
+    || value.payload.selections !== undefined || !isRecord(value.payload.handPose)
+    || !Object.entries(value.payload.handPose).every(([side, selection]) => (side === "left" || side === "right") && validateSelection(selection)))) return false;
   if (value.payload.controls !== undefined && (!isRecord(value.payload.controls) || !Object.values(value.payload.controls).every(isFiniteNumber))) return false;
   if (value.payload.colors !== undefined && (!isRecord(value.payload.colors) || !Object.values(value.payload.colors).every((item) => item === null || typeof item === "string"))) return false;
   if (!isRecord(value.compatibility) || !Array.isArray(value.compatibility.topologyFamilies) || !Array.isArray(value.compatibility.requiredCapabilities)) return false;
@@ -274,9 +280,11 @@ export function applyCharacterPartPreset(
       recipe = { ...recipe, accessories: selections.map(cloneSelection) };
       applied.push("recipe.accessories");
     } else if (slot === "hand-pose") {
+      // Old v1 arrays carried no side information and retain their original both-hands meaning.
       const first = selections[0];
-      if (first) {
-        recipe = { ...recipe, handPose: { left: cloneSelection(first), right: cloneSelection(first) } };
+      const handPose = preset.payload.handPose ?? (first ? { left: first, right: first } : {});
+      if (Object.keys(handPose).length > 0) {
+        recipe = { ...recipe, handPose: { ...recipe.handPose, ...cloneHandPose(handPose) } };
         applied.push("recipe.handPose");
       } else {
         skipped.push({ path: "recipe.handPose", reason: "저장된 손 포즈가 없습니다." });

@@ -125,3 +125,38 @@ describe("character part presets", () => {
     expect(reloaded.list({ slot: "eyes", text: "수정" })).toHaveLength(1);
   });
 });
+
+
+describe("saved hand-pose sides", () => {
+  const selection = (entryId: string) => ({ entryId, entryVersion: "1", providerId: "builtin", catalogRevision: "1" });
+  it.each(["left", "right"] as const)("saves and reloads only the original %s hand", async (side) => {
+    const base = document("eyes:round");
+    const source = { ...base, recipe: { ...base.recipe, handPose: { [side]: selection("hand-pose:fist") } } };
+    const preset = createCharacterPartPreset({ presetId: side, name: side, kind: "slot", scope: "personal", slot: "hand-pose", document: source });
+    const storage = new MemoryStorage();
+    await createCharacterPartPresetStore(async () => storage).save(preset);
+    const reopened = createCharacterPartPresetStore(async () => storage);
+    await reopened.refresh();
+    const target = { ...base, recipe: { ...base.recipe, handPose: { left: selection("hand-pose:open"), right: selection("hand-pose:relaxed") } } };
+    const result = applyCharacterPartPreset(target, reopened.list()[0]!);
+    expect(result.ok).toBe(true);
+    expect(result.document.recipe.handPose).toEqual({ ...target.recipe.handPose, [side]: selection("hand-pose:fist") });
+    expect(result.document.revision).toBe(target.revision + 1);
+  });
+});
+
+
+it("preserves legacy unsided hand presets and rejects ambiguous or malformed keyed hands", () => {
+  const base = document("eyes:round");
+  const selection = { entryId: "hand-pose:fist", entryVersion: "1", providerId: "builtin", catalogRevision: "1" };
+  const preset = createCharacterPartPreset({ presetId: "legacy", name: "legacy", kind: "slot", scope: "personal", slot: "hand-pose", document: base });
+  const legacy = { ...preset, payload: { slot: "hand-pose" as const, selections: [selection] } };
+  expect(parseCharacterPartPresetV1(legacy)).toBe(legacy);
+  expect(applyCharacterPartPreset(base, legacy).document.recipe.handPose).toEqual({ left: selection, right: selection });
+  for (const payload of [
+    { slot: "hand-pose", handPose: { both: selection } },
+    { slot: "eyes", handPose: { left: selection } },
+    { slot: "hand-pose", handPose: { left: null } },
+    { slot: "hand-pose", handPose: { left: selection }, selections: [selection] },
+  ]) expect(() => parseCharacterPartPresetV1({ ...preset, payload })).toThrow("형식");
+});

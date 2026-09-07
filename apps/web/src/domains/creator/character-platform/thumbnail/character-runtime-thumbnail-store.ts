@@ -93,7 +93,10 @@ export function CharacterRuntimeThumbnailRecorder({ h, binding }: {
     [modelId, binding.recipe, h.transparentBackground],
   );
 
-  useEffect(() => () => { aliveRef.current = false; }, []);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => { aliveRef.current = false; };
+  }, []);
   useEffect(() => { setActiveModel(modelId); }, [modelId]);
 
   useEffect(() => {

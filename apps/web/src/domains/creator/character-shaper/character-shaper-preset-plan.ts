@@ -47,12 +47,19 @@ export function planCharacterPresetApplication(
     || new Set(selections.map((selection) => selection.entryId)).size !== selections.length) {
     throw new Error("프리셋의 파츠 슬롯 구성을 지원하지 않습니다.");
   }
-  const targets = selections.map((selection) => {
+  const savedHands = payload.handPose;
+  const selectedTargets = savedHands
+    ? (["left", "right"] as const).flatMap((side) => {
+      const selection = savedHands[side];
+      return selection ? [{ selection, handSide: side }] : [];
+    })
+    : selections.map((selection) => ({ selection, handSide: "both" as const }));
+  const targets = selectedTargets.map(({ selection, handSide }) => {
     const entry = CHARACTER_SLOT_CATALOG.entries.find((candidate) => candidate.id === selection.entryId);
     if (!entry || entry.slot !== slot || (selection.overrides && Object.keys(selection.overrides).length > 0)) {
       throw new Error(`프리셋 항목 ${selection.entryId}을 현재 카탈로그에서 적용할 수 없습니다.`);
     }
-    const plan = planCharacterSlotApply(entry, profile, slot === "hand-pose" ? { ...context, handSide: "both" } : context);
+    const plan = planCharacterSlotApply(entry, profile, slot === "hand-pose" ? { ...context, handSide } : context);
     if (plan.availability.status !== "available") {
       throw new Error(plan.availability.reason ?? "프리셋의 모든 파츠를 지원하는 모델이 필요합니다.");
     }

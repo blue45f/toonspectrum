@@ -454,3 +454,18 @@ describe("serializeCharacterRecipe / parseCharacterRecipe", () => {
     }
   });
 });
+
+
+it("round-trips independently selected hands and drops invalid keyed selections", () => {
+  const original = { ...createEmptyCharacterRecipe(), handPoses: { left: "hand-pose:fist", right: "hand-pose:relaxed" } };
+  expect(parseCharacterRecipe(serializeCharacterRecipe(original))).toEqual(original);
+  expect(parseCharacterRecipe({ ...original, handPoses: { left: "nose:dot", right: "hand-pose:fist", both: "hand-pose:relaxed" } }).handPoses).toEqual({ right: "hand-pose:fist" });
+  expect(parseCharacterRecipe(serializeCharacterRecipe(createEmptyCharacterRecipe()))).toEqual(createEmptyCharacterRecipe());
+});
+
+
+it("marks the hand slot changed when only one keyed hand differs", () => {
+  const base = { ...createEmptyCharacterRecipe(), handPoses: { left: "hand-pose:fist", right: "hand-pose:relaxed" } };
+  expect(diffCharacterRecipes(base, { ...base, handPoses: { ...base.handPoses, left: "hand-pose:relaxed" } })).toEqual(["hand-pose"]);
+  expect(diffCharacterRecipes(base, { ...base, handPoses: { ...base.handPoses } })).toEqual([]);
+});

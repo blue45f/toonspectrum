@@ -762,3 +762,43 @@ describe("complete imported presets through the real workbench binding", () => {
   });
 
 });
+
+
+describe("saved hand-pose side transactions", () => {
+  it.each(["left", "right"] as const)("reapplies a saved %s hand without changing the other hand or losing its side on resave", async (side) => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    act(() => result.current.binding.setHandSide(side));
+    act(() => result.current.binding.commit(entryOf("hand-pose:fist")));
+    const preset = createCharacterPartPreset({ presetId: side, name: side, kind: "slot", scope: "personal", slot: "hand-pose", document: result.current.workbench.document });
+    act(() => result.current.binding.setHandSide(side === "left" ? "right" : "left"));
+    fake.calls.hands.length = 0;
+    act(() => expect(result.current.workbench.applyPreset(preset)).toBe(true));
+    expect(fake.calls.hands).toEqual([{ side, poseType: "fist" }]);
+    const resaved = createCharacterPartPreset({ presetId: "again", name: "again", kind: "slot", scope: "personal", slot: "hand-pose", document: result.current.workbench.document });
+    expect(resaved.payload.handPose).toEqual(preset.payload.handPose);
+    expect(result.current.binding.history).toHaveLength(2);
+  });
+
+  it("preserves distinct hands through actual application, resave and one Undo/Redo", async () => {
+    const fake = createFakeHost();
+    const { result } = renderWorkbench(fake);
+    await act(async () => {});
+    const selection = (entryId: string) => ({ entryId, entryVersion: "1", providerId: "toonstudio-builtin", catalogRevision: "character-slot-catalog-v1" });
+    const handPose = { left: selection("hand-pose:fist"), right: selection("hand-pose:relaxed") };
+    const preset = importedPreset(result.current.workbench, { slot: "hand-pose", handPose });
+    act(() => expect(result.current.workbench.applyPreset(preset)).toBe(true));
+    expect(fake.calls.hands).toEqual([{ side: "left", poseType: "fist" }, { side: "right", poseType: "relaxed" }]);
+    expect(result.current.workbench.document.recipe.handPose).toEqual(handPose);
+    const resaved = createCharacterPartPreset({ presetId: "again", name: "again", kind: "slot", scope: "personal", slot: "hand-pose", document: result.current.workbench.document });
+    expect(resaved.payload.handPose).toEqual(handPose);
+    expect(result.current.binding.history).toHaveLength(1);
+    act(() => result.current.binding.undo());
+    expect(result.current.workbench.document.recipe.handPose).toEqual({});
+    expect(fake.state.fingerEdits).toEqual({});
+    act(() => result.current.binding.redo());
+    expect(result.current.workbench.document.recipe.handPose).toEqual(handPose);
+    expect(fake.state.fingerEdits).toEqual({ "left:fist": true, "right:relaxed": true });
+  });
+});

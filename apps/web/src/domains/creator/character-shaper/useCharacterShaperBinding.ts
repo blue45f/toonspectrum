@@ -108,12 +108,14 @@ export interface CharacterShaperHostState {
   readonly irisColor: string | null;
   readonly handSide: CharacterHandSide;
   readonly lastHandPoseType: CharacterHandPoseType | null;
+  readonly handPoseTypes?: CharacterHostSnapshot["handPoseTypes"];
 }
 
 interface CharacterShaperSession {
   readonly irisColor: string | null;
   readonly handSide: CharacterHandSide;
   readonly lastHandPoseType: CharacterHandPoseType | null;
+  readonly handPoseTypes?: CharacterHostSnapshot["handPoseTypes"];
 }
 
 const HAND_SIDES: readonly CharacterHandSide[] = ["left", "right", "both"];
@@ -216,6 +218,7 @@ function deriveSnapshot(input: SnapshotInput): CharacterHostSnapshot {
     irisColor: session.irisColor,
     handSide: session.handSide,
     lastHandPoseType: session.lastHandPoseType,
+    handPoseTypes: session.handPoseTypes,
   };
 }
 
@@ -352,6 +355,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
       irisColor: current.irisColor,
       handSide: current.handSide,
       lastHandPoseType: current.lastHandPoseType,
+      handPoseTypes: current.handPoseTypes,
     };
   }, []);
 
@@ -378,6 +382,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
       irisColor: state.irisColor,
       handSide: state.handSide,
       lastHandPoseType: state.lastHandPoseType,
+      handPoseTypes: state.handPoseTypes,
     });
   }, []);
 
@@ -403,7 +408,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     resetHistory();
     // A different model starts a new session: the tint and the tracked hand pose belonged to the
     // model that is gone, so they never carry over.
-    setSession((current) => ({ ...current, irisColor: null, lastHandPoseType: null }));
+    setSession((current) => ({ ...current, irisColor: null, lastHandPoseType: null, handPoseTypes: undefined }));
   }, [status, modelId, recipe, captureHostState, resetHistory]);
 
   /* ---------------------------------------------------------------------- */
@@ -433,6 +438,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     };
     let nextIris: string | null | undefined;
     let nextHandPose: CharacterHandPoseType | undefined;
+    const updatedHands: Partial<Record<"left" | "right", CharacterHandPoseType>> = {};
 
     for (const step of steps) {
       switch (step.kind) {
@@ -532,7 +538,10 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
           break;
         case "hand-pose": {
           const sides: readonly ("left" | "right")[] = step.side === "both" ? ["left", "right"] : [step.side];
-          for (const side of sides) host.applyHandPosePreset?.(side, step.poseType);
+          for (const side of sides) {
+            host.applyHandPosePreset?.(side, step.poseType);
+            updatedHands[side] = step.poseType;
+          }
           nextHandPose = step.poseType;
           break;
         }
@@ -590,7 +599,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
       setSession((current) => ({
         ...current,
         ...(nextIris === undefined ? {} : { irisColor: nextIris }),
-        ...(nextHandPose === undefined ? {} : { lastHandPoseType: nextHandPose }),
+        ...(nextHandPose === undefined ? {} : { lastHandPoseType: nextHandPose, handPoseTypes: { ...current.handPoseTypes, ...updatedHands } }),
       }));
     }
     return steps.length > 0 || colorChanged;

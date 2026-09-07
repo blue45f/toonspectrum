@@ -363,6 +363,8 @@ export interface CharacterRecipe {
   readonly slots: CharacterRecipeSlots;
   readonly colors: CharacterRecipeColors;
   readonly handSide: CharacterHandSide;
+  /** Optional keyed selections preserve independently edited hands in v1 recipes. */
+  readonly handPoses?: Readonly<Partial<Record<"left" | "right", string>>>;
 }
 
 /** Snapshot of the host state the recipe is derived from; produced by the binding, consumed by pure code. */
@@ -385,6 +387,7 @@ export interface CharacterHostSnapshot {
   readonly irisColor: string | null;
   readonly handSide: CharacterHandSide;
   readonly lastHandPoseType: CharacterHandPoseType | null;
+  readonly handPoseTypes?: Readonly<Partial<Record<"left" | "right", CharacterHandPoseType>>>;
 }
 
 /* -------------------------------------------------------------------------- */

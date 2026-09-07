@@ -73,5 +73,6 @@ export async function saveCharacterSurfaceInkDocument(modelKey: string, document
   if (new TextEncoder().encode(serialized).byteLength > MAX_STORED_BYTES) {
     return Promise.reject(new Error("3D 펜선 저장 공간이 가득 찼습니다."));
   }
+  parseCharacterSurfaceInkDocument(serialized);
   return enqueue(modelKey, async () => (await acquireInkStorage()).set(modelKey, serialized));
 }
