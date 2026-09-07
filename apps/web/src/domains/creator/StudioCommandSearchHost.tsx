@@ -16,6 +16,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
 import {
   subscribeStudioCommandSearchRequests,
+  type StudioCommandSearchRequest,
   type StudioCommandSearchScope,
 } from "./studio-help-center-channel";
 
@@ -39,6 +40,8 @@ export type StudioCommandSearchHostProps = Omit<
   hideTrigger?: boolean;
   /** Make the owning surface visible before the global search dialog opens. */
   onRequestOpen?: () => void;
+  pendingRequest?: StudioCommandSearchRequest | null;
+  onRequestHandled?: () => void;
   /**
    * 트리거와 같은 줄 오른쪽에 붙는 크롬 버튼(예: 인스펙터 접기).
    *
@@ -63,6 +66,8 @@ function isEditingTarget(target: EventTarget | null): boolean {
 export function StudioCommandSearchHost({
   hideTrigger = false,
   onRequestOpen,
+  pendingRequest,
+  onRequestHandled,
   trailing,
   ...dialogProps
 }: StudioCommandSearchHostProps) {
@@ -120,6 +125,12 @@ export function StudioCommandSearchHost({
     () => subscribeStudioCommandSearchRequests((request) => openSearch(request.scope ?? "all")),
     [openSearch],
   );
+
+  useEffect(() => {
+    if (!pendingRequest) return;
+    openSearch(pendingRequest.scope ?? "all");
+    onRequestHandled?.();
+  }, [pendingRequest, onRequestHandled, openSearch]);
 
   return (
     <>

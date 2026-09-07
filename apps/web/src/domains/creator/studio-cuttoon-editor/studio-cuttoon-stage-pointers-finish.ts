@@ -333,6 +333,15 @@ export function bindStudioCuttoonStagePointersFinish(
   const finishStudioSpecialistStroke = (...args) => api.finishStudioSpecialistStroke(...args);
   const hideBrushCursor = (...args) => api.hideBrushCursor(...args);
   const queueStudioRasterDrawPromotion = (...args) => api.queueStudioRasterDrawPromotion(...args);
+  function prepareFinishedStrokeCommitPage(finished: DrawEl): boolean {
+    if (h.prepareStrokeCommitPage()) return true;
+    // Preserve a completed stroke before cancelling its live draft when another page still owns
+    // the rejected batch. Nothing may seal pixels without a page-owned document payload.
+    salvageRejectedStroke(finished, "페이지 동기화", "previous-page-commit-pending");
+    setError("이전 페이지의 획을 확정하지 못했어요. 현재 획은 상태 레일의 '획 복구'에 보관했습니다.");
+    discardDrawingPointerSession();
+    return false;
+  }
   const sealStudioDrawReleaseInput = (...args) => api.sealStudioDrawReleaseInput(...args);
   function finishDrawingPointer(
     stage: Konva.Stage | null,
@@ -382,7 +391,6 @@ export function bindStudioCuttoonStagePointersFinish(
       }
       if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
         const completedDrawing = drawingRef.current;
-        completedLiveStrokeBackendAudit = true;
         const overlayRenderer = liveInkOverlayRendererRef.current;
         const releasePostCorrectionStrength = inputSettings?.postCorrection ?? postCorrection;
         const releasePreserveCorners = inputSettings?.preserveCorners ?? preserveCorners;
@@ -424,6 +432,8 @@ export function bindStudioCuttoonStagePointersFinish(
           releasePlan = planRelease(releasePostCorrectionStrength);
         }
         const finished = releasePlan.stroke;
+        if (!prepareFinishedStrokeCommitPage(finished)) return;
+        completedLiveStrokeBackendAudit = true;
         gesturePreviewFinished = drawingGesturePreviewPublisherRef.current.end(finished);
         if (livingInkWaterNoopStrokeIdsRef.current.has(finished.id)) {
           completeStudioLivingInkRejectedNoop(

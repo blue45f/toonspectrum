@@ -42,7 +42,7 @@ export function studioRejectedLiveSurfaceMessage(
 export function restoreStudioRejectedStrokeIntoDocument(
   record: StudioRejectedStrokeRecord,
   activePageId: string,
-  queueDeferredStrokeCommit: (finished: DrawEl) => void,
+  queueDeferredStrokeCommit: (finished: DrawEl) => boolean,
   nextId: () => string = uid,
 ): ReturnType<StudioRejectedStrokeRestorer> {
   if (record.pageId !== activePageId) {
@@ -53,7 +53,13 @@ export function restoreStudioRejectedStrokeIntoDocument(
     };
   }
   const restored: DrawEl = { ...structuredClone(record.stroke), id: nextId() };
-  queueDeferredStrokeCommit(restored);
+  if (!queueDeferredStrokeCommit(restored)) {
+    return {
+      status: "refused",
+      recordId: record.id,
+      reason: "이전 페이지의 획이 아직 저장 대기 중입니다. 동기화가 끝난 뒤 다시 복구하세요.",
+    };
+  }
   return { status: "restored", recordId: record.id, restoredStrokeId: restored.id };
 }
 
@@ -66,7 +72,7 @@ export type StudioSalvageRejectedStroke = (
 
 export interface StudioRejectedStrokeRecoveryHostInput {
   readonly activePageId: string;
-  readonly queueDeferredStrokeCommit: (finished: DrawEl) => void;
+  readonly queueDeferredStrokeCommit: (finished: DrawEl) => boolean;
 }
 
 /**
