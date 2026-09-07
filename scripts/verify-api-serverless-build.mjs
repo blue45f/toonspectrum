@@ -86,6 +86,13 @@ function probeNativeArtifact() {
     if (process.env.STUDIO_LIVE_VERCEL_ENABLED === "true") {
       assert(loadedModules.some((path) => path.endsWith("/dist/packages/core/src/studio-music.js")),
         "The enabled native probe must load the real compiled application before cluster preflight fails");
+      // A 503 alone could hide a Nest dependency-injection failure before PostgreSQL is reached.
+      const { initializeStudioLiveVercelRuntime } = require(root + "/apps/api/dist/apps/api/src/studio-live-serverless.js");
+      await assert.rejects(initializeStudioLiveVercelRuntime(), (error) =>
+        error instanceof Error &&
+        error.message.startsWith("Studio live PostgreSQL adapter initialization failed:") &&
+        error.message.endsWith("[ECONNREFUSED]"),
+      "The compiled application must reach the deliberately unavailable cluster database");
     }
     fs.writeFileSync(process.argv[2], JSON.stringify({ rows, loadedModules }, null, 2));
     await new Promise((resolvePromise) => server.close(resolvePromise));
