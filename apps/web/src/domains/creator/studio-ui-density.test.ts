@@ -23,10 +23,10 @@ describe("studio ui density modes", () => {
     expect(studioUiDensityLabel("full")).toBe("전체 기능");
   });
 
-  it("hides AI/reference in standard work; focus keeps the core creation path", () => {
+  it("folds AI in standard work but honors reference tools users explicitly expose", () => {
     expect(studioUiDensityAllows("simple", "toolbar-draw")).toBe(true);
     expect(studioUiDensityAllows("simple", "toolbar-ai")).toBe(false);
-    expect(studioUiDensityAllows("simple", "toolbar-reference")).toBe(false);
+    expect(studioUiDensityAllows("simple", "toolbar-reference")).toBe(true);
     expect(studioUiDensityAllows("simple", "toolbar-assets")).toBe(true);
     expect(studioUiDensityAllows("simple", "toolbar-insert")).toBe(true);
     expect(studioUiDensityAllows("focus", "toolbar-draw")).toBe(true);
@@ -36,6 +36,7 @@ describe("studio ui density modes", () => {
     expect(studioUiDensityAllows("focus", "toolbar-insert")).toBe(true);
     expect(studioUiDensityAllows("focus", "toolbar-cut")).toBe(true);
     expect(studioUiDensityAllows("focus", "toolbar-ai")).toBe(false);
+    expect(studioUiDensityAllows("focus", "toolbar-reference")).toBe(false);
     expect(studioUiDensityAllows("focus", "right-panel")).toBe(false);
     expect(studioUiDensityAllows("full", "toolbar-ai")).toBe(true);
   });
