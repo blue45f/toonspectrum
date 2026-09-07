@@ -146,15 +146,15 @@ export function createCharacterPartPresetStore(
 
   return Object.freeze({
     getSnapshot: () => snapshot,
-    subscribe(listener) {
+    subscribe(listener: () => void) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
     refresh,
-    list(query = {}) {
+    list(query: CharacterPartPresetQuery = {}) {
       return queryPresets(snapshot.presets, query);
     },
-    save(presetInput) {
+    save(presetInput: CharacterPartPresetV1) {
       const preset = parseCharacterPartPresetV1(presetInput);
       const existing = snapshot.presets.find((item) => item.presetId === preset.presetId);
       const nextPreset: CharacterPartPresetV1 = existing
@@ -168,7 +168,7 @@ export function createCharacterPartPresetStore(
       const next = [nextPreset, ...snapshot.presets.filter((item) => item.presetId !== preset.presetId)].slice(0, MAX_PRESETS);
       return persist(next);
     },
-    remove(presetId) {
+    remove(presetId: string) {
       return persist(snapshot.presets.filter((item) => item.presetId !== presetId));
     },
     clear() {
