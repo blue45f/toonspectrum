@@ -43,9 +43,9 @@ const STATE_TONE: Readonly<Record<StudioSurfaceStateKind, string>> = {
 const DEFAULT_ANNOUNCEMENT: Readonly<
   Record<StudioSurfaceStateKind, StudioSurfaceStateAnnouncement>
 > = {
-  // Static empty/info/blocked cards are already discoverable in reading order and should not
-  // re-announce on every render. Callers can opt in when a state changed after user action.
-  empty: "none",
+  // Empty results frequently appear after search/filter input, so preserve the polite announcement.
+  // Callers rendering a permanently static empty card can explicitly opt out with announce="none".
+  empty: "polite",
   info: "none",
   blocked: "none",
   loading: "polite",
@@ -60,15 +60,15 @@ export interface StudioSurfaceStateProps {
   icon?: ReactNode;
   action?: ReactNode;
   secondaryAction?: ReactNode;
-  /** Override only when the caller knows this card appeared as a dynamic state change. */
+  /** Static cards can opt out; newly appeared states can choose polite or assertive. */
   announce?: StudioSurfaceStateAnnouncement;
   compact?: boolean;
   className?: string;
 }
 
 /**
- * Studio의 빈 상태·로딩·오류·잠금·완료 안내를 하나의 시각 문법으로 통일한다.
- * 동적 상태만 기본 공지하고 정적 빈 상태는 읽기 순서에서 자연스럽게 탐색하게 한다.
+ * Studio의 빈 상태·로딩·오류·잠금·완료 안내를 하나의 시각/접근성 문법으로 통일한다.
+ * 검색·필터 결과처럼 동적으로 바뀌는 빈 상태는 공지하고, 정적 안내는 호출부가 끌 수 있다.
  */
 export function StudioSurfaceState({
   state,
