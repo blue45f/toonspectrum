@@ -22,8 +22,17 @@ const routes = [
   ["/authors", "작가별 보기", "작가 디렉터리"],
   ["/u/:userId", "회원 프로필", "사용자 공개 프로필"],
   ["/news", "소식", "웹툰·웹소설 뉴스"],
+  ["/research", "창작 리서치 데스크", "작품·판본·자료·기회를 한 보드로 연결"],
+  ["/research/assets", "창작 레퍼런스", "공개 이용이 확인된 미술·복식·소품 자료"],
+  ["/research/books", "글로벌 판본 탐색", "Open Library·openBD 도서 메타데이터 검색"],
+  ["/opportunities", "작가 기회센터", "지원사업 검색과 마감 관리"],
+  ["/learn/recipes", "웹툰 제작 레시피", "작은 실험으로 연출 학습"],
+  ["/story-lab", "스토리 연구실", "인물·욕망·갈등 설계"],
+  ["/publishing", "연재·출판 준비실", "원고·권리·소개 자료 점검"],
   ["/settings", "설정", "사용자 설정"],
   ["/about", "소개", "서비스 소개"],
+  ["/about/data", "데이터 출처", "공급자별 연결·상업 이용 준비 상태"],
+  ["/about/crawler", "공개 데이터 수집 정책", "자동수집 원칙·제외 범위·중지 요청"],
   ["/guide", "랭킹 산정 방식", "랭킹 설명"],
   ["/terms", "이용약관", "정책 문서"],
   ["/privacy", "개인정보처리방침", "정책 문서"],
@@ -58,7 +67,7 @@ export function SitemapPage() {
         <p className="eyebrow text-accent">BETA Sitemap</p>
         <h1 className="mt-2 font-display text-[clamp(1.6rem,7vw,1.875rem)] font-bold sm:text-4xl">툰스펙트럼 사이트맵</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-2">
-          탐색, 커뮤니티, 창작, 계정, 정책, 디자인 시스템 경로를 한 화면에 정리했습니다.
+          탐색, 커뮤니티, 창작, 리서치, 데이터 투명성, 계정과 정책 경로를 한 화면에 정리했습니다.
         </p>
       </section>
 
