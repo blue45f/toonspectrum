@@ -12,9 +12,9 @@ import {
 import { useCallback, useEffect, useState } from "react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
+import { marketAuthorityErrorMessage } from "../models/market-authority";
 import { marketKindMeta } from "../models/market-kind";
 import { marketStudioResourceHref } from "../models/market-studio-handoff";
-import { marketAuthorityErrorMessage } from "../models/market-authority";
 
 import type {
   CreatorMarketplaceCloudLibraryItem,
@@ -286,8 +286,10 @@ export function MarketLibraryPage() {
               {items.map((item) => {
                 const kind = marketKindMeta(item.kind);
                 const KindIcon = kind.icon;
-                const available = item.catalog.state === "available";
-                const head = available ? item.catalog.head : null;
+                const head = item.catalog.state === "available"
+                  ? item.catalog.head
+                  : null;
+                const available = head !== null;
                 return (
                   <li key={item.id} className="flex min-w-0 flex-col rounded-xl border border-line bg-card p-4">
                     <div className="flex items-start justify-between gap-3">
