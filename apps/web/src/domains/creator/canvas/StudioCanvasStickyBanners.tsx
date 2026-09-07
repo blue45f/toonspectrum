@@ -133,7 +133,7 @@ export function renderStudioCanvasStickyBanners({
       내보내기 옵션 / 프로젝트 센터 / 초안 저장. Clear the floating pill (55px tall) on that shell only;
       the windowed shell already starts the canvas below the chrome.
     */}
-    <div className='pointer-events-none sticky top-2 [[data-studio-mobile-immersive="true"]_&]:top-16 z-[56] flex h-0 items-start justify-end gap-1.5 pr-2'>
+    <div data-studio-presence-controls className='pointer-events-none sticky top-2 [[data-studio-mobile-immersive="true"]_&]:top-16 z-[56] flex h-0 items-start justify-end gap-1.5 pr-2'>
       <StudioLiveCollaborationQuickControls
         followingSessionId={followingStudioSessionId}
         onOpenTeam={openTeam}

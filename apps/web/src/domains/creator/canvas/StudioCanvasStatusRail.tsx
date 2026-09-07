@@ -15,7 +15,7 @@ import {
   PaintBucket,
   ScanSearch,
 } from "lucide-react";
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 import { presentStudioAutosaveDocumentLeadership } from "../studio-autosave-document-leader";
 import { StudioReliabilityStatusRail } from "../StudioReliabilityStatusRail";
@@ -379,6 +379,33 @@ export function StudioCanvasStatusRail({
     || advancedFillBusy
     || hasAdvancedFillPreview;
 
+  const noticeRailRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!mobileImmersive || !mobileNoticeStripFilled) return;
+    const rail = noticeRailRef.current;
+    const host = rail?.parentElement;
+    if (!rail || !host) return;
+    const controls = host.querySelector("[data-studio-presence-controls]");
+    if (!controls) return;
+    const placeBelowControls = () => {
+      const hostTop = host.getBoundingClientRect().top;
+      const bottom = Math.max(64, ...Array.from(controls.children, (child) =>
+        child.getBoundingClientRect().bottom - hostTop));
+      rail.style.top = `${Math.ceil(bottom + 8)}px`;
+    };
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(placeBelowControls);
+    const observeChildren = () => {
+      resize?.disconnect();
+      resize?.observe(host);
+      for (const child of controls.children) resize?.observe(child);
+      placeBelowControls();
+    };
+    const mutations = new MutationObserver(observeChildren);
+    mutations.observe(controls, { childList: true });
+    observeChildren();
+    return () => { resize?.disconnect(); mutations.disconnect(); };
+  }, [mobileImmersive, mobileNoticeStripFilled]);
+
   return (
     <>
       {/*
@@ -402,9 +429,10 @@ export function StudioCanvasStatusRail({
       </div>
 
       <div
+        ref={noticeRailRef}
         data-studio-canvas-status-rail
         data-studio-canvas-status-rail-filled={mobileImmersive ? String(mobileNoticeStripFilled) : undefined}
-        style={mobileImmersive && mobileNoticeStripFilled ? { paddingTop: "3.75rem" } : undefined}
+        style={mobileImmersive && mobileNoticeStripFilled ? { top: "8rem" } : undefined}
         className={cn(
           mobileImmersive
             ? mobileNoticeStripFilled
@@ -413,10 +441,9 @@ export function StudioCanvasStatusRail({
                * 붙는 순간 스테이지 원점이 통째로 내려가고, 이미 시작된 Konva 드래그·획이
                * 그만큼 튄다(선택 명령 레인이 상시 예약으로 막아 둔 것과 같은 결함).
                */
-              // 우상단 presence dock은 모바일에서 44px 아이콘과 컨테이너 여백을 쓴다.
-              // 복구/비우기 같은 안전 조치가 그 아래로 들어가면 두 버튼이 동시에 눌리는
-              // 치명적 상태가 되므로 모든 고지 카드에 해당 hit-area를 구조적으로 비워 둔다.
-              ? "absolute inset-x-0 top-0 z-20 max-h-[min(30dvh,12rem)] overflow-y-auto overscroll-contain pl-2 pr-[5.25rem] [scrollbar-gutter:stable]"
+              // Measure the full collaboration band: quick controls and the dock can have
+              // different heights. Notices follow it without moving the canvas origin.
+              ? "absolute inset-x-0 z-20 max-h-[min(30dvh,12rem)] overflow-y-auto overscroll-contain px-2 [scrollbar-gutter:stable]"
               : "hidden"
             : "contents"
         )}

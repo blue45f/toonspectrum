@@ -1,6 +1,6 @@
 // apps/api/src/modules/fortune/fortune.controller.ts
 
-import { Controller, Get, Post, Body, HttpCode, HttpStatus } from "@nestjs/common";
+import { Controller, Inject, Get, Post, Body, HttpCode, HttpStatus } from "@nestjs/common";
 
 import {
   CompatibilityDto,
@@ -14,7 +14,7 @@ import { FortuneService } from "./fortune.service";
 
 @Controller("fortune")
 export class FortuneController {
-  constructor(private readonly fortuneService: FortuneService) {}
+  constructor(@Inject(FortuneService) private readonly fortuneService: FortuneService) {}
 
   // 페르소나 캐릭터 목록 조회
   @Get("characters")

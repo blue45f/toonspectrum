@@ -46,6 +46,8 @@ import {
   type StudioStageViewportClipRuntime,
 } from "./studio-stage-viewport-clip";
 
+import { configureStudioTransientCanvas } from "./studio-transient-canvas";
+
 import type {
   StudioCanvasViewportProps,
 } from "./StudioCanvasViewportTypes";
@@ -314,8 +316,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     const dpr = Math.max(1, Math.min(4, globalThis.devicePixelRatio || 1));
     const backingWidth = Math.max(1, Math.ceil(hokusaiSurfaceWidth * dpr));
     const backingHeight = Math.max(1, Math.ceil(hokusaiSurfaceHeight * dpr));
-    if (canvas.width !== backingWidth) canvas.width = backingWidth;
-    if (canvas.height !== backingHeight) canvas.height = backingHeight;
+    configureStudioTransientCanvas(canvas, backingWidth, backingHeight);
     const surfaceKey = [
       activePage.id,
       hokusaiSurfaceLeft,
@@ -371,8 +372,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     const dpr = Math.max(1, Math.min(4, globalThis.devicePixelRatio || 1));
     const backingWidth = Math.max(1, Math.ceil(hokusaiSurfaceWidth * dpr));
     const backingHeight = Math.max(1, Math.ceil(hokusaiSurfaceHeight * dpr));
-    if (canvas.width !== backingWidth) canvas.width = backingWidth;
-    if (canvas.height !== backingHeight) canvas.height = backingHeight;
+    configureStudioTransientCanvas(canvas, backingWidth, backingHeight);
     // Living Ink frames are full-field composites. The overlay's visible clip width/height can
     // resize when contextual editor chrome opens or closes without changing document projection;
     // canvas resizing clears old pixels, then the next full frame safely repopulates the clip.

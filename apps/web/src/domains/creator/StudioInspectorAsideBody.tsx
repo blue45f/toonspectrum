@@ -93,6 +93,8 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
   return (
     <StudioInspectorAsideShell model={model} tabA11y={tabA11y}>
       <StudioInspectorContextRouteSync
+        activeImageTool={model.inspectorTransientOwners.find((owner) =>
+          owner === "fill" || owner === "retouch" || owner === "mask" || owner === "transform")}
         contentMode={inspectorContentMode}
         layout={inspectorLayout}
         selectedType={selected?.type ?? null}

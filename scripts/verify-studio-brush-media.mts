@@ -249,6 +249,8 @@ async function selectBrush(
   });
   await option.waitFor({ state: "visible" });
   await option.click();
+  // Desktop selection retains the floating library for repeated choices. Close its UI explicitly.
+  await catalog.getByRole("button", { name: / 닫기$/u }).click();
   await catalog.waitFor({ state: "detached" });
   await toolbar.getByRole("button", {
     name: new RegExp(`^현재 도구 ${escapeRegExp(brush.name)},`, "u"),

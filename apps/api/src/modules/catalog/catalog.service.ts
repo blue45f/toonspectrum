@@ -23,6 +23,7 @@ import {
   getHomeData,
   getInsightsData,
   getRankingData,
+  getRandomData,
   getTitle,
   TITLES,
 } from "../../../../../packages/core/src/server";
@@ -234,6 +235,10 @@ export class CatalogService implements OnModuleInit {
       }
     }
     return refreshCatalogIfChanged();
+  }
+
+  getRandomData(query: QueryRecord) {
+    return getRandomData(query);
   }
 
   async getHomeData() {

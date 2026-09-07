@@ -14498,8 +14498,7 @@ const puppetWarpArmed =
     if (isExporting) setMasterEditMode(false);
   }, [isExporting, setMasterEditMode]);
 
-  // Sidecar commands change identity as their editing authority changes. Applying a server
-  // snapshot is an effect event; a render must not abort and restart the source-document request.
+  // Source hydration must not refetch when render-local sidecar editing commands change.
   const hydrateSourceSidecarsFromEffect = useEffectEvent(hydrateStudioSidecarSource);
 
   // 기존 작품 로드 또는 리믹스 대상 로드.

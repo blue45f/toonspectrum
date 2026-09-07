@@ -504,11 +504,11 @@ describe("StudioCanvasStatusRail", () => {
     expect(rail?.getAttribute("data-studio-canvas-status-rail-filled")).toBe("true");
     expect(rail?.className).toContain("overflow-y-auto");
     expect(rail?.className).not.toContain("contents");
-    expect(rail?.className).toContain("pr-[5.25rem]");
+    expect(rail?.className).toContain("px-2");
     // 담을 게 생겨도 캔버스를 밀지 않는다 — 흐름 밖에서 덮는다. 흐름 안이었다면 배너가
     // 붙는 순간 스테이지 원점이 내려가 진행 중인 드래그·획이 그만큼 튄다.
     expect(rail?.className).toContain("absolute");
-    expect((rail as HTMLElement | null)?.style.paddingTop).toBe("3.75rem");
+    expect((rail as HTMLElement | null)?.style.top).toBe("8rem");
   });
 
   it("gives the empty mobile notice strip zero drawing area", () => {
@@ -522,7 +522,7 @@ describe("StudioCanvasStatusRail", () => {
     const rail = container.querySelector("[data-studio-canvas-status-rail]");
     expect(rail?.getAttribute("data-studio-canvas-status-rail-filled")).toBe("false");
     expect(rail?.className).toContain("hidden");
-    expect((rail as HTMLElement | null)?.style.paddingTop).toBe("");
+    expect((rail as HTMLElement | null)?.style.top).toBe("");
   });
 
   it("floats the reliability rail over the canvas instead of displacing it", () => {

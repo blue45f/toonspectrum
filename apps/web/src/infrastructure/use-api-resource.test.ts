@@ -24,6 +24,14 @@ describe("useApiResource fetch 계약", () => {
     expect(request.cache).toBe("no-store");
   });
 
+  it("loads public news snapshots from the web origin without an API prefix", async () => {
+    const mockFetch = vi.fn(async (_input: RequestInfo | URL) => Response.json({ items: [] }));
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+    await fetchApiResource("/data/news.json", "실패");
+    const request = mockFetch.mock.calls[0]?.[0] as unknown as Request;
+    expect(new URL(request.url).pathname).toBe("/data/news.json");
+  });
+
   it("404 는 NotFoundError 로 던진다(notFound 흐름)", async () => {
     globalThis.fetch = vi.fn(
       async () => new Response("null", { status: 404 })

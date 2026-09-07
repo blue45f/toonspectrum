@@ -1,3 +1,5 @@
+import { activateStudioTransientCanvas, releaseStudioTransientCanvas } from "../canvas/studio-transient-canvas";
+
 import type { StudioHokusaiLiveFrame } from "./studio-hokusai-live-brush-runtime";
 
 export interface StudioHokusaiLiveOverlayProjection {
@@ -110,6 +112,7 @@ export function projectStudioHokusaiLiveFrame(
  * dirty-crop sized; no document-sized canvas or main-thread full-frame copy is created.
  */
 export class StudioHokusaiLiveOverlayRenderer {
+  readonly #canvas: HTMLCanvasElement;
   readonly #context: CanvasRenderingContext2D | null;
   readonly #createScratchCanvas: (width: number, height: number) => ScratchCanvas;
   readonly #createImageData: StudioHokusaiLiveOverlayRendererOptions["createImageData"];
@@ -122,6 +125,7 @@ export class StudioHokusaiLiveOverlayRenderer {
     canvas: HTMLCanvasElement,
     options: StudioHokusaiLiveOverlayRendererOptions = {},
   ) {
+    this.#canvas = canvas;
     this.#context = canvas.getContext("2d", {
       alpha: true,
       desynchronized: true,
@@ -184,6 +188,7 @@ export class StudioHokusaiLiveOverlayRenderer {
     );
     const imageData = this.#createImageData!(packedView, dirtyWidth, dirtyHeight);
     this.#scratchContext.putImageData(imageData, 0, 0);
+    activateStudioTransientCanvas(this.#canvas);
     this.#context.save();
     this.#context.setTransform(1, 0, 0, 1, 0, 0);
     // Packed dirty frames are absolute replacement pixels, not alpha-over deltas. Clear only the
@@ -239,6 +244,7 @@ export class StudioHokusaiLiveOverlayRenderer {
     this.#context.clearRect(left, top, right - left, bottom - top);
     this.#context.restore();
     this.#composedRect = null;
+    releaseStudioTransientCanvas(this.#canvas);
   }
 
   dispose(): void {

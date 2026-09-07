@@ -200,6 +200,19 @@ function tracedInstallReceiptStorage(events: string[]): CreatorMarketplaceInstal
 }
 
 describe("Creator Pack product SQLite authority", () => {
+  it("explains a competing Studio tab without leaking Worker errors or reporting an install", async () => {
+    const pack = STUDIO_CREATOR_PACK_CATALOG.find((candidate) => candidate.metadata.kind === "brush")!;
+    const result = await installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: async () => {
+        throw new Error("DedicatedWorker ownership lock failed: Studio OPFS SQLite is already owned by another page");
+      },
+    });
+    expect(result).toMatchObject({ status: "storage-error", installedCount: 0 });
+    expect(result.message).toContain("다른 Studio 탭");
+    expect(result.message).toContain("다시 설치");
+    expect(result.message).not.toMatch(/SQLite|Worker|OPFS/);
+  });
+
   it("publishes the lightweight Market receipt only after install/update commits and removes it after uninstall", async () => {
     const database = await openDatabase();
     const product = await openProductFilterLibraryRepository({

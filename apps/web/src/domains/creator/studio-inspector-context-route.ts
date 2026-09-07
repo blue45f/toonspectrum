@@ -36,8 +36,17 @@ export function resolveStudioInspectorContextRoute(
   layout: StudioInspectorLayout,
   previous: StudioInspectorContextSnapshot | null,
   next: StudioInspectorContextSnapshot,
+  activeImageTool?: StudioInspectorLayout["image"] | null,
 ): StudioInspectorLayout {
   if (!studioInspectorContextUsesImageTabs(next)) return layout;
+
+  // A tool entry can select its raster target in the same render. Its active panel is an
+  // explicit command, so it takes precedence over resetting a stale workspace preference.
+  if (activeImageTool) {
+    return layout.primary === "properties" && layout.image === activeImageTool
+      ? layout
+      : { ...layout, primary: "properties", image: activeImageTool };
+  }
 
   const enteringNewImageContext =
     previous === null

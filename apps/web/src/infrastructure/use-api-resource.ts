@@ -29,7 +29,8 @@ function initialState<T>(url: string | null): ResourceState<T> {
 }
 
 export async function fetchApiResource<T>(url: string, errorMessage: string, signal?: AbortSignal): Promise<T> {
-  const requestUrl = apiPath(url);
+  // Public snapshots belong to the web origin, even when the API is hosted separately.
+  const requestUrl = url.startsWith("/data/") ? url : apiPath(url);
   const response = await api.raw(requestUrl, {
     cache: "no-store",
     signal,

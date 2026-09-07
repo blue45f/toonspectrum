@@ -150,6 +150,12 @@ export class CatalogController {
     return getAppConfig();
   }
 
+  @Get("/random")
+  @Header("Cache-Control", "no-store")
+  getRandom(@Query() query: QueryMap) {
+    return this.catalogService.getRandomData(normalizeQueryMap(query));
+  }
+
   @Get("/home")
   @Header("Cache-Control", "no-store, max-age=0")
   async getHome() {

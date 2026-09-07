@@ -1,3 +1,4 @@
+import { activateStudioTransientCanvas, releaseStudioTransientCanvas } from "./canvas/studio-transient-canvas";
 import { sha256HexPortable } from "./studio-sha256";
 
 import type { StudioLivingInkExecutionFrame } from "./studio-living-ink-execution-protocol";
@@ -235,6 +236,7 @@ export class StudioLivingInkOverlayRenderer {
       frame.image.close();
       return null;
     }
+    activateStudioTransientCanvas(this.#canvas);
     const deviceScaleX = projection.scaleX * projection.devicePixelRatio;
     const deviceScaleY = projection.scaleY * projection.devicePixelRatio;
     const destinationX = -projection.documentX * deviceScaleX;
@@ -330,6 +332,7 @@ export class StudioLivingInkOverlayRenderer {
     this.#context.setTransform(1, 0, 0, 1, 0, 0);
     this.#context.clearRect(0, 0, this.#canvas.width, this.#canvas.height);
     this.#context.restore();
+    releaseStudioTransientCanvas(this.#canvas);
   }
 
   dispose(): void {

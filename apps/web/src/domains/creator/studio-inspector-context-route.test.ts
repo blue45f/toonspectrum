@@ -20,6 +20,20 @@ const context = (
 ): StudioInspectorContextSnapshot => ({ contentMode, selectedType });
 
 describe("studio inspector context route", () => {
+  it.each(["fill", "retouch", "mask", "transform"] as const)(
+    "keeps an explicitly activated %s tool visible when it selects a new image target",
+    (image) => {
+      const current = { ...layout("quick"), primary: "document" as const };
+      expect(resolveStudioInspectorContextRoute(
+        current, context("drawing", null), context("selection", "image"), image,
+      )).toEqual(layout(image));
+      const active = layout(image);
+      expect(resolveStudioInspectorContextRoute(
+        active, context("selection", "draw"), context("selection", "image"), image,
+      )).toBe(active);
+    },
+  );
+
   it("recognizes only selected image-capable contexts", () => {
     expect(studioInspectorContextUsesImageTabs(context("selection", "image"))).toBe(true);
     expect(studioInspectorContextUsesImageTabs(context("selection", "draw"))).toBe(true);

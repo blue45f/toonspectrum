@@ -40,6 +40,7 @@ import {
   type StudioCreatorPackStorage,
 } from "./studio-creator-pack-runtime";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+import { studioLocalDatabaseOwnershipBusyUserMessage } from "./studio-local-database-ownership";
 import { compareStudioMarketplaceVersions } from "./studio-marketplace-packages";
 import {
   getProductStudioPaletteSqliteRepository,
@@ -636,7 +637,9 @@ function errorResult(action: string, error: unknown): StudioCreatorPackInstallRe
   return {
     status: "storage-error",
     installedCount: 0,
-    message: `${action}에 실패했습니다. SQLite 오류: ${detail}`,
+    message: studioLocalDatabaseOwnershipBusyUserMessage(error,
+      "다른 Studio 탭이 기기 저장소를 사용 중이라 설치하지 못했어요. 다른 탭의 작업을 저장하고 닫은 뒤, 이 탭을 새로고침하고 마켓에서 다시 설치해 주세요.",
+    ) ?? `${action}에 실패했습니다. SQLite 오류: ${detail}`,
   };
 }
 

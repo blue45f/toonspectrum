@@ -9,6 +9,7 @@ import {
 import type { StudioInspectorLayout } from "./studio-inspector-layout";
 
 export interface StudioInspectorContextRouteSyncProps {
+  readonly activeImageTool?: StudioInspectorLayout["image"] | null;
   readonly contentMode: StudioInspectorContentMode;
   readonly layout: StudioInspectorLayout;
   readonly selectedType: string | null;
@@ -20,6 +21,7 @@ export interface StudioInspectorContextRouteSyncProps {
  * A layout effect avoids one painted frame of the old Retouch/Mask tab after selection changes.
  */
 export function StudioInspectorContextRouteSync({
+  activeImageTool,
   contentMode,
   layout,
   selectedType,
@@ -36,10 +38,11 @@ export function StudioInspectorContextRouteSync({
       layout,
       previousContextRef.current,
       nextContext,
+      activeImageTool,
     );
     previousContextRef.current = nextContext;
     if (nextLayout !== layout) onChange(nextLayout);
-  }, [contentMode, layout, onChange, selectedType]);
+  }, [activeImageTool, contentMode, layout, onChange, selectedType]);
 
   return null;
 }

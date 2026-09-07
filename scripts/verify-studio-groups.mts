@@ -424,6 +424,7 @@ async function prepareSeededMobilePage(page: Page, studioUrl: string): Promise<v
   // just because the Konva shell became visible first — `isVisible()` never waits, so poll
   // for the control the seeded document guarantees and take it.
   await restore.waitFor({ state: "visible", timeout: 15_000 });
+  await page.screenshot({ path: join(SCRATCH, "studio-group-mobile-before-restore.png") });
   await restore.click();
   await restore.waitFor({ state: "hidden" });
   await page.locator(".konvajs-content").first().waitFor({ state: "visible" });
