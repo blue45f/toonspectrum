@@ -23,27 +23,33 @@ jobs:
         uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Build source archive
+      - name: Build code-only source archive
         shell: bash
         run: |
           set -euo pipefail
-          tar \
-            --exclude=.git \
-            --exclude=node_modules \
-            --exclude='**/node_modules' \
-            --exclude=.turbo \
-            --exclude='**/.turbo' \
-            --exclude=dist \
-            --exclude='**/dist' \
-            --exclude=coverage \
-            --exclude='**/coverage' \
-            -czf "${RUNNER_TEMP}/toonspectrum-source.tar.gz" .
-          test -s "${RUNNER_TEMP}/toonspectrum-source.tar.gz"
+          manifest="${RUNNER_TEMP}/code-files.txt"
+          : > "${manifest}"
+          for root in apps/api/src apps/web/src packages scripts; do
+            if [[ -d "${root}" ]]; then
+              find "${root}" -type f \
+                \( -name '*.ts' -o -name '*.tsx' -o -name '*.mts' -o -name '*.cts' \
+                   -o -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.json' \
+                   -o -name '*.sql' -o -name '*.py' -o -name '*.md' -o -name '*.yaml' \
+                   -o -name '*.yml' -o -name '*.toml' -o -name '*.graphql' \) \
+                -print0 >> "${manifest}"
+            fi
+          done
+          for file in package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.json \
+                      vitest.config.ts eslint.config.mjs drizzle.config.ts; do
+            [[ -f "${file}" ]] && printf '%s\0' "${file}" >> "${manifest}"
+          done
+          tar --null --files-from="${manifest}" -czf "${RUNNER_TEMP}/toonspectrum-code-source.tar.gz"
+          test -s "${RUNNER_TEMP}/toonspectrum-code-source.tar.gz"
       - name: Upload source archive
         uses: actions/upload-artifact@v6
         with:
-          name: toonspectrum-asset-platform-source-${{ github.sha }}
-          path: ${{ runner.temp }}/toonspectrum-source.tar.gz
+          name: toonspectrum-asset-platform-code-${{ github.sha }}
+          path: ${{ runner.temp }}/toonspectrum-code-source.tar.gz
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
