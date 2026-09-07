@@ -400,16 +400,22 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     if (status !== "ready") return;
     // One baseline per model: the guard makes re-running on a recipe change a no-op.
     if (baselineRef.current !== null && baselineModelRef.current === modelId) return;
+    // Clear the departed model's session values before capturing either baseline. Reset and
+    // compare must restore the same clean session that the new model initially displays.
+    const baselineSession: CharacterShaperSession = {
+      ...sessionRef.current,
+      irisColor: null,
+      lastHandPoseType: null,
+      handPoseTypes: undefined,
+    };
     baselineModelRef.current = modelId;
-    baselineRef.current = captureHostState();
+    baselineRef.current = { ...captureHostState(), ...baselineSession };
     compareStashRef.current = null;
-    setBaselineRecipe(recipe);
+    setBaselineRecipe(deriveCharacterRecipe({ ...snapshot, ...baselineSession }, CHARACTER_SLOT_CATALOG));
     setCompareActiveState(false);
     resetHistory();
-    // A different model starts a new session: the tint and the tracked hand pose belonged to the
-    // model that is gone, so they never carry over.
-    setSession((current) => ({ ...current, irisColor: null, lastHandPoseType: null, handPoseTypes: undefined }));
-  }, [status, modelId, recipe, captureHostState, resetHistory]);
+    setSession(baselineSession);
+  }, [status, modelId, snapshot, captureHostState, resetHistory]);
 
   /* ---------------------------------------------------------------------- */
   /* Iris tint — re-applied whenever the host repaints custom colours         */

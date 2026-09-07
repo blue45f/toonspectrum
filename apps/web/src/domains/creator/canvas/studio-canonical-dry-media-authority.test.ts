@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { normalizeStudioBrushDynamicsSettings } from "../brush/studio-brush-dynamics-normalize";
+
 import {
+  classifyStudioCanonicalDryMediaElement,
+  resolveStudioCanonicalDryMediaSelectedElement,
   resolveStudioCanonicalDryMediaViewportAuthority,
   studioCanonicalDryMediaOwnsDocumentElement,
 } from "./studio-canonical-dry-media-authority";
@@ -159,5 +163,55 @@ describe("canonical dry-media viewport authority", () => {
       replacedElement,
       "layout:1",
     ).hiddenElementId).toBeNull();
+  });
+});
+
+
+describe("canonical dry-media renderer selection", () => {
+  const dry = { ...element, kind: "freehand", brushCatalogId: "pastel-paper-soft" } as DrawEl;
+
+  it.each([
+    ["rectangle", { kind: "rect" }],
+    ["ordinary freehand pen", { brush: "pen" }],
+    ["eraser", { mode: "eraser" }],
+    ["discrete motif", { brushCatalogId: "canvas-weave" }],
+    ["roller", { brushCatalogId: "paint-roller" }],
+    ["unknown material", { brushCatalogId: "unknown" }],
+    ["symmetry", { symmetry: { type: "vertical", centerX: 0, centerY: 0 } }],
+    ["multiply", { blendMode: "multiply" }],
+    ["nonidentity bounded flow", { paintModel: "bounded-flow-v2", opacity: 0.5 }],
+  ] as const)("keeps %s on the ordinary document renderer", (_name, overrides) => {
+    const authored = { ...dry, ...overrides } as DrawEl;
+    expect(resolveStudioCanonicalDryMediaSelectedElement(authored, authored.id)).toBeNull();
+  });
+
+  it.each([
+    ["tip layer", { tipLayers: [{ tip: { shape: "hard" } }] }, "unsupported-multi-tip"],
+    ["dual tip", { dualBrush: { enabled: true, tip: { shape: "hard" } } }, "unsupported-multi-tip"],
+    ["color dynamics", { colorDynamics: { hueJitter: 0.2 } }, "unsupported-color-dynamics"],
+    ["external grain", { grain: { source: { kind: "r8-texture-v1", asset: { assetId: "paper.test", encodedSha256: `sha256:${"a".repeat(64)}`, decodedSha256: `sha256:${"b".repeat(64)}`, byteLength: 2048, mediaType: "image/png", width: 32, height: 32, channel: "luminance", encoding: "r8-unorm" } } } }, "unsupported-grain-source"],
+  ])("retains the authored %s renderer without mounting the specialist", (_name, settings, reason) => {
+    const authored = { ...dry, brushDynamics: normalizeStudioBrushDynamicsSettings(settings) };
+    expect(classifyStudioCanonicalDryMediaElement(authored)).toMatchObject({ status: "ineligible", reason });
+    expect(resolveStudioCanonicalDryMediaSelectedElement(authored, authored.id)).toBeNull();
+  });
+
+  it("only promotes the exact selected topmost eligible freehand and clears its old authority on deselection", () => {
+    expect(resolveStudioCanonicalDryMediaSelectedElement(dry, dry.id)).toBe(dry);
+    expect(resolveStudioCanonicalDryMediaSelectedElement({ ...dry, kind: undefined }, dry.id))
+      .toMatchObject({ id: dry.id });
+    expect(resolveStudioCanonicalDryMediaSelectedElement(dry, "lower-element")).toBeNull();
+    expect(resolveStudioCanonicalDryMediaSelectedElement(dry, null)).toBeNull();
+    expect(resolveStudioCanonicalDryMediaSelectedElement(null, dry.id)).toBeNull();
+    const oldFrame = { ...authorized(), element: dry };
+    expect(resolveStudioCanonicalDryMediaViewportAuthority(oldFrame, dry, "layout:1").canvasVisible)
+      .toBe(true);
+    for (const candidate of [
+      resolveStudioCanonicalDryMediaSelectedElement(dry, null),
+      resolveStudioCanonicalDryMediaSelectedElement({ ...dry, kind: "rect" }, dry.id),
+    ]) {
+      expect(resolveStudioCanonicalDryMediaViewportAuthority(oldFrame, candidate, "layout:1"))
+        .toMatchObject({ active: null, canvasVisible: false, hiddenElementId: null });
+    }
   });
 });

@@ -19,12 +19,16 @@ import {
   normalizeStudioBrushDynamicsSettings,
   serializeStudioBrushDynamicsSettingsCanonical,
 } from "./brush/studio-brush-dynamics";
-import { classifyStudioDryMediaCatalogIdV1 } from "./brush/studio-dry-media-anisotropic-grain-v1";
 import {
   bridgeStudioDynamicDabVariationToDryMediaV1,
   type StudioDryMediaDynamicDabVariation,
 } from "./brush/studio-dry-media-dynamic-bridge";
 import { STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2 } from "./brush/studio-stroke-paint-model";
+import {
+  classifyStudioCanonicalDryMediaElement,
+  studioCanonicalDryMediaDynamicsIneligibilityReason,
+  type StudioCanonicalDryMediaElementIneligibilityReason,
+} from "./canvas/studio-canonical-dry-media-authority";
 import {
   buildStudioEngineWebGpuTexturedBrushPlan,
   fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
@@ -63,17 +67,9 @@ export type StudioCanonicalVNextDryMediaProductCompileFailureReason =
   | "canonical-adapter-rejected"
   | "canonical-envelope-rejected"
   | "dynamic-plan-rejected"
-  | "ineligible-material"
-  | "invalid-input"
   | "quality-gate-rejected"
   | "textured-plan-rejected"
-  | "unsupported-color-dynamics"
-  | "unsupported-composite"
-  | "unsupported-grain-source"
-  | "unsupported-multi-tip"
-  | "unsupported-paint-model"
-  | "unsupported-paint-roller"
-  | "unsupported-symmetry";
+  | StudioCanonicalDryMediaElementIneligibilityReason;
 
 export type StudioCanonicalVNextDryMediaProductCompileResult =
   | Readonly<{
@@ -126,21 +122,6 @@ function positiveSafeInteger(value: unknown): value is number {
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
-}
-
-function colorDynamicsAreIdentity(
-  settings: NormalizedStudioBrushDynamicsSettings,
-): boolean {
-  const color = settings.colorDynamics;
-  return color.foregroundBackgroundMix === 0
-    && color.foregroundBackgroundJitter === 0
-    && color.hueJitter === 0
-    && color.saturationJitter === 0
-    && color.valueJitter === 0;
-}
-
-function dualTipIsActive(settings: NormalizedStudioBrushDynamicsSettings): boolean {
-  return settings.tipLayers.length > 0 || settings.dualBrush?.enabled === true;
 }
 
 function flattenVariation(
@@ -481,43 +462,13 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
   request: StudioCanonicalVNextDryMediaProductCompileRequest,
 ): Promise<StudioCanonicalVNextDryMediaProductCompileResult> {
   const { element } = request;
-  if (
-    !element
-    || element.type !== "draw"
-    || element.kind && element.kind !== "freehand"
-    || element.mode === "eraser"
-    || element.brush !== "dry-media"
-    || !positiveSafeInteger(request.sessionEpoch)
+  if (!positiveSafeInteger(request.sessionEpoch)
     || !positiveSafeInteger(request.strokeEpoch)
-    || !positiveSafeInteger(request.commandSequence)
-  ) return unavailableResult("invalid-input");
+    || !positiveSafeInteger(request.commandSequence)) return unavailableResult("invalid-input");
   if (request.signal?.aborted) return unavailableResult("invalid-input", "cancelled");
-  const classification = classifyStudioDryMediaCatalogIdV1(element.brushCatalogId);
-  if (classification?.kind !== "anisotropic-continuous") {
-    return unavailableResult("ineligible-material");
-  }
-  if (element.brushCatalogId === "paint-roller") {
-    return unavailableResult("unsupported-paint-roller");
-  }
-  if ((element.symmetry?.type ?? "none") !== "none") {
-    return unavailableResult("unsupported-symmetry");
-  }
-  if (
-    element.blendMode !== undefined
-      && element.blendMode !== "normal"
-      && element.blendMode !== "source-over"
-  ) return unavailableResult("unsupported-composite");
-  if (
-    element.paintModel !== undefined
-    && (
-      element.paintModel !== "bounded-flow-v2"
-      || (element.opacity ?? 1) !== 1
-    )
-  ) {
-    return unavailableResult(
-      "unsupported-paint-model",
-      `${element.paintModel}:${element.opacity ?? 1}`,
-    );
+  const classification = classifyStudioCanonicalDryMediaElement(element);
+  if (classification.status === "ineligible") {
+    return unavailableResult(classification.reason, classification.detail);
   }
 
   const dynamicPlanResult = planStudioDynamicBrushRender(element, "dry-media", false);
@@ -525,15 +476,8 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
     return unavailableResult("dynamic-plan-rejected", dynamicPlanResult.reason);
   }
   const dynamicPlan = dynamicPlanResult.plan;
-  if (dualTipIsActive(dynamicPlan.dynamics)) {
-    return unavailableResult("unsupported-multi-tip");
-  }
-  if (!colorDynamicsAreIdentity(dynamicPlan.dynamics)) {
-    return unavailableResult("unsupported-color-dynamics");
-  }
-  if (dynamicPlan.dynamics.grain.source) {
-    return unavailableResult("unsupported-grain-source");
-  }
+  const dynamicsReason = studioCanonicalDryMediaDynamicsIneligibilityReason(dynamicPlan.dynamics);
+  if (dynamicsReason) return unavailableResult(dynamicsReason);
   if (
     dynamicPlan.materialIdentity.dryMediaPresetId !== classification.presetId
     || dynamicPlan.dabVariations.length !== 1

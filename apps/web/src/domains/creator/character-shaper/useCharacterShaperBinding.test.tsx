@@ -68,6 +68,7 @@ afterEach(() => {
 
 interface FakeHostState {
   status: string;
+  activeModelId: string;
   avatarForgeState: AvatarForgeState;
   wardrobeState: WardrobeState;
   vrmPropItems: PropInstance[];
@@ -96,6 +97,7 @@ interface FakeHost {
 function createFakeHost(overrides: Partial<FakeHostState> = {}): FakeHost {
   const state: FakeHostState = {
     status: "ready",
+    activeModelId: "sample",
     avatarForgeState: createAvatarForgeState(),
     wardrobeState: {},
     vrmPropItems: [],
@@ -115,7 +117,7 @@ function createFakeHost(overrides: Partial<FakeHostState> = {}): FakeHost {
   const host = {
     get status() { return state.status; },
     vrm: { scene: { traverse: () => undefined } },
-    activeModelId: "sample",
+    get activeModelId() { return state.activeModelId; },
     displayModelName: "샘플 캐릭터",
     wardrobeMetrics: { ready: true },
     detectedOriginalHairCount: 2,
@@ -412,6 +414,82 @@ describe("useCharacterShaperBinding", () => {
       result.current.undo();
     });
     expect(Object.keys(fake.state.avatarForgeState.semanticFaceMorphs ?? {})).toContain("eyeSize");
+  });
+
+  it.each(["left", "right"] as const)("starts a new model baseline without the previous %s hand or iris, including reset history", (side) => {
+    const first = createFakeHost();
+    const second = createFakeHost({ activeModelId: "second-model", fingerEdits: { authored: true } });
+    const { result, rerender } = renderHook(({ current }) => {
+      const binding = useCharacterShaperBinding(current.host);
+      return { binding, workbench: useCharacterPlatformWorkbench(current.host, binding) };
+    }, { initialProps: { current: first } });
+    act(() => { result.current.binding.setHandSide(side); });
+    act(() => { result.current.binding.commit(entryOf("hand-pose:fist")); });
+    act(() => { result.current.binding.commitColor("iris", "#3b6fb6"); });
+    expect(result.current.binding.recipe.handPoses).toEqual({ [side]: "hand-pose:fist" });
+
+    second.state.status = "loading";
+    rerender({ current: second });
+    second.state.status = "ready";
+    rerender({ current: second });
+    const initialRecipe = result.current.binding.recipe;
+    expect(initialRecipe.handPoses).toBeUndefined();
+    expect(initialRecipe.colors.iris).toBeNull();
+    expect(result.current.binding.history.length).toBe(0);
+
+    const otherSide = side === "left" ? "right" : "left";
+    act(() => { result.current.binding.setHandSide(otherSide); });
+    act(() => { result.current.binding.commit(entryOf("hand-pose:relaxed")); });
+    act(() => { result.current.binding.commitColor("iris", "#228844"); });
+    const editedRecipe = result.current.binding.recipe;
+    const editedFingers = { ...second.state.fingerEdits };
+    act(() => { result.current.binding.resetToBaseline(); });
+    expect(result.current.binding.recipe).toEqual(initialRecipe);
+    expect(result.current.binding.baselineRecipe).toEqual(initialRecipe);
+    expect(result.current.workbench.document.recipe.handPose).toEqual({});
+    expect(second.state.fingerEdits).toEqual({ authored: true });
+    expect(result.current.binding.history.recentLabels[0]).toBe("처음 상태로 되돌리기");
+    const saved = createCharacterPartPreset({
+      presetId: `model-switch-${side}`, name: "새 모델 기본 손", kind: "slot", slot: "hand-pose", scope: "personal",
+      document: result.current.workbench.document,
+    });
+    expect(saved.payload.handPose).toEqual({});
+
+    act(() => { result.current.binding.undo(); });
+    expect(result.current.binding.recipe).toEqual(editedRecipe);
+    expect(second.state.fingerEdits).toEqual(editedFingers);
+    act(() => { result.current.binding.redo(); });
+    expect(result.current.binding.recipe).toEqual(initialRecipe);
+    expect(second.state.fingerEdits).toEqual({ authored: true });
+    expect(first.state.fingerEdits).toEqual({ [`${side}:fist`]: true });
+  });
+
+  it("compares against the new model's clean session and restores only its current edits", () => {
+    const first = createFakeHost();
+    const second = createFakeHost({ activeModelId: "second-model", fingerEdits: { authored: true } });
+    const { result, rerender } = renderHook(({ current }) => useCharacterShaperBinding(current.host), {
+      initialProps: { current: first },
+    });
+    act(() => { result.current.setHandSide("left"); });
+    act(() => { result.current.commit(entryOf("hand-pose:fist")); });
+    act(() => { result.current.commitColor("iris", "#3b6fb6"); });
+    rerender({ current: second });
+    const initialRecipe = result.current.recipe;
+    act(() => { result.current.setHandSide("right"); });
+    act(() => { result.current.commit(entryOf("hand-pose:relaxed")); });
+    act(() => { result.current.commitColor("iris", "#228844"); });
+    const editedRecipe = result.current.recipe;
+    const editedFingers = { ...second.state.fingerEdits };
+    const historyLength = result.current.history.length;
+    act(() => { result.current.setCompareActive(true); });
+    expect(result.current.recipe).toEqual(initialRecipe);
+    expect(result.current.baselineRecipe).toEqual(initialRecipe);
+    expect(second.state.fingerEdits).toEqual({ authored: true });
+    act(() => { result.current.setCompareActive(false); });
+    expect(result.current.recipe).toEqual(editedRecipe);
+    expect(second.state.fingerEdits).toEqual(editedFingers);
+    expect(result.current.history.length).toBe(historyLength);
+    expect(first.state.fingerEdits).toEqual({ "left:fist": true });
   });
 
   it("commitColor writes the iris colour as one labelled step", () => {
