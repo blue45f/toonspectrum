@@ -47,7 +47,7 @@ export interface StudioInspectorNavigatorProps {
   drawing: boolean;
   drawingToolPropertiesAvailable?: boolean;
   /**
-   * CSP의 도구 팔레트처럼 대상이 아직 없어도 전문 도구를 찾고 준비 조건을 확인할 수
+   * CSP의 도구 팔레트처럼 선택 항목이 없어도 전문 도구를 찾고 준비 조건을 확인할 수
    * 있게 한다. 생략하면 기존 선택 타입 기반 동작을 유지한다.
    */
   imageToolsAvailable?: boolean;
@@ -64,35 +64,48 @@ export interface StudioInspectorNavigatorProps {
 /* ----------------------------------------------------------------- copy */
 
 /**
- * 인스펙터 크롬 문구. 로케일 팩에 키가 실리기 전까지는 한국어(제품 목소리)가 기본값이고,
- * 키가 실리는 순간 그 번역이 이긴다 — 메인 메뉴의 `localizeText` 와 같은 계약이다.
- * 라벨을 한 표에 모아 두는 이유는 "속성 / 대상 / 작업 패널"처럼 같은 개념이 컴포넌트마다
- * 다른 이름으로 새어 나가던 것을 여기서 끊기 위해서다(UX 감사 2026-09-02 §5.9).
+ * 한 개념은 한 이름으로 부른다. 내부 모델의 properties/document 이름은 유지하되,
+ * 화면에서는 사용자가 지금 무엇을 바꾸는지 바로 이해할 수 있는 말로 표시한다.
  */
 const COPY = {
-  panelTitle: ["studio.inspector.panel.title", "작업 패널"],
-  panelHint: ["studio.inspector.panel.hint", "대상 · 레이어 · 문서를 한곳에서 전환합니다"],
-  tabTarget: ["studio.inspector.tab.target", "대상"],
+  panelTitle: ["studio.inspector.panel.title", "설정"],
+  panelHint: [
+    "studio.inspector.panel.hint",
+    "선택 항목 · 레이어 · 페이지 설정을 한곳에서 바꿉니다",
+  ],
+  tabTarget: ["studio.inspector.tab.target", "선택 항목"],
   tabLayers: ["studio.inspector.tab.layers", "레이어"],
-  tabDocument: ["studio.inspector.tab.document", "문서"],
-  tablist: ["studio.inspector.tablist", "스튜디오 작업 패널"],
+  tabDocument: ["studio.inspector.tab.document", "페이지"],
+  tablist: ["studio.inspector.tablist", "스튜디오 설정"],
   search: ["studio.inspector.search", "찾기"],
   searchLabel: ["studio.inspector.search.label", "기능·설정 찾기"],
-  close: ["studio.inspector.close", "작업 패널 닫기"],
-  openTarget: ["studio.inspector.openTarget", "대상 열기"],
-  openTargetSelection: ["studio.inspector.openTarget.selection", "선택한 대상의 속성을 바로 엽니다"],
-  openTargetTool: ["studio.inspector.openTarget.tool", "브러시와 그리기 옵션을 바로 엽니다"],
+  close: ["studio.inspector.close", "설정 닫기"],
+  openTarget: ["studio.inspector.openTarget", "설정 열기"],
+  openTargetSelection: [
+    "studio.inspector.openTarget.selection",
+    "선택한 그림·글자·말풍선의 설정을 바로 엽니다",
+  ],
+  openTargetTool: [
+    "studio.inspector.openTarget.tool",
+    "현재 그리기 도구의 설정을 바로 엽니다",
+  ],
   currentTool: ["studio.inspector.currentTool", "현재 도구 설정"],
   publishTitle: ["studio.inspector.publish.title", "작품 정보"],
-  publishHint: ["studio.inspector.publish.hint", "게시 준비 · 초안 저장과 게시에 함께 쓰는 정보"],
+  publishHint: [
+    "studio.inspector.publish.hint",
+    "작품 정보와 게시 준비에 필요한 내용을 확인합니다",
+  ],
   publishBack: ["studio.inspector.publish.back", "편집으로 돌아가기"],
-  imageTablist: ["studio.inspector.imageTablist", "이미지 전문 도구"],
-  documentTablist: ["studio.inspector.documentTablist", "문서 설정"],
+  imageTablist: ["studio.inspector.imageTablist", "이미지 설정"],
+  documentTablist: ["studio.inspector.documentTablist", "페이지 설정"],
   summaryLayers: ["studio.inspector.summary.layers", "순서·그룹·표시 상태"],
   summaryPublish: ["studio.inspector.summary.publish", "게시 준비"],
-  summaryDrawing: ["studio.inspector.summary.drawing", "그리기 도구"],
-  summaryEmpty: ["studio.inspector.summary.empty", "B 펜 · V 선택 · 빈 화면에서 바로 그리기"],
-  summaryElement: ["studio.inspector.summary.element", "요소"],
+  summaryDrawing: ["studio.inspector.summary.drawing", "현재 도구"],
+  summaryEmpty: [
+    "studio.inspector.summary.empty",
+    "그림·글자·말풍선을 선택하면 설정을 바꿀 수 있어요",
+  ],
+  summaryElement: ["studio.inspector.summary.element", "선택 항목"],
 } as const satisfies Record<string, readonly [string, string]>;
 
 type CopyKey = keyof typeof COPY;
@@ -111,9 +124,9 @@ const IMAGE_TAB_META: Readonly<
 > = {
   quick: { label: "빠른 수정", icon: Sparkles },
   fill: { label: "채우기·선화", icon: PaintBucket },
-  transform: { label: "변형", icon: Map },
-  retouch: { label: "선택·리터치", icon: SlidersHorizontal },
-  mask: { label: "마스크", icon: Layers3 },
+  transform: { label: "크기·회전", icon: Map },
+  retouch: { label: "선택·보정", icon: SlidersHorizontal },
+  mask: { label: "가리기", icon: Layers3 },
 };
 
 /**
@@ -125,9 +138,9 @@ const IMAGE_TABS = STUDIO_IMAGE_INSPECTOR_SECTIONS.map((id) => ({ id, ...IMAGE_T
 const DOCUMENT_TAB_META: Readonly<
   Record<StudioDocumentInspectorSection, { label: string; icon: typeof PanelsTopLeft }>
 > = {
-  canvas: { label: "캔버스", icon: PanelsTopLeft },
-  grade: { label: "색보정", icon: SlidersHorizontal },
-  navigator: { label: "미니맵", icon: Map },
+  canvas: { label: "페이지", icon: PanelsTopLeft },
+  grade: { label: "색상 보정", icon: SlidersHorizontal },
+  navigator: { label: "긴 원고 미니맵", icon: Map },
 };
 
 const DOCUMENT_TABS = STUDIO_DOCUMENT_INSPECTOR_SECTIONS.map((id) => ({
@@ -222,7 +235,7 @@ export function StudioInspectorNavigator({
   }
 
   const selectionSummary = normalizedSelectionCount > 1
-    ? `${normalizedSelectionCount}개 요소`
+    ? `${normalizedSelectionCount}개 항목`
     : selectionLabel ?? copy("summaryElement");
   const summary = (() => {
     if (layout.primary === "layers") return copy("summaryLayers");
@@ -230,11 +243,10 @@ export function StudioInspectorNavigator({
       return DOCUMENT_TAB_META[layout.document]?.label ?? copy("tabDocument");
     }
     if (publishMode) return copy("summaryPublish");
-    if (normalizedSelectionCount > 1) return `${normalizedSelectionCount}개 요소`;
+    if (normalizedSelectionCount > 1) return `${normalizedSelectionCount}개 항목`;
     if (selectionLabel) return selectionLabel;
     if (normalizedSelectionCount > 0) return copy("summaryElement");
     if (drawing) return copy("summaryDrawing");
-    // Empty canvas coaching — competitive apps never leave a dead "select something" dead-end.
     return copy("summaryEmpty");
   })();
   const summaryTone = publishMode
@@ -266,10 +278,7 @@ export function StudioInspectorNavigator({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
-          {/*
-            화면당 검색 표면은 하나다(감사 §5.5). 데스크톱은 바로 위 통합 검색 행이 그 하나이고,
-            모바일은 그 행이 숨겨지므로 여기 버튼이 같은 다이얼로그를 '현재 패널' 범위로 연다.
-          */}
+          {/* Desktop uses the shared search row; mobile opens the same dialog scoped here. */}
           <button
             type="button"
             onClick={() => requestStudioCommandSearch({ scope: "inspector" })}
@@ -324,7 +333,7 @@ export function StudioInspectorNavigator({
             </span>
             <span className="min-w-0">
               <span className="block truncate text-xs font-bold text-fg">
-                {hasSelection ? `${selectionSummary} 편집` : copy("currentTool")}
+                {hasSelection ? `${selectionSummary} 설정` : copy("currentTool")}
               </span>
               <span className="block truncate text-[0.6875rem] text-fg-3">
                 {hasSelection ? copy("openTargetSelection") : copy("openTargetTool")}
@@ -336,11 +345,6 @@ export function StudioInspectorNavigator({
       ) : null}
 
       {publishMode ? (
-        /*
-         * 작품 정보는 상시 탭이 아니라 게시 CTA·파일 메뉴·검색이 여는 게시 준비 모드다
-         * (감사 §5.3 — 사용 빈도가 낮은 영역이 4개 탭 중 하나를 항상 차지하고 있었다).
-         * 탭 스트립은 그대로 두어 언제든 편집 범위로 돌아갈 수 있게 한다.
-         */
         <div
           className="mb-2 flex min-h-11 items-center justify-between gap-2 rounded-lg border border-accent/35 bg-accent-soft/60 px-2 py-1.5"
           data-studio-inspector-publish-mode="true"
@@ -424,10 +428,6 @@ export function StudioInspectorNavigator({
       </div>
 
       {shouldShowImageInspectorTabs ? (
-        /*
-         * 다섯 탭을 가로 스크롤에 숨기지 않는다 — 320px 패널에서도 전부 보이는 3+2 그리드.
-         * (감사 수용 기준: "이미지 하위 탐색 — 320px에서 숨은 가로 탭 없음")
-         */
         <div
           role="tablist"
           aria-label={copy("imageTablist")}

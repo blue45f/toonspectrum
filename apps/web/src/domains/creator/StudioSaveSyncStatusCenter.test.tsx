@@ -14,22 +14,31 @@ afterEach(() => {
 });
 
 describe("StudioSaveSyncStatusCenter", () => {
-  it("renders compact status pill with save status", () => {
+  it("shows a compact, unambiguous saved state", () => {
     const journal = createEmptyOperationJournal("doc-1");
     render(<StudioSaveSyncStatusCenter journal={journal} />);
 
-    expect(screen.getByText("저장 완료")).not.toBeNull();
+    expect(screen.getByText("저장됨")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "저장 상태 열기: 저장됨" })).not.toBeNull();
   });
 
-  it("shows pending operations count when journal has buffered ops", () => {
+  it("describes uncheckpointed work as locally preserved, not active server saving", () => {
     let journal = createEmptyOperationJournal("doc-1");
     journal = appendCanvasOperation(journal, "stroke", "선화 작화", {});
 
     render(<StudioSaveSyncStatusCenter journal={journal} />);
-    expect(screen.getByText("1개 작업 보존 중")).not.toBeNull();
+    expect(screen.getByText("1개 변경 보존 중")).not.toBeNull();
+    expect(screen.queryByText(/서버에 저장하는 중/u)).toBeNull();
   });
 
-  it("opens popover dialog on pill click and displays detailed status", () => {
+  it("makes offline safety explicit", () => {
+    const journal = createEmptyOperationJournal("doc-1");
+    render(<StudioSaveSyncStatusCenter journal={journal} isOnline={false} />);
+
+    expect(screen.getByText("오프라인 · 이 기기에 보관 중")).not.toBeNull();
+  });
+
+  it("opens plain-language details and keeps implementation data under advanced diagnostics", () => {
     const onForceCheckpoint = vi.fn();
     let journal = createEmptyOperationJournal("doc-1");
     journal = appendCanvasOperation(journal, "stroke", "스케치", {});
@@ -41,15 +50,17 @@ describe("StudioSaveSyncStatusCenter", () => {
       />
     );
 
-    const pill = screen.getByRole("button", { name: "저장 및 동기화 상태 열기" });
-    fireEvent.click(pill);
+    fireEvent.click(screen.getByRole("button", { name: /저장 상태 열기/u }));
 
-    expect(screen.getByRole("dialog", { name: "저장 및 동기화 상태 상세" })).not.toBeNull();
-    expect(screen.getByText("로컬 지속성 (OPFS)")).not.toBeNull();
-    expect(screen.getByText("작업 단위 저널 (Journal)")).not.toBeNull();
+    expect(screen.getByRole("dialog", { name: "저장 상태 상세" })).not.toBeNull();
+    expect(screen.getByText("이 기기")).not.toBeNull();
+    expect(screen.getByText("서버")).not.toBeNull();
+    expect(screen.getByText("복구")).not.toBeNull();
+    expect(screen.getByText(/서버 동기화를 기다리고 있어요/u)).not.toBeNull();
+    expect(screen.getByText("고급 진단 보기")).not.toBeNull();
+    expect(screen.getByText("로컬 저장 방식")).not.toBeNull();
 
-    const checkpointBtn = screen.getByRole("button", { name: /체크포인트 생성/u });
-    fireEvent.click(checkpointBtn);
+    fireEvent.click(screen.getByRole("button", { name: "복구 지점 만들기" }));
     expect(onForceCheckpoint).toHaveBeenCalledTimes(1);
   });
 });
