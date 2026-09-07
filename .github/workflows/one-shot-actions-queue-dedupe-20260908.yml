@@ -18,22 +18,30 @@ concurrency:
 
 jobs:
   dedupe:
-    if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-slim
+    name: Dedupe on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-slim
+          - windows-latest
+          - macos-15
     steps:
-      - name: Cancel stale and superseded active workflow runs
+      - name: Preserve only main and the newest required CI for each open PR
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPOSITORY: ${{ github.repository }}
           SELF_RUN_ID: ${{ github.run_id }}
+          REQUIRED_WORKFLOW_ID: "287571038"
         run: |
           set -euo pipefail
-          python3 <<'PY'
+          PYTHON_BIN="$(command -v python3 || command -v python)"
+          "$PYTHON_BIN" <<'PY'
           from __future__ import annotations
 
-          from collections import defaultdict
           import json
           import os
           import time
@@ -43,7 +51,8 @@ jobs:
           repository = os.environ["GH_REPOSITORY"]
           token = os.environ["GH_TOKEN"]
           self_run_id = int(os.environ["SELF_RUN_ID"])
-          active_statuses = {"requested", "waiting", "pending", "queued", "in_progress"}
+          required_workflow_id = int(os.environ["REQUIRED_WORKFLOW_ID"])
+          active_statuses = ("in_progress", "queued", "pending", "waiting", "requested")
 
           def api(path: str, method: str = "GET") -> tuple[int, object]:
               request = urllib.request.Request(
@@ -68,23 +77,7 @@ jobs:
                       payload = raw.decode("utf-8", errors="replace")
                   return error.code, payload
 
-          def list_runs() -> list[dict[str, object]]:
-              runs: list[dict[str, object]] = []
-              for page in range(1, 11):
-                  status, payload = api(
-                      f"/repos/{repository}/actions/runs?per_page=100&page={page}"
-                  )
-                  if status != 200 or not isinstance(payload, dict):
-                      raise SystemExit(f"Unable to list workflow runs: HTTP {status}: {payload}")
-                  page_runs = payload.get("workflow_runs", [])
-                  if not isinstance(page_runs, list):
-                      raise SystemExit("GitHub returned an invalid workflow_runs payload")
-                  runs.extend(run for run in page_runs if isinstance(run, dict))
-                  if len(page_runs) < 100:
-                      break
-              return runs
-
-          def list_open_pr_branches() -> set[str]:
+          def open_pr_branches() -> set[str]:
               branches: set[str] = set()
               for page in range(1, 6):
                   status, payload = api(
@@ -102,64 +95,77 @@ jobs:
                       break
               return branches
 
-          all_runs = list_runs()
-          open_pr_branches = list_open_pr_branches()
-          active_runs = [
+          def active_runs() -> list[dict[str, object]]:
+              by_id: dict[int, dict[str, object]] = {}
+              for run_status in active_statuses:
+                  for page in range(1, 11):
+                      status, payload = api(
+                          f"/repos/{repository}/actions/runs"
+                          f"?status={run_status}&per_page=100&page={page}"
+                      )
+                      if status != 200 or not isinstance(payload, dict):
+                          raise SystemExit(
+                              f"Unable to list {run_status} runs: HTTP {status}: {payload}"
+                          )
+                      runs = payload.get("workflow_runs", [])
+                      if not isinstance(runs, list):
+                          raise SystemExit("GitHub returned an invalid workflow_runs payload")
+                      for run in runs:
+                          if isinstance(run, dict):
+                              by_id[int(run.get("id", 0))] = run
+                      if len(runs) < 100:
+                          break
+              return list(by_id.values())
+
+          branches = open_pr_branches()
+          runs = active_runs()
+          newest_required: dict[str, dict[str, object]] = {}
+          for run in runs:
+              branch = run.get("head_branch")
+              if (
+                  isinstance(branch, str)
+                  and branch in branches
+                  and int(run.get("workflow_id", 0)) == required_workflow_id
+              ):
+                  current = newest_required.get(branch)
+                  run_order = (str(run.get("created_at") or ""), int(run.get("id", 0)))
+                  current_order = (
+                      (str(current.get("created_at") or ""), int(current.get("id", 0)))
+                      if current is not None
+                      else ("", 0)
+                  )
+                  if run_order > current_order:
+                      newest_required[branch] = run
+
+          keep_ids = {self_run_id}
+          keep_ids.update(int(run["id"]) for run in newest_required.values())
+          candidates = [
               run
-              for run in all_runs
-              if run.get("status") in active_statuses
-              and int(run.get("id", 0)) != self_run_id
+              for run in runs
+              if int(run.get("id", 0)) not in keep_ids
               and run.get("head_branch") != "main"
           ]
+          candidates.sort(key=lambda run: (str(run.get("created_at") or ""), int(run.get("id", 0))))
 
-          candidates: dict[int, tuple[dict[str, object], str]] = {}
-          survivors: list[dict[str, object]] = []
-          for run in active_runs:
-              run_id = int(run.get("id", 0))
-              branch = run.get("head_branch")
-              if run.get("event") == "pull_request" and branch not in open_pr_branches:
-                  candidates[run_id] = (run, "closed pull request")
-              else:
-                  survivors.append(run)
-
-          groups: dict[tuple[object, object, object], list[dict[str, object]]] = defaultdict(list)
-          for run in survivors:
-              key = (run.get("head_branch"), run.get("workflow_id"), run.get("event"))
-              groups[key].append(run)
-
-          def order(run: dict[str, object]) -> tuple[str, int]:
-              return str(run.get("created_at") or ""), int(run.get("id", 0))
-
-          keepers: list[dict[str, object]] = []
-          for group in groups.values():
-              if len(group) == 1:
-                  keepers.append(group[0])
-                  continue
-              newest = max(group, key=order)
-              newest_sha = newest.get("head_sha")
-              running_same_sha = [
-                  run
-                  for run in group
-                  if run.get("status") == "in_progress" and run.get("head_sha") == newest_sha
-              ]
-              keeper = max(running_same_sha, key=order) if running_same_sha else newest
-              keepers.append(keeper)
-              for run in group:
-                  run_id = int(run.get("id", 0))
-                  if run_id != int(keeper.get("id", 0)):
-                      candidates[run_id] = (run, "superseded duplicate")
-
-          ordered_candidates = sorted(candidates.values(), key=lambda item: order(item[0]))
           print(
-              f"open_pr_branches={sorted(open_pr_branches)} "
-              f"active_non_main={len(active_runs)} groups={len(groups)} "
-              f"keepers={len(keepers)} cancellations={len(ordered_candidates)}"
+              json.dumps(
+                  {
+                      "open_pr_branches": sorted(branches),
+                      "active_runs": len(runs),
+                      "preserved_required": {
+                          branch: int(run["id"])
+                          for branch, run in newest_required.items()
+                      },
+                      "cancellations": len(candidates),
+                  },
+                  sort_keys=True,
+              )
           )
 
           cancelled = 0
           raced = 0
           failures: list[str] = []
-          for run, reason in ordered_candidates:
+          for run in candidates:
               run_id = int(run["id"])
               status, payload = api(
                   f"/repos/{repository}/actions/runs/{run_id}/cancel",
@@ -167,7 +173,7 @@ jobs:
               )
               label = (
                   f"{run_id} {run.get('head_branch')} / {run.get('name')} "
-                  f"[{run.get('status')}] ({reason})"
+                  f"[{run.get('status')}]"
               )
               if status == 202:
                   cancelled += 1
@@ -177,7 +183,7 @@ jobs:
                   print(f"already terminal: {label} (HTTP {status})")
               else:
                   failures.append(f"{label}: HTTP {status}: {payload}")
-              time.sleep(0.05)
+              time.sleep(0.03)
 
           print(
               f"summary: cancelled={cancelled} already_terminal={raced} "
