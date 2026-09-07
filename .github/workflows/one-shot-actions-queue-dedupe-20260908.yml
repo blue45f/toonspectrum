@@ -1,4 +1,4 @@
-name: Prioritize final protected core run
+name: Prioritize final PR 917 protected core on slim
 
 on:
   push:
@@ -16,17 +16,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dedupe:
+  cancel-duplicate-runs:
     runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
-      - name: Cancel duplicate non-required runs and preserve protected CI
+      - name: Preserve only final PR 917 CI and main runs
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPOSITORY: ${{ github.repository }}
           SELF_RUN_ID: ${{ github.run_id }}
-          REQUIRED_RUN_ID: "34167974156"
+          REQUIRED_RUN_ID: "34168628743"
         run: |
           set -euo pipefail
           python3 <<'PY'
@@ -51,7 +51,7 @@ jobs:
                   headers={
                       "Accept": "application/vnd.github+json",
                       "Authorization": f"Bearer {token}",
-                      "User-Agent": "toonspectrum-final-ci-prioritizer",
+                      "User-Agent": "toonspectrum-pr917-ci-isolator-slim",
                       "X-GitHub-Api-Version": "2022-11-28",
                   },
               )
@@ -91,21 +91,15 @@ jobs:
               if run_id not in keep_ids and run.get("head_branch") != "main"
           ]
           candidates.sort(key=lambda run: (str(run.get("created_at") or ""), int(run.get("id", 0))))
+          print(json.dumps({
+              "active": len(runs_by_id),
+              "preserved": sorted(keep_ids),
+              "cancellations": len(candidates),
+          }, sort_keys=True))
 
-          print(
-              json.dumps(
-                  {
-                      "active": len(runs_by_id),
-                      "preserved": sorted(keep_ids),
-                      "cancellations": len(candidates),
-                  },
-                  sort_keys=True,
-              )
-          )
-
-          failures: list[str] = []
           cancelled = 0
           raced = 0
+          failures: list[str] = []
           for run in candidates:
               run_id = int(run["id"])
               status, payload = api(
