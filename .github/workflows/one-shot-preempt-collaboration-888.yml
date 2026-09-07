@@ -1,0 +1,21 @@
+name: Retire stale collaboration PR 888 run
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-preempt-collaboration-888.yml
+
+permissions: {}
+
+concurrency:
+  group: studio-mesh-sync-ops/production-final-2015ef35-20260908
+  cancel-in-progress: true
+
+jobs:
+  retire:
+    if: ${{ false }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "Retired stale collaboration run from closed PR 888."

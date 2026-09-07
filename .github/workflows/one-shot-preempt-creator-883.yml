@@ -1,0 +1,21 @@
+name: Retire stale creator homepage PR 883 run
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-preempt-creator-883.yml
+
+permissions: {}
+
+concurrency:
+  group: creator-home-quality-883
+  cancel-in-progress: true
+
+jobs:
+  retire:
+    if: ${{ false }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "Retired stale creator homepage run from closed PR 883."

@@ -1,0 +1,21 @@
+name: Retire stale Studio asset PR 882 run
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-preempt-asset-882.yml
+
+permissions: {}
+
+concurrency:
+  group: studio-asset-browser-882
+  cancel-in-progress: true
+
+jobs:
+  retire:
+    if: ${{ false }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "Retired stale Studio asset run from closed PR 882."

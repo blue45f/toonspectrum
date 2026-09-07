@@ -1,0 +1,21 @@
+name: Retire stale Studio brush PR 867 run
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-preempt-brush-867.yml
+
+permissions: {}
+
+concurrency:
+  group: studio-brush-filter-stability-867
+  cancel-in-progress: true
+
+jobs:
+  retire:
+    if: ${{ false }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "Retired stale Studio brush run from closed PR 867."

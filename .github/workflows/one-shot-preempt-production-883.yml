@@ -1,0 +1,21 @@
+name: Retire stale Studio production PR 883 run
+
+on:
+  push:
+    branches:
+      - ci/actions-queue-dedupe-20260908
+    paths:
+      - .github/workflows/one-shot-preempt-production-883.yml
+
+permissions: {}
+
+concurrency:
+  group: studio-production-integrity-883
+  cancel-in-progress: true
+
+jobs:
+  retire:
+    if: ${{ false }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "Retired stale Studio production run from closed PR 883."
