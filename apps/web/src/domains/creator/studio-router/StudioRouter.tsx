@@ -9,7 +9,7 @@ import { StudioPublishRoute } from "./routes/StudioPublishRoute";
 import { StudioStoryworldRoute } from "./routes/StudioStoryworldRoute";
 import { resolveStudioRoute } from "./studio-route-manifest";
 import { StudioRouteFailure, StudioRoutePlaceholder } from "./StudioRouteFallbacks";
-import { useStudioI18nPriorityLoading } from "./use-studio-i18n-priority-loading";
+import { useStudioI18nPriorityLoading } from "./useStudioI18nPriorityLoading";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
@@ -36,6 +36,7 @@ export function StudioRouter() {
     pathname: location.pathname,
     search: location.search,
   });
+
   if (resolution.kind === "invalid") {
     return (
       <StudioRouteFailure
