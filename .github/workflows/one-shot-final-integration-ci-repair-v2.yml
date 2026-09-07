@@ -1,5 +1,6 @@
 name: One-shot final integration CI repair v2
 
+# Re-triggered on the standard x64 pool after the superseding fixture commit.
 on:
   push:
     branches:
