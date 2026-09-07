@@ -1,0 +1,108 @@
+name: One-shot TypeScript 6 compatibility fix
+
+on:
+  push:
+    branches:
+      - merge-ready/3ad5d69c-final
+    paths:
+      - .github/workflows/one-shot-typescript6-compatibility-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Apply exact TypeScript 6 compatibility fixes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one occurrence, found {count}: {old!r}")
+              path.write_text(text.replace(old, new), encoding="utf-8")
+
+          pointer = Path("apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink-pointer.ts")
+          replace_once(pointer,
+              "    barycentric: [barycentric.x, barycentric.y, barycentric.z],",
+              "    barycentric: [barycentric.x, barycentric.y, barycentric.z] as const,",
+          )
+          replace_once(pointer,
+              "    localNormal: [normal.x, normal.y, normal.z],",
+              "    localNormal: [normal.x, normal.y, normal.z] as const,",
+          )
+          replace_once(pointer,
+              "    localTangent: [1, 0, 0],",
+              "    localTangent: [1, 0, 0] as const,",
+          )
+          replace_once(pointer,
+              "    skinIndices: [0, 0, 0, 0],",
+              "    skinIndices: [0, 0, 0, 0] as const,",
+          )
+          replace_once(pointer,
+              "    skinWeights: [1, 0, 0, 0],",
+              "    skinWeights: [1, 0, 0, 0] as const,",
+          )
+
+          workbench = Path("apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts")
+          replace_once(workbench,
+              "      root: Object.freeze({ position: [0, 0, 0], rotation: [0, 0, 0, 1] }),",
+              "      root: Object.freeze({ position: [0, 0, 0] as const, rotation: [0, 0, 0, 1] as const }),",
+          )
+          replace_once(workbench,
+              "    setSelectedPoseRegions: (regions) => setSelectedPoseRegionsState(Object.freeze([...regions])),",
+              "    setSelectedPoseRegions: (regions: readonly CharacterPoseRegion[]) => setSelectedPoseRegionsState(Object.freeze([...regions])),",
+          )
+          replace_once(workbench,
+              "    removePreset: (presetId) => { PRESET_STORE.remove(presetId); },",
+              "    removePreset: (presetId: string) => { PRESET_STORE.remove(presetId); },",
+          )
+
+          contract = Path("apps/web/src/shared/lib/creator-asset-platform-contract.ts")
+          contract_text = contract.read_text(encoding="utf-8")
+          transitions_start = contract_text.index("const DRAFT_TRANSITIONS")
+          transitions_end = contract_text.index("export function canTransitionCreatorAssetDraft")
+          transition_block = contract_text[transitions_start:transitions_end]
+          if transition_block.count("new Set([") != 10 or transition_block.count("new Set()") != 2:
+              raise SystemExit("creator asset draft transition table shape changed")
+          transition_block = transition_block.replace(
+              "new Set([",
+              "new Set<CreatorAssetDraftState>([",
+          ).replace(
+              "new Set()",
+              "new Set<CreatorAssetDraftState>()",
+          )
+          contract_text = (
+              contract_text[:transitions_start]
+              + transition_block
+              + contract_text[transitions_end:]
+          )
+          old_digest = '''  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
+          const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);'''
+          new_digest = '''  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
+          const digestInput = new Uint8Array(bytes.byteLength);
+          digestInput.set(bytes);
+          const digest = await globalThis.crypto.subtle.digest("SHA-256", digestInput);'''
+          if contract_text.count(old_digest) != 1:
+              raise SystemExit("creator asset digest implementation changed")
+          contract.write_text(contract_text.replace(old_digest, new_digest), encoding="utf-8")
+          PY
+          git diff --check
+      - name: Commit the product fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/web/src/domains/creator/character-platform/surface-ink/character-surface-ink-pointer.ts \
+            apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts \
+            apps/web/src/shared/lib/creator-asset-platform-contract.ts
+          git commit -m "fix(ci): satisfy TypeScript 6 tuple and buffer contracts"
+          git push origin HEAD:${GITHUB_REF_NAME}
