@@ -86,6 +86,7 @@ function makeHost(overrides: Record<string, unknown> = {}): StudioVrmPoserHost {
     insertBackgroundColor: "#ffffff",
     setInsertBackgroundColor: vi.fn(),
     handleInsert: vi.fn(),
+    acquireVrmCaptureHelperLease: vi.fn(() => vi.fn()),
     texturePaintDisabledReason: "",
     captureRef: { current: { gl: { domElement: document.createElement("canvas") }, scene: {}, camera: {} } },
     ...overrides,
@@ -192,11 +193,13 @@ describe("CharacterShaperOutputDock", () => {
   });
 
   it("saves a PNG from the live capture state", async () => {
-    renderDock();
+    const { h } = renderDock();
     fireEvent.click(screen.getByRole("button", { name: "PNG 저장" }));
 
     expect(await screen.findByText(/PNG를 저장했습니다/u)).toBeTruthy();
     expect(captureStudioVrmRgba).toHaveBeenCalledTimes(1);
+    expect(h.acquireVrmCaptureHelperLease).toHaveBeenCalledWith({ subjectOnly: true });
+    expect(vi.mocked(h.acquireVrmCaptureHelperLease).mock.results[0]?.value).toHaveBeenCalledTimes(1);
     expect(encodeStudioVrmCapturePngBlob).toHaveBeenCalledWith(expect.any(Uint8ClampedArray), {
       width: 512,
       height: 640,
@@ -217,8 +220,18 @@ describe("CharacterShaperOutputDock", () => {
       readonly height: number;
     };
     expect(input.vrm).toBe(h.vrm);
+    expect(h.acquireVrmCaptureHelperLease).toHaveBeenCalledWith({ subjectOnly: true });
+    expect(vi.mocked(h.acquireVrmCaptureHelperLease).mock.results[0]?.value).toHaveBeenCalledTimes(1);
     expect(input.width).toBe(512);
     expect(input.height).toBe(640);
+  });
+
+  it("restores viewport helpers when PNG capture fails", async () => {
+    captureStudioVrmRgba.mockImplementationOnce(() => { throw new Error("readback failed"); });
+    const { h } = renderDock();
+    fireEvent.click(screen.getByRole("button", { name: "PNG 저장" }));
+    expect(await screen.findByText("PNG를 저장하지 못했습니다.")).toBeTruthy();
+    expect(vi.mocked(h.acquireVrmCaptureHelperLease).mock.results[0]?.value).toHaveBeenCalledTimes(1);
   });
 
   it("says so when the scene is not ready instead of exporting", () => {

@@ -31,6 +31,7 @@ from .geometry import (
     build_authored_hair,
     create_reference_head,
     infer_head_frame,
+    infer_face_frame,
     parent_hair_to_head,
 )
 from .materials import create_outline_material, create_skin_material, create_toon_material
@@ -544,7 +545,8 @@ def run_pipeline( # NOSONAR python:S3776
     hair_result: HairBuildResult | None = None
     vrm_expression_result: VrmExpressionBindingResult | None = None
     if config.mode != "audit":
-        face_result = create_semantic_face_shape_keys(meshes, frame, config.face)
+        face_frame = infer_face_frame(armature, meshes, frame)
+        face_result = create_semantic_face_shape_keys(meshes, face_frame, config.face)
         vrm_expression_result = bind_semantic_vrm1_expressions(armature, face_result)
         if config.hair.enabled:
             hair_result = build_authored_hair(frame, config.hair)

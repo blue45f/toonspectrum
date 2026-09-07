@@ -99,9 +99,11 @@ artifacts, and malformed hashes before import.
 ### Face
 
 - Existing blink, phoneme/viseme, emotion, and look-at keys are never renamed or reused.
-- New semantic keys use paired `TS_*_Pos` / `TS_*_Neg` names.
+- New semantic keys use descriptive pairs such as `faceEyeSizeBig` / `faceEyeSizeSmall`.
 - Detection uses explicit metadata first and fails closed when confidence is below the recipe.
-- Vertex displacement is bounded as a fraction of the detected face dimensions.
+- Face dimensions come from the skin weighted to the head bone, or an explicitly marked face mesh.
+  This frame is separate from the hair placement frame; facial edits leave body vertices outside
+  the detected head region unchanged and bound displacement as a fraction of its dimensions.
 
 ### Hair
 

@@ -177,6 +177,7 @@ export function CharacterShaperOutputDock({
     setRunning("png");
     setProgress("PNG로 굽는 중");
     void (async () => {
+      const releaseHelpers = h.acquireVrmCaptureHelperLease({ subjectOnly: transparent });
       try {
         const gl = capture.gl as { domElement: HTMLCanvasElement };
         const size = roundExportSize(gl.domElement);
@@ -201,6 +202,7 @@ export function CharacterShaperOutputDock({
       } catch (error) {
         fail("PNG를 저장하지 못했습니다.", error instanceof Error ? error.message : undefined);
       } finally {
+        releaseHelpers();
         if (aliveRef.current) {
           setRunning(null);
           setProgress(null);
@@ -222,6 +224,7 @@ export function CharacterShaperOutputDock({
     setRunning("psd");
     setProgress("레이어를 나누는 중 · 밑색 · 음영 · 하이라이트 · 주선");
     void (async () => {
+      const releaseHelpers = h.acquireVrmCaptureHelperLease({ subjectOnly: true });
       try {
         const gl = capture.gl as { domElement: HTMLCanvasElement };
         const display = roundExportSize(gl.domElement);
@@ -258,6 +261,7 @@ export function CharacterShaperOutputDock({
       } catch (error) {
         fail("PSD를 내보내지 못했습니다.", error instanceof Error ? error.message : undefined);
       } finally {
+        releaseHelpers();
         if (aliveRef.current) {
           setRunning(null);
           setProgress(null);

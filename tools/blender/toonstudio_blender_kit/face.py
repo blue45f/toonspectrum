@@ -345,6 +345,11 @@ def _write_shape(
     for index, point in enumerate(basis.data):
         world = obj.matrix_world @ point.co
         x, depth, z = _frame_coordinates(world, frame)
+        # Jaw/chin ramps otherwise remain active below the head and can deform a combined
+        # body's torso or legs. Semantic facial controls never own vertices outside the skull.
+        if max(abs(x), abs(depth), abs(z)) > 1.15:
+            key.data[index].co = point.co
+            continue
         weight = spec.weight(x, depth, z)
         if weight <= 1e-5:
             key.data[index].co = point.co
