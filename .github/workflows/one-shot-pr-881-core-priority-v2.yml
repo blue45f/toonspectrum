@@ -1,0 +1,51 @@
+name: One-shot PR 881 protected core priority v2
+
+on:
+  push:
+    branches:
+      - ops/pr-881-core-priority-20260908-v2
+    paths:
+      - .github/workflows/one-shot-pr-881-core-priority-v2.yml
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: one-shot-pr-881-core-priority-20260908-v2
+  cancel-in-progress: true
+
+jobs:
+  prioritize-protected-core:
+    runs-on: macos-15
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_PR: "881"
+    steps:
+      - name: Cancel every pull-request run except latest PR 881 CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          pr_json="$(gh api "repos/${repo}/pulls/${TARGET_PR}")"
+          current_head="$(jq -r '.head.sha' <<<"$pr_json")"
+          current_branch="$(jq -r '.head.ref' <<<"$pr_json")"
+          ci_runs="$(gh api --paginate "repos/${repo}/actions/runs?event=pull_request&branch=${current_branch}&per_page=100")"
+          keep_run="$(jq -r --arg sha "$current_head" '[.workflow_runs[] | select(.name == "CI" and .head_sha == $sha)] | sort_by(.id) | last | .id // empty' <<<"$ci_runs")"
+          if [[ -z "$keep_run" ]]; then
+            echo "::error::No CI run exists for current PR head ${current_head}."
+            exit 1
+          fi
+          echo "Keeping CI run ${keep_run} for ${current_branch}@${current_head}"
+          candidates="$(mktemp)"
+          for status in queued in_progress waiting pending requested; do
+            gh api --paginate "repos/${repo}/actions/runs?status=${status}&event=pull_request&per_page=100" --jq '.workflow_runs[] | [.id, .name, .head_branch, .head_sha, .status] | @tsv' >> "$candidates"
+          done
+          while IFS=$'\t' read -r run_id name branch sha status; do
+            [[ -n "$run_id" ]] || continue
+            [[ "$run_id" == "$keep_run" ]] && continue
+            echo "Cancelling ${run_id}: ${name} ${branch}@${sha} (${status})"
+            gh api --method POST "repos/${repo}/actions/runs/${run_id}/cancel" >/dev/null 2>&1 || true
+          done < <(sort -u "$candidates")
