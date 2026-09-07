@@ -1,4 +1,4 @@
-name: Isolate final PR 917 runs on slim runner
+name: Isolate final PR 919 runs on slim runner
 
 on:
   push:
@@ -19,9 +19,9 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPOSITORY: ${{ github.repository }}
       HELPER_BRANCH: ci/isolate-pr917-slim-20260908
-      TARGET_BRANCH: release/final-combined-496aa743-20260908
+      TARGET_BRANCH: release/final-main-merge-4888b061-immutable-20260908
     steps:
-      - name: Cancel stale branches and duplicate PR 917 runs
+      - name: Cancel stale branches and duplicate PR 919 runs
         shell: bash
         run: |
           set -euo pipefail
@@ -48,7 +48,7 @@ jobs:
                   headers={
                       "Accept": "application/vnd.github+json",
                       "Authorization": f"Bearer {token}",
-                      "User-Agent": "toonspectrum-pr917-slim-isolator",
+                      "User-Agent": "toonspectrum-pr919-slim-isolator",
                       "X-GitHub-Api-Version": "2022-11-28",
                   },
               )
