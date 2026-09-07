@@ -8,7 +8,7 @@ import { StudioSurfaceState } from "./StudioSurfaceState";
 afterEach(cleanup);
 
 describe("StudioSurfaceState", () => {
-  it("preserves the legacy empty-state marker while exposing the canonical state", () => {
+  it("keeps a static empty state in reading order without announcing every render", () => {
     const { container } = render(
       <StudioSurfaceState
         state="empty"
@@ -17,18 +17,36 @@ describe("StudioSurfaceState", () => {
       />,
     );
 
-    expect(container.querySelector('[data-studio-empty-state="true"]')).toBeTruthy();
-    expect(container.querySelector('[data-studio-surface-state="empty"]')).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toContain("항목이 없습니다");
+    const empty = container.querySelector('[data-studio-empty-state="true"]');
+    expect(empty).toBeTruthy();
+    expect(empty?.getAttribute("data-studio-surface-state")).toBe("empty");
+    expect(empty?.getAttribute("data-studio-surface-announcement")).toBe("none");
+    expect(empty?.getAttribute("role")).toBeNull();
+    expect(empty?.getAttribute("aria-live")).toBeNull();
+    expect(screen.getByText("항목이 없습니다")).not.toBeNull();
   });
 
-  it("announces errors assertively and loading as busy", () => {
+  it("announces errors assertively and loading as a polite busy status", () => {
     const { rerender } = render(
       <StudioSurfaceState state="error" title="불러오지 못했습니다" />,
     );
     expect(screen.getByRole("alert").getAttribute("aria-live")).toBe("assertive");
 
     rerender(<StudioSurfaceState state="loading" title="불러오는 중" />);
-    expect(screen.getByRole("status").getAttribute("aria-busy")).toBe("true");
+    const loading = screen.getByRole("status");
+    expect(loading.getAttribute("aria-live")).toBe("polite");
+    expect(loading.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("allows a caller to announce a newly appeared blocked state", () => {
+    render(
+      <StudioSurfaceState
+        state="blocked"
+        announce="polite"
+        title="이미지 레이어가 필요해요"
+      />,
+    );
+
+    expect(screen.getByRole("status").textContent).toContain("이미지 레이어가 필요해요");
   });
 });
