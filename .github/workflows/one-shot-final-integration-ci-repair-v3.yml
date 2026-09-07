@@ -1,5 +1,6 @@
 name: One-shot final integration CI repair v3
 
+# Final shallow repair trigger while the protected-main PR is open.
 on:
   push:
     branches:
