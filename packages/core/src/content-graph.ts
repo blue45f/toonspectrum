@@ -253,6 +253,7 @@ export interface UsageDecision {
   allowed: boolean;
   reason?:
     | "RIGHTS_NOT_VERIFIED"
+    | "RIGHTS_EXPIRED"
     | "MONETIZATION_NOT_ALLOWED"
     | "SURFACE_NOT_ALLOWED"
     | "COMMERCIAL_USE_NOT_ALLOWED"
@@ -264,6 +265,7 @@ export interface UsageDecision {
 /**
  * UI의 버튼 노출과 서버의 실제 다운로드·가져오기 실행에서 같은 판정을 사용한다.
  * `null`은 권리 미확인 상태이며 허용으로 해석하지 않는다.
+ * `validUntil`이 있으면 해당 시각부터 만료되며, 해석할 수 없는 시각도 거절한다.
  */
 export function authorizeContentUsage(
   rights: RightsDecision,
@@ -271,6 +273,15 @@ export function authorizeContentUsage(
 ): UsageDecision {
   if (rights.reviewStatus !== "verified") {
     return { allowed: false, reason: "RIGHTS_NOT_VERIFIED" };
+  }
+  if (rights.validUntil !== undefined) {
+    const validUntil = Date.parse(rights.validUntil);
+    if (!Number.isFinite(validUntil)) {
+      return { allowed: false, reason: "RIGHTS_NOT_VERIFIED" };
+    }
+    if (validUntil <= Date.now()) {
+      return { allowed: false, reason: "RIGHTS_EXPIRED" };
+    }
   }
   if (!rights.allowedMonetizationModels.includes(context.monetization)) {
     return { allowed: false, reason: "MONETIZATION_NOT_ALLOWED" };

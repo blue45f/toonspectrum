@@ -15,7 +15,15 @@ export function characterSurfacePointerIntersection(
   canvas: HTMLCanvasElement,
   scene: Scene,
   camera: Camera,
+  modelRoot: Object3D | null,
 ): Intersection<Object3D> | null {
+  if (!modelRoot) return null;
+  let ancestor: Object3D | null = modelRoot;
+  while (ancestor && ancestor !== scene) {
+    if (!ancestor.visible) return null;
+    ancestor = ancestor.parent;
+  }
+  if (ancestor !== scene || !scene.visible) return null;
   const rect = canvas.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return null;
   const pointer = new Vector2(
@@ -25,7 +33,7 @@ export function characterSurfacePointerIntersection(
   const raycaster = new Raycaster();
   raycaster.setFromCamera(pointer, camera);
   const targets: Object3D[] = [];
-  scene.traverse((object) => {
+  modelRoot.traverseVisible((object) => {
     if (
       object instanceof Mesh &&
       object.visible &&

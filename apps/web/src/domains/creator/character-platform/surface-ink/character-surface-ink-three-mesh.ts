@@ -11,6 +11,8 @@ import {
   Vector3,
 } from "three";
 
+import { createSha256Portable } from "../../studio-sha256";
+
 import { buildCharacterSurfaceInkRibbon } from "./character-surface-ink";
 
 import type {
@@ -34,8 +36,55 @@ export function characterSurfaceObjectPath(object: Object3D): string {
   return parts.reverse().join("/") || object.uuid;
 }
 
+type SurfaceAttribute = BufferAttribute | InterleavedBufferAttribute;
+const geometryDigests = new WeakMap<BufferGeometry, {
+  position: SurfaceAttribute | undefined;
+  index: BufferAttribute | null;
+  positionVersion: number;
+  indexVersion: number;
+  digest: string;
+}>();
+
+function attributeVersion(attribute: SurfaceAttribute | null | undefined): number {
+  if (!attribute) return -1;
+  return "data" in attribute ? attribute.data.version : attribute.version;
+}
+
+/** Bind geometry only: ordinary skeleton poses and scene transforms do not change anchors. */
+function geometryDigest(geometry: BufferGeometry): string {
+  const position = geometry.attributes.position;
+  const index = geometry.index;
+  const positionVersion = attributeVersion(position);
+  const indexVersion = attributeVersion(index);
+  const cached = geometryDigests.get(geometry);
+  if (cached && cached.position === position && cached.index === index
+    && cached.positionVersion === positionVersion && cached.indexVersion === indexVersion) {
+    return cached.digest;
+  }
+  const hash = createSha256Portable();
+  hash.update(new TextEncoder().encode(JSON.stringify(["geometry-v2", position?.count ?? 0, index !== null, index?.count ?? 0])));
+  const bytes = new Uint8Array(8192);
+  const view = new DataView(bytes.buffer);
+  let offset = 0;
+  const write = (value: number) => {
+    view.setFloat64(offset, value, true);
+    offset += 8;
+    if (offset === bytes.length) { hash.update(bytes); offset = 0; }
+  };
+  for (let vertex = 0; vertex < (position?.count ?? 0); vertex += 1) {
+    write(position.getX(vertex)); write(position.getY(vertex)); write(position.getZ(vertex));
+  }
+  for (let vertex = 0; vertex < (index?.count ?? 0); vertex += 1) write(index!.getX(vertex));
+  if (offset) hash.update(bytes.subarray(0, offset));
+  const digest = hash.finalizeHex();
+  // Three's standard mutation contract increments the attribute (or interleaved buffer) version
+  // through needsUpdate. Replaced geometry/attributes also invalidate without object UUIDs.
+  geometryDigests.set(geometry, { position, index, positionVersion, indexVersion, digest });
+  return digest;
+}
+
 export function characterSurfaceTopologyRevision(modelKey: string, mesh: Mesh): string {
-  return [modelKey, characterSurfaceObjectPath(mesh), mesh.geometry.attributes.position?.count ?? 0, mesh.geometry.index?.count ?? 0].join(":");
+  return [modelKey, characterSurfaceObjectPath(mesh), "geometry-v2", geometryDigest(mesh.geometry)].join(":");
 }
 
 function tuple4(

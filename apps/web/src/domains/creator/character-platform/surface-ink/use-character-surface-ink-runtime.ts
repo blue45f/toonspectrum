@@ -195,7 +195,7 @@ export function useCharacterSurfaceInkRuntime({
     }
 
     const sample = (event: PointerEvent): CharacterSurfaceInkAnchor | null => {
-      const hit = characterSurfacePointerIntersection(event, canvas, scene, camera);
+      const hit = characterSurfacePointerIntersection(event, canvas, scene, camera, h.vrm?.scene ?? null);
       return hit ? characterSurfaceAnchorFromIntersection(hit, modelKey, event.pressure) : null;
     };
 
@@ -275,7 +275,7 @@ export function useCharacterSurfaceInkRuntime({
       canvas.removeEventListener("pointerup", onPointerUp, true);
       canvas.removeEventListener("pointercancel", onPointerCancel, true);
     };
-  }, [active, commitDocument, h.captureRef, modelKey]);
+  }, [active, commitDocument, h.captureRef, h.vrm, modelKey]);
 
   const undo = useCallback(() => {
     const previous = historyRef.current.past.pop();
