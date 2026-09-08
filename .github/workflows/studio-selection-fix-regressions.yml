@@ -1,0 +1,163 @@
+name: Studio Selection Regression Repair
+
+on:
+  push:
+    branches:
+      - feat/studio-selection-workbench-v2
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-selection-regression-repair-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/studio-selection-workbench-v2
+          fetch-depth: 1
+
+      - name: Repair audit contracts and realistic HUD fixture
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, before: str, after: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if after in text:
+                  return
+              count = text.count(before)
+              if count != 1:
+                  raise RuntimeError(f"{path}: expected one repair anchor, found {count}")
+              target.write_text(text.replace(before, after, 1), encoding="utf-8")
+
+          replace_once(
+              "apps/web/src/domains/creator/StudioPixelSelectionHud.test.tsx",
+              'return this.dataset?.studioPixelSelectionHud === "true" ? 720 : 0;',
+              'return this.dataset?.studioPixelSelectionHud === "true" ? 480 : 0;',
+          )
+
+          replace_once(
+              "apps/web/src/domains/creator/studio-main-menu-group-spec.ts",
+              '''      part(
+                "Semantic/Object Select",
+                "인스펙터 선택 작업대에서 레이어 불투명도와 온디바이스 AI 피사체를 현재 결합 모드로 선택한다. 독립 메인 메뉴 명령은 아직 없다.",
+              ),''',
+              '''      gap(
+                "Semantic/Object Select",
+                "인스펙터 작업대에 AI·불투명도 선택은 있으나 메인 메뉴에서 호출하는 명령은 아직 없다.",
+              ),''',
+          )
+          replace_once(
+              "apps/web/src/domains/creator/studio-main-menu-group-spec.ts",
+              '''      part(
+                "Expand/Shrink/Feather/Smooth",
+                "선택 도구 패널과 캔버스 HUD에서 확장·축소·페더·면적 보존 스무딩을 제공한다. 메인 메뉴 수치 대화상자는 아직 없다.",
+              ),''',
+              '''      gap(
+                "Expand/Shrink/Feather/Smooth",
+                "선택 패널과 캔버스 HUD에 기능은 있으나 메인 메뉴 명령·수치 대화상자는 아직 없다.",
+              ),''',
+          )
+          replace_once(
+              "apps/web/src/domains/creator/studio-main-menu-group-spec.ts",
+              '''      part(
+                "Save Selection",
+                "이미지 단위·기기 로컬 이름 저장/불러오기를 제공한다. 프로젝트·CRDT 영구 채널과 팀 동기화는 아직 없다.",
+              ),''',
+              '''      gap(
+                "Save Selection",
+                "이미지 단위 로컬 저장·불러오기는 있으나 메인 메뉴 명령과 프로젝트 영구 채널은 아직 없다.",
+              ),''',
+          )
+          replace_once(
+              "apps/web/src/domains/creator/studio-main-menu-group-spec.ts",
+              '''      part(
+                "Selection HUD",
+                "픽셀 선택 대상 근처에 safe-area 인지 HUD를 제공한다. 사용자가 명령 구성을 편집하는 기능은 아직 없다.",
+              ),''',
+              '''      gap(
+                "Selection HUD",
+                "픽셀 선택 HUD는 있으나 메인 메뉴 행이 아닌 캔버스 맥락형 표면이며 사용자 커스터마이즈 명령은 없다.",
+              ),''',
+          )
+
+          replace_once(
+              "apps/web/src/domains/creator/studio-main-menu-items-selection.ts",
+              ''' * The workbench and contextual HUD now partially deliver Semantic/Object Select,
+           * Expand/Shrink/Feather/Smooth, Save Selection and Selection HUD. They remain
+           * recorded as partial in `studio-main-menu-group-spec.ts`: no direct menubar command,
+           * project-synced named-selection channel or user-customizable launcher is invented.''',
+              ''' * The workbench and contextual HUD deliver those capabilities outside the menubar.
+           * The corresponding §15.3 menu rows remain gaps because no direct menu command,
+           * project-synced named-selection channel or customizable launcher item is invented.''',
+          )
+
+          replace_once(
+              "apps/web/src/domains/creator/studio-selection-workbench-integration.test.ts",
+              '''  it("records the delivered surfaces as partial rather than inventing menubar commands", () => {
+            const source = readCreatorFile("studio-main-menu-group-spec.ts");
+            expect(source).toContain('part(\\n        "Semantic/Object Select"');
+            expect(source).toContain('part(\\n        "Expand/Shrink/Feather/Smooth"');
+            expect(source).toContain('part(\\n        "Save Selection"');
+            expect(source).toContain('part(\\n        "Selection HUD"');
+          });''',
+              '''  it("keeps inspector and HUD capabilities distinct from absent menubar commands", () => {
+            const source = readCreatorFile("studio-main-menu-group-spec.ts");
+            expect(source).toContain('gap(\\n        "Semantic/Object Select"');
+            expect(source).toContain('gap(\\n        "Expand/Shrink/Feather/Smooth"');
+            expect(source).toContain('gap(\\n        "Save Selection"');
+            expect(source).toContain('gap(\\n        "Selection HUD"');
+          });''',
+          )
+          replace_once(
+              "apps/web/src/domains/creator/studio-selection-workbench-integration.test.ts",
+              'expect(menuSource).toContain("now partially deliver");',
+              'expect(menuSource).toContain("outside the menubar");',
+          )
+
+          replace_once(
+              ".github/workflows/studio-selection-workbench-v2.yml",
+              '''      - name: Apply fail-closed source integration
+                run: |
+                  set -euo pipefail
+                  python3 -m py_compile scripts/codex-selection-workbench-v2-patch.py
+                  python3 scripts/codex-selection-workbench-v2-patch.py
+                  git diff --check''',
+              '''      - name: Verify committed source integration
+                run: |
+                  set -euo pipefail
+                  test -f apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.tsx
+                  test -f apps/web/src/domains/creator/StudioPixelSelectionHud.tsx
+                  grep -q 'StudioSelectionWorkbenchPanel' apps/web/src/domains/creator/StudioInspectorImageToolsSection.tsx
+                  grep -q 'StudioPixelSelectionHud' apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx
+                  git diff --check''',
+          )
+          PY
+          git diff --check
+
+      - name: Commit repaired contracts
+        run: |
+          set -euo pipefail
+          git add \
+            .github/workflows/studio-selection-workbench-v2.yml \
+            apps/web/src/domains/creator/StudioPixelSelectionHud.test.tsx \
+            apps/web/src/domains/creator/studio-main-menu-group-spec.ts \
+            apps/web/src/domains/creator/studio-main-menu-items-selection.ts \
+            apps/web/src/domains/creator/studio-selection-workbench-integration.test.ts
+          git rm .github/workflows/studio-selection-fix-regressions.yml
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test(studio): align selection regression contracts"
+          git push origin HEAD:feat/studio-selection-workbench-v2
