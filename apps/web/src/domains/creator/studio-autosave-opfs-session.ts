@@ -211,6 +211,8 @@ export interface StudioAutosaveOpfsSessionOptions {
   readonly journal: StudioAutosaveOpfsJournalPort;
   readonly ownerId: string;
   readonly now?: () => number;
+  /** An acquired tab-lifetime document lock protects idle periods between journal writes. */
+  readonly documentLease?: Pick<StudioAutosaveDocumentLease, "role" | "basis">;
 }
 
 interface StudioAutosaveBrowserScope {
@@ -404,6 +406,7 @@ export class StudioAutosaveOpfsSession {
   readonly #journal: StudioAutosaveOpfsJournalPort;
   readonly #ownerId: string;
   readonly #now: () => number;
+  readonly #documentLease: StudioAutosaveOpfsSessionOptions["documentLease"];
   #writer: StudioOpfsRecoveryWriterLease | null = null;
   #tail: Promise<void> = Promise.resolve();
   #disposed = false;
@@ -416,6 +419,7 @@ export class StudioAutosaveOpfsSession {
     this.#journal = options.journal;
     this.#ownerId = options.ownerId;
     this.#now = options.now ?? Date.now;
+    this.#documentLease = options.documentLease;
   }
 
   #enqueue<T>(operation: () => Promise<T>): Promise<T> {
@@ -428,6 +432,7 @@ export class StudioAutosaveOpfsSession {
   }
 
   async #ensureWriter(signal?: AbortSignal): Promise<StudioOpfsRecoveryWriterLease> {
+    if (this.#documentLease?.role === "follower") throw new StudioAutosaveDocumentBusyError();
     const now = this.#now();
     if (this.#writer && this.#writer.expiresAt > now + WRITER_RENEW_WINDOW_MS) {
       return this.#writer;
@@ -503,22 +508,38 @@ export class StudioAutosaveOpfsSession {
       );
       const digest = sha256HexPortable(bytes);
       const writer = await this.#ensureWriter(signal);
-      const entry = await this.#journal.appendCheckpoint(writer, {
-        id: `autosave-${revision}-${digest.slice(0, 12)}`,
-        pageId: AUTOSAVE_PAGE_ID,
-        revision,
-        payload: bytes,
-        byteLength: bytes.byteLength,
-        createdAt: timestamp(savedAt),
-        compactThroughSequence: scan.lastSequence,
-      }, { signal });
-      await this.#journal.evictObsolete(writer, { signal });
-      return Object.freeze({
-        authority: "opfs-journal",
-        savedAt,
-        sequence: entry.sequence,
-        revision: entry.revision,
-      });
+      try {
+        const entry = await this.#journal.appendCheckpoint(writer, {
+          id: `autosave-${revision}-${digest.slice(0, 12)}`,
+          pageId: AUTOSAVE_PAGE_ID,
+          revision,
+          payload: bytes,
+          byteLength: bytes.byteLength,
+          createdAt: timestamp(savedAt),
+          compactThroughSequence: scan.lastSequence,
+        }, { signal });
+        await this.#journal.evictObsolete(writer, { signal });
+        return Object.freeze({
+          authority: "opfs-journal",
+          savedAt,
+          sequence: entry.sequence,
+          revision: entry.revision,
+        });
+      } finally {
+        // A navigation does not run React cleanup. Keep the journal lease only for the write
+        // transaction when a separate Web Lock already guards the whole document lifetime;
+        // otherwise a completed checkpoint strands a 30-second disk lease after reload.
+        // Callers without that document lock retain the existing expiry/fencing discipline.
+        if (this.#documentLease?.role === "leader"
+          && this.#documentLease.basis !== "locks-unavailable") {
+          try {
+            await this.#journal.releaseWriter(writer);
+            if (this.#writer === writer) this.#writer = null;
+          } catch {
+            // The checkpoint receipt remains valid. Retain the writer for retry/dispose.
+          }
+        }
+      }
     });
   }
 
@@ -569,6 +590,7 @@ export async function createStudioAutosaveOpfsSession(
   options: {
     /** Follower tabs get a session that reads the document but refuses every mutation. */
     readonly readOnly?: boolean;
+    readonly documentLease?: StudioAutosaveOpfsSessionOptions["documentLease"];
   } = {},
 ): Promise<StudioAutosaveOpfsSession | null> {
   const lockManager = scope.navigator?.locks ?? null;
@@ -603,6 +625,7 @@ export async function createStudioAutosaveOpfsSession(
     autosaveKey,
     journal: options.readOnly ? createStudioAutosaveFollowerJournal(journal) : journal,
     ownerId: `autosave-${randomId}`,
+    documentLease: options.documentLease,
   });
 }
 
@@ -667,6 +690,7 @@ export async function openStudioAutosaveDocumentSession(
   try {
     const session = await createStudioAutosaveOpfsSession(autosaveKey, scope, {
       readOnly: lease.role === "follower",
+      documentLease: lease,
     });
     return Object.freeze({ role: lease.role, session, lease });
   } catch (cause: unknown) {
@@ -679,10 +703,13 @@ export async function reopenStudioAutosaveDocumentSessionForLeadership(input: {
   readonly session: StudioAutosaveOpfsSession | null;
   readonly autosaveKey: string;
   readonly scope?: StudioAutosaveBrowserScope;
+  readonly documentLease?: StudioAutosaveOpfsSessionOptions["documentLease"];
 }): Promise<StudioAutosaveOpfsSession | null> {
   if (input.session === null) return null;
   await input.session.dispose();
-  return createStudioAutosaveOpfsSession(input.autosaveKey, input.scope);
+  return createStudioAutosaveOpfsSession(input.autosaveKey, input.scope, {
+    documentLease: input.documentLease,
+  });
 }
 
 /**
