@@ -271,7 +271,7 @@ export class CatalogController {
     return data;
   }
 
-  @Get("/api/go/:platformId")
+  @Get("/go/:platformId")
   @Header("Cache-Control", "no-store, max-age=0")
   async redirectAffiliate(
     @Param("platformId") platformId: string,
