@@ -5,6 +5,7 @@ import { imageFilterCacheKey, hasActiveImageFilters } from "./render/studio-konv
 import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./render/studio-konva-filters";
 import { createStudioAdjustmentLayerDocument, serializeStudioAdjustmentLayerDocument } from "./studio-adjustment-layer-plan";
 import { normalizeStudioAdjustmentStack, serializeStudioAdjustmentStack, studioAdjustmentStackSerializedByteLength, studioAdjustmentStackToFilterFields, type StudioAdjustmentEntry } from "./studio-adjustment-stack";
+import type { StudioImageDataLike } from "./studio-filters";
 
 function stack(opacity?: number, engine: StudioAdjustmentEntry["engine"] = "invert", params: StudioAdjustmentEntry["params"] = {}) {
   return { version: 1 as const, entries: [{ id: "effect", engine, enabled: true, params, ...(opacity === undefined ? {} : { opacity }) }] };
@@ -80,7 +81,7 @@ describe("smart-filter opacity through the document and pixel program", () => {
   it("retains the complete accepted input when a partial-strength kernel fails", () => {
     const registry: KonvaLike = { Filters: {} };
     registerStudioKonvaFilters(registry);
-    registry.Filters.Invert = (image) => { image.data[0] = 0; throw new Error("kernel failed"); };
+    registry.Filters.Invert = (image: StudioImageDataLike) => { image.data[0] = 0; throw new Error("kernel failed"); };
     const image = { width: 1, height: 1, data: new Uint8ClampedArray([40, 80, 120, 255]) };
     const build = buildImageFilters({ smartFilters: stack(0.5) }, registry);
     expect(() => applyImageFilters(image, build.filters, build.attrs)).toThrow("kernel failed");
