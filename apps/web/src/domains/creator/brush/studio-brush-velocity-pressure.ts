@@ -86,6 +86,17 @@ interface StudioBrushVelocityPressureInputSettings {
   readonly velocitySensitivity?: unknown;
 }
 
+/**
+ * The velocity state is already one-stroke authority. Associate its immutable device profile here
+ * so every authoritative, predicted and raw-preview sample stays on the pointerdown calibration
+ * even though existing call sites intentionally rebuild their small pressure setting object.
+ */
+const profileByVelocityState = new WeakMap<
+  StudioVelocityPressureState,
+  StudioStylusPressureProfile
+>();
+let activeStrokePressureProfile = DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE;
+
 function finiteOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -96,6 +107,15 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 function clamp01(value: unknown, fallback: number): number {
   return clamp(finiteOr(value, fallback), 0, 1);
+}
+
+function pressureProfileForTransition(
+  state: StudioVelocityPressureState | null | undefined,
+  explicit: StudioStylusPressureProfile | undefined,
+): StudioStylusPressureProfile {
+  if (explicit) return explicit;
+  if (!state) return DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE;
+  return profileByVelocityState.get(state) ?? activeStrokePressureProfile;
 }
 
 /**
@@ -131,10 +151,14 @@ export function advanceStudioBrushVelocityPressure(
     0.05,
     8
   );
+  const pressureProfile = pressureProfileForTransition(
+    state,
+    settings.stylusPressureProfile,
+  );
   const profiledPressure = resolveStudioStylusPressureInput(
     pointer.pointerType,
     pointer.pressure,
-    settings.stylusPressureProfile ?? DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE,
+    pressureProfile,
   );
   const transition = advanceStudioVelocityPressure(
     state,
@@ -154,6 +178,7 @@ export function advanceStudioBrushVelocityPressure(
       penPolicy: "hardware-precedence",
     },
   );
+  profileByVelocityState.set(transition.state, pressureProfile);
   const nonHardware = transition.sample.hardwarePressure === null;
   const pressure = nonHardware
     && (transition.sample.source === "nominal" || !velocityEnabled)
@@ -183,6 +208,8 @@ export function initializeStudioBrushVelocityPressure(
   settings: StudioBrushVelocityPressureInputSettings | null | undefined,
 ): StudioVelocityPressureState | null {
   if (drawMode === "shape" || drawMode === "pixel") return null;
+  activeStrokePressureProfile = settings?.stylusPressureProfile
+    ?? DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE;
   return advanceStudioBrushVelocityPressure(
     null,
     {
@@ -196,7 +223,7 @@ export function initializeStudioBrushVelocityPressure(
       brushId: element.brush,
       pressureCurve: settings?.pressureCurve,
       pressureMinSize: settings?.pressureMinSize,
-      stylusPressureProfile: settings?.stylusPressureProfile,
+      stylusPressureProfile: activeStrokePressureProfile,
       useVelocityPressure: settings?.useVelocityPressure,
       velocitySensitivity: settings?.velocitySensitivity,
       fallbackPressure:
@@ -228,7 +255,7 @@ export function resolveStudioBrushReleasePressure(
   const profiledRawPressure = resolveStudioStylusPressureInput(
     input.pointerType,
     rawPressure,
-    input.stylusPressureProfile ?? DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE,
+    input.stylusPressureProfile ?? activeStrokePressureProfile,
   );
   const family = input.brushId === "pen"
     ? null
