@@ -26,6 +26,7 @@ export interface StudioCanvasViewportDomOverlaysProps {
   canonicalDryMediaCanvasVisible: StudioCanvasViewportLiveSurfaces["canonicalDryMediaCanvasVisible"];
   canonicalDryMediaCandidate: StudioCanvasViewportLiveSurfaces["canonicalDryMediaCandidate"];
   canonicalDryMediaLayoutKey: string;
+  paperSurfaceForPreview?: StudioCanvasViewportLiveSurfaces["paperSurfaceForPreview"];
   canvasFlipH: StudioCanvasViewportProps["canvasFlipH"];
   canvasH: StudioCanvasViewportProps["canvasH"];
   velloHubAuthority: StudioCanvasViewportLiveSurfaces["velloHubAuthority"];
@@ -68,6 +69,7 @@ export function StudioCanvasViewportDomOverlays({
   canonicalDryMediaCanvasVisible,
   canonicalDryMediaCandidate,
   canonicalDryMediaLayoutKey,
+  paperSurfaceForPreview,
   canvasFlipH,
   canvasH,
   velloHubAuthority,
@@ -268,6 +270,7 @@ export function StudioCanvasViewportDomOverlays({
               <StudioCanonicalVNextDryMediaCanvas
                 element={canonicalDryMediaCandidate}
                 layoutKey={canonicalDryMediaLayoutKey}
+                paperSurface={paperSurfaceForPreview}
                 visible={canonicalDryMediaCanvasVisible}
                 surfaceBounds={webGpuViewportSurface.surface}
                 documentWidth={CANVAS_W}
