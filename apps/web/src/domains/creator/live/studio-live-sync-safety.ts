@@ -1,3 +1,8 @@
+import {
+  isStudioLiveAdmissionDeniedMessage,
+  STUDIO_LIVE_UNSUPPORTED_JAM_MESSAGE,
+} from "./studio-live-admission-support";
+
 import type { StudioLiveAvailability } from "./studio-live-collaboration-context";
 import type { StudioLiveTransportMode } from "./studio-live-collaboration-transport";
 
@@ -10,6 +15,8 @@ export type StudioLiveSyncPhase =
   | "repairing"
   | "durability-risk"
   | "read-only-follower"
+  | "unsupported-jam"
+  | "admission-denied"
   | "revoked"
   | "recovery-required";
 
@@ -145,13 +152,28 @@ export function projectStudioLiveSyncSnapshot({
   } satisfies Omit<StudioLiveSyncSnapshot, "phase">;
 
   if (terminalTransportState === "revoked" || telemetry?.state === "revoked") {
-    return { ...common, phase: "revoked", editsDurablyProtected: false };
+    return {
+      ...common,
+      phase: isStudioLiveAdmissionDeniedMessage(message) ? "admission-denied" : "revoked",
+      editsDurablyProtected: false,
+    };
   }
   if (
     terminalTransportState === "recovery-required" ||
     telemetry?.state === "recovery-required"
   ) {
     return { ...common, phase: "recovery-required", editsDurablyProtected: false };
+  }
+  if (message === STUDIO_LIVE_UNSUPPORTED_JAM_MESSAGE) {
+    return {
+      ...common,
+      phase: "unsupported-jam",
+      transportReady: false,
+      operationSyncReady: false,
+      editsDurablyProtected: false,
+      lastAckAt: null,
+      lastAckServerSequence: null,
+    };
   }
   // A follower tab is healthy, not at risk — its document lives safely in the leader tab. What it
   // must never do is claim the green "안전하게 동기화됨" while its own saves are being rejected, so
@@ -291,6 +313,20 @@ export function presentStudioLiveSyncSnapshot(
         detail: snapshot.editsDurablyProtected
           ? snapshot.message
           : "팀 서버와 이 기기의 복구 저장소가 모두 준비되지 않아 새 변경을 안전하게 보장할 수 없습니다.",
+        tone: "bad",
+        assertive: true,
+      };
+    case "unsupported-jam":
+      return {
+        shortLabel: "저장 전 공동 작업 미지원",
+        detail: snapshot.message,
+        tone: "warn",
+        assertive: false,
+      };
+    case "admission-denied":
+      return {
+        shortLabel: "작업실 참여 권한 없음",
+        detail: snapshot.message,
         tone: "bad",
         assertive: true,
       };
