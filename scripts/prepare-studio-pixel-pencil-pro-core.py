@@ -35,9 +35,16 @@ def replace_once(relative: str, old: str, new: str) -> None:
                 f"{relative}: ambiguous match count {count}: {candidate_old[:120]!r}"
             )
 
-    if len(matches) != 1:
+    if not matches:
         raise RuntimeError(
-            f"{relative}: expected one direct or reindented match, found {len(matches)}: {old[:120]!r}"
+            f"{relative}: expected one direct or reindented match, found 0: {old[:120]!r}"
+        )
+    # A one-line dedented marker also appears as a substring of its indented form. Prefer the
+    # longest candidate so replacement text inherits the exact source indentation.
+    matches.sort(key=lambda pair: len(pair[0]), reverse=True)
+    if len(matches) > 1 and len(matches[0][0]) == len(matches[1][0]):
+        raise RuntimeError(
+            f"{relative}: equally specific matches remain ambiguous: {old[:120]!r}"
         )
     candidate_old, candidate_new = matches[0]
     write(relative, source.replace(candidate_old, candidate_new, 1))
