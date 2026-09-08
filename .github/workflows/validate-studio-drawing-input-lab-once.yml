@@ -1,0 +1,52 @@
+name: Validate Studio drawing input lab once
+
+'on':
+  push:
+    branches:
+      - feat/studio-drawing-input-lab-20260909
+    paths:
+      - .github/workflows/validate-studio-drawing-input-lab-once.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: validate-studio-drawing-input-lab-once
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    if: "${{ github.actor != 'github-actions[bot]' }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      HUSKY: "0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/studio-drawing-input-lab-20260909
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint workspace
+        run: pnpm run lint
+      - name: Typecheck workspace
+        run: pnpm run typecheck
+      - name: Test pressure conditioning contracts
+        run: pnpm exec vitest run apps/web/src/domains/creator/brush/studio-stylus-pressure-profile.test.ts
+      - name: Build production workspace
+        run: pnpm run build
+      - name: Remove successful one-shot gate
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/validate-studio-drawing-input-lab-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "ci(studio): record drawing input validation"
+          git push origin HEAD:feat/studio-drawing-input-lab-20260909
