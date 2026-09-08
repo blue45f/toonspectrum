@@ -1,0 +1,111 @@
+name: Codex apply Studio epic core
+
+on:
+  push:
+    branches:
+      - codex/studio-epic-completion-20260909
+    paths:
+      - .codex/studio-open-issues-core.patch.xz
+      - .github/workflows/codex-apply-studio-epic-core.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: codex-apply-studio-epic-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply audited core patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .codex/studio-open-issues-core.patch.xz
+          xz -dc .codex/studio-open-issues-core.patch.xz > /tmp/studio-open-issues-core.patch
+          git apply --check --whitespace=error /tmp/studio-open-issues-core.patch
+          git apply --whitespace=error /tmp/studio-open-issues-core.patch
+          rm -f .codex/studio-open-issues-core.patch.xz
+          rmdir .codex 2>/dev/null || true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run focused epic contract tests
+        run: >-
+          pnpm exec vitest run
+          apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.test.ts
+          apps/web/src/domains/creator/ai/studio-stroke-proposal.test.ts
+          apps/web/src/domains/creator/ai/studio-structured-edit-proposal.test.ts
+          apps/web/src/domains/creator/animation/studio-timeline-timebase.test.ts
+          apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.test.ts
+          apps/web/src/domains/creator/studio-asset-family-revision.test.ts
+          apps/web/src/domains/creator/studio-deterministic-serialization.test.ts
+          apps/web/src/domains/creator/studio-soft-proofing.test.ts
+          apps/web/src/domains/creator/vrm/studio-vrm-attachment-graph.test.ts
+          apps/web/src/domains/creator/vrm/studio-vrm-texture-dilation.test.ts
+
+      - name: Verify aggregate open-issue contracts
+        run: pnpm exec tsx scripts/verify-studio-open-issues-wave.mts
+
+      - name: Lint added production and verification files
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts
+          apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.test.ts
+          apps/web/src/domains/creator/ai/studio-stroke-proposal.ts
+          apps/web/src/domains/creator/ai/studio-stroke-proposal.test.ts
+          apps/web/src/domains/creator/ai/studio-structured-edit-proposal.ts
+          apps/web/src/domains/creator/ai/studio-structured-edit-proposal.test.ts
+          apps/web/src/domains/creator/animation/studio-timeline-timebase.ts
+          apps/web/src/domains/creator/animation/studio-timeline-timebase.test.ts
+          apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.ts
+          apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.test.ts
+          apps/web/src/domains/creator/studio-asset-family-revision.ts
+          apps/web/src/domains/creator/studio-asset-family-revision.test.ts
+          apps/web/src/domains/creator/studio-deterministic-serialization.ts
+          apps/web/src/domains/creator/studio-deterministic-serialization.test.ts
+          apps/web/src/domains/creator/studio-soft-proofing.ts
+          apps/web/src/domains/creator/studio-soft-proofing.test.ts
+          apps/web/src/domains/creator/vrm/studio-vrm-attachment-graph.ts
+          apps/web/src/domains/creator/vrm/studio-vrm-attachment-graph.test.ts
+          apps/web/src/domains/creator/vrm/studio-vrm-texture-dilation.ts
+          apps/web/src/domains/creator/vrm/studio-vrm-texture-dilation.test.ts
+          scripts/verify-studio-open-issues-wave.mts
+
+      - name: Typecheck web and API production sources
+        run: |
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          pnpm --filter @webtoon-nest/api run typecheck
+
+      - name: Commit verified core implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          rm -f .github/workflows/codex-apply-studio-epic-core.yml
+          rm -f .github/workflows/codex-source-snapshot.yml
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(studio): add verified core contracts for remaining large epics"
+          git push origin HEAD:codex/studio-epic-completion-20260909
