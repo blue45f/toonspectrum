@@ -7,12 +7,10 @@ import {
   Eye,
   EyeOff,
   FileWarning,
-  GitFork,
   Globe2,
   LayoutPanelTop,
   Link2,
   LockKeyhole,
-  MessageCircle,
   Search,
   Share2,
   ShieldCheck,
@@ -89,9 +87,13 @@ function ChoiceCard({
       <span className="flex items-center gap-2 text-sm font-semibold">
         <span className={cn("text-fg-3", active && "text-accent")}>{icon}</span>
         {title}
-        {active && <Check size={14} className="ml-auto text-accent" aria-hidden="true" />}
+        {active && (
+          <Check size={14} className="ml-auto text-accent" aria-hidden="true" />
+        )}
       </span>
-      <span className="mt-1.5 block text-xs leading-relaxed text-fg-3">{description}</span>
+      <span className="mt-1.5 block text-xs leading-relaxed text-fg-3">
+        {description}
+      </span>
     </button>
   );
 }
@@ -120,7 +122,9 @@ function ToggleRow({
       />
       <span>
         <span className="block text-sm font-medium text-fg">{label}</span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-fg-3">{description}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-fg-3">
+          {description}
+        </span>
       </span>
     </label>
   );
@@ -152,7 +156,9 @@ function nextRoundedSchedule(): string {
   return date.toISOString();
 }
 
-function visibilityDescription(visibility: CreatorPublicationVisibility): string {
+function visibilityDescription(
+  visibility: CreatorPublicationVisibility,
+): string {
   if (visibility === "public") return "탐색·시리즈·검색 화면에 노출";
   if (visibility === "unlisted") return "정확한 링크를 아는 독자만 열람";
   return "나와 공동 작업자만 열람";
@@ -174,11 +180,17 @@ export function StudioPublicationControls({
   onChange,
 }: StudioPublicationControlsProps) {
   const [scheduleDraft, setScheduleDraft] = useState(() =>
-    formatStudioPublicationLocalDateTime(directive.scheduledAt, directive.timeZone),
+    formatStudioPublicationLocalDateTime(
+      directive.scheduledAt,
+      directive.timeZone,
+    ),
   );
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const timeZones = useMemo(() => {
-    const zones = new Set<string>([directive.timeZone, ...COMMON_TIME_ZONES]);
+    const zones = new Set<string>([
+      directive.timeZone,
+      ...COMMON_TIME_ZONES,
+    ]);
     try {
       zones.add(Intl.DateTimeFormat().resolvedOptions().timeZone);
     } catch {
@@ -189,7 +201,10 @@ export function StudioPublicationControls({
 
   useEffect(() => {
     setScheduleDraft(
-      formatStudioPublicationLocalDateTime(directive.scheduledAt, directive.timeZone),
+      formatStudioPublicationLocalDateTime(
+        directive.scheduledAt,
+        directive.timeZone,
+      ),
     );
   }, [directive.scheduledAt, directive.timeZone]);
 
@@ -208,7 +223,10 @@ export function StudioPublicationControls({
     patch({ mode, scheduledAt });
   };
 
-  const updateSchedule = (value: string, timeZone = directive.timeZone) => {
+  const updateSchedule = (
+    value: string,
+    timeZone = directive.timeZone,
+  ) => {
     setScheduleDraft(value);
     const resolution = resolveStudioPublicationSchedule(value, timeZone);
     setScheduleError(resolution.message);
@@ -218,8 +236,11 @@ export function StudioPublicationControls({
   const setVisibility = (visibility: CreatorPublicationVisibility) => {
     patch({
       visibility,
-      searchIndexing: visibility === "public" ? directive.searchIndexing : false,
-      ...(visibility === "private" ? { mode: "immediate", scheduledAt: null } : {}),
+      searchIndexing:
+        visibility === "public" ? directive.searchIndexing : false,
+      ...(visibility === "private"
+        ? { mode: "immediate", scheduledAt: null }
+        : {}),
     });
     if (visibility === "private") setScheduleError(null);
   };
@@ -227,11 +248,14 @@ export function StudioPublicationControls({
   const setReadingMode = (readingMode: CreatorPublicationReadingMode) => {
     patch({
       readingMode,
-      readingDirection: readingMode === "vertical" ? "ltr" : directive.readingDirection,
+      readingDirection:
+        readingMode === "vertical" ? "ltr" : directive.readingDirection,
     });
   };
 
-  const setReadingDirection = (readingDirection: CreatorPublicationReadingDirection) => {
+  const setReadingDirection = (
+    readingDirection: CreatorPublicationReadingDirection,
+  ) => {
     patch({ readingDirection });
   };
 
@@ -278,7 +302,9 @@ export function StudioPublicationControls({
               <select
                 value={directive.timeZone}
                 disabled={disabled}
-                onChange={(event) => updateSchedule(scheduleDraft, event.target.value)}
+                onChange={(event) =>
+                  updateSchedule(scheduleDraft, event.target.value)
+                }
                 className={cn(fieldClass, "mt-1 h-11")}
               >
                 {timeZones.map((zone) => (
@@ -330,7 +356,11 @@ export function StudioPublicationControls({
           />
         </div>
         <p className="mt-2 flex items-center gap-1.5 text-xs text-fg-3">
-          {directive.visibility === "public" ? <Eye size={13} /> : <EyeOff size={13} />}
+          {directive.visibility === "public" ? (
+            <Eye size={13} />
+          ) : (
+            <EyeOff size={13} />
+          )}
           현재 설정: {visibilityDescription(directive.visibility)}
         </p>
       </section>
@@ -393,7 +423,9 @@ export function StudioPublicationControls({
             disabled={disabled}
             label="새 댓글 허용"
             description="끄면 기존 댓글은 유지하고 새 댓글 등록만 차단합니다."
-            onChange={(checked) => patch({ comments: checked ? "open" : "closed" })}
+            onChange={(checked) =>
+              patch({ comments: checked ? "open" : "closed" })
+            }
           />
           <ToggleRow
             checked={directive.allowRemix}
@@ -447,25 +479,37 @@ export function StudioPublicationControls({
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="space-y-3">
             <label className="block text-xs text-fg-2">
-              공유 카드 제목 <span className="numeral text-fg-3">{directive.socialTitle.length}/70</span>
+              공유 카드 제목{" "}
+              <span className="numeral text-fg-3">
+                {directive.socialTitle.length}/70
+              </span>
               <input
                 value={directive.socialTitle}
                 maxLength={70}
                 disabled={disabled}
-                onChange={(event) => patch({ socialTitle: event.target.value })}
+                onChange={(event) =>
+                  patch({ socialTitle: event.target.value })
+                }
                 placeholder={title.trim() || "작품 제목"}
                 className={cn(fieldClass, "mt-1 h-11")}
               />
             </label>
             <label className="block text-xs text-fg-2">
-              공유 카드 설명 <span className="numeral text-fg-3">{directive.socialDescription.length}/160</span>
+              공유 카드 설명{" "}
+              <span className="numeral text-fg-3">
+                {directive.socialDescription.length}/160
+              </span>
               <textarea
                 value={directive.socialDescription}
                 maxLength={160}
                 rows={3}
                 disabled={disabled}
-                onChange={(event) => patch({ socialDescription: event.target.value })}
-                placeholder={description.trim() || "작품을 한두 문장으로 소개해 주세요."}
+                onChange={(event) =>
+                  patch({ socialDescription: event.target.value })
+                }
+                placeholder={
+                  description.trim() || "작품을 한두 문장으로 소개해 주세요."
+                }
                 className={cn(fieldClass, "mt-1 resize-y py-2.5")}
               />
             </label>
@@ -477,7 +521,9 @@ export function StudioPublicationControls({
                   value={directive.canonicalSlug}
                   maxLength={80}
                   disabled={disabled}
-                  onChange={(event) => patch({ canonicalSlug: event.target.value })}
+                  onChange={(event) =>
+                    patch({ canonicalSlug: event.target.value })
+                  }
                   placeholder="작품-id"
                   className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none disabled:cursor-not-allowed"
                 />
@@ -488,7 +534,11 @@ export function StudioPublicationControls({
           <div className="overflow-hidden rounded-2xl border border-line bg-canvas shadow-sm">
             <div className="aspect-[1.91/1] bg-raised/60">
               {cover ? (
-                <img src={cover} alt="공유 카드 표지 미리보기" className="h-full w-full object-cover" />
+                <img
+                  src={cover}
+                  alt="공유 카드 표지 미리보기"
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <div className="flex h-full items-center justify-center text-fg-3">
                   <FileWarning size={22} />
@@ -503,7 +553,9 @@ export function StudioPublicationControls({
                 {directive.socialTitle || title.trim() || "작품 제목"}
               </p>
               <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-3">
-                {directive.socialDescription || description.trim() || "작품 설명이 여기에 표시됩니다."}
+                {directive.socialDescription ||
+                  description.trim() ||
+                  "작품 설명이 여기에 표시됩니다."}
               </p>
             </div>
           </div>
@@ -537,18 +589,32 @@ export function StudioPublicationControls({
         </h3>
         {preflight.issues.length === 0 ? (
           <p className="mt-2 text-xs leading-relaxed text-good">
-            공개를 막는 문제가 없습니다. 최종 미리보기에서 독자 화면을 확인하세요.
+            공개를 막는 문제가 없습니다. 최종 미리보기에서 독자 화면을
+            확인하세요.
           </p>
         ) : (
           <ul className="mt-3 space-y-2">
             {preflight.issues.map((issue) => (
-              <li key={`${issue.code}:${issue.path}`} className="flex gap-2 text-xs leading-relaxed">
+              <li
+                key={`${issue.code}:${issue.path}`}
+                className="flex gap-2 text-xs leading-relaxed"
+              >
                 {issue.severity === "error" ? (
-                  <AlertTriangle size={13} className="mt-0.5 shrink-0 text-bad" />
+                  <AlertTriangle
+                    size={13}
+                    className="mt-0.5 shrink-0 text-bad"
+                  />
                 ) : (
-                  <FileWarning size={13} className="mt-0.5 shrink-0 text-warn" />
+                  <FileWarning
+                    size={13}
+                    className="mt-0.5 shrink-0 text-warn"
+                  />
                 )}
-                <span className={issue.severity === "error" ? "text-bad" : "text-fg-2"}>
+                <span
+                  className={
+                    issue.severity === "error" ? "text-bad" : "text-fg-2"
+                  }
+                >
                   {issue.message}
                 </span>
               </li>
@@ -559,7 +625,8 @@ export function StudioPublicationControls({
 
       <div className="sr-only" aria-live="polite">
         댓글 {directive.comments === "open" ? "허용" : "차단"}, 리믹스{" "}
-        {directive.allowRemix ? "허용" : "차단"}, 독자 등급 {ratingLabel(directive.contentRating)}
+        {directive.allowRemix ? "허용" : "차단"}, 독자 등급{" "}
+        {ratingLabel(directive.contentRating)}
         {directive.searchIndexing ? ", 검색 색인 허용" : ", 검색 색인 차단"}
       </div>
     </div>
