@@ -12,12 +12,12 @@ permissions:
 
 concurrency:
   group: studio-drawing-input-lab-once
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply-and-verify:
     if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-24.04
+    runs-on: macos-15-intel
     timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: feat/studio-drawing-input-lab-20260909
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: pnpm/action-setup@v6
 
