@@ -43,9 +43,16 @@ export const EMPTY_STUDIO_SAVED_SELECTION_LIBRARY: StudioSavedSelectionLibrary =
   items: Object.freeze([]),
 });
 
+function replaceControlCharacters(value: string): string {
+  return Array.from(value, (character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint <= 0x1f || codePoint === 0x7f ? " " : character;
+  }).join("");
+}
+
 function sanitizeText(value: unknown, maxLength: number): string {
   if (typeof value !== "string") return "";
-  return value.replace(/[\u0000-\u001f\u007f]/gu, " ").trim().slice(0, maxLength);
+  return replaceControlCharacters(value).trim().slice(0, maxLength);
 }
 
 function sanitizeId(value: unknown): string {
