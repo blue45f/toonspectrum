@@ -365,6 +365,7 @@ export interface StudioInspectorAsideProps {
   puppetWarpBusy: boolean;
   puppetWarpPins: PuppetPin[];
   quickShapeActive: boolean;
+  onCorrectCurrentStroke?: () => void;
   recentColors: string[];
   rightResize: Resizable;
   savedBrushes: StudioSavedBrush[];

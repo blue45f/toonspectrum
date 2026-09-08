@@ -209,6 +209,7 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
     quickMaskTintColor,
     quickMaskTintOpacity,
     quickShapeActive,
+    onCorrectCurrentStroke,
     recentColors,
     refreshQuickMaskTint,
     resetPixelSelectionHistoryState,
@@ -621,6 +622,7 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
           puppetWarpBusy={puppetWarpBusy}
           puppetWarpPins={puppetWarpPins}
           quickShapeActive={quickShapeActive}
+          onCorrectCurrentStroke={onCorrectCurrentStroke}
           recentColors={recentColors}
           rightResize={rightResize}
           savedBrushes={savedBrushes}

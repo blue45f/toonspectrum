@@ -1,4 +1,5 @@
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
+import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
 /** Editor host extracted from the /studio page entry.
  * StudioPage.tsx stays the route-facing re-export so the lazy Studio chunk
  * still starts at that path; this file owns remaining editor session logic.
@@ -18437,6 +18438,7 @@ const puppetWarpArmed =
     let handler: ((e: KeyboardEvent) => void) | null = null;
     shortcutRef.current = (e: KeyboardEvent) => {
       handler ??= buildStudioShortcutHandler({
+        openSmartShapeEditor,
         activateDrawToolWithProperties,
         activatePixelSelectionToolFromInspector,
         activatePrimaryCanvasTool,
@@ -25281,9 +25283,23 @@ function clearSelectionForEdit() {
   function handleImportProjectArchive(event: React.ChangeEvent<HTMLInputElement>) {
     return projectArchiveOrchestration.handleImportProjectArchive(event);
   }
+  const { openSmartShapeEditor, smartShapeDialog } = useStudioSmartShapeEditing({
+    elements, selectedId, currentPageId: () => currentPageIdRef.current,
+    isDrawing: canvasEditingGestureIsOwned,
+    isLocked: (stroke) => collaborationAccessRef.current.locked || isEffectivelyLocked(stroke, groups) || activeSurfaceReviewLocked,
+    captureTicket: captureStudioMutationTicket, canApply: canApplyStudioMutation, commit,
+    select: (id) => { setSelectedId(id); setMarqueeIds([]); },
+    closeMenu: () => setMenu(null), setError,
+    onApplied: (stroke) => {
+      activatePrimaryCanvasTool("select");
+      setNodeEditTool("move");
+      announceDrawingShortcut(stroke.smartShape ? "도형을 확정했어요. 캔버스의 점을 끌어 편집하세요." : "원래 자유선을 복원했어요.");
+    },
+  });
   // 메뉴 항목 onSelect 클로저가 참조하는 에디터 핸들러의 안정 번들 — 그룹 배열 useMemo가
   // 렌더마다 무효화되지 않게 하고, 이벤트 시점엔 항상 최신 클로저를 호출한다.
   const studioMainMenuActions = useStudioStableHandlers({
+    openSmartShapeEditor,
     activatePrimaryCanvasTool,
     addPage,
     addText,
@@ -25760,6 +25776,7 @@ function clearSelectionForEdit() {
           selectDrawMode: (mode) => {
             studioMainMenuActions.activatePrimaryCanvasTool("draw", mode);
           },
+          correctCurrentStroke: studioMainMenuActions.openSmartShapeEditor,
           enableSmartShape: () => {
             studioMainMenuActions.activatePrimaryCanvasTool("draw", "pen");
             setQuickShapeActive(true);
@@ -25901,6 +25918,7 @@ function clearSelectionForEdit() {
     "quick-mask": !quickActionsDisabledActions.has("quick-mask"),
     "wet-mix": !quickActionsDisabledActions.has("wet-mix"),
     "dodge-burn": !quickActionsDisabledActions.has("dodge-burn"),
+    "correct-current-stroke": !activePageMutationLocked,
   };
   const quickAccessCatalog: readonly StudioQuickAccessCommandMeta[] =
     quickAccessIntegration?.buildStudioQuickAccessCommandCatalog(
@@ -25919,6 +25937,8 @@ function clearSelectionForEdit() {
       executeQuickAction(intent.action);
     } else if (intent.kind === "save-draft") {
       void handleSave("draft");
+    } else if (intent.kind === "correct-current-stroke") {
+      openSmartShapeEditor();
     } else if (intent.kind === "pixel-transform") {
       openPixelSelectionTransform();
     }
@@ -28846,6 +28866,7 @@ function clearSelectionForEdit() {
       quickMaskTintCanvas={quickMaskTintCanvas}
       quickMaskTintColor={quickMaskTintColor}
       quickMaskTintOpacity={quickMaskTintOpacity}
+      onCorrectCurrentStroke={studioMainMenuActions.openSmartShapeEditor}
       quickShapeActive={quickShapeActive}
       railMoreOpen={railMoreOpen}
       rasterFavoriteOnly={rasterFavoriteOnly}
@@ -29417,6 +29438,7 @@ function clearSelectionForEdit() {
         onFlushWorkspacePersistence={flushHybridDccWorkspacePersistence}
       >
         {editorSurface}
+        {smartShapeDialog}
         <StudioWebtoonAssistantModal
           open={webtoonAssistantOpen}
           onClose={() => setWebtoonAssistantOpen(false)}

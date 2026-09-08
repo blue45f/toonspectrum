@@ -7,6 +7,8 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { flushSync } from "react-dom";
 
+import { moveStudioSmartShapePoint } from "../studio-smart-shape-edit";
+
 import { resolveStudioCapturedBrushDynamicsPresetId } from "../brush/studio-brush-dynamics";
 import {
   advanceStudioBrushVelocityPressure,
@@ -511,7 +513,9 @@ export function bindStudioCuttoonStagePointersMove(
             const { x, y } = updateNodeDragMove(session, pos);
             scheduleNodeEditDraft({
               elId,
-              points: withPointMoved(el.points, session.pointIndex, x, y),
+              points: el.smartShape
+                ? moveStudioSmartShapePoint(el.points, session.pointIndex, x, y, Boolean(e.evt.shiftKey))
+                : withPointMoved(el.points, session.pointIndex, x, y),
               pressures: el.pressures ?? [],
             });
           } else if (session.tool === "width") {
