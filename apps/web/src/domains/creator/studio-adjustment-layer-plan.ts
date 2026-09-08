@@ -379,7 +379,7 @@ function normalizeStack(value: unknown, path: string): StudioAdjustmentStack {
     const entryPath = `${path}.entries[${index}]`;
     const entry = requireRecord(
       rawEntry,
-      new Set(["id", "engine", "enabled", "params"]),
+      new Set(["id", "engine", "enabled", "opacity", "params"]),
       entryPath,
       "INVALID_STACK",
     );
@@ -396,6 +396,7 @@ function normalizeStack(value: unknown, path: string): StudioAdjustmentStack {
       id,
       engine: entry.engine,
       enabled: entry.enabled,
+      ...(entry.opacity === undefined ? {} : { opacity: requireOpacity(entry.opacity, `${entryPath}.opacity`) }),
       params: normalizeParams(entry.params, `${entryPath}.params`),
     });
   });

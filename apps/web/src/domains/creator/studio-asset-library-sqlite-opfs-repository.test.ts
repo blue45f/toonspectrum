@@ -10,6 +10,7 @@ import {
   STUDIO_ASSET_LIBRARY_SQLITE_NAMESPACE,
   StudioAssetLibraryRepositoryError,
   type StudioAssetManifestEntry,
+  type StudioAssetLibraryRunExclusive,
 } from "./studio-asset-library-sqlite-opfs-repository";
 import { openStudioLocalDatabase } from "./studio-local-database";
 import { StudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
@@ -160,6 +161,91 @@ describe("Studio asset SQLite manifest + OPFS CAS authority", () => {
     await expect(repository.listReadOnly()).resolves.toEqual([saved]);
     expect(setOwnerRefs).not.toHaveBeenCalled();
     expect(sweep).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("preserves an in-flight revision when another tab lists assets (lost response: %s)", async (loseResponse) => {
+    const { database, fs, store, repository } = await fixture();
+    const original = await repository.save(saveInput(105));
+    const publicationStarted = Promise.withResolvers<void>();
+    const resumePublication = Promise.withResolvers<void>();
+    const readerRequestedLock = Promise.withResolvers<void>();
+    let notifyLockRequest = () => {};
+    let lockTail = Promise.resolve();
+    const runExclusive: StudioAssetLibraryRunExclusive = (task) => {
+      notifyLockRequest();
+      const result = lockTail.then(task, task);
+      lockTail = result.then(() => undefined, () => undefined);
+      return result;
+    };
+    const pausedDatabase = proxyDatabase(database, {
+      kvSet: async (...args) => {
+        publicationStarted.resolve();
+        await resumePublication.promise;
+        await database.kvSet(...args);
+        if (loseResponse) {
+          throw new StudioLocalDatabaseCommitOutcomeUnknownError("kvSet", new Error("lost response"));
+        }
+      },
+    });
+    const writer = createStudioAssetLibrarySqliteOpfsRepository({
+      acquireDatabase: async () => pausedDatabase,
+      acquireAssetStore: async () => store,
+      runExclusive,
+      createId: () => "new-immutable-revision",
+    });
+    const readerStore = createStudioOpfsAssetStore({ fs, graceMs: 0 });
+    const reader = createStudioAssetLibrarySqliteOpfsRepository({
+      acquireDatabase: async () => database,
+      acquireAssetStore: async () => readerStore,
+      runExclusive,
+    });
+    // Each tab has its own warm CAS index, not a shared in-process cache.
+    await expect(reader.list()).resolves.toEqual([original]);
+    const saving = writer.save(saveInput(106));
+    await publicationStarted.promise;
+    // The new blob is verified and protected, but SQLite still names only the old revision.
+    expect(await store.ownerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER)).toHaveLength(2);
+    notifyLockRequest = () => readerRequestedLock.resolve();
+    const listing = reader.list();
+    try {
+      // A fenced reader queues; the old implementation instead finishes a destructive sweep.
+      // Both paths release the writer without sleeps or a deadlock in the regression test.
+      await Promise.race([readerRequestedLock.promise, listing]);
+    } finally {
+      resumePublication.resolve();
+    }
+    const [saved] = await Promise.all([saving, listing]);
+    expect(await store.ownerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER)).toEqual([
+      original.contentHash,
+      saved.contentHash,
+    ].toSorted());
+
+    // Rebuild the CAS index cache and repository, as a newly opened tab does. Returning a save
+    // receipt is insufficient: the exact original and new bytes must still hydrate from storage.
+    const reopened = await fixture({ database, fs, store: createStudioOpfsAssetStore({ fs, graceMs: 0 }) });
+    const recovered = await reopened.repository.listReadOnly();
+    expect(recovered.find(({ id }) => id === saved.id)).toEqual(saved);
+    expect(recovered.find(({ id }) => id === original.id)).toEqual(original);
+    expect(await reopened.store.get(saved.contentHash, { verify: true })).toEqual(bytes("payload-106"));
+  });
+
+  it("keeps listing read-only when no cross-tab writer lock is available", async () => {
+    const { database, store, repository } = await fixture();
+    const saved = await repository.save(saveInput(107));
+    const unpublished = await store.put(bytes("pending-in-another-tab"), { mime: "image/png" });
+    const setOwnerRefs = vi.spyOn(store, "setOwnerRefs");
+    const sweep = vi.spyOn(store, "sweep");
+    const reader = createStudioAssetLibrarySqliteOpfsRepository({
+      acquireDatabase: async () => database,
+      acquireAssetStore: async () => store,
+      runExclusive: null,
+    });
+
+    await expect(reader.list()).resolves.toEqual([saved]);
+    expect(setOwnerRefs).not.toHaveBeenCalled();
+    expect(sweep).not.toHaveBeenCalled();
+    expect(await store.has(unpublished.ref.hash)).toBe(true);
+    await expect(reader.save(saveInput(108))).rejects.toMatchObject({ code: "unavailable" });
   });
 
   it("compare-deletes only an exact reference-import id + content hash", async () => {

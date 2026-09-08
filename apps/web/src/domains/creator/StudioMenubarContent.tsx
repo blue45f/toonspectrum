@@ -23,6 +23,7 @@ import {
   Scan,
   Send,
   Settings2,
+  Shapes,
   ShieldCheck,
   SlidersHorizontal,
   Redo2,
@@ -239,6 +240,7 @@ const MENUBAR_OVERFLOW_HINT = {
 
 /** Hints for command-bar-only surfaces. Ids are globally unique across every hint spec. */
 const COMMAND_BAR_HINTS = {
+  correctStroke: { id: "menubar-correct-stroke", title: "현재 스트로크 교정", description: "최근 펜 스트로크를 편집 가능한 도형으로 다듬습니다.", shortcut: "⌥⇧Q" },
   zoomFit: {
     id: "menubar-zoom-fit",
     title: "화면 폭 맞춤",
@@ -267,6 +269,7 @@ const COMMAND_BAR_COMMAND_LABELS: Readonly<Record<StudioCommandBarCommandId, str
   assets: MENUBAR_HINTS.assets.title,
   bubbles: MENUBAR_HINTS.bubbles.title,
   project: MENUBAR_HINTS.project.title,
+  "correct-current-stroke": COMMAND_BAR_HINTS.correctStroke.title,
 };
 
 /**
@@ -1250,9 +1253,14 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
 
   const sharedNonOwner = Boolean(sharedDocument && sharedDocument.role !== "owner");
   /** Every slot routes through a handler the fixed menubar controls already own. */
+  const correctionCommand = studioMainMenuGroups.flatMap((group) => group.items).find((item) => item.commandId === "brush.correct-current-stroke");
   const commandBarBindings: Readonly<
     Record<StudioCommandBarCommandId, StudioMenubarCommandBinding>
   > = {
+    "correct-current-stroke": {
+      label: COMMAND_BAR_COMMAND_LABELS["correct-current-stroke"], labelKey: "studio.commandBar.command.correct-current-stroke", icon: Shapes, hint: COMMAND_BAR_HINTS.correctStroke,
+      run: () => correctionCommand?.onSelect(), disabled: !correctionCommand || correctionCommand.disabled,
+    },
     undo: {
       label: COMMAND_BAR_COMMAND_LABELS.undo,
       labelKey: "studio.commandBar.command.undo",

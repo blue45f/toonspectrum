@@ -122,6 +122,7 @@ export function StudioInspectorDrawingSection({
     previewVanishingPointById,
     queueBrushDelete,
     quickShapeActive,
+    onCorrectCurrentStroke,
     recentBrushSizes,
     rememberRecentBrushSize,
     removeAdvancedRuler,
@@ -421,6 +422,7 @@ export function StudioInspectorDrawingSection({
                   <Suspense fallback={null}>
                     <StudioQuickShapePanel
                       active={quickShapeActive}
+                      onCorrectCurrentStroke={onCorrectCurrentStroke}
                       matchedKindLabel={
                         tool === "draw" && liveDraftShapeKind && liveDraftShapeKind !== "freehand"
                           ? (QUICKSHAPE_KIND_LABELS[liveDraftShapeKind] ?? null)

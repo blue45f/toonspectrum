@@ -159,6 +159,24 @@ async function openPullRequestsForBranch(repository, branch, token) {
   );
 }
 
+async function openPullRequestsTargetingBranch(repository, branch, token) {
+  return paginate(
+    `/repos/${repository.owner}/${repository.repo}/pulls?state=open&base=${encodeURIComponent(branch)}`,
+    token,
+  );
+}
+
+function preservePullRequestBase(branch, sha, pulls, report) {
+  if (pulls.length === 0) return false;
+  report.skipped.push({
+    branch,
+    sha,
+    reason: "open-pull-request-base",
+    pullRequests: pulls.map((pull) => pull.number),
+  });
+  return true;
+}
+
 async function exactMergedPullRequestForBranch(
   repository,
   branch,
@@ -258,7 +276,11 @@ async function inspectAndMaybeDelete( // NOSONAR javascript:S3776
     return;
   }
 
-  const openPulls = await openPullRequestsForBranch(repository, name, token);
+  const [openPulls, basePulls] = await Promise.all([
+    openPullRequestsForBranch(repository, name, token),
+    openPullRequestsTargetingBranch(repository, name, token),
+  ]);
+  if (preservePullRequestBase(name, currentSha, basePulls, report)) return;
   const nonDefaultPulls = openPulls.filter((pull) => pull.base?.ref !== defaultBranch);
   if (nonDefaultPulls.length > 0) {
     report.skipped.push({
@@ -270,7 +292,12 @@ async function inspectAndMaybeDelete( // NOSONAR javascript:S3776
     return;
   }
 
-  const verifiedSha = await currentRefSha(repository, name, token);
+  // A PR can start targeting this branch after the initial candidate inspection.
+  const [verifiedSha, latestBasePulls] = await Promise.all([
+    currentRefSha(repository, name, token),
+    openPullRequestsTargetingBranch(repository, name, token),
+  ]);
+  if (preservePullRequestBase(name, currentSha, latestBasePulls, report)) return;
   if (verifiedSha === null) {
     report.skipped.push({ branch: name, sha: currentSha, reason: "already-deleted" });
     return;

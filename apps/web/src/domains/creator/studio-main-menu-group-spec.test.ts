@@ -191,7 +191,8 @@ describe("§15.3 menu group spec", () => {
       // 항목이라 extras 가 아니라 partial 행에 머문다(rowsPartial 36 그대로) — 로케일별
       // 폰트/박스 오버라이드가 남아 present 로 올리지 않는다.
       // 2026-09-06: 별도 사용자 매뉴얼 문(help/user-manual, #794)은 §15.3 행이 없어 extras(38 → 39).
-      extras: 39,
+      // Recent-stroke correction is a shipped extra alongside the drawing-assist mode.
+      extras: 40,
     });
   });
 

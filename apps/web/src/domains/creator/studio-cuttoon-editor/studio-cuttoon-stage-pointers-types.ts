@@ -1,3 +1,5 @@
+import type { StudioNodeEditPointerSession } from "../vector/studio-node-edit-pointer-session";
+
 export type PixelSelectionActivationKind = string;
 export type StudioHokusaiPinnedLiveStroke = any;
 export type StudioLivingInkPinnedStroke = any;
@@ -185,7 +187,7 @@ export type StudioCuttoonStagePointersHost = {
   masterEditMode: any;
   masterEditModeRef: any;
   nodeEditDraft: any;
-  nodeEditDragRef: any;
+  nodeEditDragRef: { current: StudioNodeEditPointerSession | null };
   nodeEditRafRef: any;
   nodeEditTool: any;
   nodeRefsRef: any;

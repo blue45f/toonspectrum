@@ -260,7 +260,8 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     // 2026-09-03: 웹툰 창작 보조 센터 + AI 슈퍼 스위트 추가 (188 → 190).
     // 2026-09-03: 텍스트 ▸ 현지화 QA(넘침·문체·MQM 점수) 추가 (190 → 191).
     // 2026-09-04: 3D ▸ 캐릭터 셰이퍼(프리셋 우선 캐릭터 작업실) 추가 (191 → 192).
-    measuredCount: 192,
+    // 2026-09-08: editable recent-stroke correction.
+    measuredCount: 193,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -273,7 +274,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     file: "apps/web/src/domains/creator/studio-quick-access-integration.ts",
     declarationRef:
       "studio-quick-access-integration.ts:10-28 (STUDIO_QUICK_ACCESS_COMMAND_IDS)",
-    measuredCount: 18,
+    measuredCount: 19,
   },
   radial: {
     label: "라디얼 퀵 액션",
@@ -285,7 +286,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     label: "커스터마이즈 키맵",
     file: "apps/web/src/domains/creator/studio-app-settings.ts",
     declarationRef: "studio-app-settings.ts:82-117 (STUDIO_SHORTCUT_ACTIONS)",
-    measuredCount: 41,
+    measuredCount: 42,
   },
   help: {
     label: "단축키 도움말",
@@ -395,6 +396,7 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "brush/eraser",
   "brush/fill",
   "brush/smart-shape",
+  "brush/correct-current-stroke",
   "brush/preset-browser",
   "brush/brush-studio",
   "brush/natural-media",
@@ -1527,6 +1529,14 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("스마트 도형"), en("Smart shape")],
       aliases: [csp("도형"), ps("Shape Tool"), krita("Shape Tools"), procreate("QuickShape")],
       origins: [menu("brush/smart-shape")],
+    }),
+
+    defineCommand({
+      id: "brush.correct-current-stroke",
+      labels: [ko("현재 스트로크 교정"), en("Correct current stroke")],
+      aliases: [procreate("Edit Shape"), csp("도형 편집")],
+      shortcut: "⌥⇧Q",
+      origins: [menu("brush/correct-current-stroke", { shortcut: "⌥⇧Q" }), keymap("correct-current-stroke", { shortcut: "Alt+Shift+Q" }), quickAccess("correct-current-stroke", { shortcut: "⌥⇧Q" })],
     }),
 
     /* --------------------------------------------------------------- brush */

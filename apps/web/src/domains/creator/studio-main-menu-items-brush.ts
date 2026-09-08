@@ -93,6 +93,19 @@ export function buildStudioBrushMenuItems({
       },
     },
     {
+      id: "correct-current-stroke",
+      commandId: "brush.correct-current-stroke",
+      searchActivation: "execute",
+      shortcut: "⌥⇧Q",
+      label: "현재 스트로크 교정…",
+      icon: Shapes,
+      disabled: !ui.correctCurrentStroke,
+      unavailableReason: ui.correctCurrentStroke
+        ? undefined
+        : "현재 스트로크를 교정할 편집기가 연결되어 있지 않아요.",
+      onSelect: () => { ui.correctCurrentStroke?.(); },
+    },
+    {
       id: "preset-browser",
       commandId: "brush.preset-browser",
       label: "브러시 프리셋 목록…",

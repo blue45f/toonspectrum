@@ -68,6 +68,23 @@ describe("content usage authorization", () => {
       .toEqual({ allowed: true });
   });
 
+  it.each([
+    ["ai-input", "aiInput"],
+    ["ai-training", "aiTraining"],
+  ] as const)("requires the %s capability %s even when willUseForAi is false", (surface, permission) => {
+    const context: UsageContext = { ...usage, surface, willUseForAi: false };
+    const snapshot: RightsDecision = { ...rights, allowedSurfaces: [surface] };
+
+    for (const value of [false, null]) {
+      expect(authorizeContentUsage({ ...snapshot, [permission]: value }, context)).toEqual({
+        allowed: false,
+        reason: "SURFACE_NOT_ALLOWED",
+      });
+    }
+    expect(authorizeContentUsage({ ...snapshot, [permission]: true }, context))
+      .toEqual({ allowed: true });
+  });
+
   it.each(["research-board", "studio-reference"] as const)(
     "preserves %s reference use without download or import permissions",
     (surface) => {

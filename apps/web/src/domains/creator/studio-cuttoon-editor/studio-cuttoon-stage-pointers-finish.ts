@@ -6,6 +6,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { flushSync } from "react-dom";
+import { cancelStudioNodeEditPointer, ownsStudioNodeEditPointer } from "../vector/studio-node-edit-pointer-session";
 
 import { resolveStudioCapturedBrushDynamicsPresetId } from "../brush/studio-brush-dynamics";
 import {
@@ -762,6 +763,10 @@ export function bindStudioCuttoonStagePointersFinish(
   }
   function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
+    if (h.nodeEditDragRef.current) {
+      if (ownsStudioNodeEditPointer(h.nodeEditDragRef.current, pointerEvent)) cancelStudioNodeEditPointer(h);
+      return;
+    }
     hideBrushCursor();
     if (groupResizeRef.current) {
       cancelCanvasSelectionResize();

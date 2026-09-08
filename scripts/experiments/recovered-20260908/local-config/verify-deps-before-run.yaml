@@ -1,0 +1,3 @@
+# Historical local diagnostic option; this file is not loaded by pnpm.
+# Never copy this into the live workspace manifest as a default.
+verifyDepsBeforeRun: false

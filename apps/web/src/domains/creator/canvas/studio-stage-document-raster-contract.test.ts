@@ -672,7 +672,8 @@ describe("every stage raster read goes through a choke point", () => {
     const reads = runtimeSource.match(/\bstage\.toCanvas\(/gu) ?? [];
     expect(reads).toHaveLength(1);
     expect(runtimeSource.match(/captureStudioRasterAtExportScale\(stage,/gu) ?? []).toHaveLength(6);
-    expect(runtimeSource.match(/await captureReadyStageForPage\(/gu) ?? []).toHaveLength(6);
+    expect(runtimeSource.match(/await captureReadyStageForPage\(/gu) ?? []).toHaveLength(1);
+    expect(runtimeSource.match(/await capturePage\(/gu) ?? []).toHaveLength(6);
     expect(runtimeSource).toMatch(
       /encodeStudioRasterInterchangeAsync\([\s\S]*?\{\s*executionMode:\s*"worker"\s*\}\s*\)/u,
     );

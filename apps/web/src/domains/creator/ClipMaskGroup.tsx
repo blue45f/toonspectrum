@@ -20,8 +20,10 @@
  * UrlImage의 캐시 패턴(clearCache → cache → getLayer()?.batchDraw())을 그대로 따른다.
  * 순수 래퍼 — Konva/react-konva 외 의존 없음.
  */
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { Group } from "react-konva/lib/ReactKonvaCore";
+
+import { registerStudioRasterPresentationCache } from "./render/studio-raster-presentation-cache";
 
 import type Konva from "konva";
 import type { ReactNode } from "react";
@@ -48,11 +50,11 @@ export function ClipMaskGroup({
   // cacheKey가 바뀔 때(그리고 마운트 시)마다 그룹을 다시 캐시해 합성을 격리한다.
   // 마스크/콘텐츠가 비동기로 로드되는 이미지면 첫 캐시가 빈 비트맵을 잡으므로,
   // 잠시 동안 몇 번 더 재캐시해 늦게 도착한 이미지까지 마스크에 반영한다.
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
     const recache = () => {
       const node = ref.current;
-      if (cancelled || !node) return;
+      if (cancelled || !node) return false;
       node.clearCache();
       // 자식 이미지가 아직 로드 전이면 그룹 크기가 0 — 이때 cache()는 Konva 경고를 낸다.
       // 크기가 생긴 뒤(지연 재캐시)에만 캐시하고, 그 전엔 마스크 없이 그대로 렌더한다.
@@ -65,11 +67,14 @@ export function ClipMaskGroup({
         }
       }
       node.getLayer()?.batchDraw();
+      return node.isCached();
     };
+    const unregister = registerStudioRasterPresentationCache(ref.current, recache);
     recache();
     const timers = [120, 350, 700, 1200].map((ms) => globalThis.setTimeout(recache, ms));
     return () => {
       cancelled = true;
+      unregister();
       timers.forEach((t) => globalThis.clearTimeout(t));
     };
   }, [cacheKey]);

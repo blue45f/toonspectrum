@@ -1,0 +1,251 @@
+{
+  "filesScanned": 303,
+  "issueFiles": 11,
+  "errors": 21,
+  "issues": [
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/command-palette.tsx",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'infrastructure'",
+          "line": 44,
+          "column": 8,
+          "endLine": 44,
+          "endColumn": 40
+        }
+      ]
+    },
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/search-explorer.tsx",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'infrastructure'",
+          "line": 37,
+          "column": 81,
+          "endLine": 37,
+          "endColumn": 113
+        }
+      ]
+    },
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/site-header.tsx",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 9,
+          "column": 31,
+          "endLine": 9,
+          "endColumn": 78
+        },
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'app'",
+          "line": 17,
+          "column": 40,
+          "endLine": 17,
+          "endColumn": 77
+        }
+      ]
+    },
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/title-fan-works.tsx",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'infrastructure'",
+          "line": 8,
+          "column": 45,
+          "endLine": 8,
+          "endColumn": 78
+        }
+      ]
+    },
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference-hardening.test.ts",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 6,
+          "column": 63,
+          "endLine": 6,
+          "endColumn": 114
+        },
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 10,
+          "column": 8,
+          "endLine": 10,
+          "endColumn": 63
+        },
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 13,
+          "column": 64,
+          "endLine": 13,
+          "endColumn": 119
+        }
+      ]
+    },
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference-merge-readiness.test.ts",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'app'",
+          "line": 7,
+          "column": 27,
+          "endLine": 7,
+          "endColumn": 63
+        },
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 11,
+          "column": 8,
+          "endLine": 11,
+          "endColumn": 63
+        },
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 14,
+          "column": 55,
+          "endLine": 14,
+          "endColumn": 110
+        }
+      ]
+    },
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference-recovery.test.ts",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 8,
+          "column": 8,
+          "endLine": 8,
+          "endColumn": 62
+        },
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 9,
+          "column": 62,
+          "endLine": 9,
+          "endColumn": 117
+        },
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 12,
+          "column": 37,
+          "endLine": 12,
+          "endColumn": 91
+        },
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 13,
+          "column": 36,
+          "endLine": 13,
+          "endColumn": 91
+        }
+      ]
+    },
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference.test.ts",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 6,
+          "column": 82,
+          "endLine": 6,
+          "endColumn": 137
+        }
+      ]
+    },
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'app'",
+          "line": 6,
+          "column": 27,
+          "endLine": 6,
+          "endColumn": 63
+        }
+      ]
+    },
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/vite-migration.test.ts",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'app'",
+          "line": 6,
+          "column": 27,
+          "endLine": 6,
+          "endColumn": 63
+        },
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'infrastructure'",
+          "line": 7,
+          "column": 25,
+          "endLine": 7,
+          "endColumn": 54
+        },
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'infrastructure'",
+          "line": 8,
+          "column": 35,
+          "endLine": 8,
+          "endColumn": 77
+        }
+      ]
+    },
+    {
+      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/creator-marketplace-cloud-library-contract.test.ts",
+      "messages": [
+        {
+          "ruleId": "boundaries/element-types",
+          "severity": 2,
+          "message": "No rule allowing this dependency was found. File is of type 'shared'. Dependency is of type 'domains'",
+          "line": 5,
+          "column": 35,
+          "endLine": 5,
+          "endColumn": 72
+        }
+      ]
+    }
+  ]
+}

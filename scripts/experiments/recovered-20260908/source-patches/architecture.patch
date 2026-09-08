@@ -1,0 +1,3465 @@
+commit 0a630760455ad6ddc70e038caf86224861d42b1c
+Author:     hjunkim <blue45f@gmail.com>
+AuthorDate: Tue Sep 8 21:24:01 2026 +0900
+Commit:     hjunkim <blue45f@gmail.com>
+CommitDate: Tue Sep 8 21:24:01 2026 +0900
+
+    chore: salvage unique uncommitted work from toonspectrum-arch
+    
+    Source worktree: /Users/hjunkim/WebstormProjects/toonspectrum-arch
+    Source SHA: b6ad9db34b9b1d5c2567095aa7294449f2099fdb
+    Files: 110
+
+diff --git a/.dockerignore b/.dockerignore
+index 5ee809011..2a618a51f 100644
+--- a/.dockerignore
++++ b/.dockerignore
+@@ -4,7 +4,7 @@ node_modules
+ dist
+ **/dist
+ apps/api/dist
+-public/data
++apps/web/public
+ .git
+ .github
+ *.log
+@@ -14,3 +14,7 @@ public/data
+ .vercel
+ coverage
+ .DS_Store
++crates/**/target/
++docs/
++tests/
++e2e/
+diff --git a/.env.example b/.env.example
+index 7d1827c83..77dd1c40e 100644
+--- a/.env.example
++++ b/.env.example
+@@ -23,6 +23,7 @@ DATABASE_URL=
+ # ── 실시간 라이브 랭킹 설정(보존된 어댑터용) ──
+ # 현재 프론트 정적 카탈로그와 Nest /api/ranking 기본 경로는 disableLive=true라 스냅샷 산식만 사용합니다.
+ # live.ts 어댑터를 별도 운영 경로에서 다시 연결할 때만 아래 값을 켜세요.
++# 주의: 그 어댑터가 이 저장소에 없으므로 현재 아래 이름들을 읽는 코드는 하나도 없습니다.
+ WEBTOON_LIVE_REFRESH_MODE=off
+ # WEBTOON_LIVE_TTL_SECONDS=120
+ # WEBTOON_LIVE_REFRESH_INTERVAL_SECONDS=120
+@@ -76,7 +77,10 @@ WEBDEX_CRAWL_DELAY_MS=300
+ # NODE_ENV=development
+ # API_RUNTIME_ROLE=full       # 장기 Socket.IO 전용 호스트만 studio-live
+ # PORT=4001                  # 호스팅 플랫폼이 주입할 때는 직접 고정하지 않습니다.
++# vite dev 프록시가 /api 를 넘길 대상입니다. Nest 서버 자신은 이 이름을 읽지 않습니다.
+ NEST_API_URL=http://127.0.0.1:4001
++# Nest 서버가 실제로 바인딩하는 주소(apps/api/src/main.ts). 미설정 시 0.0.0.0.
++# NEST_API_HOST=0.0.0.0
+ NEST_API_PORT=4001
+ # API 접근을 허용할 운영 Origin(쉼표 구분). 로컬 Origin은 development에서 자동 허용.
+ API_CORS_ALLOWED_ORIGINS=
+@@ -290,16 +294,33 @@ VITE_CHANGELOGDESK_URL=
+ VITE_NOTIFYDESK_URL=
+ # VITE_NOTIFYDESK_PK=pk_demo
+ 
+-# ── 통합 로그인 (Firebase Auth — deskcloud-fleet-auth) ──
+-# 헤더 "회원" 진입점이 이메일/비밀번호 + 게스트(익명) 로그인을 제공합니다(기존 세션 로그인과 별개).
+-# Firebase 웹 apiKey 는 공개 식별자지만(보안은 Auth 규칙 + authorizedDomains), 시크릿 스캔 훅이
+-# AIza… 패턴을 차단하므로 절대 커밋하지 말고 .env.local(gitignored) + Vercel env 로만 주입하세요.
+-# 실제 값은 비커밋 보관소(~/.config/deskcloud-firebase.env)에서 복사합니다.
+-# apiKey/appId 미설정 시 런타임 인증이 비활성화됩니다(빌드/타입은 정상, 친절히 degrade).
+-VITE_FIREBASE_API_KEY=
+-VITE_FIREBASE_APP_ID=
+-VITE_FIREBASE_SENDER_ID=
+-VITE_FIREBASE_STORAGE_BUCKET=
+-# projectId / authDomain 은 비밀이 아니며 기본값(deskcloud-fleet-auth)이 있어 생략 가능합니다.
+-# VITE_FIREBASE_PROJECT_ID=deskcloud-fleet-auth
+-# VITE_FIREBASE_AUTH_DOMAIN=deskcloud-fleet-auth.firebaseapp.com
++# ── DeskCloud 인앱 위젯 ──
++# 위 3형제와 같은 방식으로 주입되는 네 번째 위젯입니다(apps/web/src/components/deskcloud-native/config.ts).
++VITE_ADDESK_URL=
++# VITE_ADDESK_PK=pk_demo
++
++# ── Studio 음악 생성 (apps/api StudioMusicModule) ──
++# 모듈은 app.module.ts 에 등록되어 출하되지만, 아래가 없으면 configuration-required 로 조용히 꺼집니다.
++# ELEVENLABS_API_KEY=
++# 조율용 UPSTASH_COORDINATION_* 과는 다른 두 번째 Upstash 인스턴스입니다.
++# UPSTASH_REDIS_REST_URL=
++# UPSTASH_REDIS_REST_TOKEN=
++# 아래 둘은 문자열 "true" 일 때만 켜집니다.
++# STUDIO_MUSIC_ENABLED=false
++# STUDIO_MUSIC_LICENSE_ACKNOWLEDGED=false
++# STUDIO_MUSIC_USER_DAILY_SECONDS=180
++# STUDIO_MUSIC_GLOBAL_DAILY_SECONDS=1200
++
++# ── Studio AI (OpenRouter) ──
++# 미설정 시 provider 가 configured:false 로 비활성화됩니다. vercel.json CSP 가 openrouter.ai 를 허용합니다.
++# OPENROUTER_API_KEY=
++# OPENROUTER_MODEL=stealth/ox-alpha
++# OPENROUTER_TIMEOUT_MS=
++
++# ── 트래픽 분석 ──
++# 방문자 해시 솔트. 미설정 시 AUTH_SESSION_SECRET → AUTH_STATE_SECRET 순으로 폴백하고,
++# 셋 다 없는 production 에서는 수집 엔드포인트가 503 을 반환합니다.
++# TRAFFIC_ANALYTICS_HASH_SECRET=
++# TRAFFIC_ANALYTICS_RETENTION_DAYS=
++# 프런트 수집은 기본 켜짐이라, 끄려면 명시적으로 false 를 넣어야 합니다.
++# VITE_TRAFFIC_ANALYTICS_ENABLED=true
+diff --git a/.github/workflows/studio-discovery-ux.yml b/.github/workflows/studio-discovery-ux.yml
+index c373b8578..ff6299e29 100644
+--- a/.github/workflows/studio-discovery-ux.yml
++++ b/.github/workflows/studio-discovery-ux.yml
+@@ -75,10 +75,17 @@ jobs:
+           cache: pnpm
+       - run: pnpm install --frozen-lockfile
+       - run: pnpm run build:bundle
++      # The brush verifier resolves the built Studio autosave SQLite module through
++      # `dist/.vite/manifest.json`. `.vite/` is a dotted directory, and upload-artifact
++      # drops hidden files unless told otherwise, so without this the manifest never
++      # reaches the browser job and every SQLite durability wait dies on ENOENT.
++      - name: Require the production manifest used by SQLite durability checks
++        run: test -s dist/.vite/manifest.json
+       - uses: actions/upload-artifact@v6
+         with:
+           name: studio-discovery-dist
+           path: dist
++          include-hidden-files: true
+           retention-days: 2
+ 
+   browser:
+@@ -110,6 +117,8 @@ jobs:
+         with:
+           name: studio-discovery-dist
+           path: dist
++      - name: Verify hidden manifest survived artifact transport
++        run: test -s dist/.vite/manifest.json
+       - name: Real component responsive keyboard and production editor integration
+         if: matrix.suite == 'discovery'
+         run: pnpm exec tsx scripts/verify-studio-discovery-ux.mts
+diff --git a/.gitignore b/.gitignore
+index 280797331..84858d3c3 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -104,7 +104,7 @@ test-accounts.local.*
+ /*.jpg
+ 
+ # cargo build artifacts
+-crates/*/target/
++crates/**/target/
+ 
+ # Local AI assistant sessions & configs
+ /.continue/
+@@ -121,3 +121,7 @@ crates/*/target/
+ *.swp
+ *.swo
+ *~
++dist-feedback-review/
++playwright-report/
++reference-playwright-report/
++reference-test-results/
+diff --git a/apps/api/src/config/vercel-security-headers.test.ts b/apps/api/src/config/vercel-security-headers.test.ts
+index e04c310a4..daf20bfd3 100644
+--- a/apps/api/src/config/vercel-security-headers.test.ts
++++ b/apps/api/src/config/vercel-security-headers.test.ts
+@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
+ import { describe, expect, it } from "vitest";
+ 
+ const VERCEL_CONFIG_URL = new URL("../../../../vercel.json", import.meta.url);
+-const INDEX_HTML_URL = new URL("../../../../index.html", import.meta.url);
++// The Vite HTML entry moved from the repository root to `apps/web/index.html` in the
++// 2026-09 apps/web move; `vercel.json` above is still workspace-root infrastructure.
++const INDEX_HTML_URL = new URL("../../../../apps/web/index.html", import.meta.url);
+ 
+ type Header = Readonly<{ key: string; value: string }>;
+ type VercelConfig = Readonly<{
+diff --git a/apps/web/src/app/App.tsx b/apps/web/src/app/App.tsx
+index 3b97a61ac..9facd89fb 100644
+--- a/apps/web/src/app/App.tsx
++++ b/apps/web/src/app/App.tsx
+@@ -20,7 +20,7 @@ const BackToTop = lazy(() =>
+   })),
+ );
+ const DeskCloudMounts = lazy(() =>
+-  import("@/src/components/deskcloud-native/DeskCloudMounts").then((mod) => ({
++  import("@/components/deskcloud-native/DeskCloudMounts").then((mod) => ({
+     default: mod.DeskCloudMounts,
+   })),
+ );
+diff --git a/apps/web/src/app/AppShell.tsx b/apps/web/src/app/AppShell.tsx
+index 51ff454de..b45322f64 100644
+--- a/apps/web/src/app/AppShell.tsx
++++ b/apps/web/src/app/AppShell.tsx
+@@ -11,7 +11,7 @@ import { pingVisit } from "@/shared/lib/visits-api";
+ import {
+   isStudioRoutePathname,
+   shouldPreserveStudioRouteLifecycle,
+-} from "@/src/domains/creator/studio-workspace-route";
++} from "@/domains/creator/studio-workspace-route";
+ 
+ // 공용 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역에서 한 번만 import 합니다.
+ import "@toonspectrum/core/fx/fx.css";
+diff --git a/apps/web/src/app/app-shell-splash.ts b/apps/web/src/app/app-shell-splash.ts
+index 8f90cb9ba..4d1d7ba1e 100644
+--- a/apps/web/src/app/app-shell-splash.ts
++++ b/apps/web/src/app/app-shell-splash.ts
+@@ -1,4 +1,4 @@
+-import { resolveStudioRoute } from "@/src/domains/creator/studio-router/studio-route-manifest";
++import { resolveStudioRoute } from "@/domains/creator/studio-router/studio-route-manifest";
+ 
+ /**
+  * 전용 컷툰 편집기는 자체 풀스크린 셸과 로딩 상태를 소유한다. 앱 인트로를 그 위에 다시
+diff --git a/apps/web/src/app/routes/app-route-title-ownership.ts b/apps/web/src/app/routes/app-route-title-ownership.ts
+index eee6486d3..c804887bc 100644
+--- a/apps/web/src/app/routes/app-route-title-ownership.ts
++++ b/apps/web/src/app/routes/app-route-title-ownership.ts
+@@ -1,4 +1,4 @@
+-import { studioRouteOwnsDocumentTitle } from "@/src/domains/creator/studio-router/studio-route-manifest";
++import { studioRouteOwnsDocumentTitle } from "@/domains/creator/studio-router/studio-route-manifest";
+ 
+ export interface AppRouteTitleLocation {
+   readonly pathname: string;
+diff --git a/apps/web/src/app/routes/groups/admin.routes.tsx b/apps/web/src/app/routes/groups/admin.routes.tsx
+index 71ecf4b82..9634ad9c6 100644
+--- a/apps/web/src/app/routes/groups/admin.routes.tsx
++++ b/apps/web/src/app/routes/groups/admin.routes.tsx
+@@ -3,19 +3,19 @@ import { defineAppRoutes } from "../app-route-definition";
+ import { lazyRetry } from "@/shared/lib/lazy-retry";
+ 
+ const AdminPage = lazyRetry(
+-  () => import("@/src/domains/admin/AdminPage").then((module) => ({
++  () => import("@/domains/admin/AdminPage").then((module) => ({
+     default: module.AdminPage,
+   })),
+   "AdminPage",
+ );
+ const AdminCommunityPage = lazyRetry(
+-  () => import("@/src/domains/admin/AdminCommunityPage").then((module) => ({
++  () => import("@/domains/admin/AdminCommunityPage").then((module) => ({
+     default: module.AdminCommunityPage,
+   })),
+   "AdminCommunityPage",
+ );
+ const AdminMembersPage = lazyRetry(
+-  () => import("@/src/domains/admin/AdminMembersPage").then((module) => ({
++  () => import("@/domains/admin/AdminMembersPage").then((module) => ({
+     default: module.AdminMembersPage,
+   })),
+   "AdminMembersPage",
+diff --git a/apps/web/src/app/routes/groups/creator-resources.routes.tsx b/apps/web/src/app/routes/groups/creator-resources.routes.tsx
+index fc2505563..ab2f5ba1a 100644
+--- a/apps/web/src/app/routes/groups/creator-resources.routes.tsx
++++ b/apps/web/src/app/routes/groups/creator-resources.routes.tsx
+@@ -4,14 +4,14 @@ import { defineAppRoutes } from "../app-route-definition";
+ 
+ import { lazyRetry } from "@/shared/lib/lazy-retry";
+ 
+-const CreatorHubPage = lazyRetry(() => import("@/src/domains/creator-resources/CreatorHubPage").then((module) => ({ default: module.CreatorHubPage })), "CreatorHubPage");
+-const OpportunitiesPage = lazyRetry(() => import("@/src/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.OpportunitiesPage })), "OpportunitiesPage");
+-const ReferencesPage = lazyRetry(() => import("@/src/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.ReferencesPage })), "ReferencesPage");
+-const WorksPage = lazyRetry(() => import("@/src/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.WorksPage })), "WorksPage");
+-const RecipesPage = lazyRetry(() => import("@/src/domains/creator-resources/RecipesPage").then((module) => ({ default: module.RecipesPage })), "RecipesPage");
+-const StoryLabPage = lazyRetry(() => import("@/src/domains/creator-resources/StoryLabPage").then((module) => ({ default: module.StoryLabPage })), "StoryLabPage");
+-const PublishingPage = lazyRetry(() => import("@/src/domains/creator-resources/PublishingPage").then((module) => ({ default: module.PublishingPage })), "PublishingPage");
+-const SourcesPage = lazyRetry(() => import("@/src/domains/creator-resources/SourcesPage").then((module) => ({ default: module.SourcesPage })), "SourcesPage");
++const CreatorHubPage = lazyRetry(() => import("@/domains/creator-resources/CreatorHubPage").then((module) => ({ default: module.CreatorHubPage })), "CreatorHubPage");
++const OpportunitiesPage = lazyRetry(() => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.OpportunitiesPage })), "OpportunitiesPage");
++const ReferencesPage = lazyRetry(() => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.ReferencesPage })), "ReferencesPage");
++const WorksPage = lazyRetry(() => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.WorksPage })), "WorksPage");
++const RecipesPage = lazyRetry(() => import("@/domains/creator-resources/RecipesPage").then((module) => ({ default: module.RecipesPage })), "RecipesPage");
++const StoryLabPage = lazyRetry(() => import("@/domains/creator-resources/StoryLabPage").then((module) => ({ default: module.StoryLabPage })), "StoryLabPage");
++const PublishingPage = lazyRetry(() => import("@/domains/creator-resources/PublishingPage").then((module) => ({ default: module.PublishingPage })), "PublishingPage");
++const SourcesPage = lazyRetry(() => import("@/domains/creator-resources/SourcesPage").then((module) => ({ default: module.SourcesPage })), "SourcesPage");
+ 
+ export const creatorResourcesRoutes = defineAppRoutes([
+   { id: "resources-hub", path: "/creator-hub", element: <CreatorHubPage /> },
+diff --git a/apps/web/src/app/routes/groups/creator.routes.tsx b/apps/web/src/app/routes/groups/creator.routes.tsx
+index 48ff55c58..a1f310621 100644
+--- a/apps/web/src/app/routes/groups/creator.routes.tsx
++++ b/apps/web/src/app/routes/groups/creator.routes.tsx
+@@ -1,34 +1,34 @@
+ import { defineAppRoutes } from "../app-route-definition";
+ 
+ import { lazyRetry } from "@/shared/lib/lazy-retry";
+-import { loadStudioI18nDictionaries } from "@/src/domains/creator/studio-i18n-loader";
++import { loadStudioI18nDictionaries } from "@/domains/creator/studio-i18n-loader";
+ 
+ const StudioMusicPage = lazyRetry(
+-  () => import("@/src/domains/creator/music/StudioMusicPage").then((module) => ({ default: module.StudioMusicPage })),
++  () => import("@/domains/creator/music/StudioMusicPage").then((module) => ({ default: module.StudioMusicPage })),
+   "StudioMusicPage",
+ );
+ const CreateGalleryPage = lazyRetry(
+-  () => import("@/src/domains/creator/CreateGalleryPage").then((module) => ({ default: module.CreateGalleryPage })),
++  () => import("@/domains/creator/CreateGalleryPage").then((module) => ({ default: module.CreateGalleryPage })),
+   "CreateGalleryPage",
+ );
+ const CreateWorkPage = lazyRetry(
+-  () => import("@/src/domains/creator/CreateWorkPage").then((module) => ({ default: module.CreateWorkPage })),
++  () => import("@/domains/creator/CreateWorkPage").then((module) => ({ default: module.CreateWorkPage })),
+   "CreateWorkPage",
+ );
+ const CreateSeriesPage = lazyRetry(
+-  () => import("@/src/domains/creator/CreateSeriesPage").then((module) => ({ default: module.CreateSeriesPage })),
++  () => import("@/domains/creator/CreateSeriesPage").then((module) => ({ default: module.CreateSeriesPage })),
+   "CreateSeriesPage",
+ );
+ const CreateChallengesPage = lazyRetry(
+-  () => import("@/src/domains/creator/CreateChallengesPage").then((module) => ({ default: module.CreateChallengesPage })),
++  () => import("@/domains/creator/CreateChallengesPage").then((module) => ({ default: module.CreateChallengesPage })),
+   "CreateChallengesPage",
+ );
+ const StudioPromoPage = lazyRetry(
+-  () => import("@/src/domains/creator/promo/StudioPromoPage").then((module) => ({ default: module.StudioPromoPage })),
++  () => import("@/domains/creator/promo/StudioPromoPage").then((module) => ({ default: module.StudioPromoPage })),
+   "StudioPromoPage",
+ );
+ const CharacterShaperLandingPage = lazyRetry(
+-  () => import("@/src/domains/creator/CharacterShaperLandingPage").then((module) => ({
++  () => import("@/domains/creator/CharacterShaperLandingPage").then((module) => ({
+     default: module.CharacterShaperLandingPage,
+   })),
+   "CharacterShaperLandingPage",
+@@ -36,7 +36,7 @@ const CharacterShaperLandingPage = lazyRetry(
+ const StudioBrushLabPage = lazyRetry(
+   async () => {
+     const [module] = await Promise.all([
+-      import("@/src/domains/creator/brush-lab/StudioBrushLabPage"),
++      import("@/domains/creator/brush-lab/StudioBrushLabPage"),
+       loadStudioI18nDictionaries(),
+     ]);
+     return { default: module.StudioBrushLabPage };
+@@ -44,12 +44,12 @@ const StudioBrushLabPage = lazyRetry(
+   "StudioBrushLabPage",
+ );
+ const LearnPage = lazyRetry(
+-  () => import("@/src/domains/learn/LearnPage").then((module) => ({ default: module.LearnPage })),
++  () => import("@/domains/learn/LearnPage").then((module) => ({ default: module.LearnPage })),
+   "LearnPage",
+ );
+ // Public reference pages must not initialize the editor or its dictionaries/GPU engines.
+ const StudioManualPage = lazyRetry(
+-  () => import("@/src/domains/creator/manual/StudioManualPage").then((module) => ({
++  () => import("@/domains/creator/manual/StudioManualPage").then((module) => ({
+     default: module.StudioManualPage,
+   })),
+   "StudioManualPage",
+@@ -57,7 +57,7 @@ const StudioManualPage = lazyRetry(
+ const StudioRouter = lazyRetry(
+   async () => {
+     const [module] = await Promise.all([
+-      import("@/src/domains/creator/studio-router/StudioRouter"),
++      import("@/domains/creator/studio-router/StudioRouter"),
+       loadStudioI18nDictionaries(),
+     ]);
+     return { default: module.StudioRouter };
+diff --git a/apps/web/src/app/routes/groups/legal.routes.tsx b/apps/web/src/app/routes/groups/legal.routes.tsx
+index f3516cda1..96238adb8 100644
+--- a/apps/web/src/app/routes/groups/legal.routes.tsx
++++ b/apps/web/src/app/routes/groups/legal.routes.tsx
+@@ -3,55 +3,55 @@ import { defineAppRoutes } from "../app-route-definition";
+ import { lazyRetry } from "@/shared/lib/lazy-retry";
+ 
+ const AboutPage = lazyRetry(
+-  () => import("@/src/domains/legal/AboutPage").then((module) => ({
++  () => import("@/domains/legal/AboutPage").then((module) => ({
+     default: module.AboutPage,
+   })),
+   "AboutPage",
+ );
+ const DesignSystemPage = lazyRetry(
+-  () => import("@/src/domains/legal/DesignSystemPage").then((module) => ({
++  () => import("@/domains/legal/DesignSystemPage").then((module) => ({
+     default: module.DesignSystemPage,
+   })),
+   "DesignSystemPage",
+ );
+ const SitemapPage = lazyRetry(
+-  () => import("@/src/domains/legal/SitemapPage").then((module) => ({
++  () => import("@/domains/legal/SitemapPage").then((module) => ({
+     default: module.SitemapPage,
+   })),
+   "SitemapPage",
+ );
+ const CopyrightPage = lazyRetry(
+-  () => import("@/src/domains/legal/CopyrightPage").then((module) => ({
++  () => import("@/domains/legal/CopyrightPage").then((module) => ({
+     default: module.CopyrightPage,
+   })),
+   "CopyrightPage",
+ );
+ const TermsPage = lazyRetry(
+-  () => import("@/src/domains/legal/PolicyPage").then((module) => ({
++  () => import("@/domains/legal/PolicyPage").then((module) => ({
+     default: module.TermsPage,
+   })),
+   "TermsPage",
+ );
+ const PrivacyPage = lazyRetry(
+-  () => import("@/src/domains/legal/PolicyPage").then((module) => ({
++  () => import("@/domains/legal/PolicyPage").then((module) => ({
+     default: module.PrivacyPage,
+   })),
+   "PrivacyPage",
+ );
+ const ContactPage = lazyRetry(
+-  () => import("@/src/domains/legal/ContactPage").then((module) => ({
++  () => import("@/domains/legal/ContactPage").then((module) => ({
+     default: module.ContactPage,
+   })),
+   "ContactPage",
+ );
+ const SupportPage = lazyRetry(
+-  () => import("@/src/domains/legal/SupportPage").then((module) => ({
++  () => import("@/domains/legal/SupportPage").then((module) => ({
+     default: module.SupportPage,
+   })),
+   "SupportPage",
+ );
+ const FeedbackPage = lazyRetry(
+-  () => import("@/src/domains/legal/FeedbackPage").then((module) => ({
++  () => import("@/domains/legal/FeedbackPage").then((module) => ({
+     default: module.FeedbackPage,
+   })),
+   "FeedbackPage",
+diff --git a/apps/web/src/app/routes/groups/market.routes.tsx b/apps/web/src/app/routes/groups/market.routes.tsx
+index 8b768e968..a54d3a907 100644
+--- a/apps/web/src/app/routes/groups/market.routes.tsx
++++ b/apps/web/src/app/routes/groups/market.routes.tsx
+@@ -3,35 +3,35 @@ import { defineAppRoutes } from "../app-route-definition";
+ import { lazyRetry } from "@/shared/lib/lazy-retry";
+ 
+ const MarketHomePage = lazyRetry(
+-  () => import("@/src/domains/market/pages/MarketHomePage").then((module) => ({ default: module.MarketHomePage })),
++  () => import("@/domains/market/pages/MarketHomePage").then((module) => ({ default: module.MarketHomePage })),
+   "MarketHomePage",
+ );
+ const MarketBrowsePage = lazyRetry(
+-  () => import("@/src/domains/market/pages/MarketBrowsePage").then((module) => ({ default: module.MarketBrowsePage })),
++  () => import("@/domains/market/pages/MarketBrowsePage").then((module) => ({ default: module.MarketBrowsePage })),
+   "MarketBrowsePage",
+ );
+ const MarketResourceDetailPage = lazyRetry(
+-  () => import("@/src/domains/market/pages/MarketResourceDetailPage").then((module) => ({ default: module.MarketResourceDetailPage })),
++  () => import("@/domains/market/pages/MarketResourceDetailPage").then((module) => ({ default: module.MarketResourceDetailPage })),
+   "MarketResourceDetailPage",
+ );
+ const MarketPublishPage = lazyRetry(
+-  () => import("@/src/domains/market/pages/MarketPublishPage").then((module) => ({ default: module.MarketPublishPage })),
++  () => import("@/domains/market/pages/MarketPublishPage").then((module) => ({ default: module.MarketPublishPage })),
+   "MarketPublishPage",
+ );
+ const MarketManagePage = lazyRetry(
+-  () => import("@/src/domains/market/pages/MarketManagePage").then((module) => ({ default: module.MarketManagePage })),
++  () => import("@/domains/market/pages/MarketManagePage").then((module) => ({ default: module.MarketManagePage })),
+   "MarketManagePage",
+ );
+ const MarketLibraryPage = lazyRetry(
+-  () => import("@/src/domains/market/pages/MarketLibraryPage").then((module) => ({ default: module.MarketLibraryPage })),
++  () => import("@/domains/market/pages/MarketLibraryPage").then((module) => ({ default: module.MarketLibraryPage })),
+   "MarketLibraryPage",
+ );
+ const MarketWishlistPage = lazyRetry(
+-  () => import("@/src/domains/market/pages/MarketWishlistPage").then((module) => ({ default: module.MarketWishlistPage })),
++  () => import("@/domains/market/pages/MarketWishlistPage").then((module) => ({ default: module.MarketWishlistPage })),
+   "MarketWishlistPage",
+ );
+ const MarketComparePage = lazyRetry(
+-  () => import("@/src/domains/market/pages/MarketComparePage").then((module) => ({ default: module.MarketComparePage })),
++  () => import("@/domains/market/pages/MarketComparePage").then((module) => ({ default: module.MarketComparePage })),
+   "MarketComparePage",
+ );
+ 
+diff --git a/apps/web/src/app/routes/route-stage.tsx b/apps/web/src/app/routes/route-stage.tsx
+index bfaab8739..5cbc9e735 100644
+--- a/apps/web/src/app/routes/route-stage.tsx
++++ b/apps/web/src/app/routes/route-stage.tsx
+@@ -1,11 +1,11 @@
+ import { useState, type AnimationEvent, type ReactNode } from "react";
+ 
+ import { cn } from "@/shared/lib/utils";
+-import { resolveStudioRoute } from "@/src/domains/creator/studio-router/studio-route-manifest";
++import { resolveStudioRoute } from "@/domains/creator/studio-router/studio-route-manifest";
+ import {
+   isStudioRoutePathname,
+   studioRouteStageKey,
+-} from "@/src/domains/creator/studio-workspace-route";
++} from "@/domains/creator/studio-workspace-route";
+ 
+ interface RouteStageProps {
+   pathname: string;
+diff --git a/apps/web/src/app/studio-immersive-shell.test.ts b/apps/web/src/app/studio-immersive-shell.test.ts
+index 107aac210..0e512cfec 100644
+--- a/apps/web/src/app/studio-immersive-shell.test.ts
++++ b/apps/web/src/app/studio-immersive-shell.test.ts
+@@ -5,7 +5,7 @@
+ import { describe, expect, it, beforeEach } from "vitest";
+ 
+ import { useUi } from "@/shared/lib/ui-store";
+-import { isImmersiveMobileRoute } from "@/src/app/routes/immersive-mobile-route";
++import { isImmersiveMobileRoute } from "@/app/routes/immersive-mobile-route";
+ 
+ describe("studio immersive shell", () => {
+   beforeEach(() => {
+diff --git a/apps/web/src/domains/admin/components/AdminQuickPalette.tsx b/apps/web/src/domains/admin/components/AdminQuickPalette.tsx
+index 856b920d4..0227550f5 100644
+--- a/apps/web/src/domains/admin/components/AdminQuickPalette.tsx
++++ b/apps/web/src/domains/admin/components/AdminQuickPalette.tsx
+@@ -26,7 +26,7 @@ import {
+ import { useAdminToast } from "./use-admin-toast";
+ 
+ import { useT } from "@/shared/lib/i18n";
+-import { useRouter } from "@/src/compat/navigation";
++import { useRouter } from "@/compat/navigation";
+ 
+ interface AdminQuickPaletteProps {
+   userId: string;
+diff --git a/apps/web/src/domains/admin/components/admin-client.ts b/apps/web/src/domains/admin/components/admin-client.ts
+index 9b577df87..756e77faa 100644
+--- a/apps/web/src/domains/admin/components/admin-client.ts
++++ b/apps/web/src/domains/admin/components/admin-client.ts
+@@ -1,5 +1,5 @@
+ // 관리자 API(Nest /api/admin/*) 공용 클라이언트 — HttpOnly 쿠키 인증을 공유한다.
+-import { api, apiPath, HTTPError } from "@/src/infrastructure/api";
++import { api, apiPath, HTTPError } from "@/infrastructure/api";
+ 
+ export interface AdminMe {
+   id: string;
+diff --git a/apps/web/src/domains/admin/components/admin-gate-state.ts b/apps/web/src/domains/admin/components/admin-gate-state.ts
+index b91fc0bf2..bd3c7fafc 100644
+--- a/apps/web/src/domains/admin/components/admin-gate-state.ts
++++ b/apps/web/src/domains/admin/components/admin-gate-state.ts
+@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
+ 
+ import { adminFetch, type AdminApiError, type AdminMe } from "./admin-client";
+ 
+-import { useSession } from "@/src/compat/auth-session-store";
++import { useSession } from "@/compat/auth-session-store";
+ 
+ // 관리자 콘솔 진입 게이트 — /admin과 분할 라우트(/admin/community, /admin/members)가 공유한다.
+ export type AdminGate =
+diff --git a/apps/web/src/domains/catalog/references/ReferencePage.tsx b/apps/web/src/domains/catalog/references/ReferencePage.tsx
+index 0820ac4d2..204f2c17e 100644
+--- a/apps/web/src/domains/catalog/references/ReferencePage.tsx
++++ b/apps/web/src/domains/catalog/references/ReferencePage.tsx
+@@ -21,7 +21,7 @@ import type { FormEvent } from "react";
+ 
+ import { useT } from "@/shared/lib/i18n";
+ import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchParams } from "@/shared/lib/kmas-reference";
+-import { apiPath } from "@/src/infrastructure/api";
++import { apiPath } from "@/infrastructure/api";
+ 
+ import "./reference.css";
+ 
+diff --git a/apps/web/src/domains/creator-resources/ResourceSearchPage.tsx b/apps/web/src/domains/creator-resources/ResourceSearchPage.tsx
+index af7cf7695..297ded59d 100644
+--- a/apps/web/src/domains/creator-resources/ResourceSearchPage.tsx
++++ b/apps/web/src/domains/creator-resources/ResourceSearchPage.tsx
+@@ -9,7 +9,7 @@ import { downloadText, useCreatorWorkspace } from "./workspace";
+ import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@/shared/lib/creator-resources";
+ 
+ import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
+-import { apiPath } from "@/src/infrastructure/api";
++import { apiPath } from "@/infrastructure/api";
+ 
+ const CONFIG = {
+   met: { title: "창작 레퍼런스", intro: "복식·장식·가구·미술 자료를 찾아 출처와 함께 저장하세요. 공개 이용이 확인된 Met 자료만 미리보기를 제공합니다.", hint: "예: armor, costume, furniture, Korea", url: "https://www.metmuseum.org/art/collection", examples: ["armor", "costume", "furniture", "Korea"] },
+diff --git a/apps/web/src/domains/creator/CharacterShaperLandingPage.test.tsx b/apps/web/src/domains/creator/CharacterShaperLandingPage.test.tsx
+index b5427f667..4e5c11e1a 100644
+--- a/apps/web/src/domains/creator/CharacterShaperLandingPage.test.tsx
++++ b/apps/web/src/domains/creator/CharacterShaperLandingPage.test.tsx
+@@ -156,10 +156,10 @@ describe("/shaper registration", () => {
+       '{ path: "/shaper", label: "route.shaper" }',
+     );
+     expect(readRepoFile("scripts/build-static-catalog.ts")).toContain('"/shaper"');
+-    expect(readRepoFile("components/site-footer.tsx")).toContain(
++    expect(readRepoFile("apps/web/src/shared/components/site-footer.tsx")).toContain(
+       '{ key: "footer.link.shaper", href: "/shaper" }',
+     );
+-    expect(readRepoFile("components/site-header-mobile-nav.tsx")).toContain('href: "/shaper"');
++    expect(readRepoFile("apps/web/src/shared/components/site-header-mobile-nav.tsx")).toContain('href: "/shaper"');
+   });
+ 
+   it("publishes the new app-shell keys in the built-in locales", () => {
+diff --git a/apps/web/src/domains/creator/StudioAnimaticTimelineDialog.tsx b/apps/web/src/domains/creator/StudioAnimaticTimelineDialog.tsx
+index 1deb7ad82..575b426c7 100644
+--- a/apps/web/src/domains/creator/StudioAnimaticTimelineDialog.tsx
++++ b/apps/web/src/domains/creator/StudioAnimaticTimelineDialog.tsx
+@@ -7,7 +7,7 @@ import { useStudioFloatingSurfaceLayout } from "./use-studio-floating-surface-la
+ 
+ import type { StudioAnimaticPageLike } from "./studio-animatic-timeline";
+ 
+-import { useIsMobile } from "@/src/hooks/use-media-query";
++import { useIsMobile } from "@/hooks/use-media-query";
+ 
+ export interface StudioAnimaticTimelineDialogProps {
+   readonly open: boolean;
+diff --git a/apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx b/apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx
+index 7457dac86..7de42d98c 100644
+--- a/apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx
++++ b/apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx
+@@ -1400,18 +1400,18 @@ import type {
+   SharedAssetCatalogItem,
+   WorkDetail,
+   WorkRevisionSummary,
+-} from "@/src/infrastructure/creator-client";
++} from "@/infrastructure/creator-client";
+ import type Konva from "konva";
+ 
+ import { scheduleIdle } from "@/domains/auth/components/schedule-idle";
+-import { useIsMobile } from "@/src/hooks/use-media-query";
+-import { useResizable } from "@/src/hooks/use-resizable";
++import { useIsMobile } from "@/hooks/use-media-query";
++import { useResizable } from "@/hooks/use-resizable";
+ import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
+ import { useT } from "@/shared/lib/i18n";
+ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-asset-contract";
+ import { cn } from "@/shared/lib/utils";
+-import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
+-import { useSession } from "@/src/compat/auth-session-store";
++import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
++import { useSession } from "@/compat/auth-session-store";
+ 
+ export function StudioCuttoonEditor({
+   remixId,
+@@ -7967,7 +7967,7 @@ export function StudioCuttoonEditor({
+     }
+     sharedAssetContentInFlightRef.current.add(asset.id);
+     try {
+-      const { getSharedAssetContent } = await import("@/src/infrastructure/creator-client");
++      const { getSharedAssetContent } = await import("@/infrastructure/creator-client");
+       const content = await getSharedAssetContent(asset.id);
+       return await verifyStudioSharedAssetContent(asset, content);
+     } finally {
+@@ -7977,7 +7977,7 @@ export function StudioCuttoonEditor({
+ 
+   function recordCommunityAssetUse(assetId: string) {
+     if (!studioAuthUserId) return;
+-    void import("@/src/infrastructure/creator-client")
++    void import("@/infrastructure/creator-client")
+       .then(({ markSharedAssetUsed }) => markSharedAssetUsed(assetId))
+       .catch(() => {
+         // Usage analytics must never roll back a successful, locally persisted insertion.
+@@ -14547,7 +14547,7 @@ const puppetWarpArmed =
+       }
+ 
+       // 리믹스와 비로그인 공개 작품 열람은 기존 public getWork 흐름을 그대로 유지한다.
+-      const { getWork } = await import("@/src/infrastructure/creator-client");
++      const { getWork } = await import("@/infrastructure/creator-client");
+       const publicWork = await getWork(resolvedTargetId, controller.signal);
+       return {
+         work: publicWork,
+@@ -14785,7 +14785,7 @@ const puppetWarpArmed =
+       const next: PublishContext = {};
+       if (publishContextSeriesId) {
+         try {
+-          const { getSeries } = await import("@/src/infrastructure/creator-client");
++          const { getSeries } = await import("@/infrastructure/creator-client");
+           const series = await getSeries(publishContextSeriesId, controller.signal);
+           if (!alive) return;
+           const maxEpisode = series.episodeList.reduce(
+@@ -14803,7 +14803,7 @@ const puppetWarpArmed =
+       }
+       if (publishContextChallengeId) {
+         try {
+-          const { getChallenge } = await import("@/src/infrastructure/creator-client");
++          const { getChallenge } = await import("@/infrastructure/creator-client");
+           const challenge = await getChallenge(publishContextChallengeId, controller.signal);
+           if (!alive) return;
+           next.challenge = {
+@@ -15434,7 +15434,7 @@ const puppetWarpArmed =
+     setError(null);
+     let operationId: string | null = null;
+     try {
+-      const { generateAsset } = await import("@/src/infrastructure/creator-client");
++      const { generateAsset } = await import("@/infrastructure/creator-client");
+       if (!canApplyStudioMutation(mutationTicket)) return;
+       operationId = beginTrackedStudioAiOperation("asset-image", {
+         kind: "image",
+@@ -15649,7 +15649,7 @@ const puppetWarpArmed =
+     setSharedLoading(true);
+     setSharedError(null);
+     try {
+-      const { listSharedAssetCatalog } = await import("@/src/infrastructure/creator-client");
++      const { listSharedAssetCatalog } = await import("@/infrastructure/creator-client");
+       const page = await listSharedAssetCatalog({
+         limit: 20,
+         search: assetSearchQuery.trim() || undefined,
+@@ -15671,7 +15671,7 @@ const puppetWarpArmed =
+     setSharedLoadingMore(true);
+     setSharedError(null);
+     try {
+-      const { listSharedAssetCatalog } = await import("@/src/infrastructure/creator-client");
++      const { listSharedAssetCatalog } = await import("@/infrastructure/creator-client");
+       const page = await listSharedAssetCatalog({
+         limit: 20,
+         offset: sharedNextOffset,
+@@ -15695,7 +15695,7 @@ const puppetWarpArmed =
+     const controller = new AbortController();
+     setSharedLoading(true);
+     setSharedError(null);
+-    void import("@/src/infrastructure/creator-client")
++    void import("@/infrastructure/creator-client")
+       .then(({ listSharedAssetCatalog }) => listSharedAssetCatalog({
+         limit: 20,
+         search: assetSearchQuery.trim() || undefined,
+@@ -15837,7 +15837,7 @@ const puppetWarpArmed =
+               { getProductStudioMarketplaceRuntimeCompatibility },
+               { synchronizeStudioCommunityMarketplaceInstalledPack },
+             ] = await Promise.all([
+-              import("@/src/infrastructure/creator-marketplace-client"),
++              import("@/infrastructure/creator-marketplace-client"),
+               import("./studio-community-marketplace"),
+               import("./studio-creator-pack-product-runtime"),
+               import("./studio-creator-pack-runtime"),
+@@ -15992,7 +15992,7 @@ const puppetWarpArmed =
+     }
+     setPublishingId(asset.id);
+     try {
+-      const { publishAsset } = await import("@/src/infrastructure/creator-client");
++      const { publishAsset } = await import("@/infrastructure/creator-client");
+       await publishAsset({
+         name: asset.name,
+         dataUrl: asset.dataUrl,
+@@ -16053,7 +16053,7 @@ const puppetWarpArmed =
+ 
+   async function onDeleteSharedAsset(id: string) {
+     try {
+-      const { deleteSharedAsset } = await import("@/src/infrastructure/creator-client");
++      const { deleteSharedAsset } = await import("@/infrastructure/creator-client");
+       await deleteSharedAsset(id);
+       removeAssetFavorite(createStudioAssetFavoriteId("community", id));
+       await loadSharedAssets();
+@@ -16072,7 +16072,7 @@ const puppetWarpArmed =
+       return;
+     }
+     try {
+-      const { reportSharedAsset } = await import("@/src/infrastructure/creator-client");
++      const { reportSharedAsset } = await import("@/infrastructure/creator-client");
+       await reportSharedAsset(asset.id, { reason, details });
+       announceDrawingShortcut("신고가 접수되었습니다. 검수 결과에 따라 공개 상태가 조정됩니다.");
+       await loadSharedAssets();
+@@ -26610,7 +26610,7 @@ function clearSelectionForEdit() {
+       });
+     setServerRevisionLoading(true);
+     setServerRevisionError(null);
+-    void import("@/src/infrastructure/creator-client")
++    void import("@/infrastructure/creator-client")
+       .then(({ listWorkRevisions }) => {
+         if (!requestIsCurrent()) return null;
+         return listWorkRevisions(workId, 20, controller.signal);
+@@ -26664,7 +26664,7 @@ function clearSelectionForEdit() {
+       });
+     setFxPanelLoading(true);
+     try {
+-      const { getWork } = await import("@/src/infrastructure/creator-client");
++      const { getWork } = await import("@/infrastructure/creator-client");
+       if (!requestIsCurrent()) return;
+       const detail = await getWork(workId, controller.signal);
+       if (!requestIsCurrent()) return;
+@@ -26707,7 +26707,7 @@ function clearSelectionForEdit() {
+     setServerRevisionLoading(true);
+     setServerRevisionError(null);
+     try {
+-      const { listWorkRevisions } = await import("@/src/infrastructure/creator-client");
++      const { listWorkRevisions } = await import("@/infrastructure/creator-client");
+       if (!requestIsCurrent()) return;
+       const revisions = await listWorkRevisions(workId, 20, controller.signal);
+       if (requestIsCurrent()) setServerRevisions(revisions);
+diff --git a/apps/web/src/domains/creator/StudioInspectorAsideTypes.ts b/apps/web/src/domains/creator/StudioInspectorAsideTypes.ts
+index 1638cb81b..2dedf0cce 100644
+--- a/apps/web/src/domains/creator/StudioInspectorAsideTypes.ts
++++ b/apps/web/src/domains/creator/StudioInspectorAsideTypes.ts
+@@ -74,7 +74,7 @@ import type { StudioViewRotation } from "./studio-view-controls";
+ import type { StudioHokusaiNaturalMediaReplaceHandler } from "./StudioHokusaiNaturalMediaInspectorMount";
+ import type { StudioMobileSheet } from "./StudioMobileEditingDock";
+ import type { StudioInspectorPixelSelectionToolId } from "./StudioRasterToolRecoveryPanel";
+-import type { Resizable } from "@/src/hooks/use-resizable";
++import type { Resizable } from "@/hooks/use-resizable";
+ 
+ export interface StudioInspectorAsideHandlers {
+   activateCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
+diff --git a/apps/web/src/domains/creator/StudioMenubarContent.tsx b/apps/web/src/domains/creator/StudioMenubarContent.tsx
+index 923b06509..c5491913b 100644
+--- a/apps/web/src/domains/creator/StudioMenubarContent.tsx
++++ b/apps/web/src/domains/creator/StudioMenubarContent.tsx
+@@ -105,7 +105,7 @@ import type {
+   StudioWorkspaceState,
+ } from "./studio-workspaces";
+ import type { StudioWriterRoomDocument } from "./studio-writer-room";
+-import type { WorkDetail } from "@/src/infrastructure/creator-client";
++import type { WorkDetail } from "@/infrastructure/creator-client";
+ 
+ import { buttonClass } from "@/shared/components/ui/button-utils";
+ import { useT } from "@/shared/lib/i18n";
+diff --git a/apps/web/src/domains/creator/StudioPageListPane.tsx b/apps/web/src/domains/creator/StudioPageListPane.tsx
+index 3fd03a55a..1c015cd1c 100644
+--- a/apps/web/src/domains/creator/StudioPageListPane.tsx
++++ b/apps/web/src/domains/creator/StudioPageListPane.tsx
+@@ -54,7 +54,7 @@ import type {
+   StudioUiPreferencesRepository,
+ } from "./studio-ui-preferences-sqlite";
+ import type { StudioMobileSheet } from "./StudioMobileEditingDock";
+-import type { Resizable } from "@/src/hooks/use-resizable";
++import type { Resizable } from "@/hooks/use-resizable";
+ import type { Dispatch, RefObject, SetStateAction } from "react";
+ 
+ import { cn } from "@/shared/lib/utils";
+diff --git a/apps/web/src/domains/creator/StudioToolBeltContent.tsx b/apps/web/src/domains/creator/StudioToolBeltContent.tsx
+index ac57f2a84..d2ec28e0e 100644
+--- a/apps/web/src/domains/creator/StudioToolBeltContent.tsx
++++ b/apps/web/src/domains/creator/StudioToolBeltContent.tsx
+@@ -65,7 +65,7 @@ import type {
+   GeneratedAssetQuality,
+   GeneratedAssetSize,
+   SharedAssetCatalogItem,
+-} from "@/src/infrastructure/creator-client";
++} from "@/infrastructure/creator-client";
+ 
+ const STUDIO_CANVAS_IMAGE_ACCEPT =
+   "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff";
+diff --git a/apps/web/src/domains/creator/StudioUploadPublish.tsx b/apps/web/src/domains/creator/StudioUploadPublish.tsx
+index d0639321b..009128ea3 100644
+--- a/apps/web/src/domains/creator/StudioUploadPublish.tsx
++++ b/apps/web/src/domains/creator/StudioUploadPublish.tsx
+@@ -68,13 +68,13 @@ import { StudioPublishContextBanner, type PublishContext } from "./StudioPublish
+ import { Container } from "@/shared/components/section";
+ import { buttonClass } from "@/shared/components/ui/button-utils";
+ import { cn } from "@/shared/lib/utils";
+-import { useSession } from "@/src/compat/auth-session-store";
+-import Link from "@/src/compat/router-link";
+-import { useDocumentTitle } from "@/src/hooks/use-document-title";
++import { useSession } from "@/compat/auth-session-store";
++import Link from "@/compat/router-link";
++import { useDocumentTitle } from "@/hooks/use-document-title";
+ import {
+   getChallenge,
+   getSeries,
+-} from "@/src/infrastructure/creator-client";
++} from "@/infrastructure/creator-client";
+ 
+ const MAX_PAGES = 40;
+ 
+@@ -568,7 +568,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
+               })
+             : ({
+                 kind: "create" as const,
+-                module: await import("@/src/infrastructure/creator-client"),
++                module: await import("@/infrastructure/creator-client"),
+               }),
+         mutate: async (client, cover, signal) => {
+           const editableContent = {
+diff --git a/apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.test.tsx b/apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.test.tsx
+index b0f28e459..160a84142 100644
+--- a/apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.test.tsx
++++ b/apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.test.tsx
+@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
+ 
+ const viewportState = vi.hoisted(() => ({ mobile: false }));
+ 
+-vi.mock("@/src/hooks/use-media-query", () => ({
++vi.mock("@/hooks/use-media-query", () => ({
+   useIsMobile: () => viewportState.mobile,
+ }));
+ 
+diff --git a/apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.tsx b/apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.tsx
+index b6267d55b..82d12bc11 100644
+--- a/apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.tsx
++++ b/apps/web/src/domains/creator/canvas/StudioCanvasStatusRail.tsx
+@@ -28,7 +28,7 @@ import type {
+ import type { CSSProperties, ReactNode } from "react";
+ 
+ import { cn } from "@/shared/lib/utils";
+-import { useIsMobile } from "@/src/hooks/use-media-query";
++import { useIsMobile } from "@/hooks/use-media-query";
+ 
+ const SELECTION_LAYOUT_HINTS = {
+   group: {
+diff --git a/apps/web/src/domains/creator/lift3d/StudioLift3dPage.tsx b/apps/web/src/domains/creator/lift3d/StudioLift3dPage.tsx
+index c382a0f6d..f8e6517b6 100644
+--- a/apps/web/src/domains/creator/lift3d/StudioLift3dPage.tsx
++++ b/apps/web/src/domains/creator/lift3d/StudioLift3dPage.tsx
+@@ -32,8 +32,8 @@ import type {
+ } from "./studio-lift3d-library-handoff";
+ 
+ import { lazyRetry } from "@/shared/lib/lazy-retry";
+-import Link from "@/src/compat/router-link";
+-import { useDocumentTitle } from "@/src/hooks/use-document-title";
++import Link from "@/compat/router-link";
++import { useDocumentTitle } from "@/hooks/use-document-title";
+ 
+ const StudioLift3dPreview = lazyRetry(
+   () => import("./StudioLift3dPreview").then((module) => ({
+diff --git a/apps/web/src/domains/creator/live/studio-crdt-raster-ops-production-import-boundary.test.ts b/apps/web/src/domains/creator/live/studio-crdt-raster-ops-production-import-boundary.test.ts
+index ae818e791..17c893dba 100644
+--- a/apps/web/src/domains/creator/live/studio-crdt-raster-ops-production-import-boundary.test.ts
++++ b/apps/web/src/domains/creator/live/studio-crdt-raster-ops-production-import-boundary.test.ts
+@@ -9,7 +9,9 @@ import { STUDIO_RASTER_CRDT_VERSION } from "../../../shared/lib/studio-crdt-rast
+ import { STUDIO_RASTER_CRDT_VERSION as liveFacadeVersion } from "./studio-crdt-raster-ops";
+ 
+ const CREATOR_ROOT = fileURLToPath(new URL("..", import.meta.url));
+-const LIB_ROOT = fileURLToPath(new URL("../../../../lib", import.meta.url));
++// The shared `lib/` tree moved from the repository root to `apps/web/src/shared/lib` in the
++// 2026-09 apps/web move; anchoring on the old root made this walk throw at collection.
++const LIB_ROOT = fileURLToPath(new URL("../../../shared/lib", import.meta.url));
+ const TEST_MODULE_IMPORT = /\.test\.tsx?(?:["']|$)/u;
+ const PRODUCTION_IMPORT = /^\s*import\s[\s\S]*?from\s+["']([^"']+)["']/gmu;
+ 
+diff --git a/apps/web/src/domains/creator/music/StudioMusicPage.tsx b/apps/web/src/domains/creator/music/StudioMusicPage.tsx
+index 76ba262c8..eada1d8ff 100644
+--- a/apps/web/src/domains/creator/music/StudioMusicPage.tsx
++++ b/apps/web/src/domains/creator/music/StudioMusicPage.tsx
+@@ -11,8 +11,8 @@ import { readMusicWorkId, scopeMusicBrief } from "./studio-music-work-scope";
+ import type { LocalMusicTrack } from "./studio-music-client";
+ 
+ import { buildMusicPrompt, defaultMusicBrief, MUSIC_DURATIONS, MUSIC_INSTRUMENTS, MUSIC_MOODS, MUSIC_PURPOSES, MUSIC_TERMS_URL, parseMusicBrief, type MusicBrief, type MusicStatus } from "@toonspectrum/core/studio-music";
+-import { useSession } from "@/src/compat/auth-session-store";
+-import { getApiErrorMessage } from "@/src/infrastructure/api";
++import { useSession } from "@/compat/auth-session-store";
++import { getApiErrorMessage } from "@/infrastructure/api";
+ 
+ const inputClass = "w-full rounded-xl border border-line bg-canvas px-3 py-2.5 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50";
+ const buttonClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line px-4 py-2 text-sm transition-colors hover:bg-panel focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
+diff --git a/apps/web/src/domains/creator/render/studio-canvaskit-quality-worker-browser-boundary.test.ts b/apps/web/src/domains/creator/render/studio-canvaskit-quality-worker-browser-boundary.test.ts
+index 9978429c5..f65d4691e 100644
+--- a/apps/web/src/domains/creator/render/studio-canvaskit-quality-worker-browser-boundary.test.ts
++++ b/apps/web/src/domains/creator/render/studio-canvaskit-quality-worker-browser-boundary.test.ts
+@@ -3,7 +3,9 @@ import { resolve } from "node:path";
+ 
+ import { describe, expect, it } from "vitest";
+ 
+-const root = resolve(import.meta.dirname, "../../../..");
++// Workspace root, six levels above `apps/web/src/domains/creator/render/` (the 2026-09
++// apps/web move added two; the old count landed on `apps/web`, which has no `scripts/`).
++const root = resolve(import.meta.dirname, "../../../../../..");
+ const browserEntry = readFileSync(
+   resolve(root, "scripts/studio-canvaskit-quality-worker-browser.ts"),
+   "utf8",
+diff --git a/apps/web/src/domains/creator/render/studio-engine-tile-storage-opfs-v2-browser-boundary.test.ts b/apps/web/src/domains/creator/render/studio-engine-tile-storage-opfs-v2-browser-boundary.test.ts
+index c314404d2..91b425522 100644
+--- a/apps/web/src/domains/creator/render/studio-engine-tile-storage-opfs-v2-browser-boundary.test.ts
++++ b/apps/web/src/domains/creator/render/studio-engine-tile-storage-opfs-v2-browser-boundary.test.ts
+@@ -3,7 +3,9 @@ import { resolve } from "node:path";
+ 
+ import { describe, expect, it } from "vitest";
+ 
+-const root = resolve(import.meta.dirname, "../../../..");
++// Workspace root, six levels above `apps/web/src/domains/creator/render/` (the 2026-09
++// apps/web move added two; the old count landed on `apps/web`, which has no `scripts/`).
++const root = resolve(import.meta.dirname, "../../../../../..");
+ const workerEntry = readFileSync(
+   resolve(
+     root,
+diff --git a/apps/web/src/domains/creator/render/studio-engine-webgpu-brush-parity-browser-boundary.test.ts b/apps/web/src/domains/creator/render/studio-engine-webgpu-brush-parity-browser-boundary.test.ts
+index 145943ac5..1e950e6d1 100644
+--- a/apps/web/src/domains/creator/render/studio-engine-webgpu-brush-parity-browser-boundary.test.ts
++++ b/apps/web/src/domains/creator/render/studio-engine-webgpu-brush-parity-browser-boundary.test.ts
+@@ -3,7 +3,8 @@ import { resolve } from "node:path";
+ 
+ import { describe, expect, it } from "vitest";
+ 
+-const root = resolve(import.meta.dirname, "../../../..");
++// Workspace root, six levels above `apps/web/src/domains/creator/render/`.
++const root = resolve(import.meta.dirname, "../../../../../..");
+ const browserEntry = readFileSync(
+   resolve(root, "scripts/studio-engine-webgpu-brush-parity-browser.ts"),
+   "utf8",
+diff --git a/apps/web/src/domains/creator/render/studio-engine-webgpu-filter-parity-browser-boundary.test.ts b/apps/web/src/domains/creator/render/studio-engine-webgpu-filter-parity-browser-boundary.test.ts
+index 4f3926fa1..435cd7955 100644
+--- a/apps/web/src/domains/creator/render/studio-engine-webgpu-filter-parity-browser-boundary.test.ts
++++ b/apps/web/src/domains/creator/render/studio-engine-webgpu-filter-parity-browser-boundary.test.ts
+@@ -3,7 +3,9 @@ import { resolve } from "node:path";
+ 
+ import { describe, expect, it } from "vitest";
+ 
+-const root = resolve(import.meta.dirname, "../../../..");
++// Workspace root, six levels above `apps/web/src/domains/creator/render/` (the 2026-09
++// apps/web move added two; the old count landed on `apps/web`, which has no `scripts/`).
++const root = resolve(import.meta.dirname, "../../../../../..");
+ const browserEntry = readFileSync(
+   resolve(root, "scripts/studio-engine-webgpu-filter-parity-browser.ts"),
+   "utf8",
+diff --git a/apps/web/src/domains/creator/render/studio-engine-webgpu-presentation-browser-boundary.test.ts b/apps/web/src/domains/creator/render/studio-engine-webgpu-presentation-browser-boundary.test.ts
+index 4f4044b19..6359b7626 100644
+--- a/apps/web/src/domains/creator/render/studio-engine-webgpu-presentation-browser-boundary.test.ts
++++ b/apps/web/src/domains/creator/render/studio-engine-webgpu-presentation-browser-boundary.test.ts
+@@ -3,7 +3,8 @@ import { resolve } from "node:path";
+ 
+ import { describe, expect, it } from "vitest";
+ 
+-const root = resolve(import.meta.dirname, "../../../..");
++// Workspace root, six levels above `apps/web/src/domains/creator/render/`.
++const root = resolve(import.meta.dirname, "../../../../../..");
+ const browserEntry = readFileSync(
+   resolve(root, "scripts/studio-engine-webgpu-presentation-browser.ts"),
+   "utf8",
+diff --git a/apps/web/src/domains/creator/render/studio-engine-webgpu-textured-brush-browser-boundary.test.ts b/apps/web/src/domains/creator/render/studio-engine-webgpu-textured-brush-browser-boundary.test.ts
+index 0f8a42c16..713f5ad81 100644
+--- a/apps/web/src/domains/creator/render/studio-engine-webgpu-textured-brush-browser-boundary.test.ts
++++ b/apps/web/src/domains/creator/render/studio-engine-webgpu-textured-brush-browser-boundary.test.ts
+@@ -3,7 +3,8 @@ import { resolve } from "node:path";
+ 
+ import { describe, expect, it } from "vitest";
+ 
+-const root = resolve(import.meta.dirname, "../../../..");
++// Workspace root, six levels above `apps/web/src/domains/creator/render/`.
++const root = resolve(import.meta.dirname, "../../../../../..");
+ const browserEntry = readFileSync(
+   resolve(root, "scripts/studio-engine-webgpu-textured-brush-browser.ts"),
+   "utf8",
+diff --git a/apps/web/src/domains/creator/render/studio-engine-webgpu-tile-provider-browser-boundary.test.ts b/apps/web/src/domains/creator/render/studio-engine-webgpu-tile-provider-browser-boundary.test.ts
+index c20c3b124..bfb5eb6ae 100644
+--- a/apps/web/src/domains/creator/render/studio-engine-webgpu-tile-provider-browser-boundary.test.ts
++++ b/apps/web/src/domains/creator/render/studio-engine-webgpu-tile-provider-browser-boundary.test.ts
+@@ -3,7 +3,9 @@ import { resolve } from "node:path";
+ 
+ import { describe, expect, it } from "vitest";
+ 
+-const root = resolve(import.meta.dirname, "../../../..");
++// Workspace root, six levels above `apps/web/src/domains/creator/render/` (the 2026-09
++// apps/web move added two; the old count landed on `apps/web`, which has no `scripts/`).
++const root = resolve(import.meta.dirname, "../../../../../..");
+ const browserEntry = readFileSync(
+   resolve(root, "scripts/studio-engine-webgpu-tile-provider-browser.ts"),
+   "utf8",
+diff --git a/apps/web/src/domains/creator/render/studio-gpu-bristle-browser-boundary.test.ts b/apps/web/src/domains/creator/render/studio-gpu-bristle-browser-boundary.test.ts
+index 06003f3e7..86653050d 100644
+--- a/apps/web/src/domains/creator/render/studio-gpu-bristle-browser-boundary.test.ts
++++ b/apps/web/src/domains/creator/render/studio-gpu-bristle-browser-boundary.test.ts
+@@ -31,7 +31,10 @@ import {
+  * has no GPU.
+  */
+ 
+-const ROOT = resolve(import.meta.dirname, "../../../..");
++// Workspace root, six levels above `apps/web/src/domains/creator/render/` (the 2026-09
++// apps/web move added two of them; the old count landed on `apps/web` and doubled the
++// `apps/web/` prefix of every path joined below).
++const ROOT = resolve(import.meta.dirname, "../../../../../..");
+ const WGSL_MODULE = readFileSync(
+   resolve(ROOT, "apps/web/src/domains/creator/render/studio-gpu-bristle-wgsl.ts"),
+   "utf8",
+diff --git a/apps/web/src/domains/creator/render/studio-gpu-bristle-route-import-boundary.test.ts b/apps/web/src/domains/creator/render/studio-gpu-bristle-route-import-boundary.test.ts
+index f176bde44..44420f636 100644
+--- a/apps/web/src/domains/creator/render/studio-gpu-bristle-route-import-boundary.test.ts
++++ b/apps/web/src/domains/creator/render/studio-gpu-bristle-route-import-boundary.test.ts
+@@ -21,7 +21,28 @@ import { describe, expect, it } from "vitest";
+  */
+ 
+ const HERE = path.dirname(fileURLToPath(import.meta.url));
+-const ROOT = path.resolve(HERE, "../../../..");
++/**
++ * Repository root, found by walking up to the pnpm workspace manifest rather than counting
++ * `..` segments. The 2026-09 apps/web move shifted this file two directories deeper; the
++ * hardcoded count then resolved to `apps/web`, every `path.join(ROOT, file)` gained a second
++ * `apps/web/` prefix, and the whole suite died at collection instead of guarding anything.
++ */
++function findRepositoryRoot(from: string): string {
++  for (let directory = from; ; ) {
++    if (existsSync(path.join(directory, "pnpm-workspace.yaml"))) return directory;
++    const parent = path.dirname(directory);
++    if (parent === directory) {
++      throw new Error(`No pnpm-workspace.yaml above ${from}; cannot locate the repository root.`);
++    }
++    directory = parent;
++  }
++}
++
++const ROOT = findRepositoryRoot(HERE);
++/** Source root behind the `@/…` alias (tsconfig paths, vite and vitest all point here). */
++const WEB_SRC = "apps/web/src";
++/** Specifier suffixes that are assets rather than TypeScript modules, so failing to resolve one is expected. */
++const NON_MODULE_SUFFIXES = [".css", ".json", ".wgsl", ".glsl", ".svg", ".png", ".txt", ".html"];
+ 
+ /** Durable render surfaces plus the lane's own route-reachable entry. */
+ const ROUTE_ROOTS = [
+@@ -56,8 +77,9 @@ function resolveSpecifier(fromFile: string, specifier: string): string | null {
+   if (bare.startsWith(".")) {
+     absolute = path.resolve(ROOT, path.dirname(fromFile), bare);
+   } else if (bare.startsWith("@/")) {
+-    absolute = path.resolve(ROOT, bare.slice(2));
++    absolute = path.resolve(ROOT, WEB_SRC, bare.slice(2));
+   } else {
++    // A bare specifier is a package dependency; those are never part of this first-party walk.
+     return null;
+   }
+   const candidates = [
+@@ -71,6 +93,14 @@ function resolveSpecifier(fromFile: string, specifier: string): string | null {
+     if (!/\.tsx?$/u.test(candidate)) continue;
+     if (existsSync(candidate)) return path.relative(ROOT, candidate);
+   }
++  // An alias import that resolves to nothing means this walk just skipped a first-party module,
++  // which is how the gate silently shrinks to nothing after a tree move. Fail loudly instead.
++  if (bare.startsWith("@/") && !NON_MODULE_SUFFIXES.some((suffix) => bare.endsWith(suffix))) {
++    throw new Error(
++      `Unresolvable alias import "${specifier}" in ${fromFile}. The import-boundary walk would `
++      + `silently skip it, so the boundary assertions below would pass vacuously.`,
++    );
++  }
+   return null;
+ }
+ 
+diff --git a/apps/web/src/domains/creator/studio-build-size-advisory-policy-boundary.test.ts b/apps/web/src/domains/creator/studio-build-size-advisory-policy-boundary.test.ts
+index f77331af2..f1e65806b 100644
+--- a/apps/web/src/domains/creator/studio-build-size-advisory-policy-boundary.test.ts
++++ b/apps/web/src/domains/creator/studio-build-size-advisory-policy-boundary.test.ts
+@@ -10,8 +10,10 @@ const pageOrchestrationBoundarySource = readFileSync(
+   new URL("./studio-page-orchestration-boundary.test.ts", import.meta.url),
+   "utf8",
+ );
++// The manual-chunk policy moved out of `vite.config.ts` into `apps/web/config/vite-manual-chunks.ts`
++// in the 2026-09 apps/web move; `vite.config.ts` now only calls `createStudioManualChunks()`.
+ const viteConfigSource = readFileSync(
+-  new URL("../../../vite.config.ts", import.meta.url),
++  new URL("../../../config/vite-manual-chunks.ts", import.meta.url),
+   "utf8",
+ );
+ 
+@@ -69,8 +71,10 @@ describe("Studio quality-first build-size policy", () => {
+   });
+ 
+   it("allows Babylon only through one exact lazy specialist boundary", () => {
++    // Vite manifest keys are relative to the Vite `root` (`apps/web`), not to the repository
++    // root, so this one stays `src/…` after the 2026-09 apps/web move.
+     expect(bundleCheckSource).toContain(
+-      '"apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts"',
++      '"src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts"',
+     );
+     expect(bundleCheckSource).toContain(
+       "const babylonManifestPattern = /(?:@babylonjs|babylon(?:\\.js)?)/i",
+diff --git a/apps/web/src/domains/creator/studio-collaboration-cost-boundary.test.ts b/apps/web/src/domains/creator/studio-collaboration-cost-boundary.test.ts
+index 33bc3a540..065771f74 100644
+--- a/apps/web/src/domains/creator/studio-collaboration-cost-boundary.test.ts
++++ b/apps/web/src/domains/creator/studio-collaboration-cost-boundary.test.ts
+@@ -21,7 +21,8 @@ describe("studio collaboration cost boundary", () => {
+ 
+   it("exposes only the screen-share ICE credential route", () => {
+     const controllerSource = source(
+-      "../../../apps/api/src/modules/creator/studio-voice-ice-policy.controller.ts"
++      // Workspace-root `apps/api`, five levels above `apps/web/src/domains/creator/`.
++      "../../../../../apps/api/src/modules/creator/studio-voice-ice-policy.controller.ts"
+     );
+ 
+     expect(controllerSource).toContain("/creator/works/:id/screen-share/ice");
+diff --git a/apps/web/src/domains/creator/studio-companion-reference-runtime-boundary.test.ts b/apps/web/src/domains/creator/studio-companion-reference-runtime-boundary.test.ts
+index e34419d3d..b6a533e41 100644
+--- a/apps/web/src/domains/creator/studio-companion-reference-runtime-boundary.test.ts
++++ b/apps/web/src/domains/creator/studio-companion-reference-runtime-boundary.test.ts
+@@ -228,7 +228,7 @@ function propertyInitializers(sourceFile: ts.SourceFile, name: string): ts.Expre
+ 
+ const CAPTURE_RUNTIME = "@/domains/creator/studio/components/runtime/studio-companion-reference-capture-runtime";
+ const SOURCE_RUNTIME = "./studio-companion-reference-source-runtime";
+-const PREVIEW_RUNTIME = "@/src/domains/creator/studio-companion-reference-preview";
++const PREVIEW_RUNTIME = "@/domains/creator/studio-companion-reference-preview";
+ const REFERENCE_DISPLAY = "./StudioCompanionReferenceDisplay";
+ 
+ describe("Studio companion Reference runtime boundaries", () => {
+@@ -244,7 +244,7 @@ describe("Studio companion Reference runtime boundaries", () => {
+ 
+   it("keeps source decoding and preview composition behind coordinator demand imports", () => {
+     const coordinator = moduleEdges(
+-      "../../../components/studio/runtime/studio-companion-reference-capture-runtime.ts"
++      "./studio/components/runtime/studio-companion-reference-capture-runtime.ts"
+     );
+ 
+     for (const specifier of [SOURCE_RUNTIME, PREVIEW_RUNTIME]) {
+@@ -333,7 +333,7 @@ describe("Studio companion Reference runtime boundaries", () => {
+     expect(pageSource.match(/setReferenceBoardState\(/gu)?.length).toBeGreaterThanOrEqual(2);
+ 
+     const coordinator = moduleEdges(
+-      "../../../components/studio/runtime/studio-companion-reference-capture-runtime.ts"
++      "./studio/components/runtime/studio-companion-reference-capture-runtime.ts"
+     ).sourceFile.getFullText();
+     expect(coordinator).toContain("getSnapshot(): StudioCompanionReferenceCaptureSnapshot");
+     expect(coordinator).not.toContain("getDocument():");
+diff --git a/apps/web/src/domains/creator/studio-csp-sut-sqlite-reader-browser.test.ts b/apps/web/src/domains/creator/studio-csp-sut-sqlite-reader-browser.test.ts
+index 41e2a8c60..6d1e98db1 100644
+--- a/apps/web/src/domains/creator/studio-csp-sut-sqlite-reader-browser.test.ts
++++ b/apps/web/src/domains/creator/studio-csp-sut-sqlite-reader-browser.test.ts
+@@ -28,7 +28,9 @@ describeBrowser("real Chromium SUT sqlite-wasm Worker fixture", () => {
+   beforeAll(async () => {
+     const { createServer } = await import("vite");
+     vite = await createServer({
+-      root: resolve(import.meta.dirname, "../../.."),
++      // Workspace root, five levels above `apps/web/src/domains/creator/` — the harness page
++      // below is served from `tests/format-gateway/`, which lives at the workspace root.
++      root: resolve(import.meta.dirname, "../../../../.."),
+       logLevel: "error",
+       server: { host: "127.0.0.1", port: 0 },
+     });
+diff --git a/apps/web/src/domains/creator/studio-dynamic-dual-tip-webgpu-browser-boundary.test.ts b/apps/web/src/domains/creator/studio-dynamic-dual-tip-webgpu-browser-boundary.test.ts
+index b9fed32b1..52faf60fd 100644
+--- a/apps/web/src/domains/creator/studio-dynamic-dual-tip-webgpu-browser-boundary.test.ts
++++ b/apps/web/src/domains/creator/studio-dynamic-dual-tip-webgpu-browser-boundary.test.ts
+@@ -3,7 +3,8 @@ import { resolve } from "node:path";
+ 
+ import { describe, expect, it } from "vitest";
+ 
+-const root = resolve(import.meta.dirname, "../../..");
++// Workspace root, five levels above `apps/web/src/domains/creator/`.
++const root = resolve(import.meta.dirname, "../../../../..");
+ const browserEntry = readFileSync(
+   resolve(root, "scripts/studio-dynamic-dual-tip-webgpu-browser.ts"),
+   "utf8",
+diff --git a/apps/web/src/domains/creator/studio-i18n-loader.test.ts b/apps/web/src/domains/creator/studio-i18n-loader.test.ts
+index f4d6fca83..128cf83ad 100644
+--- a/apps/web/src/domains/creator/studio-i18n-loader.test.ts
++++ b/apps/web/src/domains/creator/studio-i18n-loader.test.ts
+@@ -1,5 +1,6 @@
+ import { readFileSync } from "node:fs";
+ import path from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+ import { describe, expect, it, vi } from "vitest";
+ 
+@@ -13,19 +14,48 @@ import {
+   studioI18nAssetUrl,
+ } from "./studio-i18n-loader";
+ 
++const STUDIO_ASSET_DIRECTORY = fileURLToPath(
++  new URL("../../../public/i18n/studio/", import.meta.url),
++);
++
++/**
++ * Merged studio dictionary per locale, memoised.
++ *
++ * The branch split each locale's studio pack into 23 namespace files, so one `readAsset` call
++ * now costs 23 reads plus 23 `JSON.parse` passes instead of one. The assertions below call it
++ * once per (key, locale) pair — roughly a thousand times — which took this file from a few
++ * seconds to 85s, past the 30s suite timeout. The files do not change during a run, so read
++ * and parse each locale exactly once and hand every assertion the same string. Memoising the
++ * validated dictionary as well keeps `parseStudioI18nDictionary` covered (every locale still
++ * goes through it) without re-validating 1_334 keys a thousand times.
++ */
++const assetCache = new Map<string, string>();
+ function readAsset(locale: string): string {
++  const cached = assetCache.get(locale);
++  if (cached !== undefined) return cached;
+   const merged: Record<string, string> = {};
+   for (const namespace of STUDIO_I18N_NAMESPACES) {
+-    const file = path.resolve(process.cwd(), "apps/web/public/i18n/studio", namespace, `${locale}.json`);
++    const file = path.resolve(STUDIO_ASSET_DIRECTORY, namespace, `${locale}.json`);
+     Object.assign(merged, JSON.parse(readFileSync(file, "utf8")));
+   }
+-  return JSON.stringify(merged);
++  const serialized = JSON.stringify(merged);
++  assetCache.set(locale, serialized);
++  return serialized;
++}
++
++const dictionaryCache = new Map<string, Record<string, string> | null>();
++/** `parseStudioI18nDictionary(readAsset(locale))`, memoised per locale. */
++function assetDictionary(locale: string): Record<string, string> | null {
++  if (dictionaryCache.has(locale)) return dictionaryCache.get(locale) ?? null;
++  const parsed = parseStudioI18nDictionary(readAsset(locale));
++  dictionaryCache.set(locale, parsed);
++  return parsed;
+ }
+ 
+ describe("Studio lazy i18n assets", () => {
+   it("keeps complete, validated Korean and English dictionaries", () => {
+     for (const locale of STUDIO_I18N_ASSET_LOCALES) {
+-      const dictionary = parseStudioI18nDictionary(readAsset(locale));
++      const dictionary = assetDictionary(locale);
+       expect(dictionary).not.toBeNull();
+       // 1_323 → 1_325: 컴패니언 창의 막다른 상태에 붙인 탈출구 두 줄
+       // (studio.toolsCompanion.exit.disconnected / .editor).
+@@ -60,7 +90,7 @@ describe("Studio lazy i18n assets", () => {
+       "studio.creativeModes.title",
+     ]) {
+       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
+-        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toBeTruthy();
++        expect(assetDictionary(locale)?.[key]).toBeTruthy();
+       }
+       expect(resolveI18nValue("ko", key)).not.toBe(key);
+     }
+@@ -80,7 +110,7 @@ describe("Studio lazy i18n assets", () => {
+       "studio.mainMenu.item.filter.wave-warp",
+     ]) {
+       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
+-        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toBeTruthy();
++        expect(assetDictionary(locale)?.[key]).toBeTruthy();
+       }
+     }
+     expect(resolveI18nValue("en", "studio.mainMenu.item.filter.lens-blur")).toBe("Lens blur");
+@@ -129,13 +159,13 @@ describe("Studio lazy i18n assets", () => {
+       ]
+     ) {
+       const values = STUDIO_I18N_ASSET_LOCALES.map(
+-        (locale) => parseStudioI18nDictionary(readAsset(locale))?.[key],
++        (locale) => assetDictionary(locale)?.[key],
+       );
+       for (const value of values) expect(value).toBeTruthy();
+       // A key left untranslated shows up as ~75 copies of the English value. The
+       // ceiling is loose rather than 1 because loanwords legitimately collide —
+       // "Slot {index}" is the same string in Dutch, German, Czech, Malay and more.
+-      const english = parseStudioI18nDictionary(readAsset("en"))?.[key];
++      const english = assetDictionary("en")?.[key];
+       expect(values.filter((value) => value === english).length).toBeLessThan(20);
+     }
+     // Korean stays the authored source of truth for the literals these replaced.
+@@ -155,7 +185,7 @@ describe("Studio lazy i18n assets", () => {
+     // Both slot rows interpolate the same placeholder the rest of the packs use.
+     for (const key of ["studio.commandBar.slot", "studio.commandBar.slotAria"]) {
+       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
+-        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toContain("{index}");
++        expect(assetDictionary(locale)?.[key]).toContain("{index}");
+       }
+     }
+   });
+@@ -195,39 +225,24 @@ describe("Studio lazy i18n assets", () => {
+   });
+ 
+   it("keeps Studio strings out of the eagerly loaded global dictionary source", () => {
+-    const i18nSource = readFileSync(
+-      path.resolve(process.cwd(), "lib", "i18n.ts"),
+-      "utf8",
+-    );
++    // The 2026-09 apps/web move relocated the browser tree from `<root>/{src,lib}` to
++    // `apps/web/src/{,shared/lib}`; these four reads still pointed at the old cwd-relative
++    // paths and threw ENOENT. Anchor on this file instead of `process.cwd()` so the paths
++    // travel with the tree.
++    const webSrc = (...segments: readonly string[]): string =>
++      path.resolve(fileURLToPath(new URL("../../", import.meta.url)), ...segments);
++
++    const i18nSource = readFileSync(webSrc("shared", "lib", "i18n.ts"), "utf8");
+     const studioPageSource = readFileSync(
+-      path.resolve(
+-        process.cwd(),
+-        "src",
+-        "domains",
+-        "creator",
+-        "StudioPage.tsx",
+-      ),
++      webSrc("domains", "creator", "StudioPage.tsx"),
+       "utf8",
+     );
+     const companionSource = readFileSync(
+-      path.resolve(
+-        process.cwd(),
+-        "src",
+-        "domains",
+-        "creator",
+-        "StudioToolsCompanionPage.tsx",
+-      ),
++      webSrc("domains", "creator", "StudioToolsCompanionPage.tsx"),
+       "utf8",
+     );
+     const creatorRoutesSource = readFileSync(
+-      path.resolve(
+-        process.cwd(),
+-        "src",
+-        "app",
+-        "routes",
+-        "groups",
+-        "creator.routes.tsx",
+-      ),
++      webSrc("app", "routes", "groups", "creator.routes.tsx"),
+       "utf8",
+     );
+ 
+diff --git a/apps/web/src/domains/creator/studio-living-ink-route-import-boundary.test.ts b/apps/web/src/domains/creator/studio-living-ink-route-import-boundary.test.ts
+index 8427032b0..8a6b7bc89 100644
+--- a/apps/web/src/domains/creator/studio-living-ink-route-import-boundary.test.ts
++++ b/apps/web/src/domains/creator/studio-living-ink-route-import-boundary.test.ts
+@@ -23,7 +23,28 @@ import { describe, expect, it } from "vitest";
+  */
+ 
+ const HERE = path.dirname(fileURLToPath(import.meta.url));
+-const ROOT = path.resolve(HERE, "../../..");
++/**
++ * Repository root, found by walking up to the pnpm workspace manifest rather than counting
++ * `..` segments. The 2026-09 apps/web move shifted this file two directories deeper; the
++ * hardcoded count then resolved to `apps/web`, every `path.join(ROOT, file)` gained a second
++ * `apps/web/` prefix, and the whole suite died at collection instead of guarding anything.
++ */
++function findRepositoryRoot(from: string): string {
++  for (let directory = from; ; ) {
++    if (existsSync(path.join(directory, "pnpm-workspace.yaml"))) return directory;
++    const parent = path.dirname(directory);
++    if (parent === directory) {
++      throw new Error(`No pnpm-workspace.yaml above ${from}; cannot locate the repository root.`);
++    }
++    directory = parent;
++  }
++}
++
++const ROOT = findRepositoryRoot(HERE);
++/** Source root behind the `@/…` alias (tsconfig paths, vite and vitest all point here). */
++const WEB_SRC = "apps/web/src";
++/** Specifier suffixes that are assets rather than TypeScript modules, so failing to resolve one is expected. */
++const NON_MODULE_SUFFIXES = [".css", ".json", ".wgsl", ".glsl", ".svg", ".png", ".txt", ".html"];
+ 
+ /** Durable render surfaces: retained Canvas, SVG export, and the shared alias/bake boundary. */
+ const ROUTE_ROOTS = [
+@@ -63,8 +84,9 @@ function resolveSpecifier(fromFile: string, specifier: string): string | null {
+   if (bare.startsWith(".")) {
+     absolute = path.resolve(ROOT, path.dirname(fromFile), bare);
+   } else if (bare.startsWith("@/")) {
+-    absolute = path.resolve(ROOT, bare.slice(2));
++    absolute = path.resolve(ROOT, WEB_SRC, bare.slice(2));
+   } else {
++    // A bare specifier is a package dependency; those are never part of this first-party walk.
+     return null;
+   }
+   const candidates = [
+@@ -78,6 +100,14 @@ function resolveSpecifier(fromFile: string, specifier: string): string | null {
+     if (!/\.tsx?$/u.test(candidate)) continue;
+     if (existsSync(candidate)) return path.relative(ROOT, candidate);
+   }
++  // An alias import that resolves to nothing means this walk just skipped a first-party module,
++  // which is how the gate silently shrinks to nothing after a tree move. Fail loudly instead.
++  if (bare.startsWith("@/") && !NON_MODULE_SUFFIXES.some((suffix) => bare.endsWith(suffix))) {
++    throw new Error(
++      `Unresolvable alias import "${specifier}" in ${fromFile}. The import-boundary walk would `
++      + `silently skip it, so the boundary assertions below would pass vacuously.`,
++    );
++  }
+   return null;
+ }
+ 
+diff --git a/apps/web/src/domains/creator/studio-manifold-mesh-provider.test.ts b/apps/web/src/domains/creator/studio-manifold-mesh-provider.test.ts
+index 2025dcfdd..b8b5d16b6 100644
+--- a/apps/web/src/domains/creator/studio-manifold-mesh-provider.test.ts
++++ b/apps/web/src/domains/creator/studio-manifold-mesh-provider.test.ts
+@@ -292,7 +292,9 @@ describe("Studio Manifold mesh provider", () => {
+ 
+   it("executes a real Manifold WASM union without exposing vendor handles", async () => {
+     const factory = await import("manifold-3d");
+-    const wasmPath = new URL("../../../node_modules/manifold-3d/manifold.wasm",
++    // Workspace-root `node_modules/` — five levels above `apps/web/src/domains/creator/`.
++    // pnpm hoists this to the root store link; `apps/web/` has no `node_modules/`.
++    const wasmPath = new URL("../../../../../node_modules/manifold-3d/manifold.wasm",
+       import.meta.url,
+     ).pathname;
+     const module = await factory.default({ locateFile: () => wasmPath });
+diff --git a/apps/web/src/domains/creator/studio-production/StudioProductionHubPage.tsx b/apps/web/src/domains/creator/studio-production/StudioProductionHubPage.tsx
+index 240d6afec..b4b7c7a2d 100644
+--- a/apps/web/src/domains/creator/studio-production/StudioProductionHubPage.tsx
++++ b/apps/web/src/domains/creator/studio-production/StudioProductionHubPage.tsx
+@@ -35,7 +35,7 @@ import { StudioServerVersionsCard } from "./StudioServerVersionsCard";
+ 
+ import { buttonClass } from "@/shared/components/ui/button-utils";
+ import { cn } from "@/shared/lib/utils";
+-import Link from "@/src/compat/router-link";
++import Link from "@/compat/router-link";
+ 
+ const STUDIO_PRODUCTION_SURFACES = [
+   "projects",
+diff --git a/apps/web/src/domains/creator/studio-professional-bristle-webgpu-browser-boundary.test.ts b/apps/web/src/domains/creator/studio-professional-bristle-webgpu-browser-boundary.test.ts
+index da46ae656..be2a2d2d8 100644
+--- a/apps/web/src/domains/creator/studio-professional-bristle-webgpu-browser-boundary.test.ts
++++ b/apps/web/src/domains/creator/studio-professional-bristle-webgpu-browser-boundary.test.ts
+@@ -3,7 +3,9 @@ import { resolve } from "node:path";
+ 
+ import { describe, expect, it } from "vitest";
+ 
+-const root = resolve(import.meta.dirname, "../../..");
++// Workspace root, five levels above `apps/web/src/domains/creator/` (the 2026-09 apps/web
++// move added two; the old count landed on `apps/web`, which has no `scripts/`).
++const root = resolve(import.meta.dirname, "../../../../..");
+ const browserEntry = readFileSync(
+   resolve(root, "scripts/studio-professional-bristle-webgpu-browser.ts"),
+   "utf8",
+diff --git a/apps/web/src/domains/creator/studio-renderer-role-boundary.test.ts b/apps/web/src/domains/creator/studio-renderer-role-boundary.test.ts
+index 54250beaf..513cb797f 100644
+--- a/apps/web/src/domains/creator/studio-renderer-role-boundary.test.ts
++++ b/apps/web/src/domains/creator/studio-renderer-role-boundary.test.ts
+@@ -18,13 +18,19 @@ import {
+ } from "@toonspectrum/studio-engine-registry/renderer-roles";
+ import { describe, expect, it } from "vitest";
+ 
+-// src/domains/creator -> repo root
++// apps/web/src/domains/creator -> repository root (five levels).
++// Before the 2026-09 apps/web move this counted three; that now lands on `apps/web`, so the
++// walk below scanned `apps/web/src` while calling it `src` and every reported path was wrong.
+ const REPO_ROOT = resolve(
+   fileURLToPath(new URL(".", import.meta.url)),
+   "..",
+   "..",
+   "..",
++  "..",
++  "..",
+ );
++/** Browser source root behind the `@` alias — the tree this boundary guards. */
++const WEB_SRC = "apps/web/src";
+ 
+ const IGNORED_DIRECTORIES = new Set([
+   "node_modules",
+@@ -80,9 +86,9 @@ describe("studio renderer role boundary", () => {
+     }
+   });
+ 
+-  it("no lab engine has a product import site under src/", () => {
++  it("no lab engine has a product import site under apps/web/src", () => {
+     const violations = findLabEngineProductImports({
+-      roots: ["src"],
++      roots: [WEB_SRC],
+       ledger: STUDIO_RENDERER_ROLE_LEDGER,
+       listFiles: walkOnce,
+       readFile: readCached,
+@@ -97,6 +103,6 @@ describe("studio renderer role boundary", () => {
+ 
+   it("scanned a non-trivial slice of the product tree", () => {
+     // 스캐너가 조용히 0개 파일을 읽고 초록으로 통과하는 회귀를 막는다.
+-    expect(walkOnce("src").length).toBeGreaterThan(100);
++    expect(walkOnce(WEB_SRC).length).toBeGreaterThan(100);
+   });
+ });
+diff --git a/apps/web/src/domains/creator/studio-revision-compare-worker-csp.test.ts b/apps/web/src/domains/creator/studio-revision-compare-worker-csp.test.ts
+index 41cb0bf6a..85293a12c 100644
+--- a/apps/web/src/domains/creator/studio-revision-compare-worker-csp.test.ts
++++ b/apps/web/src/domains/creator/studio-revision-compare-worker-csp.test.ts
+@@ -28,7 +28,11 @@ import {
+ } from "./studio-server-revision-comparison";
+ 
+ const CREATOR_DIRECTORY = dirname(fileURLToPath(import.meta.url));
+-const REPOSITORY_ROOT = resolve(CREATOR_DIRECTORY, "../../..");
++// Target of the `@` alias — a single `@` -> `apps/web/src` since the 2026-09 apps/web move.
++// This used to be the repository root because `@` then pointed there and specifiers read
++// `@/src/...`; pointing the fixture build at `apps/web` made every `@/...` import miss and
++// the in-test Vite build fail.
++const WEB_SRC_ROOT = resolve(CREATOR_DIRECTORY, "../..");
+ const BOOTSTRAP_PATH = join(
+   CREATOR_DIRECTORY,
+   "studio-revision-compare.worker-bootstrap.ts"
+@@ -411,7 +415,7 @@ describe("revision comparison Worker strict-CSP bootstrap", () => {
+         resolve: {
+           alias: [
+             { find: "virtual:revision-client", replacement: CLIENT_PATH },
+-            { find: "@", replacement: REPOSITORY_ROOT },
++            { find: "@", replacement: WEB_SRC_ROOT },
+           ],
+         },
+         build: {
+diff --git a/apps/web/src/domains/creator/studio-work-asset-hydrator-lazy-boundary.test.ts b/apps/web/src/domains/creator/studio-work-asset-hydrator-lazy-boundary.test.ts
+index d7997ddae..c169fa4e7 100644
+--- a/apps/web/src/domains/creator/studio-work-asset-hydrator-lazy-boundary.test.ts
++++ b/apps/web/src/domains/creator/studio-work-asset-hydrator-lazy-boundary.test.ts
+@@ -14,7 +14,12 @@ const runtimeSource = readFileSync(
+   "utf8"
+ );
+ const studioPageSource = readStudioPageCompositionSource();
+-const viteConfigSource = readFileSync(new URL("../../../vite.config.ts", import.meta.url), "utf8");
++// The manual-chunk policy moved out of `vite.config.ts` into `apps/web/config/vite-manual-chunks.ts`
++// in the 2026-09 apps/web move; `vite.config.ts` now only calls `createStudioManualChunks()`.
++const viteConfigSource = readFileSync(
++  new URL("../../../config/vite-manual-chunks.ts", import.meta.url),
++  "utf8",
++);
+ 
+ describe("Studio work-asset hydrator lazy boundary", () => {
+   it("keeps the synchronous façade free of the request client value graph", () => {
+diff --git a/apps/web/src/domains/creator/studio-xatlas-uv-provider.test.ts b/apps/web/src/domains/creator/studio-xatlas-uv-provider.test.ts
+index 13f13fead..f388f05ff 100644
+--- a/apps/web/src/domains/creator/studio-xatlas-uv-provider.test.ts
++++ b/apps/web/src/domains/creator/studio-xatlas-uv-provider.test.ts
+@@ -610,7 +610,9 @@ describe("StudioXAtlasUvProvider", () => {
+       throw new TypeError("xatlasjs API constructor is unavailable");
+     }
+     const wasmPath = fileURLToPath(
+-      new URL("../../../node_modules/xatlasjs/dist/node/xatlas.wasm", import.meta.url),
++      // Workspace-root `node_modules/` — five levels above `apps/web/src/domains/creator/`.
++      // pnpm hoists xatlasjs to the root store link, and `apps/web/` has no `node_modules/`.
++      new URL("../../../../../node_modules/xatlasjs/dist/node/xatlas.wasm", import.meta.url),
+     );
+     const api = await new Promise<object>((resolve, reject) => {
+       const holder: { instance: object | null } = { instance: null };
+diff --git a/apps/web/src/domains/creator/vrm/studio-vrm-asset-runtime-boundary.test.ts b/apps/web/src/domains/creator/vrm/studio-vrm-asset-runtime-boundary.test.ts
+index 4abe6b461..2fe220098 100644
+--- a/apps/web/src/domains/creator/vrm/studio-vrm-asset-runtime-boundary.test.ts
++++ b/apps/web/src/domains/creator/vrm/studio-vrm-asset-runtime-boundary.test.ts
+@@ -89,7 +89,7 @@ describe("Studio VRM asset runtime ownership boundary", () => {
+       "./studio-vrm-license-product-gate",
+       "./studio-vrm-texture-paint-binding",
+       "./vrm-library",
+-      "@/src/shared/catalog/catalog-static",
++      "@/shared/catalog/catalog-static",
+     ]);
+     expect(runtime.typeImports).toEqual(["@pixiv/three-vrm"]);
+     expect(binding.allImports).toEqual([]);
+diff --git a/apps/web/src/domains/creator/vrm/studio-vrm-finger-curl-polarity.test.ts b/apps/web/src/domains/creator/vrm/studio-vrm-finger-curl-polarity.test.ts
+index df1527deb..655102f7c 100644
+--- a/apps/web/src/domains/creator/vrm/studio-vrm-finger-curl-polarity.test.ts
++++ b/apps/web/src/domains/creator/vrm/studio-vrm-finger-curl-polarity.test.ts
+@@ -1,5 +1,6 @@
+ import fs from "node:fs";
+ import path from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+ import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
+ import * as THREE from "three";
+@@ -21,15 +22,33 @@ import {
+ 
+ (globalThis as unknown as { self: typeof globalThis }).self = globalThis;
+ 
++/**
++ * Bundled VRM fixtures, anchored on this file rather than `process.cwd()`.
++ *
++ * These used to be `path.resolve("public/vrm/...")`, i.e. cwd-relative. The 2026-09 apps/web
++ * move put `public/` under `apps/web/`, so every resolve missed, every `existsSync` guard fired
++ * and the suite passed while examining zero characters. Resolving from `import.meta.url` and
++ * asserting the fixture set below keeps that failure loud.
++ */
++const VRM_DIR = fileURLToPath(new URL("../../../../public/vrm/", import.meta.url));
++
++function vrmFixture(name: string): string {
++  const file = path.join(VRM_DIR, name);
++  if (!fs.existsSync(file)) {
++    throw new Error(`Bundled VRM fixture is missing: ${path.relative(process.cwd(), file)}`);
++  }
++  return file;
++}
++
+ const CORE = [
+-  { id: "sample-vrm", name: "루미", file: "public/vrm/sample.vrm" },
+-  { id: "avatar-a", name: "하린", file: "public/vrm/AvatarSample_A.vrm" },
+-  { id: "avatar-b", name: "세라", file: "public/vrm/AvatarSample_B.vrm" },
+-  { id: "avatar-c", name: "유나", file: "public/vrm/AvatarSample_C.vrm" },
+-  { id: "mio", name: "미오", file: "public/vrm/fem_vroid.vrm" },
+-  { id: "noa", name: "노아", file: "public/vrm/masc_vroid.vrm" },
+-  { id: "alicia", name: "아리시아", file: "public/vrm/AliciaSolid.vrm" },
+-  { id: "jennifer", name: "제니퍼", file: "public/vrm/Jennifer.vrm" },
++  { id: "sample-vrm", name: "루미", file: "sample.vrm" },
++  { id: "avatar-a", name: "하린", file: "AvatarSample_A.vrm" },
++  { id: "avatar-b", name: "세라", file: "AvatarSample_B.vrm" },
++  { id: "avatar-c", name: "유나", file: "AvatarSample_C.vrm" },
++  { id: "mio", name: "미오", file: "fem_vroid.vrm" },
++  { id: "noa", name: "노아", file: "masc_vroid.vrm" },
++  { id: "alicia", name: "아리시아", file: "AliciaSolid.vrm" },
++  { id: "jennifer", name: "제니퍼", file: "Jennifer.vrm" },
+ ] as const;
+ 
+ function extractFingers(bones: PoseBoneMap): FingerRotationMap {
+@@ -43,7 +62,7 @@ function extractFingers(bones: PoseBoneMap): FingerRotationMap {
+ }
+ 
+ async function load(file: string) {
+-  const buf = fs.readFileSync(path.resolve(file)).buffer;
++  const buf = fs.readFileSync(file).buffer;
+   const loader = new GLTFLoader();
+   loader.register((parser) => new VRMLoaderPlugin(parser));
+   const gltf = await new Promise<{ userData: { vrm: import("@pixiv/three-vrm").VRM } }>(
+@@ -69,8 +88,7 @@ describe("VRM finger curl polarity", () => {
+   it("curls middle fingertips into the palm for core humanoids (including Lumi axis flip)", async () => {
+     const failures: string[] = [];
+     for (const character of CORE) {
+-      if (!fs.existsSync(path.resolve(character.file))) continue;
+-      const vrm = await load(character.file);
++      const vrm = await load(vrmFixture(character.file));
+       const pose = pickNaturalIdlePose(character.id);
+       const bones = stripFingerBones(pose.bones as PoseBoneMap);
+       const fingers = extractFingers(pose.bones as PoseBoneMap);
+@@ -101,8 +119,7 @@ describe("VRM finger curl polarity", () => {
+ 
+   it("keeps the untouched hand's finger pose when only one side is overridden", async () => {
+     for (const character of CORE) {
+-      if (!fs.existsSync(path.resolve(character.file))) continue;
+-      const vrm = await load(character.file);
++      const vrm = await load(vrmFixture(character.file));
+       const pose = pickNaturalIdlePose(character.id);
+       const bones = stripFingerBones(pose.bones as PoseBoneMap);
+       const fingers = extractFingers(pose.bones as PoseBoneMap);
+@@ -128,8 +145,7 @@ describe("VRM finger curl polarity", () => {
+ 
+   it("caches polarity so repeated applies do not flip between curl and hyperextension", async () => {
+     for (const character of CORE) {
+-      if (!fs.existsSync(path.resolve(character.file))) continue;
+-      const vrm = await load(character.file);
++      const vrm = await load(vrmFixture(character.file));
+       const pose = pickNaturalIdlePose(character.id);
+       const bones = stripFingerBones(pose.bones as PoseBoneMap);
+       const fingers = extractFingers(pose.bones as PoseBoneMap);
+diff --git a/apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts b/apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts
+index 37643e5ef..addc1fb0f 100644
+--- a/apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts
++++ b/apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts
+@@ -1,5 +1,6 @@
+ import fs from "node:fs";
+ import path from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+ import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
+ import * as THREE from "three";
+@@ -31,8 +32,25 @@ function extractFingers(bones: PoseBoneMap): FingerRotationMap {
+   return fingers;
+ }
+ 
+-async function loadBundledVrm(relativePath: string) {
+-  const buf = fs.readFileSync(path.resolve(relativePath)).buffer;
++/**
++ * Bundled VRM fixtures, anchored on this file rather than `process.cwd()`.
++ *
++ * These used to be `path.resolve("public/vrm/...")`, i.e. cwd-relative. The 2026-09 apps/web
++ * move put `public/` under `apps/web/`, so every resolve missed, the `existsSync` guard below
++ * fired for every character and the palm sweep passed while examining none of them.
++ */
++const VRM_DIR = fileURLToPath(new URL("../../../../public/vrm/", import.meta.url));
++
++function vrmFixture(name: string): string {
++  const file = path.join(VRM_DIR, name);
++  if (!fs.existsSync(file)) {
++    throw new Error(`Bundled VRM fixture is missing: ${path.relative(process.cwd(), file)}`);
++  }
++  return file;
++}
++
++async function loadBundledVrm(fixtureName: string) {
++  const buf = fs.readFileSync(vrmFixture(fixtureName)).buffer;
+   const loader = new GLTFLoader();
+   loader.register((parser) => new VRMLoaderPlugin(parser));
+   const gltf = await new Promise<{ userData: { vrm: import("@pixiv/three-vrm").VRM } }>(
+@@ -44,12 +62,12 @@ async function loadBundledVrm(relativePath: string) {
+ }
+ 
+ const CHARACTERS = [
+-  { id: "sample", name: "루미", file: "public/vrm/sample.vrm" },
+-  { id: "avatar-a", name: "하린", file: "public/vrm/AvatarSample_A.vrm" },
+-  { id: "avatar-b", name: "세라", file: "public/vrm/AvatarSample_B.vrm" },
+-  { id: "avatar-c", name: "유나", file: "public/vrm/AvatarSample_C.vrm" },
+-  { id: "alicia", name: "아리시아", file: "public/vrm/AliciaSolid.vrm" },
+-  { id: "mio", name: "미오", file: "public/vrm/fem_vroid.vrm" },
++  { id: "sample", name: "루미", file: "sample.vrm" },
++  { id: "avatar-a", name: "하린", file: "AvatarSample_A.vrm" },
++  { id: "avatar-b", name: "세라", file: "AvatarSample_B.vrm" },
++  { id: "avatar-c", name: "유나", file: "AvatarSample_C.vrm" },
++  { id: "alicia", name: "아리시아", file: "AliciaSolid.vrm" },
++  { id: "mio", name: "미오", file: "fem_vroid.vrm" },
+ ] as const;
+ 
+ function applyNaturalIdle(vrm: import("@pixiv/three-vrm").VRM, characterId: string) {
+@@ -91,7 +109,6 @@ describe("relaxed hand palm orientation across bundled characters", () => {
+     const failures: string[] = [];
+ 
+     for (const character of CHARACTERS) {
+-      if (!fs.existsSync(path.resolve(character.file))) continue;
+       const vrm = await loadBundledVrm(character.file);
+       // Skip non-humanoid / missing hands.
+       if (
+@@ -137,7 +154,7 @@ describe("relaxed hand palm orientation across bundled characters", () => {
+   }, 180_000);
+ 
+   it("does not force palm twist on a clearly raised arm (wave-like)", async () => {
+-    const vrm = await loadBundledVrm("public/vrm/AvatarSample_A.vrm");
++    const vrm = await loadBundledVrm("AvatarSample_A.vrm");
+     const bones: PoseBoneMap = {
+       rightUpperArm: { direction: { sideX: 0.48, y: 0.66, z: 0.08 } },
+       rightLowerArm: { direction: { sideX: 0.18, y: 0.96, z: 0.1 } },
+diff --git a/apps/web/src/domains/legal/SitemapPage.tsx b/apps/web/src/domains/legal/SitemapPage.tsx
+index 9ed4e7eb3..1cb34341c 100644
+--- a/apps/web/src/domains/legal/SitemapPage.tsx
++++ b/apps/web/src/domains/legal/SitemapPage.tsx
+@@ -1,4 +1,4 @@
+-import Link from "@/src/compat/router-link";
++import Link from "@/compat/router-link";
+ 
+ const routes = [
+   ["/", "홈", "통합 카탈로그와 추천 진입점"],
+diff --git a/apps/web/src/domains/market/components/CreatorMarketplaceCloudLibraryAction.test.tsx b/apps/web/src/domains/market/components/CreatorMarketplaceCloudLibraryAction.test.tsx
+index 81bb83d48..89a9339a8 100644
+--- a/apps/web/src/domains/market/components/CreatorMarketplaceCloudLibraryAction.test.tsx
++++ b/apps/web/src/domains/market/components/CreatorMarketplaceCloudLibraryAction.test.tsx
+@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ import { CreatorMarketplaceCloudLibraryAction } from "./CreatorMarketplaceCloudLibraryAction";
+ 
+ import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
+-import type { SessionContextValue } from "@/src/compat/auth-session-store";
++import type { SessionContextValue } from "@/compat/auth-session-store";
+ 
+ import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
+-import { SessionContext } from "@/src/compat/auth-session-store";
++import { SessionContext } from "@/compat/auth-session-store";
+ 
+ const mocks = vi.hoisted(() => ({
+   acquire: vi.fn(),
+@@ -28,7 +28,7 @@ function deferred<T>() {
+   return { promise, reject, resolve };
+ }
+ 
+-vi.mock("@/src/infrastructure/creator-marketplace-client", () => ({
++vi.mock("@/infrastructure/creator-marketplace-client", () => ({
+   acquireCreatorMarketplaceCloudLibraryRelease: mocks.acquire,
+   listCreatorMarketplaceCloudLibrary: mocks.list,
+   resolveCreatorMarketplaceCloudLibraryAcquisitionTarget: mocks.resolveTarget,
+diff --git a/apps/web/src/domains/market/components/CreatorMarketplaceCloudLibraryAction.tsx b/apps/web/src/domains/market/components/CreatorMarketplaceCloudLibraryAction.tsx
+index 6edbbb7d8..e9f3ca3ad 100644
+--- a/apps/web/src/domains/market/components/CreatorMarketplaceCloudLibraryAction.tsx
++++ b/apps/web/src/domains/market/components/CreatorMarketplaceCloudLibraryAction.tsx
+@@ -10,13 +10,13 @@ import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-mark
+ 
+ import { buttonClass } from "@/shared/components/ui/button-utils";
+ import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
+-import { useSession } from "@/src/compat/auth-session-store";
++import { useSession } from "@/compat/auth-session-store";
+ import {
+   acquireCreatorMarketplaceCloudLibraryRelease,
+   listCreatorMarketplaceCloudLibrary,
+   resolveCreatorMarketplaceCloudLibraryAcquisitionTarget,
+   setCreatorMarketplaceCloudLibraryArchived,
+-} from "@/src/infrastructure/creator-marketplace-client";
++} from "@/infrastructure/creator-marketplace-client";
+ 
+ interface ReceiptSnapshot {
+   readonly libraryItemId: string;
+diff --git a/apps/web/src/domains/market/components/MarketNavHeader.tsx b/apps/web/src/domains/market/components/MarketNavHeader.tsx
+index 95be56504..4f534135a 100644
+--- a/apps/web/src/domains/market/components/MarketNavHeader.tsx
++++ b/apps/web/src/domains/market/components/MarketNavHeader.tsx
+@@ -16,7 +16,7 @@ import { useMarketWishlist } from "../hooks/use-market-wishlist";
+ 
+ import { buttonClass } from "@/shared/components/ui/button-utils";
+ import { cn } from "@/shared/lib/utils";
+-import Link from "@/src/compat/router-link";
++import Link from "@/compat/router-link";
+ 
+ interface MarketNavHeaderProps {
+   className?: string;
+diff --git a/apps/web/src/domains/market/hooks/use-market-library.ts b/apps/web/src/domains/market/hooks/use-market-library.ts
+index 32c598dc8..9183813a8 100644
+--- a/apps/web/src/domains/market/hooks/use-market-library.ts
++++ b/apps/web/src/domains/market/hooks/use-market-library.ts
+@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
+ 
+ import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
+ 
+-import { acquireCreatorMarketplaceCloudLibraryRelease } from "@/src/infrastructure/creator-marketplace-client";
++import { acquireCreatorMarketplaceCloudLibraryRelease } from "@/infrastructure/creator-marketplace-client";
+ 
+ export interface AcquiredMarketItem {
+   id: string;
+diff --git a/apps/web/src/domains/market/hooks/use-market-resource-detail.test.tsx b/apps/web/src/domains/market/hooks/use-market-resource-detail.test.tsx
+index de4b22466..fc9251d36 100644
+--- a/apps/web/src/domains/market/hooks/use-market-resource-detail.test.tsx
++++ b/apps/web/src/domains/market/hooks/use-market-resource-detail.test.tsx
+@@ -12,7 +12,7 @@ import { getCreatorMarketplaceResource } from "../remotes/market-resource-remote
+ 
+ import { useMarketResourceDetail } from "./use-market-resource-detail";
+ 
+-import { NotFoundError } from "@/src/infrastructure/use-api-resource";
++import { NotFoundError } from "@/infrastructure/use-api-resource";
+ 
+ vi.mock("../models/market-resource-cache", () => ({
+   readCachedMarketResource: vi.fn(),
+diff --git a/apps/web/src/domains/market/hooks/use-market-resource-detail.ts b/apps/web/src/domains/market/hooks/use-market-resource-detail.ts
+index 076bf9df6..135f25ebd 100644
+--- a/apps/web/src/domains/market/hooks/use-market-resource-detail.ts
++++ b/apps/web/src/domains/market/hooks/use-market-resource-detail.ts
+@@ -11,7 +11,7 @@ import { getCreatorMarketplaceResource } from "../remotes/market-resource-remote
+ import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
+ 
+ import { findStarterMarketplaceResourceById } from "@/shared/lib/creator-marketplace-starter-catalog";
+-import { NotFoundError } from "@/src/infrastructure/use-api-resource";
++import { NotFoundError } from "@/infrastructure/use-api-resource";
+ 
+ export interface MarketResourceDetail {
+   readonly record: CreatorMarketplaceResourceRecord | null;
+diff --git a/apps/web/src/domains/market/hooks/use-market-resources.test.tsx b/apps/web/src/domains/market/hooks/use-market-resources.test.tsx
+index 13b3b9a1f..64c5f6482 100644
+--- a/apps/web/src/domains/market/hooks/use-market-resources.test.tsx
++++ b/apps/web/src/domains/market/hooks/use-market-resources.test.tsx
+@@ -10,9 +10,9 @@ import {
+   type CreatorMarketplaceResourceListPage,
+   type CreatorMarketplaceResourceRecord,
+ } from "@/shared/lib/creator-marketplace-resource-contract";
+-import { listCreatorMarketplaceResources } from "@/src/domains/market/remotes/market-resource-remote";
++import { listCreatorMarketplaceResources } from "@/domains/market/remotes/market-resource-remote";
+ 
+-vi.mock("@/src/domains/market/remotes/market-resource-remote", () => ({
++vi.mock("@/domains/market/remotes/market-resource-remote", () => ({
+   listCreatorMarketplaceResources: vi.fn(),
+ }));
+ 
+diff --git a/apps/web/src/domains/market/pages/MarketPublishPage.tsx b/apps/web/src/domains/market/pages/MarketPublishPage.tsx
+index bf53c2ce8..c2d2282fe 100644
+--- a/apps/web/src/domains/market/pages/MarketPublishPage.tsx
++++ b/apps/web/src/domains/market/pages/MarketPublishPage.tsx
+@@ -33,13 +33,13 @@ import { Container } from "@/shared/components/section";
+ import { buttonClass } from "@/shared/components/ui/button-utils";
+ import { CREATOR_MARKETPLACE_RUNTIME_BY_KIND } from "@/shared/lib/creator-marketplace-resource-contract";
+ import { cn } from "@/shared/lib/utils";
+-import { useSession } from "@/src/compat/auth-session-store";
+-import Link from "@/src/compat/router-link";
++import { useSession } from "@/compat/auth-session-store";
++import Link from "@/compat/router-link";
+ import {
+   useDocumentTitle,
+   useMetaDescription,
+-} from "@/src/hooks/use-document-title";
+-import { publishCreatorMarketplaceResource } from "@/src/infrastructure/creator-marketplace-client";
++} from "@/hooks/use-document-title";
++import { publishCreatorMarketplaceResource } from "@/infrastructure/creator-marketplace-client";
+ 
+ export function MarketPublishPage() {
+   useDocumentTitle("에셋 등록 · 창작 마켓");
+diff --git a/apps/web/src/infrastructure/use-api-resource.ts b/apps/web/src/infrastructure/use-api-resource.ts
+index 0892bd0d3..e22e5d139 100644
+--- a/apps/web/src/infrastructure/use-api-resource.ts
++++ b/apps/web/src/infrastructure/use-api-resource.ts
+@@ -1,6 +1,6 @@
+ import { useEffect, useState } from "react";
+ 
+-import { api, apiPath } from "@/src/infrastructure/api";
++import { api, apiPath } from "@/infrastructure/api";
+ 
+ // 404 를 흐름 제어(notFound)로 다루기 위한 센티넬 에러. 일반 에러와 구분한다.
+ export class NotFoundError extends Error {
+diff --git a/apps/web/src/shared/components/site-header-auth-surface.test.ts b/apps/web/src/shared/components/site-header-auth-surface.test.ts
+index 0249c6f49..15a8828f4 100644
+--- a/apps/web/src/shared/components/site-header-auth-surface.test.ts
++++ b/apps/web/src/shared/components/site-header-auth-surface.test.ts
+@@ -9,9 +9,14 @@ import { describe, expect, it } from "vitest";
+  */
+ describe("site header auth surface", () => {
+   it("exposes a single canonical session auth control and never remounts Firebase member auth", () => {
+-    const header = readFileSync(join(process.cwd(), "components/site-header.tsx"), "utf8");
++    const header = readFileSync(join(process.cwd(), "apps/web/src/shared/components/site-header.tsx"), "utf8");
+ 
+-    expect(header).toMatch(/import\s+\{\s*AuthMenuShell\s*\}\s+from\s+"\.\/auth\/auth-menu-shell"/);
++    // The auth shell moved to `apps/web/src/domains/auth/components/` in the 2026-09 apps/web
++    // move, so the header now reaches it through `../../domains/…`. Pin the module identity,
++    // not the number of `../` segments in front of it.
++    expect(header).toMatch(
++      /import\s+\{\s*AuthMenuShell\s*\}\s+from\s+"[^"]*\/domains\/auth\/components\/auth-menu-shell"/,
++    );
+     expect(header).toMatch(/<AuthMenuShell\s*\/>/);
+ 
+     expect(header).not.toMatch(/MemberAuth/);
+diff --git a/apps/web/src/shared/components/site-header-mobile-nav.tsx b/apps/web/src/shared/components/site-header-mobile-nav.tsx
+index 0f98c6008..3278e461e 100644
+--- a/apps/web/src/shared/components/site-header-mobile-nav.tsx
++++ b/apps/web/src/shared/components/site-header-mobile-nav.tsx
+@@ -19,7 +19,7 @@ import { useEffect, useRef, type RefObject } from "react";
+ 
+ import { cx } from "@/shared/lib/cx";
+ import { useT } from "@/shared/lib/i18n";
+-import Link from "@/src/compat/router-link";
++import Link from "@/compat/router-link";
+ 
+ const MOBILE_NAV = [
+   { i18n: "nav.home", href: "/", icon: Home, exact: true },
+diff --git a/apps/web/src/shared/components/site-header.tsx b/apps/web/src/shared/components/site-header.tsx
+index e104393be..809fd60b2 100644
+--- a/apps/web/src/shared/components/site-header.tsx
++++ b/apps/web/src/shared/components/site-header.tsx
+@@ -14,9 +14,9 @@ import { cx } from "@/shared/lib/cx";
+ import { useT } from "@/shared/lib/i18n";
+ import { keepInlineText } from "@/shared/lib/text";
+ import { useUi } from "@/shared/lib/ui-store";
+-import { isImmersiveMobileRoute } from "@/src/app/routes/immersive-mobile-route";
+-import { usePathname } from "@/src/compat/navigation";
+-import Link from "@/src/compat/router-link";
++import { isImmersiveMobileRoute } from "@/app/routes/immersive-mobile-route";
++import { usePathname } from "@/compat/navigation";
++import Link from "@/compat/router-link";
+ 
+ const NAV = [
+   { i18n: "nav.home", href: "/", exact: true },
+diff --git a/apps/web/src/shared/lib/__tests__/i18n-asset-manifest.test.ts b/apps/web/src/shared/lib/__tests__/i18n-asset-manifest.test.ts
+new file mode 100644
+index 000000000..97aae0bfe
+--- /dev/null
++++ b/apps/web/src/shared/lib/__tests__/i18n-asset-manifest.test.ts
+@@ -0,0 +1,138 @@
++import { existsSync, readFileSync, readdirSync } from "node:fs";
++import path from "node:path";
++
++import { describe, expect, it } from "vitest";
++
++import {
++  ADMIN_I18N_NAMESPACES,
++  APP_I18N_NAMESPACES,
++  STUDIO_I18N_NAMESPACES,
++} from "../i18n-asset-manifest";
++
++/**
++ * The namespace manifest is the only thing standing between a translation directory on disk and
++ * the strings a user actually sees. Nothing else connects them: the loaders iterate the manifest
++ * arrays and fetch exactly those directories, so a namespace added to `public/i18n` but not to the
++ * manifest ships as dead files, and a namespace removed from disk but left in the manifest makes
++ * every locale load fail (app, Studio) or silently lose strings (the fail-soft paths).
++ *
++ * Each bucket also still carries the pre-split flat `<locale>.json` next to its namespace
++ * directories, and the locale catalog generator reads those flat files while the browser reads the
++ * namespace files. Two sources of truth for one dictionary drift the moment someone edits one of
++ * them, so equality between them is asserted here rather than left to review.
++ */
++
++const I18N_ROOT = path.resolve(process.cwd(), "apps/web/public/i18n");
++
++const BUCKETS = [
++  { name: "app", namespaces: APP_I18N_NAMESPACES },
++  { name: "studio", namespaces: STUDIO_I18N_NAMESPACES },
++  { name: "admin", namespaces: ADMIN_I18N_NAMESPACES },
++] as const;
++
++function bucketDirectory(bucket: string): string {
++  return path.join(I18N_ROOT, bucket);
++}
++
++/** Namespace subdirectories present on disk for one bucket, sorted. */
++function namespacesOnDisk(bucket: string): string[] {
++  return readdirSync(bucketDirectory(bucket), { withFileTypes: true })
++    .filter((entry) => entry.isDirectory())
++    .map((entry) => entry.name)
++    .sort();
++}
++
++/** Flat `<locale>.json` assets left over from the pre-split layout, sorted by locale. */
++function flatLocalesOnDisk(bucket: string): string[] {
++  return readdirSync(bucketDirectory(bucket))
++    .filter((name) => name.endsWith(".json"))
++    .map((name) => name.slice(0, -".json".length))
++    .sort();
++}
++
++function readJson(file: string): Record<string, string> {
++  return JSON.parse(readFileSync(file, "utf8")) as Record<string, string>;
++}
++
++describe("i18n asset manifest", () => {
++  it("finds the published translation assets where the loaders look for them", () => {
++    // Anti-vacuity guard: every assertion below walks directories, so an I18N_ROOT that no longer
++    // exists after a tree move would otherwise turn this whole file into a no-op.
++    expect(existsSync(I18N_ROOT)).toBe(true);
++    expect(BUCKETS.map((bucket) => bucket.name)).toEqual(["app", "studio", "admin"]);
++  });
++
++  for (const { name, namespaces } of BUCKETS) {
++    describe(`${name} bucket`, () => {
++      it("lists exactly the namespace directories that exist on disk", () => {
++        expect(namespacesOnDisk(name)).toEqual([...namespaces].sort());
++      });
++
++      it("omits a namespace file only where that namespace has no strings in the locale", () => {
++        // The split writes no file rather than an empty one, so absence is meaningful: it must
++        // mean "this namespace contributes nothing to this locale". An absent file whose keys DO
++        // appear in the flat asset is a dropped translation, which is what this catches. The
++        // loaders read absence as empty, so without this assertion a lost file would be invisible.
++        const locales = flatLocalesOnDisk(name);
++        expect(locales.length).toBeGreaterThan(0);
++        const keysOwnedBy = new Map<string, Set<string>>();
++        for (const namespace of namespaces) {
++          const owned = new Set<string>();
++          for (const locale of locales) {
++            const file = path.join(bucketDirectory(name), namespace, `${locale}.json`);
++            if (existsSync(file)) for (const key of Object.keys(readJson(file))) owned.add(key);
++          }
++          keysOwnedBy.set(namespace, owned);
++        }
++        const dropped: string[] = [];
++        for (const locale of locales) {
++          const flat = readJson(path.join(bucketDirectory(name), `${locale}.json`));
++          for (const namespace of namespaces) {
++            const file = path.join(bucketDirectory(name), namespace, `${locale}.json`);
++            if (existsSync(file)) continue;
++            const stranded = [...keysOwnedBy.get(namespace)!].filter((key) => key in flat);
++            if (stranded.length > 0) {
++              dropped.push(`${name}/${namespace}/${locale}.json is absent but the flat asset still carries ${stranded.length} of its keys (e.g. ${stranded[0]})`);
++            }
++          }
++        }
++        expect(dropped).toEqual([]);
++      });
++
++      it("keeps the namespace files and the flat asset in agreement", () => {
++        // The loaders merge namespaces in manifest order; the catalog generator reads the flat
++        // file. If these ever disagree, the language picker advertises coverage the browser will
++        // not render.
++        const disagreeing: string[] = [];
++        for (const locale of flatLocalesOnDisk(name)) {
++          const flat = readJson(path.join(bucketDirectory(name), `${locale}.json`));
++          const merged: Record<string, string> = {};
++          for (const namespace of namespaces) {
++            // Absent means "no strings in this locale", exactly as the loaders read it; the
++            // sibling assertion above proves no absence is hiding a dropped translation.
++            const file = path.join(bucketDirectory(name), namespace, `${locale}.json`);
++            if (existsSync(file)) Object.assign(merged, readJson(file));
++          }
++          // Key order legitimately differs — the flat file preserves authoring order while the
++          // merge follows manifest order — so compare the key set and each value, not the text.
++          const flatKeys = Object.keys(flat);
++          const onlyFlat = flatKeys.filter((key) => !(key in merged));
++          const onlyMerged = Object.keys(merged).filter((key) => !(key in flat));
++          const changed = flatKeys.filter((key) => key in merged && merged[key] !== flat[key]);
++          if (onlyFlat.length > 0 || onlyMerged.length > 0 || changed.length > 0) {
++            disagreeing.push(
++              `${name}/${locale}: only-in-flat=${onlyFlat.length}${onlyFlat[0] ? ` (e.g. ${onlyFlat[0]})` : ""}`
++              + ` only-in-namespaces=${onlyMerged.length}${onlyMerged[0] ? ` (e.g. ${onlyMerged[0]})` : ""}`
++              + ` differing-values=${changed.length}${changed[0] ? ` (e.g. ${changed[0]})` : ""}`,
++            );
++          }
++        }
++        expect(disagreeing).toEqual([]);
++      });
++
++      it("declares no duplicate namespace", () => {
++        expect(new Set(namespaces).size).toBe(namespaces.length);
++      });
++    });
++  }
++});
+diff --git a/apps/web/src/shared/lib/__tests__/i18n-locale-assets.test.ts b/apps/web/src/shared/lib/__tests__/i18n-locale-assets.test.ts
+index f8b416501..e0c5e7a23 100644
+--- a/apps/web/src/shared/lib/__tests__/i18n-locale-assets.test.ts
++++ b/apps/web/src/shared/lib/__tests__/i18n-locale-assets.test.ts
+@@ -1,5 +1,6 @@
+ import { readFileSync } from "node:fs";
+ import path from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+ import { beforeEach, describe, expect, it, vi } from "vitest";
+ 
+@@ -60,7 +61,9 @@ describe("published app locale assets", () => {
+   it("keeps the generated catalog in sync with the assets on disk", () => {
+     const regenerated = buildCatalogSource(readAppLocaleDictionaries());
+     const committed = readFileSync(
+-      path.resolve(process.cwd(), "lib", "i18n-locale-catalog.ts"),
++      // The 2026-09 apps/web move relocated `<root>/lib` to `apps/web/src/shared/lib`;
++      // anchor on this file rather than `process.cwd()`.
++      fileURLToPath(new URL("../i18n-locale-catalog.ts", import.meta.url)),
+       "utf8",
+     );
+ 
+diff --git a/apps/web/src/shared/lib/__tests__/i18n.test.ts b/apps/web/src/shared/lib/__tests__/i18n.test.ts
+index 313bf85eb..ac745da06 100644
+--- a/apps/web/src/shared/lib/__tests__/i18n.test.ts
++++ b/apps/web/src/shared/lib/__tests__/i18n.test.ts
+@@ -1,5 +1,6 @@
+ import { readFileSync, readdirSync, statSync } from "node:fs";
+ import { join, extname } from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+ import { afterEach, describe, expect, it, vi } from "vitest";
+ 
+@@ -83,8 +84,17 @@ async function withLocalStorage<T>(fn: () => T | Promise<T>): Promise<T> {
+   }
+ }
+ 
++/**
++ * Browser source root behind the `@` alias.
++ *
++ * This scan used to walk the cwd-relative roots `["components", "lib", "src"]`. The 2026-09
++ * apps/web move folded all three under `apps/web/src` (`src/components`, `src/shared/lib`,
++ * and the per-domain component trees), so the old list threw ENOENT on `components`.
++ */
++const WEB_SRC_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
++
+ function collectSourceI18nKeys(): Set<string> {
+-  const roots = ["components", "lib", "src"];
++  const roots = [WEB_SRC_ROOT];
+   const visited = new Set<string>();
+   const used = new Set<string>();
+   const keyRe = /\bt\(\s*["'`]([^"'`]+)["'`]\s*\)/g;
+@@ -347,9 +357,16 @@ describe("runtime translation bundles", () => {
+ describe("translation dictionary completeness", () => {
+   it("keeps every t() key covered by its shell or lazy route dictionaries", () => {
+     const usedKeys = collectSourceI18nKeys();
++    // A scan that silently reaches zero files would satisfy every assertion below, so keep the
++    // floor explicit: the browser tree calls t() thousands of times.
++    expect(usedKeys.size).toBeGreaterThan(200);
+     const shellKeys = new Set([...Object.keys(i18nDict.ko), ...Object.keys(i18nDict.en)]);
+-    const adminEn = readRouteDictionary("apps/web/public/i18n/admin");
+-    const adminKo = readRouteDictionary("apps/web/public/i18n/admin");
++    // `public/i18n/admin` became a directory in the 2026-09 split (flat `<locale>.json` beside
++    // per-namespace subdirectories), so both reads hit EISDIR. They also both named the same
++    // path, which made `adminKoMissing` a second check of the English file — the Korean
++    // dictionary was never verified. Read each locale's own flat asset.
++    const adminEn = readRouteDictionary("apps/web/public/i18n/admin/en.json");
++    const adminKo = readRouteDictionary("apps/web/public/i18n/admin/ko.json");
+     const adminKeys = [...usedKeys].filter((key) => key.startsWith("admin."));
+     const shellMissing = [...usedKeys]
+       .filter((key) => !key.startsWith("admin.") && !shellKeys.has(key))
+diff --git a/apps/web/src/shared/lib/__tests__/production-domain.test.ts b/apps/web/src/shared/lib/__tests__/production-domain.test.ts
+index 8094fa8d0..87763f5b1 100644
+--- a/apps/web/src/shared/lib/__tests__/production-domain.test.ts
++++ b/apps/web/src/shared/lib/__tests__/production-domain.test.ts
+@@ -20,7 +20,8 @@ describe("toonstudio.cloud production domain", () => {
+   });
+ 
+   it("publishes canonical, OG, JSON-LD, robots and LLM links on the www origin", () => {
+-    const html = read("index.html");
++    // The Vite HTML entry moved to `apps/web/index.html` in the 2026-09 apps/web move.
++    const html = read("apps/web/index.html");
+     expect(html).toContain(`<link rel="canonical" href="${CANONICAL_ORIGIN}/"`);
+     expect(html).toContain(`<meta property="og:url" content="${CANONICAL_ORIGIN}/"`);
+     expect(html).toContain(`"@id": "${CANONICAL_ORIGIN}/#website"`);
+diff --git a/apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts b/apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts
+index 43af628f7..c0c843103 100644
+--- a/apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts
++++ b/apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts
+@@ -101,7 +101,8 @@ describe("PWA manifest", () => {
+   });
+ 
+   it("serves a raster apple-touch-icon (iOS does not render SVG touch icons)", () => {
+-    const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
++    // The Vite HTML entry moved to `apps/web/index.html` in the 2026-09 apps/web move.
++    const html = readFileSync(join(process.cwd(), "apps/web/index.html"), "utf8");
+     const href = html.match(/<link rel="apple-touch-icon"[^>]*href="([^"]+)"/)?.[1];
+ 
+     expect(href).toBe("/apple-touch-icon.png");
+diff --git a/apps/web/src/shared/lib/__tests__/vite-migration.test.ts b/apps/web/src/shared/lib/__tests__/vite-migration.test.ts
+index 5ee8951ec..50a8b8079 100644
+--- a/apps/web/src/shared/lib/__tests__/vite-migration.test.ts
++++ b/apps/web/src/shared/lib/__tests__/vite-migration.test.ts
+@@ -54,7 +54,7 @@ describe("vite migration", () => {
+     // 커맨드 팔레트 호스트는 공용 셸(AppShell)에서 마운트한다(App.tsx 는 라우터+크롬만 조립).
+     const app = readFileSync(join(process.cwd(), "apps/web/src/app/App.tsx"), "utf8");
+     const shell = readFileSync(join(process.cwd(), "apps/web/src/app/AppShell.tsx"), "utf8");
+-    const host = readFileSync(join(process.cwd(), "components/command-palette-host.tsx"), "utf8");
++    const host = readFileSync(join(process.cwd(), "apps/web/src/shared/components/command-palette-host.tsx"), "utf8");
+ 
+     expect(shell).toContain("@/shared/components/command-palette-host");
+     expect(app).not.toMatch(/from\s+["']@\/components\/command-palette["']/);
+@@ -79,7 +79,8 @@ describe("vite migration", () => {
+   });
+ 
+   it("keeps studio-only Google Fonts out of the global render-blocking stylesheet", () => {
+-    const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
++    // The Vite HTML entry moved to `apps/web/index.html` in the 2026-09 apps/web move.
++    const html = readFileSync(join(process.cwd(), "apps/web/index.html"), "utf8");
+     // Ownership moved out of StudioPage: the studio no longer injects all eight families on idle,
+     // it loads the families a document actually uses and defers the rest to the preset list. The
+     // css2 URL is assembled from these declarations at runtime, so the source carries plain names
+diff --git a/apps/web/src/shared/lib/creator-asset-marketplace-boundary.test.ts b/apps/web/src/shared/lib/creator-asset-marketplace-boundary.test.ts
+index 465ecde64..214c3faf5 100644
+--- a/apps/web/src/shared/lib/creator-asset-marketplace-boundary.test.ts
++++ b/apps/web/src/shared/lib/creator-asset-marketplace-boundary.test.ts
+@@ -32,7 +32,12 @@ const creatorModuleSource = readFileSync(
+   new URL("../../../../../apps/api/src/modules/creator/creator.module.ts", import.meta.url),
+   "utf8"
+ );
+-const ciSource = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
++// Workspace-root `.github/`, five levels above `apps/web/src/shared/lib/` — the same anchor
++// the `apps/api` reads above use.
++const ciSource = readFileSync(
++  new URL("../../../../../.github/workflows/ci.yml", import.meta.url),
++  "utf8",
++);
+ const productionMigrationManifestSource = readFileSync(
+   new URL("../../../../../scripts/production-database-migrations.manifest",
+     import.meta.url
+diff --git a/apps/web/src/shared/lib/i18n-asset-loader.ts b/apps/web/src/shared/lib/i18n-asset-loader.ts
+index 39e36abb0..da14bd3d5 100644
+--- a/apps/web/src/shared/lib/i18n-asset-loader.ts
++++ b/apps/web/src/shared/lib/i18n-asset-loader.ts
+@@ -278,19 +278,44 @@ export async function loadAppI18nLocale(
+         if (typeof resolvedFetch !== "function") {
+           throw new Error("The Fetch API is unavailable in this runtime.");
+         }
++        // One request per namespace, all in flight together. Awaiting inside the loop made a
++        // non-built-in locale pay 34 sequential round-trips where the pre-split asset cost one.
++        //
++        // A namespace with no strings in a locale is not published at all — the split writes no
++        // file rather than an empty one — so 404 means "this namespace contributes nothing here",
++        // which is true for 353 of the published (locale, namespace) pairs. Treating it as an
++        // error took 67 of the 75 locales down to the fallback chain entirely; only the two
++        // built-in locales, which never fetch, were unaffected. Any other non-OK status is still
++        // a real transport or deployment failure and still fails the load.
++        const parts = await Promise.all(
++          APP_I18N_NAMESPACES.map(async (namespace) => {
++            const url = appI18nAssetUrl(assetLocale, options.baseUrl, namespace);
++            const response = await resolvedFetch(url, {
++              cache: "force-cache",
++              credentials: "same-origin",
++            });
++            if (response.status === 404) return null;
++            if (!response.ok) {
++              throw new Error(`HTTP ${response.status} for ${url}`);
++            }
++            const part = parseAppI18nDictionary(await response.text());
++            if (!part) {
++              throw new Error(`Malformed app dictionary asset for "${assetLocale}/${namespace}".`);
++            }
++            return part;
++          }),
++        );
++        // Merged in manifest order, so a key defined in two namespaces resolves the same way
++        // on every run regardless of which response arrived first.
+         const merged: Record<string, string> = {};
+-        for (const namespace of APP_I18N_NAMESPACES) {
+-          const url = appI18nAssetUrl(assetLocale, options.baseUrl, namespace);
+-          const response = await resolvedFetch(url, {
+-            cache: "force-cache",
+-            credentials: "same-origin",
+-          });
+-          if (!response.ok) {
+-            throw new Error(`HTTP ${response.status} for ${url}`);
+-          }
+-          const part = parseAppI18nDictionary(await response.text());
+-          if (!part) throw new Error(`Malformed app dictionary asset for "${assetLocale}/${namespace}".`);
+-          Object.assign(merged, part);
++        for (const part of parts) if (part) Object.assign(merged, part);
++        // Every namespace missing means the assets are not deployed at this base URL at all,
++        // which must surface as a failed locale rather than as a silently empty dictionary.
++        if (Object.keys(merged).length === 0) {
++          throw new Error(
++            `All ${APP_I18N_NAMESPACES.length} app dictionary namespaces returned 404 for `
++            + `"${assetLocale}" (first: ${appI18nAssetUrl(assetLocale, options.baseUrl, APP_I18N_NAMESPACES[0])}).`,
++          );
+         }
+         source = JSON.stringify(merged);
+       }
+@@ -367,16 +392,27 @@ export async function loadStudioAssetIfAvailable(
+           ? (window as unknown as Record<string, string>).__VITE_BASE_URL__
+           : "/";
+       const normBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
++      // Fail-soft per namespace, and all requests in flight at once: a missing or flaky
++      // namespace costs its own strings, not the whole locale, and not 23 serial round-trips.
++      const parts = await Promise.all(
++        STUDIO_I18N_NAMESPACES.map(async (namespace) => {
++          try {
++            const response = await fetch(
++              `${normBaseUrl}i18n/studio/${namespace}/${assetLocale}.json`,
++              { cache: "force-cache", credentials: "same-origin" },
++            );
++            if (!response.ok) return null;
++            const data: unknown = await response.json();
++            return data && typeof data === "object" && !Array.isArray(data)
++              ? (data as Record<string, string>)
++              : null;
++          } catch {
++            return null;
++          }
++        }),
++      );
+       const merged: Record<string, string> = {};
+-      for (const namespace of STUDIO_I18N_NAMESPACES) {
+-        const response = await fetch(
+-          `${normBaseUrl}i18n/studio/${namespace}/${assetLocale}.json`,
+-          { cache: "force-cache", credentials: "same-origin" },
+-        );
+-        if (!response.ok) continue;
+-        const data = await response.json();
+-        if (data && typeof data === "object" && !Array.isArray(data)) Object.assign(merged, data);
+-      }
++      for (const part of parts) if (part) Object.assign(merged, part);
+       if (Object.keys(merged).length > 0) {
+         registerI18nLocaleEntries(assetLocale, merged);
+         if (assetLocale !== normalized) registerI18nLocaleEntries(normalized, merged);
+diff --git a/eslint.config.mjs b/eslint.config.mjs
+index e9a6ae2ac..24c8f9073 100644
+--- a/eslint.config.mjs
++++ b/eslint.config.mjs
+@@ -134,7 +134,9 @@ export default defineConfig(
+         pattern: 'apps/web/src/{components,hooks,styles,compat,catalog-static,catalog-static-engine}*/**/*',
+         mode: 'full',
+       },
+-      { type: 'shared', pattern: 'apps/web/src/catalog-static*.ts', mode: 'full' },
++      // The move created apps/web/src/shared/; without this the whole tree stayed unclassified
++      // and boundaries/element-types silently allowed every import into and out of it.
++      { type: 'shared', pattern: 'apps/web/src/shared/**/*', mode: 'full' },
+       { type: 'infrastructure', pattern: 'apps/web/src/infrastructure/**/*', mode: 'full' },
+     ],
+     rules: [
+@@ -177,9 +179,10 @@ export default defineConfig(
+     },
+   },
+ 
+-  // 서버/DB/스크립트 유틸은 Node 런타임.
++  // 서버/스크립트 유틸은 Node 런타임. (구 lib/db 는 apps/api/src/db 로 옮겨져 이 목록에서 빠졌고,
++  // 구 lib/server 는 웹 앱과 함께 apps/web/src/shared/lib/server 로 이동했다.)
+   {
+-    files: ['lib/db/**/*.ts', 'lib/server/**/*.ts', 'scripts/**/*.{ts,tsx,mts,cts}'],
++    files: ['apps/web/src/shared/lib/server/**/*.ts', 'scripts/**/*.{ts,tsx,mts,cts}'],
+     languageOptions: { globals: globals.node },
+   },
+ 
+diff --git a/package.json b/package.json
+index d71fc19ce..339cb649c 100644
+--- a/package.json
++++ b/package.json
+@@ -54,7 +54,7 @@
+     "typecheck:cloudflare-realtime": "tsc -p deploy/cloudflare-realtime/tsconfig.json && tsc -p deploy/cloudflare-realtime/tsconfig.integration.json",
+     "verify:cloudflare-realtime": "pnpm run test:cloudflare-realtime && pnpm run typecheck:cloudflare-realtime && pnpm exec wrangler deploy --dry-run --config deploy/cloudflare-realtime/wrangler.jsonc",
+     "verify:backend-capability-worker": "node scripts/canary-backend-capability-worker.mjs",
+-    "verify:csp": "node scripts/verify-vercel-csp.mjs index.html",
++    "verify:csp": "node scripts/verify-vercel-csp.mjs apps/web/index.html",
+     "validate:architecture": "node scripts/validate-architecture.mjs",
+     "verify:toolchain-coverage": "node scripts/verify-toolchain-coverage.mjs",
+     "check:studio-bundle": "node scripts/check-studio-bundle.mjs",
+diff --git a/packages/studio-engine-registry/src/__tests__/renderer-roles.test.ts b/packages/studio-engine-registry/src/__tests__/renderer-roles.test.ts
+index 38e715792..22569a4da 100644
+--- a/packages/studio-engine-registry/src/__tests__/renderer-roles.test.ts
++++ b/packages/studio-engine-registry/src/__tests__/renderer-roles.test.ts
+@@ -41,7 +41,10 @@ const loadFs = async (): Promise<NodeFsPromisesModule> =>
+ // packages/studio-engine-registry/src/__tests__/ -> repo root
+ const REPO_ROOT_URL = new URL("../../../../", import.meta.url);
+ 
+-const SCAN_ROOTS = ["src", "apps"] as const;
++// Roots the ledger markdown declares. The browser tree moved from `<root>/src` to
++// `apps/web/src` in the 2026-09 apps/web move; scanning the stale `src` returned zero
++// files, which the floor in the last test below caught.
++const SCAN_ROOTS = ["apps/web/src", "apps"] as const;
+ const IGNORED_DIRECTORIES = new Set([
+   "node_modules",
+   "dist",
+@@ -257,10 +260,10 @@ describe("lab engines have zero product import sites", () => {
+     ).toEqual(["planted-engine", "plantedSymbol"]);
+   });
+ 
+-  it("has zero violations against the real src/ and apps/ trees", async () => {
++  it("has zero violations against the real apps/web/src and apps trees", async () => {
+     const { filesByRoot, contents } = await collectProductSources(SCAN_ROOTS);
+     // 스캐너가 조용히 0개 파일을 읽고 초록으로 통과하는 회귀를 막는다.
+-    expect((filesByRoot.get("src") ?? []).length).toBeGreaterThan(100);
++    expect((filesByRoot.get("apps/web/src") ?? []).length).toBeGreaterThan(100);
+ 
+     const violations = findLabEngineProductImports({
+       roots: [...SCAN_ROOTS],
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index c6d3600a8..783be8c4c 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -95,3 +95,5 @@ patchedDependencies:
+   '@react-three/fiber@9.6.1': patches/@react-three__fiber@9.6.1.patch
+   'minimatch@3.1.5': patches/minimatch@3.1.5.patch
+   p5.brush@2.2.1: patches/p5.brush@2.2.1.patch
++
++verifyDepsBeforeRun: false
+diff --git a/scripts/generate-app-i18n-catalog.mjs b/scripts/generate-app-i18n-catalog.mjs
+index 6d96505e6..4d0a75729 100644
+--- a/scripts/generate-app-i18n-catalog.mjs
++++ b/scripts/generate-app-i18n-catalog.mjs
+@@ -14,21 +14,49 @@ import path from "node:path";
+ 
+ const repoRoot = path.resolve(import.meta.dirname, "..");
+ const assetDirectory = path.join(repoRoot, "apps", "web", "public", "i18n", "app");
+-const catalogPath = path.join(repoRoot, "apps", "web", "lib", "i18n-locale-catalog.ts");
++const catalogPath = path.join(repoRoot, "apps", "web", "src", "shared", "lib", "i18n-locale-catalog.ts");
+ 
+ /** Locales compiled into the app shell so the fallback chain never awaits I/O. */
+ const BUILT_IN_LOCALES = ["ko", "en"];
+ const REFERENCE_LOCALE = "en";
+ const TRANSLATED_LOCALE_THRESHOLD = 0.5;
+ 
++/**
++ * One merged dictionary per locale, assembled from the published namespace directories.
++ *
++ * The namespace files are the authored source — commit 9b9112c4f replaced the monolithic
++ * `<locale>.json` assets with them and the browser fetches only the namespace paths. Reading the
++ * leftover monolithic files instead would let this catalog describe a dictionary the app never
++ * serves. A namespace that has no strings in a locale is not published at all, so an absent file
++ * is skipped rather than treated as an error, exactly as the runtime loaders treat a 404.
++ *
++ * Namespaces are merged in sorted order purely for determinism; no key is defined in two
++ * namespaces, which `apps/web/src/shared/lib/__tests__/i18n-asset-manifest.test.ts` enforces.
++ */
+ export function readAppLocaleDictionaries(directory = assetDirectory) {
++  const namespaces = readdirSync(directory, { withFileTypes: true })
++    .filter((entry) => entry.isDirectory())
++    .map((entry) => entry.name)
++    .sort();
++  if (namespaces.length === 0) {
++    throw new Error(
++      `No locale namespace directories under ${directory}. `
++      + "The app dictionaries are published as <namespace>/<locale>.json.",
++    );
++  }
++
+   const dictionaries = new Map();
+-  for (const fileName of readdirSync(directory).sort()) {
+-    if (!fileName.endsWith(".json")) continue;
+-    const locale = fileName.slice(0, -".json".length);
+-    dictionaries.set(locale, JSON.parse(readFileSync(path.join(directory, fileName), "utf8")));
++  for (const namespace of namespaces) {
++    for (const fileName of readdirSync(path.join(directory, namespace)).sort()) {
++      if (!fileName.endsWith(".json")) continue;
++      const locale = fileName.slice(0, -".json".length);
++      const part = JSON.parse(readFileSync(path.join(directory, namespace, fileName), "utf8"));
++      const existing = dictionaries.get(locale);
++      if (existing) Object.assign(existing, part);
++      else dictionaries.set(locale, part);
++    }
+   }
+-  return dictionaries;
++  return new Map([...dictionaries].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+ }
+ 
+ /**
+diff --git a/scripts/generate-studio-vrm-avatar-reference-catalogue.mts b/scripts/generate-studio-vrm-avatar-reference-catalogue.mts
+index a95f03bd7..11dbb5e6d 100644
+--- a/scripts/generate-studio-vrm-avatar-reference-catalogue.mts
++++ b/scripts/generate-studio-vrm-avatar-reference-catalogue.mts
+@@ -375,7 +375,10 @@ async function startHarnessServer(modelBytes: Uint8Array): Promise<Readonly<{
+     appType: "custom",
+     logLevel: "warn",
+     resolve: {
+-      alias: { "@": STUDIO_VRM_AVATAR_REFERENCE_ROOT },
++      // `root` stays at the repository root because the harness entry is loaded through an
++      // absolute `/scripts/…` URL, but `@` must resolve where the web app now lives or the two
++      // `@/shared/…` imports in this graph fail to resolve.
++      alias: { "@": resolve(STUDIO_VRM_AVATAR_REFERENCE_ROOT, "apps/web/src") },
+     },
+     define: {
+       "process.env": JSON.stringify({ NODE_ENV: "production" }),
+diff --git a/scripts/generate-studio-vrm-avatar-reference-catalogue.test.ts b/scripts/generate-studio-vrm-avatar-reference-catalogue.test.ts
+index e8ff8999c..9630ffe44 100644
+--- a/scripts/generate-studio-vrm-avatar-reference-catalogue.test.ts
++++ b/scripts/generate-studio-vrm-avatar-reference-catalogue.test.ts
+@@ -148,7 +148,8 @@ describe("Avatar Forge reference catalogue generator", () => {
+       "scripts/studio-vrm-avatar-reference-catalogue-browser.tsx",
+     ), "utf8");
+     expect(source).toMatch(
+-      /from\s+["']\.\.\/src\/domains\/creator\/vrm\/StudioVrmAvatarForge(?:\.tsx)?["']/,
++      // The browser tree moved to `apps/web/src` in the 2026-09 apps/web move.
++      /from\s+["']\.\.\/apps\/web\/src\/domains\/creator\/vrm\/StudioVrmAvatarForge(?:\.tsx)?["']/,
+     );
+     expect(source).toContain("<StudioVrmAvatarForge");
+     expect(source).toContain("createAvatarForgeState(presetId)");
+diff --git a/scripts/lib/repo-paths.mjs b/scripts/lib/repo-paths.mjs
+index c59b0fe42..1935bee4b 100644
+--- a/scripts/lib/repo-paths.mjs
++++ b/scripts/lib/repo-paths.mjs
+@@ -16,7 +16,7 @@
+  * tsx/tsc resolve from an `.mts` consumer, and plain `.mjs`/`.js` scripts
+  * import this file directly.
+  */
+-import { dirname, join, resolve } from "node:path";
++import { dirname, join, relative, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ /** Absolute path of the repository root (this file lives in `<root>/scripts/lib`). */
+@@ -42,3 +42,20 @@ export const WEB_VITE_CONFIG = join(REPO_ROOT, "vite.config.ts");
+ 
+ /** Production build output directory (`<web root>/dist`). */
+ export const DIST_DIR = join(REPO_ROOT, "dist");
++
++/**
++ * Vite manifest key for a frontend source file, given its **repository-relative**
++ * path (`apps/web/src/...`).
++ *
++ * `dist/.vite/manifest.json` indexes modules relative to the *Vite root*
++ * (`apps/web`), not the repository root: the autosave SQLite store is keyed
++ * `src/domains/creator/studio-autosave-sqlite-store.ts`, never
++ * `apps/web/src/domains/creator/studio-autosave-sqlite-store.ts`. Callers keep
++ * writing the repo-relative path they use everywhere else and this helper
++ * rebases it, so a future move of `WEB_ROOT` cannot desynchronise the two.
++ */
++export function viteManifestKey(repositoryRelativePath) {
++  return relative(WEB_ROOT, join(REPO_ROOT, repositoryRelativePath))
++    .split(sep)
++    .join("/");
++}
+diff --git a/scripts/qa-triage-playwright-artifacts.mjs b/scripts/qa-triage-playwright-artifacts.mjs
+index 6c63ee484..6a3d243dd 100644
+--- a/scripts/qa-triage-playwright-artifacts.mjs
++++ b/scripts/qa-triage-playwright-artifacts.mjs
+@@ -37,6 +37,10 @@ const signalPatterns = [
+   /(?:^|\b)(?:mismatch|panic|uncaught|pageerror|requestfailed|offscreen|clipped|overflow|blank screen|WebGL|WebGPU|aria-modal|accessible name|not found|not visible|did not open|outside viewport)(?:\b|:)/iu,
+ ];
+ const hasSignal = (value) => signalPatterns.some((pattern) => pattern.test(value));
++// Noise that must never be reported as a failure signal: dependency/lockfile chatter,
++// license text, and the bundler's own advisory output.
++const ignorablePattern =
++  /(?:node_modules|package-lock|pnpm-lock|THIRD_PARTY|license text|deoptimised the styling|chunk.*larger than|PLUGIN_TIMINGS|externalized for browser compatibility)/iu;
+ 
+ function rel(file) {
+   return path.relative(inputRoot, file).replaceAll(path.sep, "/");
+diff --git a/scripts/studio-2d-browser-smoke.mjs b/scripts/studio-2d-browser-smoke.mjs
+index b015d2282..a7f9ddac2 100644
+--- a/scripts/studio-2d-browser-smoke.mjs
++++ b/scripts/studio-2d-browser-smoke.mjs
+@@ -33,7 +33,7 @@ const results = [];
+ let server;
+ let browser;
+ try {
+-  server = await createServer({ configFile: false, root, plugins: [react()], resolve: { alias: { "@/src": path.join(root, "apps", "web", "src"), "@/shared": path.join(root, "apps", "web", "src", "shared"), "@/domains": path.join(root, "apps", "web", "src", "domains"), "@": path.join(root, "apps", "web", "src") } },
++  server = await createServer({ configFile: false, root, plugins: [react()], resolve: { alias: { "@": path.join(root, "apps", "web", "src") } },
+     server: { host: "127.0.0.1", port: 0 }, publicDir: path.join(root, "apps", "web", "public"),
+     optimizeDeps: { entries: [path.join(fixture, "index.html")] } });
+   await server.listen();
+diff --git a/scripts/studio-autonomous-change-plan.test.mjs b/scripts/studio-autonomous-change-plan.test.mjs
+index eff32adb4..460a2cd3b 100644
+--- a/scripts/studio-autonomous-change-plan.test.mjs
++++ b/scripts/studio-autonomous-change-plan.test.mjs
+@@ -110,16 +110,19 @@ test("control-plane workflow changes do not impersonate a runtime deployment", (
+ });
+ 
+ test("paths are normalized, deduplicated, and sorted deterministically", () => {
++  // The first two entries are the same file in Windows and POSIX form, so normalization must
++  // fold them into one. The 2026-09 apps/web move rewrote only the second one and the expected
++  // pair, which broke both the dedupe and the sort this case exists to prove.
+   const classification = classifyStudioChanges([
+-    ".\\src\\domains\\creator\\canvas\\StudioCanvas.tsx",
++    ".\\apps\\web\\src\\domains\\creator\\canvas\\StudioCanvas.tsx",
+     "apps/web/src/domains/creator/canvas/StudioCanvas.tsx",
+-    "  components/studio/brush/studio-brush-runtime.ts  ",
++    "  apps/web/src/domains/creator/studio/components/brush/studio-brush-runtime.ts  ",
+     "",
+   ]);
+ 
+   assert.deepEqual(classification.paths, [
+-    "apps/web/src/domains/creator/studio/components/brush/studio-brush-runtime.ts",
+     "apps/web/src/domains/creator/canvas/StudioCanvas.tsx",
++    "apps/web/src/domains/creator/studio/components/brush/studio-brush-runtime.ts",
+   ]);
+   assert.equal(classification.changedCount, 2);
+   assert.equal(classification.categories.canvas, true);
+diff --git a/scripts/studio-bg3d-png-chunk-boundary.test.ts b/scripts/studio-bg3d-png-chunk-boundary.test.ts
+index 4a4fcba79..21dccc91d 100644
+--- a/scripts/studio-bg3d-png-chunk-boundary.test.ts
++++ b/scripts/studio-bg3d-png-chunk-boundary.test.ts
+@@ -7,6 +7,20 @@ import { describe, expect, it } from "vitest";
+ const ENCODER = "apps/web/src/domains/creator/bg3d/studio-bg3d-model-thumbnail-encode.ts";
+ const CLIENT = "apps/web/src/domains/creator/bg3d/studio-bg3d-shot-png-worker-client.ts";
+ 
++/**
++ * The manual-chunk policy moved out of `vite.config.ts` into this module in the 2026-09
++ * apps/web move; `vite.config.ts` now only calls `createStudioManualChunks()`.
++ */
++const MANUAL_CHUNKS = "apps/web/config/vite-manual-chunks.ts";
++
++/**
++ * Rollup ids are absolute, so the policy matches on a path suffix that starts at the browser
++ * `src/` root (`id.endsWith("/src/domains/…")`) rather than on the repo-relative path.
++ */
++function chunkIdSuffix(repoRelativeFile: string): string {
++  return repoRelativeFile.replace(/^apps\/web\//u, "/");
++}
++
+ function parseFile(path: string): ts.SourceFile {
+   return ts.createSourceFile(path, readFileSync(resolve(process.cwd(), path), "utf8"), ts.ScriptTarget.Latest, true);
+ }
+@@ -20,7 +34,7 @@ describe("BG3D thumbnail PNG client chunk boundary", () => {
+   it("co-locates only the unconditional encoder/client pair, not a Worker or renderer", () => {
+     const paths: string[] = [];
+     let groups = 0;
+-    visitTree(parseFile("vite.config.ts"), (node) => {
++    visitTree(parseFile(MANUAL_CHUNKS), (node) => {
+       if (!ts.isIfStatement(node) || !ts.isBlock(node.thenStatement)) return;
+       const matches = node.thenStatement.statements.some((statement) =>
+         ts.isReturnStatement(statement) && statement.expression !== undefined
+@@ -34,7 +48,7 @@ describe("BG3D thumbnail PNG client chunk boundary", () => {
+       });
+     });
+     expect(groups).toBe(1);
+-    expect(paths.toSorted()).toEqual([`/${ENCODER}`, `/${CLIENT}`].toSorted());
++    expect(paths.toSorted()).toEqual([ENCODER, CLIENT].map(chunkIdSuffix).toSorted());
+   });
+ 
+   it("keeps the thumbnail wrapper dependent only on the already-required PNG client", () => {
+diff --git a/scripts/studio-bg3d-production-chunk-boundary.test.ts b/scripts/studio-bg3d-production-chunk-boundary.test.ts
+index 3458c69a5..aba46980e 100644
+--- a/scripts/studio-bg3d-production-chunk-boundary.test.ts
++++ b/scripts/studio-bg3d-production-chunk-boundary.test.ts
+@@ -12,6 +12,20 @@ const MODEL_PATHS = [
+ const CONTEXT_PATH = "apps/web/src/domains/creator/bg3d/studio-bg3d-pro-suite-runtime-context.tsx";
+ const GROUP_PATHS = [...MODEL_PATHS, CONTEXT_PATH];
+ 
++/**
++ * The manual-chunk policy moved out of `vite.config.ts` into this module in the 2026-09
++ * apps/web move; `vite.config.ts` now only calls `createStudioManualChunks()`.
++ */
++const MANUAL_CHUNKS = "apps/web/config/vite-manual-chunks.ts";
++
++/**
++ * Rollup ids are absolute, so the policy matches on a path suffix that starts at the browser
++ * `src/` root (`id.endsWith("/src/domains/…")`) rather than on the repo-relative path.
++ */
++function chunkIdSuffix(repoRelativeFile: string): string {
++  return repoRelativeFile.replace(/^apps\/web\//u, "/");
++}
++
+ function parseFile(file: string): ts.SourceFile {
+   return ts.createSourceFile(
+     file,
+@@ -30,7 +44,7 @@ describe("BG3D production UI contract chunk boundary", () => {
+   it("co-locates exactly the production models and their shared context, not panels or engines", () => {
+     const matchedPaths: string[] = [];
+     let matchingGroups = 0;
+-    visitTree(parseFile("vite.config.ts"), (node) => {
++    visitTree(parseFile(MANUAL_CHUNKS), (node) => {
+       if (!ts.isIfStatement(node) || !ts.isBlock(node.thenStatement)) return;
+       const returnsModelChunk = node.thenStatement.statements.some((statement) =>
+         ts.isReturnStatement(statement) &&
+@@ -45,7 +59,7 @@ describe("BG3D production UI contract chunk boundary", () => {
+       });
+     });
+     expect(matchingGroups).toBe(1);
+-    expect(matchedPaths.toSorted()).toEqual(GROUP_PATHS.map((file) => `/${file}`).toSorted());
++    expect(matchedPaths.toSorted()).toEqual(GROUP_PATHS.map(chunkIdSuffix).toSorted());
+   });
+ 
+   it.each(GROUP_PATHS)("keeps %s within its explicit runtime dependency boundary", (file) => {
+@@ -78,7 +92,7 @@ describe("Studio startup capability chunk boundary", () => {
+   it("co-locates the initial tool leaf with existing tiny capability contracts", () => {
+     const matchedPaths: string[] = [];
+     let matchingGroups = 0;
+-    visitTree(parseFile("vite.config.ts"), (node) => {
++    visitTree(parseFile(MANUAL_CHUNKS), (node) => {
+       if (!ts.isIfStatement(node) || !ts.isBlock(node.thenStatement)) return;
+       const returnsCapabilityChunk = node.thenStatement.statements.some((statement) =>
+         ts.isReturnStatement(statement) &&
+diff --git a/scripts/toolchain-coverage-baseline.json b/scripts/toolchain-coverage-baseline.json
+index 3456ae102..212984fb2 100644
+--- a/scripts/toolchain-coverage-baseline.json
++++ b/scripts/toolchain-coverage-baseline.json
+@@ -1,16 +1,13 @@
+ {
+   "$comment": "Per-root floors for scripts/verify-toolchain-coverage.mjs. Ratchet only — regenerate with `node scripts/verify-toolchain-coverage.mjs --update` and review the diff in the commit.",
+-  "recordedAt": "2026-08-21",
++  "recordedAt": "2026-09-06",
+   "testFilesByRoot": {
+-    "apps": 161,
+-    "components": 14,
++    "apps": 3123,
+     "deploy": 10,
+-    "lib": 70,
+-    "packages": 88,
+-    "scripts": 46,
+-    "src": 2229,
+-    "tests": 45
++    "packages": 99,
++    "scripts": 82,
++    "tests": 54
+   },
+-  "testFilesTotal": 2664,
+-  "typecheckedFiles": 5197
++  "testFilesTotal": 3368,
++  "typecheckedFiles": 6934
+ }
+diff --git a/scripts/verify-inkwash-dippen-live-commit-fidelity.mts b/scripts/verify-inkwash-dippen-live-commit-fidelity.mts
+index 8a73ee139..4db582e81 100644
+--- a/scripts/verify-inkwash-dippen-live-commit-fidelity.mts
++++ b/scripts/verify-inkwash-dippen-live-commit-fidelity.mts
+@@ -30,12 +30,26 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { pathToFileURL } from "node:url";
+ 
++import {
++  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
++} from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
++
+ interface FidelityCaseDefinition {
++  /**
++   * Stable saved brush id. The product treats ids as the durable contract and display names as
++   * presentation — `STUDIO_BRUSH_DISCOVERY` renamed 16 catalogue entries without touching a single
++   * id — so pinning a name here only re-breaks this gate on the next copy pass.
++   */
+   readonly id: "inkwash-pen" | "pen";
++  readonly contract: string;
++}
++
++/** A case resolved against the shipped picker: name and width come from the catalogue, not literals. */
++interface FidelityCase extends FidelityCaseDefinition {
+   readonly brushName: string;
+-  /** Catalogue default width, pinned so a preview build measures the shipped configuration. */
++  /** Catalogue default width, so a preview build measures the shipped configuration. */
+   readonly brushWidth: number;
+-  readonly contract: string;
++  readonly brushOperation: "paint" | "erase";
+ }
+ 
+ interface LongStrokeAssertion {
+@@ -70,23 +84,42 @@ interface CaseResult {
+  * thin-line representative, but the quarantine ledger delisted it — "선언된 \"잉크 흐름\"으로
+  * 분기하는 렌더러가 없어" — so the catalogue never lists it and the probe timed out selecting a
+  * brush that is not there. The ledger names its replacements; `pen` is the one that survived the
+- * later feel-cull (fineliner is quarantined too).
++ * later feel-cull (fineliner is quarantined too). `resolveCase` now turns that same class of
++ * mistake into an immediate, named failure instead of a fifteen-second locator timeout.
+  */
+ const FIDELITY_CASES = Object.freeze([
+   {
+     id: "inkwash-pen",
+-    brushName: "잉크워시 딥펜(유체 잉크)",
+-    brushWidth: 8,
+     contract: "fluid wet-ink live overlay → committed document pixels",
+   },
+   {
+     id: "pen",
+-    brushName: "펜(매끈)",
+-    brushWidth: 6,
+     contract: "thin-line causal filtering → committed document geometry",
+   },
+ ] as const satisfies readonly FidelityCaseDefinition[]);
+ 
++/**
++ * Bind a case to the brush the shipped picker actually lists. The child probe drives the desktop
++ * catalogue by its accessible label, so the label has to come from the same source the UI renders
++ * from; reading it here also keeps the "selected brush matches the case" assertion meaningful
++ * instead of echoing a literal back at itself.
++ */
++function resolveCase(definition: FidelityCaseDefinition): FidelityCase {
++  const item = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.find((entry) => entry.id === definition.id);
++  if (!item) {
++    throw new Error(
++      `fidelity case "${definition.id}" is not listed in the shipped brush picker;`
++      + " a delisted or renamed id must be replaced here, not selected by a stale label",
++    );
++  }
++  return {
++    ...definition,
++    brushName: item.name,
++    brushWidth: item.defaultWidth,
++    brushOperation: item.operation,
++  };
++}
++
+ const SPAWN_PREVIEW = process.env.TOONSPECTRUM_INK_FIDELITY_SPAWN_PREVIEW === "1";
+ const VERIFY_ROOT = process.env.TOONSPECTRUM_VERIFY_DIR ?? tmpdir();
+ const OUT_DIR = join(VERIFY_ROOT, "studio-ink-live-commit");
+@@ -98,19 +131,19 @@ function log(message: string): void {
+   console.log(`[verify-studio-ink-live-commit] ${message}`);
+ }
+ 
+-function selectedCases(): readonly FidelityCaseDefinition[] {
++function selectedCases(): readonly FidelityCase[] {
+   const requested = process.env.TOONSPECTRUM_INK_FIDELITY_CASES
+     ?.split(",")
+     .map((value) => value.trim())
+     .filter(Boolean);
+-  if (!requested || requested.length === 0) return FIDELITY_CASES;
++  if (!requested || requested.length === 0) return FIDELITY_CASES.map(resolveCase);
+   const unknown = requested.filter(
+     (id) => !FIDELITY_CASES.some((definition) => definition.id === id),
+   );
+   if (unknown.length > 0) {
+     throw new Error(`알 수 없는 fidelity case: ${unknown.join(", ")}`);
+   }
+-  return FIDELITY_CASES.filter((definition) => requested.includes(definition.id));
++  return FIDELITY_CASES.filter((definition) => requested.includes(definition.id)).map(resolveCase);
+ }
+ 
+ function readChildReport(reportPath: string): LongStrokeReport {
+@@ -124,7 +157,7 @@ function readChildReport(reportPath: string): LongStrokeReport {
+   return decoded as LongStrokeReport;
+ }
+ 
+-async function runCase(definition: FidelityCaseDefinition): Promise<CaseResult> {
++async function runCase(definition: FidelityCase): Promise<CaseResult> {
+   const caseRoot = join(OUT_DIR, "cases", definition.id);
+   const reportPath = join(caseRoot, "studio-long-stroke", "report.json");
+   mkdirSync(caseRoot, { recursive: true });
+@@ -137,10 +170,12 @@ async function runCase(definition: FidelityCaseDefinition): Promise<CaseResult>
+       TOONSPECTRUM_VERIFY_DIR: caseRoot,
+       TOONSPECTRUM_LONG_STROKE_BRUSH: definition.brushName,
+       // A preview build cannot serve the /src catalogue module the child probe reads, so without
+-      // these two pins it falls back to a 12px default and measures a width the product never
+-      // ships. The id also lands in the child report, making the selected brush auditable.
++      // these pins it falls back to a 12px paint default and measures a configuration the product
++      // never ships. This parent reads the same module in Node, so the pins carry the shipped
++      // values. The id also lands in the child report, making the selected brush auditable.
+       TOONSPECTRUM_LONG_STROKE_BRUSH_ID: definition.id,
+       TOONSPECTRUM_LONG_STROKE_BRUSH_WIDTH: String(definition.brushWidth),
++      TOONSPECTRUM_LONG_STROKE_OPERATION: definition.brushOperation,
+       TOONSPECTRUM_LONG_STROKE_SPAWN_PREVIEW: SPAWN_PREVIEW ? "1" : "0",
+       // The required gate measures the deterministic shipped compatibility path. Hardware/WebGPU
+       // device-loss coverage is kept in its dedicated fault-injection suites, not silently mixed
+diff --git a/scripts/verify-studio-brushes.mts b/scripts/verify-studio-brushes.mts
+index 5b938e27a..6f9166737 100644
+--- a/scripts/verify-studio-brushes.mts
++++ b/scripts/verify-studio-brushes.mts
+@@ -85,7 +85,7 @@ import {
+   studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
+ } from "../apps/web/src/domains/creator/studio-cc0-mypaint-preset-import-v1";
+ 
+-import { DIST_DIR } from "./lib/repo-paths.mjs";
++import { DIST_DIR, viteManifestKey } from "./lib/repo-paths.mjs";
+ import {
+   enabledStudioHistoryControl,
+ } from "./lib/studio-verify-history-controls.mjs";
+@@ -2432,7 +2432,9 @@ function resolveBuiltAutosaveSqliteModulePath(): string {
+     string,
+     { file?: unknown }
+   >;
+-  const entry = manifest["apps/web/src/domains/creator/studio-autosave-sqlite-store.ts"];
++  const entry = manifest[
++    viteManifestKey("apps/web/src/domains/creator/studio-autosave-sqlite-store.ts")
++  ];
+   invariant(
+     entry && typeof entry.file === "string" && entry.file.length > 0,
+     "production manifest is missing the Studio autosave SQLite module",
+diff --git a/scripts/verify-studio-discovery-ux.mts b/scripts/verify-studio-discovery-ux.mts
+index f4c48cbc4..9d60c54e8 100644
+--- a/scripts/verify-studio-discovery-ux.mts
++++ b/scripts/verify-studio-discovery-ux.mts
+@@ -8,28 +8,36 @@ import { chromium } from "playwright";
+ 
+ import { STUDIO_FILTER_DIALOG_CATALOG } from "../apps/web/src/domains/creator/filter/studio-filter-catalog";
+ 
++import { WEB_ROOT } from "./lib/repo-paths.mjs";
+ import { findFreePort, spawnVitePreview, stopChildProcess, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
+ 
+ import type { Page } from "playwright";
+ 
+ const output = process.env.STUDIO_DISCOVERY_QA_DIR ?? "/tmp/studio-discovery-ux";
+ mkdirSync(output, { recursive: true });
++// The dev server this verifier spawns inherits vite.config.ts, whose `root` is the Vite
++// package root (apps/web) — not the repository root. A harness written next to the repo
++// root is therefore never served: the request falls through to Vite's SPA fallback, which
++// returns the full application index.html, and the app's own request waterfall keeps the
++// page from ever reaching `networkidle`. The harness has to live inside the Vite root.
+ const html = "studio-discovery-qa.html";
+ const entry = "studio-discovery-qa.tsx";
++const htmlPath = join(WEB_ROOT, html);
++const entryPath = join(WEB_ROOT, entry);
+ const runtimeErrors: string[] = [];
+-const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[]; failure?: string } = { checks: [], runtimeErrors, screenshots: [] };
++const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[]; devNavigationMs: number[]; failure?: string } = { checks: [], runtimeErrors, screenshots: [], devNavigationMs: [] };
+ const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+ const devPort = await findFreePort();
+ const previewPort = await findFreePort();
+ const devOrigin = `http://127.0.0.1:${devPort}`;
+ const previewOrigin = `http://127.0.0.1:${previewPort}`;
+-writeFileSync(html, '<!doctype html><html lang="ko" class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/studio-discovery-qa.tsx"></script></body></html>');
+-writeFileSync(entry, `
++writeFileSync(htmlPath, '<!doctype html><html lang="ko" class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/studio-discovery-qa.tsx"></script></body></html>');
++writeFileSync(entryPath, `
+ import {useState} from "react";
+ import {createRoot} from "react-dom/client";
+-import "../apps/web/src/styles/globals.css";
+-import {StudioSubToolPalette} from "../apps/web/src/domains/creator/brush/StudioSubToolPalette";
+-import {studioSubToolPaletteCategoryIdForBrushId} from "../apps/web/src/domains/creator/brush/studio-sub-tool-palette-data";
++import "./src/styles/globals.css";
++import {StudioSubToolPalette} from "./src/domains/creator/brush/StudioSubToolPalette";
++import {studioSubToolPaletteCategoryIdForBrushId} from "./src/domains/creator/brush/studio-sub-tool-palette-data";
+ function App(){
+   const [category,setCategory]=useState("pen");
+   const [selected,setSelected]=useState("gpen");
+@@ -56,6 +64,13 @@ async function screenshot(page: Page, name: string) {
+ async function assertNoOverflow(page: Page) {
+   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "horizontal document overflow");
+ }
++/**
++ * The first harness navigation pays for the dev server's cold transform of the palette
++ * module graph plus the Tailwind entry stylesheet — tens of seconds on a CI runner, far
++ * beyond the 15s default this page otherwise keeps for element waits. Only the navigation
++ * gets the longer budget; every assertion below still runs on the 15s default.
++ */
++const DEV_NAVIGATION_TIMEOUT_MS = 120_000;
+ 
+ try {
+   await Promise.all([waitForServer(devOrigin), waitForServer(previewOrigin)]);
+@@ -63,7 +78,9 @@ try {
+     const context = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 1 });
+     const page = await context.newPage();
+     watch(page);
+-    await page.goto(`${devOrigin}/${html}`, { waitUntil: "networkidle" });
++    const navigationStartedAt = Date.now();
++    await page.goto(`${devOrigin}/${html}`, { waitUntil: "networkidle", timeout: DEV_NAVIGATION_TIMEOUT_MS });
++    receipt.devNavigationMs.push(Date.now() - navigationStartedAt);
+     const palette = page.locator('[data-studio-subtool-palette="true"]');
+     await palette.waitFor({ state: "visible" });
+     assert.equal(await palette.getByRole("tab").count(), 6);
+@@ -165,6 +182,6 @@ try {
+   await browser.close();
+   stopChildProcess(dev);
+   stopChildProcess(preview);
+-  rmSync(html, { force: true });
+-  rmSync(entry, { force: true });
++  rmSync(htmlPath, { force: true });
++  rmSync(entryPath, { force: true });
+ }
+diff --git a/scripts/verify-vercel-csp.mjs b/scripts/verify-vercel-csp.mjs
+index 59ed5c8ae..d3771a29b 100644
+--- a/scripts/verify-vercel-csp.mjs
++++ b/scripts/verify-vercel-csp.mjs
+@@ -351,7 +351,9 @@ export function verifyVercelCspContract({ html, vercelConfig, bootstrapCompatSou
+ }
+ 
+ function main() {
+-  const htmlPath = resolve(repositoryRoot, process.argv[2] ?? "index.html");
++  // Default to the source entry; the 2026-09 apps/web move relocated it from the
++  // repository root. `postbuild` still passes `dist/index.html` explicitly.
++  const htmlPath = resolve(repositoryRoot, process.argv[2] ?? "apps/web/index.html");
+   const vercelPath = resolve(repositoryRoot, "vercel.json");
+   const builtBootstrapPath = resolve(dirname(htmlPath), "bootstrap-compat.js");
+   const sourceBootstrapPath = resolve(repositoryRoot, "apps/web/public/bootstrap-compat.js");
+diff --git a/scripts/verify-vercel-csp.test.mjs b/scripts/verify-vercel-csp.test.mjs
+index d12bf400e..2b9a799a7 100644
+--- a/scripts/verify-vercel-csp.test.mjs
++++ b/scripts/verify-vercel-csp.test.mjs
+@@ -10,7 +10,9 @@ const ROOT = new URL("../", import.meta.url);
+ 
+ function fixture() {
+   return {
+-    html: readFileSync(fileURLToPath(new URL("index.html", ROOT)), "utf8"),
++    // The Vite HTML entry moved to `apps/web/index.html` in the 2026-09 apps/web move;
++    // `vercel.json` stayed workspace-root infrastructure.
++    html: readFileSync(fileURLToPath(new URL("apps/web/index.html", ROOT)), "utf8"),
+     vercelConfig: JSON.parse(
+       readFileSync(fileURLToPath(new URL("vercel.json", ROOT)), "utf8"),
+     ),
+diff --git a/tests/benchmarks/results/bristle-model.json b/tests/benchmarks/results/bristle-model.json
+index 6d7dab3f8..4cfe34bef 100644
+--- a/tests/benchmarks/results/bristle-model.json
++++ b/tests/benchmarks/results/bristle-model.json
+@@ -1,7 +1,7 @@
+ {
+   "harness": "tests/visual/bristle-quality.test.ts",
+   "model": "packages/studio-brush-platform/src/bristle-model.ts",
+-  "generatedAt": "2026-09-04T09:48:33.265Z",
++  "generatedAt": "2026-09-06T18:47:04.910Z",
+   "host": {
+     "platform": "darwin",
+     "arch": "arm64",
+@@ -274,43 +274,43 @@
+       "rows": [
+         {
+           "bristleCount": 8,
+-          "simOnlyP50Ms": 0.03533,
+-          "withFootprintsP50Ms": 0.05821,
+-          "simOnlyPerSampleUs": 0.1472,
+-          "frameBudgetPct": 0.212,
+-          "samplesPerFrameBudget": 113205
++          "simOnlyP50Ms": 0.03917,
++          "withFootprintsP50Ms": 0.09183,
++          "simOnlyPerSampleUs": 0.1632,
++          "frameBudgetPct": 0.235,
++          "samplesPerFrameBudget": 102126
+         },
+         {
+           "bristleCount": 16,
+-          "simOnlyP50Ms": 0.05621,
+-          "withFootprintsP50Ms": 0.09225,
+-          "simOnlyPerSampleUs": 0.2342,
+-          "frameBudgetPct": 0.337,
+-          "samplesPerFrameBudget": 71164
++          "simOnlyP50Ms": 0.05667,
++          "withFootprintsP50Ms": 0.09329,
++          "simOnlyPerSampleUs": 0.2361,
++          "frameBudgetPct": 0.34,
++          "samplesPerFrameBudget": 70587
+         },
+         {
+           "bristleCount": 32,
+-          "simOnlyP50Ms": 0.09863,
+-          "withFootprintsP50Ms": 0.16883,
+-          "simOnlyPerSampleUs": 0.4109,
+-          "frameBudgetPct": 0.592,
+-          "samplesPerFrameBudget": 40557
++          "simOnlyP50Ms": 0.101,
++          "withFootprintsP50Ms": 0.17346,
++          "simOnlyPerSampleUs": 0.4208,
++          "frameBudgetPct": 0.606,
++          "samplesPerFrameBudget": 39603
+         },
+         {
+           "bristleCount": 64,
+-          "simOnlyP50Ms": 0.18671,
+-          "withFootprintsP50Ms": 0.32654,
+-          "simOnlyPerSampleUs": 0.778,
+-          "frameBudgetPct": 1.12,
+-          "samplesPerFrameBudget": 21423
++          "simOnlyP50Ms": 0.1905,
++          "withFootprintsP50Ms": 0.32513,
++          "simOnlyPerSampleUs": 0.7937,
++          "frameBudgetPct": 1.143,
++          "samplesPerFrameBudget": 20997
+         },
+         {
+           "bristleCount": 128,
+-          "simOnlyP50Ms": 0.37237,
+-          "withFootprintsP50Ms": 0.66879,
+-          "simOnlyPerSampleUs": 1.5516,
+-          "frameBudgetPct": 2.234,
+-          "samplesPerFrameBudget": 10741
++          "simOnlyP50Ms": 0.38596,
++          "withFootprintsP50Ms": 0.85775,
++          "simOnlyPerSampleUs": 1.6082,
++          "frameBudgetPct": 2.316,
++          "samplesPerFrameBudget": 10363
+         }
+       ]
+     },
+diff --git a/tests/benchmarks/results/living-ink-fluid.json b/tests/benchmarks/results/living-ink-fluid.json
+index b19b66fa7..f7c6a72b9 100644
+--- a/tests/benchmarks/results/living-ink-fluid.json
++++ b/tests/benchmarks/results/living-ink-fluid.json
+@@ -1,5 +1,5 @@
+ {
+-  "generatedAt": "2026-09-04",
++  "generatedAt": "2026-09-06",
+   "revision": "wgsl-field-v2",
+   "oracle": "cpu-reference-mirror-of-wgsl-kernels",
+   "sections": [
+@@ -84,67 +84,67 @@
+           {
+             "iterations": 0,
+             "reduction": 0,
+-            "milliseconds": 5.90133400000002
++            "milliseconds": 9.196500000000015
+           },
+           {
+             "iterations": 1,
+             "reduction": 0.09157809105755532,
+-            "milliseconds": 11.345167000000004
++            "milliseconds": 6.986875000000055
+           },
+           {
+             "iterations": 2,
+             "reduction": 0.1710620993891092,
+-            "milliseconds": 2.852291999999977
++            "milliseconds": 2.131791000000021
+           },
+           {
+             "iterations": 4,
+             "reduction": 0.30219825390513855,
+-            "milliseconds": 5.139957999999979
++            "milliseconds": 4.716000000000008
+           },
+           {
+             "iterations": 6,
+             "reduction": 0.40425424418057165,
+-            "milliseconds": 6.250625000000014
++            "milliseconds": 6.213375000000042
+           },
+           {
+             "iterations": 8,
+             "reduction": 0.4843866060113574,
+-            "milliseconds": 0.7230829999999742
++            "milliseconds": 0.8265420000000177
+           },
+           {
+             "iterations": 10,
+             "reduction": 0.5477456922481041,
+-            "milliseconds": 0.8130419999999958
++            "milliseconds": 0.9191670000000158
+           },
+           {
+             "iterations": 12,
+             "reduction": 0.5981555168352946,
+-            "milliseconds": 0.9207920000000058
++            "milliseconds": 1.022874999999999
+           },
+           {
+             "iterations": 16,
+             "reduction": 0.671024677911479,
+-            "milliseconds": 1.0800839999999994
++            "milliseconds": 1.8955839999999853
+           },
+           {
+             "iterations": 22,
+             "reduction": 0.7367943246945253,
+-            "milliseconds": 1.3584160000000338
++            "milliseconds": 2.2333340000000135
+           },
+           {
+             "iterations": 32,
+             "reduction": 0.7915652504810287,
+-            "milliseconds": 1.73195800000002
++            "milliseconds": 1.8730409999999438
+           },
+           {
+             "iterations": 48,
+             "reduction": 0.8296844726518429,
+-            "milliseconds": 2.460834000000034
++            "milliseconds": 2.589666999999963
+           },
+           {
+             "iterations": 64,
+             "reduction": 0.8486755997786537,
+-            "milliseconds": 3.202624999999955
++            "milliseconds": 3.2896670000000086
+           }
+         ]
+       },
+@@ -154,67 +154,67 @@
+           {
+             "iterations": 0,
+             "reduction": 0,
+-            "milliseconds": 0.38862499999999045
++            "milliseconds": 0.4536669999999958
+           },
+           {
+             "iterations": 1,
+             "reduction": 0.30563398215041204,
+-            "milliseconds": 0.4058750000000373
++            "milliseconds": 0.5177079999999705
+           },
+           {
+             "iterations": 2,
+             "reduction": 0.2962978357841195,
+-            "milliseconds": 0.4673750000000041
++            "milliseconds": 0.5491250000000036
+           },
+           {
+             "iterations": 4,
+             "reduction": 0.3355845897673906,
+-            "milliseconds": 0.6066250000000082
++            "milliseconds": 0.6376659999999674
+           },
+           {
+             "iterations": 6,
+             "reduction": 0.34731879499911156,
+-            "milliseconds": 0.6265000000000214
++            "milliseconds": 0.7415419999999813
+           },
+           {
+             "iterations": 8,
+             "reduction": 0.35215282069056286,
+-            "milliseconds": 0.7043330000000196
++            "milliseconds": 0.8147909999999001
+           },
+           {
+             "iterations": 10,
+             "reduction": 0.3545482622428314,
+-            "milliseconds": 0.7967089999999644
++            "milliseconds": 0.899167000000034
+           },
+           {
+             "iterations": 12,
+             "reduction": 0.3558880952814777,
+-            "milliseconds": 0.8860829999999851
++            "milliseconds": 0.9912080000000287
+           },
+           {
+             "iterations": 16,
+             "reduction": 0.35723549964096657,
+-            "milliseconds": 1.059582999999975
++            "milliseconds": 1.1814579999999069
+           },
+           {
+             "iterations": 22,
+             "reduction": 0.35804519083805164,
+-            "milliseconds": 1.3249999999999886
++            "milliseconds": 1.4416250000000446
+           },
+           {
+             "iterations": 32,
+             "reduction": 0.3585113316963854,
+-            "milliseconds": 1.7595000000000027
++            "milliseconds": 1.896082999999976
+           },
+           {
+             "iterations": 48,
+             "reduction": 0.3587356221652306,
+-            "milliseconds": 2.582375000000013
++            "milliseconds": 8.580042000000049
+           },
+           {
+             "iterations": 64,
+             "reduction": 0.3588133146187308,
+-            "milliseconds": 3.228666999999973
++            "milliseconds": 3.5121669999999767
+           }
+         ]
+       }
+diff --git a/tools/browser-harnesses/props-compare-main.ts b/tools/browser-harnesses/props-compare-main.ts
+index c6efec3b5..21439fdb2 100644
+--- a/tools/browser-harnesses/props-compare-main.ts
++++ b/tools/browser-harnesses/props-compare-main.ts
+@@ -8,8 +8,8 @@ import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
+ import * as THREE from "three";
+ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+ 
+-import { pickNaturalIdlePose } from "@/src/domains/creator/studio-pose-presets";
+-import { resolveStudioVrmFingerAuthority } from "@/src/domains/creator/vrm/studio-vrm-auto-grip-authority";
++import { pickNaturalIdlePose } from "@/domains/creator/studio-pose-presets";
++import { resolveStudioVrmFingerAuthority } from "@/domains/creator/vrm/studio-vrm-auto-grip-authority";
+ import {
+   applyFingerRotations,
+   applyPoseToVrm,
+@@ -18,21 +18,21 @@ import {
+   stripFingerBones,
+   type FingerRotationMap,
+   type PoseBoneMap,
+-} from "@/src/domains/creator/vrm/studio-vrm-poser-utils";
+-import { acquireStudioVrmPropAsset } from "@/src/domains/creator/vrm/studio-vrm-prop-asset-runtime";
++} from "@/domains/creator/vrm/studio-vrm-poser-utils";
++import { acquireStudioVrmPropAsset } from "@/domains/creator/vrm/studio-vrm-prop-asset-runtime";
+ import {
+   createAutoGripFingerOverrides,
+   measureVrmPropRigMetrics,
+   resolvePropAttachment,
+   resolveSecondaryPropTarget,
+   type VrmPropRigMetrics,
+-} from "@/src/domains/creator/vrm/studio-vrm-prop-rig";
++} from "@/domains/creator/vrm/studio-vrm-prop-rig";
+ import {
+   buildPropObject,
+   propDefById,
+   type PropInstance,
+   type PropRigV2,
+-} from "@/src/domains/creator/vrm/studio-vrm-props";
++} from "@/domains/creator/vrm/studio-vrm-props";
+ 
+ const statusEl = document.getElementById("status")!;
+ 
+diff --git a/tsconfig.json b/tsconfig.json
+index ef7dcf9e5..d648c13e7 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -15,9 +15,7 @@
+     "jsx": "react-jsx",
+     "incremental": true,
+     "paths": {
+-      "@/*": ["./apps/web/*"],
+-      "@/shared/*": ["./apps/web/src/shared/*"],
+-      "@/domains/*": ["./apps/web/src/domains/*"],
++      "@/*": ["./apps/web/src/*"],
+       "canvaskit-wasm": ["./apps/web/src/types/canvaskit-wasm-shim.d.ts"],
+       "canvaskit-wasm/bin/canvaskit.wasm?url": ["./apps/web/src/types/canvaskit-wasm-url-shim.d.ts"],
+       "@toonspectrum/studio-engine-skia": ["./apps/web/src/types/studio-engine-skia-shim.d.ts"]
+@@ -26,12 +24,10 @@
+   "include": [
+     "apps/web/src/**/*.ts",
+     "apps/web/src/**/*.tsx",
+-    "apps/web/src/shared/components/**/*.ts",
+-    "apps/web/src/shared/components/**/*.tsx",
+-    "apps/web/src/shared/lib/**/*.ts",
+-    "apps/web/src/shared/lib/**/*.tsx",
+     "tools/**/*.ts",
+     "tools/**/*.tsx",
++    "apps/web/tools/**/*.ts",
++    "apps/web/tools/**/*.tsx",
+     "vite.config.ts",
+     "drizzle.config.ts",
+     "eslint.config.mjs",
+diff --git a/turbo.json b/turbo.json
+index 6781f99a4..18a8ab0af 100644
+--- a/turbo.json
++++ b/turbo.json
+@@ -7,10 +7,6 @@
+       ],
+       "outputs": [
+         "dist/**",
+-        "build/**",
+-        "out/**",
+-        "storybook-static/**",
+-        "public/**",
+         "!**/node_modules/**"
+       ]
+     },
+diff --git a/vite.config.ts b/vite.config.ts
+index 3ff8d6d17..53c89a42d 100644
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -8,6 +8,9 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+ import { build as viteBuild, defineConfig, type Plugin } from "vite";
+ 
+ import { createStudioManualChunks } from "./apps/web/config/vite-manual-chunks";
++// The warm list must name exactly the namespaces the Studio loader fetches; a second hand-kept
++// copy of that list would drift silently and leave the route waiting on an uncached asset.
++import { STUDIO_I18N_NAMESPACES } from "./apps/web/src/shared/lib/i18n-asset-manifest";
+ 
+ import {
+   planStudioServiceWorkerPrecache,
+@@ -261,12 +264,6 @@ function studioCrossOriginIsolationPlugin(): Plugin {
+  * module graph: `AppRouter` `Promise.all`s these two dictionaries with the route
+  * chunk, so the route cannot commit until they resolve.
+  */
+-const STUDIO_I18N_NAMESPACES = [
+-  "aiNotice", "aiToolPopover", "assetMenu", "background", "bubble", "bubbleTail", "canvas",
+-  "commandBar", "commandSearch", "community", "creativeModes", "customFonts", "hub",
+-  "imageAdjustments", "mainMenu", "mobileDock", "quickShape", "quickStart", "settings",
+-  "shortcuts", "toolsCompanion", "tutorial", "tutorialTry",
+-];
+ const STUDIO_SERVICE_WORKER_WARM_URLS = STUDIO_I18N_NAMESPACES.flatMap((namespace) =>
+   ["ko", "en"].map((locale) => `/i18n/studio/${namespace}/${locale}.json`),
+ );
+@@ -389,9 +386,7 @@ export default defineConfig(({ mode }) => ({
+   publicDir: path.resolve(webRoot, "public"),
+   resolve: {
+     alias: {
+-      "@/shared": path.resolve(webRoot, "src/shared"),
+-      "@/domains": path.resolve(webRoot, "src/domains"),
+-      "@": webRoot,
++      "@": path.resolve(webRoot, "src"),
+     },
+   },
+   // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.
+diff --git a/vite.feedback-review.config.ts b/vite.feedback-review.config.ts
+index 8e66c2921..b1c8d26e0 100644
+--- a/vite.feedback-review.config.ts
++++ b/vite.feedback-review.config.ts
+@@ -7,7 +7,9 @@ export default defineConfig({
+   base: "./",
+   publicDir: false,
+   plugins: [react()],
+-  resolve: { alias: { "@": fileURLToPath(new URL(".", import.meta.url)) } },
++  // The web app moved to apps/web; `@` must resolve to its source root or every
++  // `@/shared/...` import in the feedback page fails to resolve at build time.
++  resolve: { alias: { "@": fileURLToPath(new URL("./apps/web/src", import.meta.url)) } },
+   build: {
+     outDir: "dist-feedback-review",
+     rolldownOptions: { input: "e2e/feedback-community.html" },
+diff --git a/vitest.config.ts b/vitest.config.ts
+index 8dd2ebec5..595282e29 100644
+--- a/vitest.config.ts
++++ b/vitest.config.ts
+@@ -43,9 +43,7 @@ process.env.DATABASE_URL = testDatabaseTarget.databaseUrl;
+ export default defineConfig({
+   resolve: {
+     alias: {
+-      "@/shared": path.resolve(root, "apps/web/src/shared"),
+-      "@/domains": path.resolve(root, "apps/web/src/domains"),
+-      "@": path.resolve(root, "apps/web"),
++      "@": path.resolve(root, "apps/web/src"),
+     },
+   },
+   test: {
+diff --git a/vitest.perf-budget-files.mjs b/vitest.perf-budget-files.mjs
+index 88097fe23..a68af1718 100644
+--- a/vitest.perf-budget-files.mjs
++++ b/vitest.perf-budget-files.mjs
+@@ -29,7 +29,6 @@
+ // and belong in the main run. tests/vitest-perf-budget-partition.test.ts pins that every entry
+ // exists and really times something.
+ export const PERF_BUDGET_TEST_FILES = Object.freeze([
+-  "scripts/studio-brush-catalogue-perf-matrix.test.ts",
+   "apps/web/src/domains/creator/brush/studio-brush-stamp-engine.test.ts",
+   "apps/web/src/domains/creator/brush/studio-dry-media-long-stroke-regression.test.ts",
+   "apps/web/src/domains/creator/brush/studio-long-stroke-per-move-cost.test.ts",
+@@ -44,4 +43,5 @@ export const PERF_BUDGET_TEST_FILES = Object.freeze([
+   "apps/web/src/domains/creator/studio-impasto-relief-shading-v1.perf.test.ts",
+   "apps/web/src/domains/creator/studio-living-ink-provider.test.ts",
+   "apps/web/src/domains/creator/studio-living-ink-settled-bake-v1.test.ts",
++  "scripts/studio-brush-catalogue-perf-matrix.test.ts",
+ ]);
+diff --git a/vitest.setup.ts b/vitest.setup.ts
+index 4572b163d..c9a046dc7 100644
+--- a/vitest.setup.ts
++++ b/vitest.setup.ts
+@@ -4,10 +4,19 @@ import path from "node:path";
+ import { afterAll } from "vitest";
+ import { APP_I18N_NAMESPACES, STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
+ import { registerI18nLocaleEntries, setAppI18nAssetSource } from "@/shared/lib/i18n";
+-import { parseStudioI18nDictionary, STUDIO_I18N_ASSET_LOCALES } from "@/src/domains/creator/studio-i18n-loader";
+-import "@/src/domains/catalog/references/reference-i18n";
++import { parseStudioI18nDictionary, STUDIO_I18N_ASSET_LOCALES } from "@/domains/creator/studio-i18n-loader";
++// The reference library registers its ko/en strings synchronously while its lazy route chunk
++// evaluates instead of fetching an asset. Evaluate that module here for the same reason as the
++// Studio block below: the t() completeness gate and component tests must see the dictionary the
++// route actually commits with.
++import "@/domains/catalog/references/reference-i18n";
+ 
+ const WEB_PUBLIC = path.resolve(process.cwd(), "apps/web/public");
++
++// Production routes fetch these static assets before their lazy component commits. Direct
++// component tests have no HTTP server, so mirror the same validated registration from disk once
++// per isolated Vitest graph. Every Studio namespace is published for every locale, so an absent
++// file here is a real deployment gap and must throw rather than be skipped.
+ for (const locale of STUDIO_I18N_ASSET_LOCALES) {
+   const merged: Record<string, string> = {};
+   for (const namespace of STUDIO_I18N_NAMESPACES) {
+@@ -19,15 +28,31 @@ for (const locale of STUDIO_I18N_ASSET_LOCALES) {
+   registerI18nLocaleEntries(locale, merged);
+ }
+ 
++// App shell dictionaries are lazy assets in production. Serving them from disk on demand — rather
++// than eagerly registering all 75 — keeps the same loader, parser and fallback chain under test
++// while a test file only pays for the locales it actually awaits.
++//
++// A namespace with no strings in a locale is not published at all, so an absent file means "this
++// namespace contributes nothing here", not "this locale is unavailable". Bailing out on the first
++// absent namespace made 67 of the 75 locales resolve to null, which is the same defect the
++// production loader carried.
+ setAppI18nAssetSource(async (assetLocale) => {
+   const merged: Record<string, string> = {};
+   for (const namespace of APP_I18N_NAMESPACES) {
+     const assetPath = path.join(WEB_PUBLIC, "i18n", "app", namespace, `${assetLocale}.json`);
+-    if (!existsSync(assetPath)) return null;
+-    Object.assign(merged, JSON.parse(readFileSync(assetPath, "utf8")));
++    if (!existsSync(assetPath)) continue;
++    Object.assign(merged, JSON.parse(readFileSync(assetPath, "utf8")) as Record<string, string>);
+   }
+-  return JSON.stringify(merged);
++  return Object.keys(merged).length > 0 ? JSON.stringify(merged) : null;
+ });
++
++// Radix's focus-scope restores focus from a `setTimeout(…, 0)` scheduled while it unmounts, and
++// Testing Library's auto-cleanup unmounts synchronously in `afterEach`. Under parallel load a
++// worker can tear the jsdom document down before that timer runs; it then dispatches an Event at a
++// dead EventTarget, which Vitest reports as an uncaught exception and the run exits non-zero even
++// though every test passed. Yield one macrotask at file teardown so the timer lands on a live
++// document. File-scoped on purpose — the race is with the environment, not between tests, so this
++// costs one tick per file rather than one per test.
+ //
+ // The timer is captured here, at setup time, because a test file that installs fake timers and
+ // never restores them would otherwise leave this hook awaiting a `setTimeout` that never fires —

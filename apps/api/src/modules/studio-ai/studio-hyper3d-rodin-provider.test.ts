@@ -206,11 +206,11 @@ describe("Hyper3dRodinProvider", () => {
     });
 
     await expect(provider.submit(generationRequest(), new AbortController().signal))
-      .rejects.toMatchObject<Partial<Studio3dGenerationProviderError>>({
+      .rejects.toMatchObject({
         code: "provider-rejected",
         providerCode: "API_INSUFFICIENT_FUNDS",
         retryable: false,
-      });
+      } satisfies Partial<Studio3dGenerationProviderError>);
     expect(requests).toHaveLength(1);
   });
 
@@ -402,6 +402,105 @@ describe("Hyper3dRodinProvider", () => {
     expect(sleeps).toEqual([5_000]);
   });
 
+  it.each(["submit", "poll", "download"] as const)(
+    "keeps caller cancellation active while %s reads the response body",
+    async (operation) => {
+      const controller = new AbortController();
+      let bodyReader: ReadableStreamDefaultController<Uint8Array> | undefined;
+      let requestSignal: AbortSignal | null | undefined;
+      let beginBodyRead!: () => void;
+      const readingBody = new Promise<void>((resolve) => { beginBodyRead = resolve; });
+      const fetchImpl = vi.fn<Hyper3dRodinFetch>(async (_input, init) => {
+        requestSignal = init?.signal;
+        const stream = new ReadableStream<Uint8Array>({
+          start(reader) {
+            bodyReader = reader;
+            init?.signal?.addEventListener("abort", () => reader.error(new DOMException("Aborted", "AbortError")), { once: true });
+          },
+        });
+        const response = new Response(stream, { status: operation === "submit" ? 201 : 200 });
+        const readJson = response.json.bind(response);
+        response.json = () => { beginBodyRead(); return readJson(); };
+        return response;
+      });
+      const sleeps: number[] = [];
+      const provider = createHyper3dRodinProvider({
+        apiKey: "fixture-only-key", fetchImpl,
+        sleep: async (delayMs) => { sleeps.push(delayMs); },
+      });
+      const pending = operation === "submit"
+        ? provider.submit(generationRequest(), controller.signal)
+        : provider[operation](jobIdentity(), controller.signal);
+      const outcome = pending.then(() => "unexpected-success", (error: unknown) => error);
+      await readingBody;
+      controller.abort();
+
+      // Release the old implementation's un-aborted stream so the regression fails immediately.
+      if (!requestSignal?.aborted) {
+        const response = operation === "submit" ? acceptedSubmission()
+          : jsonResponse(operation === "poll"
+            ? { jobs: [{ uuid: "job-1", status: "Done" }] }
+            : { list: [{ name: "model.glb", url: "https://download.example/model.glb" }] });
+        bodyReader!.enqueue(new TextEncoder().encode(await response.text()));
+        bodyReader!.close();
+      }
+
+      expect(await outcome).toMatchObject({ code: "cancelled", retryable: false });
+      expect(requestSignal?.aborted).toBe(true);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(sleeps).toEqual([]);
+    },
+  );
+
+  it.each(["submit", "poll", "download"] as const)(
+    "applies the %s deadline to a stalled response body without resubmitting paid work",
+    async (operation) => {
+      vi.useFakeTimers();
+      try {
+        let bodyReader: ReadableStreamDefaultController<Uint8Array> | undefined;
+        let firstSignal: AbortSignal | null | undefined;
+        let beginBodyRead!: () => void;
+        const readingBody = new Promise<void>((resolve) => { beginBodyRead = resolve; });
+        let calls = 0;
+        const provider = createHyper3dRodinProvider({
+          apiKey: "fixture-only-key", timeoutMs: 5_000, retryAttempts: 2,
+          sleep: async () => {},
+          fetchImpl: async (_input, init) => {
+            calls += 1;
+            if (calls > 1) return jsonResponse(operation === "poll"
+              ? { jobs: [{ uuid: "job-1", status: "Done" }] }
+              : { list: [{ name: "model.glb", url: "https://download.example/model.glb" }] });
+            firstSignal = init?.signal;
+            const response = new Response(new ReadableStream<Uint8Array>({
+              start(reader) {
+                bodyReader = reader;
+                init?.signal?.addEventListener("abort", () => reader.error(new DOMException("Aborted", "AbortError")), { once: true });
+              },
+            }), { status: operation === "submit" ? 201 : 200 });
+            const readJson = response.json.bind(response);
+            response.json = () => { beginBodyRead(); return readJson(); };
+            return response;
+          },
+        });
+        const signal = new AbortController().signal;
+        const pending = operation === "submit" ? provider.submit(generationRequest(), signal)
+          : provider[operation](jobIdentity(), signal);
+        const outcome = pending.then(() => "success", (error: unknown) => error);
+        await readingBody;
+        await vi.advanceTimersByTimeAsync(5_000);
+        if (!firstSignal?.aborted) bodyReader!.error(new Error("fixture deadline cleanup"));
+
+        if (operation === "submit") expect(await outcome).toMatchObject({ code: "timeout", retryable: true });
+        else expect(await outcome).toBe("success");
+        expect(firstSignal?.aborted).toBe(true);
+        expect(calls).toBe(operation === "submit" ? 1 : 2);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
   it.each(["authentication", "invalid-response", "provider-rejected"] as const)("does not expand transport retries to %s failures", async (code) => {
     const requests: Array<{ input: string; init: RequestInit }> = [];
     const sleeps: number[] = [];
@@ -443,10 +542,10 @@ describe("Hyper3dRodinProvider", () => {
       ? generationRequest({ mode, images: [image("reference.png")], model: model() })
       : generationRequest();
     await expect(provider.submit(request, new AbortController().signal))
-      .rejects.toMatchObject<Partial<Studio3dGenerationProviderError>>({
+      .rejects.toMatchObject({
         code: "provider-unavailable",
         retryable: true,
-      });
+      } satisfies Partial<Studio3dGenerationProviderError>);
     expect(requests).toHaveLength(1);
     expect(sleeps).toEqual([]);
   });

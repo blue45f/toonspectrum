@@ -556,14 +556,18 @@ function lightweightSmartFilterProgram(value: unknown): readonly StudioAdjustmen
       : `adj-${index + 1}`;
     if (seen.has(id)) id = `${id}-${index}`;
     seen.add(id);
+    const opacity = typeof candidate.opacity === "number" && Number.isFinite(candidate.opacity)
+      ? Math.max(0, Math.min(1, candidate.opacity))
+      : 1;
     entries.push({
       id,
+      ...(opacity < 1 ? { opacity } : {}),
       engine: candidate.engine as StudioAdjustmentEngineId,
       enabled: candidate.enabled !== false,
       params: lightweightSmartFilterParams(candidate.params),
     });
   }
-  return entries.filter((entry) => entry.enabled);
+  return entries.filter((entry) => entry.enabled && entry.opacity !== 0);
 }
 
 function hasActiveSmartFilterProgram(el: ImageFilterFields): boolean {

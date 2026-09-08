@@ -116,6 +116,12 @@ describe("VRM library helpers", () => {
         (id) => SAMPLE_VRM_ENTRIES.find((entry) => entry.id === id)?.name,
       ),
     ).toEqual(["루미", "하린", "세라", "유나"]);
+    expect(SAMPLE_VRM_ENTRIES[0]).toMatchObject({ id: "sample-vrm", name: "루미" });
+    expect(
+      ["quaternius-female-peasant", "quaternius-male-peasant", "quaternius-female-ranger"].map(
+        (id) => SAMPLE_VRM_ENTRIES.find((entry) => entry.id === id)?.name,
+      ),
+    ).toEqual(["Quaternius Peasant (Female)", "Quaternius Peasant (Male)", "Quaternius Ranger (Female)"]);
     expect(names).toContain("데빌 (악마)");
     expect(names).toContain("쿨에일리언 (외계인)");
     expect(names).toContain("스포츠메카 (메카)");
@@ -137,8 +143,9 @@ describe("VRM library helpers", () => {
 
     for (const sample of SAMPLE_VRMS) {
       expect(sample.url, `${sample.id} url`).toMatch(
-        /^\/vrm\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.vrm$/,
+        /^\/vrm\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.vrm$/,
       );
+      expect(sampleVrmUrl(sample.id), `${sample.id} resolved url`).toBe(sample.url);
       expect(sample.id, `${sample.id} id format`).toMatch(/^[a-z0-9]+([_.-][a-z0-9]+)*$/);
     }
 

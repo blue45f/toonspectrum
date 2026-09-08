@@ -1,11 +1,10 @@
-import { readFileSync } from "node:fs";
-
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   classifyBranchDeletion,
   compareProvesMerged,
   encodeGitRef,
+  main,
   mergedPullRequestProvesHead,
 } from "./cleanup-merged-branches.mjs";
 
@@ -119,21 +118,215 @@ describe("merged branch cleanup safety", () => {
     expect(classifyBranchDeletion(candidate(overrides))).toEqual({ allowed: false, reason });
   });
 
-  it("rechecks the ref, deletes it, then closes only default-branch duplicate PRs", () => {
-    const source = readFileSync(new URL("./cleanup-merged-branches.mjs", import.meta.url), "utf8");
-    const decision = source.indexOf("if (!decision.allowed)");
-    const listPulls = source.indexOf("const openPulls = await openPullRequestsForBranch", decision);
-    const preserveOtherBases = source.indexOf("const nonDefaultPulls", listPulls);
-    const recheck = source.indexOf("const verifiedSha = await currentRefSha", preserveOtherBases);
-    const deleteRef = source.indexOf('method: "DELETE"', recheck);
-    const closePulls = source.indexOf("await reportAndMaybeClosePullRequests", deleteRef);
-    expect(listPulls).toBeGreaterThan(decision);
-    expect(preserveOtherBases).toBeGreaterThan(listPulls);
-    expect(recheck).toBeGreaterThan(preserveOtherBases);
-    expect(deleteRef).toBeGreaterThan(recheck);
-    expect(closePulls).toBeGreaterThan(deleteRef);
-    expect(source).toContain('reason: "open-nondefault-pull-request"');
-    expect(source).toContain('reason: "head-changed-after-verification"');
-    expect(source).toContain("exactMergedPullRequestForBranch");
+});
+
+const REPOSITORY = "blue45f/toonspectrum";
+const BRANCH = "topic/기반+candidate";
+const REPOSITORY_PATH = `/repos/${REPOSITORY}`;
+const ENV = {
+  GITHUB_TOKEN: "test-token",
+  GITHUB_REPOSITORY: REPOSITORY,
+  GITHUB_REF_NAME: "ci/cleanup",
+};
+
+interface MockReply {
+  body: unknown;
+  status?: number;
+}
+
+interface CleanupReport {
+  dryRun: boolean;
+  deleted: Array<{ branch: string; sha: string; applied: boolean }>;
+  closedPullRequests: Array<{ number: number; applied: boolean }>;
+  skipped: Array<{ branch: string; reason: string; pullRequests?: number[] }>;
+}
+
+function duplicateHeadPull(base = "main") {
+  return {
+    number: 84,
+    state: "open",
+    html_url: `https://github.com/${REPOSITORY}/pull/84`,
+    head: { ref: BRANCH, sha: SHA, repo: { full_name: REPOSITORY } },
+    base: { ref: base },
+  };
+}
+
+function dependentPull() {
+  return {
+    number: 73,
+    state: "open",
+    draft: true,
+    head: { ref: "feature/child", repo: { full_name: "contributor/fork" } },
+    base: { ref: BRANCH, repo: { full_name: REPOSITORY } },
+  };
+}
+
+function mockCleanupGithub(options: {
+  baseReplies?: MockReply[];
+  headPulls?: unknown[];
+  currentSha?: string;
+} = {}) {
+  const requests: Array<{ method: string; path: string; base: string | null; body: unknown }> = [];
+  const output = vi.spyOn(console, "log").mockImplementation(() => {});
+  const baseReplies = options.baseReplies ?? [{ body: [] }, { body: [] }];
+  let baseReads = 0;
+  const branch = { name: BRANCH, commit: { sha: SHA }, protected: false };
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    expect(url.origin).toBe("https://api.github.com");
+    const path = decodeURIComponent(url.pathname);
+    const method = init?.method ?? "GET";
+    requests.push({
+      method,
+      path,
+      base: url.searchParams.get("base"),
+      body: init?.body ? JSON.parse(String(init.body)) : undefined,
+    });
+    if (method === "GET") {
+      if (path === REPOSITORY_PATH) return Response.json({ default_branch: "main" });
+      if (path === `${REPOSITORY_PATH}/branches`) return Response.json([branch]);
+      if (path === `${REPOSITORY_PATH}/branches/${BRANCH}`) return Response.json(branch);
+      if (path === `${REPOSITORY_PATH}/pulls/42`) {
+        return Response.json({
+          ...mergedPull(),
+          merged: true,
+          head: { ref: BRANCH, sha: SHA, repo: { full_name: REPOSITORY } },
+        });
+      }
+      if (path === `${REPOSITORY_PATH}/compare/${SHA}...main`) {
+        return Response.json({ status: "ahead", ahead_by: 3, behind_by: 0 });
+      }
+      if (path === `${REPOSITORY_PATH}/git/ref/heads/${BRANCH}`) {
+        return Response.json({ object: { sha: options.currentSha ?? SHA } });
+      }
+      if (path === `${REPOSITORY_PATH}/pulls`) {
+        expect(url.searchParams.get("state")).toBe("open");
+        if (url.searchParams.has("base")) {
+          expect(url.searchParams.get("base")).toBe(BRANCH);
+          expect(url.searchParams.has("head")).toBe(false);
+          const reply = baseReplies[baseReads++] ?? { body: [] };
+          return Response.json(reply.body, { status: reply.status ?? 200 });
+        }
+        expect(url.searchParams.get("head")).toBe(`blue45f:${BRANCH}`);
+        return Response.json(options.headPulls ?? []);
+      }
+    }
+    if (method === "DELETE" && path === `${REPOSITORY_PATH}/git/refs/heads/${BRANCH}`) {
+      return new Response(null, { status: 204 });
+    }
+    if (method === "POST" && path === `${REPOSITORY_PATH}/issues/84/comments`) {
+      return Response.json({ id: 1000 });
+    }
+    if (method === "PATCH" && path === `${REPOSITORY_PATH}/pulls/84`) {
+      return Response.json({ ...duplicateHeadPull(), state: "closed" });
+    }
+    throw new Error(`Unexpected GitHub request: ${method} ${url}`);
+  }));
+  return {
+    requests,
+    baseReads: () => baseReads,
+    mutations: () => requests.filter((request) => request.method !== "GET"),
+    report: () => JSON.parse(String(output.mock.calls.at(-1)?.[0])) as CleanupReport,
+  };
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe("merged branch cleanup GitHub behavior", () => {
+  it.each([
+    { mode: "all", apply: false },
+    { mode: "all", apply: true },
+    { mode: "pr", apply: false },
+    { mode: "pr", apply: true },
+  ])("preserves an open draft PR base in $mode mode (apply: $apply)", async ({ mode, apply }) => {
+    const github = mockCleanupGithub({ baseReplies: [{ body: [dependentPull()] }] });
+    const args = mode === "all" ? ["--all"] : ["--pr", "42"];
+    await main(apply ? [...args, "--apply"] : args, ENV);
+    expect(github.report()).toMatchObject({
+      dryRun: !apply,
+      deleted: [],
+      closedPullRequests: [],
+      skipped: [{ branch: BRANCH, reason: "open-pull-request-base", pullRequests: [73] }],
+    });
+    expect(github.baseReads()).toBe(1);
+    expect(github.mutations()).toEqual([]);
+  });
+
+  it("preserves a branch when a dependent PR appears after the initial lookup", async () => {
+    const github = mockCleanupGithub({
+      baseReplies: [{ body: [] }, { body: [dependentPull()] }],
+      headPulls: [duplicateHeadPull()],
+    });
+    await main(["--all", "--apply"], ENV);
+    expect(github.baseReads()).toBe(2);
+    expect(github.requests.some((request) => request.path.endsWith(`/git/ref/heads/${BRANCH}`))).toBe(true);
+    expect(github.report()).toMatchObject({
+      deleted: [],
+      closedPullRequests: [],
+      skipped: [{ branch: BRANCH, reason: "open-pull-request-base", pullRequests: [73] }],
+    });
+    expect(github.mutations()).toEqual([]);
+  });
+
+  it.each([
+    { label: "an API failure", reply: { status: 500, body: { message: "unavailable" } }, error: /failed: 500/u },
+    { label: "a malformed list", reply: { body: { unexpected: "not an array" } }, error: /Expected paginated array/u },
+  ])("does not delete or close PRs after $label during the final base lookup", async ({ reply, error }) => {
+    const github = mockCleanupGithub({
+      baseReplies: [{ body: [] }, reply],
+      headPulls: [duplicateHeadPull()],
+    });
+    await expect(main(["--all", "--apply"], ENV)).rejects.toThrow(error);
+    expect(github.baseReads()).toBe(2);
+    expect(github.mutations()).toEqual([]);
+  });
+
+  it.each([false, true])("rechecks both authorities and preserves duplicate-head policy (apply: %s)", async (apply) => {
+    const github = mockCleanupGithub({ headPulls: [duplicateHeadPull()] });
+    await main(apply ? ["--all", "--apply"] : ["--all"], ENV);
+    expect(github.baseReads()).toBe(2);
+    expect(github.report()).toMatchObject({
+      dryRun: !apply,
+      skipped: [],
+      deleted: [{ branch: BRANCH, sha: SHA, applied: apply }],
+      closedPullRequests: [{ number: 84, applied: apply }],
+    });
+    if (!apply) {
+      expect(github.mutations()).toEqual([]);
+      return;
+    }
+    expect(github.mutations()).toMatchObject([
+      { method: "DELETE", path: `${REPOSITORY_PATH}/git/refs/heads/${BRANCH}` },
+      { method: "POST", path: `${REPOSITORY_PATH}/issues/84/comments` },
+      { method: "PATCH", path: `${REPOSITORY_PATH}/pulls/84`, body: { state: "closed" } },
+    ]);
+    const deleteIndex = github.requests.findIndex((request) => request.method === "DELETE");
+    expect(github.requests.findLastIndex((request) => request.base === BRANCH)).toBeLessThan(deleteIndex);
+    expect(github.requests.findIndex((request) => request.path.endsWith(`/git/ref/heads/${BRANCH}`))).toBeLessThan(deleteIndex);
+  });
+
+  it("still preserves a candidate whose own open PR targets a nondefault branch", async () => {
+    const github = mockCleanupGithub({ headPulls: [duplicateHeadPull("integration/other")] });
+    await main(["--all", "--apply"], ENV);
+    expect(github.report()).toMatchObject({
+      deleted: [],
+      closedPullRequests: [],
+      skipped: [{ branch: BRANCH, reason: "open-nondefault-pull-request", pullRequests: [84] }],
+    });
+    expect(github.mutations()).toEqual([]);
+  });
+
+  it("still preserves a candidate whose SHA changed before deletion", async () => {
+    const github = mockCleanupGithub({ currentSha: "f".repeat(40), headPulls: [duplicateHeadPull()] });
+    await main(["--all", "--apply"], ENV);
+    expect(github.report()).toMatchObject({
+      deleted: [],
+      closedPullRequests: [],
+      skipped: [{ branch: BRANCH, reason: "head-changed-after-verification" }],
+    });
+    expect(github.mutations()).toEqual([]);
   });
 });

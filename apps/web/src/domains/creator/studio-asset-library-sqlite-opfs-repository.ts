@@ -811,13 +811,22 @@ export function createStudioAssetLibrarySqliteOpfsRepository(
       }));
     },
 
-    async list() {
-      await mutationTail;
-      const { database, store } = await resources();
-      const manifest = await readManifest(database);
-      const assets = await listHydrated(store, manifest.entries);
-      await reconcileOwnerAndSweep(store, manifest).catch(() => undefined);
-      return assets;
+    list() {
+      return enqueue(async () => {
+        const read = async () => {
+          const { database, store } = await resources();
+          const manifest = await readManifest(database);
+          // Refresh this tab's cached CAS index after the preceding writer's publication.
+          await store.ownerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER);
+          const assets = await listHydrated(store, manifest.entries);
+          // Reconciliation contracts owner refs and deletes blobs. Keep the manifest read and
+          // cleanup inside the writer lock so an older snapshot cannot sweep a new revision.
+          // Without Web Locks, listing remains available but cannot perform storage mutations.
+          if (runExclusive) await reconcileOwnerAndSweep(store, manifest).catch(() => undefined);
+          return assets;
+        };
+        return runExclusive ? runExclusive(read) : read();
+      });
     },
 
     async listReadOnly() {

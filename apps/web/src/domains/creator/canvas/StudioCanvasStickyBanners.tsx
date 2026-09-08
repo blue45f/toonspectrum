@@ -133,7 +133,9 @@ export function renderStudioCanvasStickyBanners({
       내보내기 옵션 / 프로젝트 센터 / 초안 저장. Clear the floating pill (55px tall) on that shell only;
       the windowed shell already starts the canvas below the chrome.
     */}
-    <div data-studio-presence-controls className='pointer-events-none sticky top-2 [[data-studio-mobile-immersive="true"]_&]:top-16 z-[56] flex h-0 items-start justify-end gap-1.5 pr-2'>
+    <div data-studio-floating-controls className='pointer-events-none sticky top-2 [[data-studio-mobile-immersive="true"]_&]:top-16 z-[56] h-0'>
+    <div className="flex flex-col gap-2">
+    <div data-studio-presence-controls className="flex items-start justify-end gap-1.5 pr-2">
       <StudioLiveCollaborationQuickControls
         followingSessionId={followingStudioSessionId}
         onOpenTeam={openTeam}
@@ -159,7 +161,7 @@ export function renderStudioCanvasStickyBanners({
       </Suspense>
     </div>
     {viewTool ? (
-      <div className="pointer-events-none sticky top-2 z-[44] flex h-0 items-start justify-center px-2">
+      <div className="pointer-events-none flex items-start justify-center px-2">
         <Suspense fallback={null}>
           <StudioViewToolsHud
             className="!relative !left-auto !top-auto !max-w-full !translate-x-0"
@@ -182,6 +184,8 @@ export function renderStudioCanvasStickyBanners({
         </Suspense>
       </div>
     ) : null}
+    </div>
+    </div>
     {commentPinArmed ? (
       <div className="pointer-events-none sticky top-3 z-[45] flex h-0 items-start justify-center px-3">
         <div
