@@ -1,0 +1,164 @@
+          {imageReferenceDocument.references.length >
+          STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX ? (
+            <p
+              role="alert"
+              className="mt-2 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-[0.7rem] leading-relaxed text-bad"
+            >
+              AI 이미지 참조는 최대 {STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX}개까지
+              사용할 수 있습니다. 일부 참조를 제거한 뒤 생성해 주세요.
+            </p>
+          ) : null}
+        </div>
+      </details>
+    );
+  }
+
+  const stageMeta = STAGE_COPY[stage];
+  const selectedCandidates = selectedItem
+    ? scenarioImageCandidates(selectedItem)
+    : [];
+
+  const modal = (
+    <div className="fixed inset-0 z-[120] bg-[oklch(0.08_0.01_70/0.82)] p-0 text-fg backdrop-blur-sm sm:p-3">
+      <section
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI 코믹 디렉터"
+        tabIndex={-1}
+        className="mx-auto flex h-full w-full max-w-[100rem] flex-col overflow-hidden border border-line bg-panel shadow-2xl sm:rounded-2xl"
+      >
+        <header className="flex min-h-14 shrink-0 items-center gap-2 border-b border-line px-3 sm:px-4">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-on-accent">
+            <Clapperboard size={15} aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-black text-fg">AI 코믹 디렉터</h2>
+            <p className="truncate text-[0.61rem] text-fg-3">
+              이야기 → 컷 연출 → 선택 후보 → 편집 가능한 원고
+            </p>
+          </div>
+          <span className="ml-auto hidden text-[0.63rem] text-fg-3 md:inline">
+            {busy
+              ? `${stageLabel ?? "AI 작업 진행 중"}${progress ? ` (${progress.done}/${progress.total})` : ""}`
+              : "부모 제작 세션에 자동 유지"}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="AI 코믹 디렉터 닫기"
+            className={cn(QUIET_BUTTON, "size-11 px-0")}
+          >
+            <X size={16} aria-hidden />
+          </button>
+        </header>
+
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[12rem_minmax(0,1fr)] lg:grid-rows-1">
+          <nav
+            aria-label="AI 코믹 디렉터 제작 단계"
+            className="overflow-x-auto border-b border-line bg-panel px-2 py-1.5 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-3"
+          >
+            <ol className="flex min-w-max gap-1 lg:min-w-0 lg:flex-col">
+              {STUDIO_AI_COMIC_DIRECTOR_STAGE_IDS.map((stageId) => {
+                const copy = STAGE_COPY[stageId];
+                const active = stage === stageId;
+                const disabled = stageId !== "brief" && !hasPreview;
+                return (
+                  <li key={stageId} className="min-w-32 lg:min-w-0">
+                    <button
+                      type="button"
+                      aria-current={active ? "step" : undefined}
+                      disabled={disabled}
+                      onClick={() => setStage(stageId)}
+                      className={cn(
+                        "flex min-h-12 w-full items-center gap-2 rounded-lg border px-2.5 text-left",
+                        STUDIO_EASE,
+                        STUDIO_FOCUS_RING,
+                        active
+                          ? "border-accent/45 bg-accent-soft text-fg"
+                          : "border-transparent text-fg-3 hover:bg-raised hover:text-fg",
+                        "disabled:cursor-not-allowed disabled:opacity-40",
+                      )}
+                    >
+                      <span className="font-mono text-sm font-black text-accent">
+                        {copy.number}
+                      </span>
+                      <span className="text-[0.67rem] font-bold">{copy.shortLabel}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+
+          <div className="flex min-h-0 min-w-0 flex-col">
+            <header className="flex min-h-[4.75rem] shrink-0 items-center gap-3 border-b border-line px-3 py-2 sm:px-4">
+              <div className="min-w-0">
+                <p className="font-mono text-[0.55rem] font-black tracking-[0.12em] text-accent">
+                  STEP {stageMeta.number}
+                </p>
+                <h3
+                  data-stage-heading="true"
+                  tabIndex={-1}
+                  className="truncate text-sm font-black text-fg"
+                >
+                  {stageMeta.title}
+                </h3>
+                <p className="truncate text-[0.62rem] text-fg-3">
+                  {stageMeta.description}
+                </p>
+              </div>
+              {qualityFindings.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => selectFinding(qualityFindings[0])}
+                  className={cn(SECONDARY_BUTTON, "ml-auto")}
+                >
+                  <AlertTriangle size={13} className="text-warn" aria-hidden />
+                  확인 {qualityFindings.length}
+                </button>
+              ) : null}
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 [scroll-padding-block:5rem] sm:px-4">
+              {stage === "brief" ? (
+                <section className="mx-auto grid max-w-6xl gap-4 xl:grid-cols-[minmax(0,1.2fr)_20rem]">
+                  <div className="space-y-4">
+                    {!textConfigured ? (
+                      <p className="rounded-xl border border-warn/35 bg-warn/10 px-3 py-2 text-xs text-fg-2">
+                        텍스트 AI를 연결하면 이야기에서 컷 구성을 만들 수 있습니다.
+                      </p>
+                    ) : null}
+                    <section className="rounded-xl border border-line bg-card/45 p-3">
+                      <label
+                        htmlFor="scenario-story-text"
+                        className="mb-1 block text-xs font-bold text-fg-2"
+                      >
+                        스토리 아이디어
+                      </label>
+                      <textarea
+                        id="scenario-story-text"
+                        value={storyText}
+                        onChange={(event) =>
+                          onStoryTextChange(event.target.value.slice(0, STORY_TEXT_MAX))
+                        }
+                        placeholder="예: 비 오는 밤, 주인공이 폐역에서 오래전 사라진 친구를 발견한다."
+                        rows={8}
+                        disabled={editingLocked}
+                        className={cn(FIELD_CLASS, "resize-y text-sm")}
+                      />
+                      <p className="mt-1 text-[0.62rem] text-fg-3">
+                        {storyText.length} / {STORY_TEXT_MAX}자 · 원문은 보존됩니다.
+                      </p>
+                    </section>
+                    {renderReferencePack()}
+                  </div>
+                  <aside className="space-y-3">
+                    <section className="rounded-xl border border-line bg-card/55 p-3">
+                      <h4 className="text-xs font-black text-fg">생성 품질</h4>
+                      <fieldset className="mt-2 grid gap-2">
+                        <legend className="sr-only">생성 품질 프로필</legend>
+                        {STUDIO_AI_COMIC_DIRECTOR_PROFILES.map((candidate) => (
+                          <label
+                            key={candidate.id}
+                            className={cn(
