@@ -27,9 +27,9 @@ overrides:
   path-to-regexp@>=8.0.0 <8.4.2: 8.4.2
   serialize-javascript: '>=7.0.3'
   piscina: '>=4.9.3'
-  vitest: '>=4.1.9'
+  vitest: 4.1.9
   '@vitest/coverage-v8': 4.1.9
-  '@vitest/ui': '>=4.1.9'
+  '@vitest/ui': 4.1.9
   vite: '>=8.0.16'
   jspdf: '>=4.2.1'
   babylonjs-gltf2interface: 9.19.0
@@ -416,7 +416,7 @@ importers:
         specifier: '>=8.0.16'
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
       vitest:
-        specifier: '>=4.1.9'
+        specifier: 4.1.9
         version: 4.1.9(@edge-runtime/vm@3.2.0)(@types/node@24.13.2)(@vitest/coverage-v8@4.1.9)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
       wesl:
         specifier: ^0.7.28
@@ -768,7 +768,7 @@ packages:
     peerDependencies:
       '@vitest/runner': ^4.1.0
       '@vitest/snapshot': ^4.1.0
-      vitest: '>=4.1.9'
+      vitest: 4.1.9
 
   '@cloudflare/workerd-darwin-64@1.20260730.1':
     resolution: {integrity: sha512-+MBHmPaiTe2KajryW0T24rZvWFxb41hD3d8anNzQqHzft6vSEb18+sp0znSwxgij7ApPhSM1+vhkNg4f3YMguA==}
@@ -3694,7 +3694,7 @@ packages:
     resolution: {integrity: sha512-G9/lgqibheLVBDRuya45EbsEXTYcWoSG+TLg7i2axuzx0Eq62eXn+aWXyaVdV5vKvFSWd6ywcX8hA7la9Pvu8g==}
     peerDependencies:
       '@vitest/browser': 4.1.9
-      vitest: '>=4.1.9'
+      vitest: 4.1.9
     peerDependenciesMeta:
       '@vitest/browser':
         optional: true
@@ -7440,7 +7440,7 @@ packages:
       '@vitest/browser-webdriverio': 4.1.9
       '@vitest/coverage-istanbul': 4.1.9
       '@vitest/coverage-v8': 4.1.9
-      '@vitest/ui': '>=4.1.9'
+      '@vitest/ui': 4.1.9
       happy-dom: '*'
       jsdom: '*'
       vite: '>=8.0.16'

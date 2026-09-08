@@ -285,7 +285,7 @@
     "typescript-eslint": "^8.60.0",
     "vercel": "^58.9.4",
     "vite": "^8.0.16",
-    "vitest": "^4.1.9",
+    "vitest": "4.1.9",
     "wesl": "^0.7.28",
     "wrangler": "4.116.0",
     "yaml": "2.9.0"
