@@ -12,7 +12,7 @@ import { expect } from "@playwright/test";
 import { decodePng } from "image-js";
 import { chromium } from "playwright";
 
-import { STUDIO_PAINT_BRUSH_CATALOG_ITEMS } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
+import { STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
 import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
 
 import { installStudioInAppFirstRunState } from "./lib/studio-inapp-sweep-harness.mjs";
@@ -23,7 +23,12 @@ import type { DrawEl } from "../apps/web/src/domains/creator/studio-element-mode
 const origin = process.env.TOONSPECTRUM_VERIFY_ORIGIN;
 assert.ok(origin, "Set TOONSPECTRUM_VERIFY_ORIGIN to the production preview to verify");
 const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? "/tmp/toonspectrum-dry-media-selection";
-const ids = (process.env.TOONSPECTRUM_BRUSH_VERIFY_IDS ?? "precision-pencil").split(",");
+const ids = (process.env.TOONSPECTRUM_BRUSH_VERIFY_IDS ?? "precision-pencil,velvet-charcoal").split(",");
+const items = ids.map(id => {
+  const item = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.find(candidate => candidate.id === id);
+  assert.ok(item, `Brush is not publicly selectable: ${id}`);
+  return item;
+});
 mkdirSync(output, { recursive: true });
 const native = process.platform === "darwin";
 const browser = await chromium.launch({
@@ -52,9 +57,8 @@ function comparePictures(first: Buffer, second: Buffer) {
 }
 
 try {
-  for (const id of ids) {
-    const item = STUDIO_PAINT_BRUSH_CATALOG_ITEMS.find(candidate => candidate.id === id);
-    assert.ok(item, `Unknown public brush: ${id}`);
+  for (const item of items) {
+    const { id } = item;
     const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, locale: "ko-KR" });
     const page = await context.newPage();
     page.setDefaultTimeout(15_000);
@@ -177,18 +181,30 @@ try {
       // A globally disabled specialist would also preserve the screenshot. Require evidence that
       // the real candidate was rendered and compared before deciding who may own its pixels.
       const receipt = selectedCanvas.attributes.studioCanonicalVnextDryMediaDocumentParity;
-      assert.ok(receipt, "The candidate must have measured document-parity evidence");
-      const parity = JSON.parse(receipt) as { status: string; comparedPixels: number;
-        mismatchedPixels: number; channelTolerance: number; colorSpace: string; alphaEncoding: string };
-      assert.ok(parity.status === "matched" || parity.status === "mismatch");
-      assert.ok(parity.comparedPixels > 0);
-      assert.equal(parity.channelTolerance, 0);
-      assert.equal(parity.colorSpace, "srgb");
-      assert.equal(parity.alphaEncoding, "straight-rgba8");
-      assert.equal(selectedCanvas.attributes.studioCanonicalVnextDryMediaAuthorized,
-        parity.status === "matched" ? "true" : "false");
-      assert.equal(selectedCanvas.visibility, parity.status === "matched" ? "visible" : "hidden");
-      assert.equal(parity.mismatchedPixels === 0, parity.status === "matched");
+      if (id === "velvet-charcoal") {
+        // This public brush's sponge footprint is rejected by the specialist's tangent gate.
+        // Verify the ordinary selection UX without claiming a GPU-rendered parity measurement.
+        assert.equal(selectedCanvas.attributes.studioCanonicalVnextDryMediaReason,
+          "compile:quality-gate-rejected:tangent-alignment-required");
+        assert.equal(receipt, undefined);
+        assert.equal(selectedCanvas.attributes.studioCanonicalVnextDryMediaAuthorized, "false");
+        assert.equal(selectedCanvas.visibility, "hidden");
+        result.candidateCoverage = "REJECTED_BEFORE_RENDER: tangent-alignment-required";
+      } else {
+        assert.ok(receipt, "The candidate must have measured document-parity evidence");
+        const parity = JSON.parse(receipt) as { status: string; comparedPixels: number;
+          mismatchedPixels: number; channelTolerance: number; colorSpace: string; alphaEncoding: string };
+        assert.ok(parity.status === "matched" || parity.status === "mismatch");
+        assert.ok(parity.comparedPixels > 0);
+        assert.equal(parity.channelTolerance, 0);
+        assert.equal(parity.colorSpace, "srgb");
+        assert.equal(parity.alphaEncoding, "straight-rgba8");
+        assert.equal(selectedCanvas.attributes.studioCanonicalVnextDryMediaAuthorized,
+          parity.status === "matched" ? "true" : "false");
+        assert.equal(selectedCanvas.visibility, parity.status === "matched" ? "visible" : "hidden");
+        assert.equal(parity.mismatchedPixels === 0, parity.status === "matched");
+        result.candidateCoverage = "MEASURED_DOCUMENT_PARITY";
+      }
       assert.equal(await page.locator('[data-studio-canonical-vnext-dry-media-unavailable]').count(), 0);
       assert.deepEqual(httpErrors, []);
       assert.deepEqual(errors, []);
