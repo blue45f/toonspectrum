@@ -18,6 +18,8 @@ function focusableIn(root: HTMLElement): HTMLElement[] {
   ));
 }
 
+// Shared modal behavior intentionally lives with the dialog-only component helpers.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useModalFocus({
   dialogRef,
   initialFocusRef,
@@ -68,6 +70,8 @@ export function useModalFocus({
   }, [dialogRef, initialFocusRef, returnFocus]);
 }
 
+// Clipboard feedback is shared by both reference-asset dialogs.
+// eslint-disable-next-line react-refresh/only-export-components
 export async function copyText(value: string, successMessage: string) {
   try {
     await navigator.clipboard.writeText(value);
