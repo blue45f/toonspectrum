@@ -137,6 +137,7 @@ export function createQuickComicPreview(draft: QuickComicDraft): QuickComicPrevi
       sceneTemplateId: scene?.id ?? null,
       dialogueScript: input.dialogueScript ?? "",
       assemblyComposable: assembly.composable,
+      assemblyBubbleCount: assembly.bubbleCount,
     }),
   };
 }
