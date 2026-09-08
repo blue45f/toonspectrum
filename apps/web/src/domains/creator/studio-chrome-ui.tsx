@@ -1007,6 +1007,8 @@ export function StudioRailToolButton({
           : undefined
       }
       hint={hint}
+      // Vertical-rail coaches must not cover the neighboring tools above the footer.
+      preferredSide="right"
     >
       {button}
     </StudioToolHintTarget>
