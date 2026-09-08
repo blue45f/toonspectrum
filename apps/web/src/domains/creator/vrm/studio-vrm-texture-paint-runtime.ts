@@ -62,9 +62,19 @@ import type {
   StudioVrmTextureStrokeSample,
   StudioVrmTextureStrokeStyle,
 } from "./studio-vrm-texture-stroke";
+import {
+  canonicalizeStudioVrmTexturePaintChannel,
+  isStudioVrmTexturePaintScalarChannel,
+  type StudioVrmTexturePaintChannel,
+} from "./studio-vrm-texture-paint-channel";
+import {
+  StudioVrmTexturePaintMaterialChannels,
+  studioVrmMaterialSupportsPaintChannel,
+} from "./studio-vrm-texture-paint-material";
 
 const RGBA_CHANNELS = 4;
 const DEFAULT_TARGET_RGBA_BYTES = STUDIO_VRM_TEXTURE_MAX_TEXELS * RGBA_CHANNELS;
+
 export const STUDIO_VRM_TEXTURE_PAINT_TARGET_RESIDENT_RGBA_COPIES = 4;
 export const STUDIO_VRM_TEXTURE_PAINT_STANDARD_GEOMETRY_MAX_TRIANGLES = 100_000;
 const DEFAULT_HISTORY_BYTES = 32 * 1024 * 1024;
@@ -101,6 +111,7 @@ export type StudioVrmTexturePaintRuntimeErrorCode =
   | "binding-conflict"
   | "binding-missing"
   | "canvas-unavailable"
+  | "channel-unsupported"
   | "disposed"
   | "fill-memory-budget"
   | "fill-worker-failed"
@@ -341,6 +352,7 @@ export interface CreateStudioVrmTexturePaintRuntimeOptions {
 }
 
 export interface StudioVrmTexturePaintTargetSnapshot {
+  readonly channel: StudioVrmTexturePaintChannel;
   readonly id: string;
   readonly sourceTextureUuid: string;
   readonly paintedTextureUuid: string;
@@ -363,6 +375,8 @@ export interface StudioVrmTexturePaintHistorySnapshot {
 }
 
 export interface StudioVrmTexturePaintRuntimeSnapshot {
+  readonly channel: StudioVrmTexturePaintChannel;
+  readonly supportedChannels: readonly StudioVrmTexturePaintChannel[];
   readonly status: StudioVrmTexturePaintRuntimeStatus;
   readonly activeOperation:
     | "fill"
@@ -405,6 +419,7 @@ interface MaterialBinding {
 }
 
 interface PaintTarget {
+  readonly channel: StudioVrmTexturePaintChannel;
   readonly id: string;
   readonly originalTexture: THREE.Texture;
   readonly paintedTexture: THREE.CanvasTexture;
@@ -556,6 +571,7 @@ const ERROR_MESSAGES: Readonly<Record<StudioVrmTexturePaintRuntimeErrorCode, str
     "binding-conflict": "저장된 표면 텍스처와 현재 모델의 재질 결합이 서로 충돌합니다.",
     "binding-missing": "저장된 표면 텍스처가 가리키는 모델 재질을 찾지 못했습니다.",
     "canvas-unavailable": "페인팅 캔버스를 사용할 수 없습니다.",
+    "channel-unsupported": "이 재질은 선택한 페인팅 채널을 지원하지 않습니다.",
     disposed: "텍스처 페인팅이 이미 종료되었습니다.",
     "fill-memory-budget": "이 텍스처는 안전한 ColorDrop 메모리 한도를 초과합니다.",
     "fill-worker-failed": "ColorDrop 영역 계산을 완료하지 못했습니다.",
@@ -870,6 +886,7 @@ function createScenePathMaterialLocator(
  */
 function collectSceneMaterialBindings(
   scene: THREE.Object3D,
+  channel: StudioVrmTexturePaintChannel = "baseColor",
 ): Map<BaseColorMaterial, StudioVrmTexturePaintBindingDescriptor> {
   const bindings = new Map<BaseColorMaterial, StudioVrmTexturePaintBindingDescriptor>();
   const stack: Array<Readonly<{ object: THREE.Object3D; path: string }>> = [
@@ -885,12 +902,13 @@ function collectSceneMaterialBindings(
     if (mesh.isMesh === true && mesh.material) {
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       materials.forEach((candidate, materialIndex) => {
-        if (!isBaseColorMaterial(candidate)) return;
+        if (!isBaseColorMaterial(candidate) || !studioVrmMaterialSupportsPaintChannel(candidate, channel)) return;
         const stamped = canonicalMaterialLocator(
           candidate.userData?.[STUDIO_VRM_TEXTURE_PAINT_MATERIAL_LOCATOR_USER_DATA_KEY],
         );
         const descriptor = createBindingDescriptor(
           stamped ?? createScenePathMaterialLocator(current.path, materialIndex),
+          channel,
         );
         if (!descriptor) return;
         const previous = bindings.get(candidate);
@@ -1447,6 +1465,9 @@ function flipRgbaRowsInPlace(
 
 export class StudioVrmTexturePaintRuntime {
   private readonly scene: THREE.Object3D;
+  private readonly materialChannels = new StudioVrmTexturePaintMaterialChannels();
+  private selectedChannel: StudioVrmTexturePaintChannel = "baseColor";
+  private readonly supportedPaintChannels: readonly StudioVrmTexturePaintChannel[];
   private readonly options: NormalizedRuntimeOptions;
   private readonly targetsByOriginal = new Map<THREE.Texture, PaintTarget>();
   private readonly targetsByPainted = new Map<THREE.Texture, PaintTarget>();
@@ -1480,11 +1501,28 @@ export class StudioVrmTexturePaintRuntime {
   ) {
     this.scene = scene;
     this.options = normalizeOptions(options);
+    this.supportedPaintChannels = Object.freeze([...this.materialChannels.supportedChannels(scene)]);
     this.snapshot = this.createSnapshot();
     void this.prewarmSceneGeometry();
   }
 
   getSnapshot = (): StudioVrmTexturePaintRuntimeSnapshot => this.snapshot;
+
+  setChannel(channel: StudioVrmTexturePaintChannel): StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintRuntimeSnapshot> {
+    if (this.disposed) return this.fail("disposed");
+    if (!canonicalizeStudioVrmTexturePaintChannel(channel)) return this.fail("channel-unsupported");
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
+      return this.fail("pointer-active");
+    }
+    if (!this.supportedPaintChannels.includes(channel)) {
+      return this.fail("channel-unsupported");
+    }
+    this.selectedChannel = channel;
+    this.selectedTarget = this.targets.find((target) => target.channel === channel) ?? null;
+    this.lastError = null;
+    this.publish();
+    return success(this.snapshot);
+  }
 
   /**
    * Monotonic revision of canvas-visible/export-observable RGBA content. Unlike React snapshots,
@@ -1573,7 +1611,7 @@ export class StudioVrmTexturePaintRuntime {
       return this.fail("invalid-dimensions");
     }
 
-    const materialEntries = [...collectSceneMaterialBindings(this.scene)]
+    const materialEntries = [...collectSceneMaterialBindings(this.scene, input.binding.textureSlot)]
       .filter(([, descriptor]) =>
         descriptor.materialLocator === input.binding.materialLocator
         && descriptor.textureSlot === input.binding.textureSlot
@@ -1584,7 +1622,7 @@ export class StudioVrmTexturePaintRuntime {
     if (!material) return this.fail("binding-missing");
     let currentMap: THREE.Texture | null;
     try {
-      currentMap = material.map;
+      currentMap = this.materialChannels.get(material, input.binding.textureSlot);
     } catch {
       return this.fail("binding-missing");
     }
@@ -2505,8 +2543,8 @@ export class StudioVrmTexturePaintRuntime {
     for (const target of this.targets) {
       for (const binding of target.bindings.values()) {
         try {
-          if (binding.material.map === target.paintedTexture) {
-            binding.material.map = binding.originalMap;
+          if (this.materialChannels.get(binding.material, target.channel) === target.paintedTexture) {
+            this.materialChannels.set(binding.material, target.channel, binding.originalMap);
             markMaterialChanged(binding.material);
           }
         } catch {
@@ -2522,6 +2560,7 @@ export class StudioVrmTexturePaintRuntime {
       target.bindings.clear();
     }
 
+    this.materialChannels.dispose();
     this.targetsByOriginal.clear();
     this.targetsByPainted.clear();
     this.targets.length = 0;
@@ -2737,7 +2776,8 @@ export class StudioVrmTexturePaintRuntime {
 
     let map: THREE.Texture | null;
     try {
-      map = material.map;
+      if (!studioVrmMaterialSupportsPaintChannel(material, this.selectedChannel)) return failure("channel-unsupported");
+      map = this.materialChannels.get(material, this.selectedChannel);
     } catch {
       return failure("material-missing");
     }
@@ -2949,7 +2989,7 @@ export class StudioVrmTexturePaintRuntime {
     this.inFlightReadsBySource.set(texture, 1);
     this.inFlightReadControllers.add(controller);
     try {
-      const readable = await this.options.readTextureImage(texture, controller.signal);
+      const readable = await this.materialChannels.read(texture, controller.signal, this.options.readTextureImage);
       if (controller.signal.aborted) return failure("source-read-aborted");
       const size = { width: readable?.width, height: readable?.height };
       if (!isStudioVrmTextureSize(size)) return failure("invalid-dimensions");
@@ -3038,6 +3078,7 @@ export class StudioVrmTexturePaintRuntime {
       return failure("source-unreadable");
     }
     const target: PaintTarget = {
+      channel: this.materialChannels.channelOf(source),
       id: sourceTargetId(source),
       originalTexture: source,
       paintedTexture,
@@ -3075,10 +3116,10 @@ export class StudioVrmTexturePaintRuntime {
       BaseColorMaterial,
       StudioVrmTexturePaintBindingDescriptor
     >();
-    for (const [material, descriptor] of collectSceneMaterialBindings(this.scene)) {
+    for (const [material, descriptor] of collectSceneMaterialBindings(this.scene, target.channel)) {
       if (target.bindings.has(material)) continue;
       try {
-        if (material.map === target.originalTexture) candidates.set(material, descriptor);
+        if (this.materialChannels.get(material, target.channel) === target.originalTexture) candidates.set(material, descriptor);
       } catch {
         // A throwing custom material is not a safe binding candidate.
       }
@@ -3089,14 +3130,14 @@ export class StudioVrmTexturePaintRuntime {
       for (const [material, descriptor] of candidates) {
         const binding = {
           material,
-          originalMap: material.map,
+          originalMap: this.materialChannels.get(material, target.channel),
           descriptor,
         } satisfies MaterialBinding;
         // Register rollback ownership before invoking a potentially hostile custom setter. A
         // setter may store the new map and then throw; recording afterwards would strand a
         // disposed CanvasTexture on the material.
         changed.push(binding);
-        material.map = target.paintedTexture;
+        this.materialChannels.set(material, target.channel, target.paintedTexture);
         markMaterialChanged(material);
         target.bindings.set(material, binding);
       }
@@ -3104,8 +3145,8 @@ export class StudioVrmTexturePaintRuntime {
     } catch {
       for (const binding of changed) {
         try {
-          if (binding.material.map === target.paintedTexture) {
-            binding.material.map = binding.originalMap;
+          if (this.materialChannels.get(binding.material, target.channel) === target.paintedTexture) {
+            this.materialChannels.set(binding.material, target.channel, binding.originalMap);
             markMaterialChanged(binding.material);
           }
         } catch {
@@ -3288,8 +3329,8 @@ export class StudioVrmTexturePaintRuntime {
     this.removeTargetHistory(target);
     for (const binding of target.bindings.values()) {
       try {
-        if (binding.material.map === target.paintedTexture) {
-          binding.material.map = binding.originalMap;
+        if (this.materialChannels.get(binding.material, target.channel) === target.paintedTexture) {
+          this.materialChannels.set(binding.material, target.channel, binding.originalMap);
           markMaterialChanged(binding.material);
         }
       } catch {
@@ -3325,6 +3366,23 @@ export class StudioVrmTexturePaintRuntime {
   ): boolean {
     if (!target.valid) return false;
     try {
+      if (isStudioVrmTexturePaintScalarChannel(target.channel) || target.channel === "emissive") {
+        const region = dirtyRect.width > 0 && dirtyRect.height > 0
+          ? dirtyRect : { x: 0, y: 0, ...target.size };
+        for (let y = region.y; y < region.y + region.height; y += 1) {
+          for (let x = region.x; x < region.x + region.width; x += 1) {
+            const offset = (y * target.size.width + x) * RGBA_CHANNELS;
+            if (target.channel !== "emissive") {
+              const component = target.channel === "metalness" ? 2 : 1;
+              const value = target.imageData.data[offset + component]!;
+              target.imageData.data[offset] = value;
+              target.imageData.data[offset + 1] = value;
+              target.imageData.data[offset + 2] = value;
+            }
+            target.imageData.data[offset + 3] = 255;
+          }
+        }
+      }
       if (dirtyRect.width > 0 && dirtyRect.height > 0) {
         target.context.putImageData(
           target.imageData,
@@ -3358,6 +3416,7 @@ export class StudioVrmTexturePaintRuntime {
   }
 
   private publish(): void {
+    if (this.selectedTarget) this.selectedChannel = this.selectedTarget.channel;
     this.snapshot = this.createSnapshot();
     for (const listener of this.listeners) {
       try {
@@ -3370,6 +3429,7 @@ export class StudioVrmTexturePaintRuntime {
 
   private createSnapshot(): StudioVrmTexturePaintRuntimeSnapshot {
     const targetSnapshots = this.targets.map((target) => Object.freeze({
+      channel: target.channel,
       id: target.id,
       sourceTextureUuid: target.originalTexture.uuid,
       paintedTextureUuid: target.paintedTexture.uuid,
@@ -3418,6 +3478,8 @@ export class StudioVrmTexturePaintRuntime {
                 : "surface-read"
             : null;
     return Object.freeze({
+      channel: this.selectedChannel,
+      supportedChannels: this.supportedPaintChannels,
       status,
       activeOperation,
       activePointerId: this.pending?.pointerId ?? this.active?.pointerId ?? null,

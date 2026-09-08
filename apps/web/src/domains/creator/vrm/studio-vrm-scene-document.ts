@@ -1,4 +1,10 @@
 import {
+  canonicalizeStudioVrmTexturePaintChannel,
+  studioVrmTexturePaintChannelEncoding,
+  type StudioVrmTexturePaintChannel,
+  type StudioVrmTexturePaintChannelEncoding,
+} from "./studio-vrm-texture-paint-channel";
+import {
   STUDIO_VRM_RIG_PROFILE_PURPOSE,
   STUDIO_VRM_RIG_PROFILE_VERSION,
   createStudioVrmRigProfileSelection,
@@ -343,7 +349,9 @@ export interface StudioVrmRigSettings {
 export interface StudioVrmSurfacePaintTexture {
   readonly bindingKey: string;
   readonly materialLocator: string;
-  readonly textureSlot: typeof STUDIO_VRM_SURFACE_PAINT_BASE_COLOR_SLOT;
+  readonly textureSlot: StudioVrmTexturePaintChannel;
+  readonly colorSpace?: StudioVrmTexturePaintChannelEncoding["colorSpace"];
+  readonly channelPacking?: StudioVrmTexturePaintChannelEncoding["channelPacking"];
   readonly hash: string;
   readonly mime: "image/png";
   readonly byteSize: number;
@@ -352,7 +360,7 @@ export interface StudioVrmSurfacePaintTexture {
 }
 
 export interface StudioVrmSurfacePaintSettings {
-  readonly version: 1;
+  readonly version: 1 | 2;
   readonly textures: readonly StudioVrmSurfacePaintTexture[];
 }
 
@@ -1200,13 +1208,15 @@ function normalizeSurfacePaintMaterialLocator(value: unknown): string | null {
     : null;
 }
 
-function normalizeSurfacePaintTexture(value: unknown): StudioVrmSurfacePaintTexture | null {
+function normalizeSurfacePaintTexture(value: unknown, version: 1 | 2): StudioVrmSurfacePaintTexture | null {
   if (!isRecord(value)) return null;
   const bindingKey = normalizeSurfacePaintIdentifier(value.bindingKey);
   const materialLocator = normalizeSurfacePaintMaterialLocator(value.materialLocator);
-  const textureSlot = value.textureSlot === STUDIO_VRM_SURFACE_PAINT_BASE_COLOR_SLOT
-    ? STUDIO_VRM_SURFACE_PAINT_BASE_COLOR_SLOT
-    : null;
+  const textureSlot = canonicalizeStudioVrmTexturePaintChannel(value.textureSlot);
+  if (!textureSlot || (version === 1 && textureSlot !== "baseColor")) return null;
+  const encoding = studioVrmTexturePaintChannelEncoding(textureSlot);
+  if (version === 2 && (value.colorSpace !== encoding.colorSpace
+    || value.channelPacking !== encoding.channelPacking)) return null;
   if (
     !bindingKey
     || !materialLocator
@@ -1230,6 +1240,7 @@ function normalizeSurfacePaintTexture(value: unknown): StudioVrmSurfacePaintText
     bindingKey,
     materialLocator,
     textureSlot,
+    ...(version === 2 ? encoding : {}),
     hash: value.hash,
     mime: "image/png",
     byteSize: value.byteSize as number,
@@ -1260,13 +1271,13 @@ function surfacePaintBindingIdentity(texture: StudioVrmSurfacePaintTexture): str
 }
 
 function normalizeSurfacePaint(value: unknown): StudioVrmSurfacePaintSettings {
-  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.textures)) {
+  if (!isRecord(value) || (value.version !== 1 && value.version !== 2) || !Array.isArray(value.textures)) {
     return { version: 1, textures: [] };
   }
 
   const sorted = value.textures
     .flatMap((texture) => {
-      const normalized = normalizeSurfacePaintTexture(texture);
+      const normalized = normalizeSurfacePaintTexture(texture, value.version as 1 | 2);
       return normalized ? [normalized] : [];
     })
     .sort(compareSurfacePaintTextures);
@@ -1327,7 +1338,7 @@ function normalizeSurfacePaint(value: unknown): StudioVrmSurfacePaintSettings {
   }
 
   return {
-    version: 1,
+    version: value.version,
     textures: uniqueBindings.filter((texture) => acceptedHashes.has(texture.hash)),
   };
 }
@@ -1385,15 +1396,16 @@ function hasStrictSurfacePaint(value: unknown): boolean {
   if (
     keys.length !== SURFACE_PAINT_KEYS.size
     || keys.some((key) => !SURFACE_PAINT_KEYS.has(key))
-    || value.version !== 1
+    || (value.version !== 1 && value.version !== 2)
     || !Array.isArray(value.textures)
     || value.textures.length > STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES
   ) return false;
   return value.textures.every((texture) => {
     if (!isRecord(texture)) return false;
     const textureKeys = Object.keys(texture);
-    return textureKeys.length === SURFACE_PAINT_TEXTURE_KEYS.size
-      && textureKeys.every((key) => SURFACE_PAINT_TEXTURE_KEYS.has(key));
+    const encodingKeys = value.version === 2 ? ["colorSpace", "channelPacking"] : [];
+    return textureKeys.length === SURFACE_PAINT_TEXTURE_KEYS.size + encodingKeys.length
+      && textureKeys.every((key) => SURFACE_PAINT_TEXTURE_KEYS.has(key) || encodingKeys.includes(key));
   });
 }
 

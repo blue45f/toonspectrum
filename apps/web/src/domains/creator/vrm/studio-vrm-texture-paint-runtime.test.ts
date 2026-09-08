@@ -132,6 +132,46 @@ function unwrap<T>(result: StudioVrmTexturePaintRuntimeResult<T>): T {
   return result.value;
 }
 
+it("restores and edits independent packed material channels with atomic cross-channel Undo and Redo", async () => {
+  const packedPixels = rgba(8, 8, [32, 128, 64, 255]);
+  const packed = new THREE.DataTexture(packedPixels, 8, 8);
+  const material = new THREE.MeshStandardMaterial({ map: packed, roughnessMap: packed, metalnessMap: packed });
+  stampStudioVrmTexturePaintMaterialLocator(material, 2);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+  const scene = new THREE.Group(); scene.add(mesh);
+  const canvas = canvasHarness();
+  const runtime = createStudioVrmTexturePaintRuntime(scene, {
+    createCanvas: canvas.createCanvas,
+    readTextureImage: (texture) => {
+      const image = texture.image as StudioVrmTexturePaintReadableImage;
+      return readable(image.width, image.height, image.data);
+    },
+  });
+  try {
+    unwrap(await runtime.rehydrateTarget({ binding: { bindingKey: "gltf-material-2-roughness", materialLocator: "gltf-material:2", textureSlot: "roughness" }, image: readable(8, 8, rgba(8, 8, [192, 192, 192, 255])) }));
+    unwrap(await runtime.rehydrateTarget({ binding: { bindingKey: "gltf-material-2-metalness", materialLocator: "gltf-material:2", textureSlot: "metalness" }, image: readable(8, 8, rgba(8, 8, [48, 48, 48, 255])) }));
+    expect(runtime.getSnapshot().channel).toBe("metalness");
+    expect(material.map).toBe(packed);
+    expect(material.roughnessMap).not.toBe(material.metalnessMap);
+    const before = unwrap(runtime.exportPaintedTargets());
+    unwrap(runtime.setChannel("roughness"));
+    unwrap(await runtime.beginStroke({ pointerId: 71, hit: hit(mesh), style: { ...INK, color: "#ffffff" } }));
+    expectFailure(runtime.setChannel("metalness"), "pointer-active");
+    unwrap(runtime.commitStroke(71));
+    const edited = unwrap(runtime.exportPaintedTargets());
+    expect(edited).not.toEqual(before);
+    unwrap(runtime.setChannel("metalness"));
+    unwrap(runtime.undo());
+    expect(runtime.getSnapshot().channel).toBe("roughness");
+    expect(unwrap(runtime.exportPaintedTargets())).toEqual(before);
+    unwrap(runtime.redo());
+    expect(unwrap(runtime.exportPaintedTargets())).toEqual(edited);
+    expect(packed.image.data).toEqual(packedPixels);
+  } finally { runtime.dispose(); material.dispose(); packed.dispose(); mesh.geometry.dispose(); }
+  expect(material.roughnessMap).toBe(packed);
+  expect(material.metalnessMap).toBe(packed);
+});
+
 function expectFailure<T>(
   result: StudioVrmTexturePaintRuntimeResult<T>,
   code: string,

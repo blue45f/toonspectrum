@@ -8,6 +8,8 @@ import {
   Undo2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { StudioVrmPaintChannelControls } from "./StudioVrmPaintChannelControls";
+import { isStudioVrmTexturePaintScalarChannel, type StudioVrmTexturePaintChannel } from "./studio-vrm-texture-paint-channel";
 
 import type { StudioVrmTextureFillScope } from "./studio-vrm-texture-fill";
 import type { StudioVrmTexturePaintBlendMode } from "./studio-vrm-texture-paint-ops";
@@ -32,6 +34,9 @@ export interface StudioVrmTexturePaintPanelSettings {
 }
 
 export interface StudioVrmTexturePaintPanelProps {
+  readonly channel?: StudioVrmTexturePaintChannel;
+  readonly supportedChannels?: readonly StudioVrmTexturePaintChannel[];
+  readonly onChannelChange?: (channel: StudioVrmTexturePaintChannel) => void;
   readonly hidden: boolean;
   readonly disabled: boolean;
   readonly settings: StudioVrmTexturePaintPanelSettings;
@@ -65,6 +70,9 @@ interface StudioVrmTexturePaintColorDraft {
 }
 
 export function StudioVrmTexturePaintPanel({
+  channel = "baseColor",
+  supportedChannels = ["baseColor"],
+  onChannelChange,
   hidden,
   disabled,
   settings,
@@ -154,7 +162,7 @@ export function StudioVrmTexturePaintPanel({
             <h3 className="text-sm font-bold text-fg">3D 표면 페인트</h3>
             <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
               모델 표면을 따라 직접 그리거나 ColorDrop으로 연결 영역을 채웁니다. 스포이드 버튼
-              또는 Alt+클릭으로 baseColor 색을 가져오며, 결과는 삽입 이미지와 캡처에 바로 반영됩니다.
+              또는 Alt+클릭으로 선택한 채널 값을 가져오며, 결과는 삽입 이미지와 캡처에 바로 반영됩니다.
             </p>
           </div>
         </div>
@@ -204,6 +212,9 @@ export function StudioVrmTexturePaintPanel({
         ) : null}
       </div>
 
+      {onChannelChange ? <StudioVrmPaintChannelControls channel={channel} supportedChannels={supportedChannels}
+        color={settings.color} disabled={editingDisabled} onChannelChange={onChannelChange}
+        onColorChange={(color) => onSettingsChange({ color })} /> : null}
       <fieldset disabled={editingDisabled} className="space-y-2 disabled:opacity-60">
         <legend className="mb-2 text-xs font-bold text-fg">표면 도구</legend>
         <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="표면 페인트 도구">
@@ -260,7 +271,7 @@ export function StudioVrmTexturePaintPanel({
       </div>
 
       <div className="space-y-3 border-t border-line pt-3">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+        <div hidden={isStudioVrmTexturePaintScalarChannel(channel)} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
           <label htmlFor="vrm-surface-paint-color" className="text-xs font-bold text-fg">
             색상
           </label>
