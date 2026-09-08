@@ -45,7 +45,8 @@ function pnpmExecutable() {
 const { index, count } = parseCiShardArguments(process.argv.slice(2));
 const candidates = listCiVisibleFiles().filter(isRootTypecheckFile);
 const sharedFiles = candidates.filter(isLikelyGlobalScript);
-const partitionedFiles = candidates.filter((file) => !sharedFiles.includes(file));
+const sharedFileSet = new Set(sharedFiles);
+const partitionedFiles = candidates.filter((file) => !sharedFileSet.has(file));
 const shard = selectCiFileShard(partitionedFiles, index, count);
 const files = [...new Set([...sharedFiles, ...shard.files])].sort();
 const temporaryConfig = `.tsconfig.ci-shard-${index + 1}-of-${count}.json`;
@@ -74,7 +75,15 @@ writeFileSync(
 try {
   const result = spawnSync(
     pnpmExecutable(),
-    ["exec", "tsc", "-p", temporaryConfig, "--pretty", "false"],
+    [
+      "exec",
+      "tsc",
+      "-p",
+      temporaryConfig,
+      "--pretty",
+      "false",
+      "--diagnostics",
+    ],
     {
       cwd: process.cwd(),
       env: {
