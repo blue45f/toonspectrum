@@ -77,7 +77,6 @@ export function transformStudioSmartShapePath(points: readonly number[], scale: 
   });
 }
 
-/** Existing point handles share page coordinates; Shift snaps a moved point relative to its neighbor. */
 export function commitStudioSmartShapeEdit(stroke: DrawEl, kind: StudioSmartShapeEditKind, points: number[]): DrawEl | null {
   if (studioSmartShapeEditReason(stroke) || points.length < 4 || points.length % 2 !== 0
     || points.length > STUDIO_SMART_SHAPE_EDIT_MAX_COORDINATES

@@ -1,3 +1,4 @@
+/** Existing point handles share page coordinates; Shift snaps a moved point relative to its neighbor. */
 export function moveStudioSmartShapePoint(points: readonly number[], index: number, x: number, y: number, snap = false): number[] {
   if (!Number.isFinite(x) || !Number.isFinite(y) || index < 0 || index * 2 + 1 >= points.length) return [...points];
   const next = [...points], neighbor = index === 0 ? 2 : (index - 1) * 2;
@@ -15,4 +16,3 @@ export function moveStudioSmartShapePoint(points: readonly number[], index: numb
   }
   return next;
 }
-
