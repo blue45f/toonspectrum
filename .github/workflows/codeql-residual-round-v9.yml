@@ -1,0 +1,94 @@
+name: Resilient residual CodeQL repair round
+
+on:
+  workflow_call:
+    inputs:
+      round:
+        type: string
+        required: true
+      branch:
+        type: string
+        required: true
+    outputs:
+      clean:
+        value: ${{ jobs.repair.outputs.clean }}
+
+permissions:
+  contents: write
+  models: read
+  security-events: read
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    outputs:
+      clean: ${{ steps.result.outputs.clean }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_MODELS_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: ${{ inputs.branch }}
+      ROUND: ${{ inputs.round }}
+    steps:
+      - name: Checkout latest branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Restore reviewed repair helper from branch history
+        shell: bash
+        run: |
+          set -euo pipefail
+          helper_commit="$(git rev-list --all -- scripts/codeql-residual-remediation-v6.py | head -1)"
+          [[ -n "$helper_commit" ]] || { echo "Repair helper is not present in branch history." >&2; exit 1; }
+          git show "${helper_commit}:scripts/codeql-residual-remediation-v6.py" > /tmp/codeql-fix-v9.py
+          chmod +x /tmp/codeql-fix-v9.py
+
+      - name: Initialize CodeQL security-and-quality
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - name: Analyze latest branch
+        uses: github/codeql-action/analyze@v3
+        with:
+          upload: false
+          output: /tmp/codeql-v9-${{ inputs.round }}
+          category: /language:javascript-typescript
+
+      - name: Inspect and repair findings
+        id: result
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="/tmp/codeql-v9-${ROUND}-findings.json"
+          set +e
+          python3 /tmp/codeql-fix-v9.py --sarif-root "/tmp/codeql-v9-${ROUND}" --output "$output"
+          status=$?
+          set -e
+          if [[ "$status" == "0" ]]; then
+            echo "clean=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [[ "$status" == "2" ]] || exit "$status"
+          echo "clean=false" >> "$GITHUB_OUTPUT"
+          python3 /tmp/codeql-fix-v9.py --sarif-root "/tmp/codeql-v9-${ROUND}" --output "$output" --fix
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "CodeQL findings remained but no repair changes were produced." >&2; exit 1; }
+          git commit -m "fix(security): resolve residual CodeQL findings (${ROUND})"
+          git push origin "HEAD:${TARGET_BRANCH}"
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-v9-${{ inputs.round }}
+          path: /tmp/codeql-v9-${{ inputs.round }}-findings.json
+          if-no-files-found: ignore
+          retention-days: 1
