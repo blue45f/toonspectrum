@@ -28,6 +28,8 @@ interface FocusRestoreRequest {
   readonly logicalPackId: string;
   readonly origin: HTMLButtonElement;
   readonly target: "action" | "retry";
+  readonly mutationOwner?: symbol;
+  readonly awaitingMutation?: boolean;
 }
 
 type LibraryLoadState = "idle" | "loading" | "ready" | "error";
@@ -191,7 +193,7 @@ export function CreatorMarketplaceCloudLibraryAction({
 
   useEffect(() => {
     const request = focusRestoreRef.current;
-    if (!request || pending) return;
+    if (!request || request.awaitingMutation || pending) return;
     if (request.recordId !== record.id || request.logicalPackId !== logicalPackId) {
       focusRestoreRef.current = null;
       return;
@@ -222,6 +224,7 @@ export function CreatorMarketplaceCloudLibraryAction({
 
   async function mutateLibrary(): Promise<void> {
     if (!authenticated || pending || loadState === "loading") return;
+    const mutationFocusOwner = Symbol("marketplace-library-focus");
     const actionButton = actionButtonRef.current;
     focusRestoreRef.current = actionButton && document.activeElement === actionButton
       ? {
@@ -229,6 +232,8 @@ export function CreatorMarketplaceCloudLibraryAction({
           logicalPackId,
           origin: actionButton,
           target: "action",
+          mutationOwner: mutationFocusOwner,
+          awaitingMutation: true,
         }
       : null;
     const generation = generationRef.current;
@@ -291,7 +296,7 @@ export function CreatorMarketplaceCloudLibraryAction({
       if (!effective) {
         setAcquisitionTarget(null);
         setLoadState("error");
-        if (focusRestoreRef.current) {
+        if (focusRestoreRef.current?.mutationOwner === mutationFocusOwner) {
           focusRestoreRef.current = {
             ...focusRestoreRef.current,
             target: "retry",
@@ -302,6 +307,11 @@ export function CreatorMarketplaceCloudLibraryAction({
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
       if (!controller.signal.aborted && generationRef.current === generation) {
+        const request = focusRestoreRef.current;
+        if (request?.mutationOwner === mutationFocusOwner) {
+          // An older ready-render effect must not consume an in-flight request.
+          focusRestoreRef.current = { ...request, awaitingMutation: false };
+        }
         setPending(false);
       }
     }
