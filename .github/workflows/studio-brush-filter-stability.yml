@@ -2,7 +2,7 @@ name: Studio brush and filter stability
 
 on:
   push:
-    branches: [main]
+    branches: [main, release/salvage-integration-20260908]
     paths:
       - 'apps/web/src/domains/creator/brush/**'
       - 'apps/web/src/domains/creator/filter/**'
@@ -12,7 +12,7 @@ on:
       - 'scripts/verify-studio-filter-dialog.mts'
       - '.github/workflows/studio-brush-filter-stability.yml'
   pull_request:
-    branches: [main]
+    branches: [main, release/salvage-integration-20260908]
     paths:
       - 'apps/web/src/domains/creator/brush/**'
       - 'apps/web/src/domains/creator/filter/**'

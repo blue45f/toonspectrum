@@ -2,7 +2,7 @@ name: Studio collaboration synchronization
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, release/salvage-integration-20260908]
     paths:
       - apps/web/src/domains/creator/live/**
       - scripts/verify-studio-p2p-channel-lifecycle.mjs
