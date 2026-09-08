@@ -54,8 +54,9 @@ describe("Studio Inspector panel controls", () => {
       screen.getByRole("button", { name: "선택에 따라 전문 탭 다시 전환" })
         .getAttribute("aria-pressed"),
     ).toBe("true");
-    expect(screen.getByRole("status")).toHaveTextContent("전문 탭 고정");
-    expect(screen.getByRole("status")).toHaveTextContent(
+    const status = screen.getByRole("status");
+    expect(status.textContent).toContain("전문 탭 고정");
+    expect(status.textContent).toContain(
       "선택이 바뀌어도 이미지 전문 탭을 자동 초기화하지 않습니다",
     );
   });
@@ -68,16 +69,17 @@ describe("Studio Inspector panel controls", () => {
     const activeToggle = within(options).getByRole("button", {
       name: "선택 항목 탭 숨기기",
     });
-    expect(activeToggle).toBeDisabled();
-    expect(activeToggle).toHaveAttribute(
-      "title",
+    expect((activeToggle as HTMLButtonElement).disabled).toBe(true);
+    expect(activeToggle.getAttribute("title")).toBe(
       "현재 열려 있는 탭은 다른 탭으로 이동한 뒤 숨길 수 있습니다.",
     );
 
     fireEvent.click(within(options).getByRole("button", { name: "페이지 탭 숨기기" }));
     expect(screen.queryByRole("tab", { name: "페이지" })).toBeNull();
-    expect(within(options).getByRole("button", { name: "페이지 탭 표시하기" }))
-      .toHaveAttribute("aria-pressed", "false");
+    expect(
+      within(options).getByRole("button", { name: "페이지 탭 표시하기" })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
   });
 
   it("switches to an icon-only primary rail without changing accessible tab names", () => {
@@ -88,7 +90,7 @@ describe("Studio Inspector panel controls", () => {
     fireEvent.click(compact);
 
     expect(compact.getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("tab", { name: "선택 항목" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "선택 항목" })).toBeTruthy();
     expect(
       screen.getByRole("tablist", { name: "스튜디오 설정" })
         .getAttribute("data-studio-inspector-primary-tabs-compact"),
@@ -105,9 +107,11 @@ describe("Studio Inspector panel controls", () => {
 
     fireEvent.click(within(options).getByRole("button", { name: "패널 기본값 복원" }));
 
-    expect(screen.getByRole("button", { name: "현재 전문 탭 고정" }))
-      .toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("tab", { name: "레이어" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "현재 전문 탭 고정" })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+    expect(screen.getByRole("tab", { name: "레이어" })).toBeTruthy();
     expect(
       screen.getByRole("tablist", { name: "스튜디오 설정" })
         .getAttribute("data-studio-inspector-primary-tabs-compact"),
