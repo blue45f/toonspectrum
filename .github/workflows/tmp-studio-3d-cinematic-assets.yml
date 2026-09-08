@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/tmp-studio-3d-cinematic-assets.yml
       - scripts/apply-studio-3d-cinematic-assets.mjs
+      - scripts/fix-studio-3d-cinematic-segments.mjs
   workflow_dispatch:
 
 permissions:
@@ -36,6 +37,9 @@ jobs:
       - name: Enable pnpm
         run: corepack enable
 
+      - name: Apply exact segment orientation
+        run: node scripts/fix-studio-3d-cinematic-segments.mjs
+
       - name: Apply product integration
         run: node scripts/apply-studio-3d-cinematic-assets.mjs
 
@@ -49,12 +53,14 @@ jobs:
           apps/web/src/domains/creator/bg3d/studio-bg3d-procedural-starter-ui.test.ts
           apps/web/src/domains/creator/bg3d/StudioBg3dProceduralStarterPanel.test.tsx
           apps/web/src/domains/creator/bg3d/studio-bg3d-cinematic-asset-pack.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-cinematic-segment-orientation.test.ts
 
       - name: Lint changed TypeScript
         run: >-
           pnpm exec eslint --max-warnings=0
           apps/web/src/domains/creator/bg3d/studio-bg3d-cinematic-asset-blueprints.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-cinematic-asset-pack.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-cinematic-segment-orientation.test.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-procedural-starter-pack.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-procedural-starter-pack.test.ts
           apps/web/src/domains/creator/bg3d/StudioBg3dProceduralStarterPanel.tsx
@@ -69,6 +75,7 @@ jobs:
       - name: Remove one-shot integration files
         run: |
           rm scripts/apply-studio-3d-cinematic-assets.mjs
+          rm scripts/fix-studio-3d-cinematic-segments.mjs
           rm .github/workflows/tmp-studio-3d-cinematic-assets.yml
 
       - name: Commit validated product changes
