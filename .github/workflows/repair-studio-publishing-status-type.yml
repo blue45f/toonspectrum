@@ -10,12 +10,12 @@ permissions:
 
 concurrency:
   group: repair-studio-publishing-status-type
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   repair:
     if: ${{ !contains(github.event.head_commit.message, '[publication-status-type-fixed]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
@@ -50,7 +50,7 @@ jobs:
           git add apps/web/src/domains/creator/StudioPublishingCommandCenter.tsx .github/workflows/repair-studio-publishing-status-type.yml
           git commit -m "fix(studio): preserve publication status union [publication-status-type-fixed]"
           git push origin HEAD:fix/studio-publishing-status-type-20260909
-      - name: Install locked workspace dependencies
+      - name: Install pnpm
         uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
