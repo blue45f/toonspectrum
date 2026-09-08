@@ -59,12 +59,15 @@ interface StudioCaptureDocumentPage {
 }
 
 /** The live overlay is not a document raster. The existing flush owns GPU receipts/publication. */
-export interface StudioCaptureDocumentReadiness<TPage extends StudioCaptureDocumentPage> {
+export interface StudioDocumentInkReadiness {
   readonly drawingRef: { readonly current: unknown };
   readonly drawingPointerTransportRef: { readonly current: { getSession(): unknown } | null };
   readonly pendingStrokeCommitsRef: { readonly current: unknown };
   /** Host wraps the canonical flush in ReactDOM.flushSync, just like manual save. */
   readonly flushPendingStrokes: () => unknown;
+}
+
+export interface StudioCaptureDocumentReadiness<TPage extends StudioCaptureDocumentPage> extends StudioDocumentInkReadiness {
   readonly pagesHistoryRef: { readonly current: readonly (readonly TPage[])[] };
   readonly pagesHiRef: { readonly current: number };
   readonly captureCommitRef: {
@@ -103,10 +106,8 @@ export interface StudioCaptureReadinessOptions<
   waitForRasterPresentations?: typeof waitForStudioRasterImagePresentations;
 }
 
-function prepareDocumentCapture<TPage extends StudioCaptureDocumentPage>(
-  pageId: string,
-  document: StudioCaptureDocumentReadiness<TPage>,
-) {
+/** Shared by raster capture and JSON's generation/cache selection; returns a later recheck. */
+export function flushStudioDocumentInkForExport(document: StudioDocumentInkReadiness): () => void {
   const gestureActive = () => Boolean(
     document.drawingRef.current || document.drawingPointerTransportRef.current?.getSession(),
   );
@@ -117,7 +118,18 @@ function prepareDocumentCapture<TPage extends StudioCaptureDocumentPage>(
   if (document.pendingStrokeCommitsRef.current) document.flushPendingStrokes();
   // A flush may retain ink while waiting for an exact terminal GPU receipt or publication access.
   // Its boolean return alone is not proof of a committed document (an active gesture returns true).
-  if (gestureActive() || document.pendingStrokeCommitsRef.current) throw pendingInk();
+  const assertSettled = () => {
+    if (gestureActive() || document.pendingStrokeCommitsRef.current) throw pendingInk();
+  };
+  assertSettled();
+  return assertSettled;
+}
+
+function prepareDocumentCapture<TPage extends StudioCaptureDocumentPage>(
+  pageId: string,
+  document: StudioCaptureDocumentReadiness<TPage>,
+) {
+  const assertInkSettled = flushStudioDocumentInkForExport(document);
   const history = document.pagesHistoryRef.current;
   const historyIndex = document.pagesHiRef.current;
   const page = history[historyIndex]?.find((candidate) => candidate.id === pageId);
@@ -125,7 +137,7 @@ function prepareDocumentCapture<TPage extends StudioCaptureDocumentPage>(
   return {
     sources: collectStudioCaptureAssetSources(page, document.master),
     assertCurrent() {
-      if (gestureActive() || document.pendingStrokeCommitsRef.current) throw pendingInk();
+      assertInkSettled();
       if (document.pagesHistoryRef.current !== history || document.pagesHiRef.current !== historyIndex) {
         throw new StudioCaptureReadinessError("stale-page", "캡처 준비 중 원고가 바뀌어 내보내기를 중단했어요.");
       }

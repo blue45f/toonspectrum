@@ -24053,9 +24053,7 @@ const puppetWarpArmed =
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 캡처할 수 있어요.");
     }
-    const {
-      waitForStudioCaptureReady,
-    } = await loadStudioCaptureReadinessRuntime();
+    const { waitForStudioCaptureReady } = await loadStudioCaptureReadinessRuntime();
     return waitForStudioCaptureReady({
       pageId: page.id,
       getRenderedPageId: () => {
@@ -26779,6 +26777,10 @@ function clearSelectionForEdit() {
     revisionProjectGenerationRef: studioRevisionProjectGenerationRef,
     projectDocumentSessionRef: studioProjectDocumentSessionRef,
     ensureSharedDocumentAvailableForExport,
+    prepareDocumentForExport: async () => (await loadStudioCaptureReadinessRuntime()).flushStudioDocumentInkForExport({
+      drawingRef, drawingPointerTransportRef, pendingStrokeCommitsRef,
+      flushPendingStrokes: () => flushSync(() => flushPendingStrokeCommitsRef.current()),
+    }),
     currentStudioProjectSnapshot,
     filterMaskSurfaceArchiveDependencies,
     loadStudioReleaseScheduleRuntime,
