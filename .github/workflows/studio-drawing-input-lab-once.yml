@@ -5,45 +5,14 @@ on:
     branches: [feat/studio-drawing-input-lab-20260909]
     paths:
       - .github/workflows/studio-drawing-input-lab-once.yml
-      - scripts/apply-studio-drawing-input-lab.mjs
-
-permissions:
-  contents: write
 
 concurrency:
   group: studio-drawing-input-lab-once
   cancel-in-progress: true
 
 jobs:
-  apply:
-    if: github.actor != 'github-actions[bot]'
+  supersede:
+    if: ${{ false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: feat/studio-drawing-input-lab-20260909
-          fetch-depth: 1
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-
-      - name: Apply reviewed Drawing Input Lab sources
-        run: |
-          set -euo pipefail
-          node --check scripts/apply-studio-drawing-input-lab.mjs
-          node scripts/apply-studio-drawing-input-lab.mjs
-          git diff --check
-
-      - name: Commit implementation and remove one-shot tooling
-        run: |
-          set -euo pipefail
-          git rm scripts/apply-studio-drawing-input-lab.mjs
-          git rm .github/workflows/studio-drawing-input-lab-once.yml
-          git add -A
-          git diff --cached --check
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "feat(studio): ship professional drawing input lab"
-          git push origin HEAD:feat/studio-drawing-input-lab-20260909
+      - run: echo superseded
