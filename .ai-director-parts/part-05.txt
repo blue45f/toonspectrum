@@ -1,0 +1,131 @@
+                                <StageThumbnail
+                                  item={item}
+                                  generating={
+                                    index === regeneratingIndex ||
+                                    (busy && progress?.done === index)
+                                  }
+                                />
+                                <span className="absolute left-2 top-2 rounded-full border border-line bg-[oklch(0.16_0.01_70/0.86)] px-2 py-1 font-mono text-[0.58rem] font-black text-fg">
+                                  CUT {String(index + 1).padStart(2, "0")}
+                                </span>
+                                <label className="absolute right-2 top-2 grid size-11 cursor-pointer place-items-center rounded-lg border border-line bg-[oklch(0.16_0.01_70/0.86)]">
+                                  <span className="sr-only">컷 {index + 1} 제작 선택</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleSelectedIndex(index)}
+                                    disabled={editingLocked}
+                                    className="size-4 accent-accent"
+                                  />
+                                </label>
+                              </div>
+                              <div className="min-w-0 p-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedPanelIndex(index)}
+                                  className={cn(
+                                    "w-full rounded-md text-left",
+                                    STUDIO_FOCUS_RING,
+                                  )}
+                                >
+                                  <strong className="block truncate text-xs text-fg">
+                                    {item.summary || `컷 ${index + 1}`}
+                                  </strong>
+                                  <span className="mt-1 block truncate text-[0.62rem] text-fg-3">
+                                    {SCENARIO_BEAT_LABELS[item.beatType]} · 후보 {scenarioImageCandidates(item).length}
+                                  </span>
+                                </button>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  <StatusPill tone={status.tone}>{status.label}</StatusPill>
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                    <aside className="min-w-0 rounded-xl border border-line bg-panel xl:sticky xl:top-0">
+                      {selectedItem ? (
+                        <>
+                          <header className="border-b border-line px-3 py-3">
+                            <p className="font-mono text-[0.57rem] font-black tracking-[0.12em] text-accent">
+                              CUT {String(selectedPanelIndex + 1).padStart(2, "0")}
+                            </p>
+                            <h4 className="mt-1 truncate text-sm font-black text-fg">
+                              {selectedItem.summary || "선택한 컷"}
+                            </h4>
+                          </header>
+                          <div className="max-h-[calc(100dvh-16rem)] space-y-4 overflow-y-auto p-3">
+                            <details open className="rounded-lg border border-line bg-card/55 px-2.5 py-2">
+                              <summary className="text-[0.68rem] font-semibold text-fg-2">
+                                이야기와 작품 기준
+                              </summary>
+                              <label
+                                htmlFor="scenario-story-text-direction"
+                                className="mt-2 block text-[0.65rem] font-semibold text-fg-3"
+                              >
+                                스토리 아이디어
+                              </label>
+                              <textarea
+                                id="scenario-story-text-direction"
+                                value={storyText}
+                                onChange={(event) =>
+                                  onStoryTextChange(
+                                    event.target.value.slice(0, STORY_TEXT_MAX),
+                                  )
+                                }
+                                disabled={editingLocked}
+                                rows={3}
+                                className={cn(FIELD_CLASS, "mt-1 resize-y")}
+                              />
+                            </details>
+                            <label className="block text-[0.65rem] font-semibold text-fg-3">
+                              비트 역할
+                              <select
+                                value={selectedItem.beatType}
+                                onChange={(event) =>
+                                  onChangeScene(selectedPanelIndex, {
+                                    beatType: event.target.value as ScenarioBeatType,
+                                  })
+                                }
+                                disabled={editingLocked}
+                                aria-label={`${selectedPanelIndex + 1}번 장면 비트 역할`}
+                                className={cn(FIELD_CLASS, "mt-1")}
+                              >
+                                {SCENARIO_BEAT_TYPES.map((type) => (
+                                  <option key={type} value={type}>
+                                    {SCENARIO_BEAT_LABELS[type]}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="block text-[0.65rem] font-semibold text-fg-3">
+                              장면 변화 요약
+                              <textarea
+                                value={selectedItem.summary}
+                                onChange={(event) =>
+                                  onChangeScene(selectedPanelIndex, {
+                                    summary: event.target.value.slice(0, 240),
+                                  })
+                                }
+                                disabled={editingLocked}
+                                rows={2}
+                                aria-label={`${selectedPanelIndex + 1}번 장면 변화 요약`}
+                                className={cn(FIELD_CLASS, "mt-1 resize-y")}
+                              />
+                            </label>
+                            <label className="block text-[0.65rem] font-semibold text-fg-3">
+                              제작 방향
+                              <select
+                                value={currentIntent(selectedPanelIndex)}
+                                onChange={(event) =>
+                                  chooseIntent(
+                                    selectedPanelIndex,
+                                    event.target.value as StudioAiComicDirectorIntentId,
+                                  )
+                                }
+                                disabled={editingLocked}
+                                aria-label={`${selectedPanelIndex + 1}번 장면 제작 방향`}
+                                className={cn(FIELD_CLASS, "mt-1")}
+                              >
+                                {STUDIO_AI_COMIC_DIRECTOR_INTENTS.map((intent) => (

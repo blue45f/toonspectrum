@@ -1,0 +1,122 @@
+                        <h5 className="text-xs font-black text-fg">부분 수리</h5>
+                        <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
+                          현재 시나리오 실행 경로는 마스크 영역 수리를 연결하지 않았습니다.
+                          손·얼굴만 고친 것처럼 표시하지 않고 컷 전체 재생성만 제공합니다.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => onRegenerateScene(selectedPanelIndex)}
+                          disabled={!selectedItem || !imageGenerationReady || editingLocked}
+                          title={imageGenerationDisabledReason}
+                          className={cn(SECONDARY_BUTTON, "mt-2 w-full")}
+                        >
+                          <RefreshCw size={13} aria-hidden /> 이 컷 전체 다시 제작
+                        </button>
+                      </section>
+                      {selectedItem ? (
+                        <section className="border-t border-line pt-3">
+                          <h5 className="flex items-center gap-1.5 text-xs font-black text-fg">
+                            <MessageSquareText size={13} className="text-accent" aria-hidden />
+                            대사·말풍선
+                          </h5>
+                          <p className="mt-1 text-[0.62rem] text-fg-3">
+                            수정해도 선택한 이미지 후보는 다시 만들지 않습니다.
+                          </p>
+                          <textarea
+                            value={selectedItem.dialogue}
+                            onChange={(event) =>
+                              onChangeScene(selectedPanelIndex, {
+                                dialogue: event.target.value.slice(0, 2_000),
+                              })
+                            }
+                            disabled={editingLocked}
+                            rows={5}
+                            aria-label={`${selectedPanelIndex + 1}번 장면 대사와 지문`}
+                            className={cn(FIELD_CLASS, "mt-2 resize-y")}
+                          />
+                        </section>
+                      ) : null}
+                    </aside>
+                  </div>
+                </section>
+              ) : null}
+
+              {stage === "finish" ? (
+                <section className="mx-auto grid max-w-6xl gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                  <div className="rounded-xl border border-line bg-card/45 p-3">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Eye size={14} className="text-accent" aria-hidden />
+                      <h4 className="text-xs font-black text-fg">세로 독자 미리보기</h4>
+                      <StatusPill tone={blockingFindings.length > 0 ? "bad" : "good"}>
+                        {blockingFindings.length > 0
+                          ? `먼저 수정 ${blockingFindings.length}`
+                          : "마감 확인 가능"}
+                      </StatusPill>
+                    </div>
+                    <div className="mx-auto max-h-[64dvh] w-full max-w-[25rem] overflow-y-auto rounded-[1.4rem] border border-line-strong bg-[oklch(0.94_0.012_83)] p-2 shadow-xl">
+                      {items.map((item, index) => (
+                        <div key={index}>
+                          <article className="relative min-h-52 overflow-hidden bg-[oklch(0.22_0.018_68)] text-center text-fg">
+                            <StageThumbnail
+                              item={item}
+                              generating={index === regeneratingIndex}
+                            />
+                            {item.dialogue.trim() ? (
+                              <p className="absolute right-4 top-4 max-w-[70%] rounded-[50%] bg-[oklch(0.96_0.009_85)] px-4 py-3 text-xs font-bold text-[oklch(0.18_0.01_70)] shadow-lg">
+                                {item.dialogue
+                                  .split("\n")
+                                  .find((line) => line.trim())}
+                              </p>
+                            ) : null}
+                          </article>
+                          {index < items.length - 1 ? (
+                            <div className="h-16 bg-[oklch(0.94_0.012_83)]" aria-hidden />
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <aside className="space-y-3">
+                    <section className="rounded-xl border border-line bg-card/55 p-3">
+                      <h4 className="text-xs font-black text-fg">추가 위치</h4>
+                      <fieldset className="mt-2 grid gap-2">
+                        <legend className="sr-only">Studio 적용 위치</legend>
+                        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-panel p-2.5">
+                          <input
+                            type="radio"
+                            name="comic-director-apply-target-main"
+                            checked={applyTarget === "current-page"}
+                            onChange={() => onApplyTargetChange("current-page")}
+                            disabled={editingLocked}
+                            className="mt-0.5 size-4 accent-accent"
+                          />
+                          <span>
+                            <strong className="block text-xs text-fg">현재 페이지 아래</strong>
+                            <span className="text-[0.61rem] text-fg-3">기존 컷 다음에 추가</span>
+                          </span>
+                        </label>
+                        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-panel p-2.5">
+                          <input
+                            type="radio"
+                            name="comic-director-apply-target-main"
+                            checked={applyTarget === "new-page"}
+                            onChange={() => onApplyTargetChange("new-page")}
+                            disabled={editingLocked}
+                            className="mt-0.5 size-4 accent-accent"
+                          />
+                          <span>
+                            <strong className="block text-xs text-fg">다음 새 페이지</strong>
+                            <span className="text-[0.61rem] text-fg-3">새 세로 원고 페이지 생성</span>
+                          </span>
+                        </label>
+                      </fieldset>
+                    </section>
+                    <section className="rounded-xl border border-line bg-card/55 p-3">
+                      <h4 className="text-xs font-black text-fg">추가될 객체</h4>
+                      <dl className="mt-2 grid gap-2 text-[0.67rem]">
+                        <div className="flex justify-between"><dt className="text-fg-3">컷 프레임</dt><dd>{applySummary.frames}</dd></div>
+                        <div className="flex justify-between"><dt className="text-fg-3">장면 이미지</dt><dd>{applySummary.images}</dd></div>
+                        <div className="flex justify-between"><dt className="text-fg-3">대사 줄</dt><dd>{applySummary.dialogueLines}</dd></div>
+                        <div className="flex justify-between"><dt className="text-fg-3">말풍선 시드</dt><dd>{applySummary.bubbles}</dd></div>
+                        <div className="flex justify-between"><dt className="text-fg-3">기존 레이어 변경</dt><dd className="text-good">없음</dd></div>
+                      </dl>
