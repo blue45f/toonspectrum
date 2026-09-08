@@ -133,10 +133,10 @@ describe("studio layer smart views and quality lens", () => {
     expect(resultIds("", { ...noFilters(), smart: "attention" })).toEqual(["masked", "orphan"]);
     expect(resultIds("", { ...noFilters(), smart: "output" })).toEqual([
       "ink",
-      "masked",
       "dialogue",
       "orphan",
     ]);
+    expect(resultIds("view:output")).toEqual(["ink", "dialogue", "orphan"]);
     expect(resultIds("", { ...noFilters(), smart: "unclassified" })).toEqual(["dialogue", "orphan"]);
     expect(resultIds("", { ...noFilters(), smart: "advanced" })).toEqual(["masked"]);
     expect(resultIds("view:attention")).toEqual(["masked", "orphan"]);
