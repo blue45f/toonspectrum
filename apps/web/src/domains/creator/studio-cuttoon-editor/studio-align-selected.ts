@@ -4,7 +4,7 @@ import { CANVAS_W } from "../studio-assets";
 import { containingPanel, elBounds } from "../studio-element-geometry";
 import { planAtomicSelectionTranslation } from "../studio-group-selection";
 import { isEffectivelyLocked } from "../studio-layers";
-import { computeAlignDeltas, computeDistributeDeltas, unionBounds } from "../studio-selection";
+import { computeAlignDeltas, computeEqualGapDeltas, unionBounds } from "../studio-selection";
 
 import type { El, FrameEl } from "../studio-element-model";
 
@@ -122,8 +122,10 @@ export function alignStudioSelection(mode: StudioAlignMode, deps: StudioAlignSel
 
     const boundsList = selectedEls.map((el) => ({ el, b: elBounds(el) }));
     const bounds = boundsList.map(({ b }) => b);
+    // 인스펙터의 "등간격"은 중심점이 아니라 실제 객체 경계 사이의 시각적 간격을 뜻한다.
+    // 크기가 다른 요소에서도 동일한 여백을 만들고 양 끝 객체는 고정한다.
     const deltas = mode === "distributeH" || mode === "distributeV"
-      ? computeDistributeDeltas(bounds, mode)
+      ? computeEqualGapDeltas(bounds, mode === "distributeH" ? "spaceH" : "spaceV")
       : computeAlignDeltas(bounds, mode, unionBounds(bounds));
     if (!deltas) return;
     const deltaById = new Map(selectedEls.map((el, index) => [el.id, deltas[index]!]));
