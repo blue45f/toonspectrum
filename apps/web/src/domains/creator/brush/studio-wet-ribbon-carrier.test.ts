@@ -115,6 +115,68 @@ function compositedLayerOpacityAt(
 }
 
 describe("studio wet ribbon carrier geometry", () => {
+  it("replays equal captured dabs without rebuilding and detects an in-place authored edit", () => {
+    const source: StudioWetRibbonSourceDab[] = [
+      { x: 0, y: 0, radius: 3, opacity: 0.5, role: "core" },
+      { x: 20, y: 0, radius: 5, opacity: 0.5, role: "core" },
+    ];
+    const first = planStudioWetRibbonCarrier(source, { seed: 947 });
+    const before = JSON.stringify(first);
+    expect(planStudioWetRibbonCarrier(source.map((dab) => ({ ...dab })), { seed: 947 }))
+      .toBe(first);
+    source[1] = { ...source[1]!, y: 15, opacity: 0.3 };
+    const edited = planStudioWetRibbonCarrier(source, { seed: 947 });
+    expect(JSON.stringify(edited)).not.toBe(before);
+    expect(JSON.stringify(first)).toBe(before);
+    expect(edited.footprints.at(-1)?.endY).toBe(15);
+  });
+
+  it("keeps seed and footprint limit changes out of an earlier replay", () => {
+    const source: StudioWetRibbonSourceDab[] = Array.from({ length: 4 }, (_, index) => ({
+      x: index * 20, y: 0, radius: 3, opacity: 0.5, role: "core",
+    }));
+    const full = planStudioWetRibbonCarrier(source, { seed: 948, maxFootprints: 4 });
+    expect(full.footprintCount).toBe(3);
+    expect(planStudioWetRibbonCarrier(source, { seed: 948, maxFootprints: 2 }).footprintCount)
+      .toBe(1);
+    const tap = [source[0]!];
+    expect(planStudioWetRibbonCarrier(tap, { seed: 948 }).footprints)
+      .not.toEqual(planStudioWetRibbonCarrier(tap, { seed: 949 }).footprints);
+  });
+
+  it("replays changed incremental rung arrays after a same-length tail replacement", () => {
+    const plan = (endY: number) => planStudioWetRibbonCarrier([
+      { x: 0, y: 0, radius: 3, opacity: 0.5, role: "core" },
+      { x: 20, y: endY, radius: 5, opacity: 0.5, role: "core" },
+    ]).batches.find((batch) => batch.layer === "core")!;
+    const first = plan(0);
+    const second = plan(12);
+    const polygons = [...first.polygons];
+    const batch = { ...first, polygons };
+    const initial = studioWetRibbonCarrierBatchPathData(batch);
+    expect(studioWetRibbonCarrierBatchPathData(batch)).toBe(initial);
+    expect(second.polygons).toHaveLength(polygons.length);
+    polygons.splice(0, polygons.length, ...second.polygons);
+    const changed = studioWetRibbonCarrierBatchPathData(batch);
+    expect(changed).not.toBe(initial);
+    expect(changed).toBe(studioWetRibbonCarrierBatchPathData(second));
+    polygons.splice(0, polygons.length, ...first.polygons);
+    expect(studioWetRibbonCarrierBatchPathData(batch)).toBe(initial);
+  });
+
+  it("observes mutable caller geometry instead of retaining its previous contour", () => {
+    const points = [0, 0, 12, 0, 12, 12, 0, 12];
+    const batch = {
+      layer: "core" as const,
+      coverageCeiling: 0.5,
+      opacity: 0.5,
+      polygons: [{ points }],
+    };
+    expect(studioWetRibbonCarrierBatchPathData(batch)).toBe("M0 0L12 0L12 12L0 12Z");
+    points[2] = 24;
+    expect(studioWetRibbonCarrierBatchPathData(batch)).toBe("M0 0L24 0L12 12L0 12Z");
+  });
+
   it("uses direction-following polygon ribbons and four nested pigment bands, never circles", () => {
     const dabs: StudioWetRibbonSourceDab[] = [
       { x: 0, y: 0, radius: 3, opacity: 0.2, role: "core" },

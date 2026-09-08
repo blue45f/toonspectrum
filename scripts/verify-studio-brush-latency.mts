@@ -663,9 +663,22 @@ async function runBrushLatency(
   const browserErrors = collectBrowserErrors(page, caseLabel, studioUrl);
   const livePath = join(SCRATCH, `studio-brush-latency-${caseLabel}-live.png`);
   const settledPath = join(SCRATCH, `studio-brush-latency-${caseLabel}-settled.png`);
+  const cpuProfiler = process.env.TOONSPECTRUM_BRUSH_LATENCY_CPU_PROFILE === "1"
+    ? await context.newCDPSession(page)
+    : null;
+  let cpuProfileStarted = false;
+  let cpuProfileBrowserStartMs: number | null = null;
 
   try {
     await prepareStudio(page, studioUrl);
+    if (process.env.TOONSPECTRUM_BRUSH_LATENCY_GPU === "1") {
+      const adapterInfo = await page.evaluate(async () => {
+        const adapter = await navigator.gpu?.requestAdapter();
+        return adapter ? { vendor: adapter.info.vendor, architecture: adapter.info.architecture, isFallbackAdapter: adapter.info.isFallbackAdapter } : null;
+      });
+      invariant(adapterInfo && !adapterInfo.isFallbackAdapter, "hardware latency lane requires a non-fallback GPU adapter");
+      writeFileSync(join(SCRATCH, `studio-brush-latency-${caseLabel}-gpu.json`), JSON.stringify({ ...adapterInfo, browserVersion: browser.version() }, null, 2));
+    }
     await selectBrush(page, brush);
     const stage = page.locator(".konvajs-content").first();
     const stageBox = await stage.boundingBox();
@@ -673,6 +686,13 @@ async function runBrushLatency(
     invariant(stageBox && viewport, `${id}: could not measure Studio canvas`);
     const route = latencyRoute(stageBox, viewport, brush.defaultWidth);
     await assertRouteVisible(page, route.points);
+
+    if (cpuProfiler) {
+      await cpuProfiler.send("Profiler.enable");
+      await cpuProfiler.send("Profiler.start");
+      cpuProfileBrowserStartMs = await page.evaluate(() => performance.now());
+      cpuProfileStarted = true;
+    }
 
     const first = route.points[0]!;
     await page.mouse.move(first.x, first.y);
@@ -793,6 +813,16 @@ async function runBrushLatency(
       browserErrors,
     };
   } finally {
+    if (cpuProfiler && cpuProfileStarted) {
+      const captured = await cpuProfiler.send("Profiler.stop").catch(() => null);
+      if (captured) {
+        writeFileSync(
+          join(SCRATCH, `studio-brush-latency-${caseLabel}.cpuprofile`),
+          JSON.stringify({ ...captured.profile, browserStartMs: cpuProfileBrowserStartMs }),
+        );
+      }
+      await cpuProfiler.detach();
+    }
     await context.close();
   }
 }
@@ -891,7 +921,11 @@ async function main(): Promise<void> {
       requestInit: { redirect: "manual" },
       notReadyMessage: `Vite preview did not become ready at ${origin}`,
     });
-    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    browser = await chromium.launch({
+      headless: true,
+      ...(process.env.TOONSPECTRUM_BRUSH_LATENCY_GPU === "1" ? { channel: "chromium" } : {}),
+      args: ["--no-sandbox", ...(process.env.TOONSPECTRUM_BRUSH_LATENCY_GPU === "1" ? ["--enable-unsafe-webgpu", "--use-gpu-in-tests"] : [])],
+    });
     const executionCases: readonly (StudioBrushCompetitiveExecutionCase | null)[] =
       competitiveLongStroke ? STUDIO_BRUSH_COMPETITIVE_EXECUTION_CASES : [null];
     for (const { id, brush } of representatives) {
