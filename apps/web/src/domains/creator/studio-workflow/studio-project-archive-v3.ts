@@ -1,3 +1,5 @@
+import { compareCodeUnitStrings } from "@/shared/lib/compare-code-unit-strings";
+
 import {
   createEmptyStudioIdentityIndex,
   validateStudioIdentityIndex,
@@ -220,7 +222,7 @@ function normalizeArchive(archive: StudioProjectArchiveV3): StudioProjectArchive
 function canonicalJsonValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalJsonValue);
   if (isRecord(value)) {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [
+    return Object.fromEntries(Object.keys(value).sort(compareCodeUnitStrings).map((key) => [
       key,
       canonicalJsonValue(value[key]),
     ]));

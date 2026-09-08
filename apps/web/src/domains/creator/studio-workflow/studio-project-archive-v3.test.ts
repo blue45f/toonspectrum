@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+
+import { describe, expect, it, vi } from "vitest";
 
 import { createEmptyStudioVersionCoordinates } from "../studio-foundation/studio-version-coordinates";
 
 import type { StudioProjectSnapshot } from "../studio-project-snapshot";
+import * as archiveHash from "../studio-sha256";
 
 import {
   migrateStudioProjectSnapshotV2ToArchiveV3,
@@ -233,6 +236,55 @@ describe("Studio project archive v3", () => {
       ...restored,
       metadata: Object.fromEntries(Object.entries(restored.metadata).reverse()) as StudioProjectArchiveV3["metadata"],
     })).toEqual([]);
+  });
+
+  it("preserves legacy UTF-16 canonical bytes for Unicode, surrogate and monetary keys", () => {
+    // This explicit legacy preimage also pins JSON's integer-key enumeration:
+    // 2 precedes 10, while non-index monetary keys keep the string order $10, $2.
+    const canonicalStory = String.raw`{"writerRoom":{"canonicalProbe":{"2":"two","10":"ten","$10":"ten dollars","$2":"two dollars","A":"upper","a":"lower","é":"decomposed","é":"composed","가":"hangul","\ud800":"lone high","𐀀":"supplementary","😀":"emoji","\udfff":"lone low","":"private"},"marker":"writer"}}`;
+    const entries = [
+      ["2", "two"], ["10", "ten"], ["$10", "ten dollars"], ["$2", "two dollars"],
+      ["A", "upper"], ["a", "lower"], ["e\u0301", "decomposed"], ["é", "composed"],
+      ["가", "hangul"], ["\ud800", "lone high"], ["\u{10000}", "supplementary"],
+      ["😀", "emoji"], ["\udfff", "lone low"], ["\ue000", "private"],
+    ] as const;
+    const expectedStoryDigest = `sha256:${createHash("sha256").update(canonicalStory).digest("hex")}`;
+    const preimages: string[] = [];
+    const createActualHasher = archiveHash.createSha256Portable;
+    const hashFactory = vi.spyOn(archiveHash, "createSha256Portable").mockImplementation(() => {
+      const hasher = createActualHasher();
+      const update = hasher.update.bind(hasher);
+      hasher.update = (bytes) => {
+        preimages.push(new TextDecoder().decode(bytes));
+        return update(bytes);
+      };
+      return hasher;
+    });
+    const locale = vi.spyOn(String.prototype, "localeCompare").mockImplementation(() => {
+      throw new Error("Archive digest ordering must not depend on locale");
+    });
+    try {
+      const manifests = [entries, [...entries].reverse(), [...entries.slice(5), ...entries.slice(0, 5)]]
+        .map((order) => {
+          const writerRoom = { ...snapshot().writerRoom, canonicalProbe: Object.fromEntries(order) };
+          const { archive, workspace } = migrate({ ...snapshot(), writerRoom });
+          expect(archive.manifest.sectionDigests.story).toBe(expectedStoryDigest);
+          const serialized = serializeStudioProjectArchiveV3(archive);
+          const restored: StudioProjectArchiveV3 = JSON.parse(serialized);
+          expect(validateStudioProjectArchiveV3(restored)).toEqual([]);
+          expect(serializeStudioProjectArchiveV3(restored)).toBe(serialized);
+          expect(projectStudioArchiveV3ToV2Snapshot({ archive: restored, workspace }).writerRoom).toEqual(writerRoom);
+          return archive.manifest;
+        });
+      expect(manifests[1]).toEqual(manifests[0]);
+      expect(manifests[2]).toEqual(manifests[0]);
+      const storyPreimages = preimages.filter((value) => value.startsWith('{"writerRoom":'));
+      expect(storyPreimages.length).toBeGreaterThanOrEqual(3);
+      expect(storyPreimages.every((value) => value === canonicalStory)).toBe(true);
+    } finally {
+      locale.mockRestore();
+      hashFactory.mockRestore();
+    }
   });
 
   it("serializes the same normalized payload that was validated without a second toJSON call", () => {
