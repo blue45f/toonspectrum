@@ -5,7 +5,7 @@
  * ImageFilterFields)이 만들어 낸 "필터 결과 픽셀"을, 요소-로컬 그레이스케일 마스크
  * (el.filterMaskSrc, PNG data URL)로 원본과 섞는다:
  *
- *   out = filtered × m + original × (1 − m)   (m = 마스크 커버리지 0..1)
+ *   out = filtered × m + original × (1 − m)   (premultiplied RGBA, m = 마스크 커버리지 0..1)
  *
  * 흰색/불투명 = 필터 결과 그대로(m=1), 검정/투명 = 원본 그대로(m=0), 회색 = 선형 블렌드.
  * 마스크 자체는 el.src·필터 파라미터를 전혀 건드리지 않으므로 지우거나 다시 그려도 언제든
@@ -196,6 +196,27 @@ function clampPadRatio(value: number | undefined): number {
  * m=1 픽셀은 대입 자체를 건너뛰어(비트 동일 보장) 마스크가 전부 흰색이면 결과가 기존 필터
  * 출력과 완전히 같다. 순수·결정적.
  */
+/** ImageData is straight RGBA; interpolate alpha-changing filters in premultiplied space. */
+function blendMaskedPixel(
+  target: Uint8ClampedArray,
+  original: Uint8ClampedArray,
+  offset: number,
+  mask: number,
+): void {
+  const inverse = 1 - mask;
+  const filteredAlpha = target[offset + 3]!;
+  const originalAlpha = original[offset + 3]!;
+  const alpha = filteredAlpha * mask + originalAlpha * inverse;
+  // Keep alpha-preserving filters byte-identical, including legacy hidden RGB.
+  const filteredWeight = filteredAlpha === originalAlpha ? mask : filteredAlpha * mask / alpha;
+  const originalWeight = filteredAlpha === originalAlpha ? inverse : originalAlpha * inverse / alpha;
+  for (let channel = 0; channel < 3; channel += 1) {
+    target[offset + channel] = target[offset + channel]! * filteredWeight
+      + original[offset + channel]! * originalWeight;
+  }
+  target[offset + 3] = alpha;
+}
+
 export function applyFilterMaskToPixels(input: {
   readonly target: Uint8ClampedArray;
   readonly original: Uint8ClampedArray;
@@ -234,12 +255,7 @@ export function applyFilterMaskToPixels(input: {
         target[p + 2] = original[p + 2]!;
         target[p + 3] = original[p + 3]!;
       } else {
-        const m = val / 255;
-        const inv = 1 - m;
-        target[p] = target[p]! * m + original[p]! * inv;
-        target[p + 1] = target[p + 1]! * m + original[p + 1]! * inv;
-        target[p + 2] = target[p + 2]! * m + original[p + 2]! * inv;
-        target[p + 3] = target[p + 3]! * m + original[p + 3]! * inv;
+        blendMaskedPixel(target, original, p, val / 255);
       }
     }
     return true;
@@ -256,11 +272,11 @@ export function applyFilterMaskToPixels(input: {
       if (flipX) u = 1 - u;
       const m = sampleFilterMaskCoverage(coverage, u, v) / 255;
       if (m >= 1) continue; // 완전 커버 픽셀은 필터 결과 비트 그대로.
-      const inv = 1 - m;
-      target[p] = target[p]! * m + original[p]! * inv;
-      target[p + 1] = target[p + 1]! * m + original[p + 1]! * inv;
-      target[p + 2] = target[p + 2]! * m + original[p + 2]! * inv;
-      target[p + 3] = target[p + 3]! * m + original[p + 3]! * inv;
+      if (m <= 0) {
+        target.set(original.subarray(p, p + 4), p);
+      } else {
+        blendMaskedPixel(target, original, p, m);
+      }
     }
   }
   return true;
