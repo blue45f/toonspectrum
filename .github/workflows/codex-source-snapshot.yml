@@ -13,14 +13,20 @@ permissions:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Pack tracked source and configuration
+      - name: Pack tracked source, configuration, and relevant PR diffs
         shell: bash
         run: |
+          set -euo pipefail
+          mkdir -p /tmp/codex-source/pr-diffs
+          for pr in 967 968 976 982 983 984; do
+            git fetch --no-tags --depth=200 origin "+refs/pull/${pr}/head:refs/remotes/origin/pr/${pr}"
+            git diff --binary "${{ github.event.before }}...refs/remotes/origin/pr/${pr}" > "/tmp/codex-source/pr-diffs/pr-${pr}.diff" || true
+          done
           python3 - <<'PY'
           from __future__ import annotations
           import pathlib
@@ -28,6 +34,8 @@ jobs:
           import tarfile
 
           root = pathlib.Path.cwd()
+          stage = pathlib.Path('/tmp/codex-source/tree')
+          stage.mkdir(parents=True, exist_ok=True)
           allowed_suffixes = {
               '.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs',
               '.json', '.jsonc', '.yaml', '.yml', '.md', '.css', '.scss',
@@ -61,8 +69,10 @@ jobs:
           archive = pathlib.Path('/tmp/toonspectrum-source.tar.gz')
           with tarfile.open(archive, 'w:gz', compresslevel=6) as tar:
               for path in sorted(paths):
-                  tar.add(path, arcname=path.relative_to(root))
-          print(f'packed {len(paths)} files into {archive} ({archive.stat().st_size} bytes)')
+                  tar.add(path, arcname=f'tree/{path.relative_to(root)}')
+              for patch in sorted(pathlib.Path('/tmp/codex-source/pr-diffs').glob('*.diff')):
+                  tar.add(patch, arcname=f'pr-diffs/{patch.name}')
+          print(f'packed {len(paths)} files and PR diffs into {archive} ({archive.stat().st_size} bytes)')
           PY
       - uses: actions/upload-artifact@v4
         with:
