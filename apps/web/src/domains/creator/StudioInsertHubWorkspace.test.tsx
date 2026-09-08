@@ -10,7 +10,10 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioInsertHubWorkspace } from "./StudioInsertHubWorkspace";
+import {
+  StudioInsertHubWorkspace,
+  type StudioInsertHubWorkspaceProps,
+} from "./StudioInsertHubWorkspace";
 
 import type { StudioUnifiedAssetItem } from "./studio-unified-asset-catalog";
 
@@ -45,14 +48,20 @@ function renderWorkspace(
   options: {
     items?: readonly StudioUnifiedAssetItem[];
     selectionPlacementAvailable?: boolean;
-    onUseAction?: ReturnType<typeof vi.fn>;
-    onUseItem?: ReturnType<typeof vi.fn>;
-    onUploadImage?: ReturnType<typeof vi.fn>;
+    onUseAction?: StudioInsertHubWorkspaceProps["onUseAction"];
+    onUseItem?: StudioInsertHubWorkspaceProps["onUseItem"];
+    onUploadImage?: StudioInsertHubWorkspaceProps["onUploadImage"];
   } = {},
 ) {
-  const onUseAction = options.onUseAction ?? vi.fn(() => true);
-  const onUseItem = options.onUseItem ?? vi.fn(() => true);
-  const onUploadImage = options.onUploadImage ?? vi.fn();
+  const onUseAction =
+    options.onUseAction ??
+    vi.fn<StudioInsertHubWorkspaceProps["onUseAction"]>(() => true);
+  const onUseItem =
+    options.onUseItem ??
+    vi.fn<StudioInsertHubWorkspaceProps["onUseItem"]>(() => true);
+  const onUploadImage =
+    options.onUploadImage ??
+    vi.fn<StudioInsertHubWorkspaceProps["onUploadImage"]>();
   const view = render(
     <StudioInsertHubWorkspace
       items={options.items ?? []}
