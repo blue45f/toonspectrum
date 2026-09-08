@@ -363,7 +363,7 @@ export function StudioInspectorNavigator({
             onClick={() => navigate({ primary: "properties" })}
             data-inspector-priority="chrome"
             className={cn(
-              "inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md border border-line bg-card px-2 text-[0.6875rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg",
+              "inline-flex min-h-11 min-w-11 shrink-0 items-center gap-1 rounded-md border border-line bg-card px-2 text-[0.6875rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg",
               tabFocusClass,
             )}
           >
@@ -402,7 +402,7 @@ export function StudioInspectorNavigator({
               onClick={() => navigate({ primary: tabId })}
               onKeyDown={moveTabFocus}
               className={cn(
-                "relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-px rounded-md px-0.5 text-[0.6875rem] font-semibold transition-colors duration-150 lg:min-h-9",
+                "relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-px rounded-md px-0.5 text-[0.6875rem] font-semibold transition-colors duration-150",
                 active
                   ? "bg-raised text-fg shadow-sm ring-1 ring-accent/25"
                   : "text-fg-3 hover:bg-card hover:text-fg-2",
@@ -452,7 +452,7 @@ export function StudioInspectorNavigator({
                 onClick={() => navigate({ primary: "properties", image: tab.id })}
                 onKeyDown={moveTabFocus}
                 className={cn(
-                  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 text-[0.6875rem] font-semibold transition-colors duration-150 lg:min-h-9 pointer-coarse:min-h-11",
+                  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 text-[0.6875rem] font-semibold transition-colors duration-150 pointer-coarse:min-h-11",
                   active
                     ? "border-accent bg-accent-soft text-accent shadow-sm"
                     : "border-line bg-card/60 text-fg-3 hover:border-line-strong hover:bg-raised hover:text-fg-2",
@@ -503,7 +503,7 @@ export function StudioInspectorNavigator({
                 onClick={() => navigate({ primary: "document", document: tab.id })}
                 onKeyDown={moveTabFocus}
                 className={cn(
-                  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 text-[0.6875rem] font-semibold transition-colors duration-150 lg:min-h-9 pointer-coarse:min-h-11",
+                  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 text-[0.6875rem] font-semibold transition-colors duration-150 pointer-coarse:min-h-11",
                   active
                     ? "border-accent bg-accent-soft text-accent shadow-sm"
                     : "border-line bg-card/60 text-fg-3 hover:border-line-strong hover:bg-raised hover:text-fg-2",

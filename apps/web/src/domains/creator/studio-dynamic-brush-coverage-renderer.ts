@@ -1081,6 +1081,11 @@ export function planStudioDynamicBrushCoverageMarks(
     coverageBudgetContract.specialistCarrier === "paint-roller-ribbon";
   const competitorSpecialtyRibbonAuthority =
     coverageBudgetContract.specialistCarrier === "competitor-specialty-ribbon";
+  // These canonical polygons consume footprint/colour only. Per-dab paper textures are discarded
+  // by their carrier; keep byte-authoritative R8 paper on its existing explicit material path.
+  const competitorDirectFootprint = competitorSpecialtyRibbonAuthority
+    && r8GrainSampler === null
+    && (input.materialIdentity?.brushCatalogId ?? input.materialIdentity?.brushId) === "paint-tube";
   const professionalShelfRibbonAuthority =
     coverageBudgetContract.specialistCarrier === "professional-shelf-ribbon";
   const dryMediaUnionRibbonAuthority =
@@ -1768,7 +1773,7 @@ export function planStudioDynamicBrushCoverageMarks(
         dynamicSeed,
         dynamics.colorDynamics
       );
-      if (dryMediaUnionRibbonAuthority) {
+      if (dryMediaUnionRibbonAuthority || competitorDirectFootprint) {
         /*
          * The connected dry-media carrier consumes only the pressure-resolved footprint,
          * deposition alpha and colour. It deliberately discards the transient per-dab bitmap tip
@@ -1787,6 +1792,12 @@ export function planStudioDynamicBrushCoverageMarks(
         const radiusX = Math.max(0.25, dab.size / 2);
         const radiusY = radiusX * dab.roundness;
         const angleRadians = dab.angle * Math.PI / 180;
+        const paperWasInsideDiscardedTip = competitorDirectFootprint
+          && tipAlphaMaps[0] !== null
+          && !tipUsesEllipse[0]
+          && !tipUsesAnalyticFalloff[0]
+          && paperTile !== null
+          && 2 * Math.min(radiusX, radiusY) >= STUDIO_PAPER_MIN_FOOTPRINT_TEXELS * paperScale;
         const directMark: StudioDynamicBrushCoverageMark = {
           x: dab.x,
           y: dab.y,
@@ -1794,19 +1805,20 @@ export function planStudioDynamicBrushCoverageMarks(
           radiusY,
           angleRadians,
           alpha: clampAlpha(
-            depositionAlpha * grainAcrossFootprint(
-              dab.x,
-              dab.y,
-              radiusX,
-              radiusY,
-              angleRadians,
-            ),
+            depositionAlpha * (paperWasInsideDiscardedTip
+              ? resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
+                  dab.x, dab.y, radiusX, radiusY, angleRadians,
+                  strokeOriginX, strokeOriginY, dynamicSeed, dynamics.grain,
+                )
+              : grainAcrossFootprint(dab.x, dab.y, radiusX, radiusY, angleRadians)),
           ),
           color: dabColor,
         };
         if (!markIsValid(directMark)) {
           return { ok: false, reason: "invalid-mark" };
         }
+        // The old primary-tip path admitted no geometry when its scalar alpha was zero.
+        if (competitorDirectFootprint && directMark.alpha <= 0) continue;
         if (!appendMark(directMark)) {
           return { ok: false, reason: "mark-budget" };
         }

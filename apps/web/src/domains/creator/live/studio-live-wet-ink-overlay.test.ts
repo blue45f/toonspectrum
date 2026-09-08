@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import * as inkwashWash from "../brush/studio-inkwash-wash";
+
 import {
   getStudioInkwashWash,
   planStudioWetInkBrushReplay,
@@ -231,6 +233,38 @@ describe("StudioLiveWetInkOverlayRenderer", () => {
     expect(activeCanvas.paths).toEqual([]);
     expect(activeCanvas.draws.length).toBeGreaterThan(drawsAfterGrowth);
   });
+
+  it.each([0.0625, 0.125, 0.1875])(
+    "keeps the deposited wash on the replay cell lattice at subcell offset %s",
+    (offset) => {
+      const ensure = vi.spyOn(inkwashWash, "ensureStudioInkwashWash");
+      try {
+        resetStudioInkwashWash();
+        const { renderer } = attachedRenderer();
+        const stroke = wetStroke([24 + offset, 30 + offset, 40.2 + offset, 37.1 + offset], {
+          brush: "inkwash-pen", id: "inkwash-subcell-origin",
+        });
+        expect(renderer.begin(stroke, { pageEpoch: 8 }).status).toBe("started");
+        expect(renderer.end(stroke, { pageEpoch: 8 }).status).toBe("settled");
+        // Settling deposits first; canonical replay must reuse that same field without copying
+        // already deposited pigment by a rounded fractional-cell displacement.
+        const allocatedWashes = ensure.mock.results.flatMap((result) =>
+          result.type === "return" ? [result.value as ReturnType<typeof getStudioInkwashWash>] : []);
+        expect(allocatedWashes.length).toBeGreaterThanOrEqual(2);
+        const first = allocatedWashes[0]!;
+        for (const wash of allocatedWashes) {
+          expect(wash!.session).toBe(first.session);
+          expect(wash!.originX).toBe(first.originX);
+          expect(wash!.originY).toBe(first.originY);
+        }
+        expect(first.originX * first.fieldScale).toBe(Math.floor(first.originX * first.fieldScale));
+        expect(first.originY * first.fieldScale).toBe(Math.floor(first.originY * first.fieldScale));
+      } finally {
+        ensure.mockRestore();
+        resetStudioInkwashWash();
+      }
+    },
+  );
 
   it("keeps InkWash pen and water on one live wash field", () => {
     const { renderer } = attachedRenderer();

@@ -185,7 +185,7 @@ function configureSurface(
     | "documentScale"
     | "flipX"
   >,
-): boolean {
+): string | null {
   const { surfaceBounds } = input;
   if (
     !Number.isFinite(surfaceBounds.left)
@@ -200,7 +200,7 @@ function configureSurface(
     || input.documentHeight <= 0
     || !Number.isFinite(input.documentScale)
     || input.documentScale <= 0
-  ) return false;
+  ) return "invalid-layout";
   const dpr = surfaceDevicePixelRatio(surfaceBounds.width, surfaceBounds.height);
   const resizeSignature = [
     surfaceBounds.width,
@@ -247,7 +247,9 @@ function configureSurface(
     },
   };
   const configured = resources.surface.configure(layout);
-  return configured.status === "ready" || configured.status === "unchanged";
+  return configured.status === "ready" || configured.status === "unchanged"
+    ? null
+    : configured.reason;
 }
 
 function disposeResources(resources: DryMediaGpuResources | null): void {
@@ -499,7 +501,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
           controller.signal.aborted
           || jobEpoch !== jobEpochRef.current
         ) return;
-        if (!configureSurface(resources, {
+        const configurationFailure = configureSurface(resources, {
           surfaceBounds: {
             left: surfaceLeft,
             top: surfaceTop,
@@ -510,8 +512,9 @@ export function StudioCanonicalVNextDryMediaCanvas({
           documentHeight,
           documentScale,
           flipX,
-        })) {
-          rejectAndRelease("surface-config-rejected");
+        });
+        if (configurationFailure) {
+          rejectAndRelease(`surface-config:${configurationFailure}`);
           return;
         }
         compileEpochRef.current += 1;

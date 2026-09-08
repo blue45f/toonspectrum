@@ -271,7 +271,7 @@ export function StudioInspectorAsideShell({
                       ? "작업 패널을 오른쪽 패널에 붙이기"
                       : "작업 패널을 창으로 분리"}
                     aria-pressed={desktopDetached}
-                    className="inline-flex min-h-9 items-center gap-1 rounded px-2 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    className="inline-flex min-h-11 min-w-11 items-center gap-1 rounded px-2 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     title={detached ? "오른쪽 패널에 붙이기" : "자유 배치 창으로 분리"}
                   >
                     {detached ? <PanelRight size={12} aria-hidden /> : <Move size={12} aria-hidden />}
@@ -281,7 +281,7 @@ export function StudioInspectorAsideShell({
                     type="button"
                     onClick={() => setRightPanelOpen(false)}
                     aria-label="작업 패널 접기"
-                    className="inline-flex min-h-9 items-center gap-0.5 rounded px-1.5 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    className="inline-flex min-h-11 min-w-11 items-center gap-0.5 rounded px-1.5 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     title="작업 패널 접기"
                   >
                     접기 <ChevronRight size={12} aria-hidden />

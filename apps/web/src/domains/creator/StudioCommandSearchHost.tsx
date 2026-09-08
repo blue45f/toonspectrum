@@ -154,7 +154,7 @@ export function StudioCommandSearchHost({
               data-testid="studio-command-search-trigger"
               data-inspector-priority="chrome"
               title="기능·설정 찾기 (F1)"
-              className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-xs text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-9"
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-xs text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Search
                 size={STUDIO_ICON_SIZE.contextMenu}
