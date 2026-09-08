@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
-
 import { readFileSync } from "node:fs";
 
+import { JSDOM } from "jsdom";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -60,7 +59,7 @@ function openingButtonTagByAriaLabel(html: string, label: string): string {
 }
 
 function openingButtonTagByText(html: string, text: string): string {
-  const button = [...new DOMParser().parseFromString(html, "text/html").querySelectorAll("button")].find((element) =>
+  const button = [...JSDOM.fragment(html).querySelectorAll("button")].find((element) =>
     (element.textContent ?? "").trim() === text
   );
   // Inspect only the button's own attributes; nested controls must not satisfy its assertions.
