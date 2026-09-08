@@ -13,6 +13,7 @@ import { useRef } from "react";
 
 import { StudioAssetLegacyPanel } from "./StudioAssetLegacyPanel";
 import { StudioInsertHubWorkspace } from "./StudioInsertHubWorkspace";
+import { StudioInsertBatchPreflight } from "./StudioInsertBatchPreflight";
 import { CANVAS_W } from "./studio-assets";
 import { BG_SCENES } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
@@ -304,6 +305,7 @@ export function StudioUnifiedAssetToolPopoverContent({
         }}
         items={ASSET_MENU_ITEMS}
       />
+      <StudioInsertBatchPreflight toolBelt={toolBelt} />
       <StudioUnifiedAssetSmartLibrary
         items={items}
         defaultCollapsed={initialView === "library"}
