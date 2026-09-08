@@ -1,0 +1,39 @@
+name: Apply Studio collaboration proof fix
+
+on:
+  push:
+    branches: [fix/studio-collaboration-proof-local-fallback-20260909]
+    paths:
+      - .github/workflows/apply-studio-collaboration-proof-fix.yml
+      - scripts/apply-studio-collaboration-proof-fix.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-studio-collaboration-proof-fix
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-collaboration-proof-local-fallback-20260909
+          fetch-depth: 0
+      - name: Patch the browser proof against the checked-out source
+        run: python3 scripts/apply-studio-collaboration-proof-fix.py
+      - name: Remove the one-shot patch machinery
+        run: |
+          rm scripts/apply-studio-collaboration-proof-fix.py
+          rm .github/workflows/apply-studio-collaboration-proof-fix.yml
+      - name: Validate and publish the focused change
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "test(studio): make collaboration proof preview-aware"
+          git push origin HEAD:fix/studio-collaboration-proof-local-fallback-20260909
