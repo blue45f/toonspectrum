@@ -41,8 +41,15 @@ import {
   STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX,
   type StudioAiImageReferenceAssetOption,
 } from "./ai/StudioAiImageReferencePackEditor";
+import {
+  approveScenarioImageCandidate,
+  scenarioImageReferenceSignature,
+  selectScenarioImageCandidate,
+  type StudioScenarioImageGenerationRequest,
+} from "./ai/studio-scenario-candidate-workflow";
 import { SCENARIO_SCENE_COUNT_MAX, SCENARIO_SCENE_COUNT_MIN } from "./studio-scenario-scenes";
 import { studioServerAiProviderLabel } from "./studio-server-ai-client";
+import { StudioScenarioCandidateDesk } from "./StudioScenarioCandidateDesk";
 import { SCENARIO_BEAT_LABELS, SCENARIO_BEAT_TYPES, type ScenarioBeatType } from "./studio-story-beats";
 import { StudioContinuityMetadataEditor } from "./StudioContinuityMetadataEditor";
 
@@ -92,18 +99,9 @@ export interface StudioScenarioAutoLayoutPanelProps {
   /** 장면 설계에 사용된 텍스트 모델 이력. 키·프롬프트·응답 본문은 포함하지 않는다. */
   textProvenance: StudioTextAiProvenance | null;
   onGenerate: () => void;
-  /** 검토·수정이 끝난 장면 중 이미지가 없는 항목만 순차 생성한다. */
-  onGenerateImages: () => void;
-  onChangeScene: (
-    index: number,
-    patch: {
-      beatType?: ScenarioBeatType;
-      summary?: string;
-      imagePrompt?: string;
-      dialogue?: string;
-      continuity?: ScenarioPreviewItem["continuity"];
-    }
-  ) => void;
+  /** 기본 호출은 빈 장면만, 명시 요청은 선택 컷에 1·2·4개 후보를 순차 생성한다. */
+  onGenerateImages: (request?: StudioScenarioImageGenerationRequest) => void;
+  onChangeScene: (index: number, patch: Partial<ScenarioPreviewItem>) => void;
   onRemoveScene: (index: number) => void;
   onRegenerateScene: (index: number) => void;
   regeneratingIndex: number | null;
@@ -197,6 +195,37 @@ export function StudioScenarioAutoLayoutPanel({
       || imageReferenceDocument.references.length > STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX
     );
   const imageGenerationReady = imageConfigured && !imageReferencesBlocked;
+  const referenceSignature = scenarioImageReferenceSignature(imageReferenceDocument.references);
+  const imageGenerationDisabledReason = !imageConfigured
+    ? "이미지 생성 API를 먼저 연결하세요"
+    : imageReferencesBlocked
+      ? "AI 참조 에셋을 모두 확인한 뒤 생성하세요"
+      : undefined;
+  const selectCandidate = (index: number, candidateId: string) => {
+    const item = preview?.[index];
+    if (!item || editingLocked) return;
+    const next = selectScenarioImageCandidate(item, candidateId);
+    onChangeScene(index, {
+      imageCandidates: next.imageCandidates,
+      selectedImageCandidateId: next.selectedImageCandidateId,
+      imageDataUrl: next.imageDataUrl,
+      imageProvenance: next.imageProvenance,
+      imageError: next.imageError,
+    });
+  };
+  const approveCandidate = (index: number, candidateId: string) => {
+    const item = preview?.[index];
+    if (!item || editingLocked) return;
+    const next = approveScenarioImageCandidate(item, candidateId);
+    onChangeScene(index, {
+      imageCandidates: next.imageCandidates,
+      selectedImageCandidateId: next.selectedImageCandidateId,
+      approvedImageCandidateId: next.approvedImageCandidateId,
+      imageDataUrl: next.imageDataUrl,
+      imageProvenance: next.imageProvenance,
+      imageError: next.imageError,
+    });
+  };
 
   const modal = (
     <div
@@ -384,6 +413,16 @@ export function StudioScenarioAutoLayoutPanel({
                   </span>
                 )}
               </div>
+              <StudioScenarioCandidateDesk
+                items={preview!}
+                referenceSignature={referenceSignature}
+                busy={editingLocked}
+                imageGenerationReady={imageGenerationReady}
+                disabledReason={imageGenerationDisabledReason}
+                onGenerate={onGenerateImages}
+                onSelectCandidate={selectCandidate}
+                onApproveCandidate={approveCandidate}
+              />
               <div className="grid gap-2 md:grid-cols-2">
                 {preview!.map((item, idx) => (
                   <article key={idx} className="rounded-xl border border-line bg-card/60 p-2">
@@ -528,7 +567,7 @@ export function StudioScenarioAutoLayoutPanel({
             {missingImageCount > 0 && (
               <button
                 type="button"
-                onClick={onGenerateImages}
+                onClick={() => onGenerateImages()}
                 disabled={!imageGenerationReady || editingLocked}
                 title={
                   !imageConfigured
