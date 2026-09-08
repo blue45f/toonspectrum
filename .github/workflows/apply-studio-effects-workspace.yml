@@ -12,11 +12,11 @@ permissions:
 
 concurrency:
   group: apply-studio-effects-workspace-20260909
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply-validate-commit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     env:
       HUSKY: "0"
