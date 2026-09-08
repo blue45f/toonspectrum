@@ -514,7 +514,11 @@ export class StudioAutosaveOpfsSession {
       );
       const digest = sha256HexPortable(bytes);
       const writer = await this.#ensureWriter(signal);
+      const lostLeadershipDuringAcquisition = this.#documentLease?.role === "follower";
       try {
+        // Acquiring/renewing the disk writer can await behind a new document leader. Revalidate
+        // immediately before checkpoint admission, not only before that asynchronous wait.
+        if (lostLeadershipDuringAcquisition) throw new StudioAutosaveDocumentBusyError();
         const entry = await this.#journal.appendCheckpoint(writer, {
           id: `autosave-${revision}-${digest.slice(0, 12)}`,
           pageId: AUTOSAVE_PAGE_ID,
@@ -538,8 +542,9 @@ export class StudioAutosaveOpfsSession {
         // Callers without that document lock retain the existing expiry/fencing discipline.
         // Admission may close while an already-started checkpoint drains. Its owned disk writer
         // still needs release even though the document handle now reports a follower role.
-        if (this.#documentLease
-          && this.#documentLease.basis !== "locks-unavailable") {
+        if (lostLeadershipDuringAcquisition || (
+          this.#documentLease && this.#documentLease.basis !== "locks-unavailable"
+        )) {
           try {
             await this.#journal.releaseWriter(writer);
             if (this.#writer === writer) this.#writer = null;
