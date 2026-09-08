@@ -74,12 +74,14 @@ export function StudioPanelChip({
   title,
   onClick,
   children,
+  className,
 }: {
   active?: boolean;
   disabled?: boolean;
   title?: string;
   onClick: () => void;
   children: ReactNode;
+  className?: string;
 }): ReactElement {
   return (
     <button
@@ -88,7 +90,7 @@ export function StudioPanelChip({
       disabled={disabled}
       title={title}
       aria-pressed={active}
-      className={cn(PANEL_CHIP_CLASS, active && "border-accent bg-accent-soft/50 text-fg")}
+      className={cn(PANEL_CHIP_CLASS, active && "border-accent bg-accent-soft/50 text-fg", className)}
     >
       {children}
     </button>
