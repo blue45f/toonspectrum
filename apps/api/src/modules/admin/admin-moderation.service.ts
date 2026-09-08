@@ -216,12 +216,18 @@ async addBannedWord(userId: string, word: string, category = "general") {
     if (!trimmed) throw new BadRequestException("금칙어를 입력해 주세요.");
     const id = crypto.randomUUID();
     try {
-      await dbClient.execute({
-        sql: `INSERT INTO admin_banned_words (id, word, category, "createdBy", "createdAt") VALUES (?, ?, ?, ?, now()) ON CONFLICT (word) DO NOTHING`,
+      const inserted = await dbClient.execute({
+        sql: `INSERT INTO admin_banned_words (id, word, category, "createdBy", "createdAt") VALUES (?, ?, ?, ?, now()) ON CONFLICT (word) DO NOTHING RETURNING id, category`,
         args: [id, trimmed, category, admin.id],
       });
-      void logAuditAction(userId, "BANNED_WORD_ADD", "moderation", id, { word: trimmed, category });
-      return { ok: true, id, word: trimmed };
+      const saved = inserted.rows[0] ?? (await dbClient.execute({
+        sql: `SELECT id, category FROM admin_banned_words WHERE word = ?`,
+        args: [trimmed],
+      })).rows[0];
+      const savedId = String(saved?.id ?? "");
+      if (!savedId) throw new BadRequestException("저장된 금칙어를 확인할 수 없습니다. 다시 시도해 주세요.");
+      void logAuditAction(userId, "BANNED_WORD_ADD", "moderation", savedId, { word: trimmed, category: saved.category });
+      return { ok: true, id: savedId, word: trimmed };
     } catch {
       throw new BadRequestException("금칙어 추가 중 오류가 발생했습니다.");
     }

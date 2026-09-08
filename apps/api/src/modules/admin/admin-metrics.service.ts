@@ -305,7 +305,7 @@ async upsertPromo(userId: string, payload: Record<string, unknown>) {
     const isActive = payload.isActive !== false;
     const expiresAt = payload.expiresAt ? new Date(String(payload.expiresAt)) : null;
 
-    await dbClient.execute({
+    const result = await dbClient.execute({
       sql: `INSERT INTO admin_promos (id, code, "discountType", "discountValue", "maxUses", "usedCount", "isActive", "expiresAt", "createdAt")
             VALUES (?, ?, ?, ?, ?, 0, ?, ?, now())
             ON CONFLICT (code) DO UPDATE SET
@@ -313,12 +313,15 @@ async upsertPromo(userId: string, payload: Record<string, unknown>) {
               "discountValue" = EXCLUDED."discountValue",
               "maxUses" = EXCLUDED."maxUses",
               "isActive" = EXCLUDED."isActive",
-              "expiresAt" = EXCLUDED."expiresAt"`,
+              "expiresAt" = EXCLUDED."expiresAt"
+            RETURNING id`,
       args: [id, code, discountType, discountValue, maxUses, isActive, expiresAt],
     });
 
-    void logAuditAction(userId, "PROMO_UPSERT", "promo", id, { code, discountType, discountValue });
-    return { ok: true, id, code };
+    const savedId = String(result.rows[0]?.id ?? "");
+    if (!savedId) throw new BadRequestException("저장된 프로모션을 확인할 수 없습니다. 다시 시도해 주세요.");
+    void logAuditAction(userId, "PROMO_UPSERT", "promo", savedId, { code, discountType, discountValue });
+    return { ok: true, id: savedId, code };
   }
 
 async togglePromo(userId: string, id: string) {
@@ -422,12 +425,18 @@ async addSecurityIpRule(userId: string, ipAddress: string, reason = "보안 우�
     const trimmedIp = parseIpAddress(ipAddress);
     const trimmedReason = String(reason ?? "보안 우려 IP 차단").trim();
     const id = crypto.randomUUID();
-    await dbClient.execute({
-      sql: `INSERT INTO admin_security_policies (id, "ipAddress", reason, action, "createdBy", "createdAt") VALUES (?, ?, ?, 'block', ?, now()) ON CONFLICT ("ipAddress") DO NOTHING`,
+    const inserted = await dbClient.execute({
+      sql: `INSERT INTO admin_security_policies (id, "ipAddress", reason, action, "createdBy", "createdAt") VALUES (?, ?, ?, 'block', ?, now()) ON CONFLICT ("ipAddress") DO NOTHING RETURNING id, reason`,
       args: [id, trimmedIp, trimmedReason, admin.id],
     });
-    void logAuditAction(userId, "SECURITY_IP_BLOCK", "security", id, { ipAddress: trimmedIp, reason: trimmedReason });
-    return { ok: true, id, ipAddress: trimmedIp };
+    const saved = inserted.rows[0] ?? (await dbClient.execute({
+      sql: `SELECT id, reason FROM admin_security_policies WHERE "ipAddress" = ?`,
+      args: [trimmedIp],
+    })).rows[0];
+    const savedId = String(saved?.id ?? "");
+    if (!savedId) throw new BadRequestException("저장된 IP 규칙을 확인할 수 없습니다. 다시 시도해 주세요.");
+    void logAuditAction(userId, "SECURITY_IP_BLOCK", "security", savedId, { ipAddress: trimmedIp, reason: saved.reason });
+    return { ok: true, id: savedId, ipAddress: trimmedIp };
   }
 
 async deleteSecurityIpRule(userId: string, id: string) {
