@@ -110,16 +110,18 @@ describe("VRM library helpers", () => {
   it("uses polished character names for bundled VRMs", () => {
     const names = SAMPLE_VRM_ENTRIES.map((entry) => entry.name);
 
-    // Keep the default first while preserving legacy and newly curated characters.
-    expect(names[0]).toBe("루미");
-    expect(names).toEqual(expect.arrayContaining([
-      "하린",
-      "세라",
-      "유나",
-      "Quaternius Peasant (Female)",
-      "Quaternius Peasant (Male)",
-      "Quaternius Ranger (Female)",
-    ]));
+    // 대표 엔트리 스팟 체크(기존 + 2026-07 신규).
+    expect(
+      ["sample-vrm", "avatar-a", "avatar-b", "avatar-c"].map(
+        (id) => SAMPLE_VRM_ENTRIES.find((entry) => entry.id === id)?.name,
+      ),
+    ).toEqual(["루미", "하린", "세라", "유나"]);
+    expect(SAMPLE_VRM_ENTRIES[0]).toMatchObject({ id: "sample-vrm", name: "루미" });
+    expect(
+      ["quaternius-female-peasant", "quaternius-male-peasant", "quaternius-female-ranger"].map(
+        (id) => SAMPLE_VRM_ENTRIES.find((entry) => entry.id === id)?.name,
+      ),
+    ).toEqual(["Quaternius Peasant (Female)", "Quaternius Peasant (Male)", "Quaternius Ranger (Female)"]);
     expect(names).toContain("데빌 (악마)");
     expect(names).toContain("쿨에일리언 (외계인)");
     expect(names).toContain("스포츠메카 (메카)");

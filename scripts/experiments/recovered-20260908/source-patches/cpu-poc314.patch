@@ -1,0 +1,214 @@
+commit e2913a9105e39136c0a6192fb2889766d9008bd3
+Author:     hjunkim <blue45f@gmail.com>
+AuthorDate: Tue Sep 8 21:24:03 2026 +0900
+Commit:     hjunkim <blue45f@gmail.com>
+CommitDate: Tue Sep 8 21:24:03 2026 +0900
+
+    chore: salvage unique uncommitted work from codex/cpu-poc314
+    
+    Source worktree: /Users/hjunkim/WebstormProjects/toonspectrum-cpu-poc314
+    Source SHA: e3cbfa7f4eaa3feee905fee43278a848661df267
+    Files: 3
+
+diff --git a/apps/web/src/domains/creator/inkwash-parity316.test.ts b/apps/web/src/domains/creator/inkwash-parity316.test.ts
+new file mode 100644
+index 000000000..d2621efbc
+--- /dev/null
++++ b/apps/web/src/domains/creator/inkwash-parity316.test.ts
+@@ -0,0 +1,47 @@
++import { mkdirSync, writeFileSync } from 'node:fs';
++import { beforeAll, afterAll, it, expect } from 'vitest';
++import { BRUSH_PRESETS } from './studio-brush';
++import { studioCoreBrushCatalogSelection } from './brush/studio-brush-selection';
++import { normalizeStudioBrushDynamicsSettings, STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3 as V3, STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4 as V4 } from './brush/studio-brush-dynamics';
++import { drawElement } from './live/studio-live-dynamic-brush-overlay.fixture';
++import { planStudioDynamicBrushRender } from './studio-dynamic-brush-render-plan';
++import { planStudioDynamicBrushCoverageMarks, renderStudioDynamicBrushCoverageMark, renderStudioDynamicBrushCoverage } from './studio-dynamic-brush-coverage-renderer';
++
++const out='/tmp/toonspectrum-inkwash-parity316';
++const rows: unknown[]=[];
++let kit: any;
++beforeAll(async()=>{ kit=await (await import('@toonspectrum/studio-engine-skia/node')).loadCanvasKitNode(); mkdirSync(out,{recursive:true}); });
++afterAll(()=>writeFileSync(out+'/results.json',JSON.stringify(rows,null,2)));
++const point=(t:number)=>({x:720*(.12+.5*t),y:807*(.2+.42*t-Math.sin(t*Math.PI)*.12)*720/1048});
++const points:number[]=[];
++for(let batch=0;batch<20;batch++){
++ const a=point(batch/20),b=point((batch+1)/20);
++ for(let i=0;i<60;i++){const t=i/60;points.push(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t);}
++}
++const last=point(1);points.push(last.x,last.y);
++const preset=BRUSH_PRESETS.find(p=>p.id==='inkwash-pen')!;
++const selected=studioCoreBrushCatalogSelection(preset);
++function plan(pipeline:string,count:number){
++ const element=drawElement('inkwash-parity316',points.slice(0,count*2),{brush:selected.runtimeBrushId,brushCatalogId:selected.catalogId,stroke:'#4936e8',strokeWidth:8,opacity:1,brushDynamics:normalizeStudioBrushDynamicsSettings({...selected.brushDynamics,depositPipeline:pipeline}),pressures:Array(count).fill(.5),speeds:Array(count).fill(.02),tangentialPressures:Array(count).fill(0),tiltXs:Array(count).fill(0),tiltYs:Array(count).fill(0),twists:Array(count).fill(0)});
++ const p=planStudioDynamicBrushRender(element,selected.runtimeBrushId,false);if(p.status!=='ready')throw Error(p.status);
++ const marks=planStudioDynamicBrushCoverageMarks({dabVariations:p.plan.dabVariations,dynamics:p.plan.dynamics,materialIdentity:p.plan.materialIdentity,dynamicSeed:p.plan.seed,stroke:element.stroke,stampGrid:p.plan.renderBudget.stampGrid,markBudget:p.plan.markBudget,...(p.plan.paper?{paper:p.plan.paper}:{})});
++ if(!marks.ok)throw Error(marks.reason);
++ return {marks:marks.marks,plan:p.plan};
++}
++function raster(marks:any[],tiled:boolean,phase:number){
++ const all:any[]=[];const create=(w:number,h:number)=>{const c=kit.MakeCanvas(w,h);all.push(c);return c;};
++ const canvas=create(1100,820),ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,1100,820);ctx.setTransform(1048/720,0,0,1048/720,phase,phase);
++ const result=tiled?renderStudioDynamicBrushCoverage(ctx,marks,{activeDraft:false,opacity:1,surfaceFactory:create}):marks.forEach(m=>renderStudioDynamicBrushCoverageMark(ctx,m,1,create));
++ const bytes=new Uint8Array(ctx.getImageData(0,0,1100,820).data);for(const c of all)c.dispose();return {bytes,result};
++}
++function diff(a:Uint8Array,b:Uint8Array){let changed=0,max=0;for(let y=113;y<282;y++)for(let x=78;x<340;x++){const i=(y*1100+x)*4;const d=Math.max(...[0,1,2,3].map(c=>Math.abs(a[i+c]!-b[i+c]!)));max=Math.max(max,d);if(d>8)changed++;}return {changed,max,total:44278};}
++for(const [label,pipeline] of [['V3',V3],['V4',V4]])it(label+' compares prefix marks and direct/tile pixels',()=>{
++ const half=plan(pipeline!,601),full=plan(pipeline!,1201);
++ const prefix=full.marks.filter(m=>m.x<220);
++ const halfPrefix=half.marks.filter(m=>m.x<220);
++ expect(prefix).toEqual(halfPrefix);
++ for(const phase of [0,.25,.5]){
++  const live=raster(half.marks as any[],false,phase),committed=raster(full.marks as any[],true,phase),direct=raster(full.marks as any[],false,phase);
++  rows.push({label,phase,halfMarks:half.marks.length,fullMarks:full.marks.length,sharedPrefixMarks:prefix.length,prefixMarksExact:true,liveVsCommitted:diff(live.bytes,committed.bytes),liveVsDirect:diff(live.bytes,direct.bytes),directVsTiled:diff(direct.bytes,committed.bytes),result:committed.result});
++ }
++});
+diff --git a/tests/benchmarks/results/ink-mesh-attempt.json b/tests/benchmarks/results/ink-mesh-attempt.json
+index 6e2f78955..8563fdd55 100644
+--- a/tests/benchmarks/results/ink-mesh-attempt.json
++++ b/tests/benchmarks/results/ink-mesh-attempt.json
+@@ -38,10 +38,10 @@
+     "apiSurface": "imk_generate(pre-modeled points stride-4 f64, BrushTip params, pressure->size behavior) -> positions f32 + surface-UV texCoords f32 + triangle indices u32; noise_seed pinned 0 (deterministic replay)"
+   },
+   "measuredRuntime": {
+-    "generatedAtUtc": "2026-08-08T05:03:49.494Z",
++    "generatedAtUtc": "2026-09-08T06:36:14.489Z",
+     "harness": "packages/studio-brush-platform/src/__tests__/ink-mesh.test.ts (INK_MESH_POC=1)",
+     "upstreamCommit": "1d0daba661f3035f42f3649b8e6a0061b47aa759",
+-    "wasmBytes": 538378,
++    "wasmBytes": 541737,
+     "stroke": {
+       "points": 240,
+       "spanPx": 180,
+@@ -52,8 +52,8 @@
+       "triangleCount": 34
+     },
+     "generationMs": {
+-      "p50": 0.47887500000001637,
+-      "p95": 0.538791999999944,
++      "p50": 0.4912919999999872,
++      "p95": 0.5951249999999959,
+       "runs": 50
+     }
+   },
+diff --git a/tests/benchmarks/results/ink-modeler-poc.json b/tests/benchmarks/results/ink-modeler-poc.json
+index b66731ae5..93ae60a48 100644
+--- a/tests/benchmarks/results/ink-modeler-poc.json
++++ b/tests/benchmarks/results/ink-modeler-poc.json
+@@ -1,6 +1,6 @@
+ {
+   "harness": "packages/studio-brush-platform/src/__tests__/ink-modeler.test.ts (INK_MODELER_POC=1)",
+-  "generatedAt": "2026-08-08T03:01:23.696Z",
++  "generatedAt": "2026-09-08T06:36:14.149Z",
+   "host": {
+     "platform": "darwin",
+     "arch": "arm64",
+@@ -62,87 +62,87 @@
+           "penultimateGapPx": 0.2741
+         }
+       },
+-      "throughputPtsPerMs": 2028.02
++      "throughputPtsPerMs": 2344.17
+     },
+     {
+       "candidate": "stabilizer-ema-0.35",
+-      "highFreqReductionPct": 52.3571,
++      "highFreqReductionPct": 52.6981,
+       "cornerErrorPx": 3.0227,
+       "endpoint": {
+         "lineJitter": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 6.0567
++          "penultimateGapPx": 4.5649
+         },
+         "sharpCurve": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 8.8186
++          "penultimateGapPx": 6.6466
+         },
+         "speedRamp": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 47.854
++          "penultimateGapPx": 36.0677
+         }
+       },
+-      "throughputPtsPerMs": 9083.86
++      "throughputPtsPerMs": 10242.16
+     },
+     {
+       "candidate": "stabilizer-ema-0.7",
+-      "highFreqReductionPct": 83.0161,
++      "highFreqReductionPct": 83.195,
+       "cornerErrorPx": 8.3067,
+       "endpoint": {
+         "lineJitter": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 11.9496
++          "penultimateGapPx": 4.5918
+         },
+         "sharpCurve": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 18.1407
++          "penultimateGapPx": 6.9707
+         },
+         "speedRamp": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 94.3028
++          "penultimateGapPx": 36.2367
+         }
+       },
+-      "throughputPtsPerMs": 14510.14
++      "throughputPtsPerMs": 14755.76
+     },
+     {
+       "candidate": "stabilizer-spring-0.35",
+-      "highFreqReductionPct": 74.3936,
++      "highFreqReductionPct": 74.5468,
+       "cornerErrorPx": 9.0401,
+       "endpoint": {
+         "lineJitter": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 11.6911
++          "penultimateGapPx": 6.0042
+         },
+         "sharpCurve": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 17.7422
++          "penultimateGapPx": 9.0722
+         },
+         "speedRamp": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 92.1033
++          "penultimateGapPx": 47.2944
+         }
+       },
+-      "throughputPtsPerMs": 13201.86
++      "throughputPtsPerMs": 10765.63
+     },
+     {
+       "candidate": "stabilizer-spring-0.7",
+-      "highFreqReductionPct": 92.512,
++      "highFreqReductionPct": 92.5998,
+       "cornerErrorPx": 14.976,
+       "endpoint": {
+         "lineJitter": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 21.623
++          "penultimateGapPx": 5.3053
+         },
+         "sharpCurve": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 33.1334
++          "penultimateGapPx": 8.1531
+         },
+         "speedRamp": {
+           "endpointDistancePx": 0,
+-          "penultimateGapPx": 168.2233
++          "penultimateGapPx": 41.2037
+         }
+       },
+-      "throughputPtsPerMs": 15382.81
++      "throughputPtsPerMs": 17902.39
+     }
+   ],
+   "note": "numbers only — no verdict here; promotion is decided by the blind lab gate (ADR-0009) and recorded in ADR-0011 lane 3"

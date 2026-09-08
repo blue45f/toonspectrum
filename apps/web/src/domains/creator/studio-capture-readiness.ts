@@ -24,6 +24,7 @@ export type StudioCaptureReadinessCode =
   | "aborted"
   | "asset-limit"
   | "asset-load"
+  | "pending-ink"
   | "render-timeout"
   | "stale-page";
 
@@ -52,13 +53,41 @@ export type StudioCaptureLinked3dPassRasterSourceResolver = (
   signal?: AbortSignal,
 ) => Promise<StudioCaptureResolvedRasterSource | null>;
 
+interface StudioCaptureDocumentPage {
+  readonly id: string;
+  readonly elements: readonly unknown[];
+}
+
+/** The live overlay is not a document raster. The existing flush owns GPU receipts/publication. */
+export interface StudioDocumentInkReadiness {
+  readonly drawingRef: { readonly current: unknown };
+  readonly drawingPointerTransportRef: { readonly current: { getSession(): unknown } | null };
+  readonly pendingStrokeCommitsRef: { readonly current: unknown };
+  /** Host wraps the canonical flush in ReactDOM.flushSync, just like manual save. */
+  readonly flushPendingStrokes: () => unknown;
+}
+
+export interface StudioCaptureDocumentReadiness<TPage extends StudioCaptureDocumentPage> extends StudioDocumentInkReadiness {
+  readonly pagesHistoryRef: { readonly current: readonly (readonly TPage[])[] };
+  readonly pagesHiRef: { readonly current: number };
+  readonly captureCommitRef: {
+    readonly current: { readonly pageId: string; readonly historyIndex: number; readonly page: TPage };
+  };
+  readonly master: unknown;
+  /** Metadata consumers receive the same immutable page whose Stage passed the capture fence. */
+  readonly onReady?: (page: TPage) => void;
+}
+
 export interface StudioCaptureReadinessOptions<
   TStage extends StudioCaptureStageLike = StudioCaptureStageLike,
+  TPage extends StudioCaptureDocumentPage = StudioCaptureDocumentPage,
 > {
   pageId: string;
   getRenderedPageId: () => string | null;
   getStage: () => TStage | null;
   assetSources?: readonly string[];
+  /** Present for current-document exports; historical timelapse snapshots keep their own inputs. */
+  document?: StudioCaptureDocumentReadiness<TPage>;
   timeoutMs?: number;
   signal?: AbortSignal;
   /** Test seam; the browser default waits for requestAnimationFrame. */
@@ -75,6 +104,51 @@ export interface StudioCaptureReadinessOptions<
   rasterPresentationIdentities?: readonly StudioRasterImagePresentationIdentity[];
   /** Test seam for the product presentation fence. */
   waitForRasterPresentations?: typeof waitForStudioRasterImagePresentations;
+}
+
+/** Shared by raster capture and JSON's generation/cache selection; returns a later recheck. */
+export function flushStudioDocumentInkForExport(document: StudioDocumentInkReadiness): () => void {
+  const gestureActive = () => Boolean(
+    document.drawingRef.current || document.drawingPointerTransportRef.current?.getSession(),
+  );
+  const pendingInk = () => new StudioCaptureReadinessError(
+    "pending-ink", "마지막 획을 원고에 확정하지 못해 내보내기를 시작하지 않았어요. 획 입력·동기화가 끝난 뒤 다시 시도해 주세요.",
+  );
+  if (gestureActive()) throw pendingInk();
+  if (document.pendingStrokeCommitsRef.current) document.flushPendingStrokes();
+  // A flush may retain ink while waiting for an exact terminal GPU receipt or publication access.
+  // Its boolean return alone is not proof of a committed document (an active gesture returns true).
+  const assertSettled = () => {
+    if (gestureActive() || document.pendingStrokeCommitsRef.current) throw pendingInk();
+  };
+  assertSettled();
+  return assertSettled;
+}
+
+function prepareDocumentCapture<TPage extends StudioCaptureDocumentPage>(
+  pageId: string,
+  document: StudioCaptureDocumentReadiness<TPage>,
+) {
+  const assertInkSettled = flushStudioDocumentInkForExport(document);
+  const history = document.pagesHistoryRef.current;
+  const historyIndex = document.pagesHiRef.current;
+  const page = history[historyIndex]?.find((candidate) => candidate.id === pageId);
+  if (!page) throw new StudioCaptureReadinessError("stale-page", "캡처할 페이지가 현재 원고에 없어요.");
+  return {
+    sources: collectStudioCaptureAssetSources(page, document.master),
+    assertCurrent() {
+      assertInkSettled();
+      if (document.pagesHistoryRef.current !== history || document.pagesHiRef.current !== historyIndex) {
+        throw new StudioCaptureReadinessError("stale-page", "캡처 준비 중 원고가 바뀌어 내보내기를 중단했어요.");
+      }
+    },
+    isRendered() {
+      const rendered = document.captureCommitRef.current;
+      return rendered.pageId === page.id && rendered.historyIndex === historyIndex
+        && rendered.page === page;
+    },
+    ready() { document.onReady?.(page); },
+  };
 }
 
 const STUDIO_LINKED_3D_PASS_LOCATOR_NAMESPACE = "studio-opfs-cas:";
@@ -332,8 +406,11 @@ async function withTimeout<T>(
  * Wait until the requested page is committed and stable enough for `stage.toCanvas()`.
  * Callers must update `getRenderedPageId` from a React layout/effect after the Stage commit.
  */
-export async function waitForStudioCaptureReady<TStage extends StudioCaptureStageLike>(
-  options: StudioCaptureReadinessOptions<TStage>
+export async function waitForStudioCaptureReady<
+  TStage extends StudioCaptureStageLike,
+  TPage extends StudioCaptureDocumentPage,
+>(
+  options: StudioCaptureReadinessOptions<TStage, TPage>
 ): Promise<TStage> {
   const pageId = options.pageId.trim();
   if (!pageId) {
@@ -346,15 +423,21 @@ export async function waitForStudioCaptureReady<TStage extends StudioCaptureStag
   const resolveLinked3dPassRasterSource =
     options.resolveLinked3dPassRasterSource
     ?? defaultResolveLinked3dPassRasterSource;
-  const sources = uniqueAssetSources(options.assetSources ?? []);
   const waitForRasterPresentations = options.waitForRasterPresentations
     ?? waitForStudioRasterImagePresentations;
 
   return withTimeout(async (operationSignal) => {
     throwIfAborted(operationSignal);
-    while (options.getRenderedPageId() !== pageId || !options.getStage()) {
-      await nextFrame();
+    const document = options.document ? prepareDocumentCapture(pageId, options.document) : undefined;
+    const sources = document?.sources ?? uniqueAssetSources(options.assetSources ?? []);
+    const assertCurrent = () => {
       throwIfAborted(operationSignal);
+      document?.assertCurrent();
+    };
+    assertCurrent();
+    while (options.getRenderedPageId() !== pageId || !options.getStage() || document?.isRendered() === false) {
+      await nextFrame();
+      assertCurrent();
     }
 
     await Promise.all([
@@ -372,8 +455,8 @@ export async function waitForStudioCaptureReady<TStage extends StudioCaptureStag
     // receive their own onload state and draw the cached bitmap into the Stage.
     await nextFrame();
     await nextFrame();
-    throwIfAborted(operationSignal);
-    if (options.getRenderedPageId() !== pageId) {
+    assertCurrent();
+    if (options.getRenderedPageId() !== pageId || document?.isRendered() === false) {
       throw new StudioCaptureReadinessError(
         "stale-page",
         "캡처 준비 중 선택 페이지가 바뀌어 내보내기를 중단했어요."
@@ -391,12 +474,14 @@ export async function waitForStudioCaptureReady<TStage extends StudioCaptureStag
       operationSignal,
     );
     await nextFrame();
-    if (options.getRenderedPageId() !== pageId || options.getStage() !== stage) {
+    assertCurrent();
+    if (options.getRenderedPageId() !== pageId || options.getStage() !== stage || document?.isRendered() === false) {
       throw new StudioCaptureReadinessError(
         "stale-page",
         "캡처 직전에 페이지가 바뀌어 잘못된 출력 생성을 막았어요."
       );
     }
+    document?.ready();
     return stage;
   }, timeoutMs, options.signal);
 }

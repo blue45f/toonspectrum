@@ -10,6 +10,7 @@ on:
       - "scripts/studio-ink-fidelity-cases.test.ts"
       - "scripts/verify-studio-long-stroke.mts"
       - "scripts/lib/studio-verify-preview-harness.mjs"
+      - "scripts/lib/studio-verify-preview-harness.mts"
       - "apps/web/src/domains/creator/**"
   pull_request:
     branches: [main, release/salvage-integration-20260908]
@@ -20,6 +21,7 @@ on:
       - "scripts/studio-ink-fidelity-cases.test.ts"
       - "scripts/verify-studio-long-stroke.mts"
       - "scripts/lib/studio-verify-preview-harness.mjs"
+      - "scripts/lib/studio-verify-preview-harness.mts"
       - "apps/web/src/domains/creator/**"
   schedule:
     # 03:23 KST. The scheduled run catches renderer drift even when a dependency or generated

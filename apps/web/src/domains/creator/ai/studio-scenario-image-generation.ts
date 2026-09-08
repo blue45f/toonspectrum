@@ -88,10 +88,9 @@ export interface StudioScenarioImageGenerationExecutors {
 }
 
 /**
- * Scenario image generation executors extracted from StudioPage. Behavior-identical move:
- * the bodies below are verbatim, with dependencies received through {@link ctx} instead of
- * component closure. Mutation tickets are still captured before the first await and
- * revalidated before every state application.
+ * Scenario image generation executors extracted from StudioPage, with dependencies received
+ * through {@link ctx}. Mutation tickets are captured before the first await and revalidated
+ * before every state application. A failed replacement keeps the previously reviewed image.
  */
 export function createStudioScenarioImageGenerationExecutors(
   ctx: StudioScenarioImageGenerationContext,
@@ -432,7 +431,9 @@ export function createStudioScenarioImageGenerationExecutors(
                         imageError: undefined,
                         imageProvenance: requestProvenance,
                       }
-                    : { ...item, imageDataUrl: undefined, imageError: imageResult.error, imageProvenance: undefined }
+                    // The failed attempt belongs in the operation ledger. The reviewed image
+                    // and its provenance remain authoritative until a replacement succeeds.
+                    : { ...item, imageError: imageResult.error }
                   : item
               ),
             }

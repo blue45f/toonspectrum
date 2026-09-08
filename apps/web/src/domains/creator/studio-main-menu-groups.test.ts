@@ -119,6 +119,7 @@ function createEditorActions(): StudioMainMenuEditorActions {
 
 function createUiActions(): StudioMainMenuUiActions {
   return {
+    correctCurrentStroke: vi.fn(),
     openExportDownload: vi.fn(),
     requestProjectImport: vi.fn(),
     requestInterchangeImport: vi.fn(),
@@ -150,7 +151,6 @@ function createUiActions(): StudioMainMenuUiActions {
     openShortcuts: vi.fn(),
     selectDrawMode: vi.fn(),
     enableSmartShape: vi.fn(),
-    correctCurrentStroke: vi.fn(),
     activateTransformTool: vi.fn(),
     openImageAdjustments: vi.fn(),
     openLayerMask: vi.fn(),

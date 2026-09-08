@@ -1,0 +1,298 @@
+{
+  "before": "e3cbfa7f4eaa3feee905fee43278a848661df267",
+  "after": "f901d93e9202e2c7c4658b1f76d5fa9db2b06064",
+  "width": 256,
+  "height": 192,
+  "tolerance": 0,
+  "backend": "CanvasKit CPU Skia, no browser or GPU",
+  "rows": [
+    {
+      "version": "V2",
+      "mode": "crossing-off",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 9943,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "5b7097480658327f833bf8546cf0ef450ea2946b6d87a6445112483ed4f6ae9a",
+      "afterSha256": "5b7097480658327f833bf8546cf0ef450ea2946b6d87a6445112483ed4f6ae9a",
+      "marksEqual": true
+    },
+    {
+      "version": "V2",
+      "mode": "crossing-on",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 9943,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "5b7097480658327f833bf8546cf0ef450ea2946b6d87a6445112483ed4f6ae9a",
+      "afterSha256": "5b7097480658327f833bf8546cf0ef450ea2946b6d87a6445112483ed4f6ae9a",
+      "marksEqual": true
+    },
+    {
+      "version": "V2",
+      "mode": "threshold-below",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 194,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "7764c6237e392f18694655b2ec510a28ee23c23d930f876028d8f12a57f13b31",
+      "afterSha256": "7764c6237e392f18694655b2ec510a28ee23c23d930f876028d8f12a57f13b31",
+      "marksEqual": true
+    },
+    {
+      "version": "V2",
+      "mode": "threshold-exact",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 194,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "79adc1ccee4a63d044b098bb639943262f5d8a5037ae4a5e51e389437f609ec5",
+      "afterSha256": "79adc1ccee4a63d044b098bb639943262f5d8a5037ae4a5e51e389437f609ec5",
+      "marksEqual": true
+    },
+    {
+      "version": "V2",
+      "mode": "threshold-above",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 194,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "bc57abf139300caabbdf4b1ca1538076d890c6b4bf70eedcee89c7c44653b51a",
+      "afterSha256": "bc57abf139300caabbdf4b1ca1538076d890c6b4bf70eedcee89c7c44653b51a",
+      "marksEqual": true
+    },
+    {
+      "version": "V2",
+      "mode": "r8-off",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 168,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "bdde79526b4c8ab828401ee05aacfa64bdbcff38d26a2d193515e0f2921c3b52",
+      "afterSha256": "bdde79526b4c8ab828401ee05aacfa64bdbcff38d26a2d193515e0f2921c3b52",
+      "marksEqual": true
+    },
+    {
+      "version": "V2",
+      "mode": "r8-on",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 168,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "bdde79526b4c8ab828401ee05aacfa64bdbcff38d26a2d193515e0f2921c3b52",
+      "afterSha256": "bdde79526b4c8ab828401ee05aacfa64bdbcff38d26a2d193515e0f2921c3b52",
+      "marksEqual": true
+    },
+    {
+      "version": "V2",
+      "mode": "r8-unavailable",
+      "before": {
+        "ok": false,
+        "reason": "r8-grain-unavailable"
+      },
+      "after": {
+        "ok": false,
+        "reason": "r8-grain-unavailable"
+      }
+    },
+    {
+      "version": "V3",
+      "mode": "crossing-off",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 9943,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "5b7097480658327f833bf8546cf0ef450ea2946b6d87a6445112483ed4f6ae9a",
+      "afterSha256": "5b7097480658327f833bf8546cf0ef450ea2946b6d87a6445112483ed4f6ae9a",
+      "marksEqual": true
+    },
+    {
+      "version": "V3",
+      "mode": "crossing-on",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 9943,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "5b7097480658327f833bf8546cf0ef450ea2946b6d87a6445112483ed4f6ae9a",
+      "afterSha256": "5b7097480658327f833bf8546cf0ef450ea2946b6d87a6445112483ed4f6ae9a",
+      "marksEqual": true
+    },
+    {
+      "version": "V3",
+      "mode": "threshold-below",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 194,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "7764c6237e392f18694655b2ec510a28ee23c23d930f876028d8f12a57f13b31",
+      "afterSha256": "7764c6237e392f18694655b2ec510a28ee23c23d930f876028d8f12a57f13b31",
+      "marksEqual": true
+    },
+    {
+      "version": "V3",
+      "mode": "threshold-exact",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 194,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "79adc1ccee4a63d044b098bb639943262f5d8a5037ae4a5e51e389437f609ec5",
+      "afterSha256": "79adc1ccee4a63d044b098bb639943262f5d8a5037ae4a5e51e389437f609ec5",
+      "marksEqual": true
+    },
+    {
+      "version": "V3",
+      "mode": "threshold-above",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 194,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "bc57abf139300caabbdf4b1ca1538076d890c6b4bf70eedcee89c7c44653b51a",
+      "afterSha256": "bc57abf139300caabbdf4b1ca1538076d890c6b4bf70eedcee89c7c44653b51a",
+      "marksEqual": true
+    },
+    {
+      "version": "V3",
+      "mode": "r8-off",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 168,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "bdde79526b4c8ab828401ee05aacfa64bdbcff38d26a2d193515e0f2921c3b52",
+      "afterSha256": "bdde79526b4c8ab828401ee05aacfa64bdbcff38d26a2d193515e0f2921c3b52",
+      "marksEqual": true
+    },
+    {
+      "version": "V3",
+      "mode": "r8-on",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 168,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "bdde79526b4c8ab828401ee05aacfa64bdbcff38d26a2d193515e0f2921c3b52",
+      "afterSha256": "bdde79526b4c8ab828401ee05aacfa64bdbcff38d26a2d193515e0f2921c3b52",
+      "marksEqual": true
+    },
+    {
+      "version": "V3",
+      "mode": "r8-unavailable",
+      "before": {
+        "ok": false,
+        "reason": "r8-grain-unavailable"
+      },
+      "after": {
+        "ok": false,
+        "reason": "r8-grain-unavailable"
+      }
+    },
+    {
+      "version": "V4",
+      "mode": "crossing-off",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 9951,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "ecd9038f0804efe359ebb768640e78935a96401d9a5d103e77b6051441dda5b1",
+      "afterSha256": "ecd9038f0804efe359ebb768640e78935a96401d9a5d103e77b6051441dda5b1",
+      "marksEqual": true
+    },
+    {
+      "version": "V4",
+      "mode": "crossing-on",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 9951,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "ecd9038f0804efe359ebb768640e78935a96401d9a5d103e77b6051441dda5b1",
+      "afterSha256": "ecd9038f0804efe359ebb768640e78935a96401d9a5d103e77b6051441dda5b1",
+      "marksEqual": true
+    },
+    {
+      "version": "V4",
+      "mode": "threshold-below",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 180,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "b9a6f709b7f4ccb52c9783a1a5d20edc6f0309cfe16820f3369416b5338b1959",
+      "afterSha256": "b9a6f709b7f4ccb52c9783a1a5d20edc6f0309cfe16820f3369416b5338b1959",
+      "marksEqual": true
+    },
+    {
+      "version": "V4",
+      "mode": "threshold-exact",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 180,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "54a8c8a2ed8ee9ff5c4ac6fa1df9d4d236fc3c014a207c3bff676b8bc0398b6c",
+      "afterSha256": "54a8c8a2ed8ee9ff5c4ac6fa1df9d4d236fc3c014a207c3bff676b8bc0398b6c",
+      "marksEqual": true
+    },
+    {
+      "version": "V4",
+      "mode": "threshold-above",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 180,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "8d8e8bb5104ef1bda23a9a92330c5067c1b5d72919e1d840aac4e8340b231019",
+      "afterSha256": "8d8e8bb5104ef1bda23a9a92330c5067c1b5d72919e1d840aac4e8340b231019",
+      "marksEqual": true
+    },
+    {
+      "version": "V4",
+      "mode": "r8-off",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 151,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "22a4405800f4275dca44a5fc5462a374ad740ce3a884ff8ab448e6c70b02fc9b",
+      "afterSha256": "22a4405800f4275dca44a5fc5462a374ad740ce3a884ff8ab448e6c70b02fc9b",
+      "marksEqual": true
+    },
+    {
+      "version": "V4",
+      "mode": "r8-on",
+      "beforeMarks": 1,
+      "afterMarks": 1,
+      "nonempty": 151,
+      "mismatchedChannels": 0,
+      "maxDelta": 0,
+      "beforeSha256": "22a4405800f4275dca44a5fc5462a374ad740ce3a884ff8ab448e6c70b02fc9b",
+      "afterSha256": "22a4405800f4275dca44a5fc5462a374ad740ce3a884ff8ab448e6c70b02fc9b",
+      "marksEqual": true
+    },
+    {
+      "version": "V4",
+      "mode": "r8-unavailable",
+      "before": {
+        "ok": false,
+        "reason": "r8-grain-unavailable"
+      },
+      "after": {
+        "ok": false,
+        "reason": "r8-grain-unavailable"
+      }
+    }
+  ]
+}

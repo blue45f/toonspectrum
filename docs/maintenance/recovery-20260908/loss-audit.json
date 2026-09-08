@@ -1,0 +1,265 @@
+{
+  "scope": "Historical deleted branches, dirty snapshots, generated artifacts; main and collection integration compared separately.",
+  "branches": {
+    "sourceCommitObjectsAvailable": 134,
+    "missingSourceObjects": [],
+    "originalArchiveRefsExact": 71,
+    "originalArchiveRefMismatches": [],
+    "directMainAncestors": 56,
+    "directReleaseAncestors": 103,
+    "notReleaseAncestors": 31,
+    "classifications": {
+      "merged-main-history": 56,
+      "equivalent-or-superseded-source-snapshot": 15,
+      "archived-experiment": 6,
+      "main-equivalent": 8,
+      "historical-operational-proposal": 24,
+      "recovered-current-code": 7,
+      "squashed-product-and-exact-tip-patch": 1,
+      "patch-equivalent-no-unique-merge": 8,
+      "retired-operational-history-no-net-changes": 3,
+      "retired-operational-history": 1,
+      "merged-mobile-timeline-product-with-retired-helper": 1,
+      "superseded-verifier-fully-represented": 1,
+      "patch-equivalent-plus-exact-product-blobs": 1,
+      "preserved-historical-benchmark-results": 1,
+      "patch-equivalent-verifier-later-strengthened": 1
+    },
+    "nonAncestorClassifications": {
+      "equivalent-or-superseded-source-snapshot": 15,
+      "squashed-product-and-exact-tip-patch": 1,
+      "patch-equivalent-no-unique-merge": 8,
+      "retired-operational-history-no-net-changes": 3,
+      "merged-mobile-timeline-product-with-retired-helper": 1,
+      "patch-equivalent-plus-exact-product-blobs": 1,
+      "preserved-historical-benchmark-results": 1,
+      "patch-equivalent-verifier-later-strengthened": 1
+    },
+    "identifiedUncollectedProductChanges": [],
+    "unresolvedSourceClassifications": []
+  },
+  "generatedArtifacts": {
+    "conclusion": {
+      "confirmedUnexplainedUniqueFileLoss": 0,
+      "trackedArtifactOutcome": "219 of 221 unchanged in both current source snapshots; only 2 logs omitted with exact verified archive.",
+      "historicalIgnoredDataOutcome": "All 320 catalog/sitemap copies from diag and diag2 are archived; all 5 unique BG3D evidence files are archived in diag2 payload and independently in prior evidence tar. Hash checks are recorded per entry.",
+      "remainingUnverified": [
+        "Seven build/runtime/cache roots were retired as generated outputs. No deleted per-file historical checksum inventory establishes exact recreation or rules out unrecorded edits inside copied build assets.",
+        "Previously untracked PBR stage targets exist and current checksums are captured, but historical unchanged identity is unavailable for targets lacking a prior hash; no regeneration or visual quality pass performed.",
+        "This bounded audit does not cover every ignored path ever present in every deleted worktree; separate source-history and dirty/untracked-snapshot audits are owned by the other agents."
+      ],
+      "overallStatus": "No unexplained unique omission demonstrated in reviewed assets/catalogs/evidence; explicit historical build and byte-provenance limits remain."
+    },
+    "archiveVerificationSummary": {
+      "archives": 5,
+      "archivesSha256Matched": 5,
+      "entryCount": 342,
+      "entryChecksAllPassed": true,
+      "historicalBg3dEvidenceAlsoIdenticalInLaterPayloadArchive": true
+    },
+    "derivedOutputLimitSummary": {
+      "roots": 7,
+      "historicalRegularFileCountExcludingDependencies": 9238,
+      "historicalBytesExcludingDependencies": 2649245831,
+      "classification": "2 web dist trees, 1 compiled API dist, 1 generated Vercel Node wrapper, 3 TypeScript incremental caches",
+      "perFilePriorHashInventoryFound": false,
+      "byteExactRebuildExecuted": false
+    }
+  },
+  "originalRootUntrackedFiles": {
+    "checked": 3,
+    "uniqueUncollectedProductChanges": 0,
+    "detailsLocalPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/current-root-dirty-audit.json"
+  },
+  "worktreeSnapshots": {
+    "summary": {
+      "initialWorktrees": 25,
+      "dirtySnapshots": 21,
+      "earlierListedChangedEntries": 565,
+      "additionalEntriesFoundInActualPatches": 3,
+      "actualChangedFileEntries": 568,
+      "uniquePaths": 529,
+      "trackedPatchSections": 537,
+      "verifiedTrackedPatchSections": 537,
+      "untrackedTarMembers": 31,
+      "verifiedUntrackedTarMembers": 31,
+      "verifiedSnapshotPatchSha256": 21,
+      "rawClassCounts": {
+        "different_blob_both": 189,
+        "exact_blob_in_main": 370,
+        "exact_blob_only_in_integration": 2,
+        "deletion_present_in_both": 7
+      },
+      "auditDispositionCounts": {
+        "exact_original_payload_in_main_history_current_file_evolved": 82,
+        "exact_original_payload_in_current_main": 370,
+        "archived_policy_or_diagnostic_proposal_with_explicit_holdback": 8,
+        "adapted_architecture_recovery_or_verified_current_equivalent": 87,
+        "diagnostic_recovery_with_current_callers": 5,
+        "historical_benchmark_evidence_main_pending": 2,
+        "original_deletion_present_in_both_targets": 7,
+        "adapted_manifest_test_recovered_obsolete_label_assertion_archived": 1,
+        "current_oauth_alias_reconciliation_supersedes_snapshot_draft": 2,
+        "current_v4_replay_tests_supersede_snapshot_draft": 1,
+        "whitespace_only_historical_patch": 1,
+        "current_versioned_v4_contract_supersedes_snapshot_draft": 2
+      },
+      "originalPathsAbsentFromBothTargets": 1,
+      "sourcePathsAbsentAfterKnownRelocation": 0,
+      "unrecoverableSnapshotPayloads": 0,
+      "concreteUnrecoveredProductOmissionsIdentified": 0
+    },
+    "conclusion": {
+      "physicalPreservation": "All 568 actual dirty/untracked snapshot entries are durably reconstructible/readable from the 21 saved patches plus untracked archives. No irrecoverable payload loss found within this scope.",
+      "mainCoverage": "370 original payloads are exact in current main, 7 deletions remain deleted, 2 original benchmark evidence payloads are exact only in integration under recovered experiment evidence. Remaining 189 source versions differ but their target paths remain; disposition and evidence below distinguish historical inclusion, adapted recovery and archived proposals.",
+      "productOmission": "No concrete missing product feature was identified by this bounded review. This is not an exhaustive semantic equivalence proof for every later-edited file, nor a claim that every archived proposal should be applied."
+    },
+    "explicitArchivedProposals": [
+      {
+        "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum-arch",
+        "path": ".dockerignore",
+        "sourceSha": "2a618a51f0c67581e324b96b512545a96e4d2ae6",
+        "decision": "Broad public/docs/tests Docker exclusions change packaging scope; preserve archive for separate packaging review.",
+        "preservedPatch": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/branch-cleanup-20260908/initial-worktree-snapshots/toonspectrum-arch/tracked.patch"
+      },
+      {
+        "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum-arch",
+        "path": "eslint.config.mjs",
+        "sourceSha": "24c8f907384b4107d4100781044bafaf6cab1f0a",
+        "decision": "Alias documentation updated. Shared-layer reclassification held: current policy explicitly exempts legacy shared coupling and enforcing it requires a separate layer-boundary refactor; no rules relaxed.",
+        "preservedPatch": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/branch-cleanup-20260908/initial-worktree-snapshots/toonspectrum-arch/tracked.patch"
+      },
+      {
+        "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum-arch",
+        "path": "pnpm-workspace.yaml",
+        "sourceSha": "783be8c4ca42648c2b90ec3aa7661d0bf241cf9c",
+        "decision": "Do not recover verifyDepsBeforeRun:false; it disables dependency validation and is not required for normal frozen installation.",
+        "preservedPatch": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/branch-cleanup-20260908/initial-worktree-snapshots/toonspectrum-arch/tracked.patch"
+      },
+      {
+        "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum-arch",
+        "path": "scripts/qa-triage-playwright-artifacts.mjs",
+        "sourceSha": "6a3d243dd58292cbc3e70b98392408f55da023b7",
+        "decision": "Original broad noise regex hides any line mentioning node_modules or package-lock; current explicit no-ignore policy retained to avoid hiding real errors.",
+        "preservedPatch": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/branch-cleanup-20260908/initial-worktree-snapshots/toonspectrum-arch/tracked.patch"
+      },
+      {
+        "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum-arch",
+        "path": "scripts/toolchain-coverage-baseline.json",
+        "sourceSha": "212984fb26f196d006505ddf6523cc05cb0b65a8",
+        "decision": "Historical generated baseline must not replace current collected toolchain coverage counts.",
+        "preservedPatch": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/branch-cleanup-20260908/initial-worktree-snapshots/toonspectrum-arch/tracked.patch"
+      },
+      {
+        "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum-arch",
+        "path": "scripts/verify-studio-discovery-ux.mts",
+        "sourceSha": "9d60c54e8cb85a09870c346be5834d8cac2357f0",
+        "decision": "Current verifier writes under WEB_ROOT, serves correct relative source imports, waits domcontentloaded and actual palette with 120000ms cold-navigation budget. Preserved newer behavior; only historical devNavigationMs telemetry remains unported.",
+        "preservedPatch": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/branch-cleanup-20260908/initial-worktree-snapshots/toonspectrum-arch/tracked.patch"
+      },
+      {
+        "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum-arch",
+        "path": "turbo.json",
+        "sourceSha": "18a8ab0af7b016765963e1ac7125f2e6d25d94f9",
+        "decision": "Removing cached output roots changes unrelated build cache contracts; preserved for separate tooling review.",
+        "preservedPatch": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/branch-cleanup-20260908/initial-worktree-snapshots/toonspectrum-arch/tracked.patch"
+      },
+      {
+        "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum-main-diag",
+        "path": "pnpm-workspace.yaml",
+        "sourceSha": "783be8c4ca42648c2b90ec3aa7661d0bf241cf9c",
+        "decision": "Local dependency-validation opt-out remains archived rather than globally disabled.",
+        "preservedPatch": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/branch-cleanup-20260908/initial-worktree-snapshots/toonspectrum-main-diag/tracked.patch"
+      }
+    ],
+    "mainPendingHistoricalEvidence": [
+      {
+        "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum-arch",
+        "head": "b6ad9db34b9b1d5c2567095aa7294449f2099fdb",
+        "path": "tests/benchmarks/results/bristle-model.json",
+        "category": "tracked",
+        "status": " M",
+        "sourceSha": "4cfe34befa897157c5b60fa2b9e450bb080a2bce",
+        "sourceBlobAvailableInGit": true,
+        "previousClass": "unresolved_unique_blob",
+        "previousHistoricalMatches": [],
+        "previousHeadMatches": [],
+        "main": {
+          "pathExists": true,
+          "sha": "6d7dab3f8a654dc8932965a0a41677e719d86dfb",
+          "exactSamePathBlob": false,
+          "sameBlobOtherPaths": []
+        },
+        "integration": {
+          "pathExists": true,
+          "sha": "6d7dab3f8a654dc8932965a0a41677e719d86dfb",
+          "exactSamePathBlob": false,
+          "sameBlobOtherPaths": [
+            "scripts/experiments/recovered-20260908/evidence/architecture/bristle-model.json"
+          ]
+        },
+        "rawClass": "exact_blob_only_in_integration",
+        "snapshotPatchReconstructedExact": true,
+        "snapshotPatchPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/branch-cleanup-20260908/initial-worktree-snapshots/toonspectrum-arch/tracked.patch",
+        "auditDisposition": "historical_benchmark_evidence_main_pending"
+      },
+      {
+        "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum-arch",
+        "head": "b6ad9db34b9b1d5c2567095aa7294449f2099fdb",
+        "path": "tests/benchmarks/results/living-ink-fluid.json",
+        "category": "tracked",
+        "status": " M",
+        "sourceSha": "f7c6a72b9e9e1642c5a55b3260b1a9d3517a70fc",
+        "sourceBlobAvailableInGit": true,
+        "previousClass": "unresolved_unique_blob",
+        "previousHistoricalMatches": [],
+        "previousHeadMatches": [],
+        "main": {
+          "pathExists": true,
+          "sha": "b19b66fa76c247be86d595a258a9e63a47ceb175",
+          "exactSamePathBlob": false,
+          "sameBlobOtherPaths": []
+        },
+        "integration": {
+          "pathExists": true,
+          "sha": "b19b66fa76c247be86d595a258a9e63a47ceb175",
+          "exactSamePathBlob": false,
+          "sameBlobOtherPaths": [
+            "scripts/experiments/recovered-20260908/evidence/architecture/living-ink-fluid.json"
+          ]
+        },
+        "rawClass": "exact_blob_only_in_integration",
+        "snapshotPatchReconstructedExact": true,
+        "snapshotPatchPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/branch-cleanup-20260908/initial-worktree-snapshots/toonspectrum-arch/tracked.patch",
+        "auditDisposition": "historical_benchmark_evidence_main_pending"
+      }
+    ],
+    "limitations": [
+      "568 counts are per-worktree changed-file entries, not unique paths; source versions from different worktrees can repeat.",
+      "A source blob in main history proves historical inclusion, not complete semantic equivalence to the latest evolved file. Adapted recovery uses prior per-file reviews plus current immutable-source checks and current consumer anchors. No browser/GPU or behavioral test rerun was performed in this read-only audit.",
+      "Ignored files and the 27 worktrees added after the earlier 25-worktree inventory are not globally re-extracted here. Root owns final PR919 179-file archive verification and final cleanup receipts; branch_audit owns all prior committed refs and archive object coverage. The later 52-worktree manifest is bridged above without treating clean/ancestral refs as dirty-payload proof.",
+      "The original partial ESLint boundary proposal, optional Docker/turbo policy changes, dependency-validation opt-out, broad QA ignore regex, old generated toolchain baseline, discovery devNavigationMs telemetry and obsolete flat Studio translation value-equality assertion remain preserved proposals. They are not silently represented as merged production behavior.",
+      "The aligned-only BG3D acceptance proposal was adapted into diagnostics while preserving the current full-frame threshold 8; V2/V3 dry-media historical replay is retained while new spacing behavior is versioned as V4.",
+      "The fixed integration SHA is audited for content only; its current remote merge/CI status is the parent task responsibility."
+    ]
+  },
+  "fullLocalEvidence": {
+    "loss-audit-branches.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/loss-audit-branches.json",
+      "sha256": "8c6dbdaaf9a81534c1158b3ce0ca0e73775abdbac1776c8091676dd6561a9bfb"
+    },
+    "verification/loss-audit-generated-artifacts.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/loss-audit-generated-artifacts.json",
+      "sha256": "8de4ebf977b9d839c42a495b8bb141ec75a76caaba5e0138f6c5c317759f5213"
+    },
+    "current-root-dirty-audit.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/current-root-dirty-audit.json",
+      "sha256": "a2a86540811344fa9bfc2d3281b563c41b32c8c37be5d37861f437fc7245a34b"
+    },
+    "loss-audit-worktrees.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/loss-audit-worktrees.json",
+      "sha256": "2dcb4cf18fcdd571406454d730e2e06822b0d485044eec041eeaff9465a95d2f"
+    }
+  },
+  "overallConclusion": "No missing original commit, irrecoverable preserved snapshot, or concrete uncollected product change was identified in the reviewed scope. Several old proposals remain intentionally archived; byte-level provenance of every deleted generated cache is not available."
+}

@@ -20,6 +20,7 @@ import {
   remapStudioShared3dStageCollectionElementIds,
   studioShared3dStageLinkedCharacterElementIds,
 } from "./studio-shared-3d-stage-collection";
+import { copyStudioSmartShapeSnapshot } from "./studio-smart-shape-copy";
 
 export interface PageElementLike {
   id: string;
@@ -84,7 +85,8 @@ export function duplicatePageState<P extends PageLike>(page: P, makeId: () => st
   const duplicated = {
     ...page,
     id: nextPageId,
-    elements: copiedElements.map(({ source, nextId }) => ({ ...source, id: nextId })),
+    elements: copiedElements.map(({ source, nextId }) =>
+      copyStudioSmartShapeSnapshot(source, { ...source, id: nextId })),
   } as P;
   if (page.layerComps !== undefined) {
     const comps = remapStudioLayerComps(page.layerComps, elementIdMap);
@@ -249,7 +251,7 @@ export function duplicateMirroredPage<P extends PageLike>(
     }
 
     // lockAspect 등 기타는 복사 유지
-    return newEl;
+    return copyStudioSmartShapeSnapshot(el, newEl, { mapPoint: (px, py) => [canvasW - px, py] });
   });
 
   const mirrored = {

@@ -560,12 +560,11 @@ export class Hyper3dRodinProvider implements Studio3dGenerationProvider {
 
     // Submission is intentionally single-shot. A network failure or 5xx after
     // delivery is ambiguous and automatically resubmitting can charge twice.
-    const response = await this.#request(`${this.#baseUrl}${submission.path}`, {
+    const { response, payload } = await this.#request(`${this.#baseUrl}${submission.path}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${this.#apiKey}` },
       body: submission.form,
     }, signal);
-    const payload = await jsonPayload(response);
     if (!response.ok) {
       throw responseFailure(
         response.status,
@@ -670,15 +669,16 @@ export class Hyper3dRodinProvider implements Studio3dGenerationProvider {
   ): Promise<unknown> {
     for (let attempt = 1; attempt <= this.#retryAttempts; attempt += 1) {
       let response: Response;
+      let payload: unknown;
       try {
-        response = await this.#request(`${this.#baseUrl}${path}`, {
+        ({ response, payload } = await this.#request(`${this.#baseUrl}${path}`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${this.#apiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(body),
-        }, signal);
+        }, signal));
       } catch (error) {
         if (signal.aborted) throw abortError("3D generation request was cancelled.");
         if (
@@ -696,7 +696,6 @@ export class Hyper3dRodinProvider implements Studio3dGenerationProvider {
         );
         continue;
       }
-      const payload = await jsonPayload(response);
       if (response.ok) return payload;
 
       const retryAfterMs = parseHyper3dRetryAfterMs(
@@ -716,7 +715,11 @@ export class Hyper3dRodinProvider implements Studio3dGenerationProvider {
     });
   }
 
-  async #request(url: string, init: RequestInit, signal: AbortSignal): Promise<Response> {
+  async #request(
+    url: string,
+    init: RequestInit,
+    signal: AbortSignal
+  ): Promise<{ response: Response; payload: unknown }> {
     if (signal.aborted) throw abortError("3D generation request was cancelled.");
     const controller = new AbortController();
     const abortFromCaller = () => controller.abort(signal.reason);
@@ -724,8 +727,13 @@ export class Hyper3dRodinProvider implements Studio3dGenerationProvider {
     const timer = setTimeout(() => controller.abort(new Error("timeout")), this.#timeoutMs);
     timer.unref?.();
     try {
-      return await this.#fetch(url, { ...init, signal: controller.signal });
-    } catch {
+      const response = await this.#fetch(url, { ...init, signal: controller.signal });
+      // Fetch resolves on headers, while its body can still be streaming. Keep the caller's
+      // cancellation and attempt deadline attached until that body has been consumed.
+      const payload = await jsonPayload(response);
+      if (controller.signal.aborted) throw controller.signal.reason;
+      return { response, payload };
+    } catch (error) {
       if (signal.aborted) throw abortError("3D generation request was cancelled.");
       if (controller.signal.aborted) {
         throw new Studio3dGenerationProviderError({
@@ -734,6 +742,7 @@ export class Hyper3dRodinProvider implements Studio3dGenerationProvider {
           retryable: true,
         });
       }
+      if (error instanceof Studio3dGenerationProviderError) throw error;
       throw new Studio3dGenerationProviderError({
         code: "provider-unavailable",
         message: "Hyper3D request failed before a response was received.",

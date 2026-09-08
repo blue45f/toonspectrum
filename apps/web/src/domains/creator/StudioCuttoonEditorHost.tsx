@@ -1,4 +1,7 @@
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
+import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
+import { useStudioRecentColors } from "./useStudioRecentColors";
+import { copyStudioSmartShapeSnapshot } from "./studio-smart-shape-copy";
 /** Editor host extracted from the /studio page entry.
  * StudioPage.tsx stays the route-facing re-export so the lazy Studio chunk
  * still starts at that path; this file owns remaining editor session logic.
@@ -295,7 +298,7 @@ import {
 } from "./studio-character-bible";
 import { svgToDataUrl } from "./studio-characters";
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
-import { deleteSavedClipInMemory, upsertSavedClipInMemory } from "./studio-clips";
+import { deleteSavedClipInMemory, prepareStudioSavedClipElements, upsertSavedClipInMemory } from "./studio-clips";
 import {
   COLOR_RANGE_FUZZINESS_DEFAULT,
   COLOR_RANGE_MAX_SAMPLES,
@@ -831,7 +834,6 @@ import {
   preloadStudioReferencePanel,
   preloadStudioSavePayloadRuntime,
   preloadStudioTextEditOverlay,
-  StudioSmartShapeEditDialog,
   type StudioWebtoonGuidesModule,
 } from "./studio-page-lazy-ui";
 import { pageDisplayName } from "./studio-page-meta";
@@ -965,10 +967,6 @@ import {
   type QuickShapeKind,
 } from "./studio-quickshape";
 import { resolveStudioSmartShapeBrushEffectAvailability } from "./studio-smart-shape-brush-effect";
-import {
-  bindStudioSmartShapeHostControllers,
-  type StudioSmartShapeEditSession,
-} from "./studio-smart-shape-host-session";
 import {
   filterStudioRasterAssets,
   STUDIO_RASTER_ASSETS,
@@ -4802,32 +4800,9 @@ export function StudioCuttoonEditor({
         : "레이어 솔로 해제"
     );
   }
-  // 최근 사용 색(색상 팝오버 공용) — 색상 선택기를 실제로 열 때만 복원해 초기 Studio 진입을 가볍게 유지한다.
-  const [recentColors, setRecentColors] = useState<string[]>([]);
-  const recentColorsRef = useRef(recentColors);
-  const recentColorsUserRevisionRef = useRef(0);
-  recentColorsRef.current = recentColors;
-  const recentColorsLoadRef = useRef<Promise<void> | null>(null);
-  const ensureRecentColorsLoaded = () => {
-    if (recentColorsLoadRef.current) return;
-    const revisionAtStart = recentColorsUserRevisionRef.current;
-    recentColorsLoadRef.current = acquireProductStudioUiPreferencesRepository()
-      .then((repository) => repository.loadRecentColors())
-      .then(async (loaded) => {
-        if (recentColorsUserRevisionRef.current === revisionAtStart) {
-          recentColorsRef.current = loaded;
-          setRecentColors(loaded);
-          return;
-        }
-        const repository = await acquireProductStudioUiPreferencesRepository();
-        await repository.saveRecentColors(recentColorsRef.current);
-      })
-      .catch((err) => {
-        recentColorsLoadRef.current = null;
-        setAppSettingsPersistenceState("session-only");
-        console.error("Failed to load SQLite/OPFS studio recent colors:", err);
-      });
-  };
+  const { recentColors, ensureRecentColorsLoaded, rememberColor, clearRecentColors } = useStudioRecentColors({
+    onPersistenceUnavailable: () => setAppSettingsPersistenceState("session-only"),
+  });
   // 저장된 클립 복원 — 클립 메뉴를 열 때만 V12 SQLite repository를 로드해 초기 진입을 가볍게
   // 유지한다. 이전 브라우저 키는 LEGACY_DATA_MIGRATION=FALSE에 따라 자동으로 읽지 않는다.
   useEffect(() => {
@@ -4938,22 +4913,6 @@ export function StudioCuttoonEditor({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [canvasOnlyMode]);
-  const rememberColor = (c: string) => {
-    void import("./studio-color-utils")
-      .then(({ pushRecentColor }) => {
-        const next = pushRecentColor(recentColorsRef.current, c);
-        if (next === recentColorsRef.current) return;
-        recentColorsUserRevisionRef.current += 1;
-        recentColorsRef.current = next;
-        setRecentColors(next);
-        void acquireProductStudioUiPreferencesRepository()
-          .then((repository) => repository.saveRecentColors(next))
-          .catch(() => setAppSettingsPersistenceState("session-only"));
-      })
-      .catch((err) => {
-        console.error("Failed to store studio recent color:", err);
-      });
-  };
   const [strokeWidth, setStrokeWidthState] = useState(
     initialToolOperationMemory.paint.strokeWidth,
   );
@@ -5927,7 +5886,6 @@ export function StudioCuttoonEditor({
   }, [activePage.id, activePage.drawingAssist]);
   const perspectiveRulerActive = drawingAssistDocument.perspective.active;
   const [quickShapeActive, setQuickShapeActive] = useState(false); // 기본 꺼짐
-  const [smartShapeEditSession, setSmartShapeEditSession] = useState<StudioSmartShapeEditSession | null>(null);
   const vanishingPoints = drawingAssistDocument.perspective.points;
   const perspectiveEyeLevelY = drawingAssistDocument.perspective.eyeLevelY;
   const perspectiveLockHorizon = drawingAssistDocument.perspective.lockHorizon;
@@ -12642,6 +12600,7 @@ export function StudioCuttoonEditor({
   const captureCommitRef = useRef({
     pageId: activePage.id,
     historyIndex: pagesHi,
+    page: activePage,
     exporting: false,
     timelapse: false,
     masterEditMode,
@@ -12650,11 +12609,12 @@ export function StudioCuttoonEditor({
     captureCommitRef.current = {
       pageId: activePage.id,
       historyIndex: pagesHi,
+      page: activePage,
       exporting: isExporting,
       timelapse: timelapseCapturing,
       masterEditMode,
     };
-  }, [activePage.id, activePage.elements, isExporting, master, masterEditMode, pagesHi, timelapseCapturing]);
+  }, [activePage, isExporting, master, masterEditMode, pagesHi, timelapseCapturing]);
   // 스테이지를 문서 전체로 되돌릴 때 필요한 기하. 동반 창(navigator) 캡처처럼 의존성 없는
   // useCallback 안에서 캡처하는 경로가 현재 문서 크기·표시 배율을 읽어야 하므로 ref 로 보관한다.
   const stageDocumentGeometryRef = useRef({
@@ -20000,9 +19960,10 @@ const puppetWarpArmed =
 
   // 요소 평행이동(draw는 points, 그 외는 x/y) — 클립 정규화·삽입용.
   function shiftEl(el: El, dx: number, dy: number): El {
-    return el.type === "draw"
+    const shifted = el.type === "draw"
       ? ({ ...el, points: el.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as El)
       : ({ ...el, x: (el as { x: number }).x + dx, y: (el as { y: number }).y + dy } as El);
+    return copyStudioSmartShapeSnapshot(el, shifted, { mapPoint: (x, y) => [x + dx, y + dy] });
   }
   // 선택 요소(그룹이면 그룹 전체)를 원점 기준으로 정규화해 재사용 클립으로 저장.
   async function saveSelectionAsClip() {
@@ -20018,9 +19979,10 @@ const puppetWarpArmed =
     const name = globalThis.prompt("클립 이름을 정해주세요", fallbackName)?.trim();
     if (!name) return;
     const clip: StudioClip = { id: uid(), name, createdAt: Date.now(), els };
+    const preparedClip = () => ({ ...clip, els: prepareStudioSavedClipElements(clip.els) });
     await commitSavedClipMutation(
-      (repository) => repository.save(clip),
-      (current) => upsertSavedClipInMemory(current, clip),
+      (repository) => repository.save(preparedClip()),
+      (current) => upsertSavedClipInMemory(current, preparedClip()),
     );
     if (editorMountedRef.current) setMenu("clip");
   }
@@ -20043,7 +20005,8 @@ const puppetWarpArmed =
         if (!groupMap.has(groupId)) groupMap.set(groupId, uid());
         groupId = groupMap.get(groupId);
       }
-      return { ...shiftEl(e, dx, dy), id: uid(), groupId, hidden: false, locked: false };
+      const shifted = shiftEl(e, dx, dy);
+      return copyStudioSmartShapeSnapshot(shifted, { ...shifted, id: uid(), groupId, hidden: false, locked: false });
     });
     const insertedElements = remapStudioBg3dLtCopiedBundles(newEls, masterEditMode);
     const clipGroups = masterEditMode
@@ -24049,14 +24012,11 @@ const puppetWarpArmed =
     endLiveResourceEdit();
   }
 
-  async function captureReadyStageForPage(page: PageState): Promise<Konva.Stage> {
+  async function captureReadyStageForPage(page: PageState, onReady?: (page: PageState) => void): Promise<Konva.Stage> {
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 캡처할 수 있어요.");
     }
-    const {
-      collectStudioCaptureAssetSources,
-      waitForStudioCaptureReady,
-    } = await loadStudioCaptureReadinessRuntime();
+    const { waitForStudioCaptureReady } = await loadStudioCaptureReadinessRuntime();
     return waitForStudioCaptureReady({
       pageId: page.id,
       getRenderedPageId: () => {
@@ -24064,7 +24024,11 @@ const puppetWarpArmed =
         return committed.exporting && !committed.masterEditMode ? committed.pageId : null;
       },
       getStage: () => stageRef.current,
-      assetSources: collectStudioCaptureAssetSources(page, master),
+      document: {
+        drawingRef, drawingPointerTransportRef, pendingStrokeCommitsRef,
+        flushPendingStrokes: () => flushSync(() => flushPendingStrokeCommitsRef.current()),
+        pagesHistoryRef, pagesHiRef, captureCommitRef, master, onReady,
+      },
     });
   }
 
@@ -25288,12 +25252,18 @@ function clearSelectionForEdit() {
   function handleImportProjectArchive(event: React.ChangeEvent<HTMLInputElement>) {
     return projectArchiveOrchestration.handleImportProjectArchive(event);
   }
-  const { openSmartShapeEditor, confirmSmartShapeEditor } = bindStudioSmartShapeHostControllers({
-    session: smartShapeEditSession, setSession: setSmartShapeEditSession,
-    drawingRef, drawingPointerTransportRef, nodeEditDragRef, currentPageIdRef, collaborationAccessRef,
-    elements, selectedId, groups, elementById, activeSurfaceReviewLocked,
-    captureStudioMutationTicket, canApplyStudioMutation, commit,
-    setError, setSelectedId, setMarqueeIds, setMenu, setNodeEditTool, activatePrimaryCanvasTool, announceDrawingShortcut,
+  const { openSmartShapeEditor, smartShapeDialog } = useStudioSmartShapeEditing({
+    elements, selectedId, currentPageId: () => currentPageIdRef.current,
+    isDrawing: canvasEditingGestureIsOwned,
+    isLocked: (stroke) => collaborationAccessRef.current.locked || isEffectivelyLocked(stroke, groups) || activeSurfaceReviewLocked,
+    captureTicket: captureStudioMutationTicket, canApply: canApplyStudioMutation, commit,
+    select: (id) => { setSelectedId(id); setMarqueeIds([]); },
+    closeMenu: () => setMenu(null), setError,
+    onApplied: (stroke) => {
+      activatePrimaryCanvasTool("select");
+      setNodeEditTool("move");
+      announceDrawingShortcut(stroke.smartShape ? "도형을 확정했어요. 캔버스의 점을 끌어 편집하세요." : "원래 자유선을 복원했어요.");
+    },
   });
   // 메뉴 항목 onSelect 클로저가 참조하는 에디터 핸들러의 안정 번들 — 그룹 배열 useMemo가
   // 렌더마다 무효화되지 않게 하고, 이벤트 시점엔 항상 최신 클로저를 호출한다.
@@ -25639,8 +25609,8 @@ function clearSelectionForEdit() {
     ],
   );
   const studioMainMenuGroups = useMemo(
-    () => {
-      return buildStudioMainMenuGroups({
+    () =>
+      buildStudioMainMenuGroups({
         state: {
           ...studioMainMenuSurfaceState,
           sharedNonOwnerSave: menuSharedNonOwnerSave,
@@ -25789,9 +25759,8 @@ function clearSelectionForEdit() {
           requestBrushPackImport: studioMainMenuActions.requestBrushPackImportFromMenu,
           openNaturalMediaBrushes: studioMainMenuActions.openNaturalMediaBrushesFromMenu,
         },
-      t,
-      });
-    },
+        t,
+      }),
     [
       canvasFlipH,
       canvasRotation,
@@ -25936,10 +25905,10 @@ function clearSelectionForEdit() {
       executeQuickAction(intent.action);
     } else if (intent.kind === "save-draft") {
       void handleSave("draft");
-    } else if (intent.kind === "pixel-transform") {
-      openPixelSelectionTransform();
     } else if (intent.kind === "correct-current-stroke") {
       openSmartShapeEditor();
+    } else if (intent.kind === "pixel-transform") {
+      openPixelSelectionTransform();
     }
   }
   // 모바일 한 손 모드에서 퀵 메뉴 트리거 자체를 DOM 순서로 좌/우 끝에 옮긴다.
@@ -26140,23 +26109,22 @@ function clearSelectionForEdit() {
     hideStrokeGuide();
     setIsExporting(true);
     try {
-      const [stage, { exportPagePsd }] = await Promise.all([
-        captureReadyStageForPage(activePage),
-        loadStudioPsdExportModule(),
-      ]);
-      const pageGroups = activePage.groups ?? EMPTY_LAYER_GROUPS;
-      const visible = activePage.elements.filter(
+      const { exportPagePsd } = await loadStudioPsdExportModule();
+      let capturedPage = activePage;
+      const stage = await captureReadyStageForPage(activePage, (page) => { capturedPage = page; });
+      const pageGroups = capturedPage.groups ?? EMPTY_LAYER_GROUPS;
+      const visible = capturedPage.elements.filter(
         (element) => !isEffectivelyHidden(element, pageGroups)
       );
-      return exportPagePsd(
+      return await exportPagePsd(
         stage,
         visible as unknown as PsdExportEl[],
         CANVAS_W,
-        canvasH,
+        capturedPage.canvasH,
         effScale,
         {
           scale: exportScale,
-          background: { color: bg, gradient: bgGrad },
+          background: { color: capturedPage.bg, gradient: capturedPage.bgGrad },
         }
       );
     } finally {
@@ -26771,6 +26739,10 @@ function clearSelectionForEdit() {
     revisionProjectGenerationRef: studioRevisionProjectGenerationRef,
     projectDocumentSessionRef: studioProjectDocumentSessionRef,
     ensureSharedDocumentAvailableForExport,
+    prepareDocumentForExport: async () => (await loadStudioCaptureReadinessRuntime()).flushStudioDocumentInkForExport({
+      drawingRef, drawingPointerTransportRef, pendingStrokeCommitsRef,
+      flushPendingStrokes: () => flushSync(() => flushPendingStrokeCommitsRef.current()),
+    }),
     currentStudioProjectSnapshot,
     filterMaskSurfaceArchiveDependencies,
     loadStudioReleaseScheduleRuntime,
@@ -27116,6 +27088,7 @@ function clearSelectionForEdit() {
     queueBrushDelete,
     regenerateTemplate,
     rememberColor,
+    clearRecentColors,
     rememberEffectRecent,
     removeSelected,
     removeAdvancedRuler,
@@ -29437,12 +29410,7 @@ function clearSelectionForEdit() {
         onFlushWorkspacePersistence={flushHybridDccWorkspacePersistence}
       >
         {editorSurface}
-        {smartShapeEditSession ? <Suspense fallback={null}>
-          <StudioSmartShapeEditDialog key={`${smartShapeEditSession.pageId}:${smartShapeEditSession.source.id}`}
-            source={smartShapeEditSession.source}
-            onCancel={() => setSmartShapeEditSession(null)}
-            onConfirm={confirmSmartShapeEditor} />
-        </Suspense> : null}
+        {smartShapeDialog}
         <StudioWebtoonAssistantModal
           open={webtoonAssistantOpen}
           onClose={() => setWebtoonAssistantOpen(false)}

@@ -171,6 +171,7 @@ export interface StudioInspectorAsideHandlers {
     currentEls?: El[],
   ) => El[] | null;
   rememberColor: (c: string) => void;
+  clearRecentColors: () => void;
   rememberEffectRecent: (effectId: StudioEffectId) => void;
   removeSelected: () => void;
   removeAdvancedRuler: (id: string) => void;
@@ -364,8 +365,8 @@ export interface StudioInspectorAsideProps {
   puppetWarpActive: boolean;
   puppetWarpBusy: boolean;
   puppetWarpPins: PuppetPin[];
-  onCorrectCurrentStroke?: () => void;
   quickShapeActive: boolean;
+  onCorrectCurrentStroke?: () => void;
   recentColors: string[];
   rightResize: Resizable;
   savedBrushes: StudioSavedBrush[];

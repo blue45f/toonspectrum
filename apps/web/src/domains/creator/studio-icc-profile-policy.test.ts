@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   SRGB_ICC_BUILD_OPTIONS,
   buildMatrixTrcIccProfile,
+  parseIccProfile,
 } from "./render/studio-canvaskit-icc-profile";
 import {
   STUDIO_BUNDLED_SRGB_ICC_MANIFEST,
@@ -144,6 +145,48 @@ async function printerRequest(
 }
 
 describe("Studio ICC provider/license policy", () => {
+  it.each([
+    { requestedUse: "transform", missing: true },
+    { requestedUse: "transform", missing: false },
+    { requestedUse: "embed", missing: true },
+    { requestedUse: "embed", missing: false },
+  ] as const)(
+    "$requestedUse 승인은 checksum·권한과 무관하게 손상된 RGB TRC를 거부한다 (missing=$missing)",
+    async ({ requestedUse, missing }) => {
+      const bytes = buildMatrixTrcIccProfile();
+      const parsed = parseIccProfile(bytes);
+      if (!parsed.ok) throw new Error(parsed.error);
+      const index = parsed.profile.tags.findIndex((tag) => tag.signature === "rTRC");
+      const tag = parsed.profile.tags[index]!;
+      if (missing) {
+        writeAscii(bytes, 132 + index * 12, "xTRC");
+      } else {
+        const view = new DataView(bytes.buffer);
+        view.setUint32(132 + index * 12 + 8, 8);
+        view.setUint32(tag.offset + 8, 0);
+      }
+      const base = await bundledRequest(bytes, requestedUse);
+      const result = await auditStudioIccProfilePolicy(replaceManifest(base, {
+        profileKey: "user-rgb-profile",
+        source: {
+          kind: "user",
+          providerId: "local-user-upload",
+          provenance: "user-selected-file",
+        },
+        rights: {
+          ...base.manifest.rights,
+          licenseClass: "user-authorized",
+          licenseId: "user-declared-profile-license",
+        },
+      }));
+      expect(result).toMatchObject({
+        ok: false,
+        code: "INVALID_PROFILE",
+        receipt: { verdict: "rejected", checksum: { matched: true } },
+      });
+    },
+  );
+
   it("제품 기본 sRGB manifest가 결정적 builder 바이트와 일치하고 embed 승인을 받는다", async () => {
     const bytes = buildMatrixTrcIccProfile();
     const result = await auditStudioIccProfilePolicy({

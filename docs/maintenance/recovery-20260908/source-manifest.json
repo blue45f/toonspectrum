@@ -1,0 +1,2370 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-08T13:59:44.874131+00:00",
+  "inventory": {
+    "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/initial-inventory.json",
+    "sha256": "59444624b06b20101d5eda7e5d7123e2a388bb100e37f6babec99cdca1581459",
+    "capturedAt": "2026-09-08T13:40:19.231706+00:00",
+    "expectedRecords": 55,
+    "localRecords": 14,
+    "remoteRecords": 41
+  },
+  "frozenMain": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+  "reviewedIntegration": {
+    "repository": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908",
+    "branch": "codex/integrate-unmerged-20260908",
+    "head": "7b28f85965df3a50bd1304f34c7502061cadf68f",
+    "tree": "2f813fa0d1275019ead396da609c5a2862f02114",
+    "note": "Content evidence includes the current working tree; per-path trackedAtReviewHead flags expose not-yet-committed recovery artifacts."
+  },
+  "classificationSemantics": {
+    "main-equivalent": "Exact patch/blob/tree evidence, or audited semantic supersession, predates any archival ancestry merge.",
+    "recovered-current-code": "Concrete missing intent selectively present in reviewed integration; does not mean old tree was copied wholesale.",
+    "historical-operational-proposal": "Reviewed temporary automation or policy proposal retained as source history; not installed/executed.",
+    "archived-experiment": "Exact snapshot patch and diagnostic/experimental payload preserved with provenance; explicit opt-in execution only.",
+    "baseline": "Frozen main or prior integration ref at same exact main SHA."
+  },
+  "auditSources": {
+    "product": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+    "backups": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+    "remote": "/tmp/toonspectrum-all-unmerged-remote-a1.json"
+  },
+  "coverage": {
+    "recordCount": 55,
+    "uniqueSourceShas": 46,
+    "coveredByThreeAuditsByExactSha": 54,
+    "supplementalCleanupRecordCount": 1,
+    "uncoveredRefs": [],
+    "duplicateInventoryKeys": 0,
+    "allAuditMainShasMatch": true,
+    "classificationCounts": {
+      "main-equivalent": 9,
+      "recovered-current-code": 7,
+      "baseline": 3,
+      "archived-experiment": 12,
+      "historical-operational-proposal": 24
+    },
+    "missingCurrentCodeAnchorGroups": [],
+    "sourcePatchHashFailures": [],
+    "allSixArchivedPatchesMatchExactOriginalShow": true
+  },
+  "cleanupExactBlobEvidence": {
+    "sourceSha": "f3557f3d9f31b1973215d8c117a08c05a2ff8a57",
+    "recoveryCommit": "52e769367558603dd9ffc11e1e4eb8867e25d458",
+    "recoveryIsAncestorOfReviewHead": true,
+    "files": [
+      {
+        "path": "scripts/cleanup-merged-branches.mjs",
+        "sourceBlob": "06836dfabc8e5e296033695b26563e15df87eb5c",
+        "integrationBlob": "06836dfabc8e5e296033695b26563e15df87eb5c",
+        "exact": true
+      },
+      {
+        "path": "scripts/cleanup-merged-branches.test.ts",
+        "sourceBlob": "db67a40718dcd0ed05b4c0359840ab3d492eab2d",
+        "integrationBlob": "db67a40718dcd0ed05b4c0359840ab3d492eab2d",
+        "exact": true
+      }
+    ]
+  },
+  "missingGroupEvidence": {
+    "smart-shape-entry-and-authority": {
+      "path": "apps/web/src/domains/creator/useStudioSmartShapeEditing.tsx",
+      "anchors": [
+        {
+          "text": "options.isDrawing()",
+          "lines": [
+            33,
+            54
+          ]
+        },
+        {
+          "text": "options.canApply(session.ticket)",
+          "lines": [
+            54
+          ]
+        },
+        {
+          "text": "JSON.stringify(current) !== JSON.stringify(session.source)",
+          "lines": [
+            58
+          ]
+        },
+        {
+          "text": "options.commit(",
+          "lines": [
+            59
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "smart-shape-host-wiring": {
+      "path": "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+      "anchors": [
+        {
+          "text": "useStudioSmartShapeEditing({",
+          "lines": [
+            25289
+          ]
+        },
+        {
+          "text": "correctCurrentStroke: studioMainMenuActions.openSmartShapeEditor",
+          "lines": [
+            25782
+          ]
+        },
+        {
+          "text": "onCorrectCurrentStroke={studioMainMenuActions.openSmartShapeEditor}",
+          "lines": [
+            28872
+          ]
+        },
+        {
+          "text": "{smartShapeDialog}",
+          "lines": [
+            29444
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "smart-shape-point-edit": {
+      "path": "apps/web/src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers-move.ts",
+      "anchors": [
+        {
+          "text": "moveStudioSmartShapePoint(el.points",
+          "lines": [
+            524
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "smart-shape-browser-coverage": {
+      "path": "scripts/verify-studio-brushes.mts",
+      "anchors": [
+        {
+          "text": "async function runCurrentStrokeCorrection",
+          "lines": [
+            3831
+          ]
+        },
+        {
+          "text": "cold reload lost correction metadata",
+          "lines": [
+            3912
+          ]
+        },
+        {
+          "text": "explicit original restore was not exact",
+          "lines": [
+            3938
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "floating-view-presence": {
+      "path": "apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.tsx",
+      "anchors": [
+        {
+          "text": "data-studio-floating-controls",
+          "lines": [
+            136
+          ]
+        },
+        {
+          "text": "flex flex-col gap-2",
+          "lines": [
+            137
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "ai-surface-permissions": {
+      "path": "packages/core/src/content-graph.ts",
+      "anchors": [
+        {
+          "text": "context.surface === \"ai-input\" && rights.aiInput !== true",
+          "lines": [
+            293
+          ]
+        },
+        {
+          "text": "context.surface === \"ai-training\" && rights.aiTraining !== true",
+          "lines": [
+            294
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "refinery-explicit-repair": {
+      "path": "apps/web/src/domains/creator/studio-3d-asset-refinery.ts",
+      "anchors": [
+        {
+          "text": "resolvedDiagnosticCodes",
+          "lines": [
+            74,
+            108,
+            199,
+            200,
+            210,
+            255
+          ]
+        },
+        {
+          "text": "resolved.length > 0 && input.to !== \"repaired\"",
+          "lines": [
+            256
+          ]
+        },
+        {
+          "text": "currentDiagnostics.get(code)?.severity !== \"error\"",
+          "lines": [
+            260
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "asset-regression-assertions": {
+      "path": "apps/web/src/domains/creator/vrm/vrm-library.test.ts",
+      "anchors": [
+        {
+          "text": "quaternius-female-peasant",
+          "lines": [
+            121
+          ]
+        },
+        {
+          "text": "sampleVrmUrl(sample.id)",
+          "lines": [
+            148
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "lift3d-tab-regression": {
+      "path": "apps/web/src/domains/creator/lift3d/StudioLift3dPage.touch-target.test.ts",
+      "anchors": [
+        {
+          "text": "aria-selected={tab === candidate}",
+          "lines": [
+            17
+          ]
+        },
+        {
+          "text": "focus-visible:outline-accent",
+          "lines": [
+            18
+          ]
+        },
+        {
+          "text": "min-w-11",
+          "lines": [
+            27
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "cc0-manifest-membership": {
+      "path": "scripts/verify-studio-cc0-curated-ui.mjs",
+      "anchors": [
+        {
+          "text": "manifest.assets.find((asset) => asset.id === firstDetailedId)",
+          "lines": [
+            145
+          ]
+        },
+        {
+          "text": "firstDetailed.license.provider",
+          "lines": [
+            149
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "architecture-navigation-telemetry": {
+      "path": "scripts/verify-studio-discovery-ux.mts",
+      "anchors": [
+        {
+          "text": "receipt.devNavigationMs.push",
+          "lines": [
+            72
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    },
+    "cleanup-open-pr-base": {
+      "path": "scripts/cleanup-merged-branches.mjs",
+      "anchors": [
+        {
+          "text": "openPullRequestsTargetingBranch",
+          "lines": [
+            162,
+            281,
+            298
+          ]
+        },
+        {
+          "text": "open-pull-request-base",
+          "lines": [
+            174
+          ]
+        }
+      ],
+      "allAnchorsPresent": true,
+      "trackedAtReviewHead": true
+    }
+  },
+  "unappliedGroupDispositions": {
+    "architecture-eslint-shared-classification": {
+      "status": "not-applied-at-review",
+      "path": "eslint.config.mjs",
+      "proposal": "Classify apps/web/src/shared/**/* as shared; original config patch preserved. Root must disposition this concrete missing guard before declaring every proposal adopted."
+    },
+    "architecture-node-globals": {
+      "status": "not-applied-at-review",
+      "path": "eslint.config.mjs",
+      "proposal": "Add apps/web/src/shared/lib/server/**/*.ts to Node globals only if live Node files exist."
+    },
+    "architecture-alternative-diagnostic-and-path-policy": {
+      "status": "archived-original-patch",
+      "path": "scripts/experiments/recovered-20260908/source-patches/architecture.patch",
+      "proposal": "Old broad docker ignores, noise suppression, alternative path anchors and local config are retained as history, not installed."
+    },
+    "local-verify-deps-opt-out": {
+      "status": "inactive-local-config-preserved",
+      "path": "scripts/experiments/recovered-20260908/local-config/verify-deps-before-run.yaml"
+    },
+    "cancelled-verify-gate-policy-proposal": {
+      "status": "intentionally-unapplied-contract-conflict",
+      "path": ".github/workflows/ci.yml",
+      "proposal": "always() && !cancelled() differs from current always() failure-reporting contract; archived proposal requires a separate deliberate policy decision."
+    },
+    "historical-operational-payload": {
+      "status": "history-and-audit-only",
+      "proposal": "One-shot run cancellation, PR rewrites/merges, old-SHA replay, fixed diagnostics and retired jobs are not active deliverables."
+    },
+    "pr900-historical-logs-and-operational-workflows": {
+      "status": "history-and-audit-only",
+      "proposal": "Product asset payload already equivalent; historical logs/workflows retained via audit/history only."
+    }
+  },
+  "historyPreservationRule": "Any subsequent -s ours merge records audited source ancestry only. It is not proof that source payload was applied; this manifest and referenced content audits remain authoritative. No refs deleted by this manifest task.",
+  "records": [
+    {
+      "index": 1,
+      "kind": "local",
+      "ref": "refs/heads/codex/fix-dry-media-paper-admission-31d",
+      "sha": "4442e6f5b0f52ef9615cfea00b2168a166ad0c47",
+      "classification": "main-equivalent",
+      "source": {
+        "branch": "codex/fix-dry-media-paper-admission-31d",
+        "sha": "4442e6f5b0f52ef9615cfea00b2168a166ad0c47",
+        "auditClassification": "already-integrated-patch-equivalent"
+      },
+      "audit": [
+        {
+          "id": "product",
+          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "pointer": "/branches/0",
+          "auditedBranch": "codex/fix-dry-media-paper-admission-31d",
+          "auditedSha": "4442e6f5b0f52ef9615cfea00b2168a166ad0c47",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "apps/web/src/domains/creator/StudioCanonicalVNextDryMediaCanvas.test.tsx",
+        "apps/web/src/domains/creator/StudioCanonicalVNextDryMediaCanvas.tsx",
+        "apps/web/src/domains/creator/canvas/StudioCanvasViewportDomOverlays.tsx",
+        "apps/web/src/domains/creator/canvas/StudioCanvasViewportStageHost.tsx",
+        "apps/web/src/domains/creator/canvas/studio-canonical-dry-media-authority.test.ts",
+        "apps/web/src/domains/creator/canvas/studio-canonical-dry-media-authority.ts"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Exact stable patch ID and all original changed-file blobs match main ancestor 356ca14cdd71613eb50436f7e9c9f41cbc6202d3."
+      ],
+      "pathCount": 10
+    },
+    {
+      "index": 2,
+      "kind": "local",
+      "ref": "refs/heads/codex/fix-released-autosave-lease-93cd716a",
+      "sha": "7855da93445cf64096d5941256b9f8ef2426d8ff",
+      "classification": "recovered-current-code",
+      "source": {
+        "branch": "codex/fix-released-autosave-lease-93cd716a",
+        "sha": "7855da93445cf64096d5941256b9f8ef2426d8ff",
+        "auditClassification": "shared-smartshape-residue-no-unique-autosave-work"
+      },
+      "audit": [
+        {
+          "id": "product",
+          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "pointer": "/branches/1",
+          "auditedBranch": "codex/fix-released-autosave-lease-93cd716a",
+          "auditedSha": "7855da93445cf64096d5941256b9f8ef2426d8ff",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+        "apps/web/src/domains/creator/StudioInspectorAsideTypes.ts",
+        "apps/web/src/domains/creator/StudioInspectorDrawingSection.tsx",
+        "apps/web/src/domains/creator/StudioMenubarContent.tsx",
+        "apps/web/src/domains/creator/StudioQuickShapePanel.tsx",
+        "apps/web/src/domains/creator/StudioSmartShapeEditDialog.test.tsx"
+      ],
+      "missingGroupsAtBaseline": [
+        "smart-shape-entry-and-authority",
+        "smart-shape-host-wiring",
+        "smart-shape-point-edit",
+        "smart-shape-browser-coverage"
+      ],
+      "unappliedGroups": [],
+      "evidence": [
+        "Selective current-code recovery verified through missingGroupEvidence; broad old files were not restored.",
+        "Autosave-specific changes already main-equivalent; remaining payload shares Smart Shape source 9aa5bdd with issues-smart-shape branch."
+      ],
+      "pathCount": 35,
+      "recoveryCommits": [
+        "f4e3d54c29ac3a12c605fbdd771daaadcfd0ff2c",
+        "754c529c5155e56e58fca56d544c7cc27174ece0",
+        "a9b1fca46edbc26936811bfff1920e70b48f8712"
+      ]
+    },
+    {
+      "index": 3,
+      "kind": "local",
+      "ref": "refs/heads/codex/fix-salvage-crdt-bundle-20260908",
+      "sha": "0ef38c4440a507f5e1d3a11d878c935773f116a4",
+      "classification": "main-equivalent",
+      "source": {
+        "branch": "codex/fix-salvage-crdt-bundle-20260908",
+        "sha": "0ef38c4440a507f5e1d3a11d878c935773f116a4",
+        "auditClassification": "already-integrated-patch-equivalent"
+      },
+      "audit": [
+        {
+          "id": "product",
+          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "pointer": "/branches/2",
+          "auditedBranch": "codex/fix-salvage-crdt-bundle-20260908",
+          "auditedSha": "0ef38c4440a507f5e1d3a11d878c935773f116a4",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/check-studio-bundle.mjs",
+        "scripts/lib/studio-crdt-bundle-boundary.mjs",
+        "scripts/lib/studio-crdt-bundle-boundary.test.mjs"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Exact stable patch ID and all original changed-file blobs match main ancestor b01823aaf7d0af6f53876735f6f342a00db13eee."
+      ],
+      "pathCount": 3
+    },
+    {
+      "index": 4,
+      "kind": "local",
+      "ref": "refs/heads/codex/issues-smart-shape-20260908",
+      "sha": "11098a2f3f425e013df792606fb5d9e5b7d73a1a",
+      "classification": "recovered-current-code",
+      "source": {
+        "branch": "codex/issues-smart-shape-20260908",
+        "sha": "11098a2f3f425e013df792606fb5d9e5b7d73a1a",
+        "auditClassification": "partially-integrated-active-smartshape-dependency"
+      },
+      "audit": [
+        {
+          "id": "product",
+          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "pointer": "/branches/3",
+          "auditedBranch": "codex/issues-smart-shape-20260908",
+          "auditedSha": "11098a2f3f425e013df792606fb5d9e5b7d73a1a",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+        "apps/web/src/domains/creator/StudioInspectorAsideTypes.ts",
+        "apps/web/src/domains/creator/StudioInspectorDrawingSection.tsx",
+        "apps/web/src/domains/creator/StudioMenubarContent.tsx",
+        "apps/web/src/domains/creator/StudioQuickShapePanel.tsx",
+        "apps/web/src/domains/creator/StudioSmartShapeEditDialog.test.tsx"
+      ],
+      "missingGroupsAtBaseline": [
+        "smart-shape-entry-and-authority",
+        "smart-shape-host-wiring",
+        "smart-shape-point-edit",
+        "smart-shape-browser-coverage",
+        "floating-view-presence"
+      ],
+      "unappliedGroups": [],
+      "evidence": [
+        "Selective current-code recovery verified through missingGroupEvidence; broad old files were not restored."
+      ],
+      "pathCount": 35,
+      "recoveryCommits": [
+        "f4e3d54c29ac3a12c605fbdd771daaadcfd0ff2c",
+        "754c529c5155e56e58fca56d544c7cc27174ece0",
+        "a9b1fca46edbc26936811bfff1920e70b48f8712"
+      ]
+    },
+    {
+      "index": 5,
+      "kind": "local",
+      "ref": "refs/heads/codex/local-first-reviewed-70742bc6",
+      "sha": "70742bc66b291bdbeb04794373254fb10a989b80",
+      "classification": "recovered-current-code",
+      "source": {
+        "branch": "codex/local-first-reviewed-70742bc6",
+        "sha": "70742bc66b291bdbeb04794373254fb10a989b80",
+        "auditClassification": "needs-selective-integration"
+      },
+      "audit": [
+        {
+          "id": "product",
+          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "pointer": "/branches/4",
+          "auditedBranch": "codex/local-first-reviewed-70742bc6",
+          "auditedSha": "70742bc66b291bdbeb04794373254fb10a989b80",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "apps/api/src/modules/admin/admin-campaigns.service.test.ts",
+        "apps/api/src/modules/admin/admin-campaigns.service.ts",
+        "apps/web/src/app/App.tsx",
+        "apps/web/src/app/StudioRouterDocumentNavigationBoundary.test.tsx",
+        "apps/web/src/app/StudioRouterDocumentNavigationBoundary.tsx",
+        "apps/web/src/app/studio-document-navigation.test.ts"
+      ],
+      "missingGroupsAtBaseline": [
+        "ai-surface-permissions",
+        "refinery-explicit-repair"
+      ],
+      "unappliedGroups": [],
+      "evidence": [
+        "Selective current-code recovery verified through missingGroupEvidence; broad old files were not restored."
+      ],
+      "pathCount": 19,
+      "recoveryCommits": [
+        "f4e3d54c29ac3a12c605fbdd771daaadcfd0ff2c"
+      ]
+    },
+    {
+      "index": 6,
+      "kind": "local",
+      "ref": "refs/heads/codex/pr937-final-review-20260908",
+      "sha": "bb9ff8924552bcc4b5b9d4b7368c4bf37fdd5938",
+      "classification": "main-equivalent",
+      "source": {
+        "branch": "codex/pr937-final-review-20260908",
+        "sha": "bb9ff8924552bcc4b5b9d4b7368c4bf37fdd5938",
+        "auditClassification": "already-integrated-patch-equivalent"
+      },
+      "audit": [
+        {
+          "id": "product",
+          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "pointer": "/branches/5",
+          "auditedBranch": "codex/pr937-final-review-20260908",
+          "auditedSha": "bb9ff8924552bcc4b5b9d4b7368c4bf37fdd5938",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/check-studio-bundle.mjs",
+        "scripts/lib/studio-crdt-bundle-boundary.mjs",
+        "scripts/lib/studio-crdt-bundle-boundary.test.mjs"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Exact stable patch ID and all original changed-file blobs match main ancestor b01823aaf7d0af6f53876735f6f342a00db13eee."
+      ],
+      "pathCount": 3
+    },
+    {
+      "index": 7,
+      "kind": "local",
+      "ref": "refs/heads/codex/studio-asset-regression-proof-2751a059",
+      "sha": "2751a059bdac4a2d4f70bdac8d931b26f290bf09",
+      "classification": "recovered-current-code",
+      "source": {
+        "branch": "codex/studio-asset-regression-proof-2751a059",
+        "sha": "2751a059bdac4a2d4f70bdac8d931b26f290bf09",
+        "auditClassification": "missing-regression-assertions-product-already-present"
+      },
+      "audit": [
+        {
+          "id": "product",
+          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "pointer": "/branches/6",
+          "auditedBranch": "codex/studio-asset-regression-proof-2751a059",
+          "auditedSha": "2751a059bdac4a2d4f70bdac8d931b26f290bf09",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "apps/web/src/domains/creator/bg3d/studio-bg3d-model-mutation-integration.test.ts",
+        "apps/web/src/domains/creator/vrm/vrm-library.test.ts"
+      ],
+      "missingGroupsAtBaseline": [
+        "asset-regression-assertions"
+      ],
+      "unappliedGroups": [],
+      "evidence": [
+        "Selective current-code recovery verified through missingGroupEvidence; broad old files were not restored."
+      ],
+      "pathCount": 2,
+      "recoveryCommits": [
+        "f4e3d54c29ac3a12c605fbdd771daaadcfd0ff2c"
+      ]
+    },
+    {
+      "index": 8,
+      "kind": "local",
+      "ref": "refs/heads/main",
+      "sha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+      "classification": "baseline",
+      "source": {
+        "branch": "main",
+        "sha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+        "role": "main-or-prior-integration-baseline"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/25",
+          "auditedBranch": "release/salvage-integration-20260908",
+          "auditedSha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Exact frozen main SHA; branch identity is recorded, with no additional source delta."
+      ]
+    },
+    {
+      "index": 9,
+      "kind": "local",
+      "ref": "refs/heads/salvage/codex/cpu-poc314",
+      "sha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/codex/cpu-poc314",
+        "sha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+        "snapshotParent": "e3cbfa7f4eaa3feee905fee43278a848661df267"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/0",
+          "auditedBranch": "salvage/codex/cpu-poc314",
+          "auditedSha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/cpu-poc314.patch",
+        "scripts/experiments/recovered-20260908/evidence/cpu-poc314/ink-mesh-attempt.json",
+        "scripts/experiments/recovered-20260908/evidence/cpu-poc314/ink-modeler-poc.json",
+        "scripts/experiments/recovered-20260908/inkwash-parity.experiment.ts"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/cpu-poc314.patch",
+        "expectedSha256": "21ced34c4dec49466672ec142ab61a20c5288a1105b8fbda5f79a31e241ba425",
+        "actualSha256": "21ced34c4dec49466672ec142ab61a20c5288a1105b8fbda5f79a31e241ba425",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 10,
+      "kind": "local",
+      "ref": "refs/heads/salvage/codex/issues-bg3d-viewport-origin-20260908",
+      "sha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/codex/issues-bg3d-viewport-origin-20260908",
+        "sha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
+        "snapshotParent": "fdf8ddab086c57a55e4c7c43582270edcb2ac63e"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/1",
+          "auditedBranch": "salvage/codex/issues-bg3d-viewport-origin-20260908",
+          "auditedSha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/bg3d-origin.patch",
+        "scripts/experiments/recovered-20260908/bg3d-origin-probe.tsx"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/bg3d-origin.patch",
+        "expectedSha256": "85e46ac1b29fdcbc6f23597261e09e732a1273aeced2749e377b9ca47d9646d6",
+        "actualSha256": "85e46ac1b29fdcbc6f23597261e09e732a1273aeced2749e377b9ca47d9646d6",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 11,
+      "kind": "local",
+      "ref": "refs/heads/salvage/codex/issues-smart-shape-20260908",
+      "sha": "3fabba274b196440435efb0bb1d35f808ed78e1f",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/codex/issues-smart-shape-20260908",
+        "sha": "3fabba274b196440435efb0bb1d35f808ed78e1f",
+        "snapshotParent": "11098a2f3f425e013df792606fb5d9e5b7d73a1a"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/2",
+          "auditedBranch": "salvage/codex/issues-smart-shape-20260908",
+          "auditedSha": "3fabba274b196440435efb0bb1d35f808ed78e1f",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/smart-shape.patch",
+        "scripts/experiments/recovered-20260908/ink-field.experiment.ts"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/smart-shape.patch",
+        "expectedSha256": "2e5d7931eaa48d1e15e373c4b6fd8a1c459407233a57224f0f3400273b737478",
+        "actualSha256": "2e5d7931eaa48d1e15e373c4b6fd8a1c459407233a57224f0f3400273b737478",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 12,
+      "kind": "local",
+      "ref": "refs/heads/salvage/codex/pr944-painttube-ab315",
+      "sha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/codex/pr944-painttube-ab315",
+        "sha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+        "snapshotParent": "e3cbfa7f4eaa3feee905fee43278a848661df267"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/3",
+          "auditedBranch": "salvage/codex/pr944-painttube-ab315",
+          "auditedSha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/painttube-ab315.patch",
+        "scripts/experiments/recovered-20260908/fixtures/coverage-before315.ts",
+        "scripts/experiments/recovered-20260908/fixtures/coverage-after315.ts",
+        "scripts/experiments/recovered-20260908/painttube-ab.experiment.ts"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/painttube-ab315.patch",
+        "expectedSha256": "0b7ea97818623fb84869d34a872bd3aa24d8417e94801544c740de4ab939e95f",
+        "actualSha256": "0b7ea97818623fb84869d34a872bd3aa24d8417e94801544c740de4ab939e95f",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 13,
+      "kind": "local",
+      "ref": "refs/heads/salvage/toonspectrum-arch",
+      "sha": "0a630760455ad6ddc70e038caf86224861d42b1c",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/toonspectrum-arch",
+        "sha": "0a630760455ad6ddc70e038caf86224861d42b1c",
+        "snapshotParent": "b6ad9db34b9b1d5c2567095aa7294449f2099fdb"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/4",
+          "auditedBranch": "salvage/toonspectrum-arch",
+          "auditedSha": "0a630760455ad6ddc70e038caf86224861d42b1c",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/architecture.patch",
+        "scripts/experiments/recovered-20260908/evidence/architecture/bristle-model.json",
+        "scripts/experiments/recovered-20260908/evidence/architecture/living-ink-fluid.json"
+      ],
+      "missingGroupsAtBaseline": [
+        "architecture-navigation-telemetry"
+      ],
+      "unappliedGroups": [
+        "architecture-eslint-shared-classification",
+        "architecture-node-globals",
+        "architecture-alternative-diagnostic-and-path-policy"
+      ],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark.",
+        "Product source mostly superseded by main. Navigation timing telemetry recovered; old config/ignore/triage alternatives remain explicitly in exact source patch, not silently described as live code."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/architecture.patch",
+        "expectedSha256": "a20c18dc7ffbb5e9e4ac6ee072f0cdb6f77a12fec6949a68b7827cf10ce5b035",
+        "actualSha256": "a20c18dc7ffbb5e9e4ac6ee072f0cdb6f77a12fec6949a68b7827cf10ce5b035",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 14,
+      "kind": "local",
+      "ref": "refs/heads/salvage/toonspectrum-main-diag",
+      "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/toonspectrum-main-diag",
+        "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
+        "snapshotParent": "02fc857ce09af00f9ad1c4757e174ff4eb320e42"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/5",
+          "auditedBranch": "salvage/toonspectrum-main-diag",
+          "auditedSha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/main-diag.patch",
+        "scripts/experiments/recovered-20260908/local-config/verify-deps-before-run.yaml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "local-verify-deps-opt-out"
+      ],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark.",
+        "Durable brush case resolution already main in scripts/studio-ink-fidelity-cases.ts; verifyDepsBeforeRun:false preserved as inactive local configuration."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/main-diag.patch",
+        "expectedSha256": "c3fd8621fe83ca188f58ce13e03c113abba65def56966af99f1171a08799f154",
+        "actualSha256": "c3fd8621fe83ca188f58ce13e03c113abba65def56966af99f1171a08799f154",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 15,
+      "kind": "remote",
+      "ref": "refs/heads/automation/final-dependency-remediation-20260908",
+      "sha": "d17dd5fcb8b3f9e8339f489a4115f9d28e36d420",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "automation/final-dependency-remediation-20260908",
+        "sha": "d17dd5fcb8b3f9e8339f489a4115f9d28e36d420",
+        "auditClassification": "retired_noop"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/0",
+          "auditedBranch": "automation/final-dependency-remediation-20260908",
+          "auditedSha": "d17dd5fcb8b3f9e8339f489a4115f9d28e36d420",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/apply-final-dependency-remediation.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Final file labels itself retired and job is if: false. Dependency audit payload was deliberately removed.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 16,
+      "kind": "remote",
+      "ref": "refs/heads/automation/finalize-pr931-20260908-v4",
+      "sha": "75308848b402f1449682713486e48dbfd7ac35cb",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "automation/finalize-pr931-20260908-v4",
+        "sha": "75308848b402f1449682713486e48dbfd7ac35cb",
+        "auditClassification": "obsolete_pr931_merge_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/1",
+          "auditedBranch": "automation/finalize-pr931-20260908-v4",
+          "auditedSha": "75308848b402f1449682713486e48dbfd7ac35cb",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/finalize-pr931.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Push-only helper for PR931; can change base/open state, merge and rerun CI; obsolete fixed target operation.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 17,
+      "kind": "remote",
+      "ref": "refs/heads/automation/free-actions-for-pr931-20260908",
+      "sha": "2495556e9572e006bc97d5dde246a3a9ee3d6dc2",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "automation/free-actions-for-pr931-20260908",
+        "sha": "2495556e9572e006bc97d5dde246a3a9ee3d6dc2",
+        "auditClassification": "obsolete_pr931_merge_and_ci_cancel_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/2",
+          "auditedBranch": "automation/free-actions-for-pr931-20260908",
+          "auditedSha": "2495556e9572e006bc97d5dde246a3a9ee3d6dc2",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/free-actions-and-merge-pr931.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Cancels release/final-main-merge workflows then reopens/retargets/merges PR931; would interfere with active work if revived.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 18,
+      "kind": "remote",
+      "ref": "refs/heads/automation/merge-pr931-after-core-20260908-v2",
+      "sha": "aecc041f9ad5f065d9e3ff9a7a7fdd840c2c2fda",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "automation/merge-pr931-after-core-20260908-v2",
+        "sha": "aecc041f9ad5f065d9e3ff9a7a7fdd840c2c2fda",
+        "auditClassification": "obsolete_pr931_merge_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/3",
+          "auditedBranch": "automation/merge-pr931-after-core-20260908-v2",
+          "auditedSha": "aecc041f9ad5f065d9e3ff9a7a7fdd840c2c2fda",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/merge-pr931-after-core.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Fixed PR931 normalization and protected-core merge loop; no product files.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 19,
+      "kind": "remote",
+      "ref": "refs/heads/automation/verify-dependabot-main-20260908-v3",
+      "sha": "d2b07e11b97bd20463a56c3d40f44392124311db",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "automation/verify-dependabot-main-20260908-v3",
+        "sha": "d2b07e11b97bd20463a56c3d40f44392124311db",
+        "auditClassification": "obsolete_pr931_merge_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/4",
+          "auditedBranch": "automation/verify-dependabot-main-20260908-v3",
+          "auditedSha": "d2b07e11b97bd20463a56c3d40f44392124311db",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/verify-dependabot-main-completion.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Fixed PR931 merge plus security-alert snapshot verification; no reusable product payload.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 20,
+      "kind": "remote",
+      "ref": "refs/heads/ci/actions-queue-dedupe-20260908",
+      "sha": "5e84ad99f11d6e72b33b9e5e68520dda8a323f75",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ci/actions-queue-dedupe-20260908",
+        "sha": "5e84ad99f11d6e72b33b9e5e68520dda8a323f75",
+        "auditClassification": "retired_noops_and_obsolete_diagnostics"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/5",
+          "auditedBranch": "ci/actions-queue-dedupe-20260908",
+          "auditedSha": "5e84ad99f11d6e72b33b9e5e68520dda8a323f75",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-actions-queue-dedupe-20260908.yml",
+        ".github/workflows/one-shot-extract-pr919-failures.yml",
+        ".github/workflows/one-shot-prioritize-core-907-windows.yml",
+        ".github/workflows/one-shot-prioritize-final-core-macos.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Two cancellation files are explicit if:false retired stubs; two final diagnostic workflows read fixed past PR919 run logs. Do not resurrect canceled earlier revisions.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 4
+    },
+    {
+      "index": 21,
+      "kind": "remote",
+      "ref": "refs/heads/ci/diagnose-pr900-integration-20260908",
+      "sha": "1331875ea9a08afc60c2c4895602df61390bf7f2",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ci/diagnose-pr900-integration-20260908",
+        "sha": "1331875ea9a08afc60c2c4895602df61390bf7f2",
+        "auditClassification": "obsolete_merge_diagnostic"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/6",
+          "auditedBranch": "ci/diagnose-pr900-integration-20260908",
+          "auditedSha": "1331875ea9a08afc60c2c4895602df61390bf7f2",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-diagnose-pr900-integration.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Checks out old integration refs, attempts local --no-commit merge then aborts; no delivered source.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 22,
+      "kind": "remote",
+      "ref": "refs/heads/ci/isolate-pr917-runs-20260908",
+      "sha": "7477c652a5f1d332db1370b10751b7f378961c96",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ci/isolate-pr917-runs-20260908",
+        "sha": "7477c652a5f1d332db1370b10751b7f378961c96",
+        "auditClassification": "obsolete_broad_ci_cancel_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/7",
+          "auditedBranch": "ci/isolate-pr917-runs-20260908",
+          "auditedSha": "7477c652a5f1d332db1370b10751b7f378961c96",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-isolate-pr917-runs.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Cancels runs outside main/helper/latest PR917 target workflow set; dangerous to replay against new work.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 23,
+      "kind": "remote",
+      "ref": "refs/heads/ci/isolate-pr917-slim-20260908",
+      "sha": "52de7e5565d8f1d39400792ba742d57d5de2c141",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ci/isolate-pr917-slim-20260908",
+        "sha": "52de7e5565d8f1d39400792ba742d57d5de2c141",
+        "auditClassification": "obsolete_broad_ci_cancel_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/8",
+          "auditedBranch": "ci/isolate-pr917-slim-20260908",
+          "auditedSha": "52de7e5565d8f1d39400792ba742d57d5de2c141",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-isolate-pr917-slim.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Retargeted to fixed PR919 release branch; cancels every active run except main/helper/single protected CI run.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 24,
+      "kind": "remote",
+      "ref": "refs/heads/ci/repair-cancelled-verify-gate-20260908",
+      "sha": "193eff0193f720a9ed534b5ccada55277cb8ad8d",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ci/repair-cancelled-verify-gate-20260908",
+        "sha": "193eff0193f720a9ed534b5ccada55277cb8ad8d",
+        "auditClassification": "unapplied_ci_semantics_conflicts_current_contract"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/9",
+          "auditedBranch": "ci/repair-cancelled-verify-gate-20260908",
+          "auditedSha": "193eff0193f720a9ed534b5ccada55277cb8ad8d",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-repair-cancelled-verify-gate.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "cancelled-verify-gate-policy-proposal"
+      ],
+      "evidence": [
+        "Final branch only contains self-push workflow; its intended verify condition change has never been applied to main. Current main deliberately reports canceled upstream as failure; gate test explicitly requires always().",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 25,
+      "kind": "remote",
+      "ref": "refs/heads/codex/code-scanning-remediation-20260908",
+      "sha": "84353b01630f4ace7e832642a8e32d7891c87de4",
+      "classification": "main-equivalent",
+      "source": {
+        "branch": "codex/code-scanning-remediation-20260908",
+        "sha": "84353b01630f4ace7e832642a8e32d7891c87de4",
+        "auditClassification": "net_empty_exact_main_ancestor_tree"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/10",
+          "auditedBranch": "codex/code-scanning-remediation-20260908",
+          "auditedSha": "84353b01630f4ace7e832642a8e32d7891c87de4",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Tip deliberately deletes all 21 temporary remediation workflows/scripts; resulting full tree exactly matches listed main ancestors."
+      ],
+      "pathCount": 0,
+      "equivalentMainTrees": [
+        "bc2a64a67c691f1b37a5fb8bf3a4f75f6362566d",
+        "028bebb67692328b0f0921f7fca585446fa1d3ac"
+      ]
+    },
+    {
+      "index": 26,
+      "kind": "remote",
+      "ref": "refs/heads/codex/fix-cleanup-active-pr-base-20260908",
+      "sha": "f3557f3d9f31b1973215d8c117a08c05a2ff8a57",
+      "classification": "recovered-current-code",
+      "source": {
+        "branch": "codex/fix-cleanup-active-pr-base-20260908",
+        "sha": "f3557f3d9f31b1973215d8c117a08c05a2ff8a57",
+        "role": "cleanup-open-pr-base-fix"
+      },
+      "audit": [],
+      "paths": [
+        "scripts/cleanup-merged-branches.mjs",
+        "scripts/cleanup-merged-branches.test.ts"
+      ],
+      "missingGroupsAtBaseline": [
+        "cleanup-open-pr-base"
+      ],
+      "unappliedGroups": [],
+      "evidence": [
+        "Supplemental exact two-file blob comparison to recovery commit 52e769367558603dd9ffc11e1e4eb8867e25d458; outside earlier three-audit coverage."
+      ],
+      "supplementalProof": "cleanupExactBlobEvidence"
+    },
+    {
+      "index": 27,
+      "kind": "remote",
+      "ref": "refs/heads/codex/fix-salvage-crdt-bundle-20260908",
+      "sha": "0ef38c4440a507f5e1d3a11d878c935773f116a4",
+      "classification": "main-equivalent",
+      "source": {
+        "branch": "codex/fix-salvage-crdt-bundle-20260908",
+        "sha": "0ef38c4440a507f5e1d3a11d878c935773f116a4",
+        "auditClassification": "already-integrated-patch-equivalent"
+      },
+      "audit": [
+        {
+          "id": "product",
+          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "pointer": "/branches/2",
+          "auditedBranch": "codex/fix-salvage-crdt-bundle-20260908",
+          "auditedSha": "0ef38c4440a507f5e1d3a11d878c935773f116a4",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/check-studio-bundle.mjs",
+        "scripts/lib/studio-crdt-bundle-boundary.mjs",
+        "scripts/lib/studio-crdt-bundle-boundary.test.mjs"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Exact stable patch ID and all original changed-file blobs match main ancestor b01823aaf7d0af6f53876735f6f342a00db13eee."
+      ],
+      "pathCount": 3
+    },
+    {
+      "index": 28,
+      "kind": "remote",
+      "ref": "refs/heads/diagnostics/codeql-pr919-20260908",
+      "sha": "35caeb41d7e12aad5965f4fa4050fe08df331e07",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "diagnostics/codeql-pr919-20260908",
+        "sha": "35caeb41d7e12aad5965f4fa4050fe08df331e07",
+        "auditClassification": "obsolete_fixed_run_diagnostic"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/11",
+          "auditedBranch": "diagnostics/codeql-pr919-20260908",
+          "auditedSha": "35caeb41d7e12aad5965f4fa4050fe08df331e07",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-codeql-pr919.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Final workflow summarizes preserved past Vitest outputs; earlier CodeQL diagnostic is superseded by final revision.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 29,
+      "kind": "remote",
+      "ref": "refs/heads/fix/code-scanning-alerts-20260908",
+      "sha": "d779047b103e76220975954736f8412b8378b72a",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "fix/code-scanning-alerts-20260908",
+        "sha": "d779047b103e76220975954736f8412b8378b72a",
+        "auditClassification": "obsolete_security_inventory"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/12",
+          "auditedBranch": "fix/code-scanning-alerts-20260908",
+          "auditedSha": "d779047b103e76220975954736f8412b8378b72a",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/code-scanning-inventory-temporary.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Temporary workflow snapshots/encrypts code-scanning inventory; no actual remediation source.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 30,
+      "kind": "remote",
+      "ref": "refs/heads/fix/lift3d-preview-tab-touch-targets-20260908",
+      "sha": "7f6901907eb6e7e9fe0faba4c5ff3420d745a14a",
+      "classification": "recovered-current-code",
+      "source": {
+        "branch": "fix/lift3d-preview-tab-touch-targets-20260908",
+        "sha": "7f6901907eb6e7e9fe0faba4c5ff3420d745a14a",
+        "auditClassification": "unique_additive_test_intent_with_stale_page"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/13",
+          "auditedBranch": "fix/lift3d-preview-tab-touch-targets-20260908",
+          "auditedSha": "7f6901907eb6e7e9fe0faba4c5ff3420d745a14a",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "apps/web/src/domains/creator/lift3d/StudioLift3dPage.touch-target.test.ts",
+        "apps/web/src/domains/creator/lift3d/StudioLift3dPage.tsx"
+      ],
+      "missingGroupsAtBaseline": [
+        "lift3d-tab-regression"
+      ],
+      "unappliedGroups": [],
+      "evidence": [
+        "Existing main has complete tab semantics and 44px width/height, but its test does not assert aria-selected or visible keyboard focus. Unique test intent should be ported additively."
+      ],
+      "pathCount": 2,
+      "recoveryCommits": [
+        "f4e3d54c29ac3a12c605fbdd771daaadcfd0ff2c"
+      ]
+    },
+    {
+      "index": 31,
+      "kind": "remote",
+      "ref": "refs/heads/main",
+      "sha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+      "classification": "baseline",
+      "source": {
+        "branch": "main",
+        "sha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+        "role": "main-or-prior-integration-baseline"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/25",
+          "auditedBranch": "release/salvage-integration-20260908",
+          "auditedSha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Exact frozen main SHA; branch identity is recorded, with no additional source delta."
+      ]
+    },
+    {
+      "index": 32,
+      "kind": "remote",
+      "ref": "refs/heads/ops/finalize-all-open-prs-20260908",
+      "sha": "a7e231014885a787ca38661b5df49cb2b9ba6244",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ops/finalize-all-open-prs-20260908",
+        "sha": "a7e231014885a787ca38661b5df49cb2b9ba6244",
+        "auditClassification": "obsolete_global_pr_mutation_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/14",
+          "auditedBranch": "ops/finalize-all-open-prs-20260908",
+          "auditedSha": "a7e231014885a787ca38661b5df49cb2b9ba6244",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-finalize-all-open-prs-20260908.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Enumerates open PRs, readies drafts, updates bases, reruns CI, comments and merges; should never be imported as product integration.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 33,
+      "kind": "remote",
+      "ref": "refs/heads/ops/force-cancel-stale-ci-3522-20260908",
+      "sha": "6b2986c4de8d3555913a1d5b73c59646a911a151",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ops/force-cancel-stale-ci-3522-20260908",
+        "sha": "6b2986c4de8d3555913a1d5b73c59646a911a151",
+        "auditClassification": "obsolete_fixed_pr_ci_cancel_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/15",
+          "auditedBranch": "ops/force-cancel-stale-ci-3522-20260908",
+          "auditedSha": "6b2986c4de8d3555913a1d5b73c59646a911a151",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-force-cancel-stale-ci-3522.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Cancels/force-cancels closed PR917/918 branch runs, including waits; no source changes.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 34,
+      "kind": "remote",
+      "ref": "refs/heads/ops/pr900-priority-20260908",
+      "sha": "327c267641df98d14f64616f840af6154628f38f",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ops/pr900-priority-20260908",
+        "sha": "327c267641df98d14f64616f840af6154628f38f",
+        "auditClassification": "obsolete_fixed_pr_ci_cancel_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/16",
+          "auditedBranch": "ops/pr900-priority-20260908",
+          "auditedSha": "327c267641df98d14f64616f840af6154628f38f",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-pr900-priority.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Targets closed PR911 branch and exact stale run 34168128282, then deletes its helper ref.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 35,
+      "kind": "remote",
+      "ref": "refs/heads/ops/pr907-apply-lint-20260908-v2",
+      "sha": "4f790925897d491496feccc8991839279a24401b",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ops/pr907-apply-lint-20260908-v2",
+        "sha": "4f790925897d491496feccc8991839279a24401b",
+        "auditClassification": "obsolete_self_push_repair_already_integrated"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/17",
+          "auditedBranch": "ops/pr907-apply-lint-20260908-v2",
+          "auditedSha": "4f790925897d491496feccc8991839279a24401b",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-pr907-apply-lint-v2.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Five embedded source edits are already incorporated or superseded; helper resolves PR907 then pushes its head and deletes helper ref.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 36,
+      "kind": "remote",
+      "ref": "refs/heads/ops/pr907-converge-20260908-v2",
+      "sha": "c746e2d8b3fcc5091fcc2f27957c7541c9e97426",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ops/pr907-converge-20260908-v2",
+        "sha": "c746e2d8b3fcc5091fcc2f27957c7541c9e97426",
+        "auditClassification": "obsolete_self_push_repair_already_integrated"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/18",
+          "auditedBranch": "ops/pr907-converge-20260908-v2",
+          "auditedSha": "c746e2d8b3fcc5091fcc2f27957c7541c9e97426",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-pr907-converge-v2.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Same five PR907 source repairs as apply-lint plus cancellation/rerun/merge operation. Current main has corresponding fixes and stronger refactors.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 37,
+      "kind": "remote",
+      "ref": "refs/heads/ops/pr917-priority-20260908",
+      "sha": "74c205ab01abc2cd08467fb4d32f7c57f1b6a88a",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "ops/pr917-priority-20260908",
+        "sha": "74c205ab01abc2cd08467fb4d32f7c57f1b6a88a",
+        "auditClassification": "obsolete_broad_ci_cancel_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/19",
+          "auditedBranch": "ops/pr917-priority-20260908",
+          "auditedSha": "74c205ab01abc2cd08467fb4d32f7c57f1b6a88a",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-pr917-priority.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Finds PR917 current head and cancels all other non-main runs, then removes its ref.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 38,
+      "kind": "remote",
+      "ref": "refs/heads/qa/verify-and-close-open-soak-20260908",
+      "sha": "896b780b5ef2dd9570c4575b614fffb84f7e5f7e",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "qa/verify-and-close-open-soak-20260908",
+        "sha": "896b780b5ef2dd9570c4575b614fffb84f7e5f7e",
+        "auditClassification": "obsolete_one_shot_qa_issue_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/20",
+          "auditedBranch": "qa/verify-and-close-open-soak-20260908",
+          "auditedSha": "896b780b5ef2dd9570c4575b614fffb84f7e5f7e",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/verify-and-close-open-qa-soak.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Branch-triggered verification matrix closes QA-SOAK issues on successful categories; preserves historical operational procedure, no new app behavior.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 39,
+      "kind": "remote",
+      "ref": "refs/heads/release/final-all-work-pr900-20260908",
+      "sha": "51922c7f2a0546f4bed8f2983a71bed90a4ae1b8",
+      "classification": "main-equivalent",
+      "source": {
+        "branch": "release/final-all-work-pr900-20260908",
+        "sha": "51922c7f2a0546f4bed8f2983a71bed90a4ae1b8",
+        "auditClassification": "asset_payload_already_main_with_superseded_source_and_historical_logs"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/21",
+          "auditedBranch": "release/final-all-work-pr900-20260908",
+          "auditedSha": "51922c7f2a0546f4bed8f2983a71bed90a4ae1b8",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-final-pr900-integration-repair.yml",
+        ".github/workflows/one-shot-pr900-catalog-regression-repair.yml",
+        "apps/web/public/assets/3d/characters/thumbnails/quaternius-fantasy-v1/quaternius-female-peasant.png",
+        "apps/web/public/assets/3d/characters/thumbnails/quaternius-fantasy-v1/quaternius-female-ranger.png",
+        "apps/web/public/assets/3d/characters/thumbnails/quaternius-fantasy-v1/quaternius-male-peasant.png",
+        "apps/web/public/assets/3d/characters/thumbnails/quaternius-fantasy-v1/quaternius-male-ranger.png"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "pr900-historical-logs-and-operational-workflows"
+      ],
+      "evidence": [
+        "Multiple merge bases make raw triple-dot delta misleading. Of 685 net paths, 673 non-workflow paths are byte-identical main, 8 files carry later main corrections, 2 are old logs and 2 are temporary self-push workflows. Embedded 18-environment/113-character/admissionPolicyKeys test corrections are all present in main."
+      ],
+      "pathCount": 685
+    },
+    {
+      "index": 40,
+      "kind": "remote",
+      "ref": "refs/heads/release/final-df46fece-20260908-1908",
+      "sha": "f800880a47260f41985ad99ea2d8f87937d3a602",
+      "classification": "main-equivalent",
+      "source": {
+        "branch": "release/final-df46fece-20260908-1908",
+        "sha": "f800880a47260f41985ad99ea2d8f87937d3a602",
+        "auditClassification": "net_empty_exact_main_ancestor_tree"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/22",
+          "auditedBranch": "release/final-df46fece-20260908-1908",
+          "auditedSha": "f800880a47260f41985ad99ea2d8f87937d3a602",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "History-only retirement merges cancel all intermediate deltas; final full tree matches listed main ancestors."
+      ],
+      "pathCount": 0,
+      "equivalentMainTrees": [
+        "e4042d72b6632e8b8b0386465cc2e73c070524eb",
+        "f206bd5c8a707c7d2898869a2363648e022fb26a",
+        "79973cfcc18f2131cd3cef14dce19657de7bb907",
+        "df46fece08f15de2b25bb3c080370d1df3f9f0dd",
+        "bdfd7acc63ac0e47b929983dfb69350723d621e3"
+      ]
+    },
+    {
+      "index": 41,
+      "kind": "remote",
+      "ref": "refs/heads/release/final-main-merge-4888b061-immutable-20260908",
+      "sha": "7f25e172a0f3382b634916d1b043e12fd887bc8e",
+      "classification": "recovered-current-code",
+      "source": {
+        "branch": "release/final-main-merge-4888b061-immutable-20260908",
+        "sha": "7f25e172a0f3382b634916d1b043e12fd887bc8e",
+        "auditClassification": "superseded_ui_verifier_with_optional_assertion_intent"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/23",
+          "auditedBranch": "release/final-main-merge-4888b061-immutable-20260908",
+          "auditedSha": "7f25e172a0f3382b634916d1b043e12fd887bc8e",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/verify-studio-cc0-curated-ui.mjs"
+      ],
+      "missingGroupsAtBaseline": [
+        "cc0-manifest-membership"
+      ],
+      "unappliedGroups": [],
+      "evidence": [
+        "Only net source is old CC0 UI verifier. Main derives detailed/component/surface counts from actual manifest and waits for result counts; branch still has obsolete fixed 46/47/30 checks. Old workflow additions are removed by tip.",
+        "Current verifier keeps dynamic catalogue counts and adds the original first-visible manifest membership/provider assertion."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 42,
+      "kind": "remote",
+      "ref": "refs/heads/release/final-pr911-df7fdd87-20260908",
+      "sha": "f4b5eaebba88c9514f180862ffef081efd18d181",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "release/final-pr911-df7fdd87-20260908",
+        "sha": "f4b5eaebba88c9514f180862ffef081efd18d181",
+        "auditClassification": "obsolete_fixed_commit_replay_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/24",
+          "auditedBranch": "release/final-pr911-df7fdd87-20260908",
+          "auditedSha": "f4b5eaebba88c9514f180862ffef081efd18d181",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/one-shot-replay-pr900.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Self-push helper cherry-picks fixed PR900 commits 55ca11c/f79fd9a then deletes itself. Main already contains corresponding asset payload and newer corrections.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 43,
+      "kind": "remote",
+      "ref": "refs/heads/release/salvage-integration-20260908",
+      "sha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+      "classification": "baseline",
+      "source": {
+        "branch": "release/salvage-integration-20260908",
+        "sha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+        "role": "main-or-prior-integration-baseline"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/25",
+          "auditedBranch": "release/salvage-integration-20260908",
+          "auditedSha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Exact frozen main SHA; branch identity is recorded, with no additional source delta."
+      ]
+    },
+    {
+      "index": 44,
+      "kind": "remote",
+      "ref": "refs/heads/salvage/codex/cpu-poc314",
+      "sha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/codex/cpu-poc314",
+        "sha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+        "snapshotParent": "e3cbfa7f4eaa3feee905fee43278a848661df267"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/0",
+          "auditedBranch": "salvage/codex/cpu-poc314",
+          "auditedSha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/cpu-poc314.patch",
+        "scripts/experiments/recovered-20260908/evidence/cpu-poc314/ink-mesh-attempt.json",
+        "scripts/experiments/recovered-20260908/evidence/cpu-poc314/ink-modeler-poc.json",
+        "scripts/experiments/recovered-20260908/inkwash-parity.experiment.ts"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/cpu-poc314.patch",
+        "expectedSha256": "21ced34c4dec49466672ec142ab61a20c5288a1105b8fbda5f79a31e241ba425",
+        "actualSha256": "21ced34c4dec49466672ec142ab61a20c5288a1105b8fbda5f79a31e241ba425",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 45,
+      "kind": "remote",
+      "ref": "refs/heads/salvage/codex/issues-bg3d-viewport-origin-20260908",
+      "sha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/codex/issues-bg3d-viewport-origin-20260908",
+        "sha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
+        "snapshotParent": "fdf8ddab086c57a55e4c7c43582270edcb2ac63e"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/1",
+          "auditedBranch": "salvage/codex/issues-bg3d-viewport-origin-20260908",
+          "auditedSha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/bg3d-origin.patch",
+        "scripts/experiments/recovered-20260908/bg3d-origin-probe.tsx"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/bg3d-origin.patch",
+        "expectedSha256": "85e46ac1b29fdcbc6f23597261e09e732a1273aeced2749e377b9ca47d9646d6",
+        "actualSha256": "85e46ac1b29fdcbc6f23597261e09e732a1273aeced2749e377b9ca47d9646d6",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 46,
+      "kind": "remote",
+      "ref": "refs/heads/salvage/codex/issues-smart-shape-20260908",
+      "sha": "3fabba274b196440435efb0bb1d35f808ed78e1f",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/codex/issues-smart-shape-20260908",
+        "sha": "3fabba274b196440435efb0bb1d35f808ed78e1f",
+        "snapshotParent": "11098a2f3f425e013df792606fb5d9e5b7d73a1a"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/2",
+          "auditedBranch": "salvage/codex/issues-smart-shape-20260908",
+          "auditedSha": "3fabba274b196440435efb0bb1d35f808ed78e1f",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/smart-shape.patch",
+        "scripts/experiments/recovered-20260908/ink-field.experiment.ts"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/smart-shape.patch",
+        "expectedSha256": "2e5d7931eaa48d1e15e373c4b6fd8a1c459407233a57224f0f3400273b737478",
+        "actualSha256": "2e5d7931eaa48d1e15e373c4b6fd8a1c459407233a57224f0f3400273b737478",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 47,
+      "kind": "remote",
+      "ref": "refs/heads/salvage/codex/pr944-painttube-ab315",
+      "sha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/codex/pr944-painttube-ab315",
+        "sha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+        "snapshotParent": "e3cbfa7f4eaa3feee905fee43278a848661df267"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/3",
+          "auditedBranch": "salvage/codex/pr944-painttube-ab315",
+          "auditedSha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/painttube-ab315.patch",
+        "scripts/experiments/recovered-20260908/fixtures/coverage-before315.ts",
+        "scripts/experiments/recovered-20260908/fixtures/coverage-after315.ts",
+        "scripts/experiments/recovered-20260908/painttube-ab.experiment.ts"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/painttube-ab315.patch",
+        "expectedSha256": "0b7ea97818623fb84869d34a872bd3aa24d8417e94801544c740de4ab939e95f",
+        "actualSha256": "0b7ea97818623fb84869d34a872bd3aa24d8417e94801544c740de4ab939e95f",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 48,
+      "kind": "remote",
+      "ref": "refs/heads/salvage/toonspectrum-arch",
+      "sha": "0a630760455ad6ddc70e038caf86224861d42b1c",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/toonspectrum-arch",
+        "sha": "0a630760455ad6ddc70e038caf86224861d42b1c",
+        "snapshotParent": "b6ad9db34b9b1d5c2567095aa7294449f2099fdb"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/4",
+          "auditedBranch": "salvage/toonspectrum-arch",
+          "auditedSha": "0a630760455ad6ddc70e038caf86224861d42b1c",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/architecture.patch",
+        "scripts/experiments/recovered-20260908/evidence/architecture/bristle-model.json",
+        "scripts/experiments/recovered-20260908/evidence/architecture/living-ink-fluid.json"
+      ],
+      "missingGroupsAtBaseline": [
+        "architecture-navigation-telemetry"
+      ],
+      "unappliedGroups": [
+        "architecture-eslint-shared-classification",
+        "architecture-node-globals",
+        "architecture-alternative-diagnostic-and-path-policy"
+      ],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark.",
+        "Product source mostly superseded by main. Navigation timing telemetry recovered; old config/ignore/triage alternatives remain explicitly in exact source patch, not silently described as live code."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/architecture.patch",
+        "expectedSha256": "a20c18dc7ffbb5e9e4ac6ee072f0cdb6f77a12fec6949a68b7827cf10ce5b035",
+        "actualSha256": "a20c18dc7ffbb5e9e4ac6ee072f0cdb6f77a12fec6949a68b7827cf10ce5b035",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 49,
+      "kind": "remote",
+      "ref": "refs/heads/salvage/toonspectrum-main-diag",
+      "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
+      "classification": "archived-experiment",
+      "source": {
+        "branch": "salvage/toonspectrum-main-diag",
+        "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
+        "snapshotParent": "02fc857ce09af00f9ad1c4757e174ff4eb320e42"
+      },
+      "audit": [
+        {
+          "id": "backups",
+          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "pointer": "/branches/5",
+          "auditedBranch": "salvage/toonspectrum-main-diag",
+          "auditedSha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "scripts/experiments/recovered-20260908/source-patches/main-diag.patch",
+        "scripts/experiments/recovered-20260908/local-config/verify-deps-before-run.yaml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "local-verify-deps-opt-out"
+      ],
+      "evidence": [
+        "Original snapshot patch and original SHA preserved with verified SHA-256; adapted CPU/GPU experiments are explicitly opt-in and historical evidence is not a current benchmark.",
+        "Durable brush case resolution already main in scripts/studio-ink-fidelity-cases.ts; verifyDepsBeforeRun:false preserved as inactive local configuration."
+      ],
+      "archiveProof": {
+        "path": "scripts/experiments/recovered-20260908/source-patches/main-diag.patch",
+        "expectedSha256": "c3fd8621fe83ca188f58ce13e03c113abba65def56966af99f1171a08799f154",
+        "actualSha256": "c3fd8621fe83ca188f58ce13e03c113abba65def56966af99f1171a08799f154",
+        "matchesDeclaredHash": true,
+        "trackedAtReviewHead": false,
+        "matchesOriginalGitShowWithMetadata": true,
+        "patchBodyMatchesOriginalGitDiff": true
+      }
+    },
+    {
+      "index": 50,
+      "kind": "remote",
+      "ref": "refs/heads/security/audit-pr919-77c107e-20260908",
+      "sha": "1066c5d9d87fba565a1cecfc4d9ed95e0927abb1",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "security/audit-pr919-77c107e-20260908",
+        "sha": "1066c5d9d87fba565a1cecfc4d9ed95e0927abb1",
+        "auditClassification": "obsolete_dependency_audit_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/26",
+          "auditedBranch": "security/audit-pr919-77c107e-20260908",
+          "auditedSha": "1066c5d9d87fba565a1cecfc4d9ed95e0927abb1",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/dependabot-integration-audit.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Branch-triggered exact old integration lockfile audit. Current root audit script checks all dependencies down to low severity.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 51,
+      "kind": "remote",
+      "ref": "refs/heads/security/code-scanning-audit-20260908",
+      "sha": "cf7db9e34511bddde51b5f03b12a83203a3e0b20",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "security/code-scanning-audit-20260908",
+        "sha": "cf7db9e34511bddde51b5f03b12a83203a3e0b20",
+        "auditClassification": "obsolete_security_snapshot_and_autofix_operations"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/27",
+          "auditedBranch": "security/code-scanning-audit-20260908",
+          "auditedSha": "cf7db9e34511bddde51b5f03b12a83203a3e0b20",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/code-scanning-alert-audit.yml",
+        ".github/workflows/code-scanning-autofix-batch.yml",
+        ".github/workflows/security-review-source-snapshot.yml",
+        ".github/workflows/security-schema-query.yml",
+        ".github/workflows/security-source-snapshot.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Temporary alert inventories/source snapshots and API autofix commits to old security/code-scanning-remediation ref; no actual retained source fix.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 5
+    },
+    {
+      "index": 52,
+      "kind": "remote",
+      "ref": "refs/heads/security/code-scanning-remediation-20260908",
+      "sha": "13fdbbfe9e16f319b92461d7471d6514c0524ff9",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "security/code-scanning-remediation-20260908",
+        "sha": "13fdbbfe9e16f319b92461d7471d6514c0524ff9",
+        "auditClassification": "obsolete_branch_specific_codeql_audit"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/28",
+          "auditedBranch": "security/code-scanning-remediation-20260908",
+          "auditedSha": "13fdbbfe9e16f319b92461d7471d6514c0524ff9",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/codeql-remediation-audit.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "CodeQL workflow triggers push on named old remediation branch or dispatch. No product changes; not a persistent main security requirement.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 53,
+      "kind": "remote",
+      "ref": "refs/heads/security/dependabot-main-remediation-20260908-v2",
+      "sha": "46bc95a8898b8eeded3db8df885529c638493f5f",
+      "classification": "historical-operational-proposal",
+      "source": {
+        "branch": "security/dependabot-main-remediation-20260908-v2",
+        "sha": "46bc95a8898b8eeded3db8df885529c638493f5f",
+        "auditClassification": "obsolete_self_push_dependency_operation"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/29",
+          "auditedBranch": "security/dependabot-main-remediation-20260908-v2",
+          "auditedSha": "46bc95a8898b8eeded3db8df885529c638493f5f",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        ".github/workflows/dependabot-main-remediation-v2.yml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [
+        "historical-operational-payload"
+      ],
+      "evidence": [
+        "Branch-triggered helper installs and mutates a dependency graph and pushes old named remediation branch; actual subsequent dependency fixes are in main.",
+        "Preserve exact history/audit; do not install or replay obsolete branch-triggered automation as current CI."
+      ],
+      "pathCount": 1
+    },
+    {
+      "index": 54,
+      "kind": "remote",
+      "ref": "refs/heads/security/final-dependabot-remediation-20260908-v3",
+      "sha": "d865f15b1b70f09ef1198d17845979a64471707a",
+      "classification": "main-equivalent",
+      "source": {
+        "branch": "security/final-dependabot-remediation-20260908-v3",
+        "sha": "d865f15b1b70f09ef1198d17845979a64471707a",
+        "auditClassification": "dependency_fixes_already_integrated_and_superseded"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/30",
+          "auditedBranch": "security/final-dependabot-remediation-20260908-v3",
+          "auditedSha": "d865f15b1b70f09ef1198d17845979a64471707a",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "apps/api/package.json",
+        "package.json",
+        "packages/studio-engine-skia/package.json",
+        "packages/studio-engine-vello/package.json",
+        "packages/studio-format-gateway/package.json",
+        "pnpm-lock.yaml"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Four changed package manifests exactly equal main; remaining package+lock changes retained in main with stronger audit and exact Vitest/coverage pins. New React19.2.8/embla peer and zod4.5.4 lock entries from branch are present in main."
+      ],
+      "pathCount": 6
+    },
+    {
+      "index": 55,
+      "kind": "remote",
+      "ref": "refs/heads/security/secret-scanning-remediation",
+      "sha": "dd5636b59c1cc39fa6c0c81a132bb331abec240d",
+      "classification": "main-equivalent",
+      "source": {
+        "branch": "security/secret-scanning-remediation",
+        "sha": "dd5636b59c1cc39fa6c0c81a132bb331abec240d",
+        "auditClassification": "exact_file_content_already_main"
+      },
+      "audit": [
+        {
+          "id": "remote",
+          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "pointer": "/branches/31",
+          "auditedBranch": "security/secret-scanning-remediation",
+          "auditedSha": "dd5636b59c1cc39fa6c0c81a132bb331abec240d",
+          "exactShaMatch": true
+        }
+      ],
+      "paths": [
+        "apps/web/src/domains/creator/studio-bug-report-package.test.ts"
+      ],
+      "missingGroupsAtBaseline": [],
+      "unappliedGroups": [],
+      "evidence": [
+        "Only changed test file has exact same blob in main; provider-shaped credential fixture replacement is already integrated despite cherry plus."
+      ],
+      "pathCount": 1
+    }
+  ]
+}

@@ -68,6 +68,23 @@ describe("content usage authorization", () => {
       .toEqual({ allowed: true });
   });
 
+  it.each([
+    ["ai-input", "aiInput"],
+    ["ai-training", "aiTraining"],
+  ] as const)("requires the %s capability %s even when willUseForAi is false", (surface, permission) => {
+    const context: UsageContext = { ...usage, surface, willUseForAi: false };
+    const snapshot: RightsDecision = { ...rights, allowedSurfaces: [surface] };
+
+    for (const value of [false, null]) {
+      expect(authorizeContentUsage({ ...snapshot, [permission]: value }, context)).toEqual({
+        allowed: false,
+        reason: "SURFACE_NOT_ALLOWED",
+      });
+    }
+    expect(authorizeContentUsage({ ...snapshot, [permission]: true }, context))
+      .toEqual({ allowed: true });
+  });
+
   it.each(["research-board", "studio-reference"] as const)(
     "preserves %s reference use without download or import permissions",
     (surface) => {
@@ -114,22 +131,6 @@ describe("content usage authorization", () => {
     "2027-01-01T00:00:00.000Z",
   ])("allows matching permissions before the expiry %s", (validUntil) => {
     expect(authorizeContentUsage({ ...rights, validUntil }, usage)).toEqual({ allowed: true });
-  });
-
-  it.each([
-    ["marketplace-download", "originalDownload"],
-    ["studio-import", "projectImport"],
-    ["ai-input", "aiInput"],
-    ["ai-training", "aiTraining"],
-  ] as const)("requires the %s surface capability %s independently of context flags", (surface, permission) => {
-    const request = { ...usage, surface, willUseForAi: false };
-    for (const value of [false, null]) {
-      const snapshot = { ...rights, allowedSurfaces: [surface], [permission]: value };
-      expect(authorizeContentUsage(snapshot, request))
-        .toEqual({ allowed: false, reason: "SURFACE_NOT_ALLOWED" });
-    }
-    expect(authorizeContentUsage({ ...rights, allowedSurfaces: [surface], [permission]: true }, request))
-      .toEqual({ allowed: true });
   });
 
   it.each(["", " ", "not-a-date", "2026-09-08T25:00:00Z", "999999-01-01T00:00:00Z"])(

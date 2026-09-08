@@ -130,6 +130,8 @@ export interface StudioProjectArchiveOrchestrationInput {
   readonly projectDocumentSessionRef:
     MutableRefObject<StudioProjectDocumentSessionProvenance | null>;
   readonly ensureSharedDocumentAvailableForExport: () => boolean;
+  /** Commit accepted deferred ink before reading the generation used by the unchanged JSON cache. */
+  readonly prepareDocumentForExport?: () => Promise<unknown>;
   readonly currentStudioProjectSnapshot: () => StudioProjectSnapshot;
   /**
    * Work-scoped raster reader/replay boundary. It is optional only for projects without a surface
@@ -207,6 +209,7 @@ export function createStudioProjectArchiveOrchestration({
   revisionProjectGenerationRef,
   projectDocumentSessionRef,
   ensureSharedDocumentAvailableForExport,
+  prepareDocumentForExport,
   currentStudioProjectSnapshot,
   filterMaskSurfaceArchiveDependencies,
   loadStudioReleaseScheduleRuntime,
@@ -237,6 +240,7 @@ export function createStudioProjectArchiveOrchestration({
         import("./studio-project-document-session"),
         import( "./vrm/studio-vrm-texture-paint-project-library"),
       ]);
+      await prepareDocumentForExport?.();
       const exportedAt = new Date().toISOString();
       const documentId = workId
         ? `work:${workId}`

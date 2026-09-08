@@ -260,7 +260,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     // 2026-09-03: 웹툰 창작 보조 센터 + AI 슈퍼 스위트 추가 (188 → 190).
     // 2026-09-03: 텍스트 ▸ 현지화 QA(넘침·문체·MQM 점수) 추가 (190 → 191).
     // 2026-09-04: 3D ▸ 캐릭터 셰이퍼(프리셋 우선 캐릭터 작업실) 추가 (191 → 192).
-    // 2026-09-08: 브러시 ▸ 현재 스트로크 교정 (192 → 193).
+    // 2026-09-08: editable recent-stroke correction.
     measuredCount: 193,
   },
   "edit-menu": {
@@ -390,7 +390,7 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "select/invert-selection",
   // transform (1) — §15.3 group that shipped nothing until Wave D
   "transform/pixel-transform",
-  // brush (14) — former `draw` group + §15.3 Brush doors + pixel/silk from the
+  // brush (13) — former `draw` group + §15.3 Brush doors + pixel/silk from the
   // retired floating creative-modes pill.
   "brush/pen",
   "brush/eraser",

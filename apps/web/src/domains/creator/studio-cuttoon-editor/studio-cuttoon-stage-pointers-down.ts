@@ -261,6 +261,7 @@ export function bindStudioCuttoonStagePointersDown(
     journalPendingPixelSelectionRasterGesture,
     journalPendingRasterRetouchGesture,
     liquifyDragRef,
+    nodeEditDragRef,
     nodeEditTool,
     openColorWheelAt,
     panelSplitActive,
@@ -292,6 +293,8 @@ export function bindStudioCuttoonStagePointersDown(
       return;
     }
     const stagePointerEvent = e.evt as PointerEvent;
+    // Keep the first node-edit contact authoritative until its own up/cancel.
+    if (nodeEditDragRef.current) return;
     // One contact owns a liquify gesture. A second finger is ignored and cannot cancel or replace it.
     if (liquifyDragRef.current) return;
     // One contact also owns a pixel-selection drag; a palm/second finger cannot replace it.

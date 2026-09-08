@@ -54,6 +54,10 @@ export function StudioInspectorDrawingSection({
   model: StudioInspectorAsideModel;
 }) {
   const {
+    recentColors,
+    ensureRecentColorsLoaded,
+    rememberColor,
+    clearRecentColors,
     activeInspectorBrushId,
     activeInspectorBrushName,
     activeSavedBrushId,
@@ -121,8 +125,8 @@ export function StudioInspectorDrawingSection({
     previewPerspectiveEyeLevelY,
     previewVanishingPointById,
     queueBrushDelete,
-    onCorrectCurrentStroke,
     quickShapeActive,
+    onCorrectCurrentStroke,
     recentBrushSizes,
     rememberRecentBrushSize,
     removeAdvancedRuler,
@@ -328,6 +332,10 @@ export function StudioInspectorDrawingSection({
                   color={color}
                   eyedropperActive={eyedropperActive}
                   onColorChange={setColor}
+                  recentColors={recentColors}
+                  ensureRecentColorsLoaded={ensureRecentColorsLoaded}
+                  rememberColor={rememberColor}
+                  clearRecentColors={clearRecentColors}
                   onEyedropperToggle={() => {
                     const next = !eyedropperActive;
                     if (next) disarmAllPixelTools();
@@ -422,12 +430,12 @@ export function StudioInspectorDrawingSection({
                   <Suspense fallback={null}>
                     <StudioQuickShapePanel
                       active={quickShapeActive}
+                      onCorrectCurrentStroke={onCorrectCurrentStroke}
                       matchedKindLabel={
                         tool === "draw" && liveDraftShapeKind && liveDraftShapeKind !== "freehand"
                           ? (QUICKSHAPE_KIND_LABELS[liveDraftShapeKind] ?? null)
                           : null
                       }
-                      onCorrectCurrentStroke={onCorrectCurrentStroke}
                       onOpenTutorial={() => openFeatureTutorial("smart-shape")}
                       onToggleActive={() => {
                         const next = !quickShapeActive;

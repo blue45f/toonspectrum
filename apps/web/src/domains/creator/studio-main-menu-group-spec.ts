@@ -305,6 +305,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       ours("brush/eraser", "지우개."),
       ours("brush/fill", "채우기."),
       ours("brush/smart-shape", "스마트 도형 — 펜 + 도형 보정 모드."),
+      ours("brush/correct-current-stroke", "현재 스트로크 교정 — 최근 자유선을 도형으로 편집하고 원본을 복원한다."),
       ours("brush/pixel-art", "픽셀 아트 모드."),
       ours("brush/silk-flow", "실크 흐름 대칭 브러시."),
       ours(

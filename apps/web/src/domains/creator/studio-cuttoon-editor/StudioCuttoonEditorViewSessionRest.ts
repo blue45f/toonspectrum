@@ -10,8 +10,8 @@ export type StudioCuttoonEditorViewSessionRest = {
   hydrateAnimaticWorkspace: (document: StudioAnimaticWorkspaceDocument) => void;
   commitAnimaticWorkspace: (before: StudioAnimaticWorkspaceDocument, after: StudioAnimaticWorkspaceDocument) => boolean;
   handleCapturePagesForIndices: (indices: number[]) => Promise<HTMLCanvasElement[]>;
-  onCorrectCurrentStroke?: () => void;
   quickShapeActive: any;
+  onCorrectCurrentStroke?: () => void;
   railMoreOpen: any;
   rasterFavoriteOnly: any;
   rasterRetouchTargetAvailable: any;

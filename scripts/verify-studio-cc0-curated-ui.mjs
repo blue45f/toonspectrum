@@ -138,13 +138,17 @@ try {
   const expectedSurfaceCount = finishedDetailed.filter(
     (asset) => asset.kind === 'surface-texture',
   ).length;
-  assert.ok(
-    (
-      await panel
-        .locator('article')
-        .first()
-        .getAttribute('data-cc0-asset-id')
-    ).startsWith('polyhaven-'),
+  const firstDetailedId = await panel
+    .locator('article')
+    .first()
+    .getAttribute('data-cc0-asset-id');
+  const firstDetailed = manifest.assets.find((asset) => asset.id === firstDetailedId);
+  assert.ok(firstDetailed, 'first visible CC0 asset must exist in the bundled manifest');
+  assert.ok(firstDetailedId.startsWith('polyhaven-'));
+  assert.equal(
+    firstDetailed.license.provider,
+    'Poly Haven',
+    'detailed originals must be ordered first',
   );
   steps.push('lazy loading and detailed originals first');
 

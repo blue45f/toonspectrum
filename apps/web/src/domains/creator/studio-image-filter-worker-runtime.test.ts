@@ -142,6 +142,26 @@ describe("studio-image-filter.worker runtime", () => {
     expect(Array.from(messages[1].imageData.data)).toEqual(Array.from(expected.data));
   });
 
+  it("preserves per-entry opacity across the Worker protocol with exact direct-chain pixels", async () => {
+    const { messages, scope } = await loadWorkerHarness();
+    const input = patternedImageData();
+    const expected = patternedImageData();
+    const el: ImageFilterFields = { smartFilterOperations: [
+      { id: "bright", engine: "brightness-contrast", enabled: true, opacity: 0.35, params: { brightness: 0.2, contrast: 20 } },
+      { id: "off", engine: "invert", enabled: true, opacity: 0, params: {} },
+      { id: "invert", engine: "invert", enabled: true, opacity: 0.6, params: {} },
+    ] };
+    const built = buildImageFilters(el, registry);
+    applyImageFilters(expected, built.filters, built.attrs);
+    scope.onmessage?.({
+      data: structuredClone({ type: "studio-image-filter/run", version: 1, request: { imageData: input, el } }),
+    } as unknown as MessageEvent<StudioImageFilterWorkerRunMessage>);
+    const message = messages[1];
+    if (message?.type !== "studio-image-filter/success") throw new Error("success response expected");
+    expect(Array.from(message.imageData.data)).toEqual(Array.from(expected.data));
+    expect(Array.from(message.imageData.data)).not.toEqual(Array.from(input.data));
+  });
+
   it("returns a structured failure for malformed pixel memory", async () => {
     const { messages, scope } = await loadWorkerHarness();
     const malformed = {
