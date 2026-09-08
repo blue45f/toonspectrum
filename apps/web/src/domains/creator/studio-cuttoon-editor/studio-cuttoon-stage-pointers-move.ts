@@ -6,6 +6,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { flushSync } from "react-dom";
+import { cancelStudioNodeEditPointer, ownsStudioNodeEditPointer, studioNodeEditSourceMatches } from "../vector/studio-node-edit-pointer-session";
 
 import { moveStudioSmartShapePoint } from "../studio-smart-shape-edit";
 
@@ -504,10 +505,16 @@ export function bindStudioCuttoonStagePointersMove(
     // pressures 기준으로 재계산한다(직전 draft 가 아니라) — updateNodeDragMove 의 "시작 스냅샷+델타"
     // 설계와 일치, crop 의 updateCropDrag 와 동일한 무누적오차 패턴.
     if (nodeEditDragRef.current) {
+      if (!ownsStudioNodeEditPointer(nodeEditDragRef.current, stagePointerEvent)) return;
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const { elId, session } = nodeEditDragRef.current;
         const el = elementById.get(elId);
+        if (!el || el.type !== "draw" || !studioNodeEditSourceMatches(nodeEditDragRef.current, el)
+          || h.activeSurfaceReviewLocked || isEffectivelyLocked(el, h.groups)) {
+          cancelStudioNodeEditPointer(h);
+          return;
+        }
         if (el && el.type === "draw") {
           if (session.tool === "move") {
             const { x, y } = updateNodeDragMove(session, pos);

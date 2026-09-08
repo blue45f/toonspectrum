@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { NODE_SMOOTH_DEFAULT_STRENGTH } from "../studio-curve-smoothing";
+import { cancelStudioNodeEditPointer, ownsStudioNodeEditPointer, type StudioNodeEditPointerSession } from "./studio-node-edit-pointer-session";
 
 import type {
   NodeDragSession,
@@ -20,7 +21,7 @@ export function useStudioVectorNodeBubbleEdit({
 }: UseStudioVectorNodeBubbleEditOptions) {
   // ── 벡터 노드 편집(자유선 점 이동·굵기) ──
   const [nodeEditTool, setNodeEditTool] = useState<NodeEditTool | null>(null);
-  const nodeEditDragRef = useRef<{ elId: string; session: NodeDragSession } | null>(null);
+  const nodeEditDragRef = useRef<StudioNodeEditPointerSession | null>(null);
   const nodeEditRafRef = useRef<number | null>(null);
   const pendingNodeEditDraftRef = useRef<{ elId: string; points: number[]; pressures: number[] } | null>(null);
   const [nodeEditDraft, setNodeEditDraft] = useState<{ elId: string; points: number[]; pressures: number[] } | null>(null);
@@ -34,21 +35,32 @@ export function useStudioVectorNodeBubbleEdit({
     });
   };
 
-  useEffect(() => () => {
-    if (nodeEditRafRef.current !== null) globalThis.cancelAnimationFrame(nodeEditRafRef.current);
-  }, []);
+  const resetNodeEditSession = useCallback(() => cancelStudioNodeEditPointer({
+    nodeEditDragRef, pendingNodeEditDraftRef, nodeEditRafRef, setNodeEditDraft,
+  }), []);
+
+  useEffect(() => {
+    const cancelOutsideStage = (event: PointerEvent) => {
+      const drag = nodeEditDragRef.current;
+      if (drag && ownsStudioNodeEditPointer(drag, event)) resetNodeEditSession();
+    };
+    // Stage pointerup commits first; any remaining session ended outside it and is discarded.
+    globalThis.addEventListener("pointerup", cancelOutsideStage);
+    globalThis.addEventListener("pointercancel", cancelOutsideStage);
+    globalThis.addEventListener("lostpointercapture", cancelOutsideStage);
+    return () => {
+      globalThis.removeEventListener("pointerup", cancelOutsideStage);
+      globalThis.removeEventListener("pointercancel", cancelOutsideStage);
+      globalThis.removeEventListener("lostpointercapture", cancelOutsideStage);
+      resetNodeEditSession();
+    };
+  }, [resetNodeEditSession]);
 
   useEffect(() => {
     void selectedId;
-    nodeEditDragRef.current = null;
-    pendingNodeEditDraftRef.current = null;
-    if (nodeEditRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(nodeEditRafRef.current);
-      nodeEditRafRef.current = null;
-    }
-    setNodeEditDraft(null);
+    resetNodeEditSession();
     setNodeEditTool(null);
-  }, [selectedId]);
+  }, [selectedId, resetNodeEditSession]);
 
   const [nodeSmoothStrength, setNodeSmoothStrength] = useState(NODE_SMOOTH_DEFAULT_STRENGTH);
   const nodeSmoothStrengthAtDragStartRef = useRef(NODE_SMOOTH_DEFAULT_STRENGTH);
