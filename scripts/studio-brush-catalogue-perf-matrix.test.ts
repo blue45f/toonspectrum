@@ -4,6 +4,8 @@ import { STUDIO_PAINT_BRUSH_CATALOG_ITEMS } from "../apps/web/src/domains/creato
 import {
   resolveStudioBrushDynamics,
   resolveStudioBrushDynamicsForNormalizedSettings,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
   type StudioBrushDynamicsRecipe,
 } from "../apps/web/src/domains/creator/brush/studio-brush-dynamics";
 import { materializeAllStudioBrushPackSelections } from "../apps/web/src/domains/creator/brush/studio-brush-pack-runtime";
@@ -405,23 +407,26 @@ describe("studio brush catalogue paint performance matrix", () => {
     expect(failures, JSON.stringify(failures.slice(0, 8))).toEqual([]);
     expect(freezes, JSON.stringify(freezes.slice(0, 8))).toEqual([]);
 
-    // How much work each crayon-family row plans, pinned exactly.
+    // How much work each current V4 crayon-family row plans, pinned exactly.
     //
     // This is the half of the freeze gate that owes nothing to a clock. The plan is deterministic
     // -- the determinism probe below proves the digests repeat -- so these counts are identical on
     // every machine under every load, and a regression that makes a planner emit more geometry is
     // convicted here exactly, for all five brushes, including the four whose CPU budget has slack.
-    // Recorded on the reference container and reproduced unchanged idle and under six spinning
-    // hogs on four cores.
+    // V4 sizes spacing after taper. Its deliberately denser tips have their own measured pins;
+    // the separate persisted-V3 tests below retain all of the historical pins and geometry.
     const PLANNED_WORK: Readonly<Record<string, readonly [number, number]>> = {
-      crayon: [3_538, 11_231],
-      chalk: [2_000, 10_000],
-      charcoal: [1_979, 9_895],
-      pastel: [1_658, 8_290],
-      "oil-pastel": [2_295, 11_475],
+      crayon: [3_546, 11_253],
+      chalk: [2_007, 10_035],
+      charcoal: [1_988, 9_940],
+      pastel: [1_660, 8_300],
+      "oil-pastel": [2_296, 11_480],
     };
     expect(Object.keys(PLANNED_WORK).sort()).toEqual([...STUDIO_BRUSH_CRAYON_FAMILY_IDS].sort());
     for (const family of report.crayonFamily) {
+      expect(planStudioBrushCataloguePaintDynamics(family.catalogId)?.depositPipeline).toBe(
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
+      );
       expect(family.ok, `${family.catalogId}: ${family.failure}`).toBe(true);
       expect(
         family.freeze,
@@ -485,6 +490,26 @@ describe("studio brush catalogue paint performance matrix", () => {
     ).toBe(report.determinism.probeCount);
 
     expect(report.ok).toBe(true);
+  });
+
+  it.each([
+    ["crayon", 3_538, 11_231, "fe67ae85"],
+    ["chalk", 2_000, 10_000, "570a2a90"],
+    ["charcoal", 1_979, 9_895, "0ae7f47f"],
+    ["pastel", 1_658, 8_290, "31a8e83d"],
+    ["oil-pastel", 2_295, 11_475, "a1a51e33"],
+  ] as const)("preserves the persisted V3 work and geometry for %s", (catalogId, dabCount, markCount, digest) => {
+    // These are the pre-V4 work pins. A saved V3 revision must keep them even while new
+    // authoring uses taper-aware V4 spacing, which deliberately emits a different plan.
+    const replay = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
+      sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+    });
+    expect(replay.ok, replay.failure ?? catalogId).toBe(true);
+    expect(replay.path).toBe("causal-coverage");
+    expect(replay.dabCount).toBe(dabCount);
+    expect(replay.markCount).toBe(markCount);
+    expect(replay.digest).toBe(digest);
   });
 
   it("replays identical same-seed digests and feeds honest bench receipts", () => {

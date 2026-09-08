@@ -18,6 +18,7 @@ import {
   planNormalizedStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
+  type StudioDynamicBrushDepositPipeline,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
 } from "../apps/web/src/domains/creator/brush/studio-brush-dynamics";
@@ -583,6 +584,9 @@ export function evaluateStudioBrushCataloguePaintPerfRow(
     readonly sampleCount?: number;
     readonly budgetMs?: number;
     readonly packById?: ReadonlyMap<string, StudioBrushPackSelection>;
+    /** Explicit persisted replay revision; omission exercises the current authored default. */
+    readonly depositPipeline?: Extract<StudioDynamicBrushDepositPipeline,
+      "causal-deposit-v3-segmented" | "causal-deposit-v4-taper-spacing">;
   },
 ): StudioBrushCataloguePerfRow {
   const sampleCount = options?.sampleCount ?? MATRIX_SAMPLE_COUNT;
@@ -592,7 +596,13 @@ export function evaluateStudioBrushCataloguePaintPerfRow(
     ?? (pack?.runtimeBrushId
       ? resolveStudioBrushDynamicsPresetId(pack.runtimeBrushId)
       : null);
-  const dynamics = planStudioBrushCataloguePaintDynamics(catalogId, options?.packById);
+  const authoredDynamics = planStudioBrushCataloguePaintDynamics(catalogId, options?.packById);
+  const dynamics = authoredDynamics && options?.depositPipeline
+    ? normalizeStudioBrushDynamicsSettings({
+      ...authoredDynamics,
+      depositPipeline: options.depositPipeline,
+    })
+    : authoredDynamics;
   const identity = resolveStudioDynamicBrushMaterialIdentity(
     pack?.runtimeBrushId ?? catalogId,
     catalogId,
