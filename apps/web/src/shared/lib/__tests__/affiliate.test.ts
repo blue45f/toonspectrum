@@ -20,6 +20,14 @@ describe("Affiliate utilities", () => {
   });
 
   describe("buildAffiliateUrl", () => {
+    it("rejects query-parameter arrays and inherited registry keys", () => {
+      expect(buildAffiliateUrl("ridi", ["/books/1", "?"] as unknown as string)).toBe("");
+      expect(buildAffiliateUrl("ridi", { includes: () => true } as unknown as string)).toBe("");
+      expect(buildAffiliateUrl(["ridi"] as unknown as string, "/books/1")).toBe("/books/1");
+      expect(buildAffiliateUrl("__proto__", "/books/1")).toBe("/books/1");
+      expect(buildAffiliateUrl("constructor", "/books/1")).toBe("/books/1");
+    });
+
     it("returns empty string if URL is falsy", () => {
       expect(buildAffiliateUrl("ridi", "")).toBe("");
     });

@@ -12,6 +12,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { gunzipSync } from "node:zlib";
 
+import { htmlToText } from "./lib/html-text.mjs";
+
 // ── 데이터 모양 ──────────────────────────────────────────────────────────────
 // 기존 필드(title/source/url/date)는 하위호환 유지, category/related 를 추가한다.
 
@@ -83,16 +85,7 @@ export interface ParsedRssItem {
 }
 
 function decodeXmlText(s: string): string {
-  return s
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, "&")
-    .replace(/<[^>]+>/g, "")
-    .trim();
+  return htmlToText(s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")).trim();
 }
 
 // <item> 블록에서 헤드라인·출처·링크·날짜를 추출한다. Google News 제목은

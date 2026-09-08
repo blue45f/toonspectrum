@@ -156,7 +156,7 @@ test("non-colliding IDs and the first collision retain their existing identity",
 
 test("long-name repeated collisions terminate and remain unique", async () => {
   const code = `
-    import { buildAssetId } from ${JSON.stringify(scriptUrl.href)};
+    const { buildAssetId } = await import(process.argv[1]);
     const item = { path: '/fixture/a.glb', sourcePath: 'a.glb', name: 'a'.repeat(200), category: 'prop' };
     const used = new Set();
     for (let i = 0; i < 250; i++) {
@@ -166,13 +166,13 @@ test("long-name repeated collisions terminate and remain unique", async () => {
     if (used.size !== 250) throw Error('duplicate ID');
     console.log(used.size);
   `;
-  const { stdout } = await exec(process.execPath, ["--experimental-strip-types", "--input-type=module", "--eval", code], { timeout: 3000 });
+  const { stdout } = await exec(process.execPath, ["--experimental-strip-types", "--input-type=module", "--eval", code, scriptUrl.href], { timeout: 3000 });
   assert.equal(stdout.trim(), "250");
 });
 
 test("module import is inert and makes no requests", async () => {
-  const code = `globalThis.fetch = () => { throw Error('unexpected request'); }; await import(${JSON.stringify(scriptUrl.href)}); console.log('import-only');`;
-  const { stdout } = await exec(process.execPath, ["--experimental-strip-types", "--input-type=module", "--eval", code], { timeout: 3000 });
+  const code = "globalThis.fetch = () => { throw Error('unexpected request'); }; await import(process.argv[1]); console.log('import-only');";
+  const { stdout } = await exec(process.execPath, ["--experimental-strip-types", "--input-type=module", "--eval", code, scriptUrl.href], { timeout: 3000 });
   assert.equal(stdout.trim(), "import-only");
 });
 

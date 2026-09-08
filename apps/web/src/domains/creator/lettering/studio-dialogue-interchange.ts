@@ -1146,6 +1146,38 @@ function parseTimestamp(value: string, vtt: boolean): number | undefined {
   return result <= STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxTimestampMs ? result : undefined;
 }
 
+const SUBTITLE_PRESENTATION_TAGS = new Set(["b", "i", "u", "ruby", "rt", "c", "v", "lang", "font"]);
+
+function isSubtitlePresentationToken(token: string): boolean {
+  if (/^(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}$/u.test(token)) return true;
+  const body = token.startsWith("/") ? token.slice(1) : token;
+  const delimiter = body.search(/[. \t]/u);
+  const name = delimiter < 0 ? body : body.slice(0, delimiter);
+  if (!SUBTITLE_PRESENTATION_TAGS.has(name.toLowerCase())) return false;
+  const suffix = delimiter < 0 ? "" : body.slice(delimiter);
+  return /^(?:\.[^\s.<>]+)*(?:[ \t][^<>]*)?$/u.test(suffix);
+}
+
+/** Read tokens once; unknown or unterminated markup remains literal dialogue. */
+function stripSubtitlePresentation(source: string): string {
+  const chunks: string[] = [];
+  let tokenStart = -1;
+  let textStart = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    if (source[index] === "<") {
+      tokenStart = index;
+    } else if (source[index] === ">" && tokenStart >= 0) {
+      if (isSubtitlePresentationToken(source.slice(tokenStart + 1, index))) {
+        chunks.push(source.slice(textStart, tokenStart));
+        textStart = index + 1;
+      }
+      tokenStart = -1;
+    }
+  }
+  chunks.push(source.slice(textStart));
+  return chunks.join("");
+}
+
 function parseTimedText(text: string, vtt: boolean): StudioDialogueInterchangeResult {
   let normalized = text.replace(/\r\n?/gu, "\n").trim();
   if (vtt) {
@@ -1167,7 +1199,9 @@ function parseTimedText(text: string, vtt: boolean): StudioDialogueInterchangeRe
     if (startMs == null || endMs == null || endMs <= startMs) {
       fail("INVALID_CUE", "자막 시간 범위가 올바르지 않습니다.");
     }
-    const payload = lines.slice(timingIndex + 1).join("\n").replace(/<[^>]*>/gu, "").trim();
+    // Strip only the presentation syntax supported by SRT/WebVTT. Unknown
+    // markup stays literal dialogue text; this codec never produces trusted HTML.
+    const payload = stripSubtitlePresentation(lines.slice(timingIndex + 1).join("\n")).trim();
     if (!payload) continue;
     const firstLineEnd = payload.indexOf("\n");
     const firstLine = firstLineEnd >= 0 ? payload.slice(0, firstLineEnd) : payload;
