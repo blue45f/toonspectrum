@@ -6,6 +6,8 @@ on:
     paths:
       - ".github/workflows/studio-ink-live-commit.yml"
       - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"
+      - "scripts/studio-ink-fidelity-cases.ts"
+      - "scripts/studio-ink-fidelity-cases.test.ts"
       - "scripts/verify-studio-long-stroke.mts"
       - "scripts/lib/studio-verify-preview-harness.mjs"
       - "apps/web/src/domains/creator/**"
@@ -14,6 +16,8 @@ on:
     paths:
       - ".github/workflows/studio-ink-live-commit.yml"
       - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"
+      - "scripts/studio-ink-fidelity-cases.ts"
+      - "scripts/studio-ink-fidelity-cases.test.ts"
       - "scripts/verify-studio-long-stroke.mts"
       - "scripts/lib/studio-verify-preview-harness.mjs"
       - "apps/web/src/domains/creator/**"
