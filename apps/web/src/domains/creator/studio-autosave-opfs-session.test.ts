@@ -319,6 +319,32 @@ describe("StudioAutosaveOpfsSession", () => {
     expect(journal.releaseCount).toBe(2);
   });
 
+  it("released-handle regression: returns an in-flight writer after leadership is released", async () => {
+    const journal = new FakeAutosaveJournal();
+    let finishAppend!: () => void;
+    journal.appendGate = new Promise<void>((resolve) => { finishAppend = resolve; });
+    const documentLease: { role: "leader" | "follower"; basis: "web-lock" } = {
+      role: "leader", basis: "web-lock",
+    };
+    const target = new StudioAutosaveOpfsSession({
+      autosaveKey: "autosave-primary", journal, ownerId: "closing-leader",
+      now: () => journal.now, documentLease,
+    });
+    const writing = target.write(payload("2026-07-30T01:00:00.000Z"));
+    await vi.waitFor(() => expect(journal.acquireCount).toBe(1));
+    documentLease.role = "follower";
+    finishAppend();
+    try {
+      await writing;
+      expect(journal.releaseCount).toBe(1);
+      await expect(target.write(payload("2026-07-30T01:01:00.000Z")))
+        .rejects.toMatchObject({ name: "StudioAutosaveDocumentBusyError" });
+      expect(journal.acquireCount).toBe(1);
+    } finally {
+      await target.dispose();
+    }
+  });
+
   it("retains journal fencing when document Web Locks are unavailable", async () => {
     const journal = new FakeAutosaveJournal();
     const target = new StudioAutosaveOpfsSession({

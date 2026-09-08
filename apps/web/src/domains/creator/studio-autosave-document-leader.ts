@@ -192,11 +192,14 @@ function queuePromotion(
 
 function createLease(record: LeadershipRecord, documentKey: string): StudioAutosaveDocumentLease {
   let released = false;
+  const releaseWaiters = new Set<() => void>();
   return Object.freeze({
     documentKey,
     lockName: record.lockName,
     get role(): StudioAutosaveDocumentRole {
-      return record.role;
+      // Releasing one handle must revoke that handle without demoting other same-tab owners
+      // which still retain the shared Web Lock through this record's reference count.
+      return released ? "follower" : record.role;
     },
     get basis(): StudioAutosaveDocumentLeadershipBasis {
       return record.basis;
@@ -205,31 +208,39 @@ function createLease(record: LeadershipRecord, documentKey: string): StudioAutos
       readonly timeoutMs?: number;
       readonly signal?: AbortSignal;
     } = {}): Promise<boolean> {
+      if (released) return false;
       if (record.role === "leader") return true;
       const timeoutMs = options.timeoutMs;
       if (timeoutMs === 0) return false;
-      if (timeoutMs === undefined && options.signal === undefined) return record.promotion;
       return new Promise<boolean>((resolve) => {
         let timer: ReturnType<typeof setTimeout> | null = null;
         let done = false;
+        const onRelease = (): void => finish(false);
+        const onAbort = (): void => finish(record.role === "leader");
         const finish = (value: boolean): void => {
           if (done) return;
           done = true;
           if (timer !== null) clearTimeout(timer);
-          resolve(value);
+          releaseWaiters.delete(onRelease);
+          options.signal?.removeEventListener("abort", onAbort);
+          resolve(!released && value);
         };
+        releaseWaiters.add(onRelease);
         if (timeoutMs !== undefined) {
           timer = setTimeout(() => finish(record.role === "leader"), timeoutMs);
         }
-        options.signal?.addEventListener("abort", () => finish(record.role === "leader"), {
-          once: true,
-        });
+        if (options.signal?.aborted) {
+          onAbort();
+          return;
+        }
+        options.signal?.addEventListener("abort", onAbort, { once: true });
         void record.promotion.then((promoted) => finish(promoted));
       });
     },
     async release(): Promise<void> {
       if (released) return;
       released = true;
+      for (const finish of releaseWaiters) finish();
       record.refCount -= 1;
       if (record.refCount > 0) return;
       record.registry.delete(record.lockName);
