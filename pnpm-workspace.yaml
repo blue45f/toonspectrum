@@ -67,6 +67,7 @@ overrides:
   'path-to-regexp@>=8.0.0 <8.4.2': 8.4.2
   serialize-javascript: '>=7.0.3'
   piscina: '>=4.9.3'
+  drizzle-orm: '>=0.45.2'
   vitest: '>=4.1.9'
   '@vitest/coverage-v8': '>=4.1.9'
   '@vitest/ui': '>=4.1.9'
