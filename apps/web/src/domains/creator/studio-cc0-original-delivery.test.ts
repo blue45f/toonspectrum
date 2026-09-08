@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,18 +32,24 @@ interface RawManifest extends Record<string, unknown> {
   assets: RawAsset[];
 }
 
-const root = fileURLToPath(new URL("../../../../../", import.meta.url));
-const publicPack = path.join(root, "apps/web/public/assets/studio/cc0-20260906");
-const evidencePack = path.join(root, "artifacts/studio-asset-expansion/pbr-20260908");
-const manifestBytes = readFileSync(path.join(publicPack, "manifest.json"));
-const manifest = JSON.parse(manifestBytes.toString("utf8")) as RawManifest;
-const publication = JSON.parse(
-  readFileSync(path.join(evidencePack, "publication-report.json"), "utf8"),
-) as {
+interface PublicationReport {
   addedIds: string[];
   catalogCount: number;
   afterManifestSha256: string;
-};
+}
+
+const root = fileURLToPath(new URL("../../../../../", import.meta.url));
+const publicPack = path.join(root, "apps/web/public/assets/studio/cc0-20260906");
+const evidencePack = path.join(root, "artifacts/studio-asset-expansion/pbr-20260908");
+const publicationReportPath = path.join(evidencePack, "publication-report.json");
+const originalVariantsReportPath = path.join(
+  evidencePack,
+  "original-variants-publication-report.json",
+);
+const hasPublicationEvidence =
+  existsSync(publicationReportPath) && existsSync(originalVariantsReportPath);
+const manifestBytes = readFileSync(path.join(publicPack, "manifest.json"));
+const manifest = JSON.parse(manifestBytes.toString("utf8")) as RawManifest;
 const originals = [
   {
     id: "polyhaven-cassette-player",
@@ -67,6 +73,12 @@ const originals = [
 const cassette = manifest.assets.find(({ id }) => id === originals[0].id)!;
 const digest = (bytes: Uint8Array | string) =>
   createHash("sha256").update(bytes).digest("hex");
+
+function readPublicationReport() {
+  return JSON.parse(
+    readFileSync(publicationReportPath, "utf8"),
+  ) as PublicationReport;
+}
 
 function parseOriginal(original: unknown, patch: Record<string, unknown> = {}) {
   return parseStudioCc0Catalog({
@@ -216,8 +228,11 @@ describe("published CC0 original bytes and provenance", () => {
       expect(original.path).not.toBe(asset.path);
     },
   );
+});
 
+describe.skipIf(!hasPublicationEvidence)("CC0 local publication evidence", () => {
   it("preserves all 1212 primary entries and the prior publication digest after removing only three variants", () => {
+    const publication = readPublicationReport();
     expect(manifest.assets).toHaveLength(1212);
     expect(manifest.assets).toHaveLength(publication.catalogCount);
     expect(manifest.assets.filter(({ original }) => original)).toHaveLength(3);
@@ -234,6 +249,7 @@ describe("published CC0 original bytes and provenance", () => {
   });
 
   it("preserves every approved expansion primary ID, URL, size, hash and actual file", () => {
+    const publication = readPublicationReport();
     expect(publication.addedIds).toHaveLength(69);
     expect(new Set(publication.addedIds).size).toBe(69);
     for (const id of publication.addedIds) {
@@ -246,11 +262,9 @@ describe("published CC0 original bytes and provenance", () => {
   });
 
   it("records the optional-variant manifest change in a separate publication report", () => {
+    const publication = readPublicationReport();
     const report = JSON.parse(
-      readFileSync(
-        path.join(evidencePack, "original-variants-publication-report.json"),
-        "utf8",
-      ),
+      readFileSync(originalVariantsReportPath, "utf8"),
     ) as Record<string, unknown>;
     expect(report).toMatchObject({
       beforeManifestSha256: publication.afterManifestSha256,
