@@ -4,12 +4,11 @@ import { StudioRealtimeRevocationModule } from "../../infrastructure/studio-real
 import { SupabaseObjectStorageModule } from "../../infrastructure/supabase-object-storage/supabase-object-storage.module";
 
 import { creatorAssetSchemaPreflightProvider } from "./creator-asset-schema-preflight";
-import {
-  CreatorCollaborationRepository,
-  creatorCollaborationRepositoryProvider,
-} from "./creator-collaboration.repository";
+import { CreatorCollaborationRepository } from "./creator-collaboration.repository";
 import { creatorDraftCollaborationRepositoryProvider } from "./creator-draft-collaboration.repository";
 import { CreatorController } from "./creator.controller";
+import { creatorPublicationCollaborationRepositoryProvider } from "./creator-publication-collaboration.repository";
+import { CreatorPublicationSchedulerService } from "./creator-publication-scheduler.service";
 import { CreatorService } from "./creator.service";
 import {
   StudioRasterAssetUploadGuard,
@@ -78,7 +77,7 @@ const supabaseObjectStorageModule =
   ],
   providers: [
     creatorAssetSchemaPreflightProvider,
-    creatorCollaborationRepositoryProvider,
+    creatorPublicationCollaborationRepositoryProvider,
     creatorDraftCollaborationRepositoryProvider,
     studioCrdtClusterLoadRepositoryProvider,
     studioCrdtRasterCheckpointRepositoryProvider,
@@ -93,6 +92,7 @@ const supabaseObjectStorageModule =
     studioTeamCommentRepositoryProvider,
     studioVoiceIceConfigurationProvider,
     studioWorkAssetRepositoryProvider,
+    CreatorPublicationSchedulerService,
     CreatorService,
     StudioRasterAssetService,
     StudioRemoteReferenceImageService,

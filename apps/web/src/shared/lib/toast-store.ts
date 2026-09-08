@@ -4,7 +4,7 @@ import { create } from "zustand";
 // 서버 상태(react-query) 와 분리, 외부 의존성 없이 zustand 로만 구현한다.
 // 접근성: 호스트가 aria-live="polite" 영역에 렌더하고, 모션은 globals.css 의 전역 reduced-motion 가드를 따른다.
 
-export type ToastTone = "default" | "success" | "info";
+export type ToastTone = "default" | "success" | "info" | "error";
 
 export interface Toast {
   id: number;

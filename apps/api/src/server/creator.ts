@@ -8,8 +8,6 @@ export {
 } from "./creator/asset-generation";
 export {
   ensureDefaultChallenges,
-  getChallenge,
-  listChallenges,
   type CreatorChallengeDetail,
   type CreatorChallengeSummary,
 } from "./creator/challenges";
@@ -38,10 +36,27 @@ export {
   type CreatorPublicProfile,
 } from "./creator/follows";
 export {
+  addComment,
+  createWork,
+  getWork,
+  listComments,
+  toggleLike,
+  updateWork,
+} from "./creator/publication-api";
+export { listSeries } from "./creator/publication-list-series";
+export {
+  CreatorPublicationValidationError,
+  bumpViews,
+  deleteWork,
+  getChallenge,
+  getSeries,
+  listChallenges,
+  listWorks,
+  promoteDueCreatorPublications,
+} from "./creator/publication";
+export {
   createSeries,
   deleteSeries,
-  getSeries,
-  listSeries,
   updateSeries,
   type CreatorSeriesDetail,
   type CreatorSeriesSummary,
@@ -69,7 +84,6 @@ export {
   listWorkRevisions,
   restoreWorkRevision,
 } from "./creator/work-revision-service";
-export { addComment, listComments, toggleLike } from "./creator/work-social";
 export {
   parseCreatorSort,
   type CreatorAuthor,
@@ -86,4 +100,3 @@ export {
   type CreatorWorkStatus,
   type CreatorWorkSummary,
 } from "./creator/works-contract";
-export { bumpViews, createWork, deleteWork, getWork, listWorks, updateWork } from "./creator/works";

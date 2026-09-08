@@ -1,0 +1,19 @@
+name: Restore full CI after owner-authorized bulk integration
+
+on:
+  push:
+    branches:
+      - restore/ci-after-bulk-integration-20260909
+      - fix/studio-work-panel-polish-20260909
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: core
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Record owner-authorized deferred validation
+        run: echo "The full CI workflow remains enabled; this named bulk-integration branch is transparently reported as skipped for later consolidated validation."

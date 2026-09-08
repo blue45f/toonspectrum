@@ -8,6 +8,14 @@ export interface StudioInspectorContextSnapshot {
   readonly selectedType: string | null;
 }
 
+export interface StudioInspectorContextRouteOptions {
+  /**
+   * Keep the remembered image specialist section across selection-context changes.
+   * Explicit tool activation still wins so a user command can never be swallowed by the pin.
+   */
+  readonly preserveImageSection?: boolean;
+}
+
 const IMAGE_INSPECTOR_SELECTION_TYPES = new Set(["image", "draw"]);
 
 /** True only when the current selection can actually present the five image-tool subtabs. */
@@ -31,12 +39,17 @@ export function studioInspectorContextUsesImageTabs(
  * Entering a new image-capable context therefore starts at Quick, while same-type image-to-image
  * selection preserves the artist's local workflow. Merely visiting another inspector primary tab
  * does not reset the subtab while the same image selection remains active.
+ *
+ * `preserveImageSection` is the explicit artist override exposed by the work-panel pin. It freezes
+ * this automatic reset only; it does not pin the selected object or suppress an explicitly
+ * activated image tool, so document mutation and undo continue to target the live selection.
  */
 export function resolveStudioInspectorContextRoute(
   layout: StudioInspectorLayout,
   previous: StudioInspectorContextSnapshot | null,
   next: StudioInspectorContextSnapshot,
   activeImageTool?: StudioInspectorLayout["image"] | null,
+  options: StudioInspectorContextRouteOptions = {},
 ): StudioInspectorLayout {
   if (!studioInspectorContextUsesImageTabs(next)) return layout;
 
@@ -47,6 +60,8 @@ export function resolveStudioInspectorContextRoute(
       ? layout
       : { ...layout, primary: "properties", image: activeImageTool };
   }
+
+  if (options.preserveImageSection) return layout;
 
   const enteringNewImageContext =
     previous === null
