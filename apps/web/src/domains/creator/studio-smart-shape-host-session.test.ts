@@ -8,6 +8,7 @@ import {
   applyStudioSmartShapeEditSession,
   beginStudioSmartShapeEditSession,
   bindStudioSmartShapeHostControllers,
+  type StudioSmartShapeEditSession,
 } from "./studio-smart-shape-host-session";
 
 import type { DrawEl, El } from "./studio-element-model";
@@ -117,7 +118,7 @@ describe("studio smart shape host session", () => {
       canApply: true,
       drawing: false,
       current: source as El,
-      groups: [] as const,
+      groups: [],
       elements: [source] as El[],
     };
     expect(applyStudioSmartShapeEditSession({ ...base, pageId: "page-2" }).ok).toBe(false);
@@ -129,7 +130,7 @@ describe("studio smart shape host session", () => {
 
   it("bindStudioSmartShapeHostControllers drives begin/apply and commits the replaced document", () => {
     const source = stroke();
-    let session: ReturnType<typeof beginStudioSmartShapeEditSession> extends { ok: true; session: infer S } ? S | null : never = null;
+    let session: StudioSmartShapeEditSession | null = null;
     let selectedId: string | null = "stroke-1";
     let committed: El[] | null = null;
     const host = bindStudioSmartShapeHostControllers({
