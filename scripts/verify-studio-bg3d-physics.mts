@@ -39,7 +39,7 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
-  "/api/analytics/traffic/",
+  "/api/analytics/traffic/page-view",
 ] as const;
 const VITE_ERROR_OVERLAY_SELECTOR = [
   "vite-error-overlay",
@@ -308,7 +308,40 @@ async function waitForBackground3dDialog(page: Page): Promise<Locator> {
     exact: true,
   });
   assertCondition(await namedDialog.count() === 1, "3D dialog lost its accessible name contract");
+  await selectPhysicsRenderer(dialog);
   return dialog;
+}
+
+async function selectPhysicsRenderer(dialog: Locator): Promise<void> {
+  // ADR-0018 keeps an unavailable WebGPU selection visible without mounting another engine.
+  // This headless physics lane must make the same explicit WebGL2 choice as an artist before
+  // preparing scene objects; otherwise a successful Worker result has no objects to project onto.
+  await dialog.getByRole("tab", { name: "보기", exact: true }).click();
+  const webgl2 = dialog.getByTestId("studio-bg3d-engine-preference-webgl2");
+  await webgl2.waitFor({ state: "visible", timeout: 15_000 });
+  await waitForEnabled(webgl2, "explicit WebGL2 selection enabled");
+  if (await webgl2.getAttribute("aria-pressed") !== "true") await webgl2.click();
+  await dialog.getByTestId("studio-bg3d-engine-active-backend")
+    .filter({ hasText: "WebGL2 사용 중" })
+    .waitFor({ state: "visible", timeout: 30_000 });
+  const canvas = dialog.getByTestId("studio-bg3d-viewport").locator("canvas");
+  await canvas.waitFor({ state: "visible", timeout: 15_000 });
+  const renderer = await canvas.evaluate((element) => {
+    const gl = (element as HTMLCanvasElement).getContext("webgl2");
+    if (!gl || gl.isContextLost()) return null;
+    const debug = gl.getExtension("WEBGL_debug_renderer_info");
+    return {
+      backend: "webgl2",
+      vendor: debug ? gl.getParameter(debug.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
+      renderer: debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+      version: gl.getParameter(gl.VERSION),
+      width: gl.drawingBufferWidth,
+      height: gl.drawingBufferHeight,
+    };
+  });
+  assertCondition(renderer && renderer.width > 0 && renderer.height > 0,
+    "the selected physics renderer has no live WebGL2 drawing buffer");
+  log(`physics renderer: ${JSON.stringify(renderer)}`);
 }
 
 async function setupPlaneAndBox(page: Page, dialog: Locator): Promise<Locator> {
@@ -528,6 +561,7 @@ async function runDesktop(browser: Browser, url: string): Promise<string[]> {
     log(`desktop PASS: previewY=${bakePose.previewY?.toFixed(4)} bakedY=${bakedY.toFixed(4)}`);
     return screenshots;
   } catch (error) {
+    if (collector.errors.length > 0) log(`desktop browser diagnostics: ${collector.errors.join("\n")}`);
     screenshots.push(await screenshot(page, "desktop-failure.png").catch(() => ""));
     throw error;
   } finally {
@@ -630,6 +664,7 @@ async function runMobile(browser: Browser, url: string, width: 390 | 320): Promi
     log(`mobile ${width}px PASS: touch targets >=44px, no horizontal overflow`);
     return screenshots;
   } catch (error) {
+    if (collector.errors.length > 0) log(`${width}px browser diagnostics: ${collector.errors.join("\n")}`);
     screenshots.push(await screenshot(page, `mobile-${width}-failure.png`).catch(() => ""));
     throw error;
   } finally {
@@ -689,6 +724,7 @@ async function main(): Promise<void> {
     });
     log(`preview ready @ ${studioUrl}`);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    log(`physics browser: Chromium ${browser.version()} (headless)`);
     const activeBrowser = browser;
     const results: BrowserCaseResult[] = [];
     results.push(await runCase("desktop", () => runDesktop(activeBrowser, studioUrl)));
