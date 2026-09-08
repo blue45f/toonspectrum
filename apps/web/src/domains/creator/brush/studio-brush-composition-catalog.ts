@@ -22,7 +22,6 @@ import {
   type StudioBrushCompositionCost,
   type StudioBrushCompositionIntegration,
   type StudioBrushCompositionNode,
-  type StudioBrushCompositionRights,
 } from "./studio-brush-composition-types";
 
 export {
