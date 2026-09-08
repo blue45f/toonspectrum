@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import { createEmptyStudioVersionCoordinates } from "../studio-foundation/studio-version-coordinates";
@@ -10,16 +12,11 @@ import {
   projectStudioArchiveV3ToV2Snapshot,
   serializeStudioProjectArchiveV3,
   validateStudioProjectArchiveV3,
-  type StudioProjectArchiveSectionKey,
+  type StudioProjectArchiveManifestV3,
+  type StudioProjectArchiveV3,
 } from "./studio-project-archive-v3";
 
 const NOW = "2026-09-07T00:00:00.000Z";
-
-function sectionDigests(): Readonly<Record<StudioProjectArchiveSectionKey, string>> {
-  return Object.fromEntries(
-    STUDIO_PROJECT_ARCHIVE_SECTION_KEYS.map((key) => [key, `digest-${key}`]),
-  ) as Readonly<Record<StudioProjectArchiveSectionKey, string>>;
-}
 
 function snapshot(): StudioProjectSnapshot {
   return {
@@ -63,15 +60,17 @@ function snapshot(): StudioProjectSnapshot {
   };
 }
 
-function migrate(source = snapshot()) {
+function migrate(
+  source = snapshot(),
+  integrity: Partial<Pick<StudioProjectArchiveManifestV3, "contentDigest" | "sectionDigests">> = {},
+) {
   return migrateStudioProjectSnapshotV2ToArchiveV3({
     snapshot: source,
     archiveId: "archive-1",
     workScope: "work:episode-1",
     createdAt: NOW,
     sourceCoordinates: createEmptyStudioVersionCoordinates(),
-    contentDigest: "digest-content-root",
-    sectionDigests: sectionDigests(),
+    ...integrity,
     selectedElementIds: ["element-1"],
     primarySelectionId: "element-1",
     zoom: 1.25,
@@ -82,6 +81,71 @@ function migrate(source = snapshot()) {
 }
 
 describe("Studio project archive v3", () => {
+  it("computes canonical SHA-256 pins that survive JSON serialization and property reordering", () => {
+    const { archive } = migrate();
+    const expectedMetadata = JSON.stringify({
+      description: archive.metadata.description,
+      linkedChallengeId: archive.metadata.linkedChallengeId,
+      linkedSeriesId: archive.metadata.linkedSeriesId,
+      linkedTitleId: archive.metadata.linkedTitleId,
+      tagsText: archive.metadata.tagsText,
+      title: archive.metadata.title,
+    });
+    expect(archive.manifest.sectionDigests.metadata).toBe(
+      `sha256:${createHash("sha256").update(expectedMetadata).digest("hex")}`,
+    );
+    expect(archive.manifest.contentDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    const persisted = JSON.parse(serializeStudioProjectArchiveV3(archive)) as StudioProjectArchiveV3;
+    const reordered = {
+      ...persisted,
+      metadata: Object.fromEntries(Object.entries(persisted.metadata).reverse()) as StudioProjectArchiveV3["metadata"],
+    };
+    expect(validateStudioProjectArchiveV3(reordered)).toEqual([]);
+    expect(migrate(snapshot(), {
+      contentDigest: archive.manifest.contentDigest,
+      sectionDigests: archive.manifest.sectionDigests,
+    }).archive.manifest.contentDigest).toBe(archive.manifest.contentDigest);
+  });
+
+  it.each(STUDIO_PROJECT_ARCHIVE_SECTION_KEYS)("rejects modified %s bytes at validation, serialization, and restore boundaries", (key) => {
+    const { archive, workspace } = migrate();
+    const property = key === "publish-draft" ? "publishDraft" : key === "local-drafts" ? "localDrafts" : key;
+    const changed = { ...archive, [property]: { ...archive[property], unexpectedChange: true } };
+    expect(validateStudioProjectArchiveV3(changed)).toContainEqual(expect.objectContaining({
+      code: "section-digest-mismatch",
+      path: `manifest.sectionDigests.${key}`,
+    }));
+    expect(validateStudioProjectArchiveV3(changed).map((issue) => issue.code)).toContain("content-digest-mismatch");
+    expect(() => serializeStudioProjectArchiveV3(changed)).toThrow(/digest/u);
+    expect(() => projectStudioArchiveV3ToV2Snapshot({ archive: changed, workspace })).toThrow(/digest/u);
+  });
+
+  it("protects root pins, manifest authority, and the v2 compatibility payload", () => {
+    const { archive, workspace } = migrate();
+    const characterBible = archive.compatibility.characterBibleV1;
+    if (!characterBible) throw new Error("fixture requires a character bible");
+    const candidates = [
+      { ...archive, manifest: { ...archive.manifest, contentDigest: `sha256:${"a".repeat(64)}` } },
+      { ...archive, manifest: { ...archive.manifest, createdAt: "2026-09-08T00:00:00.000Z" } },
+      { ...archive, compatibility: { characterBibleV1: { ...characterBible, characters: [] } } },
+    ];
+    for (const changed of candidates) {
+      expect(validateStudioProjectArchiveV3(changed).map((issue) => issue.code)).toContain("content-digest-mismatch");
+      expect(() => projectStudioArchiveV3ToV2Snapshot({ archive: changed, workspace })).toThrow(/digest/u);
+    }
+    expect(() => migrate(snapshot(), { contentDigest: `sha256:${"a".repeat(64)}` })).toThrow(/content digest does not match/u);
+    expect(() => migrate(snapshot(), {
+      sectionDigests: { ...archive.manifest.sectionDigests, story: `sha256:${"a".repeat(64)}` },
+    })).toThrow(/section digest does not match/u);
+  });
+
+  it("does not include device-local workspace selection in the archive content digest", () => {
+    const first = migrate();
+    const second = migrate({ ...snapshot(), currentPageId: "page-2" });
+    expect(first.workspace.currentPageId).not.toBe(second.workspace.currentPageId);
+    expect(first.archive.manifest.contentDigest).toBe(second.archive.manifest.contentDigest);
+  });
+
   it("separates authoring content, local workspace, local comments, and operations", () => {
     const { archive, workspace } = migrate();
 
@@ -129,22 +193,21 @@ describe("Studio project archive v3", () => {
       workScope: "work:episode-1",
       createdAt: NOW,
       sourceCoordinates: createEmptyStudioVersionCoordinates(),
-      contentDigest: "digest-content-root",
-      sectionDigests: sectionDigests(),
       selectedElementIds: [],
       primarySelectionId: "element-1",
     })).toThrow(/Primary selection/u);
   });
 
   it("rejects a missing section digest", () => {
-    const digests = { ...sectionDigests(), story: "" };
+    const { archive } = migrate();
+    const digests = { ...archive.manifest.sectionDigests, story: "" };
     expect(() => migrateStudioProjectSnapshotV2ToArchiveV3({
       snapshot: snapshot(),
       archiveId: "archive-1",
       workScope: "work:episode-1",
       createdAt: NOW,
       sourceCoordinates: createEmptyStudioVersionCoordinates(),
-      contentDigest: "digest-content-root",
+      contentDigest: archive.manifest.contentDigest,
       sectionDigests: digests,
     })).toThrow(/section digest is missing: story/u);
   });

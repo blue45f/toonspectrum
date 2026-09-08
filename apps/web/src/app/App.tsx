@@ -6,6 +6,7 @@ import { BrowserCompatModal } from "../components/browser-compat-modal";
 import { apiPath } from "../infrastructure/api";
 
 import { AppShell } from "./AppShell";
+import { StudioRouterDocumentNavigationBoundary } from "./StudioRouterDocumentNavigationBoundary";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
 import { installStudioDocumentNavigationBridge } from "./studio-document-navigation";
@@ -290,7 +291,9 @@ function AppRuntime() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppRuntime />
+      <StudioRouterDocumentNavigationBoundary>
+        <AppRuntime />
+      </StudioRouterDocumentNavigationBoundary>
     </BrowserRouter>
   );
 }

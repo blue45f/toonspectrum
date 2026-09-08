@@ -41,7 +41,13 @@ export class AdminCampaignsService {
         title: creatorCampaigns.title,
         description: creatorCampaigns.description,
         targetAmountCents: creatorCampaigns.targetAmountCents,
-        raisedAmountCents: creatorCampaigns.raisedAmountCents,
+        raisedAmountCents: sql<number>`coalesce((
+          select sum(${revenueLedger.amountCents})
+          from ${revenueLedger}
+          where ${revenueLedger.campaignId} = ${creatorCampaigns.id}
+            and ${revenueLedger.status} = 'paid'
+            and ${revenueLedger.currency} = 'KRW'
+        ), 0)`,
         isActive: creatorCampaigns.isActive,
         startsAt: creatorCampaigns.startsAt,
         endsAt: creatorCampaigns.endsAt,

@@ -132,5 +132,6 @@ describe("Studio document navigation boundary", () => {
 
     expect(appSource).toContain("installStudioDocumentNavigationBridge");
     expect(appSource).toContain("<StudioDocumentNavigationBridge />");
+    expect(appSource).toContain("<StudioRouterDocumentNavigationBoundary>");
   });
 });

@@ -1,3 +1,5 @@
+import { sha256HexPortable } from "@/shared/lib/sha256-portable";
+
 import {
   createEmptyStudioIdentityIndex,
   validateStudioIdentityIndex,
@@ -151,6 +153,9 @@ export type StudioProjectArchiveIssueCode =
   | "invalid-timestamp"
   | "missing-content-digest"
   | "missing-section-digest"
+  | "content-digest-mismatch"
+  | "section-digest-mismatch"
+  | "invalid-content-integrity"
   | "invalid-version-coordinates"
   | "invalid-character-bible"
   | "invalid-identity-index"
@@ -180,9 +185,64 @@ function nullableId(value: string | null | undefined): string | null {
   return normalized || null;
 }
 
-function validDigest(value: string): boolean {
-  const digest = value.trim();
-  return digest.length >= 8 && digest.length <= 512;
+function validDigest(value: unknown): value is string {
+  return typeof value === "string" && /^sha256:[a-f0-9]{64}$/u.test(value);
+}
+
+const ARCHIVE_SECTION_PROPERTIES = {
+  metadata: "metadata",
+  content: "content",
+  story: "story",
+  bible: "bible",
+  identity: "identity",
+  provenance: "provenance",
+  assets: "assets",
+  "publish-draft": "publishDraft",
+  operations: "operations",
+  "local-drafts": "localDrafts",
+} as const satisfies Readonly<Record<StudioProjectArchiveSectionKey, keyof StudioProjectArchiveV3>>;
+
+function canonicalArchiveJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalArchiveJson).join(",")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map((key) =>
+      `${JSON.stringify(key)}:${canonicalArchiveJson(record[key])}`
+    ).join(",")}}`;
+  }
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) throw new TypeError("Archive integrity requires JSON content.");
+  return serialized;
+}
+
+function archiveDigest(value: unknown): string {
+  // Pin the persisted JSON representation: optional undefined properties disappear,
+  // while shared in-memory references become independent JSON values on disk.
+  const persisted = JSON.stringify(value);
+  if (persisted === undefined) throw new TypeError("Archive integrity requires JSON content.");
+  const canonical = canonicalArchiveJson(JSON.parse(persisted) as unknown);
+  return `sha256:${sha256HexPortable(new TextEncoder().encode(canonical))}`;
+}
+
+export function computeStudioProjectArchiveV3Integrity(
+  archive: StudioProjectArchiveV3,
+): Pick<StudioProjectArchiveManifestV3, "contentDigest" | "sectionDigests"> {
+  const sectionDigests = Object.fromEntries(STUDIO_PROJECT_ARCHIVE_SECTION_KEYS.map((key) => [
+    key,
+    archiveDigest(archive[ARCHIVE_SECTION_PROPERTIES[key]]),
+  ])) as Record<StudioProjectArchiveSectionKey, string>;
+  const root: Record<string, unknown> = {
+    ...archive,
+    manifest: { ...archive.manifest, contentDigest: undefined, sectionDigests },
+  };
+  for (const key of STUDIO_PROJECT_ARCHIVE_SECTION_KEYS) {
+    root[ARCHIVE_SECTION_PROPERTIES[key]] = sectionDigests[key];
+  }
+  // The root also pins manifest authority, compatibility data, and any extra JSON
+  // fields. Replacing sections with their digests avoids hashing their bytes twice.
+  return { contentDigest: archiveDigest(root), sectionDigests };
 }
 
 function validateWorkspaceState(
@@ -214,8 +274,8 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
   readonly workScope: string;
   readonly createdAt: string;
   readonly sourceCoordinates: StudioVersionCoordinates;
-  readonly contentDigest: string;
-  readonly sectionDigests: Readonly<Record<StudioProjectArchiveSectionKey, string>>;
+  readonly contentDigest?: string;
+  readonly sectionDigests?: Readonly<Record<StudioProjectArchiveSectionKey, string>>;
   readonly identityIndex?: StudioIdentityIndexV1;
   readonly assetRevisions?: readonly StudioAssetReferenceV2[];
   readonly selectedElementIds?: readonly string[];
@@ -231,7 +291,7 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
     || !SAFE_ID.test(input.archiveId)
     || !SAFE_ID.test(input.workScope)
     || !validTimestamp(input.createdAt)
-    || !validDigest(input.contentDigest)
+    || (input.contentDigest !== undefined && !validDigest(input.contentDigest))
   ) {
     throw new Error("Studio archive v3 migration requires valid, pinned source metadata.");
   }
@@ -240,9 +300,11 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
   if (identityIndex.workScope !== input.workScope) {
     throw new Error("Studio archive identity index belongs to another work scope.");
   }
-  const sectionDigests = { ...input.sectionDigests };
+  const sectionDigests = Object.fromEntries(STUDIO_PROJECT_ARCHIVE_SECTION_KEYS.map((key) => [
+    key, input.sectionDigests?.[key] ?? "",
+  ])) as Record<StudioProjectArchiveSectionKey, string>;
   for (const key of STUDIO_PROJECT_ARCHIVE_SECTION_KEYS) {
-    if (!validDigest(sectionDigests[key])) {
+    if (input.sectionDigests !== undefined && !validDigest(sectionDigests[key])) {
       throw new Error(`Studio archive section digest is missing: ${key}`);
     }
   }
@@ -260,7 +322,7 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
     throw new Error("Primary selection must belong to the workspace selection set.");
   }
 
-  const archive: StudioProjectArchiveV3 = {
+  let archive: StudioProjectArchiveV3 = {
     version: STUDIO_PROJECT_ARCHIVE_VERSION,
     manifest: {
       archiveId: input.archiveId,
@@ -270,7 +332,7 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
         ? input.snapshot.savedAt
         : null,
       sourceCoordinates: input.sourceCoordinates,
-      contentDigest: input.contentDigest,
+      contentDigest: input.contentDigest ?? "",
       sectionDigests,
       schemaVersions: {
         archive: STUDIO_PROJECT_ARCHIVE_VERSION,
@@ -324,6 +386,17 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
     localDrafts: { comments: input.snapshot.comments },
     compatibility: { characterBibleV1: input.snapshot.characterBible },
   };
+
+  const integrity = computeStudioProjectArchiveV3Integrity(archive);
+  if (input.contentDigest !== undefined && input.contentDigest !== integrity.contentDigest) {
+    throw new Error("Studio archive content digest does not match the migrated content.");
+  }
+  for (const key of STUDIO_PROJECT_ARCHIVE_SECTION_KEYS) {
+    if (input.sectionDigests !== undefined && sectionDigests[key] !== integrity.sectionDigests[key]) {
+      throw new Error(`Studio archive section digest does not match the migrated content: ${key}`);
+    }
+  }
+  archive = { ...archive, manifest: { ...archive.manifest, ...integrity } };
 
   const workspace: StudioProjectWorkspaceStateV1 = {
     version: 1,
@@ -436,6 +509,34 @@ export function validateStudioProjectArchiveV3(
         message: `Studio archive section digest is missing: ${key}`,
       });
     }
+  }
+  try {
+    const integrity = computeStudioProjectArchiveV3Integrity(archive);
+    for (const key of STUDIO_PROJECT_ARCHIVE_SECTION_KEYS) {
+      if (
+        validDigest(archive.manifest.sectionDigests[key])
+        && archive.manifest.sectionDigests[key] !== integrity.sectionDigests[key]
+      ) {
+        issues.push({
+          code: "section-digest-mismatch",
+          path: `manifest.sectionDigests.${key}`,
+          message: `Studio archive section digest does not match its content: ${key}`,
+        });
+      }
+    }
+    if (validDigest(archive.manifest.contentDigest) && archive.manifest.contentDigest !== integrity.contentDigest) {
+      issues.push({
+        code: "content-digest-mismatch",
+        path: "manifest.contentDigest",
+        message: "Studio archive root digest does not match its content or manifest.",
+      });
+    }
+  } catch {
+    issues.push({
+      code: "invalid-content-integrity",
+      path: "archive",
+      message: "Studio archive integrity cannot be computed from its JSON content.",
+    });
   }
   for (const issue of validateStudioVersionCoordinates(archive.manifest.sourceCoordinates)) {
     issues.push({

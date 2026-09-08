@@ -71,6 +71,7 @@ export interface Studio3dAssetRefineryEvent {
   readonly actor: string;
   readonly reason: string;
   readonly diagnostics: readonly Studio3dAssetRefineryDiagnostic[];
+  readonly resolvedDiagnosticCodes?: readonly string[];
   readonly outputs: readonly Studio3dAssetRefineryOutput[];
 }
 
@@ -103,6 +104,8 @@ export interface Studio3dAssetRefineryTransitionInput {
   readonly actor: string;
   readonly reason: string;
   readonly diagnostics?: readonly Studio3dAssetRefineryDiagnostic[];
+  /** Only a repaired transition may explicitly resolve currently active error codes. */
+  readonly resolvedDiagnosticCodes?: readonly string[];
   readonly outputs?: readonly Studio3dAssetRefineryOutput[];
 }
 
@@ -193,6 +196,9 @@ function freezeEvent(
   input: Studio3dAssetRefineryTransitionInput
 ): Studio3dAssetRefineryEvent {
   const diagnostics = Object.freeze((input.diagnostics ?? []).map(diagnostic));
+  const resolvedDiagnosticCodes = Object.freeze([...new Set(
+    (input.resolvedDiagnosticCodes ?? []).map(code => requiredText(code, "resolvedDiagnosticCode", 120))
+  )]);
   const outputs = Object.freeze((input.outputs ?? []).map(output));
   return Object.freeze({
     from,
@@ -201,6 +207,7 @@ function freezeEvent(
     actor: requiredText(input.actor, "actor", 80),
     reason: requiredText(input.reason, "reason", 500),
     diagnostics,
+    resolvedDiagnosticCodes,
     outputs,
   });
 }
@@ -244,11 +251,23 @@ export function transitionStudio3dAssetRefinery(
   if (Date.parse(event.at) < Date.parse(receipt.history.at(-1)?.at ?? "")) {
     throw new RangeError("Refinery 이벤트 시각은 이전 이벤트보다 빠를 수 없습니다.");
   }
+  const resolved = new Set(event.resolvedDiagnosticCodes ?? []);
+  if (resolved.size > 0 && input.to !== "repaired") {
+    throw new Error("Refinery errors can only be resolved in the repaired stage.");
+  }
+  for (const code of resolved) {
+    if (!receipt.diagnostics.some(entry => entry.code === code && entry.severity === "error")) {
+      throw new Error(`No active refinery error exists for resolution: ${code}`);
+    }
+  }
   return Object.freeze({
     ...receipt,
     stage: input.to,
     history: Object.freeze([...receipt.history, event]),
-    diagnostics: Object.freeze([...receipt.diagnostics, ...event.diagnostics]),
+    diagnostics: Object.freeze([
+      ...receipt.diagnostics.filter(entry => !resolved.has(entry.code)),
+      ...event.diagnostics,
+    ]),
     outputs: Object.freeze([...receipt.outputs, ...event.outputs]),
   });
 }

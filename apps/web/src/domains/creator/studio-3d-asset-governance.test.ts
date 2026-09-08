@@ -291,6 +291,76 @@ describe("studio 3D asset supply policy", () => {
 });
 
 describe("studio 3D asset refinery and release gate", () => {
+  function repairableRefinery() {
+    let receipt = createStudio3dAssetRefineryReceipt({
+      assetId: ASSET_ID,
+      assetVersion: ASSET_VERSION,
+      inputSha256: SHA256,
+      pipelineVersion: "asset-refinery-v1",
+      receivedAt: REVIEWED_AT,
+      actor: "asset-intake",
+    });
+    for (const to of ["quarantined", "rights_checked", "analyzed", "normalized"] as const) {
+      receipt = transitionStudio3dAssetRefinery(receipt, {
+        to, at: REVIEWED_AT, actor: "asset-refinery", reason: "Record the actual analysis result.",
+        diagnostics: to === "analyzed" ? [
+          { code: "MESH_INVALID", severity: "error", message: "The mesh requires repair." },
+          { code: "TEXTURE_MISSING", severity: "error", message: "A texture requires replacement." },
+          { code: "UV_NOTE", severity: "warning", message: "Keep this advisory visible." },
+        ] : [],
+      });
+    }
+    return receipt;
+  }
+
+  it.each([false, true])("only releases assets after every active error has been explicitly repaired (all: %s)", (resolveAll) => {
+    const before = repairableRefinery();
+    const codes = resolveAll ? ["MESH_INVALID", "TEXTURE_MISSING"] : ["MESH_INVALID"];
+    let receipt = transitionStudio3dAssetRefinery(before, {
+      to: "repaired", at: REVIEWED_AT, actor: "repairer", reason: "Replaced and rechecked the named defects.",
+      resolvedDiagnosticCodes: codes,
+    });
+    expect(receipt.history.at(-1)?.resolvedDiagnosticCodes).toEqual(codes);
+    expect(receipt.diagnostics.map(({ code }) => code)).toEqual(resolveAll ? ["UV_NOTE"] : ["TEXTURE_MISSING", "UV_NOTE"]);
+    expect(before.diagnostics).toHaveLength(3);
+    for (const to of ["optimized", "technical_qa", "render_qa", "art_review", "approved"] as const) {
+      receipt = transitionStudio3dAssetRefinery(receipt, {
+        to, at: REVIEWED_AT, actor: "reviewer", reason: "Passed the required downstream QA stage.",
+      });
+    }
+    expect(receipt.history.find(({ to }) => to === "analyzed")?.diagnostics).toEqual(before.diagnostics);
+    const gate = {
+      refinery: receipt,
+      quality: buildStudio3dAssetQualityPassport(qualityInput()),
+      supply: evaluateStudio3dAssetSupply(supplyEvidence()),
+      rights: rights(),
+    };
+    expect(evaluateStudio3dAssetRelease(gate).allowed).toBe(resolveAll);
+    const publication = { at: REVIEWED_AT, actor: "publisher", reason: "Publish only resolved evidence." };
+    if (resolveAll) expect(publishStudio3dAsset(gate, publication).stage).toBe("published");
+    else expect(() => publishStudio3dAsset(gate, publication)).toThrow("REFINERY_ERRORS_PRESENT");
+  });
+
+  it("cannot erase unknown errors, advisories, or errors outside the repair stage", () => {
+    const receipt = repairableRefinery();
+    for (const code of ["UNKNOWN_ERROR", "UV_NOTE"]) {
+      expect(() => transitionStudio3dAssetRefinery(receipt, {
+        to: "repaired", at: REVIEWED_AT, actor: "repairer", reason: "Invalid resolution request.",
+        resolvedDiagnosticCodes: [code],
+      })).toThrow("No active refinery error");
+    }
+    expect(() => transitionStudio3dAssetRefinery(receipt, {
+      to: "optimized", at: REVIEWED_AT, actor: "optimizer", reason: "Not a repair transition.",
+      resolvedDiagnosticCodes: ["MESH_INVALID"],
+    })).toThrow("only be resolved in the repaired stage");
+    const repaired = transitionStudio3dAssetRefinery(receipt, {
+      to: "repaired", at: REVIEWED_AT, actor: "repairer", reason: "The repair reported a new failure.",
+      resolvedDiagnosticCodes: ["MESH_INVALID"],
+      diagnostics: [{ code: "MESH_INVALID", severity: "error", message: "The new output is still invalid." }],
+    });
+    expect(repaired.diagnostics).toContainEqual(expect.objectContaining({ code: "MESH_INVALID", severity: "error" }));
+  });
+
   it("rejects skipped states and preserves an immutable approval history", () => {
     const received = createStudio3dAssetRefineryReceipt({
       assetId: ASSET_ID,
