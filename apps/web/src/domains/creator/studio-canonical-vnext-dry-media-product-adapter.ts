@@ -43,6 +43,7 @@ import {
   hashStudioCanonicalBrushPlan,
   parseStudioCanonicalBrushPlan,
 } from "./studio-canonical-brush-plan";
+import { studioCanonicalDryMediaEligibilityFailure } from "./studio-canonical-vnext-dry-media-eligibility";
 import {
   STUDIO_CANONICAL_VNEXT_DRY_MEDIA_CATALOG_ID,
   STUDIO_CANONICAL_VNEXT_DRY_MEDIA_PRESENTATION_CONTROLLER_VERSION,
@@ -466,6 +467,8 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
     || !positiveSafeInteger(request.strokeEpoch)
     || !positiveSafeInteger(request.commandSequence)) return unavailableResult("invalid-input");
   if (request.signal?.aborted) return unavailableResult("invalid-input", "cancelled");
+  const eligibilityFailure = studioCanonicalDryMediaEligibilityFailure(element);
+  if (eligibilityFailure) return unavailableResult(eligibilityFailure.reason, eligibilityFailure.detail);
   const classification = classifyStudioCanonicalDryMediaElement(element);
   if (classification.status === "ineligible") {
     return unavailableResult(classification.reason, classification.detail);
