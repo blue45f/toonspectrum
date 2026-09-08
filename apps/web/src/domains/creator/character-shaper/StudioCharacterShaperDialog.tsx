@@ -142,11 +142,13 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   };
 
   const togglePaint = () => {
+    binding.cancelPreview?.();
     if (paintActive) exitPaint();
     else enterPaint();
   };
 
   const openDrawer = (mode: Exclude<CharacterShaperDrawerMode, null>) => {
+    binding.cancelPreview?.();
     if (ui.drawer === null) {
       drawerReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     }
@@ -172,18 +174,22 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
 
   const requestClose = () => {
     if (h.isCapturing) return;
+    binding.cancelPreview?.();
     h.cancelActiveTexturePaintStroke?.();
     h.cancelPendingPoseShare?.();
     h.onClose();
   };
 
   const selectSlot = (slot: CharacterSlotKind) => {
+    binding.cancelPreview?.();
     dispatch({ type: "select-slot", slot });
     if (layout === "mobile") setMobileTab("shelf");
   };
 
   const commitEntry = (entry: CharacterSlotEntry) => {
-    const result = binding.commit(entry);
+    const result = binding.previewEntryId === entry.id && binding.commitPreview
+      ? binding.commitPreview(entry)
+      : binding.commit(entry);
     if (!result.ok) {
       setCommitNotice(result.reason ?? "지금은 적용할 수 없습니다.");
     }
@@ -194,6 +200,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   const setHovered = (entryId: string | null) => dispatch({ type: "hover-entry", entryId });
 
   const toggleAdvanced = () => {
+    binding.cancelPreview?.();
     const next = !ui.advanced;
     dispatch({ type: "set-advanced", advanced: next });
     if (next) onOpenAdvanced?.();
@@ -216,6 +223,10 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
       }
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (binding.previewEntryId && binding.cancelPreview) {
+        binding.cancelPreview();
+        return true;
+      }
       const next = reduceCharacterShaperUiState(ui, { type: "escape", layout });
       if (next !== ui) {
         if (ui.drawer !== null) closeDrawer();
@@ -269,6 +280,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   useEffect(() => pushCharacterShaperKeyLayer((event) => keyHandlerRef.current(event), window), []);
 
   const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    binding.cancelPreview?.();
     void h.handleFileChange?.(event);
   };
 

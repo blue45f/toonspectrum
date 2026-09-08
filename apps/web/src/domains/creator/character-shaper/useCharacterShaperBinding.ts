@@ -118,8 +118,24 @@ interface CharacterShaperSession {
   readonly handPoseTypes?: CharacterHostSnapshot["handPoseTypes"];
 }
 
+interface CharacterShaperPlanContext {
+  readonly snapshot: CharacterHostSnapshot;
+  readonly handSide: CharacterHandSide;
+}
+
+interface CharacterShaperPreviewState {
+  readonly modelId: string | null;
+  readonly entryId: string;
+  readonly plan: CharacterApplyPlan;
+  readonly before: CharacterShaperHostState;
+  readonly snapshot: CharacterHostSnapshot;
+  readonly recipe: CharacterRecipe;
+  readonly handSide: CharacterHandSide;
+}
+
 const HAND_SIDES: readonly CharacterHandSide[] = ["left", "right", "both"];
 const HEX_COLOR = /^#[0-9a-f]{6}$/iu;
+const PREVIEW_LOCK_REASON = "미리보기 후보를 확정하거나 닫은 뒤에 다른 편집을 할 수 있습니다.";
 
 const COLOR_LABELS: Readonly<Record<keyof CharacterRecipe["colors"], string>> = {
   skin: "피부",
@@ -256,6 +272,15 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     lastHandPoseType: null,
   });
   const sessionRef = useRef(session);
+  const previewRef = useRef<CharacterShaperPreviewState | null>(null);
+  const [previewEntryId, setPreviewEntryId] = useState<string | null>(null);
+  const updateSession = useCallback((
+    update: CharacterShaperSession | ((current: CharacterShaperSession) => CharacterShaperSession),
+  ) => {
+    const next = typeof update === "function" ? update(sessionRef.current) : update;
+    sessionRef.current = next;
+    setSession(next);
+  }, []);
   const history = useCharacterShaperHistory<CharacterShaperHostState>();
   const resetHistory = history.reset;
   const pushHistory = history.push;
@@ -308,7 +333,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
   const activeExpressionId = readString(h.activeExpressionId);
   const expressionWeights = readRecord<number>(h.expressionWeights);
 
-  const snapshot = useMemo<CharacterHostSnapshot>(
+  const derivedSnapshot = useMemo<CharacterHostSnapshot>(
     () => (status === "ready"
       ? deriveSnapshot({
           forge,
@@ -324,10 +349,20 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     [status, forge, wardrobe, props, customColors, activePoseId, activeExpressionId, expressionWeights, session],
   );
 
-  const recipe = useMemo(
-    () => (status === "ready" ? deriveCharacterRecipe(snapshot, CHARACTER_SLOT_CATALOG) : createEmptyCharacterRecipe()),
-    [status, snapshot],
+  const derivedRecipe = useMemo(
+    () => (status === "ready" ? deriveCharacterRecipe(derivedSnapshot, CHARACTER_SLOT_CATALOG) : createEmptyCharacterRecipe()),
+    [status, derivedSnapshot],
   );
+  const activePreview = previewRef.current?.modelId === modelId ? previewRef.current : null;
+  const snapshot = activePreview?.snapshot ?? derivedSnapshot;
+  const recipe = activePreview?.recipe ?? derivedRecipe;
+
+  useEffect(() => {
+    const preview = previewRef.current;
+    if (!preview || preview.modelId === modelId) return;
+    previewRef.current = null;
+    setPreviewEntryId(null);
+  }, [modelId]);
 
   /* ---------------------------------------------------------------------- */
   /* Raw host state capture / restore                                        */
@@ -378,13 +413,13 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     host.setActiveExpressionId?.(state.activeExpressionId);
     host.setExpressionWeights?.({ ...state.expressionWeights });
     host.setBodyRotation?.(state.bodyRotation);
-    setSession({
+    updateSession({
       irisColor: state.irisColor,
       handSide: state.handSide,
       lastHandPoseType: state.lastHandPoseType,
       handPoseTypes: state.handPoseTypes,
     });
-  }, []);
+  }, [updateSession]);
 
   /* ---------------------------------------------------------------------- */
   /* Baseline (hold-to-compare · 처음 상태로)                                 */
@@ -411,11 +446,11 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     baselineModelRef.current = modelId;
     baselineRef.current = { ...captureHostState(), ...baselineSession };
     compareStashRef.current = null;
-    setBaselineRecipe(deriveCharacterRecipe({ ...snapshot, ...baselineSession }, CHARACTER_SLOT_CATALOG));
+    setBaselineRecipe(deriveCharacterRecipe({ ...derivedSnapshot, ...baselineSession }, CHARACTER_SLOT_CATALOG));
     setCompareActiveState(false);
     resetHistory();
-    setSession(baselineSession);
-  }, [status, modelId, snapshot, captureHostState, resetHistory]);
+    updateSession(baselineSession);
+  }, [status, modelId, derivedSnapshot, captureHostState, resetHistory, updateSession]);
 
   /* ---------------------------------------------------------------------- */
   /* Iris tint — re-applied whenever the host repaints custom colours         */
@@ -602,14 +637,14 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     // One merged Avatar Forge write per commit, exactly as the brief requires.
     if (mergedForge) host.handleAvatarForgeChange?.(mergedForge);
     if (nextIris !== undefined || nextHandPose !== undefined) {
-      setSession((current) => ({
+      updateSession((current) => ({
         ...current,
         ...(nextIris === undefined ? {} : { irisColor: nextIris }),
         ...(nextHandPose === undefined ? {} : { lastHandPoseType: nextHandPose, handPoseTypes: { ...current.handPoseTypes, ...updatedHands } }),
       }));
     }
     return steps.length > 0 || colorChanged;
-  }, []);
+  }, [updateSession]);
 
   /* ---------------------------------------------------------------------- */
   /* Commit surface                                                          */
@@ -618,6 +653,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
   const runPlan = useCallback((plan: CharacterApplyPlan): CharacterShaperCommitResult => {
     const blocked = busyRef.current;
     if (blocked !== null) return { ok: false, plan, reason: blocked };
+    if (previewRef.current !== null) return { ok: false, plan, reason: PREVIEW_LOCK_REASON };
     if (plan.availability.status === "unavailable") {
       return { ok: false, plan, reason: plan.availability.reason ?? "이 모델에는 적용할 수 없습니다." };
     }
@@ -631,13 +667,16 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
 
   /** Precision edits share the commit path so one completed drag is one undo step, not many. */
   const commitSteps = useCallback((label: string, steps: readonly CharacterApplyStep[]) => {
-    if (busyRef.current !== null || steps.length === 0) return;
+    if (busyRef.current !== null || previewRef.current !== null || steps.length === 0) return;
     const before = captureHostState();
     runSteps(steps);
     pushHistory(label, before);
   }, [captureHostState, runSteps, pushHistory]);
 
-  const planContext = useMemo(() => ({ snapshot, handSide: session.handSide }), [snapshot, session.handSide]);
+  const planContext = useMemo<CharacterShaperPlanContext>(() => ({
+    snapshot,
+    handSide: activePreview?.handSide ?? session.handSide,
+  }), [activePreview?.handSide, snapshot, session.handSide]);
 
   const evaluate = useCallback(
     (entry: CharacterSlotEntry): CharacterSlotAvailability => evaluateCharacterSlotEntry(entry, profile),
@@ -649,17 +688,96 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     [profile, planContext],
   );
 
-  const commit = useCallback((entry: CharacterSlotEntry): CharacterShaperCommitResult => {
-    // Multi slots toggle: clicking an equipped accessory takes it off instead of doing nothing.
-    if (characterSlotMeta(entry.slot).multi) {
-      const selected = planContext.snapshot.propIds;
-      if (entry.apply.kind === "prop" && selected.includes(entry.apply.propId)) {
-        const removal = planCharacterSlotRemove(entry.slot, entry.id, planContext);
-        if (removal) return runPlan(removal);
-      }
+  const planForContext = useCallback((
+    entry: CharacterSlotEntry,
+    context: CharacterShaperPlanContext,
+  ): CharacterApplyPlan => {
+    if (
+      characterSlotMeta(entry.slot).multi
+      && entry.apply.kind === "prop"
+      && context.snapshot.propIds.includes(entry.apply.propId)
+    ) {
+      const removal = planCharacterSlotRemove(entry.slot, entry.id, context);
+      if (removal) return removal;
     }
-    return runPlan(planCharacterSlotApply(entry, profile, planContext));
-  }, [profile, planContext, runPlan]);
+    return planCharacterSlotApply(entry, profile, context);
+  }, [profile]);
+
+  const commit = useCallback((entry: CharacterSlotEntry): CharacterShaperCommitResult =>
+    runPlan(planForContext(entry, planContext)), [planContext, planForContext, runPlan]);
+
+  const cancelPreview = useCallback(() => {
+    const previewState = previewRef.current;
+    if (!previewState) return;
+    previewRef.current = null;
+    setPreviewEntryId(null);
+    if (previewState.modelId === readString(hostRef.current.activeModelId)) {
+      restoreHostState(previewState.before);
+    }
+  }, [restoreHostState]);
+
+  const preview = useCallback((entry: CharacterSlotEntry): CharacterShaperCommitResult => {
+    const context: CharacterShaperPlanContext = {
+      snapshot,
+      handSide: sessionRef.current.handSide,
+    };
+    const prepared = planForContext(entry, context);
+    const blocked = busyRef.current;
+    if (blocked !== null) return { ok: false, plan: prepared, reason: blocked };
+    if (prepared.availability.status === "unavailable") {
+      return {
+        ok: false,
+        plan: prepared,
+        reason: prepared.availability.reason ?? "이 모델에는 적용할 수 없습니다.",
+      };
+    }
+    const current = previewRef.current;
+    if (current) {
+      return current.entryId === entry.id
+        ? { ok: true, plan: current.plan, reason: null }
+        : { ok: false, plan: prepared, reason: PREVIEW_LOCK_REASON };
+    }
+    if (prepared.steps.length === 0) return { ok: true, plan: prepared, reason: null };
+
+    const before = captureHostState();
+    previewRef.current = {
+      modelId,
+      entryId: entry.id,
+      plan: prepared,
+      before,
+      snapshot,
+      recipe,
+      handSide: sessionRef.current.handSide,
+    };
+    setPreviewEntryId(entry.id);
+    try {
+      runSteps(prepared.steps);
+      return { ok: true, plan: prepared, reason: null };
+    } catch (error) {
+      previewRef.current = null;
+      setPreviewEntryId(null);
+      restoreHostState(before);
+      return {
+        ok: false,
+        plan: prepared,
+        reason: error instanceof Error ? error.message : "후보를 미리 볼 수 없습니다.",
+      };
+    }
+  }, [captureHostState, modelId, planForContext, recipe, restoreHostState, runSteps, snapshot]);
+
+  const commitPreview = useCallback((entry: CharacterSlotEntry): CharacterShaperCommitResult => {
+    const current = previewRef.current;
+    if (!current) return commit(entry);
+    const blocked = busyRef.current;
+    if (blocked !== null) return { ok: false, plan: current.plan, reason: blocked };
+    if (current.entryId !== entry.id || current.modelId !== readString(hostRef.current.activeModelId)) {
+      return { ok: false, plan: current.plan, reason: PREVIEW_LOCK_REASON };
+    }
+    previewRef.current = null;
+    setPreviewEntryId(null);
+    pushHistory(current.plan.label, current.before);
+    return { ok: true, plan: current.plan, reason: null };
+  }, [commit, pushHistory]);
 
   const clear = useCallback((slot: CharacterSlotKind): CharacterShaperCommitResult | null => {
     const cleared = planCharacterSlotClear(slot, planContext);
@@ -672,25 +790,33 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
   }, [planContext, runPlan]);
 
   const setHandSide = useCallback((side: CharacterHandSide) => {
-    if (!HAND_SIDES.includes(side)) return;
-    setSession((current) => ({ ...current, handSide: side }));
-  }, []);
+    if (!HAND_SIDES.includes(side) || previewRef.current !== null) return;
+    updateSession((current) => ({ ...current, handSide: side }));
+  }, [updateSession]);
 
   const undo = useCallback(() => {
     if (busyRef.current !== null) return;
+    if (previewRef.current !== null) {
+      cancelPreview();
+      return;
+    }
     const restore = history.undo(captureHostState());
     if (restore) restoreHostState(restore);
-  }, [history, captureHostState, restoreHostState]);
+  }, [history, cancelPreview, captureHostState, restoreHostState]);
 
   const redo = useCallback(() => {
     if (busyRef.current !== null) return;
+    if (previewRef.current !== null) {
+      cancelPreview();
+      return;
+    }
     const restore = history.redo(captureHostState());
     if (restore) restoreHostState(restore);
-  }, [history, captureHostState, restoreHostState]);
+  }, [history, cancelPreview, captureHostState, restoreHostState]);
 
   const setCompareActive = useCallback((active: boolean) => {
     const baseline = baselineRef.current;
-    if (!baseline || busyRef.current !== null) return;
+    if (!baseline || busyRef.current !== null || previewRef.current !== null) return;
     if (active) {
       if (compareStashRef.current) return;
       compareStashRef.current = captureHostState();
@@ -707,10 +833,14 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
   const resetToBaseline = useCallback(() => {
     const baseline = baselineRef.current;
     if (!baseline || busyRef.current !== null) return;
+    if (previewRef.current !== null) {
+      cancelPreview();
+      return;
+    }
     const before = captureHostState();
     restoreHostState(baseline);
     pushHistory("처음 상태로 되돌리기", before);
-  }, [captureHostState, restoreHostState, pushHistory]);
+  }, [cancelPreview, captureHostState, restoreHostState, pushHistory]);
 
   const commitFaceParams = useCallback((face: Partial<CharacterHostSnapshot["forgeFace"]>, label: string) => {
     commitSteps(label, [{ kind: "forge-face", face }]);
@@ -725,7 +855,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
   }, [commitSteps]);
 
   const commitColor = useCallback((target: keyof CharacterRecipe["colors"], color: string | null) => {
-    if (busyRef.current !== null) return;
+    if (busyRef.current !== null || previewRef.current !== null) return;
     const before = captureHostState();
     if (runSteps([], { [target]: color })) pushHistory(`색: ${COLOR_LABELS[target]}`, before);
   }, [captureHostState, runSteps, pushHistory]);
@@ -733,6 +863,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
   const commitPreset = useCallback<CharacterShaperBinding["commitPreset"]>((preset, document) => {
     const blocked = busyRef.current;
     if (blocked !== null) return { ok: false, reason: blocked };
+    if (previewRef.current !== null) return { ok: false, reason: PREVIEW_LOCK_REASON };
     const host = hostRef.current;
     let prepared: ReturnType<typeof planCharacterPresetApplication>;
     try {
@@ -773,9 +904,13 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     busyReason,
     handSide: session.handSide,
     compareActive,
+    previewEntryId,
     evaluate,
     plan,
     commit,
+    preview,
+    cancelPreview,
+    commitPreview,
     commitPreset,
     clear,
     remove,
@@ -797,9 +932,13 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     busyReason,
     session.handSide,
     compareActive,
+    previewEntryId,
     evaluate,
     plan,
     commit,
+    preview,
+    cancelPreview,
+    commitPreview,
     commitPreset,
     clear,
     remove,
