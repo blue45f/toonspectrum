@@ -79,7 +79,7 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "lease.throwIfRevoked()",
       "const combinedSignal = combineStudioBg3dAbortSignals(",
       "signal: combinedSignal.signal",
-      "if (!lease.isCurrent() || !args.isActive())",
+      "if (!lease.isCurrent() || !args.isActive() || !isPolicyCurrent())",
       "loaded.dispose()",
       "args.cache.set(args.record.id, entry)",
       "combinedSignal.dispose()",
