@@ -30,7 +30,7 @@ from first-party product documentation whenever possible.
 
 ### Converged expectations
 
-Across these products, the strongest file systems consistently separate five concepts:
+Across these products, the strongest file systems consistently separate six concepts:
 
 1. **Current document save** — updates the active source.
 2. **Named recovery point** — preserves a meaningful milestone in history.
