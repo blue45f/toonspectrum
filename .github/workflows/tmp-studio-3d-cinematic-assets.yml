@@ -8,6 +8,7 @@ on:
       - .github/workflows/tmp-studio-3d-cinematic-assets.yml
       - scripts/apply-studio-3d-cinematic-assets.mjs
       - scripts/fix-studio-3d-cinematic-segments.mjs
+      - scripts/fix-studio-3d-cinematic-roundtrip.mjs
   workflow_dispatch:
 
 permissions:
@@ -43,6 +44,9 @@ jobs:
       - name: Apply product integration
         run: node scripts/apply-studio-3d-cinematic-assets.mjs
 
+      - name: Apply bounded runtime round-trip validation
+        run: node scripts/fix-studio-3d-cinematic-roundtrip.mjs
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -77,6 +81,7 @@ jobs:
           rm scripts/apply-studio-3d-cinematic-assets.mjs
           rm scripts/fix-studio-3d-cinematic-segments.mjs
           rm scripts/fix-studio-3d-cinematic-integration-script.mjs
+          rm scripts/fix-studio-3d-cinematic-roundtrip.mjs
           rm .github/workflows/tmp-studio-3d-cinematic-assets.yml
 
       - name: Commit validated product changes
