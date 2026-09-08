@@ -292,7 +292,7 @@ describe("database integration runner CI policy", () => {
     // was holding. A main push is keyed by its own SHA: main runs never cancel or queue behind
     // each other, because each commit must keep its own red/green signal.
     expect(workflow.concurrency).toEqual({
-      group: "${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}",
+      group: "${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}-release-final-g2",
       "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
     });
   });

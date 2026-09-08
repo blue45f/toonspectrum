@@ -40,7 +40,7 @@ permissions:
 # PR 는 PR 번호 단위로 묶어 동일 PR의 진행 중인 CI를 취소하고 새 커밋은 새 신호로 갱신합니다.
 # main 푸시는 SHA 단위로 분리해 각 커밋의 변경 신호를 그대로 남겨 둡니다.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}-release-final-g2
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Core is backed by executed checks; no fast-merge bypass is permitted.
