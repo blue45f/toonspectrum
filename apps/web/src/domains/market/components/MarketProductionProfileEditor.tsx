@@ -41,6 +41,8 @@ export function MarketProductionProfileEditor({
 }: MarketProductionProfileEditorProps) {
   const titleId = useId();
   const versionHelpId = useId();
+  const attributionId = useId();
+  const attributionHelpId = useId();
   const versionInvalid = !isMarketProductionStudioVersionValid(profile.studioVersion);
 
   return (
@@ -197,20 +199,27 @@ export function MarketProductionProfileEditor({
         </label>
       </div>
 
-      <label className="mt-4 flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-line bg-card px-3 py-2.5 text-xs text-fg-2">
+      <div className="mt-4 flex min-h-11 items-start gap-3 rounded-xl border border-line bg-card px-3 py-2.5 text-xs text-fg-2">
         <input
+          id={attributionId}
           type="checkbox"
           checked={profile.attributionSupported}
           onChange={(event) => onChange({ attributionSupported: event.target.checked })}
+          aria-describedby={attributionHelpId}
           className="mt-0.5 size-4 accent-accent"
         />
-        <span>
-          <span className="block font-semibold text-fg">작품 크레딧에 저작자 표시를 보존할 수 있음</span>
-          <span className="mt-0.5 block leading-relaxed text-fg-3">
+        <div>
+          <label
+            htmlFor={attributionId}
+            className="block cursor-pointer font-semibold text-fg"
+          >
+            작품 크레딧에 저작자 표시를 보존할 수 있음
+          </label>
+          <p id={attributionHelpId} className="mt-0.5 leading-relaxed text-fg-3">
             CC BY 계열처럼 표시가 필수인 리소스는 이 항목이 꺼져 있으면 차단합니다.
-          </span>
-        </span>
-      </label>
+          </p>
+        </div>
+      </div>
 
       <p
         role="status"
