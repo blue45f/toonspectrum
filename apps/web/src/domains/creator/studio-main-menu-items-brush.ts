@@ -93,6 +93,16 @@ export function buildStudioBrushMenuItems({
       },
     },
     {
+      id: "correct-current-stroke",
+      commandId: "brush.correct-current-stroke",
+      searchActivation: "execute",
+      shortcut: "⌥⇧Q",
+      label: "현재 스트로크 교정…",
+      icon: Shapes,
+      disabled: !ui.correctCurrentStroke,
+      onSelect: () => { ui.correctCurrentStroke?.(); },
+    },
+    {
       id: "preset-browser",
       commandId: "brush.preset-browser",
       label: "브러시 프리셋 목록…",

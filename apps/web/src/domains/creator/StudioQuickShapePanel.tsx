@@ -19,6 +19,7 @@ export type StudioQuickShapePanelProps = {
   /** 지금 이 순간 인식되어 미리보기 중인 도형의 한글 라벨(예: "사각형"). 인식 전/비활성이면 null. */
   matchedKindLabel: string | null;
   onToggleActive: () => void;
+  onCorrectCurrentStroke?: () => void;
   /** 선택: 기능 튜토리얼(스마트 도형) 열기. */
   onOpenTutorial?: () => void;
   className?: string;
@@ -33,6 +34,7 @@ export function StudioQuickShapePanel({
   active,
   matchedKindLabel,
   onToggleActive,
+  onCorrectCurrentStroke,
   onOpenTutorial,
   className,
 }: StudioQuickShapePanelProps): ReactElement {
@@ -158,6 +160,10 @@ export function StudioQuickShapePanel({
             </div>
           </div>
         ) : null}
+        {onCorrectCurrentStroke ? <button type="button" onClick={onCorrectCurrentStroke}
+          className="min-h-11 w-full rounded-xl border border-accent/40 bg-accent-soft px-3 py-2 text-sm font-semibold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+          현재 스트로크 교정…
+        </button> : null}
         {onOpenTutorial ? (
           <button
             type="button"

@@ -82,6 +82,7 @@ export const DEFAULT_STUDIO_RAIL_TOOL_ORDER: StudioRailToolId[] = STUDIO_RAIL_TO
 
 /** Customizable shortcut action ids (subset wired in StudioPage). */
 export const STUDIO_SHORTCUT_ACTIONS = [
+  { id: "correct-current-stroke", label: "현재 스트로크 교정", labelKey: "studio.settings.shortcut.correctCurrentStroke", defaultKeys: "Alt+Shift+Q" },
   { id: "tool-select", label: "선택 도구", labelKey: "studio.settings.shortcut.toolSelect", defaultKeys: "V" },
   { id: "tool-hand", label: "핸드(팬)", labelKey: "studio.settings.shortcut.toolHand", defaultKeys: "Space" },
   { id: "tool-pen", label: "펜", labelKey: "studio.settings.shortcut.toolPen", defaultKeys: "B" },
@@ -636,7 +637,8 @@ export function studioShortcutActionLabel(
 ): string {
   const action = STUDIO_SHORTCUT_ACTIONS.find((item) => item.id === actionId);
   if (!action) return actionId;
-  return t ? t(action.labelKey) : action.label;
+  const localized = t?.(action.labelKey);
+  return localized && localized !== action.labelKey ? localized : action.label;
 }
 
 export const STUDIO_PIXEL_GRID_SIZE_OPTIONS = PIXEL_GRID_SIZES;

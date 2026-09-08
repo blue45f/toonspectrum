@@ -4,6 +4,7 @@
 
 export type StudioCuttoonEditorViewSessionRest = {
   quickShapeActive: any;
+  onCorrectCurrentStroke?: () => void;
   railMoreOpen: any;
   rasterFavoriteOnly: any;
   rasterRetouchTargetAvailable: any;

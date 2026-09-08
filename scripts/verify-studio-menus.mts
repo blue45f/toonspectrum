@@ -122,6 +122,7 @@ const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "지우개",
       "채우기",
       "스마트 도형",
+      "현재 스트로크 교정…",
       "브러시 프리셋 목록…",
       "브러시 스튜디오…",
       "자연 매체 · 안료…",

@@ -452,6 +452,10 @@ const StudioPuppetWarpPanel = lazyRetry(
   () => import("./StudioPuppetWarpPanel").then((mod) => ({ default: mod.StudioPuppetWarpPanel })),
   "StudioPuppetWarpPanel"
 );
+const StudioSmartShapeEditDialog = lazyRetry(
+  () => import("./StudioSmartShapeEditDialog").then((mod) => ({ default: mod.StudioSmartShapeEditDialog })),
+  "StudioSmartShapeEditDialog"
+);
 const StudioQuickShapePanel = lazyRetry(
   () => import("./StudioQuickShapePanel").then((mod) => ({ default: mod.StudioQuickShapePanel })),
   "StudioQuickShapePanel"
@@ -923,6 +927,7 @@ export {
   StudioQuickActionsMenu,
   StudioQuickMaskPanel,
   StudioQuickShapePanel,
+  StudioSmartShapeEditDialog,
   StudioRasterAssetGrid,
   StudioRasterCrdtSurface,
   StudioReferencePanel,

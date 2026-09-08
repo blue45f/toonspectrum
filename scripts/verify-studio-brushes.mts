@@ -663,6 +663,7 @@ async function captureBrushStageFailure(
     stage,
     error: error instanceof Error ? error.stack ?? error.message : String(error),
     browserErrors,
+    rendererReasons: await page.locator("[data-studio-canonical-vnext-dry-media-reason]").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-studio-canonical-vnext-dry-media-reason"))).catch(() => []),
     requestedRounds: STABILITY_ROUNDS,
     uniquePresetCount: BRUSH_MATRIX_CATALOG_COUNT,
   }, null, 2));
@@ -2421,6 +2422,7 @@ interface PersistedDrawElement {
   polygonSides: number | null;
   points: number[];
   pressures: number[];
+  smartShape: { version?: number; kind?: string; original?: { points?: number[] } } | null;
 }
 
 interface PersistedStudioDocument {
@@ -2515,6 +2517,7 @@ function drawElementsFromPersistedDocument(
         ? record.brushCatalogName
         : null,
       brushDynamics: record.brushDynamics,
+      smartShape: record.smartShape && typeof record.smartShape === "object" ? record.smartShape as PersistedDrawElement["smartShape"] : null,
       groupId: typeof record.groupId === "string" ? record.groupId : null,
       hidden: record.hidden === true,
       hasLivingInkReceipt: record.livingInkReceipt != null,
@@ -3831,14 +3834,133 @@ async function enableSmartShape(page: Page): Promise<void> {
   throw new Error("visible Smart Shape toggle was not found");
 }
 
+async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: number) => ScreenPoint): Promise<void> {
+  const before = (await persistedDrawElements(page)).at(-1);
+  invariant(before?.id, "current-stroke correction has no persisted source");
+  const open = async () => {
+    await page.locator('[data-studio-main-menu="true"]').getByRole("menuitem", { name: /^(그리기|Draw)$/u }).click();
+    await page.getByRole("menuitem", { name: /^현재 스트로크 교정/u }).click();
+    await page.getByRole("dialog", { name: "현재 스트로크 교정", exact: true }).waitFor({ state: "visible" });
+  };
+  await open();
+  let dialog = page.getByRole("dialog", { name: "현재 스트로크 교정", exact: true });
+  await dialog.getByRole("button", { name: "사각형", exact: true }).click();
+  await dialog.getByLabel("점 X", { exact: true }).fill(String(before.points[0]! + 12));
+  await dialog.getByRole("button", { name: "원래 자유선과 비교", exact: true }).click();
+  await dialog.getByRole("button", { name: "취소", exact: true }).click();
+  invariant(JSON.stringify((await persistedDrawElements(page)).at(-1)) === JSON.stringify(before), "cancel changed the original stroke or durable metadata");
+  await page.keyboard.press("Alt+Shift+Q");
+  await page.getByRole("dialog", { name: "현재 스트로크 교정", exact: true }).waitFor({ state: "visible" });
+  dialog = page.getByRole("dialog", { name: "현재 스트로크 교정", exact: true });
+  await dialog.getByRole("button", { name: "타원", exact: true }).click();
+  await dialog.getByLabel("회전 (°)", { exact: true }).fill("15");
+  await dialog.getByRole("button", { name: "도형 확정", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  const corrected = (await waitForPersistedDrawElements(page, (draws) => draws.at(-1)?.smartShape?.kind === "ellipse", "correction did not reach SQLite" )).at(-1)!;
+  invariant(corrected.smartShape?.version === 1, "correction snapshot version was not saved");
+  invariant(JSON.stringify(corrected.smartShape?.original?.points) === JSON.stringify(before.points), "original authored points were not retained");
+  invariant(JSON.stringify(corrected.points) !== JSON.stringify(before.points), "correction did not change the shape");
+  invariant(corrected.brush === before.brush, "correction changed the captured brush identity");
+  if (process.env.TOONSPECTRUM_BRUSH_VERIFY_GPU === "1") {
+    await page.locator('[data-studio-canonical-vnext-dry-media-authorized="true"]').waitFor({ state: "attached", timeout: 15_000 });
+    const adapters = await page.evaluate(() => (globalThis as typeof globalThis & { __studioShapeAdapters: Array<{ isFallbackAdapter?: boolean; options?: { forceFallbackAdapter?: boolean } }> }).__studioShapeAdapters);
+    invariant(adapters.length >= 2 && adapters.every((adapter) => adapter.isFallbackAdapter === false && adapter.options?.forceFallbackAdapter !== true), `corrected-shape renderer used an unexpected GPU: ${JSON.stringify(adapters)}`);
+    writeFileSync(join(SCRATCH, "studio-smart-shape-renderer-adapters.json"), JSON.stringify(adapters, null, 2));
+  }
+  const handle = toScreen(corrected.points[0]!, corrected.points[1]!);
+  await page.mouse.move(handle.x, handle.y);
+  await page.keyboard.down("Shift");
+  await page.mouse.down();
+  await page.mouse.move(handle.x + 24, handle.y + 16, { steps: 8 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  const moved = (await waitForPersistedDrawElements(page, (draws) =>
+    draws.at(-1)?.id === corrected.id && JSON.stringify(draws.at(-1)?.points) !== JSON.stringify(corrected.points),
+  "canvas control-point drag did not change corrected shape")).at(-1)!;
+  const angle = Math.atan2(moved.points[1]! - corrected.points[3]!, moved.points[0]! - corrected.points[2]!) / (Math.PI / 12);
+  invariant(Math.abs(angle - Math.round(angle)) < 0.00001, "Shift control-point drag did not snap to 15 degrees");
+  invariant(moved.points[0] === moved.points.at(-2) && moved.points[1] === moved.points.at(-1), "node drag broke closed-shape endpoints");
+  invariant(JSON.stringify(moved.smartShape) === JSON.stringify(corrected.smartShape), "node drag changed captured original or shape metadata");
+  await (await enabledHistoryButton(page, "실행취소")).click();
+  await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(corrected), "control-point Undo did not restore shape");
+  await (await enabledHistoryButton(page, "다시실행")).click();
+  await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(moved), "control-point Redo did not restore point edit");
+  await (await enabledHistoryButton(page, "실행취소")).click();
+  await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(corrected), "control-point second Undo did not restore shape");
+  await (await enabledHistoryButton(page, "실행취소")).click();
+  await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(before), "correction Undo did not restore exact source");
+  await (await enabledHistoryButton(page, "다시실행")).click();
+  await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(corrected), "correction Redo did not restore exact result");
+  await page.keyboard.press("Shift+Q");
+  await page.getByRole("button", { name: "빠른 액세스 편집", exact: true }).click();
+  await page.getByRole("searchbox", { name: "추가할 빠른 액세스 명령 검색", exact: true }).fill("현재 스트로크 교정");
+  await page.getByRole("button", { name: "현재 스트로크 교정 세트에 추가", exact: true }).click();
+  await page.getByRole("button", { name: "빠른 액세스 편집 완료", exact: true }).click();
+  await page.getByRole("button", { name: "현재 스트로크 교정 실행", exact: true }).click();
+  await page.getByRole("dialog", { name: "현재 스트로크 교정", exact: true }).waitFor({ state: "visible" });
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "빠른 액세스 닫기", exact: true }).click();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible" });
+  await dismissTransientChrome(page);
+  await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(corrected), "cold reload lost correction metadata");
+  await page.locator('[data-studio-command-bar-settings-trigger="true"]').click();
+  await page.locator('[data-studio-command-bar-settings-panel="true"] select').nth(7).selectOption("correct-current-stroke");
+  await page.keyboard.press("Escape");
+  await page.locator('[data-studio-command-bar-command="correct-current-stroke"]').click();
+  dialog = page.getByRole("dialog", { name: "현재 스트로크 교정", exact: true });
+  await dialog.getByRole("button", { name: "원래 자유선 복원", exact: true }).waitFor({ state: "visible" });
+  // The same portal is measured at narrow mobile widths; it is independent of canvas zoom and rotation.
+  await page.setViewportSize({ width: 320, height: 720 });
+  const layout = await dialog.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const small = Array.from(element.querySelectorAll("button,input:not([type=checkbox]),select")).filter((node) => {
+      const bounds = node.getBoundingClientRect();
+      return bounds.width > 0 && (bounds.width < 44 || bounds.height < 44);
+    });
+    return { left: box.left, right: box.right, width: innerWidth, small: small.length };
+  });
+  invariant(layout.left >= 0 && layout.right <= layout.width && layout.small === 0, `mobile correction controls overflow or miss 44px: ${JSON.stringify(layout)}`);
+  await page.screenshot({ path: join(SCRATCH, "studio-current-stroke-correction-mobile.png"), animations: "disabled" });
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await dialog.getByRole("button", { name: "원래 자유선 복원", exact: true }).click();
+  await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(before), "explicit original restore was not exact");
+  log("current stroke correction: kind/point preview, cancel, commit, canvas point drag with Shift, Undo/Redo, cold reload, exact restore and 320px controls OK");
+}
+
 async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise<SmartShapeResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  await context.addInitScript(() => {
+    type AdapterRecord = { options: unknown; vendor?: string; architecture?: string; isFallbackAdapter?: boolean };
+    const state = globalThis as typeof globalThis & { __studioShapeAdapters: AdapterRecord[] };
+    state.__studioShapeAdapters = [];
+    const gpu = (navigator as Navigator & { gpu?: { requestAdapter(options?: unknown): Promise<{ info: Omit<AdapterRecord, "options"> } | null> } }).gpu;
+    if (!gpu) return;
+    const original = gpu.requestAdapter.bind(gpu);
+    gpu.requestAdapter = async (options) => {
+      const adapter = await original(options);
+      state.__studioShapeAdapters.push({ options: options ?? null, vendor: adapter?.info.vendor,
+        architecture: adapter?.info.architecture, isFallbackAdapter: adapter?.info.isFallbackAdapter });
+      return adapter;
+    };
+  });
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, "smart-shapes", studioUrl);
   const screenshot = join(SCRATCH, "studio-smart-shape-desktop.png");
 
   try {
     await prepareStudioPage(page, studioUrl);
+    if (process.env.TOONSPECTRUM_BRUSH_VERIFY_GPU === "1") {
+      const adapter = await page.evaluate(async () => {
+        const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<{ info: { vendor: string; architecture: string; isFallbackAdapter: boolean }; features: Set<string>; limits: { maxBufferSize: number } } | null> } }).gpu;
+        const selected = await gpu?.requestAdapter();
+        return selected ? { origin: location.origin, vendor: selected.info.vendor, architecture: selected.info.architecture,
+          isFallbackAdapter: selected.info.isFallbackAdapter, featureCount: selected.features.size, maxBufferSize: selected.limits.maxBufferSize } : null;
+      });
+      invariant(adapter && adapter.isFallbackAdapter === false, `Smart Shape GPU lane lacks a real adapter: ${JSON.stringify(adapter)}`);
+      writeFileSync(join(SCRATCH, "studio-smart-shape-gpu.json"), JSON.stringify({ ...adapter, browserVersion: browser.version() }, null, 2));
+      log(`Smart Shape actual GPU: ${adapter.vendor}/${adapter.architecture}, fallback=${adapter.isFallbackAdapter}`);
+    }
     await activateDesktopPen(page);
     await enableSmartShape(page);
     const stage = page.locator(".konvajs-content").first();
@@ -3987,6 +4109,15 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
       );
     }
 
+    // Calibrate page coordinates from a user-drawn rectangular fixture at this unchanged camera.
+    const calibration = persisted[1]!.points;
+    const xs = calibration.filter((_, index) => index % 2 === 0);
+    const ys = calibration.filter((_, index) => index % 2 === 1);
+    const box = fixtures[1]!.box;
+    const docLeft = Math.min(...xs), docTop = Math.min(...ys);
+    const scaleX = (box.right - box.left) / (Math.max(...xs) - docLeft);
+    const scaleY = (box.bottom - box.top) / (Math.max(...ys) - docTop);
+    await runCurrentStrokeCorrection(page, (x, y) => ({ x: box.left + (x - docLeft) * scaleX, y: box.top + (y - docTop) * scaleY }));
     await page.screenshot({ path: screenshot, animations: "disabled" });
     reportBrowserErrors(errors);
     invariant(errors.messages.length === 0, "Smart Shape browser emitted console/page errors");
@@ -4639,7 +4770,8 @@ async function main(): Promise<void> {
     // playwright.config.ts 와 같은 규약으로 실행 파일 경로를 받아들인다.
     browser = await chromium.launch({
       headless: true,
-      args: ["--no-sandbox"],
+      ...(process.env.TOONSPECTRUM_BRUSH_VERIFY_GPU === "1" ? { channel: "chromium" } : {}),
+      args: ["--no-sandbox", ...(process.env.TOONSPECTRUM_BRUSH_VERIFY_GPU === "1" ? ["--enable-unsafe-webgpu", "--use-gpu-in-tests"] : [])],
       ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
         ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
         : {}),
