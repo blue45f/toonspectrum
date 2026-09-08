@@ -374,6 +374,7 @@ export function isCreatorPublicationDue(
   return (
     directive.mode === "scheduled" &&
     directive.visibility !== "private" &&
+    directive.publishedAt === null &&
     directive.scheduledAt !== null &&
     Date.parse(directive.scheduledAt) <= now.getTime()
   );
