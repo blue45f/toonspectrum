@@ -295,7 +295,7 @@ export function resolveStudioDraftSaveCenter(
   } else if (input.hasServerDocument && serverRevision !== null) {
     phase = "saved";
     tone = "success";
-    compactLabel = `저장됨 · r${serverRevision}`;
+    compactLabel = `서버 r${serverRevision} 확인`;
     headline = "이 기기 복구와 서버 revision을 각각 확인할 수 있어요";
     detail = input.lastServerSaveAt === null
       ? `서버 revision #${serverRevision}이 확인됐습니다.`
