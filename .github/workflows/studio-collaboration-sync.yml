@@ -23,7 +23,7 @@ concurrency:
 jobs:
   document-convergence:
     name: two-tab-document-convergence
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -42,7 +42,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/production"
           mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/branch"
       - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install chromium
       - name: Reproduce the currently deployed Studio
         id: production-baseline
         continue-on-error: true
