@@ -702,7 +702,6 @@ export function StudioProjectCenterSearch(): ReactElement {
             aria-label="프로젝트 센터 도구 검색"
             aria-controls={resultMode ? resultListId : undefined}
             aria-activedescendant={resultMode ? activeResultId : undefined}
-            aria-expanded={resultMode}
             className="min-w-0 flex-1 bg-transparent text-[0.75rem] text-fg outline-none placeholder:text-fg-3"
           />
           <span
