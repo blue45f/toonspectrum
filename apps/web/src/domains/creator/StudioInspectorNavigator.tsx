@@ -743,7 +743,7 @@ export function StudioInspectorNavigator({
                 />
               ) : null}
               {tabId === "layers" && normalizedLayerCount > 0 ? (
-                <span className="absolute right-1 top-1 rounded-full bg-accent-soft px-1 text-[0.6875rem] font-bold tabular-nums text-accent">
+                <span aria-hidden="true" className="absolute right-1 top-1 rounded-full bg-accent-soft px-1 text-[0.6875rem] font-bold tabular-nums text-accent">
                   {normalizedLayerCount > 99 ? "99+" : normalizedLayerCount}
                 </span>
               ) : null}
