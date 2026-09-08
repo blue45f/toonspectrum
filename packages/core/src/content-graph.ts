@@ -290,6 +290,8 @@ export function authorizeContentUsage(
     !rights.allowedSurfaces.includes(context.surface)
     || (context.surface === "studio-import" && rights.projectImport !== true)
     || (context.surface === "marketplace-download" && rights.originalDownload !== true)
+    || (context.surface === "ai-input" && rights.aiInput !== true)
+    || (context.surface === "ai-training" && rights.aiTraining !== true)
   ) {
     return { allowed: false, reason: "SURFACE_NOT_ALLOWED" };
   }

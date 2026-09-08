@@ -71,6 +71,7 @@ export interface Studio3dAssetRefineryEvent {
   readonly actor: string;
   readonly reason: string;
   readonly diagnostics: readonly Studio3dAssetRefineryDiagnostic[];
+  readonly resolvedDiagnosticCodes?: readonly string[];
   readonly outputs: readonly Studio3dAssetRefineryOutput[];
 }
 
@@ -103,6 +104,8 @@ export interface Studio3dAssetRefineryTransitionInput {
   readonly actor: string;
   readonly reason: string;
   readonly diagnostics?: readonly Studio3dAssetRefineryDiagnostic[];
+  /** Only a repaired transition may explicitly resolve currently active error codes. */
+  readonly resolvedDiagnosticCodes?: readonly string[];
   readonly outputs?: readonly Studio3dAssetRefineryOutput[];
 }
 
@@ -193,6 +196,9 @@ function freezeEvent(
   input: Studio3dAssetRefineryTransitionInput
 ): Studio3dAssetRefineryEvent {
   const diagnostics = Object.freeze((input.diagnostics ?? []).map(diagnostic));
+  const resolvedDiagnosticCodes = Object.freeze([...new Set(
+    (input.resolvedDiagnosticCodes ?? []).map(code => requiredText(code, "resolvedDiagnosticCode", 120))
+  )]);
   const outputs = Object.freeze((input.outputs ?? []).map(output));
   return Object.freeze({
     from,
@@ -201,6 +207,7 @@ function freezeEvent(
     actor: requiredText(input.actor, "actor", 80),
     reason: requiredText(input.reason, "reason", 500),
     diagnostics,
+    resolvedDiagnosticCodes,
     outputs,
   });
 }
@@ -244,9 +251,19 @@ export function transitionStudio3dAssetRefinery(
   if (Date.parse(event.at) < Date.parse(receipt.history.at(-1)?.at ?? "")) {
     throw new RangeError("Refinery 이벤트 시각은 이전 이벤트보다 빠를 수 없습니다.");
   }
-  // Re-diagnosing a code updates its current outcome; history retains every finding.
-  // Advancing a stage without explicitly re-diagnosing an error never clears it.
   const currentDiagnostics = new Map(receipt.diagnostics.map(entry => [entry.code, entry]));
+  const resolved = event.resolvedDiagnosticCodes ?? [];
+  if (resolved.length > 0 && input.to !== "repaired") {
+    throw new Error("Refinery errors can only be resolved in the repaired stage.");
+  }
+  for (const code of resolved) {
+    if (currentDiagnostics.get(code)?.severity !== "error") {
+      throw new Error(`No active refinery error exists for resolution: ${code}`);
+    }
+    currentDiagnostics.delete(code);
+  }
+  // Explicit repairs and re-diagnosis update current outcomes; history retains every finding.
+  // Apply new findings last so a recurring error stays active even in its repair event.
   for (const entry of event.diagnostics) currentDiagnostics.set(entry.code, entry);
   return Object.freeze({
     ...receipt,

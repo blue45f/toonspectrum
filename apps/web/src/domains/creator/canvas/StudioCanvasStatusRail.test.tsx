@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   StudioCanvasStatusRail,
   type StudioCanvasStatusRailProps,
 } from "./StudioCanvasStatusRail";
+import {
+  renderStudioCanvasStickyBanners,
+  type StudioCanvasStickyBannersContext,
+} from "./StudioCanvasStickyBanners";
 
 import type { ReactNode } from "react";
 
@@ -14,6 +18,22 @@ const viewportState = vi.hoisted(() => ({ mobile: false }));
 
 vi.mock("@/hooks/use-media-query", () => ({
   useIsMobile: () => viewportState.mobile,
+}));
+
+vi.mock("../live/StudioLiveCollaborationQuickControls", () => ({
+  StudioLiveCollaborationQuickControls: () => <button type="button">협업 설정</button>,
+}));
+
+vi.mock("../studio-page-lazy-ui", () => ({
+  StudioLivePresenceDockConnected: () => <button type="button">팀원 보기</button>,
+}));
+
+vi.mock("../studio-view-tools-hud-loader", () => ({
+  StudioViewToolsHud: ({ mode, onClose }: { mode: string; onClose: () => void }) => (
+    <div role="toolbar" aria-label={`${mode} view controls`}>
+      <button type="button" onClick={onClose}>보기 닫기</button>
+    </div>
+  ),
 }));
 
 vi.mock("../StudioToolHint", () => ({
@@ -43,7 +63,48 @@ vi.mock("../StudioToolHint", () => ({
 afterEach(() => {
   cleanup();
   viewportState.mobile = false;
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
+
+function createStickyProps(viewTool: "zoom" | "rotate" | null): StudioCanvasStickyBannersContext {
+  const activePage = { id: "page-1", elements: [], bg: "#fff", bgGrad: null, canvasH: 1080 };
+  return {
+    activePage,
+    canvasFlipH: false,
+    canvasRotation: 0,
+    closeViewToolWithFocus: vi.fn(),
+    collaborationDocumentUnavailable: false,
+    commentPinArmed: false,
+    commitPages: vi.fn(() => true),
+    dismissQuickStart: vi.fn(),
+    effScale: 1,
+    fitCanvasToWidth: vi.fn(),
+    followingStudioSessionId: null,
+    navigate: vi.fn(),
+    pages: [activePage],
+    remixId: null,
+    resetView: vi.fn(),
+    rotateCanvasView: vi.fn(),
+    setActualPixelView: vi.fn(),
+    setCurrentPageId: vi.fn(() => true),
+    setFollowingStudioSessionId: vi.fn(),
+    setSelectedId: vi.fn(),
+    setTeamPanelOpen: vi.fn(),
+    setTool: vi.fn(),
+    setZoom: vi.fn(),
+    sourceHydrationPending: false,
+    stopStudioCommentPlacementSession: vi.fn(),
+    studioCrdtOperationSyncReady: true,
+    t: (key) => key,
+    toggleHorizontalCanvasView: vi.fn(),
+    viewTool,
+    workHydrationFailed: false,
+    workHydrationUnsupportedFormat: false,
+    workId: null,
+    zoom: 1,
+  };
+}
 
 function createProps(
   overrides: Partial<StudioCanvasStatusRailProps> = {}
@@ -509,6 +570,63 @@ describe("StudioCanvasStatusRail", () => {
     // 붙는 순간 스테이지 원점이 내려가 진행 중인 드래그·획이 그만큼 튄다.
     expect(rail?.className).toContain("absolute");
     expect((rail as HTMLElement | null)?.style.top).toBe("8rem");
+  });
+
+  it.each(["zoom", "rotate"] as const)("keeps the mobile notice below both presence and %s controls as the HUD closes", (mode) => {
+    viewportState.mobile = true;
+    const resizeCallbacks: Array<() => void> = [];
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    vi.stubGlobal("ResizeObserver", class implements ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallbacks.push(() => callback([], this));
+      }
+      observe = observe;
+      unobserve = vi.fn();
+      disconnect = disconnect;
+    });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.hasAttribute("data-testid") && this.dataset.testid === "viewport") {
+        return new DOMRect(0, 20, 320, 720);
+      }
+      if (this.parentElement?.hasAttribute("data-studio-floating-controls")) {
+        return new DOMRect(0, 84, 320, this.querySelector('[role="toolbar"]') ? 124 : 44);
+      }
+      return new DOMRect();
+    });
+
+    const stickyProps = createStickyProps(mode);
+    const railProps = createProps({ mobileImmersive: true, hasAutosave: true });
+    const viewport = (viewTool: typeof mode | null) => (
+      <div data-testid="viewport" data-studio-mobile-immersive="true">
+        {renderStudioCanvasStickyBanners({ ...stickyProps, viewTool })}
+        <StudioCanvasStatusRail {...railProps} />
+      </div>
+    );
+    const { container, rerender } = render(viewport(mode));
+    const band = container.querySelector<HTMLElement>("[data-studio-floating-controls]");
+    const stack = band?.firstElementChild;
+    const presence = container.querySelector("[data-studio-presence-controls]");
+    const hud = screen.getByRole("toolbar", { name: `${mode} view controls` });
+    const rail = container.querySelector<HTMLElement>("[data-studio-canvas-status-rail]");
+
+    expect(band?.className.split(/\s/u)).toEqual(expect.arrayContaining([
+      "sticky", "top-2", '[[data-studio-mobile-immersive="true"]_&]:top-16', "h-0",
+    ]));
+    expect(stack?.className).toBe("flex flex-col gap-2");
+    expect(stack?.firstElementChild).toBe(presence);
+    expect(stack?.lastElementChild).toBe(hud.parentElement);
+    expect(presence?.className).not.toMatch(/\bsticky\b|\bh-0\b/u);
+    expect(hud.parentElement?.className).not.toMatch(/\bsticky\b|\bh-0\b/u);
+    expect(observe).toHaveBeenCalledWith(stack);
+    expect(rail?.style.top).toBe("196px");
+
+    fireEvent.click(screen.getByRole("button", { name: "보기 닫기" }));
+    expect(stickyProps.closeViewToolWithFocus).toHaveBeenCalledOnce();
+    rerender(viewport(null));
+    act(() => resizeCallbacks.forEach((callback) => callback()));
+    expect(screen.queryByRole("toolbar", { name: `${mode} view controls` })).toBeNull();
+    expect(rail?.style.top).toBe("116px");
   });
 
   it("gives the empty mobile notice strip zero drawing area", () => {
