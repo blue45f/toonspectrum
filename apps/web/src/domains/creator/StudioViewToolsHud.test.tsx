@@ -107,7 +107,7 @@ describe("StudioViewToolsHud", () => {
     fireEvent.blur(input);
 
     expect(onSetMagnification).not.toHaveBeenCalled();
-    expect(input).toHaveValue("40");
+    expect((input as HTMLInputElement).value).toBe("40");
   });
 
   it("keeps bounded and selection-only actions discoverable while blocking commands", () => {
@@ -133,9 +133,9 @@ describe("StudioViewToolsHud", () => {
       name: "선택 영역에 맞춤",
     });
 
-    expect(zoomOut).toHaveAttribute("aria-disabled", "true");
-    expect(zoomIn).toHaveAttribute("aria-disabled", "true");
-    expect(fitSelection).toHaveAttribute("aria-disabled", "true");
+    expect(zoomOut.getAttribute("aria-disabled")).toBe("true");
+    expect(zoomIn.getAttribute("aria-disabled")).toBe("true");
+    expect(fitSelection.getAttribute("aria-disabled")).toBe("true");
 
     fireEvent.click(zoomOut);
     fireEvent.click(zoomIn);
@@ -151,8 +151,8 @@ describe("StudioViewToolsHud", () => {
     const buttons = within(toolbar).getAllByRole("button");
 
     await waitFor(() => expect(document.activeElement).toBe(buttons[0]));
-    expect(buttons[0]).toHaveAttribute("tabindex", "0");
-    expect(buttons[1]).toHaveAttribute("tabindex", "-1");
+    expect(buttons[0]?.getAttribute("tabindex")).toBe("0");
+    expect(buttons[1]?.getAttribute("tabindex")).toBe("-1");
 
     fireEvent.keyDown(buttons[0], { key: "ArrowRight" });
     expect(document.activeElement).toBe(buttons[1]);
@@ -185,7 +185,7 @@ describe("StudioViewToolsHud", () => {
     fireEvent.change(input, { target: { value: "777" } });
     fireEvent.keyDown(input, { key: "Escape" });
     expect(onClose).not.toHaveBeenCalled();
-    expect(input).toHaveValue("40");
+    expect((input as HTMLInputElement).value).toBe("40");
 
     const firstAction = screen.getByRole("button", { name: "캔버스 축소" });
     fireEvent.focus(firstAction);
