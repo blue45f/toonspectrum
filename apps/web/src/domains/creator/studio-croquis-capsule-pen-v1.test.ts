@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getStroke } from "perfect-freehand";
 import { describe, expect, it } from "vitest";
 
@@ -11,6 +12,7 @@ import {
   STUDIO_CROQUIS_PULLED_STRING_DEFAULT_LENGTH_PX,
   studioCroquisCapsuleLoop,
   studioCroquisCapsuleLoopsToPathData,
+  studioCroquisCapsuleLoopToPathPart,
   studioCroquisCapsuleRadiiFromPressures,
   type StudioCroquisCapsuleCircle,
 } from "./studio-croquis-capsule-pen-v1";
@@ -421,6 +423,37 @@ describe("capsule stroke loops", () => {
       .toBe(buildStudioCroquisCapsuleStrokePathData(input));
   });
 
+  it("retains the canonical two-decimal coordinate bytes at rounding and numeric-format boundaries", () => {
+    const values = [0, -0, 0.005, -0.005, 1.015, -1.015, 2.675, -2.675, Number.MIN_VALUE,
+      999_999_999.99, -999_999_999.99, 1_000_000_000, -1_000_000_000, 1e21, -1e21, 1e100];
+    for (let index = 0; index < 1000; index++) values.push(Math.sin(index * 0.731) * (index % 2 ? 1e8 : 100));
+    for (const value of values) {
+      const coordinate = String(Math.round(value * 100) / 100);
+      expect(studioCroquisCapsuleLoopToPathPart([[value, 0], [value, 1], [value, 2]]))
+        .toBe(`M${coordinate} 0 L${coordinate} 1 L${coordinate} 2 Z`);
+    }
+  });
+
+  it("streams byte-identical paths to the retained-ring serializer across long and degenerate strokes", () => {
+    const cases = [
+      longStrokeInput(),
+      { points: [], radii: [] },
+      { points: [2, 3], radii: [0] },
+      { points: [2, 3], radii: [6] },
+      { points: [0, 0, 0, 0, 20, 10, 25, 15], radii: [2, 4, 0, 12] },
+      { points: [0, 0, 1, 0, 2, 0], radii: [10, 1, 2] },
+      { points: [Number.NaN, 0, 1, 1], radii: [1, 1] },
+      { points: [0, 0, 0.001, 0.001, 0.002, 0.002], radii: [0.001, 0.002, 0.001] },
+    ];
+    for (const input of cases) {
+      for (const arcTolerancePx of [0.01, 0.1, 1, 4]) {
+        const fixture = { ...input, arcTolerancePx };
+        expect(buildStudioCroquisCapsuleStrokePathData(fixture))
+          .toBe(studioCroquisCapsuleLoopsToPathData(buildStudioCroquisCapsuleStrokeLoops(fixture)));
+      }
+    }
+  });
+
   /** Per-build current-JavaScript-thread CPU ceiling in one clean, complete warm-process pass. */
   const CROQUIS_LONG_STROKE_CPU_BUDGET_MS = 40;
   /** Every build in a pass is graded so one unusually fast sample cannot hide repeated hitches. */
@@ -442,8 +475,8 @@ describe("capsule stroke loops", () => {
    * The builder is a pure function of (points, radii), so its emitted command and path-size census
    * is pinnable and holds on every machine with no clock involved. The path is built by walking
    * capsules and emitting their outlines, so finer tessellation, duplicate emitted segments, or
-   * lost collinear-run merging moves these receipts. They do not claim full-byte output identity
-   * or detect internal work that still emits the same string; the CPU gate below covers the latter
+   * lost collinear-run merging moves these receipts. The SHA-256 receipt also pins full-byte output identity. They do not detect
+   * internal work that still emits the same string; the CPU gate below covers the latter
    * once it breaches the product ceiling.
    *
    * Recorded values, exact and reproduced across runs.
@@ -462,6 +495,8 @@ describe("capsule stroke loops", () => {
     expect(occurrences(/A/gu)).toBe(0);
     expect(occurrences(/C/gu)).toBe(0);
     expect(pathData.length).toBe(513_581);
+    expect(createHash("sha256").update(pathData).digest("hex"))
+      .toBe("5e27104a26418ed23843b27ab5472e459d9abcd69892539c1839f2cfb471dd39");
   });
 
   /**
@@ -476,7 +511,7 @@ describe("capsule stroke loops", () => {
    * JavaScript worker that synchronously builds it. It deliberately does not claim that every
    * sub-40ms constant-factor slowdown is detectable.
    * The command census and byte length above remain machine-independent receipts for emitted
-   * segment, tessellation, and path-size growth. They do not claim full-byte correctness.
+   * segment, tessellation, path-size growth, and byte identity against the retained fixture.
    *
    * Five samples make one complete pass and its maximum is graded, so one fast build cannot hide
    * repeated allocation or GC hitches. An apparent violation earns two fresh complete passes; the
