@@ -1,0 +1,115 @@
+name: Apply studio pixel pencil pro core macOS
+
+on:
+  push:
+    branches:
+      - feat/studio-pixel-pencil-pro-v2-20260909
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-studio-pixel-pencil-pro-core-macos-sparse-v1
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[pixel-pencil-pro-core-applied]') }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Sparse partial-clone feature branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FEATURE_BRANCH: feat/studio-pixel-pencil-pro-v2-20260909
+        run: |
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git sparse-checkout init --cone
+          git sparse-checkout set .github .husky apps/web docs packages patches scripts
+          git -c protocol.version=2 fetch \
+            --depth=1 \
+            --filter=blob:none \
+            origin \
+            "+refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}"
+          git checkout -B "${FEATURE_BRANCH}" "refs/remotes/origin/${FEATURE_BRANCH}"
+
+      - name: Prepare indentation-safe source patch
+        run: python3 scripts/prepare-studio-pixel-pencil-pro-core.py
+
+      - name: Apply focused source patch
+        run: python3 scripts/apply-studio-pixel-pencil-pro-core.py
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format changed sources
+        run: |
+          pnpm exec prettier --write \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts \
+            apps/web/src/domains/creator/studio-pixel-pencil.test.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.test.ts \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers-freehand.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.test.ts \
+            docs/studio-pixel-pencil-pro-benchmark-2026-09-09.md
+
+      - name: Lint changed TypeScript sources
+        run: |
+          pnpm exec eslint \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts \
+            apps/web/src/domains/creator/studio-pixel-pencil.test.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.test.ts \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers-freehand.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.test.ts
+
+      - name: Run focused pixel-pencil tests
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-pixel-pencil.test.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.test.ts
+
+      - name: Verify pixel input wiring
+        run: |
+          grep -F 'planStudioPixelPencilSampleUpdate({' \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers-freehand.ts
+          grep -F 'pixelSampleUpdate === "replace-tail"' \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers-freehand.ts
+          ! grep -F 'strokeWidth: drawMode === "pixel" ? 1 : strokeWidth' \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.ts
+
+      - name: Typecheck web workspace
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Build production web bundle
+        run: pnpm run build:bundle
+
+      - name: Check patch whitespace
+        run: git diff --check
+
+      - name: Commit verified implementation
+        run: |
+          rm -f scripts/apply-studio-pixel-pencil-pro-core.py
+          rm -f scripts/prepare-studio-pixel-pencil-pro-core.py
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core.yml
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core-macos.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git commit -m "feat(studio): upgrade pixel pencil core [pixel-pencil-pro-core-applied]"
+          git push origin HEAD:feat/studio-pixel-pencil-pro-v2-20260909
