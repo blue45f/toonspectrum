@@ -1,0 +1,222 @@
+name: Studio large epics final reconcile v2
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-large-epics-final-reconcile-v2.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: studio-large-epics-final-reconcile-v2
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      GH_TOKEN: ${{ github.token }}
+      STATUS_FILE: docs/automation/studio-large-epics-closure-status.json
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Wait for every source-mutating precursor
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 100); do
+            active="$(gh run list --repo "$GITHUB_REPOSITORY" --branch "$GITHUB_REF_NAME" --limit 100 \
+              --json name,status \
+              --jq '[.[] | select(.status == "queued" or .status == "in_progress") | select(
+                .name == "Studio large epics source normalization" or
+                .name == "Integrate Studio 3D generation API" or
+                .name == "Integrate Studio advanced AI tools" or
+                .name == "Studio large epics deep fixes" or
+                .name == "Studio large epics reconcile"
+              )] | length')"
+            if [ "$active" = 0 ]; then break; fi
+            if [ "$attempt" = 100 ]; then
+              echo "Timed out waiting for prerequisite integration jobs." >&2
+              exit 1
+            fi
+            sleep 15
+          done
+          git fetch origin "$GITHUB_REF_NAME"
+          git reset --hard "origin/$GITHUB_REF_NAME"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Enforce deterministic final source corrections
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          ledger = Path('apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts')
+          text = ledger.read_text()
+          text = text.replace(
+            '    this.#locks.set(userId, previous.then(() => current));\n    await previous;',
+            '    const lock = previous.then(() => current);\n    this.#locks.set(userId, lock);\n    await previous;',
+          )
+          text = text.replace(
+            '      if (this.#locks.get(userId) === current) this.#locks.delete(userId);',
+            '      if (this.#locks.get(userId) === lock) this.#locks.delete(userId);',
+          )
+          ledger.write_text(text)
+
+          client_test = Path('apps/web/src/domains/creator/ai/studio-3d-generation-client.test.ts')
+          if client_test.exists():
+            text = client_test.read_text().replace(
+              'expect(String(url)).toEndWith("/api/studio-ai/3d/jobs");',
+              'expect(String(url).endsWith("/api/studio-ai/3d/jobs")).toBe(true);',
+            )
+            client_test.write_text(text)
+
+          panel_test = Path('apps/web/src/domains/creator/ai/StudioAi3dGenerationPanel.test.tsx')
+          if panel_test.exists():
+            text = panel_test.read_text().replace(
+              '''    const fetchMock = vi.fn<typeof fetch>((input) =>
+      Promise.resolve(String(input).endsWith("/jobs") ? response(job) : response([])),
+    );''',
+              '''    const fetchMock = vi.fn<typeof fetch>((input, init) =>
+      Promise.resolve(init?.method === "POST" ? response(job) : response([])),
+    );''',
+            )
+            panel_test.write_text(text)
+
+          aggregate = Path('scripts/verify-studio-open-issues-wave.mts')
+          text = aggregate.read_text()
+          anchor = '"apps/web/src/domains/creator/StudioSmartShapeEditDialog.tsx",'
+          if 'studio-command-catalog-base.ts' not in text and anchor in text:
+            text = text.replace(
+              anchor,
+              anchor + '\n      "apps/web/src/domains/creator/studio-command-catalog-base.ts",',
+              1,
+            )
+          aggregate.write_text(text)
+          PY
+
+      - name: Normalize all changed TypeScript and workflows
+        shell: bash
+        run: |
+          mapfile -t sources < <(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx' '*.mts' '*.mjs' | grep -v '^artifacts/' || true)
+          if [ "${#sources[@]}" -gt 0 ]; then
+            pnpm exec eslint --fix --max-warnings=0 "${sources[@]}"
+          fi
+
+      - name: Run all new and integration-focused tests
+        shell: bash
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-deterministic-serialization.test.ts \
+            apps/web/src/domains/creator/ai/studio-stroke-proposal.test.ts \
+            apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.test.tsx \
+            apps/web/src/domains/creator/ai/studio-3d-generation-client.test.ts \
+            apps/web/src/domains/creator/ai/StudioAi3dGenerationPanel.test.tsx \
+            apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.test.ts \
+            apps/web/src/domains/creator/animation/studio-timeline-timebase.test.ts \
+            apps/web/src/domains/creator/studio-asset-family-revision.test.ts \
+            apps/web/src/domains/creator/studio-soft-proofing.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-texture-dilation.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-attachment-graph.test.ts \
+            apps/web/src/domains/creator/ai/studio-structured-edit-proposal.test.ts \
+            apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.test.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-artifact-atomicity.test.ts \
+            apps/api/src/modules/studio-ai/studio-hyper3d-rodin-provider.test.ts \
+            apps/web/src/domains/creator/ai/StudioAiAssistHub.test.tsx \
+            apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts
+
+      - name: Verify product wiring and aggregate issue coverage
+        shell: bash
+        run: |
+          test -f apps/web/src/domains/creator/StudioUnifiedAssetSmartLibrary.tsx
+          grep -q 'useStudioAiCanvasBridge' apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx
+          grep -q 'StudioAdvancedAiTools' apps/web/src/domains/creator/ai/StudioAiAssistHub.tsx
+          grep -q 'Studio3dGenerationController' apps/api/src/modules/studio-ai/studio-ai.module.ts
+          grep -q 'Studio3dGenerationService' apps/api/src/modules/studio-ai/studio-ai.module.ts
+          pnpm exec tsx scripts/verify-studio-open-issues-wave.mts
+
+      - name: Full frontend and API typecheck
+        shell: bash
+        run: |
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          pnpm --filter @webtoon-nest/api run typecheck
+
+      - name: Production build and Studio bundle gate
+        shell: bash
+        run: |
+          pnpm run build
+          pnpm run check:studio-bundle
+
+      - name: Write green receipt
+        shell: bash
+        run: |
+          mkdir -p "$(dirname "$STATUS_FILE")"
+          node <<'NODE'
+          const fs = require('node:fs');
+          fs.writeFileSync(process.env.STATUS_FILE, JSON.stringify({
+            schemaVersion: 2,
+            passed: true,
+            runId: process.env.GITHUB_RUN_ID,
+            validatedHeadSha: process.env.GITHUB_SHA,
+            completedAt: new Date().toISOString(),
+            checks: {
+              deterministicSerialization: 'success',
+              strokeProposals: 'success',
+              effectGraph: 'success',
+              timeline: 'success',
+              assetFamilies: 'success',
+              colorProofing: 'success',
+              textureDilation: 'success',
+              attachmentGraph: 'success',
+              structuredAi: 'success',
+              generationLedger: 'success',
+              productWiring: 'success',
+              aggregate: 'success',
+              webTypecheck: 'success',
+              apiTypecheck: 'success',
+              productionBuild: 'success',
+              studioBundle: 'success',
+            },
+          }, null, 2) + '\n');
+          NODE
+
+      - name: Publish reconciled source and receipt with retries
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add . ':!artifacts'
+          if ! git diff --cached --quiet; then
+            git commit -m "test(studio): finalize verified large-epic closure"
+          fi
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$GITHUB_REF_NAME"
+            if git rebase "origin/$GITHUB_REF_NAME" && git push origin HEAD:"$GITHUB_REF_NAME"; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep $((attempt * 7))
+          done
+          exit 1
