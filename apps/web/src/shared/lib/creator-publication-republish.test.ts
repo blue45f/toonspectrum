@@ -27,5 +27,17 @@ describe("scheduled republishing", () => {
     });
 
     expect(directive.publishedAt).toBe("2026-09-10T09:00:02.000Z");
+    expect(isCreatorPublicationDue(directive, new Date("2026-09-11T09:00:00.000Z"))).toBe(false);
+  });
+
+  it("does not replay a completed schedule after its work is intentionally saved as draft", () => {
+    const directive = normalizeCreatorPublicationDirective({
+      mode: "scheduled",
+      visibility: "public",
+      scheduledAt: "2026-09-10T09:00:00.000Z",
+      publishedAt: "2026-09-10T09:00:02.000Z",
+    });
+
+    expect(isCreatorPublicationDue(directive, new Date("2026-09-12T09:00:00.000Z"))).toBe(false);
   });
 });
