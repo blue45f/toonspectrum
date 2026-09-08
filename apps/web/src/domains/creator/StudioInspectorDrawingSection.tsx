@@ -54,6 +54,10 @@ export function StudioInspectorDrawingSection({
   model: StudioInspectorAsideModel;
 }) {
   const {
+    recentColors,
+    ensureRecentColorsLoaded,
+    rememberColor,
+    clearRecentColors,
     activeInspectorBrushId,
     activeInspectorBrushName,
     activeSavedBrushId,
@@ -328,6 +332,10 @@ export function StudioInspectorDrawingSection({
                   color={color}
                   eyedropperActive={eyedropperActive}
                   onColorChange={setColor}
+                  recentColors={recentColors}
+                  ensureRecentColorsLoaded={ensureRecentColorsLoaded}
+                  rememberColor={rememberColor}
+                  clearRecentColors={clearRecentColors}
                   onEyedropperToggle={() => {
                     const next = !eyedropperActive;
                     if (next) disarmAllPixelTools();

@@ -52,7 +52,12 @@ describe("Studio product UI preference authority", () => {
     expect(workspacePersistence).toContain(
       'repository.loadBooleanPreference("ai-notice-acknowledged")',
     );
-    expect(page).toContain("repository.loadRecentColors()");
+    const recentColorsOwner = readFileSync(resolve(
+      process.cwd(), "apps/web/src/domains/creator/useStudioRecentColors.ts",
+    ), "utf8");
+    expect(page).toContain("useStudioRecentColors({");
+    expect(recentColorsOwner).toContain("acquireProductStudioUiPreferencesRepository()");
+    expect(recentColorsOwner).toContain("repository.loadRecentColors()");
     expect(page).toContain("repository.loadServerAiProvider()");
     expect(page).toContain("appSettingsUserRevisionRef.current === settingsRevisionAtStart");
     expect(page).toContain("advancedFillUserRevisionRef.current === revisionAtStart");
