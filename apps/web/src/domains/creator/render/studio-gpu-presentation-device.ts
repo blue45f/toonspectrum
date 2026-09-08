@@ -1,7 +1,4 @@
-import {
-  acquireStudioGpuDevice,
-  type StudioGpuDeviceLease,
-} from "./studio-gpu-fabric";
+import { acquireStudioGpuDevice } from "./studio-gpu-fabric";
 
 export type StudioGpuCanvasFormat = "bgra8unorm" | "rgba8unorm";
 export type StudioGpuPresentationDeviceStrategy =
@@ -24,6 +21,8 @@ export interface StudioGpuPresentationDevice {
   readonly deviceEpoch: number;
   readonly canvasFormat: StudioGpuCanvasFormat;
   readonly ownership: "fabric-lease" | "dedicated";
+  /** Idempotently releases this ownership; never destroy a borrowed physical device directly. */
+  readonly release: () => void;
 }
 
 function browserGpu(): GPU | null {
@@ -48,23 +47,13 @@ function resolvedStrategy(
   return import.meta.env.MODE === "test" ? "dedicated" : "shared";
 }
 
-function createLeaseDeviceFacade(lease: StudioGpuDeviceLease): GPUDevice {
+function once(release: () => void): () => void {
   let released = false;
-  return new Proxy(lease.device, {
-    get(real, property) {
-      if (property === "destroy") {
-        return () => {
-          if (released) return;
-          released = true;
-          lease.release();
-        };
-      }
-      const value: unknown = Reflect.get(real, property, real);
-      return typeof value === "function"
-        ? (value as (...args: unknown[]) => unknown).bind(real)
-        : value;
-    },
-  });
+  return () => {
+    if (released) return;
+    released = true;
+    release();
+  };
 }
 
 async function acquireDedicatedDevice(
@@ -82,6 +71,7 @@ async function acquireDedicatedDevice(
       deviceEpoch: 1,
       canvasFormat,
       ownership: "dedicated" as const,
+      release: once(() => device.destroy()),
     });
   } catch {
     return null;
@@ -99,20 +89,21 @@ async function acquireSharedDevice(
     return null;
   }
   return Object.freeze({
-    device: createLeaseDeviceFacade(lease),
+    device: lease.device,
     deviceEpoch: lease.epoch,
     canvasFormat,
     ownership: "fabric-lease" as const,
+    release: once(() => lease.release()),
   });
 }
 
 /**
  * Acquires a presentation-capable GPUDevice without leaking ownership into React components.
  *
- * Product callers borrow the single StudioGpuFabric device. Their existing `device.destroy()`
- * cleanup contract is preserved through a facade that idempotently releases only that lease;
- * it never destroys the physical shared device. The explicit dedicated strategy remains for
- * isolated harnesses and compatibility tests.
+ * Product callers borrow the single StudioGpuFabric device and explicitly release their lease.
+ * The device must remain the actual WebIDL object: a Proxy facade can call bound methods but
+ * fails the native GPUCanvasContext.configure device brand check. The dedicated strategy uses
+ * the same release contract and remains available for isolated harnesses.
  */
 export async function acquireStudioGpuPresentationDevice(
   options?: StudioGpuPresentationDeviceOptions,
