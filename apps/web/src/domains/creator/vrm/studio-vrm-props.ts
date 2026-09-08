@@ -184,26 +184,26 @@ export const BLENDER_PROP_GLTF_URLS = Object.freeze({
   blender_school_desk: "/assets/3d/school_desk.glb",
   blender_adaptive_power_wheelchair: "/assets/3d/adaptive_power_wheelchair.glb",
   blender_ramen_bowl: "/assets/3d/ramen_bowl.glb",
-  blender_ice_cream_cone: "/assets/3d/refined-v8/ice_cream_cone.glb",
-  blender_bubble_tea: "/assets/3d/refined-v8/bubble_tea.glb",
+  blender_ice_cream_cone: "/assets/3d/ice_cream_cone.glb",
+  blender_bubble_tea: "/assets/3d/bubble_tea.glb",
   blender_paper_lantern: "/assets/3d/paper_lantern.glb",
   blender_potted_monstera: "/assets/3d/potted_monstera.glb",
   blender_bonsai_tree: "/assets/3d/bonsai_tree.glb",
   blender_street_food_cart: "/assets/3d/street_food_cart.glb",
-  blender_traffic_light: "/assets/3d/refined-v8/traffic_light.glb",
-  blender_mailbox: "/assets/3d/refined-v8/mailbox.glb",
+  blender_traffic_light: "/assets/3d/traffic_light.glb",
+  blender_mailbox: "/assets/3d/mailbox.glb",
   blender_grandfather_clock: "/assets/3d/grandfather_clock.glb",
   blender_fireplace: "/assets/3d/fireplace.glb",
   blender_bathtub: "/assets/3d/bathtub.glb",
   blender_kitchen_stove: "/assets/3d/kitchen_stove.glb",
   blender_campfire: "/assets/3d/campfire.glb",
   blender_wishing_well: "/assets/3d/wishing_well.glb",
-  blender_robot_pet: "/assets/3d/refined-v8/robot_pet.glb",
+  blender_robot_pet: "/assets/3d/robot_pet.glb",
   blender_mech_turret: "/assets/3d/mech_turret.glb",
-  blender_fox_mask: "/assets/3d/refined-v8/fox_mask.glb",
+  blender_fox_mask: "/assets/3d/fox_mask.glb",
   blender_wizard_hat: "/assets/3d/wizard_hat.glb",
   blender_tea_set: "/assets/3d/tea_set.glb",
-  blender_hanging_sign: "/assets/3d/refined-v8/hanging_sign.glb",
+  blender_hanging_sign: "/assets/3d/hanging_sign.glb",
 } as const satisfies Readonly<Record<string, PropGltfAssetUrl>>);
 
 const PROCEDURAL_PROP_GEOMETRY_SOURCE = Object.freeze({ kind: "procedural" } as const);
@@ -336,7 +336,13 @@ const VRM_PROP_BASES = [
   { id: "blender_hanging_sign", label: "블렌더 매달린 간판", category: "body", defaultBone: "chest", defaultPosition: [0.55, 0.3, -0.4], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 가게 현판." },
 ] as const satisfies readonly LegacyPropDef[];
 
-export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
+type OriginalVrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
+const REFINED_V8_PROP_IDS = [
+  "blender_hanging_sign", "blender_traffic_light", "blender_mailbox", "blender_bubble_tea",
+  "blender_ice_cream_cone", "blender_fox_mask", "blender_robot_pet",
+] as const satisfies readonly OriginalVrmPropId[];
+type RefinedV8OriginalPropId = (typeof REFINED_V8_PROP_IDS)[number];
+export type VrmPropId = OriginalVrmPropId | `${RefinedV8OriginalPropId}_v8`;
 
 type PropProfile = Pick<PropDef, "anchors" | "fit"> & {
   grip?: PropGripProfile;
@@ -376,7 +382,7 @@ function fit(reference: PropFitReference, designReference: number, minScale = 0.
  * geometry와 같은 로컬 좌표로 기록한 접촉점 카탈로그.
  * Record<VrmPropId, ...>를 사용해 소품 추가 시 프로필 누락을 컴파일 단계에서 막는다.
  */
-const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
+const PROP_PROFILES: Record<OriginalVrmPropId, PropProfile> = {
   smartphone: {
     anchors: [handAnchor("primary", "primary", [0, -0.02, -0.006], 0.009)],
     grip: grip("flat", 0.009, 38, 34),
@@ -709,13 +715,13 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     fit: fit("hand", 0.075, 0.7, 1.4),
   },
   blender_ice_cream_cone: {
-    anchors: [handAnchor("primary", "primary", [0, 0.085, 0], 0.021)],
-    grip: grip("cylinder", 0.021, 42, 30),
+    anchors: [handAnchor("primary", "primary", [0, -0.04, 0], 0.014)],
+    grip: grip("cylinder", 0.014, 42, 30),
     fit: fit("hand", 0.075, 0.72, 1.4),
   },
   blender_bubble_tea: {
-    anchors: [handAnchor("primary", "primary", [0, 0.08, 0], 0.03)],
-    grip: grip("cylinder", 0.03, 40, 28),
+    anchors: [handAnchor("primary", "primary", [0, -0.03, 0], 0.02)],
+    grip: grip("cylinder", 0.02, 40, 28),
     fit: fit("hand", 0.075, 0.72, 1.4),
   },
   blender_paper_lantern: {
@@ -724,7 +730,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     fit: fit("hand", 0.075, 0.7, 1.45),
   },
   blender_fox_mask: {
-    anchors: [anchor("surface", "surface", [0, 0.04, 0.06014])],
+    anchors: [anchor("surface", "surface", [0, 0, 0.02])],
     fit: fit("head", 0.16, 0.75, 1.35),
     wearSocket: "face",
   },
@@ -794,15 +800,43 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   },
 };
 
-export const VRM_PROPS: readonly PropDef[] = VRM_PROP_BASES.map((def): PropDef => ({
+// Persisted IDs own both their original bytes and original attachment coordinates.
+const ORIGINAL_VRM_PROPS: readonly PropDef[] = VRM_PROP_BASES.map((def): PropDef => ({
   ...def,
   geometrySource: geometrySourceForPropId(def.id),
   wearSocket: "bone",
   ...PROP_PROFILES[def.id],
 }));
 
+const REFINED_V8_PROFILES: Partial<Record<RefinedV8OriginalPropId, Partial<PropProfile>>> = {
+  blender_ice_cream_cone: {
+    anchors: [handAnchor("primary", "primary", [0, 0.085, 0], 0.021)],
+    grip: grip("cylinder", 0.021, 42, 30),
+  },
+  blender_bubble_tea: {
+    anchors: [handAnchor("primary", "primary", [0, 0.08, 0], 0.03)],
+    grip: grip("cylinder", 0.03, 40, 28),
+  },
+  blender_fox_mask: {
+    anchors: [anchor("surface", "surface", [0, 0.04, 0.06014])],
+  },
+};
+
+/** New selections record an explicit revision; historical documents keep their authored geometry. */
+export const VRM_PROPS: readonly PropDef[] = ORIGINAL_VRM_PROPS.map((def): PropDef => {
+  const originalId = REFINED_V8_PROP_IDS.find(id => id === def.id);
+  if (!originalId) return def;
+  return {
+    ...def,
+    id: `${originalId}_v8`,
+    label: `${def.label} · 개선형`,
+    geometrySource: { kind: "gltf", url: `/assets/3d/refined-v8/${originalId.slice("blender_".length)}.glb` },
+    ...REFINED_V8_PROFILES[originalId],
+  };
+});
+
 export function propDefById(id: string): PropDef | undefined {
-  return VRM_PROPS.find((p) => p.id === id);
+  return VRM_PROPS.find((p) => p.id === id) ?? ORIGINAL_VRM_PROPS.find((p) => p.id === id);
 }
 
 export function propsByCategory(category: PropCategory): PropDef[] {

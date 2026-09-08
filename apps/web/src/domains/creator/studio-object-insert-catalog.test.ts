@@ -38,6 +38,19 @@ describe("studio object insert catalog (Canva-style 3D elements)", () => {
     );
   });
 
+  it("inserts explicit refined revisions without relabeling persisted legacy prop IDs", () => {
+    for (const name of ["hanging_sign", "traffic_light", "mailbox", "bubble_tea", "ice_cream_cone", "fox_mask", "robot_pet"]) {
+      const id = `obj-prop-blender_${name}_v8`;
+      const entry = findStudioObjectInsertItem(id);
+      expect(entry?.sourceId).toBe(`blender_${name}_v8`);
+      expect(entry?.label).toContain("개선형");
+      const placement = planStudioObjectInsertPlacement({ itemId: id, canvasWidth: 800, canvasHeight: 1200 });
+      expect(placement?.sourceId).toBe(`blender_${name}_v8`);
+      expect(placement?.openTarget).toBe("vrm-poser");
+      expect(findStudioObjectInsertItem(`obj-prop-blender_${name}`)).toBeNull();
+    }
+  });
+
   it("filters by query and family with contrasting results", () => {
     const sword = filterStudioObjectInsertItems({ query: "검" });
     expect(sword.some((item) => item.sourceId === "sword")).toBe(true);

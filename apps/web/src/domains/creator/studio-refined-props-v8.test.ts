@@ -50,9 +50,12 @@ describe("refined Blender props v8", () => {
     for (const image of json.images ?? []) expect(image.bufferView).toBeTypeOf("number");
   });
 
-  it("uses replacement models for the existing prop IDs without changing saved identifiers", () => {
+  it("selects explicit refined revisions while preserving existing saved prop definitions", () => {
     for (const name of WEARABLE_PROPS) {
       expect(propDefById(`blender_${name}`)?.geometrySource).toEqual({
+        kind: "gltf", url: `/assets/3d/${name}.glb`,
+      });
+      expect(propDefById(`blender_${name}_v8`)?.geometrySource).toEqual({
         kind: "gltf", url: `/assets/3d/refined-v8/${name}.glb`,
       });
     }

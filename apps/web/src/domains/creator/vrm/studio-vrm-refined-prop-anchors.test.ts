@@ -23,9 +23,9 @@ const metrics: Parameters<typeof resolvePropAttachment>[2] = {
 };
 
 const profiles = [
-  { id: "blender_ice_cream_cone", point: [0, 0.085, 0], radius: 0.021 },
-  { id: "blender_bubble_tea", point: [0, 0.08, 0], radius: 0.03 },
-  { id: "blender_fox_mask", point: [0, 0.04, 0.06014], radius: undefined },
+  { id: "blender_ice_cream_cone_v8", point: [0, 0.085, 0], radius: 0.021 },
+  { id: "blender_bubble_tea_v8", point: [0, 0.08, 0], radius: 0.03 },
+  { id: "blender_fox_mask_v8", point: [0, 0.04, 0.06014], radius: undefined },
 ] as const;
 
 describe("refined GLB attachment profiles", () => {
