@@ -31,7 +31,9 @@ function normalizeText(value: string | null | undefined): string {
 
 function stableSerialize(value: unknown): string {
   if (value === undefined) return "undefined";
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "undefined";
+  }
   if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
   return `{${Object.entries(value as Record<string, unknown>)
     .sort(([left], [right]) => left.localeCompare(right))
@@ -117,8 +119,13 @@ export function appendScenarioImageCandidate(
     .filter((existing) => existing.id !== candidate.id)
     .concat(candidate);
   const candidates = allCandidates.slice(-12);
-  if (item.approvedImageCandidateId && !candidates.some((entry) => entry.id === item.approvedImageCandidateId)) {
-    const approved = allCandidates.find((entry) => entry.id === item.approvedImageCandidateId);
+  if (
+    item.approvedImageCandidateId &&
+    !candidates.some((entry) => entry.id === item.approvedImageCandidateId)
+  ) {
+    const approved = allCandidates.find(
+      (entry) => entry.id === item.approvedImageCandidateId,
+    );
     if (approved) candidates[0] = approved;
   }
   return {
@@ -173,15 +180,17 @@ export function planStudioScenarioImageGeneration(
   const explicitIndexes = request.indexes
     ? [...new Set(request.indexes)].filter(
         (index) =>
-          Number.isInteger(index)
-          && index >= 0
-          && index < items.length
-          && items[index].imagePrompt.trim().length > 0,
+          Number.isInteger(index) &&
+          index >= 0 &&
+          index < items.length &&
+          (items[index]?.imagePrompt.trim().length ?? 0) > 0,
       )
     : null;
-  const indexes = explicitIndexes ?? items.flatMap((item, index) =>
-    item.imageDataUrl || item.imagePrompt.trim().length === 0 ? [] : [index],
-  );
+  const indexes =
+    explicitIndexes ??
+    items.flatMap((item, index) =>
+      item.imageDataUrl || item.imagePrompt.trim().length === 0 ? [] : [index],
+    );
   return indexes.flatMap((index) =>
     Array.from({ length: variants }, (_, variant) => ({
       index,
