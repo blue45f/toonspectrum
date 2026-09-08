@@ -34,10 +34,10 @@
  * 옮겼다(`studio-view-controls.ts`, `studio-main-menu-items-document.ts`).
  * 도달 조건 자체는 아래 `disabled` + 사유가 화면에 적는다.
  *
- * The workbench and contextual HUD now partially deliver Semantic/Object Select,
- * Expand/Shrink/Feather/Smooth, Save Selection and Selection HUD. They remain
- * recorded as partial in `studio-main-menu-group-spec.ts`: no direct menubar command,
- * project-synced named-selection channel or user-customizable launcher is invented.
+ * The workbench and contextual HUD deliver Semantic/Object Select,
+ * Expand/Shrink/Feather/Smooth, Save Selection and Selection HUD outside the menubar.
+ * Their §15.3 rows therefore remain absent until direct menu commands exist; the
+ * audit must not mistake inspector or on-canvas reachability for menubar coverage.
  */
 
 import { Circle, Contrast, Lasso, Pipette, Spline, SquareDashed, Wand2 } from "lucide-react";
