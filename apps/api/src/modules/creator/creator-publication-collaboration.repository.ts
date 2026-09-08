@@ -48,7 +48,7 @@ export interface PrepareCreatorPublicationSharedDocumentPatchInput {
  * - collaborators cannot introduce publication metadata into a legacy document;
  * - legacy owner clients also retain policy when replacing the rest of the document;
  * - owners get the same normalized status transition as the ordinary creator API;
- * - invalid owner publication attempts fail closed to draft rather than exposing the work.
+ * - invalid owner publication attempts deactivate scheduling and fail closed to draft.
  *
  * The following repository transaction still rechecks role, CRDT sequence, and base revision. A
  * concurrent document update after this read therefore becomes a normal revision conflict.
@@ -94,14 +94,24 @@ export function prepareCreatorPublicationSharedDocumentPatch({
           challengeLinked: shared.document.challengeId !== null,
         })
       : null;
-  const effectiveStatus =
-    publicationValidation && !publicationValidation.valid
-      ? "draft"
-      : resolveCreatorPublicationStatus(requestedStatus, directive, now);
+  const invalidPublication = Boolean(
+    publicationValidation && !publicationValidation.valid,
+  );
+  const safeDirective = invalidPublication
+    ? normalizeCreatorPublicationDirective({
+        ...directive,
+        mode: "immediate",
+        scheduledAt: null,
+        publishedAt: null,
+      })
+    : directive;
+  const effectiveStatus = invalidPublication
+    ? "draft"
+    : resolveCreatorPublicationStatus(requestedStatus, safeDirective, now);
   const effectiveDirective =
-    effectiveStatus === "published" && directive.publishedAt === null
-      ? markCreatorPublicationPublished(directive, now)
-      : directive;
+    effectiveStatus === "published" && safeDirective.publishedAt === null
+      ? markCreatorPublicationPublished(safeDirective, now)
+      : safeDirective;
   const documentSource = patch.doc ?? shared.document.doc;
 
   next.doc = writeCreatorPublicationDirective(
