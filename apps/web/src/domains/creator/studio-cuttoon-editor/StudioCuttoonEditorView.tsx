@@ -132,10 +132,15 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
       >
         <StudioCuttoonEditorChrome {...s} />
         <StudioDraftSaveCenter
+          key={s.effectiveWorkId ?? s.workId ?? "new-work"}
           saving={s.saving}
           workId={s.workId}
+          workHydrated={s.workHydrated}
+          workHydrationFailed={s.workHydrationFailed}
+          pendingSaveIntent={s.pendingSaveIntent}
           loadedWork={s.loadedWork}
           sharedDocument={s.sharedDocument}
+          localCheckpointCount={s.checkpoints?.length ?? 0}
           serverCurrentRevision={s.serverCurrentRevision}
           serverRevisions={s.serverRevisions}
           serverRevisionLoading={s.serverRevisionLoading}
@@ -147,6 +152,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
           mobileImmersive={s.mobileImmersive}
           canvasOnlyMode={s.canvasOnlyMode}
           onSaveDraft={() => s.studioMenubarContentHandlers.handleSave("draft")}
+          onContinuePendingSave={() => s.onContinuePendingSave()}
           onOpenVersions={() => s.setCheckpointPanelOpen(true)}
           onExportBackup={() => s.studioMenubarContentHandlers.handleExportProject()}
         />
