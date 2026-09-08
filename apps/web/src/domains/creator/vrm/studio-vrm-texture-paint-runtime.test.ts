@@ -181,6 +181,65 @@ function expectFailure<T>(
   expect(result.error.code).toBe(code);
 }
 
+describe.each(["pointer", "surface"] as const)("first %s paint on a material channel", (mode) => {
+  it.each([
+    ["roughness", "roughnessMap"],
+    ["metalness", "metalnessMap"],
+    ["emissive", "emissiveMap"],
+    ["opacity", "alphaMap"],
+  ] as const)("loads %s independently and rejects replacement of its source", async (channel, property) => {
+    for (const mutation of ["none", "baseColor", "channel"] as const) {
+      const source = new THREE.DataTexture(rgba(8, 8, [32, 128, 64, 255]), 8, 8);
+      const baseColor = new THREE.Texture();
+      const replacement = new THREE.Texture();
+      const material = new THREE.MeshStandardMaterial({ map: baseColor, [property]: source });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+      const scene = new THREE.Group();
+      scene.add(mesh);
+      const canvas = canvasHarness();
+      let finishRead!: (image: StudioVrmTexturePaintReadableImage) => void;
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: () => new Promise((resolve) => { finishRead = resolve; }),
+      });
+      try {
+        unwrap(runtime.setChannel(channel));
+        const pending = mode === "pointer"
+          ? runtime.beginStroke({ pointerId: 72, hit: hit(mesh, 0.5, 0.5, 0, 0), style: INK })
+          : runtime.prepareSurfaceBrushSession({ hit: hit(mesh, 0.5, 0.5, 0, 0) });
+        expectFailure(runtime.setChannel("baseColor"), "pointer-active");
+        if (mutation === "baseColor") material.map = replacement;
+        if (mutation === "channel") material[property] = replacement;
+        finishRead(readable(8, 8, rgba(8, 8, [32, 128, 64, 255])));
+        const result = await pending;
+        if (mutation === "channel") {
+          expectFailure<unknown>(result, "source-changed");
+          expect(canvas.createCanvas).not.toHaveBeenCalled();
+          expect(material[property]).toBe(replacement);
+          expect(runtime.getSnapshot()).toMatchObject({ activeOperation: null, targets: [] });
+        } else {
+          expect(result.ok).toBe(true);
+          if (!result.ok) throw new Error(result.error.code);
+          if ("session" in result.value) unwrap(runtime.cancelSurfaceBrushSession(result.value.session));
+          else unwrap(runtime.commitStroke(72));
+          expect(canvas.canvases).toHaveLength(1);
+          expect(material[property]).not.toBe(source);
+          expect(material.map).toBe(mutation === "baseColor" ? replacement : baseColor);
+          expect(runtime.getSnapshot().channel).toBe(channel);
+        }
+      } finally {
+        runtime.dispose();
+        material.dispose();
+        mesh.geometry.dispose();
+        source.dispose();
+        baseColor.dispose();
+        replacement.dispose();
+      }
+      expect(material[property]).toBe(mutation === "channel" ? replacement : source);
+    }
+  });
+});
+
 function hit(
   mesh: THREE.Mesh,
   u = 0.5,
