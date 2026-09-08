@@ -156,6 +156,28 @@ describe("studio hand navigation motion", () => {
     ).toBe(4_000);
   });
 
+  it("guards invalid samples and stops sub-threshold inertia", () => {
+    expect(
+      sampleStudioHandPanVelocity({
+        currentVelocity: 400,
+        deltaPx: Number.NaN,
+        elapsedMs: 16,
+      })
+    ).toBe(0);
+
+    const stoppedFrame = planStudioHandPanInertiaFrame({
+      velocityX: 10,
+      velocityY: -10,
+      elapsedMs: 16,
+      reducedMotion: false,
+    });
+    expect(stoppedFrame.deltaX).toBeCloseTo(0.16);
+    expect(stoppedFrame.deltaY).toBeCloseTo(-0.16);
+    expect(stoppedFrame.velocityX).toBe(0);
+    expect(stoppedFrame.velocityY).toBe(0);
+    expect(stoppedFrame.shouldContinue).toBe(false);
+  });
+
   it("decays inertial movement and disables it for reduced motion", () => {
     const frame = planStudioHandPanInertiaFrame({
       velocityX: 1_000,
