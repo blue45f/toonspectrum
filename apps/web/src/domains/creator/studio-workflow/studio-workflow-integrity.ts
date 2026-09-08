@@ -248,7 +248,9 @@ export function evaluateStudioWorkflowIntegrity(
     }
   }
 
-  for (const [index, snapshot] of (input.generationSnapshots ?? []).entries()) {
+  const generationSnapshots = input.generationSnapshots ?? [];
+  const suppliedSnapshotDigests = new Set(generationSnapshots.map((snapshot) => snapshot.snapshotDigest));
+  for (const [index, snapshot] of generationSnapshots.entries()) {
     for (const candidateIssue of validateStudioGenerationInputSnapshot(snapshot)) {
       issues.push(issue({
         code: candidateIssue.code,
@@ -262,6 +264,16 @@ export function evaluateStudioWorkflowIntegrity(
   }
   const candidates = input.generationCandidates ?? [];
   for (const [index, candidate] of candidates.entries()) {
+    if (!suppliedSnapshotDigests.has(candidate.inputSnapshotDigest)) {
+      issues.push(issue({
+        code: "candidate-input-snapshot-missing",
+        category: "generation",
+        severity: "error",
+        message: "Generation candidate input digest must reference a supplied generation snapshot.",
+        path: `generationCandidates[${index}].inputSnapshotDigest`,
+        blocks: ["review", "approval", "publish"],
+      }));
+    }
     for (const candidateIssue of validateStudioGenerationCandidate(candidate)) {
       issues.push(issue({
         code: candidateIssue.code,

@@ -301,6 +301,7 @@ export function evaluateStudioReviewApproval(input: {
     input.cycle.currentSnapshotId !== input.snapshot.id
     || input.snapshot.cycleId !== input.cycle.id
     || input.snapshot.workId !== input.cycle.workId
+    || !input.cycle.snapshotIds.includes(input.snapshot.id)
   ) {
     reasons.push("현재 검수 회차와 검수본이 일치하지 않습니다.");
   }
@@ -503,7 +504,12 @@ export function validateStudioReviewWorkflow(input: {
       });
     }
     const snapshot = snapshots.get(approval.reviewSnapshotId);
-    if (!snapshot) {
+    if (
+      !snapshot
+      || snapshot.cycleId !== input.cycle.id
+      || snapshot.workId !== input.cycle.workId
+      || !input.cycle.snapshotIds.includes(snapshot.id)
+    ) {
       issues.push({
         code: "approval-snapshot-mismatch",
         entityId: approval.id,

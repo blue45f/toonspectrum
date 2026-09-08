@@ -11,6 +11,7 @@ import {
 
 import type { StudioAssetLicenseRevisionV2, StudioAssetReferenceV2 } from "./studio-asset-reference-v2";
 import type { StudioCharacterBibleV2 } from "./studio-character-bible-v2";
+import type { StudioGenerationCandidateV1, StudioGenerationInputSnapshotV1 } from "./studio-generation-candidate";
 
 import {
   createStudioApproval,
@@ -156,6 +157,44 @@ function reviewBundle(threads: readonly StudioReviewThreadV1[] = []) {
   };
 }
 
+function generationSnapshot(): StudioGenerationInputSnapshotV1 {
+  return {
+    version: 1,
+    snapshotDigest: "generation-input-digest-1",
+    workScope: "work:episode-1",
+    localDocumentDigest: "digest-r42",
+    serverRevision: 42,
+    semanticPanelId: null,
+    targetElementId: null,
+    characterPins: [],
+    styleVersionId: null,
+    references: [],
+    editMask: null,
+    protectMask: null,
+    createdAt: NOW,
+  };
+}
+
+function generationCandidate(
+  id = "candidate-1",
+  inputSnapshotDigest = generationSnapshot().snapshotDigest,
+): StudioGenerationCandidateV1 {
+  return {
+    version: 1,
+    id,
+    requestId: `request-${id}`,
+    parentCandidateId: null,
+    output: asset(),
+    thumbnail: null,
+    inputSnapshotDigest,
+    label: "Candidate",
+    favorite: false,
+    selectedAsBase: false,
+    state: "ready",
+    createdAt: NOW,
+  };
+}
+
 function identity() {
   return upsertStudioIdentityLink(
     createEmptyStudioIdentityIndex("work:episode-1"),
@@ -211,6 +250,114 @@ describe("Studio workflow integrity", () => {
     expect(report.canApprove).toBe(true);
     expect(report.canPublish).toBe(true);
     expect(report.blockingIssueIds.publish).toEqual([]);
+  });
+
+  it.each(["foreign-cycle", "foreign-work", "unlisted-snapshot"])(
+    "blocks publishing a source never registered to its claimed approval cycle: %s",
+    (kind) => {
+      const review = reviewBundle();
+      const supplied = {
+        ...review.snapshots[0],
+        id: "review-snapshot-extra",
+        cycleId: kind === "foreign-cycle" ? "review-cycle-other" : review.cycle.id,
+        workId: kind === "foreign-work" ? "work-other" : review.cycle.workId,
+      };
+      const report = evaluateStudioWorkflowIntegrity({
+        versionCoordinates: approvedCoordinates(),
+        review: {
+          ...review,
+          cycle: {
+            ...review.cycle,
+            currentSnapshotId: supplied.id,
+            snapshotIds: kind === "unlisted-snapshot"
+              ? review.cycle.snapshotIds : [...review.cycle.snapshotIds, supplied.id],
+          },
+          snapshots: [...review.snapshots, supplied],
+          approval: { ...review.approval, reviewSnapshotId: supplied.id },
+        },
+        publishSource: { serverRevision: 42, contentDigest: "digest-r42" },
+      });
+      expect(report.canApprove).toBe(false);
+      expect(report.canPublish).toBe(false);
+      expect(report.issues).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: expect.stringContaining("approval-snapshot-mismatch"),
+          category: "review",
+          blocks: ["approval", "publish"],
+        }),
+      ]));
+    },
+  );
+
+  it.each(["omitted", "empty", "different-digest"])(
+    "requires a candidate to reference a supplied generation input: %s",
+    (kind) => {
+      const generationSnapshots = kind === "omitted" ? undefined
+        : kind === "empty" ? [] : [{ ...generationSnapshot(), snapshotDigest: "another-input-digest" }];
+      const report = evaluateStudioWorkflowIntegrity({
+        versionCoordinates: approvedCoordinates(),
+        review: reviewBundle(),
+        publishSource: { serverRevision: 42, contentDigest: "digest-r42" },
+        generationCandidates: [generationCandidate()],
+        generationSnapshots,
+      });
+      expect(report.canRequestReview).toBe(false);
+      expect(report.canApprove).toBe(false);
+      expect(report.canPublish).toBe(false);
+      expect(report.issues).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: expect.stringContaining("candidate-input-snapshot-missing"),
+          category: "generation",
+          path: "generationCandidates[0].inputSnapshotDigest",
+          blocks: ["review", "approval", "publish"],
+        }),
+      ]));
+    },
+  );
+
+  it("checks every candidate even when another candidate has a matching input", () => {
+    const report = evaluateStudioWorkflowIntegrity({
+      versionCoordinates: approvedCoordinates(),
+      review: reviewBundle(),
+      publishSource: { serverRevision: 42, contentDigest: "digest-r42" },
+      generationSnapshots: [generationSnapshot()],
+      generationCandidates: [generationCandidate(), generationCandidate("candidate-2", "missing-input-digest")],
+    });
+    expect(report.canPublish).toBe(false);
+    expect(report.issues.filter((issue) => issue.category === "generation")).toEqual([
+      expect.objectContaining({ path: "generationCandidates[1].inputSnapshotDigest" }),
+    ]);
+  });
+
+  it("preserves publishing when every candidate references a valid supplied input", () => {
+    const report = evaluateStudioWorkflowIntegrity({
+      versionCoordinates: approvedCoordinates(),
+      review: reviewBundle(),
+      publishSource: { serverRevision: 42, contentDigest: "digest-r42" },
+      generationSnapshots: [
+        { ...generationSnapshot(), snapshotDigest: "another-input-digest" },
+        generationSnapshot(),
+      ],
+      generationCandidates: [generationCandidate(), generationCandidate("candidate-2")],
+    });
+    expect(report.canRequestReview).toBe(true);
+    expect(report.canApprove).toBe(true);
+    expect(report.canPublish).toBe(true);
+    expect(report.issues.filter((issue) => issue.category === "generation")).toEqual([]);
+  });
+
+  it("still rejects invalid input snapshots even when their digest matches a candidate", () => {
+    const report = evaluateStudioWorkflowIntegrity({
+      versionCoordinates: approvedCoordinates(),
+      review: reviewBundle(),
+      publishSource: { serverRevision: 42, contentDigest: "digest-r42" },
+      generationSnapshots: [{ ...generationSnapshot(), createdAt: "invalid-time" }],
+      generationCandidates: [generationCandidate()],
+    });
+    expect(report.canPublish).toBe(false);
+    expect(report.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "generation", path: "generationSnapshots[0]" }),
+    ]));
   });
 
   it("blocks publish when the requested source differs from the immutable approval", () => {
