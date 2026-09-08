@@ -26,13 +26,12 @@ import {
   type CreatorWorkDetail,
   type CreatorWorkInput,
   type CreatorWorkMutationResult,
-  type CreatorWorkStatus,
 } from "./works-contract";
 
 interface CreatorPublicationPolicyRow {
   id: string;
   ownerId: string;
-  status: CreatorWorkStatus;
+  status: string;
   hidden: boolean;
   doc: unknown;
 }
