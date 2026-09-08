@@ -171,6 +171,7 @@ export interface StudioInspectorAsideHandlers {
     currentEls?: El[],
   ) => El[] | null;
   rememberColor: (c: string) => void;
+  clearRecentColors: () => void;
   rememberEffectRecent: (effectId: StudioEffectId) => void;
   removeSelected: () => void;
   removeAdvancedRuler: (id: string) => void;

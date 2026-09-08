@@ -138,15 +138,28 @@ export function StudioInspectorDrawColorControls({
   eyedropperActive,
   onColorChange,
   onEyedropperToggle,
+  recentColors,
+  ensureRecentColorsLoaded,
+  rememberColor,
+  clearRecentColors,
 }: {
   color: string;
   eyedropperActive: boolean;
   onColorChange: (color: string) => void;
   onEyedropperToggle: () => void;
+  recentColors: readonly string[];
+  ensureRecentColorsLoaded: () => void;
+  rememberColor: (color: string) => void;
+  clearRecentColors: () => void;
 }) {
   const [activeCspPalette, setActiveCspPalette] = useState<
     "intermediate" | "approximate" | "history" | null
   >(null);
+
+  const selectColor = (next: string) => {
+    onColorChange(next);
+    rememberColor(next);
+  };
 
   return (
     <div className="space-y-1.5 border-t border-line/35 pt-1.5">
@@ -185,9 +198,10 @@ export function StudioInspectorDrawColorControls({
           </button>
           <button
             type="button"
-            onClick={() =>
-              setActiveCspPalette((prev) => (prev === "history" ? null : "history"))
-            }
+            onClick={() => {
+              ensureRecentColorsLoaded();
+              setActiveCspPalette((prev) => (prev === "history" ? null : "history"));
+            }}
             className={cn(
               "px-1.5 py-0.2 rounded text-[9px] font-medium transition-colors border whitespace-nowrap",
               activeCspPalette === "history"
@@ -224,7 +238,7 @@ export function StudioInspectorDrawColorControls({
           <button
             key={swatch}
             type="button"
-            onClick={() => onColorChange(swatch)}
+            onClick={() => selectColor(swatch)}
             aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
             className="group grid size-11 place-items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:size-5 lg:rounded"
             title={swatch}
@@ -249,7 +263,7 @@ export function StudioInspectorDrawColorControls({
           <input
             type="color"
             value={color}
-            onChange={(event) => onColorChange(event.target.value)}
+            onChange={(event) => selectColor(event.target.value)}
             className="absolute inset-0 size-full cursor-pointer opacity-0"
             aria-label="사용자 정의 색상 선택"
           />
@@ -266,7 +280,7 @@ export function StudioInspectorDrawColorControls({
         <div className="pt-1">
           <StudioIntermediateColorPanel
             activeColor={color}
-            onSelectColor={onColorChange}
+            onSelectColor={selectColor}
           />
         </div>
       )}
@@ -274,7 +288,7 @@ export function StudioInspectorDrawColorControls({
         <div className="pt-1">
           <StudioApproximateColorPanel
             activeColor={color}
-            onSelectColor={onColorChange}
+            onSelectColor={selectColor}
           />
         </div>
       )}
@@ -282,7 +296,10 @@ export function StudioInspectorDrawColorControls({
         <div className="pt-1">
           <StudioColorHistoryPanel
             activeColor={color}
-            onSelectColor={onColorChange}
+            onSelectColor={selectColor}
+            history={recentColors}
+            onRegisterCurrent={() => rememberColor(color)}
+            onClearHistory={clearRecentColors}
           />
         </div>
       )}

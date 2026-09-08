@@ -9,7 +9,10 @@ export function StudioVrmTextureExportButton({ runtime, disabled }: {
   const active = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => () => active.current?.abort(), [runtime]);
+  useEffect(() => () => {
+    active.current?.abort();
+    setError("");
+  }, [runtime]);
   const run = async () => {
     if (!runtime || disabled || active.current) return;
     const controller = new AbortController();

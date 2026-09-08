@@ -159,6 +159,10 @@ describe("StudioUnifiedBrushPicker", () => {
       <>
         <StudioInspectorBrushCatalogButton onOpen={vi.fn()} />
         <StudioInspectorDrawColorControls
+          recentColors={[]}
+          ensureRecentColorsLoaded={vi.fn()}
+          rememberColor={vi.fn()}
+          clearRecentColors={vi.fn()}
           color="#16100c"
           eyedropperActive={false}
           onColorChange={vi.fn()}
