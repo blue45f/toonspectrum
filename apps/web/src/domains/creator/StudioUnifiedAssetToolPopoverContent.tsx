@@ -9,11 +9,21 @@ import {
   Shapes,
   Sticker as StickerIcon,
 } from "lucide-react";
+import { useRef } from "react";
 
 import { StudioAssetLegacyPanel } from "./StudioAssetLegacyPanel";
+import { StudioInsertHubWorkspace } from "./StudioInsertHubWorkspace";
+import { CANVAS_W } from "./studio-assets";
 import { BG_SCENES } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "./studio-chrome-ui";
+import { elBounds } from "./studio-element-geometry";
+import { createCanvasImageElement } from "./studio-image-placement";
+import {
+  resolveStudioInsertPlacement,
+  type StudioInsertActionId,
+  type StudioInsertPlacementMode,
+} from "./studio-insert-hub-model";
 import { preloadStudioAssetMenuPanel } from "./studio-page-lazy-ui";
 import { SCENE_TEMPLATES } from "./studio-scene-templates";
 import {
@@ -21,12 +31,20 @@ import {
   type StudioUnifiedAssetItem,
 } from "./studio-unified-asset-catalog";
 import { StudioUnifiedAssetSmartLibrary } from "./StudioUnifiedAssetSmartLibrary";
-import { StudioUnifiedAssetWorkspace } from "./StudioUnifiedAssetWorkspace";
 
 import type { StudioMenu } from "./studio-editor-tool-model";
 import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
 
+const INSERT_REVIEW_LOCKED_MESSAGE =
+  "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 항목을 삽입해 주세요.";
+
 const ASSET_MENU_ITEMS = [
+  {
+    id: "asset",
+    label: "삽입",
+    icon: Library,
+    title: "검색·최근·즐겨찾기·배치가 통합된 삽입 허브",
+  },
   {
     id: "template",
     label: "템플릿",
@@ -69,29 +87,63 @@ const ASSET_MENU_ITEMS = [
     icon: StickerIcon,
     title: "만화 효과·스티커",
   },
-  {
-    id: "asset",
-    label: "에셋",
-    icon: Library,
-    title: "통합 탐색·보관함·마켓",
-  },
 ] as const;
 
 export interface StudioUnifiedAssetToolPopoverContentProps {
   readonly toolBelt: StudioToolBeltContentProps;
 }
 
+interface InsertSelectionBounds {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+function assertInsertMutationAllowed(
+  toolBelt: StudioToolBeltContentProps,
+): void {
+  if (toolBelt.activeSurfaceReviewLocked) {
+    throw new Error(INSERT_REVIEW_LOCKED_MESSAGE);
+  }
+}
+
+function resolveSelectionBounds(
+  toolBelt: StudioToolBeltContentProps,
+): InsertSelectionBounds | null {
+  if (!toolBelt.selected) return null;
+  const bounds = elBounds(toolBelt.selected);
+  if (
+    !Number.isFinite(bounds.x) ||
+    !Number.isFinite(bounds.y) ||
+    !Number.isFinite(bounds.w) ||
+    !Number.isFinite(bounds.h) ||
+    bounds.w <= 0 ||
+    bounds.h <= 0
+  ) {
+    return null;
+  }
+  return {
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.w,
+    height: bounds.h,
+  };
+}
+
 function routeUnifiedAsset(
   item: StudioUnifiedAssetItem,
   toolBelt: StudioToolBeltContentProps,
+  placementMode: StudioInsertPlacementMode,
+  selectionBounds: InsertSelectionBounds | null,
 ): boolean | void | Promise<boolean | void> {
   const handlers = toolBelt.stableHandlers;
   switch (item.source.kind) {
     case "background":
       return handlers.addBgScene(item.source.value);
     case "scene-template":
-      // The legacy controller resolves void even when it rejects a placement internally.
-      // Route to its preview/placement surface instead of announcing an insertion here.
+      // The legacy controller resolves void even when it rejects internally.
+      // Open its owned preview surface instead of announcing an insertion here.
       toolBelt.setMenu("scene");
       return true;
     case "element":
@@ -103,12 +155,42 @@ function routeUnifiedAsset(
         sourceId: item.source.value.sourceId,
       });
       return true;
-    case "local":
+    case "local": {
+      const placement = resolveStudioInsertPlacement(placementMode, {
+        canvasWidth: CANVAS_W,
+        canvasHeight: toolBelt.canvasH,
+        selectionBounds,
+      });
+      if (!placement) {
+        return handlers.addRenderedImage(
+          item.source.value.dataUrl,
+          item.source.value.width,
+          item.source.value.height,
+        );
+      }
+      const placed = createCanvasImageElement({
+        id: `insert-preview:${item.source.value.id}`,
+        src: item.source.value.dataUrl,
+        canvasWidth: CANVAS_W,
+        canvasHeight: toolBelt.canvasH,
+        sourceWidth: item.source.value.width,
+        sourceHeight: item.source.value.height,
+        placement,
+      });
       return handlers.addRenderedImage(
         item.source.value.dataUrl,
         item.source.value.width,
         item.source.value.height,
+        undefined,
+        undefined,
+        {
+          x: placed.x,
+          y: placed.y,
+          width: placed.width,
+          height: placed.height,
+        },
       );
+    }
     case "native-tool":
       toolBelt.setMenu(item.source.value.menu);
       return true;
@@ -117,12 +199,70 @@ function routeUnifiedAsset(
   }
 }
 
+function routeInsertAction(
+  actionId: StudioInsertActionId,
+  toolBelt: StudioToolBeltContentProps,
+): boolean {
+  const handlers = toolBelt.stableHandlers;
+  switch (actionId) {
+    case "text":
+      assertInsertMutationAllowed(toolBelt);
+      handlers.addText(undefined, true);
+      toolBelt.setMenu(null);
+      return true;
+    case "bubble":
+      toolBelt.setMenu("bubble");
+      return true;
+    case "upload":
+      // The workspace owns the hidden file input so cancellation is a no-op.
+      return true;
+    case "stock":
+      toolBelt.setMenu("stockImage");
+      return true;
+    case "template":
+      toolBelt.setMenu("template");
+      return true;
+    case "collage":
+      toolBelt.setMenu("collage");
+      return true;
+    case "elements":
+      toolBelt.setMenu("elements");
+      return true;
+    case "scene":
+      toolBelt.setMenu("scene");
+      return true;
+    case "clip":
+      toolBelt.setMenu("clip");
+      return true;
+    case "sticker":
+      toolBelt.setMenu("sticker");
+      return true;
+    case "emeres":
+      toolBelt.setMenu("emeres");
+      return true;
+    case "background3d":
+      toolBelt.setMenu(null);
+      toolBelt.setBg3dOpen(true);
+      return true;
+    case "ai":
+      toolBelt.setMenu("aiAssist");
+      return true;
+    default: {
+      const neverAction: never = actionId;
+      throw new Error(`지원하지 않는 삽입 동작입니다: ${neverAction}`);
+    }
+  }
+}
+
 export function StudioUnifiedAssetToolPopoverContent({
   toolBelt,
 }: StudioUnifiedAssetToolPopoverContentProps) {
+  const requestedPlacementModeRef =
+    useRef<StudioInsertPlacementMode>("auto");
+  const selectionBounds = resolveSelectionBounds(toolBelt);
   const items = buildStudioUnifiedAssetCatalog({
-    // Cold asset-menu entry must not depend on users visiting the legacy background/scene tabs.
-    // Stable ids are deduplicated by the unified catalog when the host has already loaded them.
+    // Cold entry must not require visiting legacy background or scene tabs first.
+    // Stable ids are deduplicated by the unified catalog.
     backgrounds: [
       ...BG_SCENES,
       ...BG_SCENES_EXTRA,
@@ -146,17 +286,17 @@ export function StudioUnifiedAssetToolPopoverContent({
       : item,
   );
   const initialView =
-    toolBelt.assetTab === "community" ? "library" : "discover";
+    toolBelt.assetTab === "community" ? "library" : "insert";
 
   return (
     <>
       <StudioMenuPopoverHeader
         icon={Folder}
-        title="템플릿 · 에셋"
-        description="2D·장면·요소·3D·내 에셋을 통합 검색하고, 기존 보관함과 마켓도 함께 관리합니다."
+        title="삽입 허브"
+        description="텍스트·말풍선·이미지·레이아웃·효과·3D·내 에셋을 검색하고 최근 사용, 즐겨찾기와 배치 방식까지 한곳에서 관리합니다."
       />
       <StudioMenuSubtabs
-        aria-label="에셋 메뉴 구역"
+        aria-label="삽입·에셋 메뉴 구역"
         activeId={toolBelt.menu}
         onSelect={(id: string) => {
           if (id === "asset") preloadStudioAssetMenuPanel();
@@ -167,14 +307,36 @@ export function StudioUnifiedAssetToolPopoverContent({
       <StudioUnifiedAssetSmartLibrary
         items={items}
         defaultCollapsed={initialView === "library"}
-        onUseItem={(item) => routeUnifiedAsset(item, toolBelt)}
+        onUseItem={(item) => {
+          // The smart library owns successful-use intelligence while the insertion
+          // hub owns placement choice. The child sets the ref immediately before
+          // invoking this handler, so the mode is request-scoped and reset before
+          // any awaited mutation can interleave with a later action.
+          const placementMode = requestedPlacementModeRef.current;
+          requestedPlacementModeRef.current = "auto";
+          return routeUnifiedAsset(
+            item,
+            toolBelt,
+            placementMode,
+            selectionBounds,
+          );
+        }}
       >
         {({ items: visibleItems, onUseItem }) => (
-          <StudioUnifiedAssetWorkspace
+          <StudioInsertHubWorkspace
             initialView={initialView}
             items={visibleItems}
             legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
-            onUseItem={onUseItem}
+            selectionPlacementAvailable={selectionBounds !== null}
+            onUseItem={(item, placementMode) => {
+              requestedPlacementModeRef.current = placementMode;
+              return onUseItem(item);
+            }}
+            onUseAction={(actionId) => routeInsertAction(actionId, toolBelt)}
+            onUploadImage={async (event) => {
+              assertInsertMutationAllowed(toolBelt);
+              await toolBelt.stableHandlers.onPickImage(event);
+            }}
             onOpenAi={(prompt) => {
               if (prompt) {
                 toolBelt.stableHandlers.applyAiAssistPresetPrompt(

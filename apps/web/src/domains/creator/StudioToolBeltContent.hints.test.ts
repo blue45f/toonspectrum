@@ -72,7 +72,7 @@ describe("Studio ToolBelt rich hint coverage", () => {
   it("routes every native ToolBelt button through the shared single-open hint target", () => {
     const buttons = nativeControls("button", sourceFiles);
 
-    expect(buttons).toHaveLength(39);
+    expect(buttons).toHaveLength(40);
     expect(buttons.filter((button) => nearestHintTarget(button) === null)).toEqual([]);
     expect(allSource).toContain('<StudioToolHintTarget preferredSide="bottom" {...props} />');
     expect(allSource).not.toContain('role="tooltip"');
@@ -101,6 +101,7 @@ describe("Studio ToolBelt rich hint coverage", () => {
       "마감·품질 검사",
       "세로 스크롤 미리보기",
       "다중 레이어 타임라인",
+      "삽입 허브 열기",
     ]) {
       expect(allSource).toContain(`aria-label="${accessibleName}`);
     }

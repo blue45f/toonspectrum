@@ -8,10 +8,12 @@ function read(relativePath: string): string {
 
 const wrapperSource = read("./StudioAssetToolPopoverWorkspace.tsx");
 const contentSource = read("./StudioUnifiedAssetToolPopoverContent.tsx");
+const insertWorkspaceSource = read("./StudioInsertHubWorkspace.tsx");
+const insertModelSource = read("./studio-insert-hub-model.ts");
 const lazySource = read("./studio-unified-asset-lazy-ui.ts");
 
-describe("StudioAssetToolPopoverWorkspace review boundaries", () => {
-  it("loads unified catalogs only after the asset subtab is active", () => {
+describe("Studio insertion hub review boundaries", () => {
+  it("loads unified catalogs and the insertion hub only after the asset subtab is active", () => {
     expect(wrapperSource).toContain('if (toolBelt.menu !== "asset")');
     expect(wrapperSource).toContain(
       "<LazyStudioUnifiedAssetToolPopoverContent toolBelt={toolBelt} />",
@@ -26,11 +28,22 @@ describe("StudioAssetToolPopoverWorkspace review boundaries", () => {
       "./studio-bg-scenes-extra",
       "./studio-scene-templates",
       "./studio-unified-asset-catalog",
-      "./StudioUnifiedAssetWorkspace",
+      "./studio-insert-hub-model",
+      "./StudioInsertHubWorkspace",
     ]) {
       expect(wrapperSource).not.toContain(heavyModule);
       expect(contentSource).toContain(heavyModule);
     }
+    expect(contentSource).not.toContain("./StudioUnifiedAssetWorkspace");
+  });
+
+  it("keeps browser storage and discovery state inside the lazy insertion workspace", () => {
+    expect(contentSource).not.toContain("window.localStorage");
+    expect(insertWorkspaceSource).toContain("window.localStorage");
+    expect(insertWorkspaceSource).toContain("loadStudioInsertHubPreferences");
+    expect(insertWorkspaceSource).toContain("saveStudioInsertHubPreferences");
+    expect(insertModelSource).toContain("STUDIO_INSERT_HUB_MAX_RECENTS");
+    expect(insertModelSource).toContain("STUDIO_INSERT_HUB_MAX_FAVORITES");
   });
 
   it("ships cold-entry scene catalogs without requiring legacy tab visits", () => {
@@ -54,9 +67,9 @@ describe("StudioAssetToolPopoverWorkspace review boundaries", () => {
     expect(contentSource).not.toContain("setAssetPrompt(prompt)");
   });
 
-  it("opens community deep links without unmounting unified discovery", () => {
+  it("opens community deep links without unmounting the unified insertion surface", () => {
     expect(contentSource).toContain(
-      'toolBelt.assetTab === "community" ? "library" : "discover"',
+      'toolBelt.assetTab === "community" ? "library" : "insert"',
     );
     expect(contentSource).toContain(
       "<StudioAssetLegacyPanel toolBelt={toolBelt} />",
@@ -79,6 +92,14 @@ describe("StudioAssetToolPopoverWorkspace review boundaries", () => {
     expect(contentSource).toContain('case "native-tool":');
     expect(contentSource).toContain(
       "toolBelt.setMenu(item.source.value.menu)",
+    );
+  });
+
+  it("keeps immediate mutations behind the existing review lock", () => {
+    expect(contentSource).toContain("assertInsertMutationAllowed(toolBelt)");
+    expect(contentSource).toContain("toolBelt.activeSurfaceReviewLocked");
+    expect(contentSource).toContain(
+      "await toolBelt.stableHandlers.onPickImage(event)",
     );
   });
 });
