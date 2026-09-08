@@ -155,7 +155,8 @@ export function CharacterShaperOutputDock({
   const entries: readonly VrmLibraryEntry[] = Array.isArray(h.libraryEntries) ? h.libraryEntries : [];
   const modelName = entries.find((entry) => entry.id === h.activeModelId)?.name ?? "character";
   const exportBusy = running !== null;
-  const exportBlocked = capturing || !modelReady || exportBusy || binding.busyReason !== null;
+  const auditionActive = binding.previewEntryId != null;
+  const exportBlocked = capturing || !modelReady || exportBusy || binding.busyReason !== null || auditionActive;
 
   const fail = (text: string, detail?: string) => {
     if (!aliveRef.current) return;
@@ -271,7 +272,7 @@ export function CharacterShaperOutputDock({
   };
 
   const insert = () => {
-    if (capturing) return;
+    if (exportBlocked) return;
     h.handleInsert();
   };
 
@@ -280,7 +281,7 @@ export function CharacterShaperOutputDock({
       type="button"
       role="switch"
       aria-checked={transparent}
-      disabled={capturing}
+      disabled={capturing || auditionActive}
       title={
         transparent
           ? "투명 배경 · 캔버스와 PNG에 캐릭터만 남습니다"
@@ -308,7 +309,7 @@ export function CharacterShaperOutputDock({
       <input
         type="color"
         value={insertBackgroundColor}
-        disabled={capturing}
+        disabled={capturing || auditionActive}
         aria-label="삽입 배경색"
         className="size-8 cursor-pointer rounded-md border border-line bg-panel p-0.5 disabled:cursor-not-allowed disabled:opacity-45"
         onChange={(event) => h.setInsertBackgroundColor(event.currentTarget.value)}
@@ -344,7 +345,9 @@ export function CharacterShaperOutputDock({
     </button>
   );
 
-  const statusLine = progress ?? notice?.text ?? null;
+  const statusLine = progress ?? notice?.text ?? (auditionActive
+    ? "후보 미리보기 중 · 클릭해 확정하거나 Esc로 취소한 뒤 원고에 적용할 수 있습니다."
+    : null);
 
   return (
     <div
@@ -397,9 +400,9 @@ export function CharacterShaperOutputDock({
         )}
         <button
           type="button"
-          disabled={capturing || !modelReady}
+          disabled={exportBlocked}
           aria-label="캔버스에 추가"
-          title="지금 화면 그대로 현재 페이지에 넣습니다"
+          title={auditionActive ? "후보를 확정하거나 취소한 뒤 캔버스에 넣을 수 있습니다" : "지금 화면 그대로 현재 페이지에 넣습니다"}
           onClick={insert}
           className={compact ? cn(ICON_BUTTON, "border-accent/60 bg-accent text-on-accent hover:bg-accent-2") : PRIMARY_BUTTON}
         >
