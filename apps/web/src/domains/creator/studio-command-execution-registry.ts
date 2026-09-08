@@ -2,10 +2,10 @@
  * Live command-execution bridge for unified search.
  *
  * This is a deliberately small strangler in front of the full CommandRegistry migration.
- * Menu rows remain the product execution authority; only rows that explicitly declare
- * `searchActivation: "execute"` are published. Search therefore calls the exact same
- * `onSelect` closure as the menu, while save/publish/delete and every unreviewed command
- * remain help-only by default.
+ * Menu rows remain the product execution authority and search always calls the exact same
+ * `onSelect` closure. Reversible navigation/view/tool families are admitted by policy, while
+ * consequential commands still require an explicit `searchActivation: "execute"` review.
+ * Save, publish, delete, content transforms and every dangerous row remain help-only by default.
  */
 
 export interface StudioCommandExecutionBinding {
@@ -30,6 +30,31 @@ export interface StudioCommandExecutionMenuGroup {
   readonly items: readonly StudioCommandExecutionMenuItem[];
 }
 
+/** Families whose menu actions only change tools, selection, colour, view or UI chrome. */
+const AUTO_EXECUTE_NAMESPACES = new Set([
+  "color",
+  "help",
+  "select",
+  "tool",
+  "view",
+  "window",
+]);
+
+/** Reversible or non-mutating affordances that live in otherwise consequential namespaces. */
+const AUTO_EXECUTE_COMMAND_IDS = new Set([
+  "edit.copy",
+  "edit.history",
+  "edit.pen-pressure",
+  "edit.redo",
+  "edit.undo",
+  "file.copy-image-to-clipboard",
+  "file.export",
+  "file.project-tools",
+]);
+
+/** Executing this from inside the search would reopen the same surface and immediately close it. */
+const BLOCKED_COMMAND_IDS = new Set(["help.command-search"]);
+
 const EMPTY_BINDINGS: ReadonlyMap<string, StudioCommandExecutionBinding> = new Map();
 let bindingsSnapshot: ReadonlyMap<string, StudioCommandExecutionBinding> = EMPTY_BINDINGS;
 let activeInstallation: symbol | null = null;
@@ -37,6 +62,27 @@ const listeners = new Set<() => void>();
 
 function emit(): void {
   for (const listener of listeners) listener();
+}
+
+/**
+ * Central direct-activation policy.
+ *
+ * Explicit opt-in remains the escape hatch for a reviewed command outside the safe families.
+ * `danger` and re-entrant commands always win over either automatic or explicit admission.
+ */
+export function canStudioCommandExecuteFromSearch(
+  item: StudioCommandExecutionMenuItem,
+): boolean {
+  const commandId = item.commandId?.trim();
+  if (!commandId || item.danger === true || BLOCKED_COMMAND_IDS.has(commandId)) {
+    return false;
+  }
+  if (item.searchActivation === "execute") return true;
+  if (AUTO_EXECUTE_COMMAND_IDS.has(commandId)) return true;
+
+  const namespaceEnd = commandId.indexOf(".");
+  if (namespaceEnd <= 0) return false;
+  return AUTO_EXECUTE_NAMESPACES.has(commandId.slice(0, namespaceEnd));
 }
 
 /**
@@ -53,8 +99,7 @@ export function createStudioCommandExecutionBindings(
       const commandId = item.commandId?.trim();
       if (
         !commandId
-        || item.searchActivation !== "execute"
-        || item.danger === true
+        || !canStudioCommandExecuteFromSearch(item)
         || seen.has(commandId)
       ) {
         continue;

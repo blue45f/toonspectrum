@@ -17,9 +17,12 @@ import {
 } from "./studio-ai-client";
 import {
   appendScenarioImageCandidate,
+  compileStudioScenarioImagePromptDirective,
+  inspectStudioScenarioImageGeneration,
   planStudioScenarioImageGeneration,
   scenarioImageInputFingerprint,
   scenarioImageReferenceSignature,
+  STUDIO_SCENARIO_IMAGE_MAX_REQUESTS_PER_BATCH,
   type StudioScenarioImageGenerationRequest,
 } from "./studio-scenario-candidate-workflow";
 import { captureStudioAiGeneratedAssetProvenance } from "./studio-ai-generated-asset-model";
@@ -180,6 +183,13 @@ export function createStudioScenarioImageGenerationExecutors(
       );
       return;
     }
+    const generationPreflight = inspectStudioScenarioImageGeneration(snapshot.items, request);
+    if (!generationPreflight.withinLimit) {
+      setScenarioError(
+        `한 번에 최대 ${STUDIO_SCENARIO_IMAGE_MAX_REQUESTS_PER_BATCH}개까지 생성할 수 있어요. 선택 컷 또는 후보 수를 줄여 나눠 생성해 주세요.`
+      );
+      return;
+    }
     const tasks = planStudioScenarioImageGeneration(snapshot.items, request);
     if (tasks.length === 0) return;
     const referenceSignature = scenarioImageReferenceSignature(
@@ -190,9 +200,11 @@ export function createStudioScenarioImageGenerationExecutors(
     const controller = beginScenarioRequest();
     setScenarioBusy(true);
     setScenarioError(null);
-    setScenarioStageLabel("검토한 장면 이미지 생성 중…");
+    setScenarioStageLabel(`검토한 장면 이미지 생성 중 · ${tasks[0]?.qualityLabel ?? "균형 제작"}`);
     setScenarioProgress({ done: 0, total: tasks.length });
-    let referenceImageDataUrl = snapshot.items.find((item) => item.imageDataUrl)?.imageDataUrl ?? null;
+    let continuityReferenceDataUrl = snapshot.items.find((item) => item.imageDataUrl)?.imageDataUrl ?? null;
+    let currentCutIndex: number | null = null;
+    let firstSuccessForCurrentCut: string | null = null;
     const characterContext = buildStudioCharacterBiblePromptContext(characterBible, 4_000);
 
     try {
@@ -200,22 +212,25 @@ export function createStudioScenarioImageGenerationExecutors(
         if (scenarioCancelRef.current || controller.signal.aborted) break;
         const task = tasks[taskIndex];
         const index = task.index;
+        if (currentCutIndex !== index) {
+          continuityReferenceDataUrl ??= firstSuccessForCurrentCut;
+          currentCutIndex = index;
+          firstSuccessForCurrentCut = null;
+        }
         const panel = snapshot.items[index];
         let imageResult: StudioAiResult<{ dataUrl: string }>;
         const reviewedImagePrompt = [
           characterContext ? `[캐릭터 바이블 — [고정] 설정 유지]\n${characterContext}` : "",
           panel.imagePrompt,
-          task.variantCount > 1
-            ? `[후보 ${task.variant}/${task.variantCount}] 같은 연출 요구를 유지하되 표정·실루엣·카메라 미세 선택지를 달리합니다.`
-            : "",
+          task.promptDirective,
         ]
           .filter((value) => value.trim().length > 0)
           .join("\n\n");
         const provider = studioImageAiProviderContext(aiSettings);
         const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
-        const roleReferences = scenarioRoleReferencesForRequest(referenceImageDataUrl);
+        const roleReferences = scenarioRoleReferencesForRequest(continuityReferenceDataUrl);
         const usesRoleReferences = roleReferences.length > 0;
-        const usesPreviewReference = Boolean(referenceImageDataUrl);
+        const usesPreviewReference = Boolean(continuityReferenceDataUrl);
         const hasCharacterAnchor =
           scenarioImageReferenceResolution.hasCharacterReference || usesPreviewReference;
         const usesReference = usesRoleReferences || usesPreviewReference;
@@ -259,10 +274,10 @@ export function createStudioScenarioImageGenerationExecutors(
             requestPrompt,
             { signal: controller.signal }
           );
-        } else if (referenceImageDataUrl) {
+        } else if (continuityReferenceDataUrl) {
           imageResult = await generateConsistentCharacterImage(
             aiSettings,
-            referenceImageDataUrl,
+            continuityReferenceDataUrl,
             reviewedImagePrompt,
             { signal: controller.signal }
           );
@@ -282,7 +297,7 @@ export function createStudioScenarioImageGenerationExecutors(
 
         if (imageResult.ok) {
           const dataUrl = imageResult.data.dataUrl;
-          referenceImageDataUrl ??= dataUrl;
+          firstSuccessForCurrentCut ??= dataUrl;
           setScenarioResult((previous) =>
             previous
               ? {
@@ -298,6 +313,9 @@ export function createStudioScenarioImageGenerationExecutors(
                             referenceSignature
                           ),
                           createdAt: requestProvenance.createdAt,
+                          qualityProfile: task.qualityProfile,
+                          variationStrategy: task.variationStrategy,
+                          variationLabel: task.variationLabel,
                         })
                       : item
                   ),
@@ -375,9 +393,11 @@ export function createStudioScenarioImageGenerationExecutors(
     const referenceImageDataUrl =
       snapshot.items.find((item, itemIndex) => itemIndex !== index && item.imageDataUrl)?.imageDataUrl ?? null;
     const characterContext = buildStudioCharacterBiblePromptContext(characterBible, 4_000);
+    const defaultRecipe = compileStudioScenarioImagePromptDirective();
     const reviewedImagePrompt = [
       characterContext ? `[캐릭터 바이블 — [고정] 설정 유지]\n${characterContext}` : "",
       panel.imagePrompt,
+      defaultRecipe.promptDirective,
     ]
       .filter((value) => value.trim().length > 0)
       .join("\n\n");
@@ -458,6 +478,9 @@ export function createStudioScenarioImageGenerationExecutors(
                         referenceSignature
                       ),
                       createdAt: requestProvenance.createdAt,
+                      qualityProfile: "balanced",
+                      variationStrategy: "directorial",
+                      variationLabel: defaultRecipe.variationLabel,
                     })
                     // The failed attempt belongs in the operation ledger. The reviewed image,
                     // alternatives and approval remain authoritative until a replacement succeeds.

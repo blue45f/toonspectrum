@@ -123,6 +123,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function hasOwnSettingKey(
+  value: Record<string, unknown>,
+  key: string,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function hasValidStudioAppSettingsSections(
+  value: Record<string, unknown>,
+  requireAllSections: boolean,
+): boolean {
+  const presentTabs = STUDIO_APP_SETTINGS_TABS.filter((tab) => hasOwnSettingKey(value, tab));
+  if (requireAllSections) {
+    if (presentTabs.length !== STUDIO_APP_SETTINGS_TABS.length) return false;
+  } else if (presentTabs.length === 0) {
+    return false;
+  }
+
+  const defaults = defaultStudioAppSettings();
+  return presentTabs.every((tab) => {
+    const section = value[tab];
+    if (!isRecord(section)) return false;
+    return Object.keys(defaults[tab]).some((key) => hasOwnSettingKey(section, key));
+  });
+}
+
 export function applyStudioAppSettingsProfile(
   current: StudioAppSettings,
   profileId: StudioAppSettingsProfileId,
@@ -267,10 +293,16 @@ export function importStudioAppSettings(raw: string): StudioAppSettingsImportRes
     if (parsed.version !== STUDIO_APP_SETTINGS_EXPORT_VERSION) {
       return { ok: false, reason: "unsupported-version", message: "지원하지 않는 설정 파일 버전입니다." };
     }
-    if (!isRecord(parsed.settings)) {
+    if (
+      !isRecord(parsed.settings)
+      || !hasValidStudioAppSettingsSections(parsed.settings, true)
+    ) {
       return { ok: false, reason: "invalid-settings", message: "설정 데이터가 손상되었습니다." };
     }
     return { ok: true, settings: normalizeStudioAppSettings(parsed.settings), source: "envelope" };
+  }
+  if (!hasValidStudioAppSettingsSections(parsed, false)) {
+    return { ok: false, reason: "invalid-settings", message: "설정 데이터가 손상되었습니다." };
   }
   return { ok: true, settings: normalizeStudioAppSettings(parsed), source: "legacy" };
 }

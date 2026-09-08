@@ -4,6 +4,7 @@ import {
   Library,
   PackagePlus,
   Palette,
+  ShieldCheck,
   Store,
   UserCheck,
 } from "lucide-react";
@@ -31,6 +32,12 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
       label: "탐색",
       icon: Compass,
       active: pathname === "/market/browse" || pathname.startsWith("/market/resource"),
+    },
+    {
+      href: "/market/fit",
+      label: "제작 조건",
+      icon: ShieldCheck,
+      active: pathname === "/market/fit",
     },
     {
       href: "/market/library",
