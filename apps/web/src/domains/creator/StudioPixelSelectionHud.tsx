@@ -227,6 +227,7 @@ export const StudioPixelSelectionHud = memo(function StudioPixelSelectionHud({
       className="z-[48] flex w-max max-w-[calc(100vw-1rem)] items-center gap-1.5 overflow-x-auto rounded-xl border border-line/90 bg-bg/95 p-1.5 shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-bg/85"
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
     >
       <div className="hidden shrink-0 border-r border-line px-2 sm:block">
         <span className="block text-[0.58rem] font-semibold uppercase tracking-wide text-fg-3">
