@@ -92,8 +92,10 @@ describe("StudioDraftSaveCenter", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "저장 상태: 원고 불러오는 중" }));
 
-    expect(screen.getByRole("button", { name: "원고 불러오는 중" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "원고 로드 후 백업" })).toBeDisabled();
+    const saveButton = screen.getByRole("button", { name: "원고 불러오는 중" }) as HTMLButtonElement;
+    const backupButton = screen.getByRole("button", { name: "원고 로드 후 백업" }) as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(true);
+    expect(backupButton.disabled).toBe(true);
     expect(actions.onSaveDraft).not.toHaveBeenCalled();
   });
 
