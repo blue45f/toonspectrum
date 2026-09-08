@@ -17,6 +17,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactElement,
 } from "react";
+import { createPortal } from "react-dom";
 
 import {
   createStudioProjectCenterActionKey,
@@ -34,6 +35,41 @@ const StudioFileControlCenter = lazy(async () => {
   const module = await import("./StudioFileControlCenter");
   return { default: module.StudioFileControlCenter };
 });
+
+/**
+ * Heavy file-lifecycle diagnostics live outside the sticky search header and
+ * are mounted only when the dedicated scope is active. Keeping the host as a
+ * direct dialog child prevents the default command catalogue from being
+ * displaced while preserving a single Project Center surface.
+ */
+function StudioProjectCenterFileControlHost({
+  visible,
+}: {
+  visible: boolean;
+}): ReactElement {
+  return (
+    <div
+      data-project-center-file-control-host="true"
+      hidden={!visible}
+      className="col-span-full"
+    >
+      {visible ? (
+        <Suspense
+          fallback={(
+            <div
+              data-studio-file-control-center-loading="true"
+              className="mt-2 rounded-2xl border border-line bg-canvas/55 px-4 py-5 text-center text-[0.66rem] text-fg-3"
+            >
+              파일 제어 센터를 불러오는 중…
+            </div>
+          )}
+        >
+          <StudioFileControlCenter />
+        </Suspense>
+      ) : null}
+    </div>
+  );
+}
 
 const FAVORITE_STORAGE_KEY =
   "toonspectrum-studio-project-center:favorites:v1";
@@ -248,6 +284,8 @@ export function StudioProjectCenterSearch(): ReactElement {
   const [scope, setScope] = useState<ProjectCenterScope>("all");
   const [actions, setActions] = useState<readonly IndexedProjectAction[]>([]);
   const [sections, setSections] = useState<readonly IndexedProjectSection[]>([]);
+  const [projectCenterPanel, setProjectCenterPanel] =
+    useState<HTMLElement | null>(null);
   const [fileControlHost, setFileControlHost] = useState<HTMLElement | null>(null);
   const [favoriteKeys, setFavoriteKeys] = useState<readonly string[]>(() =>
     readStoredKeys(FAVORITE_STORAGE_KEY, FAVORITE_LIMIT),
@@ -276,7 +314,6 @@ export function StudioProjectCenterSearch(): ReactElement {
     const nextFileControlHost = panel.querySelector<HTMLElement>(
       '[data-project-center-file-control-host="true"]',
     );
-    if (nextFileControlHost) rememberAuthoredVisibility(nextFileControlHost);
     setFileControlHost((current) =>
       current === nextFileControlHost ? current : nextFileControlHost,
     );
@@ -307,7 +344,12 @@ export function StudioProjectCenterSearch(): ReactElement {
         && !(sibling instanceof HTMLElement
           && sibling.dataset.projectCenterSection === "true")
       ) {
-        if (sibling instanceof HTMLElement) contentElements.push(sibling);
+        if (
+          sibling instanceof HTMLElement
+          && sibling.dataset.projectCenterFileControlHost !== "true"
+        ) {
+          contentElements.push(sibling);
+        }
         sibling = sibling.nextElementSibling;
       }
       rememberAuthoredVisibility(element);
@@ -400,6 +442,9 @@ export function StudioProjectCenterSearch(): ReactElement {
       '[data-studio-project-actions-menu="true"]',
     );
     if (!root || !panel) return;
+    setProjectCenterPanel((current) =>
+      current === panel ? current : panel,
+    );
     rebuildIndex();
 
     const observer = typeof MutationObserver === "function"
@@ -524,16 +569,6 @@ export function StudioProjectCenterSearch(): ReactElement {
   }, [scope, sections]);
 
   useEffect(() => {
-    const showFileControl = !resultMode
-      && (scope === "all" || scope === "file-control");
-    if (fileControlHost) {
-      setManagedVisibility(
-        fileControlHost,
-        showFileControl,
-        authoredHiddenRef.current,
-      );
-    }
-
     for (const section of sections) {
       const showSection = !resultMode
         && (scope === "all" || scope === section.id);
@@ -563,7 +598,7 @@ export function StudioProjectCenterSearch(): ReactElement {
         authoredHiddenRef.current,
       );
     }
-  }, [actions, fileControlHost, resultMode, scope, sections]);
+  }, [actions, resultMode, scope, sections]);
 
   useEffect(() => () => {
     for (const [element, hidden] of authoredHiddenRef.current) {
@@ -686,6 +721,7 @@ export function StudioProjectCenterSearch(): ReactElement {
             ? `${actions.length}개 도구`
             : `${sectionCounts.get(scope) ?? 0}개 도구`;
   const activeResult = visibleResults[Math.max(0, activeIndex)];
+  const fileControlVisible = !resultMode && scope === "file-control";
   const emptyTitle = queryActive
     ? "일치하는 프로젝트 도구가 없습니다"
     : scope === "favorites"
@@ -1035,23 +1071,12 @@ export function StudioProjectCenterSearch(): ReactElement {
         </span>
       </div>
 
-      <div
-        data-project-center-file-control-host="true"
-        className="col-span-full"
-      >
-        <Suspense
-          fallback={(
-            <div
-              data-studio-file-control-center-loading="true"
-              className="mt-2 rounded-2xl border border-line bg-canvas/55 px-4 py-5 text-center text-[0.66rem] text-fg-3"
-            >
-              파일 제어 센터를 불러오는 중…
-            </div>
-          )}
-        >
-          <StudioFileControlCenter />
-        </Suspense>
-      </div>
+      {projectCenterPanel
+        ? createPortal(
+          <StudioProjectCenterFileControlHost visible={fileControlVisible} />,
+          projectCenterPanel,
+        )
+        : null}
     </>
   );
 }
