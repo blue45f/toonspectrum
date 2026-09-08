@@ -29,7 +29,7 @@ function cloneDocument(value: unknown): Record<string, unknown> {
 
 function publicationFromPatch(
   patch: CreatorSharedDocumentPatch,
-): CreatorPublicationDirective | null | undefined {
+): CreatorPublicationDirective | undefined {
   if (!patch.doc || !hasOwn(patch.doc, "publication")) return undefined;
   return normalizeCreatorPublicationDirective(patch.doc.publication);
 }
@@ -46,6 +46,7 @@ export interface PrepareCreatorPublicationSharedDocumentPatchInput {
  *
  * - collaborators can save content but the server restores the current publication directive;
  * - collaborators cannot introduce publication metadata into a legacy document;
+ * - legacy owner clients also retain policy when replacing the rest of the document;
  * - owners get the same normalized status transition as the ordinary creator API;
  * - invalid owner publication attempts fail closed to draft rather than exposing the work.
  *
@@ -75,7 +76,12 @@ export function prepareCreatorPublicationSharedDocumentPatch({
 
   const statusProvided = hasOwn(patch, "status");
   const publicationProvided = patchedDirective !== undefined;
-  if (!statusProvided && !publicationProvided) return next;
+  if (!statusProvided && !publicationProvided) {
+    if (patch.doc && currentDirective) {
+      next.doc = writeCreatorPublicationDirective(patch.doc, currentDirective);
+    }
+    return next;
+  }
 
   const directive = patchedDirective ?? currentDirective;
   if (!directive) return next;
