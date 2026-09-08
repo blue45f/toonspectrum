@@ -101,6 +101,7 @@ import {
   resolveCreatorPublicationStatus,
   writeCreatorPublicationDirective,
   type CreatorPublicationDirective,
+  type CreatorPublicationWorkStatus,
 } from "@/shared/lib/creator-publication-contract";
 import { cn } from "@/shared/lib/utils";
 import { useSession } from "@/compat/auth-session-store";
@@ -730,8 +731,9 @@ export function StudioPublishingCommandCenter({
     const storedDirective = readCreatorPublicationDirective(baseDoc);
     const ownerControlsPolicy = !publishScope.workId || sharedMetaSnapshot?.role === "owner";
     let directiveSnapshot = ownerControlsPolicy ? directive : storedDirective;
-    const requestedStatus = intent === "draft" ? "draft" : "published";
-    let effectiveStatus = requestedStatus;
+    const requestedStatus: CreatorPublicationWorkStatus =
+      intent === "draft" ? "draft" : "published";
+    let effectiveStatus: CreatorPublicationWorkStatus = requestedStatus;
     if (directiveSnapshot) {
       effectiveStatus = resolveCreatorPublicationStatus(
         requestedStatus,
