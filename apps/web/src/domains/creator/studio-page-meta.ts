@@ -21,6 +21,7 @@ import {
   type AnimationTimelineDoc,
   type StudioAnimKeyframe,
 } from "./studio-anim-tracks";
+import { copyStudioSmartShapeSnapshot } from "./studio-smart-shape-copy";
 import { STUDIO_UPLOAD_DESKTOP_MAX_DECODED_PIXELS } from "./studio-upload-image-safety";
 import { serializeStudioVrmSceneDocument } from "./vrm/studio-vrm-scene-document";
 
@@ -756,7 +757,10 @@ function scaleElement(el: ClipboardElementLike, s: number): ClipboardElementLike
       y: round2((next.tailAnchorPoint.y as number) * s),
     };
   }
-  return next;
+  return copyStudioSmartShapeSnapshot(el, next, {
+    mapPoint: (x, y) => [round2(x * s), round2(y * s)],
+    mapStrokeWidth: (width) => round2(width * s),
+  });
 }
 
 /** 관대한 바운딩 박스 — StudioPage.elBounds 와 동일 규칙(draw/text/sticker/기타). */
@@ -808,7 +812,9 @@ function shiftLooseElement(el: ClipboardElementLike, dx: number, dy: number): Cl
     next.points = (el.points as unknown[]).map((v, i) =>
       typeof v === "number" && Number.isFinite(v) ? round2(v + (i % 2 === 0 ? dx : dy)) : v
     );
-    return next;
+    return copyStudioSmartShapeSnapshot(el, next, {
+      mapPoint: (x, y) => [round2(x + dx), round2(y + dy)],
+    });
   }
   if (typeof next.x === "number" && Number.isFinite(next.x)) next.x = round2(next.x + dx);
   if (typeof next.y === "number" && Number.isFinite(next.y)) next.y = round2(next.y + dy);
@@ -893,7 +899,8 @@ export function planClipboardPaste(
   const groupMap = new Map<string, string>();
   const els = scaled.map((el, index) => {
     const id = ids[index]!;
-    const next: ClipboardElementLike = { ...shiftLooseElement(el, dx, dy), id, hidden: false, locked: false };
+    const shifted = shiftLooseElement(el, dx, dy);
+    const next: ClipboardElementLike = { ...shifted, id, hidden: false, locked: false };
     const group = el.groupId;
     if (typeof group === "string" && group) {
       if (!groupMap.has(group)) groupMap.set(group, makeId());
@@ -904,7 +911,7 @@ export function planClipboardPaste(
       if (copiedAnchorId) next.tailAnchorId = copiedAnchorId;
       else if (!samePage) delete next.tailAnchorId;
     }
-    return next;
+    return copyStudioSmartShapeSnapshot(shifted, next);
   });
 
   // Preserve user-authored group names, but pasted content always starts expanded, visible and
