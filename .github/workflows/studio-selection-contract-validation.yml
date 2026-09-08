@@ -15,8 +15,8 @@ concurrency:
 
 jobs:
   selection-contracts:
-    runs-on: ubuntu-slim
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
     env:
       NODE_OPTIONS: --max-old-space-size=4096
       HUSKY: "0"
