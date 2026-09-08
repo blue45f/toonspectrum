@@ -23,11 +23,11 @@ describe("Cloud Storage Adapter", () => {
     }
   });
 
-  it("starts disconnected and rejects operations without auth", () => {
+  it("starts disconnected and rejects operations without auth", async () => {
     const adapter = new CloudStorageAdapter();
     expect(adapter.isConnected).toBe(false);
     expect(adapter.currentProvider).toBeNull();
-    expect(() => adapter.listFiles()).rejects.toThrow("클라우드 저장소에 먼저 연결해 주세요.");
+    await expect(adapter.listFiles()).rejects.toThrow("클라우드 저장소에 먼저 연결해 주세요.");
   });
 
   it("disconnects cleanly", () => {
