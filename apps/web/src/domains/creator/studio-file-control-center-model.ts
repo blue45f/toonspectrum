@@ -214,7 +214,7 @@ function compatibilityTier(
   if (capability.import === "engine-ready" || capability.uiWiring.import === "not-wired") {
     return "bridge";
   }
-  if (capability.id === "toonproject-archive" || capability.roundTrip === "lossless") {
+  if (capability.id === "toonproject-archive") {
     return "native";
   }
   return "structured";
