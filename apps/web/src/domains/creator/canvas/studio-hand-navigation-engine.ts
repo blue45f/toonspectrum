@@ -1,17 +1,16 @@
+import type {
+  StudioMouseButtonAction,
+  StudioTouchOneFinger,
+} from "../studio-app-settings";
+
 export type StudioHandPanSource =
   | "hand-tool"
   | "temporary-space"
   | "middle-button"
   | "right-button";
 
-export type StudioHandPointerButtonAction =
-  | "pan"
-  | "zoom"
-  | "eyedropper"
-  | "context"
-  | "none";
-
-export type StudioHandTouchOneFingerMode = "draw" | "pan" | "none";
+export type StudioHandPointerButtonAction = StudioMouseButtonAction;
+export type StudioHandTouchOneFingerMode = StudioTouchOneFinger;
 
 export interface StudioHandPanIntentInput {
   pointerType: string;
