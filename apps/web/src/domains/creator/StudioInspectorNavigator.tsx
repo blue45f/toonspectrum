@@ -5,14 +5,20 @@ import {
   PaintBucket,
   PanelRightOpen,
   PanelsTopLeft,
+  Pin,
+  RotateCcw,
   Search,
+  Settings2,
   SlidersHorizontal,
   Sparkles,
   X,
 } from "lucide-react";
 import {
+  useEffect,
   useId,
   useRef,
+  useState,
+  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
@@ -29,6 +35,16 @@ import {
   type StudioInspectorPrimaryTab,
   type StudioInspectorRoute,
 } from "./studio-inspector-layout";
+import {
+  ensureStudioInspectorPanelPrimaryTabVisible,
+  getServerStudioInspectorPanelState,
+  getStudioInspectorPanelState,
+  resetStudioInspectorPanelState,
+  setStudioInspectorPanelCompactPrimaryTabs,
+  setStudioInspectorPanelContextPinned,
+  setStudioInspectorPanelPrimaryTabVisible,
+  subscribeStudioInspectorPanelState,
+} from "./studio-inspector-panel-preferences";
 import {
   createStudioInspectorTabA11y,
   type StudioInspectorTabA11y,
@@ -106,6 +122,29 @@ const COPY = {
     "그림·글자·말풍선을 선택하면 설정을 바꿀 수 있어요",
   ],
   summaryElement: ["studio.inspector.summary.element", "선택 항목"],
+  pin: ["studio.inspector.panel.pin", "현재 전문 탭 고정"],
+  unpin: ["studio.inspector.panel.unpin", "선택에 따라 전문 탭 다시 전환"],
+  pinned: ["studio.inspector.panel.pinned", "전문 탭 고정"],
+  pinnedHint: [
+    "studio.inspector.panel.pinnedHint",
+    "선택이 바뀌어도 이미지 전문 탭을 자동 초기화하지 않습니다",
+  ],
+  options: ["studio.inspector.panel.options", "작업 패널 구성"],
+  optionsHint: [
+    "studio.inspector.panel.optionsHint",
+    "자주 쓰는 탭만 남기고 패널 높이를 줄일 수 있습니다",
+  ],
+  visibleTabs: ["studio.inspector.panel.visibleTabs", "표시할 탭"],
+  compactTabs: ["studio.inspector.panel.compactTabs", "탭 이름을 아이콘으로 접기"],
+  compactTabsHint: [
+    "studio.inspector.panel.compactTabsHint",
+    "탭의 접근 가능한 이름은 유지하고 세로 공간만 줄입니다",
+  ],
+  resetPanel: ["studio.inspector.panel.reset", "패널 기본값 복원"],
+  hiddenSearchHint: [
+    "studio.inspector.panel.hiddenSearchHint",
+    "숨긴 탭은 기능·설정 찾기로 열면 자동으로 다시 표시됩니다",
+  ],
 } as const satisfies Record<string, readonly [string, string]>;
 
 type CopyKey = keyof typeof COPY;
@@ -215,8 +254,16 @@ export function StudioInspectorNavigator({
 }: StudioInspectorNavigatorProps) {
   const copy = useInspectorCopy();
   const titleId = useId();
+  const panelOptionsId = `${titleId}-panel-options`;
   const tabA11y = providedTabA11y ?? createStudioInspectorTabA11y(titleId);
   const propertiesTabRef = useRef<HTMLButtonElement>(null);
+  const panelOptionsTriggerRef = useRef<HTMLButtonElement>(null);
+  const [panelOptionsOpen, setPanelOptionsOpen] = useState(false);
+  const panelState = useSyncExternalStore(
+    subscribeStudioInspectorPanelState,
+    getStudioInspectorPanelState,
+    getServerStudioInspectorPanelState,
+  );
   const normalizedSelectionCount = safeCount(selectionCount);
   const hasSelection = selectedType !== null || normalizedSelectionCount > 0;
   const resolvedImageToolsAvailable =
@@ -229,6 +276,28 @@ export function StudioInspectorNavigator({
     : tabA11y.imagePanels.unselected;
   const imageToolsStatusId = `${titleId}-image-tools-status`;
   const publishMode = layout.primary === "publish";
+  const renderedPrimaryTabs = STUDIO_INSPECTOR_PRIMARY_TABS.filter(
+    (tab) => panelState.visiblePrimaryTabs.includes(tab) || layout.primary === tab,
+  );
+
+  useEffect(() => {
+    if (layout.primary !== "publish") {
+      ensureStudioInspectorPanelPrimaryTabVisible(layout.primary);
+    }
+  }, [layout.primary]);
+
+  useEffect(() => {
+    if (!panelOptionsOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      setPanelOptionsOpen(false);
+      globalThis.requestAnimationFrame?.(() => {
+        panelOptionsTriggerRef.current?.focus({ preventScroll: true });
+      });
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [panelOptionsOpen]);
 
   function navigate(route: StudioInspectorRoute) {
     onChange(navigateStudioInspector(layout, route));
@@ -261,6 +330,7 @@ export function StudioInspectorNavigator({
       className="sticky top-0 z-30 -mx-0.5 rounded-lg border border-line bg-panel/95 p-1.5 shadow-[0_6px_20px_oklch(0.12_0.01_70/0.28)] backdrop-blur supports-[backdrop-filter]:bg-panel/90"
       data-testid="studio-inspector-navigator"
       data-inspector-chrome="navigator"
+      data-studio-inspector-context-pinned={panelState.contextPinned ? "true" : undefined}
     >
       {mobileSheetHandle ? (
         <div className="-mx-1.5 -mt-1.5 mb-0.5 lg:hidden">{mobileSheetHandle}</div>
@@ -285,14 +355,62 @@ export function StudioInspectorNavigator({
             aria-label={copy("searchLabel")}
             title={`${copy("searchLabel")} (F1)`}
             data-inspector-priority="chrome"
+            data-inspector-control-id="panel.chrome.search"
             data-studio-inspector-search-trigger="true"
             className={cn(
-              "inline-flex min-h-11 shrink-0 items-center justify-center gap-1 rounded-lg border border-line px-2 text-[0.6875rem] font-semibold text-fg-2 transition-colors duration-150 hover:border-line-strong hover:bg-raised hover:text-fg lg:hidden",
+              "inline-flex size-11 shrink-0 items-center justify-center gap-1 rounded-lg border border-line text-[0.6875rem] font-semibold text-fg-2 transition-colors duration-150 hover:border-line-strong hover:bg-raised hover:text-fg lg:hidden",
               tabFocusClass
             )}
           >
             <Search size={15} strokeWidth={1.75} aria-hidden />
-            <span>{copy("search")}</span>
+            <span className="sr-only">{copy("search")}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setStudioInspectorPanelContextPinned(!panelState.contextPinned)
+            }
+            aria-label={panelState.contextPinned ? copy("unpin") : copy("pin")}
+            aria-pressed={panelState.contextPinned}
+            title={panelState.contextPinned ? copy("unpin") : copy("pin")}
+            data-inspector-priority="chrome"
+            data-inspector-control-id="panel.chrome.pin"
+            data-testid="studio-inspector-context-pin"
+            className={cn(
+              "grid size-11 shrink-0 place-items-center rounded-lg border transition-colors duration-150",
+              panelState.contextPinned
+                ? "border-accent bg-accent-soft text-accent"
+                : "border-transparent text-fg-3 hover:border-line hover:bg-raised hover:text-fg",
+              tabFocusClass,
+            )}
+          >
+            <Pin
+              size={15}
+              strokeWidth={1.75}
+              fill={panelState.contextPinned ? "currentColor" : "none"}
+              aria-hidden
+            />
+          </button>
+          <button
+            ref={panelOptionsTriggerRef}
+            type="button"
+            onClick={() => setPanelOptionsOpen((open) => !open)}
+            aria-label={copy("options")}
+            aria-expanded={panelOptionsOpen}
+            aria-controls={panelOptionsId}
+            title={copy("options")}
+            data-inspector-priority="chrome"
+            data-inspector-control-id="panel.chrome.options"
+            data-testid="studio-inspector-panel-options-trigger"
+            className={cn(
+              "grid size-11 shrink-0 place-items-center rounded-lg border transition-colors duration-150",
+              panelOptionsOpen
+                ? "border-accent bg-accent-soft text-accent"
+                : "border-transparent text-fg-3 hover:border-line hover:bg-raised hover:text-fg",
+              tabFocusClass,
+            )}
+          >
+            <Settings2 size={15} strokeWidth={1.75} aria-hidden />
           </button>
           {onRequestClose ? (
             <button
@@ -301,6 +419,7 @@ export function StudioInspectorNavigator({
               aria-label={copy("close")}
               data-autofocus
               data-inspector-priority="chrome"
+              data-inspector-control-id="panel.chrome.close"
               className={cn(
                 "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg lg:hidden",
                 tabFocusClass
@@ -311,6 +430,149 @@ export function StudioInspectorNavigator({
           ) : null}
         </div>
       </div>
+
+      {panelOptionsOpen ? (
+        <div
+          id={panelOptionsId}
+          role="region"
+          aria-label={copy("options")}
+          data-testid="studio-inspector-panel-options"
+          className="mb-2 rounded-lg border border-line bg-card/85 p-2 shadow-sm"
+        >
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-fg">{copy("options")}</p>
+              <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-fg-3">
+                {copy("optionsHint")}
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.6875rem] font-bold tabular-nums text-accent">
+              {panelState.visiblePrimaryTabs.length}/{STUDIO_INSPECTOR_PRIMARY_TABS.length}
+            </span>
+          </div>
+          <fieldset className="m-0 min-w-0 border-0 p-0">
+            <legend className="mb-1 text-[0.6875rem] font-semibold text-fg-2">
+              {copy("visibleTabs")}
+            </legend>
+            <div className="grid grid-cols-3 gap-1">
+              {STUDIO_INSPECTOR_PRIMARY_TABS.map((tabId) => {
+                const Icon = PRIMARY_TAB_ICONS[tabId];
+                const visible = panelState.visiblePrimaryTabs.includes(tabId);
+                const active = layout.primary === tabId;
+                const cannotHide = visible
+                  && (active || panelState.visiblePrimaryTabs.length === 1);
+                const disabledReason = active
+                  ? "현재 열려 있는 탭은 다른 탭으로 이동한 뒤 숨길 수 있습니다."
+                  : "작업 패널에는 탭 하나 이상이 필요합니다.";
+                return (
+                  <button
+                    key={tabId}
+                    type="button"
+                    aria-label={`${copy(PRIMARY_TAB_COPY[tabId])} 탭 ${
+                      visible ? "숨기기" : "표시하기"
+                    }`}
+                    aria-pressed={visible}
+                    disabled={cannotHide}
+                    title={cannotHide ? disabledReason : undefined}
+                    onClick={() =>
+                      setStudioInspectorPanelPrimaryTabVisible(tabId, !visible)
+                    }
+                    data-inspector-priority="chrome"
+                    data-inspector-control-id={`panel.chrome.visible.${tabId}`}
+                    data-studio-inspector-tab-visibility={tabId}
+                    className={cn(
+                      "flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-md border px-1 text-[0.6875rem] font-semibold transition-colors",
+                      visible
+                        ? "border-accent/45 bg-accent-soft text-accent"
+                        : "border-line bg-panel text-fg-3 hover:bg-raised hover:text-fg",
+                      cannotHide && "cursor-not-allowed opacity-55",
+                      tabFocusClass,
+                    )}
+                  >
+                    <Icon size={13} aria-hidden />
+                    <span className="truncate">{copy(PRIMARY_TAB_COPY[tabId])}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+          <button
+            type="button"
+            aria-pressed={panelState.compactPrimaryTabs}
+            onClick={() =>
+              setStudioInspectorPanelCompactPrimaryTabs(
+                !panelState.compactPrimaryTabs,
+              )
+            }
+            data-inspector-priority="chrome"
+            data-inspector-control-id="panel.chrome.compact-tabs"
+            className={cn(
+              "mt-2 flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-1.5 text-left transition-colors",
+              panelState.compactPrimaryTabs
+                ? "border-accent/45 bg-accent-soft text-accent"
+                : "border-line bg-panel text-fg-2 hover:bg-raised",
+              tabFocusClass,
+            )}
+          >
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-semibold">{copy("compactTabs")}</span>
+              <span className="block truncate text-[0.6875rem] text-fg-3">
+                {copy("compactTabsHint")}
+              </span>
+            </span>
+            <span
+              aria-hidden
+              className={cn(
+                "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
+                panelState.compactPrimaryTabs
+                  ? "border-accent bg-accent"
+                  : "border-line-strong bg-canvas",
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-0.5 size-3.5 rounded-full bg-panel shadow transition-transform",
+                  panelState.compactPrimaryTabs ? "translate-x-[1.125rem]" : "translate-x-0.5",
+                )}
+              />
+            </span>
+          </button>
+          <div className="mt-2 flex items-center justify-between gap-2 border-t border-line/60 pt-2">
+            <p className="min-w-0 text-[0.6875rem] leading-relaxed text-fg-3">
+              {copy("hiddenSearchHint")}
+            </p>
+            <button
+              type="button"
+              onClick={() => resetStudioInspectorPanelState()}
+              data-inspector-priority="chrome"
+              data-inspector-control-id="panel.chrome.reset"
+              className={cn(
+                "inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.6875rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg",
+                tabFocusClass,
+              )}
+            >
+              <RotateCcw size={13} aria-hidden />
+              {copy("resetPanel")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {panelState.contextPinned ? (
+        <div
+          role="status"
+          data-studio-inspector-pin-status="true"
+          className="mb-2 flex min-w-0 items-center gap-2 rounded-lg border border-accent/35 bg-accent-soft/55 px-2 py-1.5"
+        >
+          <Pin size={13} fill="currentColor" className="shrink-0 text-accent" aria-hidden />
+          <span className="shrink-0 text-[0.6875rem] font-bold text-accent">
+            {copy("pinned")}
+          </span>
+          <span className="min-w-0 truncate text-[0.6875rem] text-fg-3">
+            {copy("pinnedHint")}
+          </span>
+        </div>
+      ) : null}
 
       {(hasSelection || drawing) && layout.primary !== "properties" && !publishMode ? (
         <button
@@ -376,9 +638,15 @@ export function StudioInspectorNavigator({
       <div
         role="tablist"
         aria-label={copy("tablist")}
-        className="grid grid-cols-3 gap-0.5 rounded-lg border border-line/70 bg-canvas/55 p-0.5"
+        data-studio-inspector-primary-tabs-compact={
+          panelState.compactPrimaryTabs ? "true" : undefined
+        }
+        className="grid gap-0.5 rounded-lg border border-line/70 bg-canvas/55 p-0.5"
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(1, renderedPrimaryTabs.length)}, minmax(0, 1fr))`,
+        }}
       >
-        {STUDIO_INSPECTOR_PRIMARY_TABS.map((tabId, index) => {
+        {renderedPrimaryTabs.map((tabId, index) => {
           const Icon = PRIMARY_TAB_ICONS[tabId];
           const active = layout.primary === tabId;
           // 게시 준비 모드에서는 선택된 탭이 없다. roving tabindex 는 첫 탭이 이어받는다.
@@ -399,10 +667,16 @@ export function StudioInspectorNavigator({
                   : tabA11y.primary[tabId].panelId
               }
               tabIndex={tabStop ? 0 : -1}
+              title={
+                panelState.compactPrimaryTabs
+                  ? copy(PRIMARY_TAB_COPY[tabId])
+                  : undefined
+              }
               onClick={() => navigate({ primary: tabId })}
               onKeyDown={moveTabFocus}
               className={cn(
-                "relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-px rounded-md px-0.5 text-[0.6875rem] font-semibold transition-colors duration-150",
+                "relative flex min-h-11 min-w-0 items-center justify-center rounded-md px-0.5 text-[0.6875rem] font-semibold transition-colors duration-150",
+                panelState.compactPrimaryTabs ? "flex-row gap-0" : "flex-col gap-px",
                 active
                   ? "bg-raised text-fg shadow-sm ring-1 ring-accent/25"
                   : "text-fg-3 hover:bg-card hover:text-fg-2",
@@ -410,7 +684,9 @@ export function StudioInspectorNavigator({
               )}
             >
               <Icon size={15} strokeWidth={1.75} className={active ? "text-accent" : undefined} aria-hidden />
-              <span className="truncate">{copy(PRIMARY_TAB_COPY[tabId])}</span>
+              <span className={cn("truncate", panelState.compactPrimaryTabs && "sr-only")}>
+                {copy(PRIMARY_TAB_COPY[tabId])}
+              </span>
               {active ? (
                 <span
                   aria-hidden
