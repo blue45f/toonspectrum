@@ -2,8 +2,8 @@
  * Exact raster-source receipt for the visible Konva layer.
  *
  * The optional window probe remains the browser-verification surface. Product capture additionally
- * installs short-lived, in-memory fences for strict OPFS/CAS locators, and StudioKonvaImageNode
- * closes those fences only after the exact source has completed a real layer draw.
+ * installs short-lived, in-memory fences for canonical image nodes, and StudioKonvaImageNode
+ * closes those fences only after the exact source and filter program complete a real layer draw.
  */
 
 export const STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION = 1 as const;
@@ -11,6 +11,8 @@ export const STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION = 1 as const;
 export interface StudioRasterImagePresentationIdentity {
   readonly elementId: string;
   readonly src: string;
+  /** Product filter/source request identity; absent for legacy source-only verifier fences. */
+  readonly requestKey?: string;
 }
 
 export interface StudioRasterImagePresentationExpectation
@@ -50,7 +52,7 @@ const studioMountedRasterImagePresentations = new Map<
 >();
 
 function presentationIdentityKey(identity: StudioRasterImagePresentationIdentity): string {
-  return JSON.stringify([identity.elementId, identity.src]);
+  return JSON.stringify([identity.elementId, identity.src, identity.requestKey ?? null]);
 }
 
 function releasePresentationWaiter(waiter: StudioRasterImagePresentationWaiter): void {
@@ -128,8 +130,13 @@ export function acknowledgeStudioRasterImagePresentationDraw(
   identity: StudioRasterImagePresentationIdentity,
 ): void {
   const key = presentationIdentityKey(identity);
+  const sourceOnlyKey = presentationIdentityKey({ elementId: identity.elementId, src: identity.src });
   for (const waiter of [...studioRasterImagePresentationWaiters]) {
-    if (!waiter.remaining.delete(key) || waiter.remaining.size > 0) continue;
+    const acknowledgedRequest = waiter.remaining.delete(key);
+    // Older explicit source-only capture callers remain supported. A source-only draw can never
+    // satisfy a request-aware fence: only the concrete matching filter program deletes that key.
+    const acknowledgedSource = waiter.remaining.delete(sourceOnlyKey);
+    if ((!acknowledgedRequest && !acknowledgedSource) || waiter.remaining.size > 0) continue;
     releasePresentationWaiter(waiter);
     waiter.resolve();
   }

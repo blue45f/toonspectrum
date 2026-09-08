@@ -14,7 +14,13 @@ import {
   clearStudioRasterEditSurfaces,
   rememberStudioRasterEditSurface,
 } from "./render/studio-raster-edit-surface-cache";
-import { STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION } from "./render/studio-raster-image-presentation";
+import {
+  acknowledgeStudioRasterImagePresentationDraw,
+  snapshotStudioMountedRasterImagePresentations,
+  STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION,
+} from "./render/studio-raster-image-presentation";
+import { studioAdjustmentStackToFilterFields } from "./studio-adjustment-stack";
+import { waitForStudioCaptureReady } from "./studio-capture-readiness";
 import { STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION } from "./studio-living-ink-execution-protocol";
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
 import { sha256HexPortable } from "./studio-sha256";
@@ -88,13 +94,13 @@ const konvaCapture = vi.hoisted(() => {
     currentProps: null as Record<string, unknown> | null,
     fireLayerDraw: () => {
       const listeners = [...drawListeners];
-      drawListeners.clear();
       listeners.forEach((listener) => listener());
     },
     props: [] as Record<string, unknown>[],
   };
   return capture;
 });
+
 
 const filterCapture = vi.hoisted(() => ({
   build: vi.fn(),
@@ -741,7 +747,9 @@ describe("StudioKonvaImageNode image lifecycle", () => {
     await waitFor(() => expect(latestImageProps().image).toBeDefined());
     act(() => konvaCapture.fireLayerDraw());
 
-    expect(konvaCapture.layer.on).not.toHaveBeenCalled();
+    expect(konvaCapture.layer.on).toHaveBeenCalledWith(
+      "draw.studioRasterPresentation", expect.any(Function),
+    );
     expect(window.__studioRasterImagePresentationProbe.receipt).toBeNull();
   });
 
@@ -1206,5 +1214,184 @@ describe("StudioKonvaImageNode interaction lifecycle", () => {
     }).toThrow(error);
     expect(onChange).toHaveBeenCalledWith({ x: 30, y: 40 });
     expect(onInteractionEnd).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("StudioKonvaImageNode product capture readiness", () => {
+  type WorkerResult = { imageData: { data: Uint8ClampedArray; width: number; height: number } };
+  const runs: { resolve: (result: WorkerResult) => void; reject: (error: Error) => void }[] = [];
+  const captures: AbortController[] = [];
+  const renderNode = (el: ImageEl) => (
+    <StudioKonvaImageNode autoFitFrames={null} draggable el={el}
+      innerRef={vi.fn()} onChange={vi.fn()} onSelect={vi.fn()} />
+  );
+  const filtered = (opacity: number) => imageEl(studioAdjustmentStackToFilterFields({
+    version: 1,
+    entries: [{ id: "invert", engine: "invert", enabled: true, opacity, params: {} }],
+  }));
+  const startCapture = (timeoutMs?: number) => {
+    const controller = new AbortController();
+    captures.push(controller);
+    const completed = vi.fn();
+    const stage = { batchDraw: vi.fn(() => konvaCapture.fireLayerDraw()) };
+    const pending = waitForStudioCaptureReady({
+      pageId: "page-1", getRenderedPageId: () => "page-1", getStage: () => stage,
+      nextFrame: async () => undefined, waitForFonts: async () => undefined,
+      signal: controller.signal,
+      timeoutMs,
+    }).then(completed, (error: unknown) => error);
+    return { controller, completed, pending, stage };
+  };
+  const finishWorker = async (index: number) => {
+    await act(async () => {
+      runs[index].resolve({ imageData: {
+        data: new Uint8ClampedArray(200 * 200 * 4), width: 200, height: 200,
+      } });
+    });
+  };
+
+  beforeEach(() => {
+    runs.length = 0;
+    filterCapture.runWorker.mockImplementation(() => new Promise((resolve, reject) => {
+      runs.push({ resolve, reject });
+    }));
+    vi.stubGlobal("ImageData", class {
+      constructor(readonly data: Uint8ClampedArray, readonly width: number, readonly height: number) {}
+    });
+  });
+  afterEach(() => {
+    for (const controller of captures.splice(0)) controller.abort();
+    filterCapture.runWorker.mockReset().mockImplementation(() => new Promise(() => undefined));
+  });
+
+  it("waits for an imported image's exact filter Worker result and its layer draw without a probe", async () => {
+    render(renderNode(filtered(1)));
+    const source = await resolveLatestImage();
+    await waitFor(() => expect(runs).toHaveLength(1));
+    const capture = startCapture();
+    await waitFor(() => expect(capture.stage.batchDraw).toHaveBeenCalledOnce());
+    expect(latestImageProps().image).toBe(source);
+    expect(capture.completed).not.toHaveBeenCalled();
+
+    await finishWorker(0);
+    expect(latestImageProps().image).toBeInstanceOf(HTMLCanvasElement);
+    expect(capture.completed).not.toHaveBeenCalled();
+    act(() => konvaCapture.fireLayerDraw());
+    await capture.pending;
+    expect(capture.completed).toHaveBeenCalledWith(capture.stage);
+    expect(window.__studioRasterImagePresentationProbe).toBeUndefined();
+  });
+
+  it("rejects the previous same-source program's draw while a changed opacity is pending", async () => {
+    const view = render(renderNode(filtered(1)));
+    await resolveLatestImage();
+    await waitFor(() => expect(runs).toHaveLength(1));
+    await finishWorker(0);
+    const previous = snapshotStudioMountedRasterImagePresentations();
+    const staleDraw = [...konvaCapture.drawListeners];
+    view.rerender(renderNode(filtered(0.25)));
+    await waitFor(() => expect(runs).toHaveLength(2));
+    const capture = startCapture();
+    await waitFor(() => expect(capture.stage.batchDraw).toHaveBeenCalledOnce());
+    act(() => {
+      staleDraw.forEach((draw) => draw());
+      previous.forEach(acknowledgeStudioRasterImagePresentationDraw);
+    });
+    await act(async () => undefined);
+    expect(capture.completed).not.toHaveBeenCalled();
+    expect(snapshotStudioMountedRasterImagePresentations()).not.toEqual(previous);
+    await finishWorker(1);
+    act(() => konvaCapture.fireLayerDraw());
+    await capture.pending;
+    expect(capture.completed).toHaveBeenCalledWith(capture.stage);
+  });
+
+  it("keeps a failed changed program blocked even when its retained canvas draws, and allows abort", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const view = render(renderNode(filtered(1)));
+    await resolveLatestImage();
+    await waitFor(() => expect(runs).toHaveLength(1));
+    await finishWorker(0);
+    const retained = latestImageProps().image;
+    view.rerender(renderNode(filtered(0.25)));
+    await waitFor(() => expect(runs).toHaveLength(2));
+    await act(async () => runs[1].reject(new Error("Worker unavailable")));
+    expect(latestImageProps().image).toBe(retained);
+    const capture = startCapture();
+    await waitFor(() => expect(capture.stage.batchDraw).toHaveBeenCalledOnce());
+    expect(capture.completed).not.toHaveBeenCalled();
+    capture.controller.abort();
+    expect(await capture.pending).toMatchObject({ code: "aborted" });
+    expect(capture.completed).not.toHaveBeenCalled();
+  });
+
+  it.each(["zero opacity", "removed filter"])("settles %s without waiting for the superseded Worker", async (transition) => {
+    const view = render(renderNode(filtered(1)));
+    const source = await resolveLatestImage();
+    await waitFor(() => expect(runs).toHaveLength(1));
+    view.rerender(renderNode(transition === "zero opacity" ? filtered(0) : imageEl()));
+    const capture = startCapture();
+    await capture.pending;
+    expect(snapshotStudioMountedRasterImagePresentations()).toHaveLength(1);
+    expect(capture.completed).toHaveBeenCalledWith(capture.stage);
+    expect(latestImageProps().image).toBe(source);
+    expect(latestImageProps().filters).toEqual([]);
+    await finishWorker(0);
+    expect(latestImageProps().image).toBe(source);
+  });
+
+  it("times out a pending filter fence and does not export a late successful result", async () => {
+    render(renderNode(filtered(1)));
+    await resolveLatestImage();
+    await waitFor(() => expect(runs).toHaveLength(1));
+    const capture = startCapture(250);
+    expect(await capture.pending).toMatchObject({ code: "render-timeout" });
+    await finishWorker(0);
+    act(() => konvaCapture.fireLayerDraw());
+    expect(capture.completed).not.toHaveBeenCalled();
+  });
+
+  it("clears a synchronous filter cache before capturing its unfiltered source", async () => {
+    filterCapture.cachePad = 7;
+    const view = render(renderNode(imageEl({ outline: { color: "#fff", opacity: 100, width: 7 } })));
+    await resolveLatestImage();
+    await waitFor(() => expect(konvaCapture.node.cache).toHaveBeenCalled());
+    const clearCount = konvaCapture.node.clearCache.mock.calls.length;
+    view.rerender(renderNode(imageEl()));
+    const capture = startCapture();
+    await capture.pending;
+    expect(konvaCapture.node.clearCache.mock.calls.length).toBeGreaterThan(clearCount);
+    expect(latestImageProps().filters).toEqual([]);
+    expect(capture.completed).toHaveBeenCalledWith(capture.stage);
+  });
+
+  it("settles a filtered GIF using its current live-frame cache receipt", async () => {
+    render(renderNode(imageEl({ brightness: 0.25, isAnimatedGif: true })));
+    await resolveLatestImage();
+    await waitFor(() => expect(latestImageProps().studioAnimatedImageFilterStatus).toBe("active"));
+    const capture = startCapture();
+    await capture.pending;
+    expect(capture.completed).toHaveBeenCalledWith(capture.stage);
+    expect(runs).toHaveLength(0);
+  });
+
+  it("does not wait for a noncanonical mask or preview copy", async () => {
+    render(<StudioKonvaImageNode autoFitFrames={null} draggable el={filtered(1)}
+      rasterPresentationEligible={false} innerRef={vi.fn()} onChange={vi.fn()} onSelect={vi.fn()} />);
+    await resolveLatestImage();
+    const capture = startCapture();
+    await capture.pending;
+    expect(snapshotStudioMountedRasterImagePresentations()).toEqual([]);
+    expect(capture.completed).toHaveBeenCalledWith(capture.stage);
+  });
+
+  it.each([false, true])("settles an unfiltered image (animated=%s) after its real draw", async (isAnimatedGif) => {
+    render(renderNode(imageEl({ isAnimatedGif })));
+    await resolveLatestImage();
+    const capture = startCapture();
+    await capture.pending;
+    expect(snapshotStudioMountedRasterImagePresentations()).toHaveLength(1);
+    expect(capture.completed).toHaveBeenCalledWith(capture.stage);
+    expect(runs).toHaveLength(0);
   });
 });
