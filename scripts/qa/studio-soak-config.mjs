@@ -1,3 +1,5 @@
+import { studioWebGpuSoakCommand } from "./studio-webgpu-soak-command.mjs";
+
 export const VARIANTS = [
   ["ko-light", { TZ: "Asia/Seoul", TOONSPECTRUM_VERIFY_LOCALE: "ko-KR", TOONSPECTRUM_VERIFY_COLOR_SCHEME: "light", TOONSPECTRUM_VERIFY_REDUCED_MOTION: "no-preference" }],
   ["ko-dark-reduced", { TZ: "Asia/Seoul", TOONSPECTRUM_VERIFY_LOCALE: "ko-KR", TOONSPECTRUM_VERIFY_COLOR_SCHEME: "dark", TOONSPECTRUM_VERIFY_REDUCED_MOTION: "reduce" }],
@@ -37,12 +39,12 @@ export const TESTS = {
     ["living-ink", "pnpm run verify:studio-living-ink-integration", 30, "living-ink"],
     ["hybrid-dcc", "pnpm run verify:studio-hybrid-dcc-integration", 34, "hybrid-dcc"],
     ["p5-runtime", "pnpm run verify:studio-p5-brush-real-runtime", 24, "brush-p5"],
-    ["webgpu-brush", "pnpm run verify:studio-engine-webgpu-brush-parity", 24, "webgpu"],
+    ["webgpu-brush", studioWebGpuSoakCommand("verify:studio-engine-webgpu-brush-parity"), 24, "webgpu"],
     ["webgpu-filter", "pnpm run verify:studio-engine-webgpu-filter-parity", 24, "webgpu"],
     ["bg3d-physics", "pnpm run verify:studio-bg3d-physics", 28, "bg3d-physics"],
     ["3d-console", 'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console', 24, "bg3d-console"],
     ["vello", "pnpm run verify:studio-vello-candidate", 26, "renderer-vello"],
-    ["bristle-webgpu", "pnpm run verify:studio-professional-bristle-webgpu", 24, "brush-webgpu"],
+    ["bristle-webgpu", studioWebGpuSoakCommand("verify:studio-professional-bristle-webgpu"), 24, "brush-webgpu"],
     ["dual-tip-webgpu", "pnpm run verify:studio-dynamic-dual-tip-webgpu-v2", 24, "brush-webgpu"],
     ["canvaskit-worker", "pnpm run verify:studio-canvaskit-quality-worker", 24, "renderer-canvaskit"],
   ],
