@@ -1,3 +1,5 @@
+import { BadRequestException } from "@nestjs/common";
+
 import {
   markCreatorPublicationPublished,
   normalizeCreatorPublicationDirective,
@@ -48,7 +50,7 @@ export interface PrepareCreatorPublicationSharedDocumentPatchInput {
  * - collaborators cannot introduce publication metadata into a legacy document;
  * - legacy owner clients also retain policy when replacing the rest of the document;
  * - owners get the same normalized status transition as the ordinary creator API;
- * - invalid owner publication attempts deactivate scheduling and fail closed to draft.
+ * - invalid owner publication attempts are rejected before any document mutation occurs.
  *
  * The following repository transaction still rechecks role, CRDT sequence, and base revision. A
  * concurrent document update after this read therefore becomes a normal revision conflict.
@@ -87,31 +89,31 @@ export function prepareCreatorPublicationSharedDocumentPatch({
   if (!directive) return next;
 
   const requestedStatus = patch.status ?? shared.document.status;
-  const publicationValidation =
-    requestedStatus === "published"
-      ? validateCreatorPublicationDirective(directive, {
-          now,
-          challengeLinked: shared.document.challengeId !== null,
-        })
-      : null;
-  const invalidPublication = Boolean(
-    publicationValidation && !publicationValidation.valid,
+  if (requestedStatus === "published") {
+    const publicationValidation = validateCreatorPublicationDirective(directive, {
+      now,
+      challengeLinked: shared.document.challengeId !== null,
+    });
+    if (!publicationValidation.valid) {
+      throw new BadRequestException({
+        code: "creator_publication_invalid",
+        message:
+          publicationValidation.errors[0]?.message ??
+          "게시 설정을 다시 확인해 주세요.",
+        issues: publicationValidation.errors,
+      });
+    }
+  }
+
+  const effectiveStatus = resolveCreatorPublicationStatus(
+    requestedStatus,
+    directive,
+    now,
   );
-  const safeDirective = invalidPublication
-    ? normalizeCreatorPublicationDirective({
-        ...directive,
-        mode: "immediate",
-        scheduledAt: null,
-        publishedAt: null,
-      })
-    : directive;
-  const effectiveStatus = invalidPublication
-    ? "draft"
-    : resolveCreatorPublicationStatus(requestedStatus, safeDirective, now);
   const effectiveDirective =
-    effectiveStatus === "published" && safeDirective.publishedAt === null
-      ? markCreatorPublicationPublished(safeDirective, now)
-      : safeDirective;
+    effectiveStatus === "published" && directive.publishedAt === null
+      ? markCreatorPublicationPublished(directive, now)
+      : directive;
   const documentSource = patch.doc ?? shared.document.doc;
 
   next.doc = writeCreatorPublicationDirective(
