@@ -2,7 +2,7 @@ name: Studio ink live-commit fidelity
 
 on:
   push:
-    branches: [main]
+    branches: [main, release/salvage-integration-20260908]
     paths:
       - ".github/workflows/studio-ink-live-commit.yml"
       - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"
@@ -12,7 +12,7 @@ on:
       - "scripts/lib/studio-verify-preview-harness.mjs"
       - "apps/web/src/domains/creator/**"
   pull_request:
-    branches: [main]
+    branches: [main, release/salvage-integration-20260908]
     paths:
       - ".github/workflows/studio-ink-live-commit.yml"
       - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"

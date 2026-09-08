@@ -444,6 +444,8 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElemen
   id: string;
   type: "draw";
   kind?: "freehand" | DrawShapeKind;
+  /** Original authored stroke retained for editable Smart Shape correction and exact restore. */
+  smartShape?: import("./studio-smart-shape-edit").StudioSmartShapeEditSnapshot;
   mode?: "pen" | "eraser";
   points: number[];
   stroke: string;

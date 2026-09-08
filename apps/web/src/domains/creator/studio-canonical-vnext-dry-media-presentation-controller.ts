@@ -674,10 +674,10 @@ export class StudioCanonicalVNextDryMediaPresentationController {
   }
 
   /**
-   * Executes the exact same immutable compiled frame twice. The first receipt proves the final
-   * pointer-visible pixels; the second proves pointer-up commit parity. Persistence remains the
-   * caller's original DrawEl/vector operation, so this vertical slice cannot silently rasterize a
-   * document or replace undo/replay authority.
+   * Executes the same immutable compiled frame twice and checks GPU final-live/commit lineage.
+   * This is NOT a comparison against the ordinary document compositor, nor proof of equivalent
+   * paper/material pixels. The product host must obtain a separate measured document-parity
+   * receipt before replacing DrawEl's ordinary renderer. DrawEl remains the durable authority.
    */
   public async presentFinalLiveAndCommit(
     frame: StudioCanonicalVNextDryMediaCompiledFrame,
