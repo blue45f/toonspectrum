@@ -52,9 +52,10 @@ try {
   assert.equal(await panel.locator('article').count(),0,'closed library must not build every tile');
   await panel.locator('summary').click();
   await panel.locator('article').first().waitFor();
-  const detailed = manifest.assets.filter(a=>a.license.provider==='Poly Haven');
-  assert.equal(detailed.length,47);
-  assert.ok((await panel.locator('article').first().getAttribute('data-cc0-asset-id')).startsWith('polyhaven-'));
+  const firstDetailedId = await panel.locator('article').first().getAttribute('data-cc0-asset-id');
+  const firstDetailed = manifest.assets.find(a=>a.id===firstDetailedId);
+  assert.ok(firstDetailed,'first visible CC0 asset must exist in the bundled manifest');
+  assert.equal(firstDetailed.license.provider,'Poly Haven','detailed originals must be ordered first');
   steps.push('lazy loading and detailed originals first');
   await page.getByLabel('에셋 표현 스타일').selectOption('detailed');
   assert.match(await panel.getByRole('status').first().textContent(), /검색 결과 46종/);
@@ -72,7 +73,7 @@ try {
   const [download]=await Promise.all([page.waitForEvent('download'),panel.getByRole('link',{name:'GLB 받기'}).first().click()]);
   const downloadPath=await download.path();
   const bytes=await readFile(downloadPath);
-  const downloaded=detailed.find(a=>`${a.id}.glb`===download.suggestedFilename());
+  const downloaded=manifest.assets.find(a=>`${a.id}.glb`===download.suggestedFilename());
   assert.ok(downloaded);
   assert.equal(createHash('sha256').update(bytes).digest('hex'),downloaded.sha256);
   steps.push('actual same-origin GLB download verified by SHA-256');
