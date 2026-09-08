@@ -10,19 +10,32 @@ permissions:
 
 concurrency:
   group: apply-studio-pixel-pencil-pro-core-shallow-v4
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply:
     if: ${{ !contains(github.event.head_commit.message, '[pixel-pencil-pro-core-applied]') }}
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Checkout feature branch
-        uses: actions/checkout@v6
-        with:
-          ref: feat/studio-pixel-pencil-pro-v2-20260909
-          fetch-depth: 1
+      - name: Sparse partial-clone feature branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FEATURE_BRANCH: feat/studio-pixel-pencil-pro-v2-20260909
+        run: |
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git sparse-checkout init --cone
+          git sparse-checkout set .github .husky apps/web docs packages patches scripts
+          git -c protocol.version=2 fetch \
+            --depth=1 \
+            --filter=blob:none \
+            origin \
+            "+refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}"
+          git checkout -B "${FEATURE_BRANCH}" "refs/remotes/origin/${FEATURE_BRANCH}"
+
+      - name: Prepare indentation-safe source patch
+        run: python3 scripts/prepare-studio-pixel-pencil-pro-core.py
 
       - name: Apply focused source patch
         run: python3 scripts/apply-studio-pixel-pencil-pro-core.py
@@ -92,6 +105,7 @@ jobs:
       - name: Commit verified implementation
         run: |
           rm scripts/apply-studio-pixel-pencil-pro-core.py
+          rm scripts/prepare-studio-pixel-pencil-pro-core.py
           rm .github/workflows/apply-studio-pixel-pencil-pro-core.yml
           git config user.name "OpenAI Codex"
           git config user.email "codex@openai.com"
