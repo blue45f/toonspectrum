@@ -61,8 +61,12 @@ interface StudioDraftSaveLeadershipView {
 export interface StudioDraftSaveCenterProps {
   readonly saving: boolean;
   readonly workId?: string | null;
+  readonly workHydrated?: boolean;
+  readonly workHydrationFailed?: boolean;
+  readonly pendingSaveIntent?: "draft" | "published" | null;
   readonly loadedWork?: StudioDraftSaveWorkView | null;
   readonly sharedDocument?: StudioDraftSaveSharedDocumentView | null;
+  readonly localCheckpointCount?: number;
   readonly serverCurrentRevision?: number;
   readonly serverRevisions?: readonly StudioDraftSaveRevisionView[];
   readonly serverRevisionLoading?: boolean;
@@ -74,6 +78,7 @@ export interface StudioDraftSaveCenterProps {
   readonly mobileImmersive?: boolean;
   readonly canvasOnlyMode?: boolean;
   readonly onSaveDraft: () => unknown;
+  readonly onContinuePendingSave?: () => unknown;
   readonly onOpenVersions: () => void;
   readonly onExportBackup: () => unknown;
 }
@@ -94,6 +99,10 @@ function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message.trim().slice(0, 500);
   if (typeof error === "string" && error.trim()) return error.trim().slice(0, 500);
   return "서버 초안 저장 요청을 완료하지 못했습니다.";
+}
+
+function safeCount(value: number): number {
+  return Number.isInteger(value) && value > 0 ? value : 0;
 }
 
 function newestRevisionCreatedAt(
@@ -163,8 +172,12 @@ function SaveStatusCard({
 export function StudioDraftSaveCenter({
   saving,
   workId = null,
+  workHydrated = true,
+  workHydrationFailed = false,
+  pendingSaveIntent = null,
   loadedWork = null,
   sharedDocument = null,
+  localCheckpointCount = 0,
   serverCurrentRevision,
   serverRevisions = [],
   serverRevisionLoading = false,
@@ -176,6 +189,7 @@ export function StudioDraftSaveCenter({
   mobileImmersive = false,
   canvasOnlyMode = false,
   onSaveDraft,
+  onContinuePendingSave,
   onOpenVersions,
   onExportBackup,
 }: StudioDraftSaveCenterProps) {
@@ -192,6 +206,7 @@ export function StudioDraftSaveCenter({
     revision: null,
   });
   const dialogId = useId();
+  const checkpointCount = safeCount(localCheckpointCount);
 
   const serverRevision = resolveStudioDraftServerRevision([
     serverCurrentRevision,
@@ -214,6 +229,9 @@ export function StudioDraftSaveCenter({
 
   const input = useMemo<StudioDraftSaveCenterInput>(() => ({
     isOnline,
+    hydrated: workHydrated,
+    hydrationFailed: workHydrationFailed,
+    metadataRequired: pendingSaveIntent === "draft",
     saving,
     deferredSave,
     collaborationLocked: collaborationDocumentLocked,
@@ -224,6 +242,7 @@ export function StudioDraftSaveCenter({
     storageSignal: reliability.storage,
     hasServerDocument,
     serverRevision,
+    checkpointCount,
     versionCount: serverRevisions.length,
     lastServerSaveAt,
     serverSaveError,
@@ -232,12 +251,14 @@ export function StudioDraftSaveCenter({
   }), [
     autosaveDocumentLeadership?.basis,
     autosaveDocumentLeadership?.role,
+    checkpointCount,
     collaborationDocumentLocked,
     collaborationOperationSyncPending,
     deferredSave,
     hasServerDocument,
     isOnline,
     lastServerSaveAt,
+    pendingSaveIntent,
     reliability.save,
     reliability.storage,
     saving,
@@ -246,9 +267,13 @@ export function StudioDraftSaveCenter({
     serverRevisionLoading,
     serverRevisions.length,
     serverSaveError,
+    workHydrated,
+    workHydrationFailed,
   ]);
   const model = useMemo(() => resolveStudioDraftSaveCenter(input), [input]);
   const anchorAtBottom = mobileImmersive || canvasOnlyMode;
+  const backupAvailable = workHydrated && !workHydrationFailed;
+  const promoteBackup = model.shouldPromoteBackup && backupAvailable;
 
   const invokeSave = useCallback(() => {
     setManualSaveError(null);
@@ -264,7 +289,12 @@ export function StudioDraftSaveCenter({
   }, [onSaveDraft]);
 
   const requestSave = useCallback(() => {
-    if (collaborationDocumentLocked || saving) return;
+    if (
+      collaborationDocumentLocked
+      || saving
+      || !workHydrated
+      || workHydrationFailed
+    ) return;
     if (!isOnline) {
       setDeferredSave(true);
       setOpen(true);
@@ -272,7 +302,42 @@ export function StudioDraftSaveCenter({
     }
     setDeferredSave(false);
     invokeSave();
-  }, [collaborationDocumentLocked, invokeSave, isOnline, saving]);
+  }, [
+    collaborationDocumentLocked,
+    invokeSave,
+    isOnline,
+    saving,
+    workHydrated,
+    workHydrationFailed,
+  ]);
+
+  const handlePrimaryAction = useCallback(() => {
+    if (model.saveActionDisabled) return;
+    if (model.primaryAction === "versions") {
+      setOpen(false);
+      onOpenVersions();
+      return;
+    }
+    if (model.primaryAction === "metadata") {
+      if (!onContinuePendingSave) {
+        requestSave();
+        return;
+      }
+      setManualSaveError(null);
+      setOpen(false);
+      try {
+        void Promise.resolve(onContinuePendingSave()).catch((cause: unknown) => {
+          setManualSaveError(errorMessage(cause));
+          setOpen(true);
+        });
+      } catch (cause) {
+        setManualSaveError(errorMessage(cause));
+        setOpen(true);
+      }
+      return;
+    }
+    requestSave();
+  }, [model.primaryAction, model.saveActionDisabled, onContinuePendingSave, onOpenVersions, requestSave]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -287,10 +352,27 @@ export function StudioDraftSaveCenter({
   }, []);
 
   useEffect(() => {
-    if (!deferredSave || !isOnline || saving || collaborationDocumentLocked) return;
+    if (
+      !deferredSave
+      || !isOnline
+      || saving
+      || collaborationDocumentLocked
+      || !workHydrated
+      || workHydrationFailed
+      || pendingSaveIntent === "draft"
+    ) return;
     setDeferredSave(false);
     invokeSave();
-  }, [collaborationDocumentLocked, deferredSave, invokeSave, isOnline, saving]);
+  }, [
+    collaborationDocumentLocked,
+    deferredSave,
+    invokeSave,
+    isOnline,
+    pendingSaveIntent,
+    saving,
+    workHydrated,
+    workHydrationFailed,
+  ]);
 
   useEffect(() => {
     if (explicitServerSaveAt === null) return;
@@ -380,7 +462,7 @@ export function StudioDraftSaveCenter({
           aria-labelledby={`${dialogId}-title`}
           aria-describedby={`${dialogId}-description`}
           className={cn(
-            "absolute right-0 w-[min(26rem,calc(100vw-1rem))] max-h-[min(76dvh,46rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/98 p-4 text-fg shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable]",
+            "absolute right-0 w-[min(26rem,calc(100vw-1rem))] max-h-[min(76dvh,46rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-4 text-fg shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable]",
             anchorAtBottom ? "bottom-full mb-2" : "top-full mt-2",
           )}
         >
@@ -429,13 +511,17 @@ export function StudioDraftSaveCenter({
             />
           </div>
 
-          <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <dl className="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+            <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">기기 체크포인트</dt>
+              <dd className="mt-1 text-sm font-black">{checkpointCount}개</dd>
+            </div>
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
               <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">서버 revision</dt>
               <dd className="mt-1 text-sm font-black">{serverRevision ?? "—"}</dd>
             </div>
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
-              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">버전 기록</dt>
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">서버 버전</dt>
               <dd className="mt-1 flex items-center justify-center gap-1 text-sm font-black">
                 {serverRevisionLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-label="버전 기록 불러오는 중" />
@@ -443,7 +529,7 @@ export function StudioDraftSaveCenter({
               </dd>
             </div>
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
-              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">마지막 확인</dt>
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">마지막 서버 확인</dt>
               <dd className="mt-1 text-xs font-black">
                 {lastServerSaveAt === null ? "—" : formatStudioDraftSaveTime(lastServerSaveAt)}
               </dd>
@@ -452,18 +538,20 @@ export function StudioDraftSaveCenter({
 
           {serverRevisionError ? (
             <p role="status" className="mt-3 rounded-xl border border-warning/40 bg-warning-soft/25 p-2.5 text-xs font-semibold leading-relaxed text-warning">
-              버전 기록을 불러오지 못했습니다. 현재 편집 내용은 그대로 두고 기록 패널에서 다시 시도할 수 있습니다.
+              서버 버전 기록을 불러오지 못했습니다. 현재 편집 내용은 그대로 두고 체크포인트 패널에서 다시 시도할 수 있습니다.
             </p>
           ) : null}
 
           <div className="mt-3 grid gap-2">
             <button
               type="button"
-              onClick={requestSave}
+              onClick={handlePrimaryAction}
               disabled={model.saveActionDisabled}
               className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent px-3 py-2.5 text-sm font-black text-accent-foreground shadow-sm hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving ? (
+              {model.primaryAction === "versions" ? (
+                <History className="h-4 w-4" aria-hidden />
+              ) : saving || model.phase === "loading" ? (
                 <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />
               ) : serverSaveError ? (
                 <RefreshCw className="h-4 w-4" aria-hidden />
@@ -477,8 +565,8 @@ export function StudioDraftSaveCenter({
               <button
                 type="button"
                 onClick={() => {
-                  onOpenVersions();
                   setOpen(false);
+                  onOpenVersions();
                 }}
                 disabled={!model.canOpenVersions}
                 className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
@@ -489,21 +577,22 @@ export function StudioDraftSaveCenter({
               <button
                 type="button"
                 onClick={() => void Promise.resolve(onExportBackup())}
+                disabled={!backupAvailable}
                 className={cn(
-                  "flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                  model.shouldPromoteBackup
+                  "flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45",
+                  promoteBackup
                     ? "border-warning/45 bg-warning-soft/20 text-warning hover:bg-warning-soft/30"
                     : "border-line bg-card hover:bg-raised",
                 )}
               >
                 <Download className="h-4 w-4" aria-hidden />
-                프로젝트 백업
+                {backupAvailable ? "프로젝트 백업" : "원고 로드 후 백업"}
               </button>
             </div>
           </div>
 
           <p className="mt-3 text-[0.68rem] leading-relaxed text-fg-3">
-            오프라인 저장 예약은 이 탭 세션에서 한 번만 실행됩니다. 충돌 시에는 자동 덮어쓰기 대신 기존 버전 비교·복원 흐름을 사용합니다.
+            오프라인 저장 예약은 현재 문서의 이 탭 세션에서 한 번만 실행됩니다. 충돌 시에는 자동 덮어쓰기 대신 버전 비교·복원 흐름을 사용합니다.
           </p>
         </div>
       ) : null}
