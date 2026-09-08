@@ -15,7 +15,7 @@ on:
       - 'apps/web/public/assets/studio/backgrounds/**'
       - '.github/workflows/studio-2d-asset-quality.yml'
   pull_request:
-    branches: [main]
+    branches: [main, release/salvage-integration-20260908]
     paths:
       - 'apps/web/src/domains/creator/studio-bg*'
       - 'apps/web/src/domains/creator/studio-2d*'
