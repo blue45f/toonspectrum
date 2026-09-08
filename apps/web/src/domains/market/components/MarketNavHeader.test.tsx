@@ -36,8 +36,29 @@ describe("MarketNavHeader", () => {
       .toBeNull();
   });
 
+  it("opens the production-fit lab and preserves its current navigation state", () => {
+    render(
+      <MemoryRouter initialEntries={["/market/browse"]}>
+        <MarketNavHeader />
+        <Routes>
+          <Route path="/market/browse" element={<p>탐색 결과</p>} />
+          <Route path="/market/fit" element={<h1>제작 적합성 랩</h1>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const fit = screen.getByRole("link", { name: "제작 조건" });
+    expect(fit.getAttribute("href")).toBe("/market/fit");
+    fireEvent.click(fit);
+    expect(screen.getByRole("heading", { name: "제작 적합성 랩" })).toBeTruthy();
+    expect(fit.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "탐색" }).getAttribute("aria-current"))
+      .toBeNull();
+  });
+
   it.each([
     ["/market/resource/example", "탐색"],
+    ["/market/fit", "제작 조건"],
     ["/market/publish", "판매자 센터"],
   ])("preserves the current navigation for %s", (route, label) => {
     render(<MemoryRouter initialEntries={[route]}><MarketNavHeader /></MemoryRouter>);
