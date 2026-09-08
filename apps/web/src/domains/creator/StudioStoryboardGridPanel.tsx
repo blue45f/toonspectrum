@@ -1,51 +1,54 @@
 /**
- * Studio Storyboard Grid Panel — 전체 페이지를 다열 그리드로 한눈에 훑어보는 라이트테이블 모드.
+ * Studio Storyboard Control Room — 전체 페이지를 시퀀스와 검토 큐 관점에서 함께 보는 작업 공간.
  *
- * 페이지 스트립(StudioPageThumbnails)과 동일한 경량 SVG 프록시 썸네일(StudioPageThumbnail)을
- * 세로 목록 대신 반응형 CSS 그리드로 타일링한다 — 페이지마다 Konva Stage를 새로 띄우지 않는다는
- * 원칙은 그대로 유지(재사용이 핵심). 재배열도 페이지 스트립과 동일한 useStudioPageDnd 인스턴스를
- * 그대로 전달받아 쓴다(재생성 금지 — 드래그 상태가 두 뷰에서 갈라지는 버그를 원천 차단).
- *
- * 전체화면 모달이라 사이드바(최대 360px)의 폭 제약 없이 수십 개 페이지를 동시에 비교할 수 있다
- * — "페이지가 멀리 떨어져 있으면 스크롤해야 비교 가능"이라는 갭을 메우는 게 이 패널의 유일한 목적.
- *
- * 이 패널 자신은 상태를 소유하지 않는다(칸 크기 S/M/L만 예외 — 데이터에 영향 없는 순수 표시 취향).
- * 페이지 CRUD(추가/복제/삭제)는 전부 StudioPage가 이미 갖고 있는 핸들러를 그대로 위임받는다.
- *
- * 그리드는 N개 StudioPageThumbnail을 한 번에 마운트한다(가상화 없음) — 이는 이 아키텍처의
- * 기존 특성이지 이 기능이 새로 만든 비용이 아니다: 도킹된 페이지 목록도 오늘 이미 전체 페이지 수만큼
- * 마운트하고 있고(스크롤 영역만 다름), react-window 등 가상화 라이브러리는 이 코드베이스 어디에도
- * 없다. 수백 페이지급 성능 이슈가 실제로 생기면 StudioPageThumbnails.tsx까지 포함한 횡단 개선이 될
- * 사안이라 이 패널 단독 스코프가 아니다.
+ * 기존 경량 SVG 썸네일과 공유 DnD 인스턴스를 그대로 사용한다. 검색/필터가 켜진 동안에는
+ * 숨겨진 페이지를 건너뛴 재배열이 예측하기 어려우므로 DnD를 잠그고, 원본 순서를 보존한다.
  */
-import { Copy, LayoutGrid, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState, type ReactElement } from "react";
+import {
+  Copy,
+  Download,
+  LayoutGrid,
+  ListChecks,
+  Lock,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
 import { studioDeletePageRequest } from "./studio-destructive-command-catalog";
 import { hasCustomPageName, pageDisplayName } from "./studio-page-meta";
+import {
+  PAGE_REVIEW_STATUSES,
+  PAGE_REVIEW_STATUS_LABELS,
+  type PageReviewStatus,
+} from "./studio-page-review";
 import { StudioPanelChip } from "./studio-panel-ui";
 import { StudioPageThumbnail, type StudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPanelShotTagFields } from "./StudioPanelShotTagFields";
+import {
+  STORYBOARD_CONTROL_FILTERS,
+  buildStoryboardControlRoom,
+  serializeStoryboardControlRoomCsv,
+  type StoryboardControlFilter,
+  type StoryboardControlRoomRow,
+} from "./studio-storyboard-control-room";
 
 import type { ThumbPageLike } from "./studio-page-thumbs";
 import type { ShotTagPatch } from "./studio-panel-shot-tags";
 
 import { cn } from "@/shared/lib/utils";
 
-/** 그리드 패널이 받는 페이지 최소 형태 — StudioPageThumbnail과 동일 계약(ThumbPageLike) +
- * 이름/메모(스트립과 동일하게 표시용으로만 사용, 여기서는 편집하지 않는다 — 이름 편집은 목록 뷰의
- * 기존 인라인 편집(연필 버튼)을 그대로 쓰도록 의도적으로 남겨둔다: 작은 그리드 칸에 이름+메모
- * 편집 UI까지 넣으면 밀도가 무너지고, 목록 뷰 기능을 중복 구현하게 된다).
- * shotType/cameraAngle은 studio-panel-shot-tags가 관리 — 이름/메모와 달리 그리드에서 직접
- * 편집 가능하다(칩형 네이티브 select 상시 노출, onShotTagChange 참고). */
 export type StoryboardGridPage = ThumbPageLike & {
   id: string;
   name?: string;
   note?: string;
   shotType?: string;
   cameraAngle?: string;
+  review?: unknown;
 };
 
 const CELL_SIZE_PRESETS = {
@@ -54,28 +57,95 @@ const CELL_SIZE_PRESETS = {
   l: "grid-cols-[repeat(auto-fill,minmax(11rem,1fr))]",
 } as const;
 type CellSize = keyof typeof CELL_SIZE_PRESETS;
+type StoryboardViewMode = "sequence" | "review";
+
+const FILTER_LABELS: Record<StoryboardControlFilter, string> = {
+  all: "전체 페이지",
+  draft: "작업 중",
+  "needs-review": "검토 요청",
+  "changes-requested": "수정 요청",
+  approved: "승인",
+  locked: "잠금 페이지",
+  "missing-metadata": "샷 정보 누락",
+  unassigned: "담당자 미지정",
+};
+
+const REVIEW_TONE: Record<PageReviewStatus, string> = {
+  draft: "border-line bg-black/45 text-white",
+  "needs-review": "border-sky-400/40 bg-sky-500/20 text-sky-100",
+  "changes-requested": "border-rose-400/40 bg-rose-500/20 text-rose-100",
+  approved: "border-emerald-400/40 bg-emerald-500/20 text-emerald-100",
+};
 
 export interface StudioStoryboardGridPanelProps {
   open: boolean;
   onClose: () => void;
-  /** composeThumbPage(master, p)로 마스터 요소까지 합성된 페이지 배열 — 페이지 스트립과 동일 소스를
-   * 호출측(StudioPage)이 만들어 넘긴다(이 패널은 DocumentMaster 타입을 몰라도 된다). */
   pages: StoryboardGridPage[];
   currentPageId: string;
-  /** 페이지 스트립이 이미 만든 useStudioPageDnd 인스턴스 — 여기서 새로 만들지 않는다. */
   dnd: StudioPageDnd;
   onSelectPage: (pageId: string) => void;
   onAddPage: () => void;
   onDuplicatePage: (pageId: string) => void;
-  /** 확인 다이얼로그를 통과한 뒤에만 호출된다 — 삭제 자체는 이 패널이 결정하지 않는다
-   * (StudioPage.deletePage를 그대로 넘기면 됨). */
   onDeletePage: (pageId: string) => void;
-  /** pages.length > 1 — 목록 뷰의 삭제 버튼과 동일한 가드를 호출측이 계산해 넘긴다. */
   canDelete: boolean;
-  /** 샷 타입/카메라 앵글 태그 커밋 — studio-panel-shot-tags.withShotTag의 결과로 pages를
-   * 갱신하는 건 호출측(StudioPage) 책임이다. 전달하지 않으면 태그 셀렉트 UI 자체를
-   * 렌더링하지 않는다(옵트인 — 미전달 시 기존 카드 레이아웃과 완전히 동일하게 유지). */
   onShotTagChange?: (pageId: string, patch: ShotTagPatch) => void;
+}
+
+interface MetricButtonProps {
+  label: string;
+  value: string | number;
+  active?: boolean;
+  onClick?: () => void;
+  title?: string;
+}
+
+function MetricButton({ label, value, active = false, onClick, title }: MetricButtonProps): ReactElement {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={title}
+      className={cn(
+        "min-w-[6.75rem] rounded-xl border px-3 py-2 text-left transition-colors",
+        active
+          ? "border-accent bg-accent-soft text-accent"
+          : "border-line bg-card/70 text-fg-2 hover:border-accent/50 hover:bg-raised/70",
+      )}
+    >
+      <span className="block text-[10px] font-semibold uppercase tracking-wide text-fg-3">{label}</span>
+      <strong className="mt-0.5 block text-sm text-fg">{value}</strong>
+    </button>
+  );
+}
+
+function downloadStoryboardReviewCsv(
+  rows: readonly StoryboardControlRoomRow<StoryboardGridPage>[],
+): void {
+  const csv = serializeStoryboardControlRoomCsv(rows);
+  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `toonspectrum-storyboard-review-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function ReviewBadge({ status, locked }: { status: PageReviewStatus; locked: boolean }): ReactElement {
+  return (
+    <span
+      className={cn(
+        "inline-flex max-w-full items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-bold shadow-sm backdrop-blur-sm",
+        REVIEW_TONE[status],
+      )}
+    >
+      {locked ? <Lock size={9} aria-hidden /> : null}
+      <span className="truncate">{PAGE_REVIEW_STATUS_LABELS[status]}</span>
+    </span>
+  );
 }
 
 export function StudioStoryboardGridPanel({
@@ -92,181 +162,392 @@ export function StudioStoryboardGridPanel({
   onShotTagChange,
 }: StudioStoryboardGridPanelProps): ReactElement | null {
   const [cellSize, setCellSize] = useState<CellSize>("m");
+  const [viewMode, setViewMode] = useState<StoryboardViewMode>("sequence");
+  const [query, setQuery] = useState("");
+  const [reviewFilter, setReviewFilter] = useState<StoryboardControlFilter>("all");
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  // ESC로 닫기 — StudioTimelapsePanel/StudioBackground3D와 동일 관례.
-  // 단, 드래그 중(dnd.dragIndex !== null)에는 닫지 않는다: dnd는 이 패널이 소유하지 않고
-  // 페이지 스트립과 공유하는 인스턴스라, 드래그 중인 카드의 DOM이 언마운트되면 네이티브
-  // dragend가 (분리된 노드라 버블링할 트리가 없어) React 델리게이트 리스너까지 도달하지
-  // 못해 dragIndex/dropSlot이 리셋되지 않고 그대로 남는다 — 모달을 닫은 뒤 페이지 스트립의
-  // 해당 카드가 계속 반투명(opacity-50)으로 "드래그 중"인 것처럼 보이는 유령 상태가 된다.
+  const controlRoom = useMemo(
+    () => buildStoryboardControlRoom(pages, query, reviewFilter),
+    [pages, query, reviewFilter],
+  );
+  const { summary, visibleRows } = controlRoom;
+  const reorderEnabled = viewMode === "sequence" && !controlRoom.filterActive;
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && dnd.dragIndex === null) onClose();
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT" ||
+        target?.isContentEditable === true;
+
+      if (!isTyping && (event.key === "/" || ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f"))) {
+        event.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+
+      if (event.key !== "Escape" || dnd.dragIndex !== null) return;
+      if (query) {
+        setQuery("");
+        return;
+      }
+      if (reviewFilter !== "all") {
+        setReviewFilter("all");
+        return;
+      }
+      onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, dnd.dragIndex]);
+  }, [dnd.dragIndex, onClose, open, query, reviewFilter]);
 
   if (!open) return null;
+
+  const setOperationalFilter = (filter: StoryboardControlFilter) => {
+    setReviewFilter((current) => (current === filter ? "all" : filter));
+  };
+
+  const renderSequenceGrid = () => {
+    if (visibleRows.length === 0) {
+      return (
+        <div className="grid min-h-60 place-items-center rounded-2xl border border-dashed border-line bg-card/30 p-8 text-center">
+          <div>
+            <Search className="mx-auto mb-3 text-fg-3" size={28} aria-hidden />
+            <p className="text-sm font-semibold text-fg">조건에 맞는 페이지가 없습니다.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setReviewFilter("all");
+              }}
+              className="mt-3 min-h-11 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised"
+            >
+              필터 초기화
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={cn("grid gap-3", CELL_SIZE_PRESETS[cellSize])}>
+        {visibleRows.map(({ page: p, originalIndex: idx, label, review, metadataComplete }) => {
+          const isActive = p.id === currentPageId;
+          const dropIndicator = reorderEnabled ? dnd.indicatorFor(idx) : null;
+          const displayName = pageDisplayName(p, idx);
+          const dragProps = reorderEnabled ? dnd.itemProps(idx) : {};
+          return (
+            <div
+              key={p.id}
+              {...dragProps}
+              title={reorderEnabled ? "드래그하여 순서 변경" : undefined}
+              className={cn(
+                "group relative flex flex-col gap-1 rounded-xl border p-1.5 transition-all",
+                isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card hover:bg-raised/50",
+                reorderEnabled && dnd.dragIndex === idx && "opacity-50",
+              )}
+            >
+              {dropIndicator ? (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "pointer-events-none absolute inset-x-1 z-30 h-[3px] rounded-full bg-accent",
+                    dropIndicator === "before" ? "top-0" : "bottom-0",
+                  )}
+                />
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => onSelectPage(p.id)}
+                aria-label={`${displayName} 선택`}
+                aria-pressed={isActive}
+                className="absolute inset-0 z-10 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              />
+
+              <div className="pointer-events-none absolute left-2 top-2 z-20 max-w-[calc(100%-3rem)]">
+                <ReviewBadge status={review.status} locked={review.locked} />
+              </div>
+
+              <StudioPageThumbnail page={p} className="aspect-[2/3] h-auto w-full" />
+
+              <span
+                className="truncate text-[10px] font-semibold text-fg-2"
+                title={p.note ? `${displayName}\n${p.note}` : displayName}
+              >
+                {hasCustomPageName(p) ? `${idx + 1}. ${displayName}` : displayName}
+                {p.note ? " · 메모" : ""}
+              </span>
+
+              <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] text-fg-3">
+                <span className="truncate" title={review.assignee || "담당자 미지정"}>
+                  {review.assignee ? `담당 ${review.assignee}` : "담당자 미지정"}
+                </span>
+                {!metadataComplete ? (
+                  <span className="shrink-0 rounded-full border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 font-semibold text-amber-200">
+                    샷 정보 필요
+                  </span>
+                ) : null}
+              </div>
+
+              {onShotTagChange ? (
+                <StudioPanelShotTagFields
+                  shotType={p.shotType}
+                  cameraAngle={p.cameraAngle}
+                  onShotTypeChange={(value) => onShotTagChange(p.id, { shotType: value })}
+                  onCameraAngleChange={(value) => onShotTagChange(p.id, { cameraAngle: value })}
+                  size="compact"
+                  className="relative z-20"
+                />
+              ) : null}
+
+              <div className="pointer-coarse:pointer-events-auto pointer-coarse:opacity-100 pointer-coarse:gap-1.5 absolute right-1 top-1 z-20 flex flex-col items-center gap-0.5 pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDuplicatePage(p.id);
+                  }}
+                  className="grid size-11 shrink-0 place-items-center rounded-lg bg-black/55 p-1 text-white hover:bg-black/70"
+                  title="페이지 복제"
+                  aria-label={`${label} 복제`}
+                >
+                  <Copy size={11} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (!canDelete) return;
+                    void (async () => {
+                      if (
+                        !(await confirmStudioDestructiveAction(
+                          studioDeletePageRequest({
+                            pageNumber: idx + 1,
+                            elementCount: p.elements.length,
+                          }),
+                        ))
+                      ) return;
+                      onDeletePage(p.id);
+                    })();
+                  }}
+                  disabled={!canDelete}
+                  className="grid size-11 shrink-0 place-items-center rounded-lg bg-black/55 p-1 text-white hover:bg-bad/80 disabled:opacity-30"
+                  title="페이지 삭제"
+                  aria-label={`${label} 삭제`}
+                >
+                  <Trash2 size={11} aria-hidden />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderReviewBoard = () => (
+    <div className="min-w-[58rem] grid grid-cols-4 gap-3" aria-label="검토 상태별 페이지 보드">
+      {PAGE_REVIEW_STATUSES.map((status) => {
+        const rows = visibleRows.filter((row) => row.review.status === status);
+        return (
+          <section key={status} className="min-w-0 rounded-2xl border border-line bg-card/40 p-2.5">
+            <header className="mb-2 flex items-center justify-between gap-2">
+              <ReviewBadge status={status} locked={false} />
+              <span className="rounded-full bg-raised px-2 py-0.5 text-[10px] font-bold text-fg-2">{rows.length}</span>
+            </header>
+            <div className="flex max-h-[calc(100vh-18rem)] flex-col gap-2 overflow-y-auto pr-0.5">
+              {rows.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-line px-2 py-6 text-center text-[10px] text-fg-3">
+                  해당 페이지 없음
+                </p>
+              ) : rows.map(({ page, originalIndex, label, review, metadataComplete }) => (
+                <button
+                  key={page.id}
+                  type="button"
+                  onClick={() => onSelectPage(page.id)}
+                  aria-current={page.id === currentPageId ? "page" : undefined}
+                  className={cn(
+                    "rounded-xl border p-2 text-left transition-colors hover:border-accent/60 hover:bg-raised/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                    page.id === currentPageId ? "border-accent bg-accent-soft/40" : "border-line bg-panel/70",
+                  )}
+                >
+                  <div className="flex gap-2">
+                    <StudioPageThumbnail page={page} className="h-20 w-[3.35rem] shrink-0 rounded-md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[11px] font-bold text-fg">{originalIndex + 1}. {label}</p>
+                      <p className="mt-1 truncate text-[10px] text-fg-3">
+                        {[page.shotType, page.cameraAngle].filter(Boolean).join(" · ") || "샷 정보 미지정"}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-fg-2">
+                        {review.note || page.note || "검토 메모 없음"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-fg-3">
+                    <span className="truncate">{review.assignee ? `담당 ${review.assignee}` : "담당자 미지정"}</span>
+                    <span className="inline-flex shrink-0 items-center gap-1">
+                      {review.locked ? <Lock size={9} aria-label="잠금" /> : null}
+                      {!metadataComplete ? "샷 정보 필요" : "준비됨"}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
 
   const modal = (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="스토리보드 그리드 보기"
+      aria-label="스토리보드 컨트롤 룸"
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
     >
       <div className="mx-auto flex h-full w-full max-w-[100rem] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line px-4 py-3">
           <LayoutGrid size={16} className="text-accent" aria-hidden />
-          <h2 className="text-sm font-bold text-fg">스토리보드 그리드 보기</h2>
-          <span className="text-xs text-fg-3">총 {pages.length}페이지</span>
+          <div>
+            <h2 className="text-sm font-bold text-fg">스토리보드 컨트롤 룸</h2>
+            <p className="text-[10px] text-fg-3">시퀀스·샷 메타·검토 상태를 한 화면에서 점검합니다.</p>
+          </div>
+          <span className="text-xs text-fg-3">총 {summary.total}페이지</span>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <div className="flex items-center gap-1 rounded-md border border-line bg-card/50 p-0.5">
-              <StudioPanelChip className="min-h-11 min-w-11" active={cellSize === "s"} onClick={() => setCellSize("s")} title="작게 — 더 많이 보기">
-                소
+              <StudioPanelChip
+                className="min-h-11 gap-1 px-2.5"
+                active={viewMode === "sequence"}
+                onClick={() => setViewMode("sequence")}
+                title="원본 순서와 샷 정보를 보는 시퀀스 뷰"
+              >
+                <LayoutGrid size={12} aria-hidden /> 시퀀스
               </StudioPanelChip>
-              <StudioPanelChip className="min-h-11 min-w-11" active={cellSize === "m"} onClick={() => setCellSize("m")} title="보통">
-                중
-              </StudioPanelChip>
-              <StudioPanelChip className="min-h-11 min-w-11" active={cellSize === "l"} onClick={() => setCellSize("l")} title="크게 — 더 자세히 보기">
-                대
+              <StudioPanelChip
+                className="min-h-11 gap-1 px-2.5"
+                active={viewMode === "review"}
+                onClick={() => setViewMode("review")}
+                title="검토 상태별 작업 큐"
+              >
+                <ListChecks size={12} aria-hidden /> 검토 큐
               </StudioPanelChip>
             </div>
+
+            {viewMode === "sequence" ? (
+              <div className="flex items-center gap-1 rounded-md border border-line bg-card/50 p-0.5">
+                {(["s", "m", "l"] as const).map((size) => (
+                  <StudioPanelChip
+                    key={size}
+                    className="min-h-11 min-w-11"
+                    active={cellSize === size}
+                    onClick={() => setCellSize(size)}
+                    title={size === "s" ? "작게" : size === "m" ? "보통" : "크게"}
+                  >
+                    {size === "s" ? "소" : size === "m" ? "중" : "대"}
+                  </StudioPanelChip>
+                ))}
+              </div>
+            ) : null}
+
             <button
               type="button"
               onClick={onAddPage}
-              className="flex min-h-11 min-w-11 items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-on-accent hover:bg-accent-hover pointer-coarse:min-h-11 pointer-coarse:px-3"
+              className="flex min-h-11 min-w-11 items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-on-accent hover:bg-accent-hover pointer-coarse:px-3"
             >
-              <Plus size={12} /> 추가
+              <Plus size={12} aria-hidden /> 추가
             </button>
             <button
               type="button"
               aria-label="닫기"
               title="닫기 (Esc)"
               onClick={onClose}
-              className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent pointer-coarse:size-11"
+              className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent"
             >
               <X size={15} aria-hidden />
             </button>
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <div className={cn("grid gap-3", CELL_SIZE_PRESETS[cellSize])}>
-            {pages.map((p, idx) => {
-              const isActive = p.id === currentPageId;
-              const dropIndicator = dnd.indicatorFor(idx);
-              const displayName = pageDisplayName(p, idx);
-              return (
-                <div
-                  key={p.id}
-                  {...dnd.itemProps(idx)}
-                  title="드래그하여 순서 변경"
-                  className={cn(
-                    "group relative flex flex-col gap-1 rounded-xl border p-1.5 transition-all",
-                    isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card hover:bg-raised/50",
-                    dnd.dragIndex === idx && "opacity-50"
-                  )}
+        <div className="shrink-0 border-b border-line bg-card/30 px-4 py-3">
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            <MetricButton label="승인 진행률" value={`${summary.approvedPercent}%`} active={reviewFilter === "approved"} onClick={() => setOperationalFilter("approved")} title="승인 페이지만 보기" />
+            <MetricButton label="검토 요청" value={summary.statusCounts["needs-review"]} active={reviewFilter === "needs-review"} onClick={() => setOperationalFilter("needs-review")} />
+            <MetricButton label="수정 요청" value={summary.statusCounts["changes-requested"]} active={reviewFilter === "changes-requested"} onClick={() => setOperationalFilter("changes-requested")} />
+            <MetricButton label="샷 정보 누락" value={summary.missingMetadata} active={reviewFilter === "missing-metadata"} onClick={() => setOperationalFilter("missing-metadata")} />
+            <MetricButton label="잠금" value={summary.locked} active={reviewFilter === "locked"} onClick={() => setOperationalFilter("locked")} />
+            <MetricButton label="담당 미지정" value={summary.total - summary.assigned} active={reviewFilter === "unassigned"} onClick={() => setOperationalFilter("unassigned")} title="담당자가 없는 페이지만 보기" />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="relative min-w-[14rem] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" size={14} aria-hidden />
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="페이지·메모·샷·담당자 검색  /"
+                aria-label="스토리보드 검색"
+                className="min-h-11 w-full rounded-lg border border-line bg-panel pl-9 pr-9 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
+              />
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label="검색어 지우기"
+                  className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-fg"
                 >
-                  {dropIndicator && (
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "pointer-events-none absolute inset-x-1 z-10 h-[3px] rounded-full bg-accent",
-                        dropIndicator === "before" ? "top-0" : "bottom-0"
-                      )}
-                    />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => onSelectPage(p.id)}
-                    aria-label={`${displayName} 선택`}
-                    aria-pressed={isActive}
-                    className="absolute inset-0 z-10 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  />
+                  <X size={13} aria-hidden />
+                </button>
+              ) : null}
+            </label>
 
-                  <StudioPageThumbnail page={p} className="h-auto w-full aspect-[2/3]" />
+            <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-xs text-fg-2">
+              <span className="font-semibold">상태</span>
+              <select
+                value={reviewFilter}
+                onChange={(event) => setReviewFilter(event.target.value as StoryboardControlFilter)}
+                aria-label="스토리보드 상태 필터"
+                className="min-h-9 bg-transparent text-xs font-semibold text-fg outline-none"
+              >
+                {STORYBOARD_CONTROL_FILTERS.map((filter) => (
+                  <option key={filter} value={filter}>{FILTER_LABELS[filter]}</option>
+                ))}
+              </select>
+            </label>
 
-                  {/* 항상 보이는 캡션(터치 기기엔 hover가 없으므로 이름은 hover에 가두지 않는다).
-                      커스텀 이름이 없으면 displayName 자체가 이미 "N페이지" 형태라 앞에 순번을 또 붙이면
-                      "1. 1페이지"처럼 중복 표시된다 — 커스텀 이름이 있을 때만 순번 접두사를 덧붙인다. */}
-                  <span
-                    className="truncate text-[10px] font-semibold text-fg-2"
-                    title={p.note ? `${displayName}\n${p.note}` : displayName}
-                  >
-                    {hasCustomPageName(p) ? `${idx + 1}. ${displayName}` : displayName}
-                    {p.note ? " 📝" : ""}
-                  </span>
+            <span className="inline-flex min-h-11 items-center rounded-lg border border-line bg-panel px-3 text-xs text-fg-3" role="status" aria-live="polite">
+              {summary.visible}/{summary.total} 표시
+            </span>
 
-                  {/* 샷 타입/카메라 앵글 — 콘티 검토 시 상시 표시(hover에 가두지 않음). 카드 전체를
-                      덮는 선택 버튼(z-10)보다 위(z-20 + relative)에 있어야 select 클릭이 카드 선택으로
-                      새지 않는다. 호출측이 onShotTagChange를 넘기지 않으면(통합 전) 렌더링 자체를
-                      건너뛴다 — 기존 카드 레이아웃과 완전히 동일하게 유지. */}
-                  {onShotTagChange && (
-                    <StudioPanelShotTagFields
-                      shotType={p.shotType}
-                      cameraAngle={p.cameraAngle}
-                      onShotTypeChange={(value) => onShotTagChange(p.id, { shotType: value })}
-                      onCameraAngleChange={(value) => onShotTagChange(p.id, { cameraAngle: value })}
-                      size="compact"
-                      className="relative z-20"
-                    />
-                  )}
-
-                  {/* 데스크톱(마우스)에선 밀도를 위해 hover/focus에만 노출하지만, 터치 기기는 hover가
-                      없고 이 레이어가 pointer-events-none이면 탭이 아래의 전체 선택 버튼으로 그대로
-                      새어나가 "복제/삭제를 누르려다 페이지 이동+모달 닫힘"이 벌어진다 — pointer-coarse
-                      (터치)에서는 항상 보이고 항상 클릭 가능하게 강제로 켠다. */}
-                  <div className="pointer-coarse:pointer-events-auto pointer-coarse:opacity-100 pointer-coarse:gap-1.5 absolute right-1 top-1 z-20 flex flex-col items-center gap-0.5 pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-                    {/* Stack 44px actions vertically so both fit the narrowest 5rem card without overlap. */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDuplicatePage(p.id);
-                      }}
-                      className="grid size-11 shrink-0 place-items-center rounded-lg bg-black/55 p-1 text-white hover:bg-black/70"
-                      title="페이지 복제"
-                      aria-label={`${displayName} 복제`}
-                    >
-                      <Copy size={11} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!canDelete) return;
-                        void (async () => {
-                          if (
-                            !(await confirmStudioDestructiveAction(
-                              studioDeletePageRequest({
-                                pageNumber: idx + 1,
-                                elementCount: p.elements.length,
-                              })
-                            ))
-                          ) return;
-                          onDeletePage(p.id);
-                        })();
-                      }}
-                      disabled={!canDelete}
-                      className="grid size-11 shrink-0 place-items-center rounded-lg bg-black/55 p-1 text-white hover:bg-bad/80 disabled:opacity-30"
-                      title="페이지 삭제"
-                      aria-label={`${displayName} 삭제`}
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            <button
+              type="button"
+              disabled={visibleRows.length === 0}
+              onClick={() => downloadStoryboardReviewCsv(visibleRows)}
+              title={`현재 검색·필터 결과 ${visibleRows.length}개를 CSV로 내보냅니다.`}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-panel px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/50 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Download size={13} aria-hidden /> 검토표 CSV
+            </button>
           </div>
         </div>
 
+        <div className={cn("min-h-0 flex-1 overflow-auto px-4 py-3", viewMode === "review" && "bg-card/20")}>
+          {viewMode === "sequence" ? renderSequenceGrid() : renderReviewBoard()}
+        </div>
+
         <p className="shrink-0 border-t border-line px-4 py-2 text-[0.7rem] text-fg-3" role="status">
-          카드를 드래그하면 순서가 바뀌고, 클릭하면 그 페이지로 이동합니다.
+          {viewMode === "review"
+            ? "검토 큐는 원본 페이지 순서를 유지한 채 상태별로 묶습니다. 카드를 클릭하면 해당 페이지로 이동합니다."
+            : reorderEnabled
+              ? "카드를 드래그하면 순서가 바뀝니다. / 또는 Ctrl/⌘+F로 검색할 수 있습니다."
+              : "검색·필터 중에는 숨겨진 페이지를 건너뛰는 오배치를 막기 위해 재배열이 잠깁니다."}
         </p>
       </div>
     </div>
