@@ -1,0 +1,92 @@
+name: Apply dense Studio touch targets on final tree
+
+on:
+  push:
+    branches:
+      - release/final-main-merge-4888b061-immutable-20260908
+    paths:
+      - .github/workflows/apply-studio-dense-touch-target-final.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-studio-dense-touch-target-final
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out final integration branch
+        uses: actions/checkout@v6
+        with:
+          ref: release/final-main-merge-4888b061-immutable-20260908
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            apps/web/src/domains/creator/studio-panel-ui.tsx
+            apps/web/src/domains/creator/studio-panel-ui.desktop-touch-target.test.tsx
+            .github/workflows/apply-studio-dense-touch-target-final.yml
+
+      - name: Apply exact dense-button contract and regression test
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source_path = Path("apps/web/src/domains/creator/studio-panel-ui.tsx")
+          source = source_path.read_text()
+          before = '? "h-9 gap-1.5 px-2.5 text-[0.72rem] max-lg:h-11 max-lg:min-h-11 pointer-coarse:h-11 pointer-coarse:min-h-11 pointer-coarse:gap-1.5 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]"'
+          after = '? "h-11 min-h-11 gap-1.5 px-2.5 text-[0.72rem] pointer-coarse:gap-1.5 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]"'
+          if source.count(before) != 1:
+              raise SystemExit(f"expected one dense-button source token, found {source.count(before)}")
+          source_path.write_text(source.replace(before, after, 1))
+
+          test_path = Path("apps/web/src/domains/creator/studio-panel-ui.desktop-touch-target.test.tsx")
+          test_path.write_text('''import { describe, expect, it } from "vitest";
+
+import { studioToolButtonClass } from "./studio-panel-ui";
+
+describe("studioToolButtonClass desktop touch targets", () => {
+  it("keeps dense toolbar controls at least 44px tall on every pointer type", () => {
+    const tokens = studioToolButtonClass(false, { dense: true }).split(/\\s+/);
+
+    expect(tokens).toEqual(expect.arrayContaining(["h-11", "min-h-11"]));
+    expect(tokens).not.toContain("h-9");
+    expect(tokens).not.toContain("max-lg:h-11");
+  });
+});
+''')
+          PY
+
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const source = readFileSync("apps/web/src/domains/creator/studio-panel-ui.tsx", "utf8");
+          if (!source.includes('h-11 min-h-11 gap-1.5 px-2.5 text-[0.72rem]')) {
+            throw new Error("dense 44px contract was not applied");
+          }
+          if (source.includes('? "h-9 gap-1.5 px-2.5 text-[0.72rem]')) {
+            throw new Error("dense 36px contract remains");
+          }
+          NODE
+          git diff --check
+
+      - name: Commit the focused change and retire this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch='release/final-main-merge-4888b061-immutable-20260908'
+          git add -- \
+            apps/web/src/domains/creator/studio-panel-ui.tsx \
+            apps/web/src/domains/creator/studio-panel-ui.desktop-touch-target.test.tsx
+          git rm .github/workflows/apply-studio-dense-touch-target-final.yml
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(a11y): make dense Studio tools 44px tall"
+          git pull --rebase origin "$branch"
+          git push origin HEAD:"$branch"
