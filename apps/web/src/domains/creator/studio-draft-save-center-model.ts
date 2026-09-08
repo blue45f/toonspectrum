@@ -239,7 +239,8 @@ export function resolveStudioDraftSaveCenter(
 ): StudioDraftSaveCenterViewModel {
   const device = deviceSection(input);
   const server = serverSection(input);
-  const localRisk = device.tone === "danger" || device.tone === "warning" && input.localRole !== "follower";
+  const localRisk = device.tone === "danger"
+    || (device.tone === "warning" && input.localRole !== "follower");
   const hasServerRisk = server.tone === "danger";
   const serverRevision = normalizedRevision(input.serverRevision);
 
@@ -336,7 +337,7 @@ export function resolveStudioDraftSaveCenter(
     server,
     saveActionLabel,
     saveActionDisabled: input.saving || input.collaborationLocked,
-    canOpenVersions: input.hasServerDocument,
+    canOpenVersions: input.hasServerDocument || versionCount > 0,
     shouldPromoteBackup: localRisk || !input.isOnline || !input.hasServerDocument,
     ariaLiveMessage: `${compactLabel}. ${headline}`,
   };
