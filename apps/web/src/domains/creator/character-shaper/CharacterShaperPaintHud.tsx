@@ -1,3 +1,4 @@
+import { StudioVrmPaintMaterialControls } from "../vrm/StudioVrmPaintMaterialControls";
 /**
  * Character Shaper — 표면 드로잉 HUD.
  *
@@ -14,6 +15,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS } from "../vrm/StudioVrmPoserTypes";
+import { StudioVrmPaintChannelControls } from "../vrm/StudioVrmPaintChannelControls";
+import { StudioVrmTextureExportButton } from "../vrm/StudioVrmTextureExportButton";
+import { isStudioVrmTexturePaintScalarChannel } from "../vrm/studio-vrm-texture-paint-channel";
 
 import { isCharacterShaperTypingTarget, pushCharacterShaperKeyLayer } from "./character-shaper-ui-model";
 
@@ -61,6 +65,7 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
   const disabled = disabledReason.length > 0 || strokeActive;
   const eyedropperActive = Boolean(h.texturePaintEyedropperActive);
   const snapshot = h.texturePaintSnapshot ?? null;
+  const channel = snapshot?.channel ?? "baseColor";
   const canUndo = (snapshot?.history?.undoCount ?? 0) > 0;
   const canRedo = (snapshot?.history?.redoCount ?? 0) > 0;
   const status: string = typeof h.texturePaintStatus === "string" ? h.texturePaintStatus : "";
@@ -132,6 +137,14 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
       data-character-shaper-paint-hud="true"
       className="flex max-w-full flex-wrap items-center gap-1.5 rounded-2xl border border-line/70 bg-panel/95 p-1.5 shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)] backdrop-blur"
     >
+      <StudioVrmPaintChannelControls channel={channel} supportedChannels={snapshot?.supportedChannels ?? ["baseColor"]}
+        color={settings.color} disabled={disabled} onColorChange={(color) => update({ color })}
+        onChannelChange={(next) => {
+          if (disabled) return;
+          if (h.texturePaintRuntime?.setChannel(next).ok) h.setTexturePaintEyedropperActive?.(false);
+        }} />
+      <StudioVrmPaintMaterialControls runtime={h.texturePaintRuntime ?? null} snapshot={snapshot} disabled={disabled} />
+      <StudioVrmTextureExportButton runtime={h.texturePaintRuntime ?? null} disabled={disabled || (snapshot?.targets?.length ?? 0) === 0} />
       <div role="group" aria-label="도구" className="flex shrink-0 items-center gap-1">
         {tools.map((tool) => {
           const Icon = tool.icon;
@@ -194,6 +207,7 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
 
       <input
         type="color"
+        hidden={isStudioVrmTexturePaintScalarChannel(channel)}
         value={settings.color}
         disabled={disabled}
         aria-label="칠할 색"
