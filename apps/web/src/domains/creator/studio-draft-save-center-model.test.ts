@@ -38,7 +38,7 @@ describe("resolveStudioDraftSaveCenter", () => {
     const model = resolveStudioDraftSaveCenter(input());
 
     expect(model.phase).toBe("saved");
-    expect(model.compactLabel).toBe("저장됨 · r12");
+    expect(model.compactLabel).toBe("서버 r12 확인");
     expect(model.device.title).toBe("이 탭이 복구 저장 담당");
     expect(model.server.title).toBe("서버 초안 revision #12");
   });
