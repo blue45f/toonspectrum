@@ -14,6 +14,8 @@ export const STUDIO_INSPECTOR_PANEL_PREFERENCES_STORAGE_KEY =
   "toonspectrum:studio:inspector-panel:v1";
 export const STUDIO_INSPECTOR_PANEL_SESSION_STORAGE_KEY =
   "toonspectrum:studio:inspector-panel-session:v1";
+/** 손상되거나 확장 프로그램이 주입한 저장 값 때문에 무제한 JSON 파싱을 하지 않는다. */
+export const STUDIO_INSPECTOR_PANEL_RAW_MAX_CHARS = 8 * 1024;
 
 export interface StudioInspectorPanelPreferences {
   readonly version: typeof STUDIO_INSPECTOR_PANEL_PREFERENCES_VERSION;
@@ -87,6 +89,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function parseBoundedStoredJson(raw: string | null): unknown {
+  if (!raw || raw.length > STUDIO_INSPECTOR_PANEL_RAW_MAX_CHARS) return null;
+  return JSON.parse(raw);
+}
+
 function normalizeVisiblePrimaryTabs(
   value: unknown,
   fallback: readonly StudioInspectorPrimaryTab[],
@@ -143,9 +150,10 @@ export function loadStudioInspectorPanelPreferences(
   if (!storage) return DEFAULT_STUDIO_INSPECTOR_PANEL_PREFERENCES;
   try {
     const raw = storage.getItem(STUDIO_INSPECTOR_PANEL_PREFERENCES_STORAGE_KEY);
-    return raw
-      ? normalizeStudioInspectorPanelPreferences(JSON.parse(raw))
-      : DEFAULT_STUDIO_INSPECTOR_PANEL_PREFERENCES;
+    const parsed = parseBoundedStoredJson(raw);
+    return parsed === null
+      ? DEFAULT_STUDIO_INSPECTOR_PANEL_PREFERENCES
+      : normalizeStudioInspectorPanelPreferences(parsed);
   } catch {
     return DEFAULT_STUDIO_INSPECTOR_PANEL_PREFERENCES;
   }
@@ -173,9 +181,10 @@ export function loadStudioInspectorPanelSessionState(
   if (!storage) return DEFAULT_STUDIO_INSPECTOR_PANEL_SESSION_STATE;
   try {
     const raw = storage.getItem(STUDIO_INSPECTOR_PANEL_SESSION_STORAGE_KEY);
-    return raw
-      ? normalizeStudioInspectorPanelSessionState(JSON.parse(raw))
-      : DEFAULT_STUDIO_INSPECTOR_PANEL_SESSION_STATE;
+    const parsed = parseBoundedStoredJson(raw);
+    return parsed === null
+      ? DEFAULT_STUDIO_INSPECTOR_PANEL_SESSION_STATE
+      : normalizeStudioInspectorPanelSessionState(parsed);
   } catch {
     return DEFAULT_STUDIO_INSPECTOR_PANEL_SESSION_STATE;
   }
@@ -269,7 +278,7 @@ function sameState(
 }
 
 let browserSnapshot: StudioInspectorPanelState | null = null;
-let storageListenerInstalled = false;
+let storageListener: ((event: StorageEvent) => void) | null = null;
 const listeners = new Set<() => void>();
 
 function emit(next: StudioInspectorPanelState): StudioInspectorPanelState {
@@ -284,14 +293,19 @@ function emit(next: StudioInspectorPanelState): StudioInspectorPanelState {
 }
 
 function installStorageListener(): void {
-  if (storageListenerInstalled || typeof window === "undefined") return;
-  storageListenerInstalled = true;
-  window.addEventListener("storage", (event) => {
-    if (event.key !== STUDIO_INSPECTOR_PANEL_PREFERENCES_STORAGE_KEY) return;
+  if (storageListener !== null || typeof window === "undefined") return;
+  storageListener = (event) => {
+    if (
+      event.key !== null
+      && event.key !== STUDIO_INSPECTOR_PANEL_PREFERENCES_STORAGE_KEY
+    ) {
+      return;
+    }
     const current = getStudioInspectorPanelState();
     const preferences = loadStudioInspectorPanelPreferences(browserLocalStorage());
     emit(freezeState({ ...preferences, contextPinned: current.contextPinned }));
-  });
+  };
+  window.addEventListener("storage", storageListener);
 }
 
 export function getStudioInspectorPanelState(): StudioInspectorPanelState {
@@ -396,6 +410,10 @@ export function resetStudioInspectorPanelStoreForTests(): void {
     browserSessionStorage(),
     STUDIO_INSPECTOR_PANEL_SESSION_STORAGE_KEY,
   );
+  if (storageListener !== null && typeof window !== "undefined") {
+    window.removeEventListener("storage", storageListener);
+  }
+  storageListener = null;
   browserSnapshot = null;
   listeners.clear();
 }
