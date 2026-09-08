@@ -528,13 +528,6 @@ async function openStudio(page: Page): Promise<void> {
 }
 
 async function openBg3d(page: Page): Promise<void> {
-  const toolbarSettings = page.locator('[data-studio-tool-rail-settings="true"]');
-  await expect(toolbarSettings).toBeVisible();
-  await toolbarSettings.click();
-  const hiddenTools = page.getByRole("dialog", { name: "숨긴 도구" });
-  await expect(hiddenTools).toBeVisible();
-  await hiddenTools.getByRole("button", { name: /3D 배경|3D Background/ }).click();
-  await expect(hiddenTools).toBeHidden();
   await page.locator('[data-studio-rail-tool-id="bg3d"]').first().click();
   await expect(page.locator(BG3D_DIALOG)).toBeVisible({ timeout: 120_000 });
   await expect(page.locator(BG3D_VIEWPORT)).toBeVisible({ timeout: 60_000 });

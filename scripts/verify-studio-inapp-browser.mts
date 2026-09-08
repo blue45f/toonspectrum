@@ -129,11 +129,7 @@ const ROUTES: readonly RouteProbe[] = Object.freeze([
     readySelector: "h1",
   },
   { id: "lift3d", path: "/studio/lift3d", readySelector: "h1" },
-  {
-    id: "projects",
-    path: "/studio/projects",
-    readySelector: '[data-studio-production-command-center] input[aria-label="프로젝트 제목"]',
-  },
+  { id: "placeholder-projects", path: "/studio/projects", readySelector: "h1" },
   { id: "invalid", path: "/studio/nope", readySelector: "h1" },
 ]);
 
@@ -257,10 +253,7 @@ const AUDIT_SCRIPT = `(() => {
       });
     }
     var wrappingLabel = el.closest('label');
-    var associatedLabel = Array.from(el.labels || []).some(function(label) {
-      return (label.textContent || '').trim().length > 0;
-    });
-    var named = associatedLabel || (el.textContent || '').trim().length > 0 ||
+    var named = (el.textContent || '').trim().length > 0 ||
       (wrappingLabel ? (wrappingLabel.textContent || '').trim().length > 0 : false) ||
       Boolean(el.getAttribute('aria-label')) ||
       Boolean(el.getAttribute('aria-labelledby')) ||

@@ -39,7 +39,7 @@ function binding(overrides: Partial<CharacterShaperBinding> = {}): CharacterShap
     recipe, baselineRecipe: recipe, history: { canUndo: false, canRedo: false, recentLabels: [], length: 0 },
     busyReason: null, compareActive: false, handSide: "both",
     evaluate: () => ({ status: "available", reason: null, missing: [] }),
-    plan: vi.fn(), commit: vi.fn(), commitPreset: vi.fn(), clear: vi.fn(), remove: vi.fn(), setHandSide: vi.fn(),
+    plan: vi.fn(), commit: vi.fn(), clear: vi.fn(), remove: vi.fn(), setHandSide: vi.fn(),
     undo: vi.fn(), redo: vi.fn(), setCompareActive: vi.fn(), resetToBaseline: vi.fn(),
     commitFaceParams: vi.fn(), commitSemanticMorphs: vi.fn(), commitHairParams: vi.fn(), commitColor: vi.fn(),
     ...overrides,

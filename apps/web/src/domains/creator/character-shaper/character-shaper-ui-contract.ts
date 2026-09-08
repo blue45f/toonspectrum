@@ -16,8 +16,6 @@ import type {
   CharacterSlotEntry,
   CharacterSlotKind,
 } from "./character-shaper-contract";
-import type { CharacterDocumentV2 } from "../character-platform/document/character-document-v2";
-import type { CharacterPartPresetV1 } from "../character-platform/presets/character-part-preset";
 import type { StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
 import type { ReactNode } from "react";
 
@@ -56,8 +54,6 @@ export interface CharacterShaperBinding {
   /** Build the plan without executing it (used for tooltips / inspector explanations). */
   plan(entry: CharacterSlotEntry): CharacterApplyPlan;
   commit(entry: CharacterSlotEntry): CharacterShaperCommitResult;
-  /** Apply a complete supported preset atomically; an unsupported field rejects the whole edit. */
-  commitPreset(preset: CharacterPartPresetV1, document: CharacterDocumentV2): { readonly ok: boolean; readonly reason: string | null };
   /** Clear a slot back to "없음 / 원본" where the slot supports it. */
   clear(slot: CharacterSlotKind): CharacterShaperCommitResult | null;
   /** Remove one entry from a multi slot (accessory). */

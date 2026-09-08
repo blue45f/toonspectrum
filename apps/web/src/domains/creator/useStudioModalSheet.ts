@@ -185,13 +185,6 @@ export function activateStudioModalSheet({
     // modal owns its Escape and focus loop; the underlying mobile sheet must stay dormant.
     if (targetsAnotherModal(event.target, dialog)) return;
     if (event.key === "Escape") {
-      // Non-modal layer/action popovers also own their first Escape. This capture listener
-      // runs before their document listener, so leave the event available to the inner dialog.
-      const target = event.target as Element | null;
-      const escapeScope = target?.closest?.('[role="dialog"], [data-studio-escape-scope="true"]');
-      if (escapeScope && escapeScope !== dialog) return;
-      // Focus may still be on the trigger until the popover's next animation frame.
-      if (Array.from(dialog.querySelectorAll<HTMLElement>('[role="dialog"]')).some(canReceiveFocus)) return;
       event.preventDefault();
       event.stopPropagation();
       onDismiss();

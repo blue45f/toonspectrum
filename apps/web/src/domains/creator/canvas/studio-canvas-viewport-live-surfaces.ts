@@ -38,7 +38,6 @@ import {
 } from "./studio-canvas-viewport-primitives";
 import {
   resolveStudioCanonicalDryMediaViewportAuthority,
-  resolveStudioCanonicalDryMediaSelectedElement,
 } from "./studio-canonical-dry-media-authority";
 import {
   applyStudioStageViewportClip,
@@ -669,10 +668,10 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
       canonicalDryMediaVisibleElements.length - 1
     ] ?? null;
   const canonicalDryMediaSelectedElement =
-    resolveStudioCanonicalDryMediaSelectedElement(
-      canonicalDryMediaTopElement,
-      selectedId,
-    );
+    canonicalDryMediaTopElement?.id === selectedId
+      && canonicalDryMediaTopElement.type === "draw"
+      ? canonicalDryMediaTopElement
+      : null;
   const canonicalDryMediaPanelClip =
     canonicalDryMediaSelectedElement
       && !canonicalDryMediaSelectedElement.noClip

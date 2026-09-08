@@ -109,28 +109,6 @@ describe("StudioAiSuperSuiteModal — 모달 셸", () => {
     expect(document.body.style.overflow).toBe("auto");
   });
 
-  it("닫았다 다시 열어도 저장하지 않은 프롬프트와 활성 탭을 유지한다", () => {
-    const onClose = vi.fn();
-    const { rerender } = render(<StudioAiSuperSuiteModal open onClose={onClose} />);
-    fireEvent.change(screen.getByLabelText("원하는 장면 아이디어 입력:"), {
-      target: { value: "비 오는 골목에서 두 인물이 만나는 장면" },
-    });
-    fireEvent.click(screen.getByRole("tab", { name: "콘티 자동 디렉터" }));
-    fireEvent.change(screen.getByLabelText("대본 / 시나리오 줄글 입력"), {
-      target: { value: "주인공이 문을 연다. 멀리서 친구의 목소리가 들린다." },
-    });
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(onClose).toHaveBeenCalledOnce();
-    rerender(<StudioAiSuperSuiteModal open={false} onClose={onClose} />);
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.body.style.overflow).toBe("");
-    rerender(<StudioAiSuperSuiteModal open onClose={onClose} />);
-    expect(screen.getByRole("tab", { name: "콘티 자동 디렉터" }).getAttribute("aria-selected")).toBe("true");
-    expect((screen.getByLabelText("대본 / 시나리오 줄글 입력") as HTMLTextAreaElement).value).toBe("주인공이 문을 연다. 멀리서 친구의 목소리가 들린다.");
-    fireEvent.click(screen.getAllByRole("tab")[0]);
-    expect((screen.getByLabelText("원하는 장면 아이디어 입력:") as HTMLTextAreaElement).value).toBe("비 오는 골목에서 두 인물이 만나는 장면");
-  });
-
   it("Escape 와 스크림 클릭으로 닫힌다", () => {
     const onClose = vi.fn();
     render(<StudioAiSuperSuiteModal open onClose={onClose} />);

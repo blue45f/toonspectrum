@@ -5,9 +5,6 @@
  * GLB structure, device-budget, and Three.js admission path as a user-imported model.
  */
 
-import refinedV6Manifest from "../../../../public/assets/3d/environments/refined-v6/manifest.json";
-import expansionV1Manifest from "../../../../public/assets/3d/environments/expansion-v1/manifest.json";
-
 export const STUDIO_BG3D_ENVIRONMENT_PACK_ID =
   "toonspectrum-bg3d-environment-pack-v1" as const;
 export const STUDIO_BG3D_ENVIRONMENT_PACK_VERSION = 1 as const;
@@ -25,21 +22,18 @@ export type StudioBg3dEnvironmentTheme =
   | "science-fiction";
 
 export interface StudioBg3dEnvironmentProvenance {
-  readonly origin: "original-procedural" | "original-procedural-with-cc0-sources";
+  readonly origin: "original-procedural";
   readonly author: "ToonSpectrum";
   readonly generator:
     | "scripts/blender/generate_environment_pack_v3.py"
     | "scripts/blender/generate_environment_pack_v4.py"
-    | "scripts/blender/generate_environment_pack_v5.py"
-    | "scripts/blender/refine_studio_environments_v6.py"
-    | "scripts/blender/generate_studio_environment_expansion_v1.py";
+    | "scripts/blender/generate_environment_pack_v5.py";
   readonly blenderVersion: "5.2";
   readonly license: "CC0-1.0";
   readonly licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/";
   readonly attributionRequired: false;
   readonly commercialUse: true;
   readonly externalResources: 0;
-  readonly sources?: readonly string[];
 }
 
 export interface StudioBg3dEnvironmentAsset {
@@ -50,7 +44,7 @@ export interface StudioBg3dEnvironmentAsset {
   readonly tags: readonly string[];
   readonly fileName: `${string}.glb`;
   readonly url: `/assets/3d/environments/${string}.glb`;
-  readonly thumbnailUrl: `/assets/3d/environments/${string}.png`;
+  readonly thumbnailUrl: `/assets/3d/environments/thumbnails/${string}.png`;
   readonly byteSize: number;
   readonly sha256: `sha256:${string}`;
   /** Width, height, and depth in the glTF Y-up metre convention. */
@@ -281,82 +275,17 @@ export const STUDIO_BG3D_ENVIRONMENT_ASSETS_V5 = Object.freeze([
   }, V5_PROVENANCE),
 ] as const satisfies readonly StudioBg3dEnvironmentAsset[]);
 
-export const STUDIO_BG3D_LEGACY_ENVIRONMENT_ASSETS = Object.freeze([
+export const STUDIO_BG3D_ENVIRONMENT_ASSETS = Object.freeze([
   ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V3,
   ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V4,
   ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V5,
 ] as const satisfies readonly StudioBg3dEnvironmentAsset[]);
 
-const REFINED_V6_BY_FILE = new Map(
-  refinedV6Manifest.records.map((record) => [record.fileName, record] as const),
-);
-
-/** New selection uses the revised bytes. Historical IDs and hashes remain resolvable below. */
-export const STUDIO_BG3D_ENVIRONMENT_ASSETS_V6 = Object.freeze(
-  STUDIO_BG3D_LEGACY_ENVIRONMENT_ASSETS.map((original) => {
-    const refined = REFINED_V6_BY_FILE.get(original.fileName);
-    if (!refined) throw new Error(`Missing refined environment metadata: ${original.fileName}`);
-    return defineEnvironment({
-      ...original,
-      id: original.id.replace(/-v1$/u, "-v6"),
-      url: refined.url as StudioBg3dEnvironmentAsset["url"],
-      thumbnailUrl: refined.thumbnailUrl as StudioBg3dEnvironmentAsset["thumbnailUrl"],
-      byteSize: refined.byteSize,
-      sha256: refined.sha256 as `sha256:${string}`,
-      bounds: refined.bounds as [number, number, number],
-    }, Object.freeze({
-      ...V3_PROVENANCE,
-      origin: "original-procedural-with-cc0-sources",
-      generator: "scripts/blender/refine_studio_environments_v6.py",
-      sources: Object.freeze([...refined.sources]),
-    }));
-  }),
-);
-
-export const STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1 = Object.freeze(
-  expansionV1Manifest.assets.map((asset) => defineEnvironment({
-    id: asset.id,
-    name: asset.name,
-    description: asset.description,
-    theme: asset.theme as StudioBg3dEnvironmentTheme,
-    tags: asset.tags,
-    fileName: asset.fileName as `${string}.glb`,
-    url: asset.url as `/assets/3d/environments/${string}.glb`,
-    thumbnailUrl: asset.thumbnailUrl as `/assets/3d/environments/${string}.png`,
-    byteSize: asset.byteSize,
-    sha256: asset.sha256 as `sha256:${string}`,
-    bounds: asset.bounds as [number, number, number],
-    camera: {
-      position: asset.camera.position as [number, number, number],
-      target: asset.camera.target as [number, number, number],
-      fovDegrees: asset.camera.fovDegrees,
-    },
-  }, Object.freeze({
-    ...V3_PROVENANCE,
-    origin: "original-procedural-with-cc0-sources",
-    generator: "scripts/blender/generate_studio_environment_expansion_v1.py",
-    sources: Object.freeze([...new Set([
-      ...asset.sourceModels.map(({ sourceUrl }) => sourceUrl),
-      ...asset.sourceMaterials.map(({ sourceUrl }) => sourceUrl),
-    ])]),
-  }))),
-);
-
-export const STUDIO_BG3D_ENVIRONMENT_ASSETS = Object.freeze([
-  ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
-  ...STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1,
-]);
-
-const RESOLVABLE_ENVIRONMENT_ASSETS = [
-  ...STUDIO_BG3D_LEGACY_ENVIRONMENT_ASSETS,
-  ...STUDIO_BG3D_ENVIRONMENT_ASSETS,
-];
-
 const ENVIRONMENT_BY_ID = new Map(
-  RESOLVABLE_ENVIRONMENT_ASSETS.map((asset) => [asset.id, asset] as const),
+  STUDIO_BG3D_ENVIRONMENT_ASSETS.map((asset) => [asset.id, asset] as const),
 );
 const ENVIRONMENT_BY_HASH = new Map(
-  RESOLVABLE_ENVIRONMENT_ASSETS.map((asset) => [asset.sha256, asset] as const),
+  STUDIO_BG3D_ENVIRONMENT_ASSETS.map((asset) => [asset.sha256, asset] as const),
 );
 
 export function getStudioBg3dEnvironmentAsset(

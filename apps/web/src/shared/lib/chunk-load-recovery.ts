@@ -1,6 +1,5 @@
 const CHUNK_RELOAD_GUARD_PREFIX = "chunk-reload:";
 export const CHUNK_RELOAD_FLAG = "toonspectrum:chunk-reload-attempted";
-const CHUNK_RELOAD_OWNER = `${CHUNK_RELOAD_FLAG}:owner`;
 
 function chunkReloadGuardKey(chunkId: string): string {
   return `${CHUNK_RELOAD_GUARD_PREFIX}${chunkId}`;
@@ -15,21 +14,20 @@ function hasReloadGuard(key: string): boolean {
   }
 }
 
-function armReloadGuard(key: string, value = "1"): boolean {
+function armReloadGuard(key: string): boolean {
   try {
-    globalThis.sessionStorage.setItem(key, value);
+    globalThis.sessionStorage.setItem(key, "1");
     return true;
   } catch {
     return false;
   }
 }
 
-function clearReloadGuard(key: string): boolean {
+function clearReloadGuard(key: string): void {
   try {
     globalThis.sessionStorage.removeItem(key);
-    return true;
   } catch {
-    return false;
+    // A blocked store has no durable guard to clear.
   }
 }
 
@@ -42,32 +40,14 @@ export function hasAttemptedChunkReload(): boolean {
   }
 }
 
-/** Automatic reloads are safe only when this records a durable, unowned session guard. */
-export function markChunkReloadAttempted(): boolean {
-  // ErrorBoundary cannot identify the failed chunk. Keep its explicit session-wide guard sticky,
-  // even if this call replaces an earlier chunk-owned attempt whose import later succeeds.
-  if (!armReloadGuard(CHUNK_RELOAD_OWNER, "explicit") && !clearReloadGuard(CHUNK_RELOAD_OWNER)) return false;
-  return armReloadGuard(CHUNK_RELOAD_FLAG);
-}
-
-function clearRecoveredChunkGuard(guardKey: string): void {
-  clearReloadGuard(guardKey);
-  try {
-    if (globalThis.sessionStorage.getItem(CHUNK_RELOAD_OWNER) !== guardKey) return;
-    // Clear ownership first. If either storage operation fails, the remaining global guard must
-    // continue blocking reloads rather than letting an unrelated import claim this recovery.
-    globalThis.sessionStorage.removeItem(CHUNK_RELOAD_OWNER);
-    globalThis.sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
-  } catch {
-    // Loading successfully still returns the module when storage has become unavailable.
-  }
+export function markChunkReloadAttempted(): void {
+  armReloadGuard(CHUNK_RELOAD_FLAG);
 }
 
 /**
  * Recovers a stale deployment chunk once, including chunks loaded from event handlers/effects
- * rather than React.lazy. The guard remains armed until that exact chunk loads successfully,
- * so unrelated imports cannot enable reload loops. Storage-blocked or non-browser environments
- * fail closed and preserve the original import error.
+ * rather than React.lazy. A persistent guard prevents reload loops; storage-blocked or non-browser
+ * environments fail closed and preserve the original import error.
  */
 export async function loadChunkWithReloadRecovery<T>(
   load: () => Promise<T>,
@@ -76,7 +56,7 @@ export async function loadChunkWithReloadRecovery<T>(
   const guardKey = chunkReloadGuardKey(chunkId);
   try {
     const module = await load();
-    clearRecoveredChunkGuard(guardKey);
+    clearReloadGuard(guardKey);
     return module;
   } catch (error) {
     if (
@@ -86,13 +66,8 @@ export async function loadChunkWithReloadRecovery<T>(
     ) {
       throw error;
     }
-    if (!armReloadGuard(CHUNK_RELOAD_OWNER, guardKey)) {
-      clearReloadGuard(guardKey);
-      throw error;
-    }
     if (!armReloadGuard(CHUNK_RELOAD_FLAG)) {
       clearReloadGuard(guardKey);
-      clearReloadGuard(CHUNK_RELOAD_OWNER);
       throw error;
     }
     const reload = globalThis.location?.reload;

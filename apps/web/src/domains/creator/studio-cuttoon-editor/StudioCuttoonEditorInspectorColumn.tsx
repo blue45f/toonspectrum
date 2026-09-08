@@ -17,7 +17,6 @@ import { StudioMobileEditingDock } from "../studio-mobile-editing-dock-loader";
 import { studioPathBooleanUnavailableReason } from "../studio-path-boolean";
 import { canRedoPixelSelectionHistory, canUndoPixelSelectionHistory } from "../studio-pixel-selection-session-history";
 import { StudioPanelResizeHandle } from "../StudioPanelResizeHandle";
-import { useStudioDeferredCommandSearch } from "../useStudioDeferredCommandSearch";
 import type { El } from "../studio-element-model";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
@@ -412,9 +411,6 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
     proDrawPrefs,
     visibleRightPanelOpen,
   } = s;
-  const commandSearch = useStudioDeferredCommandSearch(
-    isMobile, mobileSheet === "props", () => setMobileSheet("props"),
-  );
   return (
     <>
         {/* 캔버스 ↔ 작업 패널 너비 스플리터(데스크톱) */}
@@ -450,9 +446,6 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
             )}
           >
           <LazyStudioInspectorAside
-          commandSearchRequest={commandSearch.request}
-          onCommandSearchRequestHandled={commandSearch.handled}
-          onCommandSearchHostReadyChange={commandSearch.onHostReadyChange}
           activeSavedBrushId={activeSavedBrushId}
           advancedRulers={advancedRulers}
           activeSurfaceReviewLocked={activeSurfaceReviewLocked}
@@ -517,7 +510,6 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
           cropRect={cropRect}
           currentBrushSnapshot={currentBrushSnapshot}
           currentPageId={currentPageId}
-          layerComps={activePage.layerComps ?? []}
           currentTemplate={currentTemplate}
           description={description}
           drawMode={drawMode}

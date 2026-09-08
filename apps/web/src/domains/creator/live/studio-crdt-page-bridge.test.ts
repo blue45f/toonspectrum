@@ -5,7 +5,6 @@ import {
   normalizeStudioBrushDynamicsSettings,
 } from "../brush/studio-brush-dynamics";
 import { createDefaultStudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
-import { captureLayerComp } from "../layer/studio-layer-comps";
 import {
   DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
   DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
@@ -15,7 +14,6 @@ import {
 import { parseStudioAdvancedRulerDocument } from "../studio-advanced-ruler-document";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
 import { captureStudioOutlineStrokeContractV1 } from "../studio-outline-stroke-contract";
-import { parseStudioProjectFile, serializeStudioProjectFile } from "../studio-project-file";
 import { createStudioWorkAssetInitialImageDescriptor } from "../studio-work-asset-admission";
 
 import {
@@ -1733,54 +1731,5 @@ describe("studio CRDT page bridge", () => {
       elements: [] as Array<{ id: string; type: string }>,
       drawingAssist,
     })).toThrow(/8KiB/u);
-  });
-});
-
-describe("page-owned layer comp synchronization", () => {
-  it("converges presets across two peers, preserves them in a peer save, and propagates removal", () => {
-    const comp = captureLayerComp("빈 페이지 프리셋", [], "comp-1", 1);
-    const page = { id: "comp-page", bg: "#fff", bgGrad: null, canvasH: 1080, elements: [], layerComps: [comp] };
-    const left = new StudioCrdtDocument();
-    const right = new StudioCrdtDocument();
-    try {
-      left.upsertPage(studioPageToCrdtPage(page));
-      right.applyUpdate(left.encodeStateAsUpdate());
-      const received = reconcileStudioCrdtSceneGraphPages([{ ...page, layerComps: [] }], [], [], right.getPages()).pages;
-      expect(right.getPage(page.id)?.payload.props.layerComps).toEqual([comp]);
-      expect(received[0]?.layerComps).toEqual([comp]);
-      expect(received[0]?.layerComps).not.toBe(page.layerComps);
-      right.upsertPage(studioPageToCrdtPage({ ...received[0]!, note: "동료가 작성한 메모" }));
-      left.applyUpdate(right.encodeStateAsUpdate());
-      const saved = reconcileStudioCrdtSceneGraphPages([page], [], [], left.getPages()).pages;
-      const restored = parseStudioProjectFile(JSON.parse(serializeStudioProjectFile({ version: 2, pagesList: saved })));
-      expect(restored?.pagesList[0]?.layerComps).toEqual([comp]);
-      right.patchPage(page.id, { unset: ["layerComps"] });
-      left.applyUpdate(right.encodeStateAsUpdate());
-      const removed = reconcileStudioCrdtSceneGraphPages(saved, [], [], left.getPages()).pages;
-      expect(removed[0]).not.toHaveProperty("layerComps");
-      expect(removed[0]).toMatchObject({ note: "동료가 작성한 메모", elements: [] });
-    } finally {
-      left.destroy();
-      right.destroy();
-    }
-  });
-
-  it("rejects invalid or oversized presets before mutating a peer document", () => {
-    const comp = captureLayerComp("프리셋", [], "comp-1", 1);
-    const page = { id: "comp-page", bg: "#fff", bgGrad: null, canvasH: 1080, elements: [], layerComps: [comp] };
-    const document = new StudioCrdtDocument();
-    try {
-      document.upsertPage(studioPageToCrdtPage(page));
-      const before = document.encodeStateAsUpdate();
-      expect(() => document.upsertPage(studioPageToCrdtPage({ ...page, layerComps: [comp, comp] })))
-        .toThrow(/콤프/u);
-      const oversized = Array.from({ length: 4 }, (_, index) => ({ ...comp, id: `comp-${index}`, notes: "가".repeat(1000) }));
-      expect(() => document.upsertPage(studioPageToCrdtPage({ ...page, layerComps: oversized })))
-        .toThrow(/8KiB/u);
-      expect(document.encodeStateAsUpdate()).toEqual(before);
-      expect(document.getPage(page.id)?.payload.props.layerComps).toEqual([comp]);
-    } finally {
-      document.destroy();
-    }
   });
 });

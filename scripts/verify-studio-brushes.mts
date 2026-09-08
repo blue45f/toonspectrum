@@ -34,13 +34,13 @@ import { type ChildProcess } from "node:child_process";
 import {
   appendFileSync,
   mkdirSync,
+  readFileSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
-
 
 import { decodePng } from "image-js";
 import {
@@ -89,12 +89,7 @@ import {
   studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
 } from "../apps/web/src/domains/creator/studio-cc0-mypaint-preset-import-v1";
 
-import {
-  readDurableStudioAutosaveDocument,
-  readDurableStudioAutosaveError,
-  resolveDurableStudioAutosaveModuleUrl,
-  resolveDurableStudioAutosaveSqliteModuleUrl,
-} from "./lib/studio-verify-durable-autosave.mjs";
+import { DIST_DIR } from "./lib/repo-paths.mjs";
 import {
   enabledStudioHistoryControl,
 } from "./lib/studio-verify-history-controls.mjs";
@@ -138,7 +133,7 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
 ] as const;
 /**
  * Durability timing, both tied to the product's deferred-commit idle flush
- * (DEFERRED_STROKE_COMMIT_IDLE_MS = 2_000 in StudioCuttoonEditorHost.tsx). The unload prompt is held BELOW that
+ * (DEFERRED_STROKE_COMMIT_IDLE_MS = 200 in StudioPage.tsx). The unload prompt is held BELOW that
  * window so the idle flush cannot author the surviving payload and mask a pointerup write that
  * lost its race with teardown; the receipt budget is the ceiling for a write that is supposed to
  * begin at the input event's microtask checkpoint.
@@ -825,9 +820,6 @@ async function dismissTransientChrome(page: Page, clearAutosave = true): Promise
       .catch(() => false)
   ) {
     await page.getByRole("button", { name: "비우기", exact: true }).click();
-    const confirmation = page.locator('[data-studio-destructive-confirm="studio.autosave.clear"]');
-    await confirmation.getByRole("button", { name: "임시저장본 영구 삭제", exact: true }).click();
-    await confirmation.waitFor({ state: "hidden" });
   }
 }
 
@@ -1631,26 +1623,6 @@ async function prepareVisibleEraserBaseline(
   return { empty, painted };
 }
 
-/** Rapid hatch lines must remain five history entries even before the idle commit fires. */
-async function verifyRetainedStrokeHatching(page: Page, point: { x: number; y: number }): Promise<void> {
-  for (let line = 0; line < 5; line += 1) {
-    await page.mouse.move(point.x, point.y + line * 3);
-    await page.mouse.down();
-    await page.mouse.move(point.x + 12, point.y + line * 3 + 2, { steps: 2 });
-    await page.mouse.up();
-  }
-  await page.keyboard.press("Meta+z");
-  await waitForPersistedDrawElements(page, draws => draws.length === 4,
-    "pencil: one Undo must remove only the last of five rapid retained strokes");
-  await page.keyboard.press("Meta+Shift+z");
-  await waitForPersistedDrawElements(page, draws => draws.length === 5,
-    "pencil: Redo must restore the fifth retained stroke");
-  for (let line = 0; line < 5; line += 1) await page.keyboard.press("Meta+z");
-  await waitForPersistedDrawElements(page, draws => draws.length === 0,
-    "pencil: five Undo steps must clear all five retained strokes");
-  log("pencil: rapid five-stroke hatch / individual Undo / Redo / full cleanup OK");
-}
-
 async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promise<DesktopBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
@@ -2334,22 +2306,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           fullCleanupDiff.changedPixels <= 3,
           `${preset.id}: paint+erase cleanup left ${fullCleanupDiff.changedPixels} visible pixels`,
         );
-        await waitForPersistedDrawElements(page, (draws) => draws.length === 0,
-          `${preset.id}: paint+erase Undo cleanup left persisted operations`);
-        await page.keyboard.press("Meta+Shift+z");
-        await waitForPersistedDrawElements(page,
-          (draws) => draws.length === 1 && draws[0]?.mode === "pen",
-          `${preset.id}: first Redo must restore the baseline before its eraser`);
-        await page.keyboard.press("Meta+Shift+z");
-        await waitForPersistedDrawElements(page,
-          (draws) => draws.length === 2 && draws.at(-1)?.mode === "eraser",
-          `${preset.id}: second Redo must restore the eraser after its baseline`);
-        await page.keyboard.press("Meta+z");
-        await page.keyboard.press("Meta+z");
-        await waitForPersistedDrawElements(page, (draws) => draws.length === 0,
-          `${preset.id}: repeated history traversal left persisted operations`);
       }
-      if (preset.id === "pencil") await verifyRetainedStrokeHatching(page, evidencePoint);
       log(
         `desktop ${index + 1}/${DESKTOP_STABILITY_CASES.length} `
           + `${preset.id}: select/${operation}/undo/redo OK`,
@@ -2362,6 +2319,9 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         surveyFailures.push(message);
         log(`SURVEY FAILURE ${index + 1}/${DESKTOP_STABILITY_CASES.length} ${message}`);
         await installCleanStudioState(page);
+        // 실패 진단(캔버스 덤프·검열) 직후의 페이지는 무겁다 — 기본 7초 내비게이션
+        // 타임아웃이 복구 리로드를 두 번이나 죽였다(실측). 복구에만 넉넉한 한도를 준다.
+        await page.reload({ timeout: 45_000, waitUntil: "domcontentloaded" });
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
       }
@@ -2469,17 +2429,65 @@ interface PersistedStudioDocument {
   pagesList?: Array<{ id?: string; elements?: unknown[] }>;
 }
 
-async function persistedStudioDocument(
-  page: Page,
-  moduleUrl: string | null = null,
-  sqliteModuleUrl: string | null = null,
-): Promise<PersistedStudioDocument | null> {
-  const document = await readDurableStudioAutosaveDocument(page, AUTOSAVE_KEY, { moduleUrl, sqliteModuleUrl });
-  const error = await readDurableStudioAutosaveError(page);
-  if (error) throw new Error(error);
-  // The shared reader exposes normalized page metadata alongside the complete raw payload.
-  // Durability receipts live in that payload, so returning only the metadata loses their markers.
-  return document ? JSON.parse(document.raw) as PersistedStudioDocument : null;
+let builtAutosaveSqliteModulePath: string | null = null;
+
+function resolveBuiltAutosaveSqliteModulePath(): string {
+  if (builtAutosaveSqliteModulePath) return builtAutosaveSqliteModulePath;
+  const manifestPath = resolve(DIST_DIR, ".vite/manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<
+    string,
+    { file?: unknown }
+  >;
+  const entry = manifest["src/domains/creator/studio-autosave-sqlite-store.ts"];
+  invariant(
+    entry && typeof entry.file === "string" && entry.file.length > 0,
+    "production manifest is missing the Studio autosave SQLite module",
+  );
+  builtAutosaveSqliteModulePath = `/${entry.file}`;
+  return builtAutosaveSqliteModulePath;
+}
+
+async function persistedStudioDocument(page: Page): Promise<PersistedStudioDocument | null> {
+  const moduleUrl = new URL(resolveBuiltAutosaveSqliteModulePath(), page.url()).href;
+  return page.evaluate(async ({ autosaveKey, sqliteModuleUrl }) => {
+    const sqliteModule = await import(/* @vite-ignore */ sqliteModuleUrl) as {
+      acquireStudioAutosaveSqliteStore?: () => Promise<{
+        read(key: string): Promise<{
+          state: "snapshot" | "cleared";
+          payload?: PersistedStudioDocument;
+        } | null>;
+      }>;
+    };
+    if (typeof sqliteModule.acquireStudioAutosaveSqliteStore !== "function") {
+      throw new Error("built Studio autosave SQLite module has no acquisition export");
+    }
+    const stored = await (await sqliteModule.acquireStudioAutosaveSqliteStore()).read(autosaveKey);
+    return stored?.state === "snapshot" && stored.payload ? stored.payload : null;
+  }, { autosaveKey: AUTOSAVE_KEY, sqliteModuleUrl: moduleUrl });
+}
+
+/**
+ * 서베이가 실패한 레인을 버리고 다음 프리셋으로 갈 때 자동저장에 남은 획을 지운다.
+ *
+ * installCleanStudioState 는 탭 세션당 한 번만(sessionStorage 플래그) localStorage 자동저장을
+ * 비우고, 문서의 실제 저장소는 SQLite 스토어라 페이지를 다시 세워도 그대로 남는다. 그래서 한
+ * 프리셋이 지속성 대기에서 죽으면 그 획이 다음 190개 프리셋의 "정확히 N개" 판정을 전부 오염시켰다
+ * (실측: standard-eraser 이후 maru-pen·calligraphy·parallel-pen·perfect-ink 가 같은 메시지로 연쇄).
+ */
+async function wipePersistedStudioDocument(page: Page): Promise<void> {
+  const moduleUrl = new URL(resolveBuiltAutosaveSqliteModulePath(), page.url()).href;
+  await page.evaluate(async ({ autosaveKey, sqliteModuleUrl, cleanSessionKey }) => {
+    const sqliteModule = await import(/* @vite-ignore */ sqliteModuleUrl) as {
+      acquireStudioAutosaveSqliteStore?: () => Promise<{
+        clear(key: string): Promise<void>;
+      }>;
+    };
+    if (typeof sqliteModule.acquireStudioAutosaveSqliteStore === "function") {
+      await (await sqliteModule.acquireStudioAutosaveSqliteStore()).clear(autosaveKey);
+    }
+    // 다음 내비게이션의 init 스크립트가 localStorage 자동저장도 다시 비우게 한다.
+    window.sessionStorage.removeItem(cleanSessionKey);
+  }, { autosaveKey: AUTOSAVE_KEY, sqliteModuleUrl: moduleUrl, cleanSessionKey: CLEAN_SESSION_KEY });
 }
 
 function drawElementsFromPersistedDocument(
@@ -2573,7 +2581,7 @@ async function waitForPersistedDrawElements(
     draw.hasLivingInkReceipt ? "living-ink-receipt" : "",
   ].filter(Boolean).join("/")).join(" | ");
   const suffix = lastFailure instanceof Error
-    ? `; last durable read failed: ${lastFailure.message}`
+    ? `; last SQLite read failed: ${lastFailure.message}`
     : `; last durable draw count: ${latest.length} [${durable}] raw=[${rawKinds}]`;
   throw new Error(`${label} timed out after ${timeoutMilliseconds}ms${suffix}`);
 }
@@ -2598,7 +2606,7 @@ async function waitForPersistedSingleCatalogStroke(
       && draw.points.length >= 4
       && Boolean(draw.brushDynamics)
       && typeof draw.brushDynamics === "object";
-  }, `${expected.catalogId}: durable autosave did not expose the isolated pro stroke`);
+  }, `${expected.catalogId}: SQLite autosave did not expose the isolated pro stroke`);
   invariant(saved, `${expected.catalogId}: autosave did not expose the isolated pro stroke`);
   invariant(
     saved.brushCatalogId === expected.catalogId,
@@ -2691,7 +2699,7 @@ async function waitForPersistedDrawCount(page: Page, expectedCount: number): Pro
   await waitForPersistedDrawElements(
     page,
     (draws) => draws.length >= expectedCount,
-    `durable autosave did not reach ${expectedCount} draws`,
+    `SQLite autosave did not reach ${expectedCount} draws`,
   );
 }
 
@@ -2730,7 +2738,7 @@ async function waitForPersistedSelectedOperation(
           && typeof draw.brushDynamics === "object"
         )
       );
-  }, `${expected.catalogId}: durable autosave did not expose the selected ${operation} operation`,
+  }, `${expected.catalogId}: SQLite autosave did not expose the selected ${operation} operation`,
   timeoutMilliseconds);
   invariant(
     draws.length === expectedDrawCount,
@@ -3448,6 +3456,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           if (!LONG_MATRIX_SURVEY_MODE) return false;
           surveyFailures.push(message);
           log(`long SURVEY -> ${message}`);
+          await wipePersistedStudioDocument(page).catch(() => undefined);
           await prepareStudioPage(page, studioUrl);
           await activateDesktopPen(page);
           return true;
@@ -3593,6 +3602,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         const message = error instanceof Error ? error.message : String(error);
         surveyFailures.push(message.startsWith(`${preset.id}:`) ? message : `${preset.id}: ${message}`);
         log(`long SURVEY -> ${message}`);
+        await wipePersistedStudioDocument(page).catch(() => undefined);
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
         return "skipped";
@@ -4141,14 +4151,12 @@ function persistedElementIds(
 async function waitForPersistedStudioDocument(
   page: Page,
   timeoutMilliseconds = 8_000,
-  moduleUrl: string | null = null,
-  sqliteModuleUrl: string | null = null,
 ): Promise<PersistedStudioDocument | null> {
   const deadline = performance.now() + timeoutMilliseconds;
   let lastFailure: unknown = null;
   while (performance.now() < deadline) {
     try {
-      const document = await persistedStudioDocument(page, moduleUrl, sqliteModuleUrl);
+      const document = await persistedStudioDocument(page);
       if (document) return document;
       lastFailure = null;
     } catch (cause: unknown) {
@@ -4158,7 +4166,7 @@ async function waitForPersistedStudioDocument(
   }
   if (lastFailure instanceof Error) {
     throw new Error(
-      `post-navigation durable autosave read failed: ${lastFailure.message}`,
+      `post-navigation SQLite autosave read failed: ${lastFailure.message}`,
       { cause: lastFailure },
     );
   }
@@ -4183,7 +4191,7 @@ async function waitForEmergencyAutosave(
   }
   if (lastFailure instanceof Error) {
     throw new Error(
-      `pagehide durable autosave read failed: ${lastFailure.message}`,
+      `pagehide SQLite autosave read failed: ${lastFailure.message}`,
       { cause: lastFailure },
     );
   }
@@ -4289,14 +4297,8 @@ async function runDeferredDurabilityAudit(
     // survives teardown must be the one pointerup wrote — a survivor written by pagehide would mean
     // the microtask checkpoint lost its race and durability now rides on the unload handler.
     const knownStrokeIds = [...receiptPayloadIds];
-    // The away route never mounts Studio. Keep the shipped reader URL before navigation clears
-    // resource timing, so recovery still reads the same journal without re-entering the editor.
-    const autosaveModuleUrl = await resolveDurableStudioAutosaveModuleUrl(page);
-    const sqliteModuleUrl = await resolveDurableStudioAutosaveSqliteModuleUrl(page);
-    invariant(sqliteModuleUrl, "Studio did not expose its SQLite autosave store module");
-    invariant(autosaveModuleUrl, "Studio did not expose its durable autosave session module");
-    // Separate the gestures without reaching the 2s idle commit: the second pointerup must
-    // produce a new durable receipt for the batch, including the just-released stroke.
+    // Let the first batch leave the deferred window so the navigation below audits one fresh
+    // release rather than a batch this audit already proved durable.
     await page.waitForTimeout(400);
     await page.mouse.move(navigationLane.x, navigationLane.y);
     await page.mouse.down();
@@ -4336,7 +4338,7 @@ async function runDeferredDurabilityAudit(
       `navigation was not immediate after pointerup (${navigationIssuedInMs.toFixed(2)}ms)`,
     );
 
-    const survivor = await waitForPersistedStudioDocument(page, 8_000, autosaveModuleUrl, sqliteModuleUrl);
+    const survivor = await waitForPersistedStudioDocument(page);
     if (!survivor) {
       log(`durability diagnostic: console messages ${JSON.stringify(errors.messages).slice(0, 800)}`);
     }

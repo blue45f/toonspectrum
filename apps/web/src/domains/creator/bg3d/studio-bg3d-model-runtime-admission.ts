@@ -15,12 +15,11 @@ import {
   attachStudioGeneric3dWorkflowMetadata,
   parseStudioGeneric3dWorkflowMetadata,
 } from "../studio-generic-3d-workflow-metadata";
-import {
-  getStudio3dAssetQualityMode,
-  resetStudio3dAssetQualityMode,
-} from "../studio-3d-asset-quality-session";
 
-import type { StudioBg3dResolvedDeviceQuality } from "./studio-bg3d-device-quality";
+import {
+  deriveStudioBg3dGlbValidationPolicy,
+  type StudioBg3dResolvedDeviceQuality,
+} from "./studio-bg3d-device-quality";
 import { isStudioBg3dEnvironmentAssetId } from "./studio-bg3d-environment-catalog";
 import {
   combineStudioBg3dAbortSignals,
@@ -36,9 +35,6 @@ import { applyStudioBg3dRuntimeAssetQuality } from "./studio-bg3d-runtime-asset-
 import {
   classifyStudioBg3dThreeSemanticMaterials,
 } from "./studio-bg3d-three-semantic-materials";
-import {
-  deriveStudioBg3dSessionGlbValidationPolicy as deriveStudioBg3dGlbValidationPolicy,
-} from "./studio-bg3d-session-glb-policy";
 
 import type {
   StudioBg3dModelAttachment,
@@ -60,8 +56,6 @@ export type StudioBg3dModelRootCacheEntry = Pick<
   readonly record: Bg3dVerifiedStoredRecord;
   readonly metrics: StudioBg3dThreeLoadSuccess["metrics"];
   readonly admittedProfiles: Set<StudioBg3dResolvedDeviceQuality["profile"]>;
-  /** Lazily initialized for legacy cache fixtures; profile-only stamps are not authorization. */
-  admissionPolicyKeys?: Set<string>;
   readonly joints: readonly StudioBg3dThreeJointDescriptor[];
   readonly morphTargets: readonly StudioBg3dThreeMorphDescriptor[];
   readonly semanticMaterials: StudioBg3dSemanticMaterialClassificationResult;
@@ -159,7 +153,7 @@ export function readGenericWorkflowMapsFromAttachments(
   return { sourceFormats, classifications };
 }
 
-type StudioBg3dModelAdmissionArgs = {
+export async function admitAndCacheStudioBg3dModel(args: {
   readonly record: Bg3dVerifiedStoredRecord;
   readonly document: StudioBg3dSceneDocument;
   readonly quality: StudioBg3dResolvedDeviceQuality;
@@ -175,45 +169,12 @@ type StudioBg3dModelAdmissionArgs = {
     storageId: string,
     entry: StudioBg3dModelRootCacheEntry,
   ) => void;
-};
-
-export async function admitAndCacheStudioBg3dModel(
-  args: StudioBg3dModelAdmissionArgs,
-): Promise<StudioBg3dModelRootCacheEntry> {
-  const requestedHighQuality = getStudio3dAssetQualityMode() === "high";
-  try {
-    return await admitAndCacheStudioBg3dModelInternal(args);
-  } catch (error) {
-    const cancelled = error instanceof StudioBg3dStaleModalOperationError
-      || (typeof error === "object" && error !== null && (
-        ("name" in error && error.name === "AbortError")
-        || ("code" in error && error.code === "aborted")
-      ));
-    if (
-      requestedHighQuality && getStudio3dAssetQualityMode() === "high"
-      && !cancelled && !args.signal?.aborted && args.isActive()
-    ) {
-      resetStudio3dAssetQualityMode(
-        "고품질 모델을 불러오지 못해 자동 모드로 돌아왔습니다. 경량본으로 다시 가져오세요.",
-      );
-    }
-    throw error;
-  }
-}
-
-async function admitAndCacheStudioBg3dModelInternal(
-  args: StudioBg3dModelAdmissionArgs,
-): Promise<StudioBg3dModelRootCacheEntry> {
+}): Promise<StudioBg3dModelRootCacheEntry> {
   if (!args.isActive() || args.signal?.aborted) {
     throw new StudioBg3dStaleModalOperationError();
   }
   const policy = deriveStudioBg3dGlbValidationPolicy(args.document, args.quality);
   const selectedBudgets: StudioBg3dSceneBudgets = policy.budgets[policy.profile];
-  const policyKey = JSON.stringify([policy.profile, selectedBudgets]);
-  const isPolicyCurrent = () => {
-    const current = deriveStudioBg3dGlbValidationPolicy(args.document, args.quality);
-    return JSON.stringify([current.profile, current.budgets[current.profile]]) === policyKey;
-  };
   const cached = args.cache.get(args.record.id);
   if (cached) {
     assertStudioBg3dModelPlacementAdmission({
@@ -224,7 +185,7 @@ async function admitAndCacheStudioBg3dModelInternal(
       cumulativeUsedBytes: args.cumulativeUsedBytes,
       maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
     });
-    if (!cached.admissionPolicyKeys?.has(policyKey)) {
+    if (!cached.admittedProfiles.has(policy.profile)) {
       await admitStoredBg3dModelForRendering(args.record.id, {
         profile: policy.profile,
         budgets: policy.budgets,
@@ -232,18 +193,16 @@ async function admitAndCacheStudioBg3dModelInternal(
         maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
         signal: args.signal,
       });
-      if (!args.isActive() || !isPolicyCurrent()) throw new StudioBg3dStaleModalOperationError();
-      cached.admissionPolicyKeys ??= new Set<string>();
-      cached.admissionPolicyKeys.add(policyKey);
+      if (!args.isActive()) throw new StudioBg3dStaleModalOperationError();
       cached.admittedProfiles.add(policy.profile);
     }
-    if (!args.isActive() || !isPolicyCurrent()) throw new StudioBg3dStaleModalOperationError();
+    if (!args.isActive()) throw new StudioBg3dStaleModalOperationError();
     return cached;
   }
   const pending = args.pending.get(args.record.id);
   if (pending) {
     await pending;
-    return admitAndCacheStudioBg3dModelInternal(args);
+    return admitAndCacheStudioBg3dModel(args);
   }
 
   const task = studioBg3dGlobalAssetLoadGate.run(
@@ -261,11 +220,11 @@ async function admitAndCacheStudioBg3dModelInternal(
           signal: combinedSignal.signal,
         });
         lease.throwIfRevoked();
-        if (!args.isActive() || !isPolicyCurrent()) throw new StudioBg3dStaleModalOperationError();
+        if (!args.isActive()) throw new StudioBg3dStaleModalOperationError();
         const loaded = await loadVerifiedStudioBg3dGlbWithThree(verification, selectedBudgets, {
           renderer: args.renderer,
         });
-        if (!lease.isCurrent() || !args.isActive() || !isPolicyCurrent()) {
+        if (!lease.isCurrent() || !args.isActive()) {
           if (loaded.ok) loaded.dispose();
           lease.throwIfRevoked();
           throw new StudioBg3dStaleModalOperationError();
@@ -288,7 +247,7 @@ async function admitAndCacheStudioBg3dModelInternal(
           args.record.id,
           measureBg3dObjectSize(loaded.root),
         ));
-        if (!lease.isCurrent() || !args.isActive() || !isPolicyCurrent()) {
+        if (!lease.isCurrent() || !args.isActive()) {
           loaded.dispose();
           lease.throwIfRevoked();
           throw new StudioBg3dStaleModalOperationError();
@@ -301,13 +260,12 @@ async function admitAndCacheStudioBg3dModelInternal(
           record: args.record,
           metrics: loaded.metrics,
           admittedProfiles: new Set([policy.profile]),
-          admissionPolicyKeys: new Set([policyKey]),
           joints,
           morphTargets: collectStudioBg3dThreeMorphTargets(loaded.root),
           semanticMaterials: classifyStudioBg3dThreeSemanticMaterials(loaded.root),
           genericHints: inspectStudioGeneric3dRuntimeHints(loaded.root, joints),
         };
-        if (!lease.isCurrent() || !args.isActive() || !isPolicyCurrent()) {
+        if (!lease.isCurrent() || !args.isActive()) {
           entry.dispose();
           lease.throwIfRevoked();
           throw new StudioBg3dStaleModalOperationError();

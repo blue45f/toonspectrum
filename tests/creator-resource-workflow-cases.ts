@@ -18,29 +18,22 @@ function opportunity(id: string, deadline?: string) { return resource({ provider
 export const creatorResourceWorkflowCases: WorkflowCase[] = [
   { name: "provider configuration reports booleans without exposing credentials", run() {
     const api = engine(async () => { throw new Error("must not fetch"); }, { KAKAO_REST_API_KEY: "PRIVATE_SECRET", BIZINFO_API_KEY: " " });
-    equal(api.describe(), [
-      { provider: "met", availability: "keyless" },
-      { provider: "openlibrary", availability: "keyless" },
-      { provider: "openbd", availability: "keyless" },
-      { provider: "kakao", availability: "configured" },
-      { provider: "bizinfo", availability: "not_configured" },
-    ]);
+    equal(api.describe(), [{ provider: "met", availability: "keyless" }, { provider: "kakao", availability: "configured" }, { provider: "bizinfo", availability: "not_configured" }]);
     equal(JSON.stringify(api.describe()).includes("PRIVATE_SECRET"), false);
   } },
   { name: "provider configuration is re-read rather than cached forever", run() {
     const env: Record<string, string> = {};
     const api = engine(async () => json({}), env);
-    equal(api.describe()[3].availability, "not_configured"); env.KAKAO_REST_API_KEY = "NEW_KEY";
-    equal(api.describe()[3].availability, "configured");
+    equal(api.describe()[1].availability, "not_configured"); env.KAKAO_REST_API_KEY = "NEW_KEY";
+    equal(api.describe()[1].availability, "configured");
   } },
   { name: "provider status parser rejects missing, duplicate and contradictory entries", run() {
     const all = providerAvailability({ kakao: false, bizinfo: true }); ok(parseProviderAvailability(all));
     equal(parseProviderAvailability(all.slice(1)), null);
-    equal(parseProviderAvailability([all[0], all[0], all[2], all[3], all[4]]), null);
-    equal(parseProviderAvailability([{ provider: "met", availability: "configured" }, all[1], all[2], all[3], all[4]]), null);
-    equal(parseProviderAvailability([all[0], { provider: "openlibrary", availability: "configured" }, all[2], all[3], all[4]]), null);
-    equal(parseProviderAvailability([all[0], all[1], all[2], { provider: "kakao", availability: "keyless" }, all[4]]), null);
-    equal(parseProviderAvailability([null, all[1], all[2], all[3], all[4]]), null);
+    equal(parseProviderAvailability([all[0], all[0], all[2]]), null);
+    equal(parseProviderAvailability([{ provider: "met", availability: "configured" }, all[1], all[2]]), null);
+    equal(parseProviderAvailability([all[0], { provider: "kakao", availability: "keyless" }, all[2]]), null);
+    equal(parseProviderAvailability([null, all[1], all[2]]), null);
   } },
   { name: "default restore merges resources without overwriting current records", run() {
     const local = { ...emptyWorkspace(), saved: [resource({ title: "현재 제목" })] };
@@ -124,42 +117,6 @@ export const creatorResourceWorkflowCases: WorkflowCase[] = [
       equal((await api.search({ provider: "met", q: "armor" })).status, "unavailable");
       equal((await api.search({ provider: "met", q: "armor" })).status, "ready"); equal(calls, 2);
     }
-  } },
-  { name: "Open Library maps only bounded work metadata and sends an identifiable user agent", async run() {
-    let userAgent = "";
-    const api = engine(async (_url, init) => {
-      userAgent = new Headers(init?.headers).get("User-Agent") ?? "";
-      return json({ numFound: 1, docs: [{ key: "/works/OL123W", title: "Graphic Story", author_name: ["Author"], first_publish_year: 2020, isbn: ["9784088820118"], language: ["eng"], edition_count: 2, publisher: ["Example Press"] }] });
-    });
-    const result = await api.search({ provider: "openlibrary", q: "graphic story" });
-    equal(result.status, "ready"); equal(result.items.length, 1);
-    equal(result.items[0].id, "openlibrary:OL123W"); equal(result.items[0].license, "metadata-only");
-    equal(result.items[0].sourceUrl, "https://openlibrary.org/works/OL123W");
-    ok(userAgent.includes("ToonSpectrum/1.0")); ok(userAgent.includes("/about/crawler"));
-  } },
-  { name: "Open Library rejects malformed result shapes without caching them", async run() {
-    let calls = 0;
-    const api = engine(async () => { calls++; return calls === 1 ? json({ numFound: -1, docs: [] }) : json({ numFound: 0, docs: [] }); });
-    equal((await api.search({ provider: "openlibrary", q: "manga" })).status, "unavailable");
-    equal((await api.search({ provider: "openlibrary", q: "manga" })).status, "ready"); equal(calls, 2);
-  } },
-  { name: "openBD performs exact ISBN lookup and preserves book-promotion restrictions", async run() {
-    let calls = 0;
-    const api = engine(async (url) => {
-      calls++;
-      ok(url.includes("isbn=9784088820118"));
-      return json([{ summary: { isbn: "9784088820118", title: "Japanese Comic", author: "Creator", publisher: "Publisher", pubdate: "2020-01", series: "Series", volume: "1" } }]);
-    });
-    const result = await api.search({ provider: "openbd", q: "978-4-08-882011-8" });
-    equal(result.status, "ready"); equal(result.items.length, 1); equal(calls, 1);
-    equal(result.items[0].license, "book-promotion"); equal(result.items[0].isbn, "9784088820118");
-    equal(result.items[0].licenseUrl, "https://openbd.jp/terms/");
-  } },
-  { name: "openBD does not call upstream for free-text searches", async run() {
-    let calls = 0;
-    const api = engine(async () => { calls++; return json([]); });
-    const result = await api.search({ provider: "openbd", q: "만화 작법" });
-    equal(result.status, "ready"); equal(result.items.length, 0); equal(calls, 0);
   } },
   { name: "search contracts reject duplicate cards and unavailable results with content", run() {
     equal(parseSearchResult({ provider: "met", status: "ready", items: [fixture(), fixture()] }), null);

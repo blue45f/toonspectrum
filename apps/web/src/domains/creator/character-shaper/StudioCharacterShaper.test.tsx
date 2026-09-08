@@ -16,8 +16,9 @@ vi.mock("../vrm/useStudioVrmPoserController", () => ({
   },
 }));
 
-// Keep the real binding: the thumbnail recorder and workbench consume its complete
-// recipe/profile contract even before a model has loaded.
+vi.mock("./useCharacterShaperBinding", () => ({
+  useCharacterShaperBinding: () => ({ busyReason: null }),
+}));
 
 vi.mock("./StudioCharacterShaperDialog", () => ({
   StudioCharacterShaperDialog: ({ onOpenAdvanced }: { onOpenAdvanced?: () => void }) => (
@@ -58,8 +59,6 @@ describe("StudioCharacterShaper", () => {
     render(<StudioCharacterShaper {...props()} />);
     expect(screen.getByTestId("shaper-dialog")).toBeTruthy();
     expect(screen.queryByTestId("legacy-dialog")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "품질 도구V2" }));
-    expect(screen.getByRole("dialog", { name: "캐릭터 품질 워크벤치" })).toBeTruthy();
   });
 
   it("고급 편집 swaps to the legacy builder over the same host", () => {
@@ -67,6 +66,5 @@ describe("StudioCharacterShaper", () => {
     fireEvent.click(screen.getByRole("button", { name: "고급 편집" }));
     expect(screen.getByTestId("legacy-dialog")).toBeTruthy();
     expect(screen.queryByTestId("shaper-dialog")).toBeNull();
-    expect(screen.queryByRole("button", { name: "품질 도구V2" })).toBeNull();
   });
 });

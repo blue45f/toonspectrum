@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_STUDIO_RAIL_TOOL_ORDER,
-  DEFAULT_STUDIO_RAIL_VISIBLE_IDS,
   DEFAULT_STUDIO_SHOW_ALIGNMENT_GUIDES,
   DEFAULT_STUDIO_SNAP_TO_PIXEL_GRID,
   defaultStudioAppSettings,
@@ -23,7 +22,7 @@ import {
 } from "./studio-app-settings";
 
 describe("studio-app-settings", () => {
-  it("starts new users with the standard layout and a predictable core rail", () => {
+  it("defaults include all settings tabs and full rail order", () => {
     expect(STUDIO_APP_SETTINGS_TABS).toEqual([
       "general",
       "shortcuts",
@@ -33,39 +32,24 @@ describe("studio-app-settings", () => {
       "grids",
       "other",
     ]);
-    const defaults = defaultStudioAppSettings();
-    expect(defaults.general.densityMode).toBe("simple");
-    expect(defaults.toolbar.visibleIds).toEqual(DEFAULT_STUDIO_RAIL_VISIBLE_IDS);
-    expect(DEFAULT_STUDIO_RAIL_VISIBLE_IDS).toEqual([
-      "select",
-      "pen",
-      "eraser",
-      "fill",
-      "eyedropper",
-      "text",
-      "bubble",
-      "image",
-      "zoom-fit",
-    ]);
-    expect(Object.keys(defaults.shortcuts).length).toBe(STUDIO_SHORTCUT_ACTIONS.length);
-    expect(defaults.shortcuts["toggle-chrome"]).toBe("`");
-    expect(defaults.shortcuts["flip-canvas"]).toBe("H");
-    expect(defaults.shortcuts["tool-crop"]).toBe("C");
-    expect(defaults.shortcuts["toggle-transparent-color"]).toBe("Shift+C");
+    const d = defaultStudioAppSettings();
+    expect(d.toolbar.visibleIds).toEqual(DEFAULT_STUDIO_RAIL_TOOL_ORDER);
+    expect(Object.keys(d.shortcuts).length).toBe(STUDIO_SHORTCUT_ACTIONS.length);
+    expect(d.shortcuts["toggle-chrome"]).toBe("`");
+    expect(d.shortcuts["flip-canvas"]).toBe("H");
     expect(STUDIO_RAIL_TOOL_CATALOG.find(({ id }) => id === "hand")?.defaultShortcut).toBe("Space");
     expect(STUDIO_RAIL_TOOL_CATALOG.find(({ id }) => id === "zoom-fit")).toMatchObject({
-      label: "화면 맞춤",
+      label: "너비에 맞춤",
       defaultShortcut: "Home",
     });
-    expect(defaults.general.toolHintMode).toBe("rich");
-    expect(defaults.general.showStrokeGuide).toBe(false);
-    expect(defaults.touch.toolHintHoldMs).toBe(480);
-    expect(defaults.mouse.wheel).toBe("zoom");
-    expect(defaults.touch.oneFingerDrag).toBe("draw");
-    expect(defaults.grids.showCanvasRulers).toBe(false);
-    expect(defaults.grids.snapToPixelGrid).toBe(DEFAULT_STUDIO_SNAP_TO_PIXEL_GRID);
-    expect(defaults.grids.showAlignmentGuides).toBe(DEFAULT_STUDIO_SHOW_ALIGNMENT_GUIDES);
-    expect(listStudioShortcutConflicts(defaults.shortcuts).size).toBe(0);
+    expect(d.general.toolHintMode).toBe("rich");
+    expect(d.general.showStrokeGuide).toBe(false);
+    expect(d.touch.toolHintHoldMs).toBe(480);
+    expect(d.mouse.wheel).toBe("zoom");
+    expect(d.touch.oneFingerDrag).toBe("draw");
+    expect(d.grids.showCanvasRulers).toBe(false);
+    expect(d.grids.snapToPixelGrid).toBe(DEFAULT_STUDIO_SNAP_TO_PIXEL_GRID);
+    expect(d.grids.showAlignmentGuides).toBe(DEFAULT_STUDIO_SHOW_ALIGNMENT_GUIDES);
   });
 
   it("migrates legacy settings to a visible stroke guide and preserves an explicit opt-out", () => {
@@ -77,15 +61,15 @@ describe("studio-app-settings", () => {
     ).toBe(false);
   });
 
-  it("keeps selection, retouch, and view tools aligned across both catalogs", () => {
+  it("keeps the new selection, retouch, and view tools aligned across both catalogs", () => {
     const expected = [
-      { railId: "blend", actionId: "tool-blend", label: "색 경계 섞기", shortcut: "N" },
-      { railId: "liquify", actionId: "tool-liquify", label: "밀어서 모양 바꾸기", shortcut: "J" },
+      { railId: "blend", actionId: "tool-blend", label: "문지르기", shortcut: "N" },
+      { railId: "liquify", actionId: "tool-liquify", label: "리퀴파이", shortcut: "J" },
       { railId: "marquee-circle", actionId: "tool-marquee-circle", label: "원형 선택", shortcut: "Shift+M" },
       { railId: "crop", actionId: "tool-crop", label: "자르기", shortcut: "C" },
       { railId: "comment", actionId: "tool-comment", label: "위치 댓글", shortcut: "Alt+C" },
-      { railId: "zoom", actionId: "tool-zoom", label: "화면 확대·축소", shortcut: "Z" },
-      { railId: "rotate-view", actionId: "tool-rotate-view", label: "화면 회전", shortcut: "R" },
+      { railId: "zoom", actionId: "tool-zoom", label: "보기 확대·축소", shortcut: "Z" },
+      { railId: "rotate-view", actionId: "tool-rotate-view", label: "보기 회전", shortcut: "R" },
     ] as const;
     const defaults = defaultStudioAppSettings();
 
@@ -128,7 +112,7 @@ describe("studio-app-settings", () => {
     expect(STUDIO_RAIL_TOOL_CATALOG.find(({ id }) => id === "text")?.defaultShortcut).toBe("T");
     expect(STUDIO_RAIL_TOOL_CATALOG.find(({ id }) => id === "bubble")?.defaultShortcut).toBe("T");
     expect(STUDIO_SHORTCUT_ACTIONS.find(({ id }) => id === "tool-lettering")).toMatchObject({
-      label: "글자·말풍선",
+      label: "레터링(텍스트·말풍선)",
       defaultKeys: "T",
     });
     expect(defaults.shortcuts["tool-lettering"]).toBe("T");
@@ -157,42 +141,28 @@ describe("studio-app-settings", () => {
       "tool-lettering": "T",
       "tool-zoom": "Z",
       "tool-rotate-view": "R",
-      "toggle-transparent-color": "Shift+C",
     });
-  });
-
-  it("migrates the legacy C/C crop and transparent-ink collision", () => {
-    const normalized = normalizeStudioAppSettings({
-      shortcuts: {
-        "tool-crop": "C",
-        "toggle-transparent-color": "C",
-      },
-    });
-
-    expect(normalized.shortcuts["tool-crop"]).toBe("C");
-    expect(normalized.shortcuts["toggle-transparent-color"]).toBe("Shift+C");
-    expect(listStudioShortcutConflicts(normalized.shortcuts).size).toBe(0);
   });
 
   it("normalizes broken payloads without throwing", () => {
-    const normalized = normalizeStudioAppSettings({
+    const n = normalizeStudioAppSettings({
       general: { densityMode: "nope", toolHintMode: "cinema", showToolHints: "x" },
       toolbar: { visibleIds: ["pen", "pen", "ghost", "eraser"] },
       grids: { pixelGridSize: 47 },
       other: { pressureCurve: 99 },
       shortcuts: { "tool-pen": " P " },
     });
-    expect(normalized.general.densityMode).toBe("simple");
-    expect(normalized.general.toolHintMode).toBe("rich");
-    expect(normalized.toolbar.visibleIds).toEqual(["pen", "eraser"]);
-    expect(normalized.grids.pixelGridSize).toBe(50);
-    expect(normalized.grids.showCanvasRulers).toBe(false);
+    expect(n.general.densityMode).toBe("full");
+    expect(n.general.toolHintMode).toBe("rich");
+    expect(n.toolbar.visibleIds).toEqual(["pen", "eraser"]);
+    expect(n.grids.pixelGridSize).toBe(50);
+    expect(n.grids.showCanvasRulers).toBe(false);
     expect(
       normalizeStudioAppSettings({ grids: { showCanvasRulers: true } }).grids
         .showCanvasRulers
     ).toBe(true);
-    expect(normalized.other.pressureCurve).toBe(2.5);
-    expect(normalized.shortcuts["tool-pen"]).toBe("P");
+    expect(n.other.pressureCurve).toBe(2.5);
+    expect(n.shortcuts["tool-pen"]).toBe("P");
     expect(normalizeStudioAppSettings({ shortcuts: { "toggle-chrome": "Tab" } }).shortcuts["toggle-chrome"]).toBe("`");
   });
 
@@ -214,10 +184,9 @@ describe("studio-app-settings", () => {
     );
   });
 
-  it("rail hide/show/move preserves a useful guided fallback", () => {
+  it("rail hide/show/move preserve at least one tool", () => {
     const only = hideStudioRailTool(["pen"], "pen");
-    expect(only).toEqual(DEFAULT_STUDIO_RAIL_VISIBLE_IDS);
-    expect(normalizeStudioRailVisibleIds([])).toEqual(DEFAULT_STUDIO_RAIL_VISIBLE_IDS);
+    expect(only).toEqual(DEFAULT_STUDIO_RAIL_TOOL_ORDER);
     let list = normalizeStudioRailVisibleIds(["select", "pen", "eraser"]);
     list = moveStudioRailTool(list, "pen", -1);
     expect(list[0]).toBe("pen");
@@ -265,8 +234,8 @@ describe("studio-app-settings", () => {
     expect(matches).toEqual(["tool-pen", "flip-canvas"]);
   });
 
-  it("listStudioShortcutConflicts maps deliberate collisions and skips empty bindings", () => {
-    expect(listStudioShortcutConflicts(defaultStudioAppSettings().shortcuts).size).toBe(0);
+  it("listStudioShortcutConflicts maps multi-bound chords and skips empty/unbound", () => {
+    expect(listStudioShortcutConflicts(defaultStudioAppSettings().shortcuts).size).toBe(1);
 
     const shortcuts = {
       ...defaultStudioAppSettings().shortcuts,

@@ -175,8 +175,6 @@ export function StudioBg3dShapesPanel({
   hidden,
   context,
 }: StudioBg3dShapesPanelProps) {
-  const [showProceduralBlockouts, setShowProceduralBlockouts] = useState(false);
-  const [showCompositeBlockouts, setShowCompositeBlockouts] = useState(false);
   const [pushPullAxis, setPushPullAxis] =
     useState<StudioBg3dPushPullAxis>("y");
   const [pushPullFace, setPushPullFace] =
@@ -322,24 +320,10 @@ export function StudioBg3dShapesPanel({
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
-                  <button
-                    type="button"
-                    aria-expanded={showProceduralBlockouts}
-                    aria-controls="bg3d-procedural-blockouts"
-                    className={cx(CONTROL_BUTTON, "w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-                    onClick={() => setShowProceduralBlockouts((visible) => !visible)}
-                  >
-                    {showProceduralBlockouts ? "구도용 블록아웃 접기" : "구도용 블록아웃 프리셋 보기"}
-                  </button>
-                  <p className="mt-2 text-[0.68rem] leading-relaxed text-fg-3">
-                    기본 도형으로 공간의 비율과 배치를 먼저 잡을 때 사용합니다.
-                  </p>
-                  <div id="bg3d-procedural-blockouts" hidden={!showProceduralBlockouts} className="mt-3">
-                    <StudioBg3dProceduralStarterPanel
-                      disabledReason={proceduralStarterDisabledReason}
-                      onInsert={addProceduralStarterAsset}
-                    />
-                  </div>
+                  <StudioBg3dProceduralStarterPanel
+                    disabledReason={proceduralStarterDisabledReason}
+                    onInsert={addProceduralStarterAsset}
+                  />
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
@@ -354,24 +338,11 @@ export function StudioBg3dShapesPanel({
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
-                  <h3 className="mb-2 text-sm font-bold text-fg">구도용 복합 도형</h3>
+                  <h3 className="mb-2 text-sm font-bold text-fg">복합 오브젝트 추가</h3>
                   <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    기본 도형을 조합해 건물·나무·차량·소품의 비율과 배치를 잡습니다. 세부 형태와 재질은 별도로 다듬어 주세요.
+                    건물·나무·차량·소품처럼 도형 여러 개가 조합된 배경 소재입니다. 추가 후에도 각 부품을 따로 선택해 다듬을 수 있어요.
                   </p>
-                  <button
-                    type="button"
-                    aria-expanded={showCompositeBlockouts}
-                    aria-controls="bg3d-composite-blockout-categories bg3d-composite-blockout-presets"
-                    className={cx(CONTROL_BUTTON, "mb-2.5 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-                    onClick={() => setShowCompositeBlockouts((visible) => !visible)}
-                  >
-                    {showCompositeBlockouts ? "복합 블록아웃 접기" : `복합 블록아웃 ${COMPOSITE_PRESETS.length}개 보기`}
-                  </button>
-                  <div
-                    id="bg3d-composite-blockout-categories"
-                    hidden={!showCompositeBlockouts}
-                    className={showCompositeBlockouts ? "mb-2.5 flex flex-wrap gap-1.5" : "hidden"}
-                  >
+                  <div className="mb-2.5 flex flex-wrap gap-1.5">
                     <button
                       type="button"
                       className={cx(
@@ -400,11 +371,7 @@ export function StudioBg3dShapesPanel({
                       </button>
                     ))}
                   </div>
-                  <div
-                    id="bg3d-composite-blockout-presets"
-                    hidden={!showCompositeBlockouts}
-                    className={showCompositeBlockouts ? "grid grid-cols-2 gap-2" : "hidden"}
-                  >
+                  <div className="grid grid-cols-2 gap-2">
                     {COMPOSITE_PRESETS.filter((p) => compositeCategory === null || p.category === compositeCategory).map((preset) => (
                       <button
                         key={preset.id}

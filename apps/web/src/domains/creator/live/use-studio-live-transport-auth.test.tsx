@@ -88,14 +88,12 @@ async function flushPromises(): Promise<void> {
 describe("useStudioLiveTransportAuth", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.stubEnv("VITE_STUDIO_LIVE_ORIGIN", "https://live.toonstudio.test");
   });
 
   afterEach(() => {
     cleanup();
     vi.clearAllTimers();
     vi.useRealTimers();
-    vi.unstubAllEnvs();
   });
 
   it("does not create a guest identity until server authentication is authoritative", async () => {
@@ -284,20 +282,4 @@ describe("useStudioLiveTransportAuth", () => {
     expect(deferredTransport.credentials).toEqual([ticket(9).ticket]);
     expect(hook.result.current).toBeDefined();
   });
-  it("keeps the existing signaling factory when Cloudflare is configured without Socket.IO", async () => {
-    vi.stubEnv("VITE_STUDIO_LIVE_ORIGIN", "");
-    vi.stubEnv("VITE_STUDIO_REALTIME_ORIGIN", "https://realtime.toonstudio.test");
-    const live = harness();
-    deferredTransport.credentials.length = 0;
-    const hook = renderHook(() => useStudioLiveTransportAuth(
-      { authReady: true, userId: null },
-      { createGuestCredential: live.createGuestCredential },
-    ));
-    await flushPromises();
-    expect(hook.result.current).toBeDefined();
-    expect(deferredTransport.credentials).toEqual([
-      "guest:v1:7a75f75a-4abc-4def-8abc-04c9e58a52f1",
-    ]);
-  });
-
 });

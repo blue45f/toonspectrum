@@ -11,42 +11,24 @@ import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@/
 import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
 import { apiPath } from "@/src/infrastructure/api";
 
-type ResourceSearchProvider = Extract<ResourceProvider, "met" | "kakao" | "bizinfo">;
-interface ResourceSearchConfig {
-  title: string;
-  intro: string;
-  hint: string;
-  url: string;
-  examples: string[];
-}
-const CONFIG: Record<ResourceSearchProvider, ResourceSearchConfig> = {
+const CONFIG = {
   met: { title: "창작 레퍼런스", intro: "복식·장식·가구·미술 자료를 찾아 출처와 함께 저장하세요. 공개 이용이 확인된 Met 자료만 미리보기를 제공합니다.", hint: "예: armor, costume, furniture, Korea", url: "https://www.metmuseum.org/art/collection", examples: ["armor", "costume", "furniture", "Korea"] },
   kakao: { title: "만화·작법서 탐색", intro: "만화 단행본, 작법서와 참고 도서를 검색하세요. 작품과 판본의 관계는 원출처에서 확인하며 자동으로 동일 작품으로 합치지 않습니다.", hint: "예: 만화 작법, 웹툰, 스토리", url: "https://search.daum.net/search?w=book&q=%EB%A7%8C%ED%99%94", examples: ["만화 작법", "웹툰", "스토리"] },
   bizinfo: { title: "작가 기회센터", intro: "기업마당 최근 최대 100건에서 지원사업을 찾습니다. 모든 공모전을 포함하지 않으며, 개인 작가와 사업자의 신청 자격은 공고 원문을 확인해야 합니다.", hint: "예: 웹툰, 만화, 콘텐츠", url: "https://www.bizinfo.go.kr/", examples: ["웹툰", "만화", "콘텐츠"] },
 };
-function resourceUsageLabel(item: CreatorResource): string {
-  if (item.license === "CC0") return "공개 이용 확인";
-  if (item.license === "book-promotion") return "도서 소개 목적";
-  return "정보·원문 링크";
-}
-function resourceUsageDescription(item: CreatorResource): string {
-  if (item.license === "CC0") return "Met 공개 데이터의 CC0 표시를 확인했습니다. 초상·상표 등 기타 권리는 별도 확인하세요.";
-  if (item.license === "book-promotion") return "도서 소개·홍보 목적의 서지정보입니다. 원본 데이터 재판매나 임의 변경은 허용 범위를 다시 확인하세요.";
-  return "검색 메타데이터입니다. 이미지·본문 재배포 또는 각색 허락을 의미하지 않습니다.";
-}
 function ResourceCard({ item, saved, onToggle, disabled }: { item: CreatorResource; saved: boolean; onToggle: () => void; disabled: boolean }) {
   const [imageFailed, setImageFailed] = useState(false);
   return <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel">
     {item.imageUrl && !imageFailed && <img src={item.imageUrl} alt={item.title} loading="lazy" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} className="h-52 w-full bg-raised object-contain p-3" />}
     <div className="flex flex-1 flex-col space-y-3 p-5">
-      <p className="text-xs font-semibold text-accent">{RESOURCE_LABELS[item.provider]} · {resourceUsageLabel(item)}</p>
+      <p className="text-xs font-semibold text-accent">{RESOURCE_LABELS[item.provider]} · {item.license === "CC0" ? "공개 이용 확인" : "정보·원문 링크"}</p>
       <h2 className="break-words text-lg font-bold">{item.title}</h2>
       <p className="text-sm text-fg-2">{item.creator || "저작자·기관 원문 확인"}{item.dateLabel ? ` · ${item.dateLabel}` : ""}</p>
       {item.description && <p className="break-words text-sm leading-6 text-fg-2">{item.description}</p>}
       {item.provider === "bizinfo" && <div className="rounded-lg bg-raised p-3 text-sm leading-6"><p className="font-semibold">{deadlineLabel(item.deadline)}</p><p>신청 대상: {item.eligibility}</p></div>}
       {item.isbn && <p className="text-xs text-fg-2">ISBN: {item.isbn}</p>}
       <details className="text-xs leading-6 text-fg-2"><summary className="cursor-pointer py-2">출처·이용조건·조회일</summary>
-        <p>{item.credit || "크레딧 원문 확인"}</p><p>{resourceUsageDescription(item)}</p>
+        <p>{item.credit || "크레딧 원문 확인"}</p><p>{item.license === "CC0" ? "Met 공개 데이터의 CC0 표시를 확인했습니다. 초상·상표 등 기타 권리는 별도 확인하세요." : "검색 메타데이터입니다. 이미지·본문 재배포 또는 각색 허락을 의미하지 않습니다."}</p>
         {item.licenseUrl && <a className="underline" href={item.licenseUrl} target="_blank" rel="noopener noreferrer">이용조건 확인 ↗</a>}
         <p>조회: {item.fetchedAt}</p>
       </details>
@@ -58,7 +40,7 @@ function ResourceCard({ item, saved, onToggle, disabled }: { item: CreatorResour
     </div>
   </article>;
 }
-export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvider }) {
+export function ResourceSearchPage({ provider }: { provider: ResourceProvider }) {
   const config = CONFIG[provider];
   const [params, setParams] = useSearchParams();
   const query = params.get("q") ?? "";
@@ -114,7 +96,7 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
       <button className={RESOURCE_BUTTON} aria-pressed={!savedOnly} onClick={() => setSavedOnly(false)}>검색 결과</button>
       <button className={RESOURCE_BUTTON} aria-pressed={savedOnly} onClick={() => setSavedOnly(true)}>저장한 자료 {savedItems.length}</button>
       <button className={RESOURCE_BUTTON} disabled={!savedItems.length} onClick={() => downloadText(`${provider}-sources.md`, attributionMarkdown(savedItems))}>출처 내보내기</button>
-      <Link className={RESOURCE_BUTTON} to="/research">전체 저장 보드 검색·정렬</Link>
+      <Link className={RESOURCE_BUTTON} to="/creator-hub">전체 저장 보드 검색·정렬</Link>
       <a href={config.url} className={RESOURCE_BUTTON} target="_blank" rel="noopener noreferrer">공식 사이트 ↗</a>
       {provider === "kakao" && <Link className={RESOURCE_BUTTON} to="/search">기존 웹툰·작품 검색</Link>}
     </div>

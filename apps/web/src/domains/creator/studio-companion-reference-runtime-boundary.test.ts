@@ -325,31 +325,12 @@ describe("Studio companion Reference runtime boundaries", () => {
     expect(guardedSetterEnd).toBeGreaterThan(guardedSetterStart);
     expect(guardedSetter).toContain("referenceBoardLatestRequestedRef.current");
     expect(guardedSetter).not.toContain("referenceBoardCommittedSnapshotRef.current.document");
-    const guardedCommitIndex = guardedSetter.indexOf("if (!commitReferenceBoard(normalized)) return false");
-    expect(guardedCommitIndex).toBeGreaterThanOrEqual(0);
-    expect(guardedSetter.indexOf("referenceBoardLatestRequestedRef.current = normalized")).toBeGreaterThan(
-      guardedCommitIndex
+    expect(guardedSetter.indexOf("referenceBoardLatestRequestedRef.current = normalized")).toBeLessThan(
+      guardedSetter.indexOf("setReferenceBoardState(normalized)")
     );
-    // Accepted edits now share the document mutation setter. Its latest-value ref must advance
-    // before React receives the update, while the public committed snapshot stays layout-only.
-    expect(sidecarsSource).toContain(
-      "const commitReferenceBoard = useStudioDocumentMutationSetter(referenceBoard, setReferenceBoardState, {"
-    );
-    const mutationSetter = moduleEdges(
-      "./studio-cuttoon-editor/runtime/useStudioDocumentMutationSetter.ts"
-    ).sourceFile.getFullText();
-    const acceptanceIndex = mutationSetter.indexOf("if (!markStudioDocumentChanged()) return false");
-    const latestValueIndex = mutationSetter.indexOf("latest.current = after");
-    const stateUpdateIndex = mutationSetter.indexOf("setValue(after)");
-    expect(acceptanceIndex).toBeGreaterThanOrEqual(0);
-    expect(latestValueIndex).toBeGreaterThan(acceptanceIndex);
-    expect(stateUpdateIndex).toBeGreaterThan(latestValueIndex);
-    expect(mutationSetter.match(/setValue\(/gu)).toHaveLength(1);
-    expect(mutationSetter).not.toContain(committedRef);
     // One guarded edit path plus the server-hydration raw setter must both converge through the
     // layout-effect commit boundary instead of imperatively publishing pending render state.
-    expect(pageSource.match(/useStudioDocumentMutationSetter\(referenceBoard, setReferenceBoardState,/gu)).toHaveLength(1);
-    expect(pageSource.match(/setReferenceBoardState\(/gu)?.length).toBeGreaterThanOrEqual(1);
+    expect(pageSource.match(/setReferenceBoardState\(/gu)?.length).toBeGreaterThanOrEqual(2);
 
     const coordinator = moduleEdges(
       "./studio/components/runtime/studio-companion-reference-capture-runtime.ts"

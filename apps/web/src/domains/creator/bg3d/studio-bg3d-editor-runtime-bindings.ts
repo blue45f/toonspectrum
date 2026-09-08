@@ -180,12 +180,10 @@ export {
 } from "./studio-bg3d-control-fields";
 export { StudioBg3dDestructiveMutationGuard } from "./studio-bg3d-destructive-mutation-guard";
 export {
+  deriveStudioBg3dGlbValidationPolicy,
   resolveStudioBg3dDeviceQuality,
   type StudioBg3dDeviceSignals,
 } from "./studio-bg3d-device-quality";
-export {
-  deriveStudioBg3dSessionGlbValidationPolicy as deriveStudioBg3dGlbValidationPolicy,
-} from "./studio-bg3d-session-glb-policy";
 export {
   acquireStudioBg3dCaptureAdapterAfterViewTransition,
   CAMERA_PRESETS,

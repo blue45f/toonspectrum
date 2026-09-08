@@ -76,21 +76,6 @@ export const creatorResourceCases: CreatorResourceCase[] = [
     const text = attributionMarkdown([item]); ok(text.includes(item.sourceUrl)); ok(text.includes("\\[source\\]")); ok(text.includes("CC0"));
     ok(storyMarkdown({ protagonist: "<script>" }).includes("\\<script\\>"));
   } },
-  { name: "markdown exports preserve literal backslashes before every escaped delimiter", run() {
-    const input = String.raw`\[source]\<img>\*bold*\_name_` + "\\`code`";
-    const escaped = String.raw`\\\[source\]\\\<img\>\\\*bold\*\\\_name\_` + "\\\\\\`code\\`";
-    const item = parseResource(fixture({ title: input, creator: input, credit: input })); ok(item);
-    const result = attributionMarkdown([item]);
-    ok(result.includes(`## ${escaped}\n`));
-    ok(result.includes(`- 저작자: ${escaped}\n`));
-    ok(result.includes(`- 크레딧: ${escaped}\n`));
-    ok(storyMarkdown({ protagonist: input }).includes(`\n${escaped}\n`));
-  } },
-  { name: "markdown exports escape repeated and trailing backslashes without changing Korean text", run() {
-    const input = "한글 " + "\\".repeat(3) + " 경로 " + "\\";
-    const escaped = "한글 " + "\\".repeat(6) + " 경로 " + "\\".repeat(2);
-    ok(storyMarkdown({ world: input }).includes(`\n${escaped}\n`));
-  } },
   { name: "six original recipes have stable IDs and valid frame exports", run() {
     equal(RECIPES.length, 6); equal(new Set(RECIPES.map((recipe) => recipe.id)).size, 6);
     for (const recipe of RECIPES) { const svg = exerciseSvg(recipe, Number.NaN); ok(svg.includes("<svg")); ok(!svg.includes("NaN")); equal(svg.includes("<script"), false); equal(recipe.steps.length, 4); }

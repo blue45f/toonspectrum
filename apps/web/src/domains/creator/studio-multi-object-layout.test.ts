@@ -57,15 +57,15 @@ describe("StudioMultiObjectLayoutManager", () => {
         preset.objects.map((object) => object.modelUrl)),
     );
     expect(urls).toEqual(new Set([
-      "/assets/3d/refined-v8/blackboard.glb",
-      "/assets/3d/refined-v8/desk.glb",
-      "/assets/3d/refined-v8/chair.glb",
+      "/assets/3d/blackboard.glb",
+      "/assets/3d/desk.glb",
+      "/assets/3d/chair.glb",
       "/assets/3d/round_table.glb",
-      "/assets/3d/refined-v8/sofa.glb",
+      "/assets/3d/sofa.glb",
     ]));
 
     for (const url of urls) {
-      expect(url).toMatch(/^\/assets\/3d\/(?:refined-v8\/)?[a-z_]+\.glb$/);
+      expect(url).toMatch(/^\/assets\/3d\/[a-z_]+\.glb$/);
       const file = statSync(join(process.cwd(), "apps/web/public", url));
       expect(file.isFile(), url).toBe(true);
       expect(file.size, url).toBeGreaterThan(10 * 1024);

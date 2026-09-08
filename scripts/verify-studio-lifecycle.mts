@@ -133,7 +133,6 @@ interface LifecycleResult {
     undone: string;
     redone: string;
     reloaded: string;
-    surfaceDiagnostics: string[];
     report: string;
   };
   browserErrors: BrowserErrorCollector;
@@ -409,83 +408,6 @@ async function captureStableStage(page: Page, stage: Locator): Promise<Buffer> {
   return current;
 }
 
-// Element screenshots include portal UI painted over the same physical rectangle. Preserve the
-// separate Konva Canvas2D pixels and DOM geometry to distinguish such UI from an actual ink remnant.
-async function recordStageSurfaces(stage: Locator, label: string): Promise<string> {
-  const path = join(SCRATCH, `studio-lifecycle-${label}-surfaces.json`);
-  try {
-    const observed = await stage.evaluate((root) => {
-      const stageRect = root.getBoundingClientRect();
-      // Method syntax keeps tsx's serialized callback independent of its module-level __name helper.
-      const geometry = { describe(element: Element) {
-        const rect = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        const left = Math.max(0, stageRect.left, rect.left);
-        const top = Math.max(0, stageRect.top, rect.top);
-        const right = Math.min(innerWidth, stageRect.right, rect.right);
-        const bottom = Math.min(innerHeight, stageRect.bottom, rect.bottom);
-        return {
-          tag: element.tagName, id: element.id, role: element.getAttribute("role"),
-          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-          stageIntersection: right > left && bottom > top
-            ? { x: left, y: top, width: right - left, height: bottom - top } : null,
-          display: style.display, visibility: style.visibility, opacity: style.opacity,
-          position: style.position, zIndex: style.zIndex, background: style.backgroundColor,
-          transform: style.transform, overflow: [style.overflowX, style.overflowY],
-          attributes: Object.fromEntries([...element.attributes]
-            .filter(attribute => attribute.name.startsWith("data-studio-") || attribute.name === "aria-hidden")
-            .map(attribute => [attribute.name, attribute.value])),
-        };
-      } };
-      const selectors = ["[data-studio-tool-hint]", "[data-studio-creative-starter]",
-        "[data-studio-canvas-transient]", "[data-studio-canvas-status-rail]",
-        "[role=tooltip]", "[role=status]", "[role=alert]"].join(",");
-      const overlayElements = new Set(document.querySelectorAll(selectors));
-      for (const element of document.querySelectorAll("body *")) {
-        if (root.contains(element) || !element.getAttributeNames().some(name => name.startsWith("data-studio-"))) continue;
-        const style = getComputedStyle(element);
-        if (!["fixed", "absolute"].includes(style.position) || style.display === "none"
-          || style.visibility === "hidden" || Number(style.opacity) === 0) continue;
-        if (geometry.describe(element).stageIntersection) overlayElements.add(element);
-      }
-      const overlays = [...overlayElements].slice(0, 100).map(element => ({
-        ...geometry.describe(element), insideStage: root.contains(element),
-        text: (element.textContent ?? "").trim().slice(0, 300),
-      }));
-      const ancestors = [];
-      for (let element: Element | null = root; element; element = element.parentElement) {
-        ancestors.push(geometry.describe(element));
-      }
-      const canvases = [...root.querySelectorAll<HTMLCanvasElement>(":scope > canvas")].map((canvas, index) => {
-        // These are existing Konva 2D surfaces. Never request a context or read back a GPU sibling.
-        let png: string | null = null;
-        let error: string | null = null;
-        try { png = canvas.toDataURL("image/png"); }
-        catch (cause) { error = String(cause); }
-        return { index, width: canvas.width, height: canvas.height, ...geometry.describe(canvas), png, error };
-      });
-      return {
-        observedAt: performance.now(), documentReady: document.readyState, fonts: document.fonts.status,
-        viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio, scrollX, scrollY },
-        stage: geometry.describe(root), ancestors, overlays, overlayCount: overlayElements.size, canvases,
-      };
-    });
-    const canvases = observed.canvases.map(({ png, ...canvas }) => {
-      const prefix = "data:image/png;base64,";
-      const pngPath = png?.startsWith(prefix)
-        ? join(SCRATCH, `studio-lifecycle-${label}-konva-${canvas.index}.png`) : null;
-      if (pngPath && png) writeFileSync(pngPath, Buffer.from(png.slice(prefix.length), "base64"));
-      return { ...canvas, pngPath };
-    });
-    writeFileSync(path, `${JSON.stringify({ ...observed, canvases }, null, 2)}\n`);
-  } catch (error) {
-    // Diagnostics must not replace the original visual policy with a new readiness requirement.
-    writeFileSync(path, `${JSON.stringify({ diagnosticError: String(error) }, null, 2)}\n`);
-    log(`surface observation failed for ${label}: ${String(error)}`);
-  }
-  return path;
-}
-
 async function countBrowserCompatibilityAutosaveKeys(page: Page): Promise<number> {
   return page.evaluate((prefix) => {
     let count = 0;
@@ -556,7 +478,6 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     const baseline = await captureStableStage(page, stage);
     writeFileSync(baselinePath, baseline);
-    const surfaceDiagnostics = [await recordStageSurfaces(stage, "baseline")];
 
     const stageBox = await stage.boundingBox();
     const viewport = page.viewportSize();
@@ -575,7 +496,6 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       rightRatio: Math.min(1, (safeRight - stageBox.x + 70) / stageBox.width),
       bottomRatio: Math.min(1, (start.y - stageBox.y + 150) / stageBox.height),
     };
-    log(`artwork crop: ${JSON.stringify({ stageBox, viewport, artworkCrop })}`);
     const hitCanvas = await page.evaluate(({ x, y }) => {
       const target = document.elementFromPoint(x, y);
       return Boolean(target?.closest(".konvajs-content"));
@@ -601,14 +521,12 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     const committed = await captureStableStage(page, stage);
     writeFileSync(committedPath, committed);
-    surfaceDiagnostics.push(await recordStageSurfaces(stage, "committed"));
 
     await undo.click();
     const redo = await enabledHistoryButton(page, "다시실행");
     await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     const undone = await captureStableStage(page, stage);
     writeFileSync(undonePath, undone);
-    surfaceDiagnostics.push(await recordStageSurfaces(stage, "undone"));
 
     await redo.click();
     const redoCompletedAt = performance.now();
@@ -757,7 +675,6 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
         undone: undonePath,
         redone: redonePath,
         reloaded: reloadedPath,
-        surfaceDiagnostics,
         report: REPORT_PATH,
       },
       browserErrors,
@@ -765,7 +682,6 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
         "Persistence coverage is the shipped OPFS/SQLite autosave and reload/recovery UI path, not authenticated server/database save.",
         "historyReadyAfterPointerUpMs includes Playwright transport and DOM polling overhead; it is diagnostic, not input-latency p95.",
         "The gate covers Chromium production preview and one default opaque pen stroke, not every brush/backend/browser.",
-        "Surface diagnostics follow each baseline/committed/Undo screenshot; observation and Canvas2D readback can affect subsequent timing, and rectangle intersections do not prove occlusion.",
       ],
     };
     writeFileSync(REPORT_PATH, `${JSON.stringify(result, null, 2)}\n`);

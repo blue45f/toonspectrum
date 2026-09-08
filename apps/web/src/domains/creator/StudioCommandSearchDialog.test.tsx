@@ -4,8 +4,14 @@
  * 통합 Command Search UI 계약.
  *
  * 검색 랭킹·별칭 커버리지는 `studio-command-search.test.ts` 가 잡는다. 여기서는
- * 결과가 사용자 행동 기준 구획으로 나뉘고, 급증하지 않으며, 행이 광고한 대로
- * 실제로 동작하고 보조기술에 결과가 보이는지를 본다.
+ * 그 결과가 화면에서 실제로 구획으로 나뉘어 나오고, 급증하지 않고, **행이 광고한
+ * 대로 실제로 동작하며**, 보조기술에 결과가 보이는지를 본다.
+ *
+ * 회귀 배경(감사 D1/D11, 2026-08-08 실측): 푸터는 언제나 `Enter 실행` 이라고
+ * 적혀 있었지만 명령 행의 활성화 분기는 마운트 지점이 넘기지 않는 옵셔널 콜백
+ * 하나뿐이라 클릭·↑↓+Enter·Tab+Enter 네 경로가 전부 조용한 no-op 이었고, ↑↓
+ * 하이라이트는 `data-active` 라는 시각 전용 속성으로만 움직여 스크린리더에는
+ * 결과가 아예 없는 화면이었다. 아래 두 describe 가 그 두 가지를 고정한다.
  */
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -75,21 +81,18 @@ describe("StudioCommandSearchDialog", () => {
     expect(screen.getByText(/Photoshop "Paint Bucket"/u)).toBeTruthy();
   });
 
-  it("결과를 행동 중심 구획으로 나눠 보여준다", () => {
+  it("결과를 구획으로 나눠 보여준다", () => {
     openDialog();
     type("레이어");
     const headings = screen
       .getAllByRole("heading", { level: 3 })
       .map((node) => node.textContent);
     expect(headings.length).toBeGreaterThan(1);
-    const sectionOrder = [
-      "바로 할 수 있는 작업",
-      "설정으로 이동",
-      "열 수 있는 화면",
-      "사용법",
-    ];
+    // 구획 제목은 선언된 순서를 따른다.
     expect(headings).toEqual([...headings].sort(
-      (a, b) => sectionOrder.indexOf(a ?? "") - sectionOrder.indexOf(b ?? ""),
+      (a, b) =>
+        ["명령", "속성·보정", "패널·팔레트", "튜토리얼"].indexOf(a ?? "") -
+        ["명령", "속성·보정", "패널·팔레트", "튜토리얼"].indexOf(b ?? ""),
     ));
   });
 
@@ -177,7 +180,9 @@ describe("StudioCommandSearchDialog", () => {
     );
   });
 
-  it("페이지 하위 설정 결과는 탭·하위 탭·포커스를 함께 전달한다", () => {
+  it("문서 서브탭을 가진 결과는 탭만이 아니라 서브탭·포커스까지 전달한다", () => {
+    // PR #517 회귀: 인스펙터 행이 `primary` 만 실어서 문서 탭은 열리지만
+    // 서브탭은 직전 상태에 남고 컨트롤 그룹은 열리지 않았다.
     const onNavigateInspector = vi.fn();
     openDialog({ onNavigateInspector });
     type("가이드와 스냅");
@@ -206,6 +211,10 @@ describe("StudioCommandSearchDialog", () => {
   });
 });
 
+/**
+ * D1 — "찾아놓고 실행이 안 된다". 네 경로 중 어느 하나라도 다시 no-op 이 되면
+ * 아래가 깨진다.
+ */
 describe("StudioCommandSearchDialog — 범위(scope)", () => {
   it("범위 칩은 전체·현재 패널·명령·도움말 넷이고 기본은 전체다", () => {
     openDialog(ALL_HANDLERS);
@@ -219,9 +228,10 @@ describe("StudioCommandSearchDialog — 범위(scope)", () => {
     expect(within(group).getByRole("radio", { name: "전체" }).getAttribute("aria-checked")).toBe("true");
   });
 
-  it("'현재 패널' 범위는 설정·화면 구획만 남긴다", () => {
+  it("'현재 패널' 범위는 속성·패널 구획만 남긴다", () => {
     openDialog({ ...ALL_HANDLERS, initialScope: "inspector" });
     type("블러");
+    // 가우시안 블러는 명령 구획이라 현재 패널 범위에서는 나오지 않는다.
     expect(screen.queryByText("가우시안 블러")).toBeNull();
     expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("true");
   });
@@ -237,11 +247,10 @@ describe("StudioCommandSearchDialog — 범위(scope)", () => {
     expect(screen.getByText("가우시안 블러")).toBeTruthy();
   });
 
-  it("'명령' 범위에서는 설정 행이 나오지 않는다", () => {
+  it("'명령' 범위에서는 속성 행이 나오지 않는다", () => {
     openDialog({ ...ALL_HANDLERS, initialScope: "command" });
     type("마스크");
-    expect(screen.queryByText("레이어 마스크", { exact: true })).toBeNull();
-    expect(screen.getByText("레이어 마스크 편집", { exact: true })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /대상 › 마스크/u })).toBeNull();
   });
 });
 
@@ -317,6 +326,8 @@ describe("StudioCommandSearchDialog — 결과 활성화", () => {
     const selected = screen
       .queryAllByRole("option")
       .find((node) => node.getAttribute("aria-selected") === "true");
+    // `open` 은 제어 prop 이고 onClose 는 스파이라 목록은 그대로 남는다 —
+    // Enter 가 향한 행이 두 번째 행이었음을 선택 상태로 확인한다.
     expect(onOpenHelp).toHaveBeenCalledTimes(1);
     expect(onOpenHelp.mock.calls[0]?.[1]).toMatch(/^filter\./u);
     expect(selected).toBeTruthy();
@@ -336,11 +347,12 @@ describe("StudioCommandSearchDialog — 결과 활성화", () => {
     openDialog({ onOpenHelp: vi.fn() });
     type("가우시안 블러");
     expect(footerText()).toContain("Enter 도움말 열기");
+    // 실행한다고 적힌 곳은 어디에도 없다.
     expect(footerText()).not.toContain("Enter 실행");
   });
 
   it("행마다 보이는 배지가 그 행의 실제 능력과 일치한다", () => {
-    const badge: Record<string, string> = {
+    const BADGE: Record<string, string> = {
       execute: "실행",
       inspector: "이동",
       palette: "펼치기",
@@ -354,9 +366,11 @@ describe("StudioCommandSearchDialog — 결과 활성화", () => {
     for (const option of screen.getAllByRole("option")) {
       const kind = option.getAttribute("data-action") ?? "";
       kinds.add(kind);
-      expect(within(option).getByText(badge[kind] ?? "?")).toBeTruthy();
+      expect(within(option).getByText(BADGE[kind] ?? "?")).toBeTruthy();
+      // 어떤 행도 "실행"이라고 적지 않는다 — 실행 배선이 아직 없다.
       expect(option.textContent).not.toContain("실행");
     }
+    // 명령 행과 이동 행이 섞인 질의라 두 종류 이상이 나온다.
     expect(kinds.size).toBeGreaterThan(1);
   });
 
@@ -367,11 +381,13 @@ describe("StudioCommandSearchDialog — 결과 활성화", () => {
       .getAllByRole("option")
       .find((node) => within(node).queryByText("자동 액션"));
     expect(autoActions).toBeTruthy();
+    // `panel` 타깃에는 아직 소비자가 없다 — 없는 능력을 지어내지 않는다.
     expect(autoActions?.getAttribute("data-action")).toBe("none");
     expect(autoActions?.getAttribute("aria-disabled")).toBe("true");
   });
 });
 
+/** D11 — 결과가 보조기술에 존재하고, ↑↓ 가 그 존재를 따라 움직인다. */
 describe("StudioCommandSearchDialog — 스크린리더 계약", () => {
   it("입력은 콤보박스이고 결과는 listbox/option 이다", () => {
     openDialog({ onOpenHelp: vi.fn() });
@@ -421,7 +437,7 @@ describe("StudioCommandSearchDialog — 스크린리더 계약", () => {
 });
 
 describe("StudioCommandSearchHost", () => {
-  it("F1 이 통합 검색을 연다", async () => {
+  it("F1 이 통합 검색을 연다 (감사 §2.8 'F1 바인딩 없음' 해소)", async () => {
     const onRequestOpen = vi.fn();
     render(<StudioCommandSearchHost onRequestOpen={onRequestOpen} />);
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -480,7 +496,7 @@ describe("StudioCommandSearchHost", () => {
     fireEvent.click(trigger);
     await screen.findByRole("dialog");
     type("레이어 마스크");
-    fireEvent.click(screen.getByText("레이어 마스크", { exact: true }));
+    fireEvent.click(screen.getByRole("option", { name: /대상 › 마스크/u }));
     await waitFor(() => {
       expect(document.activeElement).toBe(
         screen.getByRole("button", { name: "목적지" }),

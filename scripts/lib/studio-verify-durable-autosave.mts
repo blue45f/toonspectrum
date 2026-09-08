@@ -3,15 +3,14 @@
  *
  * Shared durable-autosave access for the `scripts/verify-studio-*` browser verifiers.
  *
- * Studio recovers the newest snapshot or tombstone from its OPFS recovery journal and
- * worker-owned SQLite store. A pointerup SQLite receipt can survive page teardown while the
- * Window-side journal write is interrupted, so observing only OPFS can report false data loss. The legacy
+ * Studio's autosave authority is the browser-owned OPFS recovery journal
+ * (`apps/web/src/domains/creator/studio-autosave-opfs-session.ts`). The legacy
  * `toonspectrum-studio-autosave*` localStorage JSON slot is no longer written and is
  * tombstoned on every durable save — `verify:studio-lifecycle` asserts that zero browser
  * compatibility records survive a save — so a verifier that enumerates localStorage reads
  * an empty store forever.
  *
- * These helpers reach both stores through their shipped readers, located
+ * These helpers reach the shipped document through the *shipped* session module, located
  * among the bundle chunks the page already loaded (the same discovery
  * `scripts/verify-studio-native-raster-tools.mts` uses). Nothing here re-implements the
  * journal's on-disk format and nothing here needs a product-only test hook.
@@ -42,22 +41,10 @@ export interface StudioDurableAutosaveDocument {
 
 const BRIDGE_GLOBAL = "__studioVerifyDurableAutosaveBridge";
 
-export interface StudioDurableAutosaveCandidate {
-  readonly authority: "opfs-journal" | "sqlite-fallback";
-  readonly state: "snapshot" | "cleared";
-  readonly savedAt: string;
-  readonly payload?: Record<string, unknown>;
-}
-
-/** Same ordering as product recovery: newest timestamp, tombstone, then OPFS on an exact tie. */
-export function selectDurableStudioAutosaveCandidate(
-  candidates: readonly StudioDurableAutosaveCandidate[],
-): StudioDurableAutosaveCandidate | null {
-  return [...candidates].sort((left, right) =>
-    Date.parse(right.savedAt) - Date.parse(left.savedAt)
-    || Number(right.state === "cleared") - Number(left.state === "cleared")
-    || Number(right.authority === "opfs-journal") - Number(left.authority === "opfs-journal")
-  )[0] ?? null;
+interface DurableAutosaveReadResult {
+  document: StudioDurableAutosaveDocument | null;
+  error: string | null;
+  moduleUrl: string | null;
 }
 
 /**
@@ -65,13 +52,9 @@ export function selectDurableStudioAutosaveCandidate(
  * out document-scoped sessions. Idempotent: repeated calls reuse the resolved module and
  * the already opened sessions, so a polling verifier pays the discovery cost once.
  */
-async function installBridge(
-  page: Page,
-  moduleUrl: string | null,
-  sqliteModuleUrl: string | null = null,
-): Promise<void> {
+async function installBridge(page: Page, moduleUrl: string | null): Promise<void> {
   await page.evaluate(
-    ({ globalName, presetModuleUrl, presetSqliteModuleUrl }) => {
+    ({ globalName, presetModuleUrl }) => {
       interface AutosaveSession {
         readLatest: () => Promise<
           | { state: "snapshot"; savedAt: string; payload: Record<string, unknown> }
@@ -80,9 +63,6 @@ async function installBridge(
         >;
         write: (payload: Record<string, unknown>) => Promise<unknown>;
         dispose: () => Promise<void>;
-      }
-      interface AutosaveSqliteStore {
-        read: (key: string) => ReturnType<AutosaveSession["readLatest"]>;
       }
       type AutosaveSessionFactory = (
         key: string,
@@ -94,10 +74,6 @@ async function installBridge(
       }
       interface AutosaveBridge {
         moduleUrl: string | null;
-        sqliteModuleUrl: string | null;
-        sqlite: Promise<AutosaveSqliteStore> | null;
-        resolveSqliteModuleUrl: () => Promise<string | null>;
-        openSqlite: () => Promise<AutosaveSqliteStore>;
         lastError: string | null;
         runtime: Promise<AutosaveRuntime> | null;
         factory: Promise<AutosaveSessionFactory> | null;
@@ -110,60 +86,11 @@ async function installBridge(
       const existing = holder[globalName] as AutosaveBridge | undefined;
       if (existing) {
         if (presetModuleUrl && !existing.moduleUrl) existing.moduleUrl = presetModuleUrl;
-        if (presetSqliteModuleUrl && !existing.sqliteModuleUrl) {
-          existing.sqliteModuleUrl = presetSqliteModuleUrl;
-        }
         return;
       }
 
       const bridge: AutosaveBridge = {
         moduleUrl: presetModuleUrl,
-        sqliteModuleUrl: presetSqliteModuleUrl,
-        sqlite: null,
-        async resolveSqliteModuleUrl() {
-          if (bridge.sqliteModuleUrl) return bridge.sqliteModuleUrl;
-          const urls = [
-            ...performance.getEntriesByType("resource").map((entry) => entry.name),
-            ...Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]'))
-              .map((link) => link.href),
-          ].filter((url) => url.startsWith(window.location.origin));
-          let found = urls.find((url) =>
-            /\/assets\/studio-autosave-sqlite-store-[A-Za-z0-9_-]+\.js(?:\?.*)?$/u.test(url)
-          ) ?? null;
-          if (!found && urls.some((url) => url.includes("/@vite/client"))) {
-            found = new URL("/src/domains/creator/studio-autosave-sqlite-store.ts", window.location.origin).href;
-          }
-          if (!found) {
-            const editorUrl = urls.find((url) =>
-              /\/assets\/(?:StudioPage|studio-legacy-editor-adapter)-[A-Za-z0-9_-]+\.js(?:\?.*)?$/u.test(url)
-            );
-            if (editorUrl) {
-              const source = await fetch(editorUrl).then((response) => response.text());
-              const match = source.match(/\.\/studio-autosave-sqlite-store-[A-Za-z0-9_-]+\.js/u);
-              if (match) found = new URL(match[0], editorUrl).href;
-            }
-          }
-          bridge.sqliteModuleUrl = found;
-          return found;
-        },
-        openSqlite() {
-          bridge.sqlite ??= (async () => {
-            const url = await bridge.resolveSqliteModuleUrl();
-            if (!url) throw new Error("the shipped SQLite autosave store chunk was not found");
-            const runtime = await import(url) as Record<string, unknown>;
-            for (const exported of [runtime, ...Object.values(runtime)]) {
-              const namespace = await Promise.resolve(exported) as {
-                acquireStudioAutosaveSqliteStore?: () => Promise<AutosaveSqliteStore>;
-              } | null;
-              if (typeof namespace?.acquireStudioAutosaveSqliteStore === "function") {
-                return namespace.acquireStudioAutosaveSqliteStore();
-              }
-            }
-            throw new Error(`no SQLite autosave store export was found in ${url}`);
-          })();
-          bridge.sqlite.catch(() => { bridge.sqlite = null; });
-          return bridge.sqlite;
-        },
         lastError: null,
         runtime: null,
         factory: null,
@@ -248,12 +175,12 @@ async function installBridge(
       };
       holder[globalName] = bridge;
     },
-    { globalName: BRIDGE_GLOBAL, presetModuleUrl: moduleUrl, presetSqliteModuleUrl: sqliteModuleUrl },
+    { globalName: BRIDGE_GLOBAL, presetModuleUrl: moduleUrl },
   );
 }
 
 /**
- * Read the newest OPFS/SQLite durable autosave document for `autosaveKey`.
+ * Read the newest durable autosave document for `autosaveKey`.
  *
  * Returns `null` when the document has never been written, when the shipped session
  * reports a `cleared` tombstone, and when a concurrent writer is publishing the next
@@ -263,52 +190,60 @@ async function installBridge(
 export async function readDurableStudioAutosaveDocument(
   page: Page,
   autosaveKey: string,
-  options: { readonly moduleUrl?: string | null; readonly sqliteModuleUrl?: string | null } = {},
+  options: { readonly moduleUrl?: string | null } = {},
 ): Promise<StudioDurableAutosaveDocument | null> {
-  await installBridge(page, options.moduleUrl ?? null, options.sqliteModuleUrl ?? null);
-  const candidates = await page.evaluate(
-    async ({ globalName, key }): Promise<StudioDurableAutosaveCandidate[]> => {
-      type StoredAutosave = Omit<StudioDurableAutosaveCandidate, "authority"> | null;
-      interface AutosaveBridge {
-        lastError: string | null;
-        open: (key: string, readOnly: boolean) => Promise<{
-          readLatest: () => Promise<StoredAutosave>;
-        } | null>;
-        openSqlite: () => Promise<{ read: (key: string) => Promise<StoredAutosave> }>;
+  await installBridge(page, options.moduleUrl ?? null);
+  const result = await page.evaluate(
+    async ({ globalName, key }): Promise<DurableAutosaveReadResult> => {
+      interface AutosaveSession {
+        readLatest: () => Promise<
+          | { state: "snapshot"; savedAt: string; payload: Record<string, unknown> }
+          | { state: "cleared"; savedAt: string }
+          | null
+        >;
       }
-      const bridge = (window as typeof window & Record<string, unknown>)[globalName] as AutosaveBridge;
-      // The product may finish its worker-owned SQLite write while document teardown interrupts
-      // Window's journal write. Read both shipped authorities; never reconcile/migrate while auditing.
-      const outcomes = await Promise.allSettled([
-        bridge.open(key, true).then(async (session) => {
-          const latest = await session?.readLatest() ?? null;
-          return latest ? { ...latest, authority: "opfs-journal" as const } : null;
-        }),
-        bridge.openSqlite().then(async (sqlite) => {
-          const latest = await sqlite.read(key);
-          return latest ? { ...latest, authority: "sqlite-fallback" as const } : null;
-        }),
-      ]);
-      const candidates = outcomes.flatMap((outcome) =>
-        outcome.status === "fulfilled" && outcome.value ? [outcome.value] : []
-      );
-      bridge.lastError = candidates.length > 0 ? null : outcomes
-        .flatMap((outcome) => outcome.status === "rejected" ? [String(outcome.reason)] : [])
-        .join("; ") || null;
-      return candidates;
+      interface AutosaveBridge {
+        moduleUrl: string | null;
+        lastError: string | null;
+        open: (key: string, readOnly: boolean) => Promise<AutosaveSession | null>;
+      }
+      const bridge = (window as typeof window & Record<string, unknown>)[
+        globalName
+      ] as AutosaveBridge;
+      try {
+        const session = await bridge.open(key, true);
+        const latest = await session?.readLatest() ?? null;
+        bridge.lastError = null;
+        if (!latest || latest.state !== "snapshot") {
+          return { document: null, error: null, moduleUrl: bridge.moduleUrl };
+        }
+        const payload = latest.payload;
+        const pagesList = Array.isArray(payload.pagesList) ? payload.pagesList : null;
+        if (!pagesList) {
+          return { document: null, error: null, moduleUrl: bridge.moduleUrl };
+        }
+        return {
+          document: {
+            key,
+            raw: JSON.stringify(payload),
+            savedAt: typeof payload.savedAt === "string" ? payload.savedAt : latest.savedAt,
+            currentPageId:
+              typeof payload.currentPageId === "string" ? payload.currentPageId : null,
+            pagesList,
+          },
+          error: null,
+          moduleUrl: bridge.moduleUrl,
+        };
+      } catch (error) {
+        // A writer may be publishing the next immutable head while this advisory reader
+        // polls. Keep the failure for timeout diagnostics instead of masking it.
+        bridge.lastError = String(error);
+        return { document: null, error: bridge.lastError, moduleUrl: bridge.moduleUrl };
+      }
     },
     { globalName: BRIDGE_GLOBAL, key: autosaveKey },
   );
-  const latest = selectDurableStudioAutosaveCandidate(candidates);
-  if (latest?.state !== "snapshot" || !Array.isArray(latest.payload?.pagesList)) return null;
-  const payload = latest.payload;
-  return {
-    key: autosaveKey,
-    raw: JSON.stringify(payload),
-    savedAt: typeof payload.savedAt === "string" ? payload.savedAt : latest.savedAt,
-    currentPageId: typeof payload.currentPageId === "string" ? payload.currentPageId : null,
-    pagesList: payload.pagesList as StudioDurableAutosavePageRecord[],
-  };
+  return result.document;
 }
 
 /** Cause of the most recent failed durable read on this page, if there was one. */
@@ -335,17 +270,6 @@ export async function resolveDurableStudioAutosaveModuleUrl(
       resolveModuleUrl: () => Promise<string | null>;
     };
     return bridge.resolveModuleUrl();
-  }, BRIDGE_GLOBAL);
-}
-
-/** Preserve this URL before navigation, just as for the OPFS session module. */
-export async function resolveDurableStudioAutosaveSqliteModuleUrl(page: Page): Promise<string | null> {
-  await installBridge(page, null);
-  return page.evaluate(async (globalName) => {
-    const bridge = (window as typeof window & Record<string, unknown>)[globalName] as {
-      resolveSqliteModuleUrl: () => Promise<string | null>;
-    };
-    return bridge.resolveSqliteModuleUrl();
   }, BRIDGE_GLOBAL);
 }
 

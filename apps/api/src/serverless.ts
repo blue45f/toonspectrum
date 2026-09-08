@@ -35,8 +35,9 @@ type ServerlessRuntimeEnvironment = Partial<
 >;
 
 /**
- * This request-handler entry serves the general HTTP API. Native Socket.IO has a separate,
- * explicitly configured HTTP-server entry; changing this role must not replace the API surface.
+ * Vercel cannot own the long-lived Socket.IO lifecycle. A role typo or an accidentally shared
+ * deployment environment must reject the cold start instead of publishing a misleading,
+ * health-only serverless surface.
  */
 export function assertVercelServerlessRuntimeRole(
   environment: ServerlessRuntimeEnvironment = process.env,

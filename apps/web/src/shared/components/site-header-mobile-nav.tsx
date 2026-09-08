@@ -2,19 +2,18 @@ import {
   BarChart3,
   CalendarDays,
   Compass,
-  Gamepad2,
   Home,
   Library,
   MessageCircle,
   MessageSquareQuote,
-  Moon,
   Palette,
   Sparkles,
   Store,
   TrendingUp,
-  UserRound,
   UserRoundPen,
   X,
+  Moon,
+  Gamepad2,
 } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 
@@ -36,20 +35,16 @@ const MOBILE_NAV = [
   { i18n: "nav.reviews", href: "/reviews", icon: MessageSquareQuote },
   { i18n: "nav.community", href: "/community", icon: MessageCircle },
   { i18n: "footer.link.feedback", href: "/feedback", icon: MessageSquareQuote },
+  { i18n: "nav.create", href: "/create", icon: Palette },
   { i18n: "nav.shaper", href: "/shaper", icon: UserRoundPen },
   { i18n: "nav.insights", href: "/insights", icon: BarChart3 },
-  { i18n: "route.me", href: "/me", icon: UserRound },
 ];
 
-// 모바일 하단 탭바는 목적이 겹치지 않는 핵심 5개 진입점만 제공한다.
-// 전체 목적지와 읽기 서재는 상단 오버플로 메뉴에서 계속 접근할 수 있다.
-const MOBILE_TABS = [
-  { i18n: "nav.home", href: "/", icon: Home, exact: true },
-  { i18n: "nav.discover", href: "/explore", icon: Compass, exact: false },
-  { i18n: "nav.studio", href: "/studio", icon: Palette, exact: false },
-  { i18n: "nav.assets", href: "/market", icon: Store, exact: false },
-  { i18n: "route.me", href: "/me", icon: UserRound, exact: false },
-] as const;
+// 모바일 하단 탭바: 빠른 접근용 핵심 4개 (+ 서재). 나머지(연재·리뷰·인사이트)는
+// 햄버거 오버플로 메뉴로 모두 도달 가능하다.
+const MOBILE_TABS = MOBILE_NAV.filter((n) =>
+  ["/", "/studio", "/market", "/create", "/explore"].includes(n.href)
+);
 
 interface MobileHeaderNavigationProps {
   menuOpen: boolean;
@@ -198,7 +193,7 @@ export function MobileHeaderNavigation({
 
   return (
     <>
-      {/* 오버플로 메뉴 (<1360px): 전체 목적지 + 읽기 서재 */}
+      {/* 오버플로 메뉴 (<1360px): 목적지 전부 + 내 서재 */}
       {menuOpen && (
         <div ref={overlayRef} className="fixed inset-0 z-[60] min-[1360px]:hidden">
           <div
@@ -222,7 +217,7 @@ export function MobileHeaderNavigation({
                 data-autofocus
                 onClick={closeMenu}
                 aria-label={`${t("nav.allMenu")} ${t("common.close")}`}
-                className="grid size-11 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+                className="grid size-10 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
               >
                 <X size={18} />
               </button>
@@ -238,7 +233,7 @@ export function MobileHeaderNavigation({
                         href={n.href}
                         aria-current={active ? "page" : undefined}
                         className={cx(
-                          "group flex min-h-11 items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-150",
+                          "group flex items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-150",
                           active
                             ? "border-accent/35 bg-accent-soft text-accent"
                             : "border-line bg-card/60 text-fg-2 hover:border-line-strong hover:bg-raised/70 hover:text-fg"
@@ -270,7 +265,7 @@ export function MobileHeaderNavigation({
                     href="/library"
                     aria-current={isActive("/library") ? "page" : undefined}
                     className={cx(
-                      "group flex min-h-11 items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-150",
+                      "group flex items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-150",
                       isActive("/library")
                         ? "border-accent/35 bg-accent text-on-accent"
                         : "border-line bg-card/60 text-fg-2 hover:border-line-strong hover:bg-raised/70 hover:text-fg"
@@ -301,14 +296,14 @@ export function MobileHeaderNavigation({
         </div>
       )}
 
-      {/* 모바일 하단 탭바 (<768px): 핵심 5개 진입점만 제공한다.
+      {/* 모바일 하단 탭바 (<768px): 빠른 접근용. 전체 목적지는 상단 햄버거 메뉴.
           /studio 등 자체 하단 도구막대를 쓰는 라우트에서는 겹치므로 hideBottomTabs로 뺀다. */}
       {!hideBottomTabs && (
         <nav
           aria-label={t("nav.quickAccess")}
           className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden"
         >
-          <div className="mx-auto grid max-w-md grid-cols-5 pb-[env(safe-area-inset-bottom)]">
+          <div className="mx-auto grid max-w-md grid-cols-6 pb-[env(safe-area-inset-bottom)]">
             {MOBILE_TABS.map((n) => {
               const active = isActive(n.href, n.exact);
               const Icon = n.icon;
@@ -318,7 +313,7 @@ export function MobileHeaderNavigation({
                   href={n.href}
                   aria-current={active ? "page" : undefined}
                   className={cx(
-                    "relative flex min-h-11 flex-col items-center justify-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
+                    "relative flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
                     active ? "text-accent" : "text-fg-3"
                   )}
                 >
@@ -330,6 +325,17 @@ export function MobileHeaderNavigation({
                 </Link>
               );
             })}
+            <Link
+              href="/library"
+              aria-current={isActive("/library") ? "page" : undefined}
+              className={cx(
+                "flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
+                isActive("/library") ? "text-accent" : "text-fg-3"
+              )}
+            >
+              <Library size={19} strokeWidth={isActive("/library") ? 2.4 : 1.9} />
+              {t("nav.library")}
+            </Link>
           </div>
         </nav>
       )}

@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 
-import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { readStudioBg3dEditorSource } from "../bg3d/read-studio-bg3d-editor-source";
@@ -25,31 +24,6 @@ function sliceBetween(source: string, startToken: string, endToken: string): str
 
 function expectPreviewVariant(source: string, preview: string, variant: string): void {
   expect(source).toMatch(new RegExp(`preview: "${preview}",\\s+previewVariant: "${variant}"`, "u"));
-}
-
-function readBackgroundToolbars(): string {
-  const url = new URL("../bg3d/StudioBg3dEditorViewport.tsx", import.meta.url);
-  const file = ts.createSourceFile(
-    url.pathname, readFileSync(url, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX,
-  );
-  const toolbars: ts.JsxElement[] = [];
-  function visit(node: ts.Node): void {
-    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(file) === "div") {
-      const attributes = node.openingElement.attributes.properties;
-      const isViewportControl = attributes.some((attribute) =>
-        ts.isJsxAttribute(attribute) && attribute.name.getText(file) === "data-bg3d-viewport-control"
-      );
-      const isToolbar = attributes.some((attribute) =>
-        ts.isJsxAttribute(attribute) && attribute.name.getText(file) === "className"
-        && /absolute (?:left|right)-2 top-2 z-10 grid/u.test(attribute.initializer?.getText(file) ?? "")
-      );
-      if (isViewportControl && isToolbar) toolbars.push(node);
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(file);
-  expect(toolbars).toHaveLength(2);
-  return toolbars.map((toolbar) => toolbar.getText(file)).join("\n");
 }
 
 describe("Studio 3D viewport Motion Coach integration", () => {
@@ -87,7 +61,14 @@ describe("Studio 3D viewport Motion Coach integration", () => {
   });
 
   it("replaces native background toolbar titles and explains unavailable actions", () => {
-    const toolbar = readBackgroundToolbars();
+    const toolbar = sliceBetween(
+      backgroundSource,
+      '"absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col"',
+      // Marks the drag-hint block that follows the toolbar. The trailing `?` is deliberately not
+      // part of the token: the hint's guard gains clauses (it is now also suppressed while the
+      // scene is empty), and this slice is about where the toolbar ends, not how the hint is gated.
+      "{!immersiveSceneActive && !physicsInteractionLocked && !viewportHinted"
+    );
 
     expect(toolbar).toContain("<StudioToolHintTarget");
     expect(toolbar).not.toContain("title=");

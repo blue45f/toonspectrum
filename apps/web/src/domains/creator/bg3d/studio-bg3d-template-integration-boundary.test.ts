@@ -34,7 +34,7 @@ function sourceBetween(startMarker: string, endMarker: string): string {
 describe("Studio BG3D user-template integration boundary", () => {
   it("saves only a lossless canonical runtime adapter document", () => {
     const save = sourceBetween(
-      "const handleSaveSceneAsTemplate = async (",
+      "const handleSaveSceneAsTemplate = async () =>",
       "const handleDeleteTemplate = async",
     );
 
@@ -81,7 +81,7 @@ describe("Studio BG3D user-template integration boundary", () => {
   it("cleans only cache entries created by this queued template and never live scene entries", () => {
     const cacheAdmission = sourceBetweenIn(
       admissionSource,
-      "type StudioBg3dModelAdmissionArgs = {",
+      "export async function admitAndCacheStudioBg3dModel(",
       "export function disposeStudioBg3dModelCache(",
     );
     const apply = sourceBetween(
@@ -90,11 +90,9 @@ describe("Studio BG3D user-template integration boundary", () => {
     );
 
     expect(cacheAdmission).toContain("readonly onCacheEntryCreated?:");
-    expect(cacheAdmission).toContain("args: StudioBg3dModelAdmissionArgs,");
-    const cacheInsert = cacheAdmission.indexOf("args.cache.set(args.record.id, entry)");
-    const creationCallback = cacheAdmission.indexOf("args.onCacheEntryCreated?.(args.record.id, entry)");
-    expect(cacheInsert).toBeGreaterThanOrEqual(0);
-    expect(creationCallback).toBeGreaterThan(cacheInsert);
+    expect(cacheAdmission.indexOf("args.cache.set(args.record.id, entry)")).toBeLessThan(
+      cacheAdmission.indexOf("args.onCacheEntryCreated?.(args.record.id, entry)"),
+    );
     expect(apply).not.toContain("cacheIdsBefore");
     expect(apply).toContain("const templateOwnedCacheEntries = new Map<string, ModelRootCacheEntry>()");
     expect(apply).toContain("onCacheEntryCreated: (storageId, cacheEntry) =>");

@@ -11,7 +11,6 @@ import {
 import { loadStudioBg3dBundledEnvironmentSource } from "./studio-bg3d-bundled-environment-loader";
 import {
   STUDIO_BG3D_ENVIRONMENT_ASSETS_V3,
-  STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
   getStudioBg3dEnvironmentAsset,
   getStudioBg3dEnvironmentAssetByHash,
   isStudioBg3dEnvironmentAssetId,
@@ -258,7 +257,7 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
 
   it("publishes the environments as usable samples and preserves metres through insertion", async () => {
     expect(SAMPLE_BG3D_MODEL_ENTRIES).toEqual(expect.arrayContaining(
-      STUDIO_BG3D_ENVIRONMENT_ASSETS_V6.slice(0, 6).map((asset) => expect.objectContaining({
+      STUDIO_BG3D_ENVIRONMENT_ASSETS_V3.map((asset) => expect.objectContaining({
         id: asset.id,
         name: asset.name,
         source: "sample",

@@ -83,6 +83,3 @@ export const dbClient = {
 export const dbPool = pool;
 export * from "./schema";
 export * from "./creator-asset-object-storage.schema";
-export * from "./creator-asset-platform.schema";
-export * from "./creator-asset-processing.schema";
-export * from "./creator-asset-rights-evidence.schema";

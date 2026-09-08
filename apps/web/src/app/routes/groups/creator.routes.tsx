@@ -1,13 +1,7 @@
 import { defineAppRoutes } from "../app-route-definition";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
-import { preloadStudioI18nCore } from "@/src/domains/creator/studio-i18n-priority-loader";
-
-function startStudioI18nCorePreload(): void {
-  // Full-catalog compatibility API `loadStudioI18nDictionaries()` remains available for
-  // explicit tooling. Route readiness intentionally starts only active-locale core strings.
-  void preloadStudioI18nCore().catch(() => undefined);
-}
+import { loadStudioI18nDictionaries } from "@/src/domains/creator/studio-i18n-loader";
 
 const StudioMusicPage = lazyRetry(
   () => import("@/src/domains/creator/music/StudioMusicPage").then((module) => ({ default: module.StudioMusicPage })),
@@ -40,11 +34,12 @@ const CharacterShaperLandingPage = lazyRetry(
   "CharacterShaperLandingPage",
 );
 const StudioBrushLabPage = lazyRetry(
-  () => {
-    startStudioI18nCorePreload();
-    return import("@/src/domains/creator/brush-lab/StudioBrushLabPage").then((module) => ({
-      default: module.StudioBrushLabPage,
-    }));
+  async () => {
+    const [module] = await Promise.all([
+      import("@/src/domains/creator/brush-lab/StudioBrushLabPage"),
+      loadStudioI18nDictionaries(),
+    ]);
+    return { default: module.StudioBrushLabPage };
   },
   "StudioBrushLabPage",
 );
@@ -60,11 +55,12 @@ const StudioManualPage = lazyRetry(
   "StudioManualPage",
 );
 const StudioRouter = lazyRetry(
-  () => {
-    startStudioI18nCorePreload();
-    return import("@/src/domains/creator/studio-router/StudioRouter").then((module) => ({
-      default: module.StudioRouter,
-    }));
+  async () => {
+    const [module] = await Promise.all([
+      import("@/src/domains/creator/studio-router/StudioRouter"),
+      loadStudioI18nDictionaries(),
+    ]);
+    return { default: module.StudioRouter };
   },
   "StudioRouter",
 );

@@ -73,42 +73,4 @@ describe("CharacterOperationCoordinator", () => {
     expect(result.lease.release()).toBe(false);
     expect(coordinator.snapshot()).toEqual([]);
   });
-
-  it("does not let a delayed old lease release a replacement with the same operation ID", () => {
-    const coordinator = new CharacterOperationCoordinator();
-    const old = coordinator.tryAcquire({
-      operationId: "export:1",
-      owner: "cancelled-export",
-      claims: [{ resource: "export-buffer", mode: "exclusive" }],
-    });
-    expect(old.ok).toBe(true);
-    if (!old.ok) return;
-    expect(coordinator.release("export:1")).toBe(true);
-
-    const replacement = coordinator.tryAcquire({
-      operationId: "export:1",
-      owner: "retried-export",
-      claims: [{ resource: "export-buffer", mode: "exclusive" }],
-    });
-    expect(replacement.ok).toBe(true);
-    if (!replacement.ok) return;
-
-    expect(old.lease.release()).toBe(false);
-    expect(old.lease.release()).toBe(false);
-    expect(coordinator.snapshot()).toMatchObject([
-      { operationId: "export:1", owner: "retried-export" },
-    ]);
-    expect(coordinator.tryAcquire({
-      operationId: "export:2",
-      owner: "competing-export",
-      claims: [{ resource: "export-buffer", mode: "exclusive" }],
-    }).ok).toBe(false);
-
-    expect(replacement.lease.release()).toBe(true);
-    expect(coordinator.tryAcquire({
-      operationId: "export:2",
-      owner: "competing-export",
-      claims: [{ resource: "export-buffer", mode: "exclusive" }],
-    }).ok).toBe(true);
-  });
 });

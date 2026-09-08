@@ -365,14 +365,14 @@ export interface StudioToolBeltContentHandlers {
    */
   activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   openFrameAnimationForSelected: () => void;
-  addBgScene: (bg: StudioBgScene) => boolean;
+  addBgScene: (bg: StudioBgScene) => void;
   addBubble: (
     variant: BubbleVariant,
     at?: { x: number; y: number; },
     editImmediately?: boolean
   ) => void;
   addBuiltinRasterAsset: (asset: StudioRasterAsset) => Promise<void>;
-  addCatalogElement: (item: { svg: string; width: number; height: number; label: string; }) => boolean;
+  addCatalogElement: (item: { svg: string; width: number; height: number; label: string; }) => void;
   /**
    * Elements 3D rail: open BG3D / VRM with a one-shot template·primitive·prop seed.
    * Host owns seed state so drag/drop and click share one entry.

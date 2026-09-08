@@ -1,16 +1,10 @@
-import {
-  createContext,
-  createElement,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useState } from "react";
 
 import { adminFetch, type AdminApiError, type AdminMe } from "./admin-client";
 
 import { useSession } from "@/src/compat/auth-session-store";
 
+// 관리자 콘솔 진입 게이트 — /admin과 분할 라우트(/admin/community, /admin/members)가 공유한다.
 export type AdminGate =
   | { kind: "loading" }
   | { kind: "guest" }
@@ -18,36 +12,12 @@ export type AdminGate =
   | { kind: "error"; message: string }
   | { kind: "admin"; me: AdminMe };
 
-export interface AdminGateState {
-  gate: AdminGate;
-  uid: string | undefined;
-}
-
-const AdminGateOverrideContext = createContext<AdminGateState | null>(null);
-
-/**
- * Reuses an already verified gate inside the routed Admin shell. Legacy member
- * and community pages continue to work standalone, but no longer repeat the
- * database-backed `/admin/me` check when embedded in AdminRouter.
- */
-export function AdminGateOverrideProvider({
-  value,
-  children,
-}: {
-  value: AdminGateState;
-  children: ReactNode;
-}) {
-  return createElement(AdminGateOverrideContext.Provider, { value }, children);
-}
-
-export function useAdminGate(): AdminGateState {
-  const override = useContext(AdminGateOverrideContext);
+export function useAdminGate(): { gate: AdminGate; uid: string | undefined } {
   const { data: session, status } = useSession();
   const uid = session?.user?.id;
   const [gate, setGate] = useState<AdminGate>({ kind: "loading" });
 
   useEffect(() => {
-    if (override) return;
     if (status === "unauthenticated") {
       setGate({ kind: "guest" });
       return;
@@ -56,25 +26,19 @@ export function useAdminGate(): AdminGateState {
       setGate({ kind: "loading" });
       return;
     }
-
     let alive = true;
     setGate({ kind: "loading" });
     adminFetch<AdminMe>("/me", uid)
-      .then((me) => {
-        if (alive) setGate({ kind: "admin", me });
-      })
-      .catch((error: AdminApiError) => {
+      .then((me) => alive && setGate({ kind: "admin", me }))
+      .catch((e: AdminApiError) => {
         if (!alive) return;
-        if (error.status === 401 || error.status === 403) {
-          setGate({ kind: "forbidden" });
-        } else {
-          setGate({ kind: "error", message: error.message });
-        }
+        if (e.status === 401 || e.status === 403) setGate({ kind: "forbidden" });
+        else setGate({ kind: "error", message: e.message });
       });
     return () => {
       alive = false;
     };
-  }, [override, status, uid]);
+  }, [status, uid]);
 
-  return override ?? { gate, uid };
+  return { gate, uid };
 }

@@ -6,8 +6,6 @@ import {
   type StudioLiveAuthTicketClientOptions,
 } from "./studio-live-auth-ticket-client";
 
-import { runtimeSocketEndpoint } from "./studio-live-socket-endpoint";
-
 import type { StudioLiveTransportFactory } from "./studio-live-collaboration-transport";
 import type { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
 import type { StudioLiveAuthTicketResponse } from "../../../shared/lib/studio-live-auth-ticket";
@@ -18,26 +16,14 @@ const MAX_AUTOMATIC_RETRY_ATTEMPTS = 5;
 
 type StudioServerLiveTransportFactoryBuilder = typeof createStudioServerLiveTransportFactory;
 
-let localTransportBuilderRequest: Promise<StudioServerLiveTransportFactoryBuilder> | null = null;
 let serverTransportBuilderRequest: Promise<StudioServerLiveTransportFactoryBuilder> | null = null;
 
 /**
  * The Socket.IO transport is ~4.5k lines and pulls the live wire protocol, the ink codec and the
  * lock ledger with it. None of that is needed to paint the editor, so it is fetched only once an
- * admission credential exists and a server transport is configured. Local-only rooms retain
- * their BroadcastChannel/Yjs lifecycle without downloading an unused Socket.IO client.
+ * admission credential exists — the point at which a collaboration channel is actually wanted.
  */
 function loadStudioServerLiveTransportFactoryBuilder(): Promise<StudioServerLiveTransportFactoryBuilder> {
-  if (!runtimeSocketEndpoint() && !import.meta.env.VITE_STUDIO_REALTIME_ORIGIN?.trim()) {
-    // Both server wrappers leave mode=local unchanged. Keep exactly that factory here.
-    localTransportBuilderRequest ??= import("./studio-live-collaboration-transport")
-      .then((module) => () => module.createStudioLocalLiveTransport)
-      .catch((error: unknown) => {
-        localTransportBuilderRequest = null;
-        throw error;
-      });
-    return localTransportBuilderRequest;
-  }
   serverTransportBuilderRequest ??= import("./studio-live-socket-transport")
     .then((module) => module.createStudioServerLiveTransportFactory)
     .catch((error: unknown) => {

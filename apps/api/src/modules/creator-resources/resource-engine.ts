@@ -17,14 +17,7 @@ const PAGE_SIZE = 12;
 const MAX_BODY = 2 * 1024 * 1024;
 const MAX_CACHE = 256;
 const LIMIT = 20;
-const USER_AGENT = "ToonSpectrum/1.0 (+https://www.toonstudio.cloud/about/crawler; blue45f@gmail.com)";
-const PROVIDER_KEY: Record<ResourceProvider, string> = {
-  met: "",
-  openlibrary: "",
-  openbd: "",
-  kakao: "KAKAO_REST_API_KEY",
-  bizinfo: "BIZINFO_API_KEY",
-};
+const PROVIDER_KEY = { met: "", kakao: "KAKAO_REST_API_KEY", bizinfo: "BIZINFO_API_KEY" } as const;
 function plainText(value: unknown, max = 1200): string {
   return textOf(value, 20000).replace(/<[^>]*>/gu, " ").replace(/&(nbsp|amp|lt|gt|quot);/gu, " ").replace(/\s+/gu, " ").trim().slice(0, max);
 }
@@ -34,47 +27,6 @@ function bizinfoLink(value: unknown): string {
 }
 function rowsOf(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
-}
-function validIsbn10(value: string): boolean {
-  if (!/^\d{9}[\dX]$/u.test(value)) return false;
-  const total = [...value].reduce((sum, digit, index) => sum + (digit === "X" ? 10 : Number(digit)) * (10 - index), 0);
-  return total % 11 === 0;
-}
-function validIsbn13(value: string): boolean {
-  if (!/^\d{13}$/u.test(value)) return false;
-  const total = [...value].reduce((sum, digit, index) => sum + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
-  return total % 10 === 0;
-}
-function normalizeIsbn(value: unknown): string {
-  const normalized = textOf(value, 100).replace(/[^0-9Xx]/gu, "").toUpperCase();
-  return validIsbn10(normalized) || validIsbn13(normalized) ? normalized : "";
-}
-function finiteNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-function validUpstreamShape(url: URL, value: unknown): boolean {
-  if (url.hostname === "api.openbd.jp") return Array.isArray(value);
-  const shape = recordOf(value);
-  if (url.hostname === "openlibrary.org") {
-    const total = finiteNumber(shape.numFound) ?? finiteNumber(shape.num_found);
-    return total !== null && total >= 0 && Array.isArray(shape.docs);
-  }
-  if (url.hostname === "www.bizinfo.go.kr") {
-    return Array.isArray(shape.jsonArray) || Array.isArray(recordOf(shape.jsonArray).item);
-  }
-  if (url.hostname === "dapi.kakao.com") {
-    return Array.isArray(shape.documents) && typeof recordOf(shape.meta).is_end === "boolean";
-  }
-  if (url.hostname === "collectionapi.metmuseum.org" && url.pathname.endsWith("/search")) {
-    return typeof shape.total === "number"
-      && Number.isSafeInteger(shape.total)
-      && shape.total >= 0
-      && (Array.isArray(shape.objectIDs) || shape.objectIDs === null);
-  }
-  if (url.hostname === "collectionapi.metmuseum.org" && url.pathname.includes("/objects/")) {
-    return typeof shape.objectID === "number" && typeof shape.isPublicDomain === "boolean";
-  }
-  return false;
 }
 async function limitedJson(response: Response): Promise<unknown> {
   if (!response.ok || response.redirected || !response.headers.get("content-type")?.toLowerCase().includes("json")) { await response.body?.cancel(); throw new Error("upstream_response"); }
@@ -136,19 +88,22 @@ export function createResourceEngine(options: ResourceEngineOptions) {
     if (budget >= 120) throw new Error("upstream_budget");
     budget += 1; active += 1;
     const task = (async () => {
-      const response = await options.fetch(url.href, {
-        headers: { Accept: "application/json", "User-Agent": USER_AGENT, ...headers },
-        signal: AbortSignal.timeout(6000),
-        redirect: "error",
-        credentials: "omit",
-      });
+      const response = await options.fetch(url.href, { headers: { Accept: "application/json", ...headers }, signal: AbortSignal.timeout(4500), redirect: "error", credentials: "omit" });
       if (response.status === 429 || response.status === 503) {
         cooldowns.set(url.hostname, now() + upstreamRetrySeconds(response.headers.get("retry-after"), now()) * 1000);
         await response.body?.cancel();
         throw new Error("upstream_cooldown");
       }
       const value = await limitedJson(response);
-      if (!validUpstreamShape(url, value)) throw new Error("upstream_schema");
+      const shape = recordOf(value);
+      const valid = url.hostname === "www.bizinfo.go.kr"
+        ? Array.isArray(shape.jsonArray) || Array.isArray(recordOf(shape.jsonArray).item)
+        : url.hostname === "dapi.kakao.com"
+          ? Array.isArray(shape.documents) && typeof recordOf(shape.meta).is_end === "boolean"
+          : url.pathname.endsWith("/search")
+            ? typeof shape.total === "number" && Number.isSafeInteger(shape.total) && shape.total >= 0 && (Array.isArray(shape.objectIDs) || shape.objectIDs === null)
+            : typeof shape.objectID === "number" && typeof shape.isPublicDomain === "boolean";
+      if (!valid) throw new Error("upstream_schema");
       const fetchedAt = new Date(now()).toISOString();
       const bytes = new TextEncoder().encode(JSON.stringify(value)).length;
       while (cache.size > 0 && (cache.size >= MAX_CACHE || cacheBytes + bytes > 8 * 1024 * 1024)) removeCached(cache.keys().next().value as string);
@@ -190,114 +145,6 @@ export function createResourceEngine(options: ResourceEngineOptions) {
     return { provider: "met", status: failed === ids.length && ids.length > 0 ? "unavailable" : failed ? "partial" : "ready", items,
       page, hasMore: page < 20 && data.total > page * PAGE_SIZE, fetchedAt: source.fetchedAt,
       message: failed ? "일부 자료를 조회하지 못했습니다. 다음 검색에서 다시 확인하세요." : "검색 결과 중 공개 이용과 미리보기가 확인된 자료만 표시합니다. 결과가 적어도 다음 페이지에 자료가 있을 수 있습니다." };
-  }
-  async function openLibrary(query: string, page: number): Promise<ResourceSearchResult> {
-    const url = new URL("https://openlibrary.org/search.json");
-    url.search = new URLSearchParams({
-      q: query,
-      page: String(page),
-      limit: String(PAGE_SIZE),
-      fields: "key,title,author_name,first_publish_year,isbn,language,edition_count,publisher",
-    }).toString();
-    const source = await request(url);
-    const data = recordOf(source.value);
-    const total = finiteNumber(data.numFound) ?? finiteNumber(data.num_found) ?? 0;
-    const items = rowsOf(data.docs).slice(0, PAGE_SIZE).map((raw) => {
-      const item = recordOf(raw);
-      const key = textOf(item.key, 120);
-      if (!/^\/(?:works|books)\/[A-Za-z0-9._-]+$/u.test(key)) return null;
-      const title = plainText(item.title, 300);
-      if (!title) return null;
-      const authors = rowsOf(item.author_name).map((author) => plainText(author, 100)).filter(Boolean).slice(0, 6);
-      const publishers = rowsOf(item.publisher).map((publisher) => plainText(publisher, 120)).filter(Boolean).slice(0, 3);
-      const languages = rowsOf(item.language).map((language) => textOf(language, 20)).filter(Boolean).slice(0, 4);
-      const isbns = rowsOf(item.isbn).map(normalizeIsbn).filter(Boolean).slice(0, 3);
-      const firstYear = finiteNumber(item.first_publish_year);
-      const editionCount = finiteNumber(item.edition_count);
-      const description = [
-        firstYear ? `초판 ${Math.round(firstYear)}` : "",
-        editionCount ? `확인 판본 ${Math.round(editionCount)}개` : "",
-        languages.length ? `언어 ${languages.join(", ")}` : "",
-      ].filter(Boolean).join(" · ");
-      return parseResource({
-        id: `openlibrary:${key.slice(key.lastIndexOf("/") + 1)}`,
-        provider: "openlibrary",
-        title,
-        creator: authors.join(", "),
-        description,
-        sourceUrl: `https://openlibrary.org${key}`,
-        credit: publishers.join(", "),
-        dateLabel: firstYear ? String(Math.round(firstYear)) : "",
-        isbn: isbns.join(" "),
-        license: "metadata-only",
-        fetchedAt: source.fetchedAt,
-      });
-    }).filter((item): item is CreatorResource => item !== null);
-    return {
-      provider: "openlibrary",
-      status: "ready",
-      items,
-      page,
-      hasMore: page < 20 && total > page * PAGE_SIZE,
-      fetchedAt: source.fetchedAt,
-      message: "Open Library의 사람 중심 저용량 검색 메타데이터입니다. 표지·원문 재배포 권한을 의미하지 않으며 대량 카탈로그 수집에는 공식 데이터 덤프를 사용해야 합니다.",
-    };
-  }
-  async function openBd(query: string, page: number): Promise<ResourceSearchResult> {
-    const isbn = normalizeIsbn(query);
-    if (!isbn || page > 1) {
-      return {
-        provider: "openbd",
-        status: "ready",
-        items: [],
-        page,
-        hasMore: false,
-        fetchedAt: null,
-        message: "openBD는 일본 도서의 ISBN-10 또는 ISBN-13 정확 조회에 사용합니다.",
-      };
-    }
-    const url = new URL("https://api.openbd.jp/v1/get");
-    url.search = new URLSearchParams({ isbn }).toString();
-    const source = await request(url);
-    const rows = rowsOf(source.value);
-    const raw = rows[0];
-    if (!raw) {
-      return {
-        provider: "openbd",
-        status: "ready",
-        items: [],
-        page,
-        hasMore: false,
-        fetchedAt: source.fetchedAt,
-        message: "openBD에서 일치하는 일본 도서 판본을 찾지 못했습니다.",
-      };
-    }
-    const item = recordOf(raw);
-    const summary = recordOf(item.summary);
-    const title = plainText(summary.title, 300);
-    const resultIsbn = normalizeIsbn(summary.isbn) || isbn;
-    const resource = title ? parseResource({
-      id: `openbd:${resultIsbn}`,
-      provider: "openbd",
-      title,
-      creator: plainText(summary.author, 300),
-      description: [plainText(summary.series, 200), plainText(summary.volume, 100)].filter(Boolean).join(" · "),
-      sourceUrl: "https://openbd.jp/",
-      credit: plainText(summary.publisher, 300),
-      dateLabel: plainText(summary.pubdate, 30),
-      isbn: resultIsbn,
-      license: "book-promotion",
-      fetchedAt: source.fetchedAt,
-    }) : null;
-    return {
-      provider: "openbd",
-      status: resource ? "ready" : "partial",
-      items: resource ? [resource] : [],
-      page,
-      hasMore: false,
-      fetchedAt: source.fetchedAt,
-      message: "openBD의 일본 도서 소개용 서지정보입니다. 데이터를 임의로 변경하거나 원본 데이터베이스 형태로 재판매하지 않으며 수정·삭제를 서비스에 반영해야 합니다.",
-    };
   }
   async function kakao(query: string, page: number, key: string): Promise<ResourceSearchResult> {
     const url = new URL("https://dapi.kakao.com/v3/search/book");
@@ -356,13 +203,10 @@ export function createResourceEngine(options: ResourceEngineOptions) {
       takeClient(clientId);
       const provider: ResourceProvider = input.provider;
       const result = (status: "not_configured" | "unavailable", message: string): ResourceSearchResult => ({ provider, status, items: [], page, hasMore: false, fetchedAt: null, message });
-      const keyName = PROVIDER_KEY[provider];
-      const key = keyName ? options.env()[keyName]?.trim() ?? "" : "";
-      if (keyName && !key) return result("not_configured", "서버 API 인증키가 등록되지 않았습니다. 공식 사이트에서 직접 확인할 수 있습니다.");
+      const key = options.env()[PROVIDER_KEY[provider]]?.trim() ?? "";
+      if (provider !== "met" && !key) return result("not_configured", "서버 API 인증키가 등록되지 않았습니다. 공식 사이트에서 직접 확인할 수 있습니다.");
       try {
         if (provider === "met") return await met(input.q.trim(), page);
-        if (provider === "openlibrary") return await openLibrary(input.q.trim(), page);
-        if (provider === "openbd") return await openBd(input.q.trim(), page);
         if (provider === "kakao") return await kakao(input.q.trim(), page, key);
         return await bizinfo(input.q.trim(), page, key);
       } catch {

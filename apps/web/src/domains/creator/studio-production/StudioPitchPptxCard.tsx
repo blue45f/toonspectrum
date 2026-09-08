@@ -7,22 +7,10 @@ import {
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 
-export const STUDIO_PITCH_SLIDE_TITLE_MAX_LENGTH = 240;
-export const STUDIO_PITCH_SLIDE_BODY_MAX_LENGTH = 4_000;
-
 interface PitchSlideLike {
   readonly id: string;
   readonly title: string;
   readonly body: string;
-}
-
-function normalizedPitchTitle(value: string): string | null {
-  const normalized = value.trim().slice(0, STUDIO_PITCH_SLIDE_TITLE_MAX_LENGTH);
-  return normalized.length > 0 ? normalized : null;
-}
-
-function normalizedPitchBody(value: string): string {
-  return value.trim().slice(0, STUDIO_PITCH_SLIDE_BODY_MAX_LENGTH);
 }
 
 export function StudioPitchPptxCard({
@@ -86,16 +74,9 @@ export function StudioPitchPptxCard({
                 <input
                   defaultValue={slide.title}
                   key={`${slide.id}:title:${slide.title}`}
-                  maxLength={STUDIO_PITCH_SLIDE_TITLE_MAX_LENGTH}
                   className="mt-1 min-h-11 w-full rounded-lg border border-line bg-bg px-3 text-sm font-bold text-fg outline-none focus:border-accent"
                   onBlur={(event) => {
-                    const value = normalizedPitchTitle(event.currentTarget.value);
-                    if (value === null) {
-                      event.currentTarget.value = slide.title;
-                      onNotice("슬라이드 제목은 비워 둘 수 없습니다.");
-                      return;
-                    }
-                    event.currentTarget.value = value;
+                    const value = event.currentTarget.value.trim();
                     if (value !== slide.title) onChangeSlide(slide.id, { title: value });
                   }}
                 />
@@ -105,12 +86,10 @@ export function StudioPitchPptxCard({
                 <textarea
                   defaultValue={slide.body}
                   key={`${slide.id}:body:${slide.body}`}
-                  maxLength={STUDIO_PITCH_SLIDE_BODY_MAX_LENGTH}
                   rows={3}
                   className="mt-1 w-full resize-y rounded-lg border border-line bg-bg px-3 py-2 text-sm leading-relaxed text-fg outline-none focus:border-accent"
                   onBlur={(event) => {
-                    const value = normalizedPitchBody(event.currentTarget.value);
-                    event.currentTarget.value = value;
+                    const value = event.currentTarget.value.trim();
                     if (value !== slide.body) onChangeSlide(slide.id, { body: value });
                   }}
                 />

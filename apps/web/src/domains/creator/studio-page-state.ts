@@ -1,7 +1,6 @@
 import type { StudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
 import type { StudioPaperSurfaceSettings } from "./brush/studio-paper-granulation-runtime";
 import type { DialogueLocaleMap } from "./lettering/studio-dialogue-translate";
-import type { StudioLayerComp } from "./layer/studio-layer-comps";
 import type { AnimationTimelineDoc } from "./studio-anim-tracks";
 import type { El } from "./studio-element-model";
 import type { LayerGroup } from "./studio-layers";
@@ -31,7 +30,6 @@ export interface PageState {
   paperGrainVisible?: boolean;
   grade?: PageGrade; // 페이지 전체 색보정(밝기/대비/채도/색조/세피아/흑백/비네트). 미설정=보정 없음.
   groups?: LayerGroup[]; // 레이어 그룹(폴더). 미설정=그룹 없음.
-  layerComps?: StudioLayerComp[]; // 페이지 소유 표시 상태 프리셋. 미설정=저장된 콤프 없음.
   animTimeline?: AnimationTimelineDoc; // 다중 레이어 타임라인(studio-anim-tracks). 미설정=타임라인 없음(기존 문서 100% 호환).
   name?: string; // 페이지 이름(스트립 표시) — studio-page-meta 관리. 미설정=자동 이름("1페이지").
   note?: string; // 콘티 메모 — 미설정=없음. 빈 값 저장 시 키 제거로 레거시 직렬화 형태 유지.

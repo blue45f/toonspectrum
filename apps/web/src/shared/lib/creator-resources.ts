@@ -1,7 +1,6 @@
 /** Versioned, dependency-free contracts shared by the API, browser and regression tests. */
-export type ResourceProvider = "met" | "openlibrary" | "openbd" | "kakao" | "bizinfo";
+export type ResourceProvider = "met" | "kakao" | "bizinfo";
 export type ResourceStatus = "ready" | "partial" | "not_configured" | "unavailable";
-export type ResourceLicense = "CC0" | "metadata-only" | "book-promotion";
 export interface CreatorResource {
   id: string;
   provider: ResourceProvider;
@@ -9,7 +8,7 @@ export interface CreatorResource {
   creator: string;
   description: string;
   sourceUrl: string;
-  license: ResourceLicense;
+  license: "CC0" | "metadata-only";
   licenseUrl: string;
   credit: string;
   fetchedAt: string;
@@ -29,11 +28,7 @@ export interface ResourceSearchResult {
   message: string;
 }
 export const RESOURCE_LABELS: Record<ResourceProvider, string> = {
-  met: "The Met · 공개 미술 자료",
-  openlibrary: "Open Library · 글로벌 도서",
-  openbd: "openBD · 일본 서지",
-  kakao: "카카오 · 도서 검색",
-  bizinfo: "기업마당 · 지원사업",
+  met: "The Met · 공개 미술 자료", kakao: "카카오 · 도서 검색", bizinfo: "기업마당 · 지원사업",
 };
 export function recordOf(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -53,17 +48,11 @@ export function httpsUrl(value: unknown, hosts?: readonly string[]): string {
 }
 const SOURCE_HOSTS: Record<ResourceProvider, readonly string[]> = {
   met: ["www.metmuseum.org", "metmuseum.org"],
-  openlibrary: ["openlibrary.org", "www.openlibrary.org"],
-  openbd: ["openbd.jp", "www.openbd.jp"],
   kakao: ["search.daum.net", "book.daum.net", "m.search.daum.net"],
   bizinfo: ["www.bizinfo.go.kr", "bizinfo.go.kr"],
 };
 export function isProvider(value: unknown): value is ResourceProvider {
-  return value === "met"
-    || value === "openlibrary"
-    || value === "openbd"
-    || value === "kakao"
-    || value === "bizinfo";
+  return value === "met" || value === "kakao" || value === "bizinfo";
 }
 export function dateOnly(value: unknown): string | undefined {
   const raw = textOf(value, 10);
@@ -95,20 +84,12 @@ export function parseResource(value: unknown): CreatorResource | null {
   const sourceUrl = httpsUrl(v.sourceUrl, SOURCE_HOSTS[provider]);
   const fetchedAt = textOf(v.fetchedAt, 40);
   if (!id.startsWith(`${provider}:`) || id.length <= provider.length + 1 || !title || !sourceUrl || !Number.isFinite(Date.parse(fetchedAt))) return null;
-  const license: ResourceLicense = provider === "met" && v.license === "CC0"
-    ? "CC0"
-    : provider === "openbd" && v.license === "book-promotion"
-      ? "book-promotion"
-      : "metadata-only";
+  const license = provider === "met" && v.license === "CC0" ? "CC0" : "metadata-only";
   const imageUrl = license === "CC0" ? httpsUrl(v.imageUrl, ["images.metmuseum.org"]) : "";
-  const licenseUrl = license === "CC0"
-    ? "https://creativecommons.org/publicdomain/zero/1.0/"
-    : license === "book-promotion"
-      ? "https://openbd.jp/terms/"
-      : "";
   return {
-    id, provider, title, sourceUrl, fetchedAt, license, licenseUrl,
+    id, provider, title, sourceUrl, fetchedAt, license,
     creator: textOf(v.creator, 300), description: textOf(v.description, 1200), credit: textOf(v.credit, 500),
+    licenseUrl: license === "CC0" ? "https://creativecommons.org/publicdomain/zero/1.0/" : "",
     ...(imageUrl ? { imageUrl } : {}),
     dateLabel: textOf(v.dateLabel, 100), deadline: dateOnly(v.deadline),
     eligibility: textOf(v.eligibility, 300), isbn: textOf(v.isbn, 100),
@@ -155,7 +136,7 @@ export function parseWorkspace(raw: string | null): CreatorWorkspace {
     checks: [...new Set(v.checks.filter((item): item is string => typeof item === "string" && /^[\w-]{1,100}$/u.test(item)))],
   };
 }
-const markdownText = (value: string) => value.replace(/[\\[\]<>`*_]/gu, "\\$&");
+const markdownText = (value: string) => value.replaceAll("\\", "\\\\").replace(/[[\]<>`*_]/gu, "\\$&");
 export function attributionMarkdown(items: readonly CreatorResource[]): string {
   return "# 창작 자료 출처 기록\n\n검색·열람 권한은 이미지 재배포 허가와 다릅니다. 제작에 사용하기 전 원문 조건을 다시 확인하세요.\n\n" + items.map((item) =>
     `## ${markdownText(item.title)}\n- 제공처: ${RESOURCE_LABELS[item.provider]}\n- 저작자: ${markdownText(item.creator || "원문 확인")}\n- 원문: ${item.sourceUrl}\n- 이용조건: ${item.license}\n- 크레딧: ${markdownText(item.credit)}\n- 조회일: ${item.fetchedAt}\n`,

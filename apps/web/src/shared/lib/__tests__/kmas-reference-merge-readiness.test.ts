@@ -91,7 +91,5 @@ test("reference discovery has one labeled route in the public manifest", () => {
 
 test("reference discovery remains reachable from the public sitemap", () => {
   const source = readFileSync(resolve(process.cwd(), "apps/web/src/domains/legal/SitemapPage.tsx"), "utf8");
-  const tupleOccurrences = source.split('["/references",').length - 1;
-  const objectOccurrences = source.split('href: "/references"').length - 1;
-  assert.equal(tupleOccurrences + objectOccurrences, 1);
+  assert.equal(source.split('["/references",').length - 1, 1);
 });

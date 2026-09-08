@@ -336,13 +336,13 @@ const RAIL_TOOLS = [
   "펜 (B)",
   "지우개 (E)",
   // Fill: when no raster is selected the aria-label becomes the guard reason (still exposed).
-  { anyOf: ["색 채우기 (G)", "래스터 이미지 레이어를 먼저 선택하세요."] },
-  "색 가져오기 (I / Alt+클릭)",
-  "스마트 도형",
+  { anyOf: ["채우기 (G)", "래스터 이미지 레이어를 먼저 선택하세요."] },
+  "스포이드 (I / Alt+클릭)",
+  { anyOf: ["스마트 도형 켜기", "스마트 도형 끄기"] },
   "사각형 도형",
   "타원 도형",
-  "텍스트",
-  "말풍선",
+  "텍스트 추가",
+  "말풍선 추가",
   "이미지 추가",
   "참고 이미지",
 ] as const;
@@ -706,34 +706,17 @@ async function assertReferenceWindowToggle(page: Page): Promise<string[]> {
 }
 
 async function assertRailTools(page: Page): Promise<string[]> {
-  // Optional tools start hidden. Expose them through the shipped toolbar settings before
-  // checking the same complete rail; changing preferences directly would bypass this journey.
-  for (const [id, label] of [
-    ["smart-shape", "스마트 도형"],
-    ["shape-rect", "사각형 도형"],
-    ["shape-ellipse", "타원 도형"],
-    ["reference", "참고 이미지"],
-  ]) {
-    const tool = page.locator(`[data-studio-rail-tool-id="${id}"]`);
-    if (await tool.isVisible()) continue;
-    await page.getByRole("button", { name: "더보기 · 툴바 설정", exact: true }).click();
-    const hiddenTools = page.getByRole("dialog", { name: "숨긴 도구", exact: true });
-    await hiddenTools.getByRole("button", { name: label, exact: true }).click();
-    await hiddenTools.waitFor({ state: "hidden", timeout: 5_000 });
-    await tool.waitFor({ state: "visible", timeout: 5_000 });
-  }
-  const rail = page.locator('[data-studio-tool-rail="true"]');
   const failures: string[] = [];
   for (const entry of RAIL_TOOLS) {
     if (typeof entry === "string") {
-      const byLabel = rail.getByRole("button", { name: entry, exact: true }).first();
-      const byTitle = rail.locator(`[title="${entry}"]`).first();
+      const byLabel = page.getByRole("button", { name: entry }).first();
+      const byTitle = page.locator(`[title="${entry}"]`).first();
       const visible =
         (await byLabel.isVisible().catch(() => false)) ||
         (await byTitle.isVisible().catch(() => false));
       if (!visible) {
         if (entry === "이미지 추가") {
-          const img = rail.getByText("이미지 추가", { exact: true }).first();
+          const img = page.getByText("이미지 추가", { exact: true }).first();
           if ((await img.count().catch(() => 0)) > 0) continue;
         }
         failures.push(`좌측 레일 도구 미노출: ${entry}`);
@@ -743,8 +726,8 @@ async function assertRailTools(page: Page): Promise<string[]> {
     const ok = await Promise.any(
       entry.anyOf.map(async (label) => {
         const visible =
-          (await rail.getByRole("button", { name: label, exact: true }).first().isVisible().catch(() => false)) ||
-          (await rail.locator(`[title="${label}"]`).first().isVisible().catch(() => false));
+          (await page.getByRole("button", { name: label }).first().isVisible().catch(() => false)) ||
+          (await page.locator(`[title="${label}"]`).first().isVisible().catch(() => false));
         if (!visible) throw new Error("miss");
         return true;
       })
@@ -894,7 +877,6 @@ async function main() {
   const port = await findFreePort({ unavailableMessage: "could not allocate port" });
   const url = `http://127.0.0.1:${port}/studio`;
   let child: ChildProcess | null = null;
-  let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
   let exitCode: number;
 
   try {
@@ -913,7 +895,7 @@ async function main() {
     });
     log(`preview ready @ ${url}`);
 
-    browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({ headless: true });
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
     const page = await ctx.newPage();
     await page.addInitScript(({ key }) => {
@@ -966,11 +948,12 @@ async function main() {
       log(`menubar text:\n${menubar}`);
       exitCode = 1;
     }
+
+    await browser.close();
   } catch (err) {
     console.error("[verify-menus] fatal:", err);
     exitCode = 1;
   } finally {
-    await browser?.close().catch(() => undefined);
     if (child && !child.killed) {
       child.kill("SIGTERM");
       setTimeout(() => {

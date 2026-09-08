@@ -193,7 +193,6 @@ function makeBinding(overrides: Partial<CharacterShaperBinding> = {}): Character
       steps: [],
       availability: { status: "available", reason: null, missing: [] },
     })),
-    commitPreset: vi.fn(),
     commit: vi.fn((item: CharacterSlotEntry): CharacterShaperCommitResult => ({
       ok: true,
       plan: { entryId: item.id, slot: item.slot, label: item.label, steps: [], availability: { status: "available", reason: null, missing: [] } },

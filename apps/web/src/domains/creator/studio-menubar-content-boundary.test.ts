@@ -135,21 +135,9 @@ describe("Studio menubar ownership boundary", () => {
     expect(menubar).toContain("globalThis.setTimeout(() => setProjectActionsOpen(false), 0)");
     expect(page).toContain("exportMenuRef={exportMenuRef}");
     expect(page).toContain("projectActionsRef={projectActionsRef}");
-    expect(page.match(/useStudioMenuPopoverDismiss\(\{/g)).toHaveLength(2);
-    for (const menu of ["exportMenu", "projectActions"] as const) {
-      expect(page).toContain(`open: ${menu}Open, triggerRef: ${menu}Ref,`);
-    }
-    expect(page).toContain("onDismiss: () => setExportMenuOpen(false)");
-    expect(page).toContain("onDismiss: () => setProjectActionsOpen(false)");
-    const dismissal = moduleEdges(
-      "./studio-cuttoon-editor/runtime/useStudioMenuPopoverDismiss.ts"
-    ).source;
-    const keyDown = dismissal.slice(dismissal.indexOf("const onKeyDown ="));
-    expect(keyDown).toContain('event.key !== "Escape" || event.defaultPrevented');
-    expect(keyDown).toContain(
-      'triggerRef.current?.querySelector<HTMLButtonElement>("button[aria-expanded]")?.focus()'
+    expect(page).toContain(
+      'projectActionsRef.current?.querySelector<HTMLButtonElement>("button")?.focus()'
     );
-    expect(dismissal.slice(0, dismissal.indexOf("const onKeyDown ="))).not.toContain("?.focus()");
   });
 
   it("keeps handler identity stable while render-time lock copy remains a normal prop", () => {

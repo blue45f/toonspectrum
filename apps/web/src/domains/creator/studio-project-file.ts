@@ -19,8 +19,6 @@ import {
   type StudioLinked3dRenderElementLike,
 } from "./studio-linked-3d-render-document";
 import { normalizePageReviewState } from "./studio-page-review";
-import { parseStudioLayerComps } from "./layer/studio-layer-comps-document";
-import { studioPageToCrdtPage } from "./live/studio-crdt-page-payload";
 import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
 import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
 import {
@@ -170,8 +168,6 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
     if (page.drawingAssist !== undefined && !drawingAssist) {
       throw new Error("페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다.");
     }
-    const layerComps = page.layerComps === undefined ? undefined : parseStudioLayerComps(page.layerComps);
-    if (layerComps === null) throw new Error("페이지 레이어 콤프가 손상되었거나 허용 범위를 벗어났습니다.");
     const shared3dStage = page.shared3dStage === undefined
       ? undefined
       : migrateStudioShared3dStageCollectionDocument(page.shared3dStage);
@@ -201,24 +197,14 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
         throw new Error(`페이지 연결형 3D 렌더 인덱스가 Canvas 권위와 다릅니다: ${validation.message}`);
       }
     }
-    const canonicalPage = {
+    return {
       ...page,
       ...(review === undefined ? {} : { review }),
       elements,
       ...(drawingAssist ? { drawingAssist } : {}),
-      ...(layerComps ? { layerComps } : {}),
       ...(shared3dStage ? { shared3dStage } : {}),
       ...(linked3dRender ? { linked3dRender } : {}),
     };
-    if (layerComps !== undefined) {
-      try {
-        // Use the same normalized, aggregate page envelope as collaboration.
-        studioPageToCrdtPage(canonicalPage);
-      } catch (cause) {
-        throw new Error("레이어 콤프와 페이지 설정이 저장 가능한 범위를 벗어났습니다.", { cause });
-      }
-    }
-    return canonicalPage;
   });
   const master = isRecord(project.master) && Array.isArray(project.master.elements)
     ? (() => {

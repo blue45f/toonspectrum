@@ -8,7 +8,10 @@ import {
   normalizeStudioGeneric3dSourceFormat,
 } from "../studio-generic-3d-workflow-metadata";
 
-import type { StudioBg3dResolvedDeviceQuality } from "./studio-bg3d-device-quality";
+import {
+  deriveStudioBg3dGlbValidationPolicy,
+  type StudioBg3dResolvedDeviceQuality,
+} from "./studio-bg3d-device-quality";
 import {
   StudioBg3dStaleModalOperationError,
   studioBg3dModalOperationCoordinator,
@@ -45,9 +48,6 @@ import {
   preflightAndDeleteStudioBg3dPersistedModel,
   type StudioBg3dSceneRemovalSuccess,
 } from "./studio-bg3d-scene-removal";
-import {
-  deriveStudioBg3dSessionGlbValidationPolicy as deriveStudioBg3dGlbValidationPolicy,
-} from "./studio-bg3d-session-glb-policy";
 
 import type { BgPrimitive } from "../studio-background-3d-primitives";
 import type {

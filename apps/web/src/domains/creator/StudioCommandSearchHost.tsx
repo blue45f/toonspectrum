@@ -16,7 +16,6 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
 import {
   subscribeStudioCommandSearchRequests,
-  type StudioCommandSearchRequest,
   type StudioCommandSearchScope,
 } from "./studio-help-center-channel";
 
@@ -40,10 +39,6 @@ export type StudioCommandSearchHostProps = Omit<
   hideTrigger?: boolean;
   /** Make the owning surface visible before the global search dialog opens. */
   onRequestOpen?: () => void;
-  pendingRequest?: StudioCommandSearchRequest | null;
-  onRequestHandled?: () => void;
-  /** Transfer deferred requests only while this host's subscriptions are installed. */
-  onReadyChange?: (ready: boolean) => void;
   /**
    * 트리거와 같은 줄 오른쪽에 붙는 크롬 버튼(예: 인스펙터 접기).
    *
@@ -68,9 +63,6 @@ function isEditingTarget(target: EventTarget | null): boolean {
 export function StudioCommandSearchHost({
   hideTrigger = false,
   onRequestOpen,
-  pendingRequest,
-  onRequestHandled,
-  onReadyChange,
   trailing,
   ...dialogProps
 }: StudioCommandSearchHostProps) {
@@ -124,20 +116,10 @@ export function StudioCommandSearchHost({
   // 메뉴 › 도움말 › 기능·설정 찾기, 인스펙터 찾기, 모바일 도크 찾기. 그 진입점들은 순수
   // 데이터거나 다른 트리에 있어 이 상태를 직접 만질 수 없으므로 채널로 요청만 받는다
   // (§15.3 Help ▸ Command Search). 요청이 범위를 실어 보내면 그 범위로 연다.
-  useEffect(() => {
-    const unsubscribe = subscribeStudioCommandSearchRequests((request) => openSearch(request.scope ?? "all"));
-    onReadyChange?.(true);
-    return () => {
-      unsubscribe();
-      onReadyChange?.(false);
-    };
-  }, [openSearch, onReadyChange]);
-
-  useEffect(() => {
-    if (!pendingRequest) return;
-    openSearch(pendingRequest.scope ?? "all");
-    onRequestHandled?.();
-  }, [pendingRequest, onRequestHandled, openSearch]);
+  useEffect(
+    () => subscribeStudioCommandSearchRequests((request) => openSearch(request.scope ?? "all")),
+    [openSearch],
+  );
 
   return (
     <>

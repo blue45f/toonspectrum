@@ -107,18 +107,6 @@ describe("production domain environment validation", () => {
   });
 });
 
-describe("production OAuth alias state authority", () => {
-  it.each([
-    "KAKAO_OAUTH_CLIENT_ID", "KAKAO_OAUTH_CLIENT_SECRET",
-    "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET",
-  ])("requires state signing before accepting %s, and validates the supplied alias", (key) => {
-    const source = { NODE_ENV: "production", AUTH_SESSION_SECRET: "fixture-session-secret-with-at-least-32-bytes", [key]: "fixture-oauth-alias-value" };
-    const logger = { warn: vi.fn(), error: vi.fn() };
-    expect(() => validateEnv(source, logger)).toThrow(/AUTH_STATE_SECRET/u);
-    expect(validateEnv({ ...source, AUTH_STATE_SECRET: "fixture-state-secret-with-at-least-32-bytes" }, logger)).toMatchObject({ [key]: "fixture-oauth-alias-value" });
-  });
-});
-
 describe("authentication boundary environment validation", () => {
   it("accepts explicit auth proxy/rate-limit boundary values", () => {
     const logger = { warn: vi.fn(), error: vi.fn() };

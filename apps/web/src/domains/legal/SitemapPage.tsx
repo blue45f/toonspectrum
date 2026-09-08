@@ -1,171 +1,80 @@
-import { Container } from "@/shared/components/section";
-import { useT } from "@/shared/lib/i18n";
 import Link from "@/src/compat/router-link";
 
-interface SitemapLink {
-  readonly href: string;
-  readonly label: string;
-  readonly description: string;
-}
-
-interface SitemapSection {
-  readonly title: string;
-  readonly description: string;
-  readonly links: readonly SitemapLink[];
-}
-
-const SECTIONS: readonly SitemapSection[] = [
-  {
-    title: "만들기",
-    description: "그리기, 캐릭터, 브러시와 사운드 도구",
-    links: [
-      { href: "/studio", label: "창작 스튜디오", description: "웹툰·컷툰·일러스트 제작" },
-      { href: "/shaper", label: "캐릭터 셰이퍼", description: "3D 캐릭터 제작 도구 안내" },
-      { href: "/brush-lab", label: "브러시 연구실", description: "브러시를 만들고 시험하기" },
-      { href: "/music", label: "음악·사운드", description: "작품에 연결할 음원 만들기" },
-    ],
-  },
-  {
-    title: "작품",
-    description: "창작자가 공개한 작품과 시리즈",
-    links: [
-      { href: "/create", label: "창작 작품", description: "공개 작품·시리즈·팔로잉 피드" },
-      { href: "/create/challenges", label: "창작 챌린지", description: "주제별 창작 이벤트" },
-      { href: "/authors", label: "작가별 보기", description: "작가와 대표 작품 탐색" },
-    ],
-  },
-  {
-    title: "에셋",
-    description: "Studio에서 사용할 브러시·템플릿·3D 리소스",
-    links: [
-      { href: "/market", label: "창작 마켓", description: "추천 리소스와 카테고리" },
-      { href: "/market/browse", label: "에셋 탐색", description: "종류·사용권으로 검색" },
-      { href: "/market/library", label: "내 에셋", description: "획득한 리소스 관리" },
-      { href: "/market/wishlist", label: "찜한 에셋", description: "나중에 사용할 리소스" },
-    ],
-  },
-  {
-    title: "리서치",
-    description: "오늘의 영감, 작품·판본·공개 자료 조사",
-    links: [
-      { href: "/now", label: "오늘의 영감", description: "매일 바뀌는 장면 소재와 5컷 미션" },
-      { href: "/research", label: "창작 리서치 데스크", description: "작품·판본·자료·기회를 한 보드로 연결" },
-      { href: "/research/assets", label: "창작 레퍼런스", description: "공개 이용이 확인된 미술·복식·소품 자료" },
-      { href: "/research/books", label: "글로벌 판본 탐색", description: "Open Library·openBD 도서 메타데이터 검색" },
-    ],
-  },
-  {
-    title: "배우기",
-    description: "제작 강좌, 레퍼런스, 기획과 출판 준비",
-    links: [
-      { href: "/learn", label: "웹툰 제작 강좌", description: "기초부터 Studio 실습까지" },
-      { href: "/learn/glossary", label: "웹툰 용어 사전", description: "제작 용어와 예시" },
-      { href: "/learn/recipes", label: "제작 레시피", description: "연출을 직접 조작하며 학습" },
-      { href: "/references", label: "작품 레퍼런스", description: "공식 자료 탐색과 연구 노트" },
-      { href: "/story-lab", label: "스토리 연구실", description: "인물·욕망·갈등 설계" },
-      { href: "/opportunities", label: "작가 기회센터", description: "공모·지원사업 찾기" },
-      { href: "/publishing", label: "연재·출판 준비", description: "원고·권리·소개 자료 점검" },
-    ],
-  },
-  {
-    title: "발견",
-    description: "검색, 추천, 랭킹과 작품 데이터",
-    links: [
-      { href: "/search", label: "통합 검색", description: "작품·작가·태그 검색" },
-      { href: "/explore", label: "취향 탐색", description: "장르·태그·조건으로 둘러보기" },
-      { href: "/recommend", label: "맞춤 추천", description: "내 기록을 바탕으로 작품 추천" },
-      { href: "/ranking", label: "통합 랭킹", description: "여러 기준의 작품 순위" },
-      { href: "/calendar", label: "연재 캘린더", description: "요일별 연재 일정" },
-      { href: "/compare", label: "작품 비교", description: "두 작품의 주요 지표 비교" },
-      { href: "/random", label: "랜덤 발견", description: "조건에 맞는 작품 무작위 추천" },
-      { href: "/insights", label: "트렌드 인사이트", description: "장르·플랫폼 데이터 보기" },
-      { href: "/tags", label: "태그로 찾기", description: "인기·유사 태그 탐색" },
-      { href: "/news", label: "업계 소식", description: "웹툰·웹소설 관련 뉴스" },
-    ],
-  },
-  {
-    title: "커뮤니티",
-    description: "작품 리뷰, 토론과 공개 기능 제안",
-    links: [
-      { href: "/reviews", label: "리뷰", description: "독자 평가와 서평" },
-      { href: "/community", label: "커뮤니티", description: "작품·작가별 토론" },
-      { href: "/community/cafes", label: "장르 카페", description: "관심 장르별 모임" },
-      { href: "/feedback", label: "제보·제안", description: "버그·아이디어·기능 요청" },
-    ],
-  },
-  {
-    title: "마이·도움말",
-    description: "내 기록, 설정, 서비스 안내와 정책",
-    links: [
-      { href: "/me", label: "내 정보", description: "내 작품·활동·프로필" },
-      { href: "/library", label: "읽기 서재", description: "읽기 상태·평가·컬렉션" },
-      { href: "/settings", label: "설정", description: "표시·데이터·계정 설정" },
-      { href: "/about", label: "서비스 소개", description: "툰스튜디오의 기능과 원칙" },
-      { href: "/about/data", label: "데이터 출처", description: "공급자별 연결·상업 이용 준비 상태" },
-      { href: "/about/crawler", label: "공개 데이터 수집 정책", description: "자동수집 원칙·제외 범위·중지 요청" },
-      { href: "/guide", label: "랭킹 산정 방식", description: "데이터와 산식 설명" },
-      { href: "/support", label: "문의", description: "서비스 이용 문의" },
-      { href: "/contact", label: "광고·제휴", description: "비즈니스 문의 안내" },
-      { href: "/copyright", label: "저작권 안내", description: "콘텐츠·권리 정책" },
-      { href: "/terms", label: "이용약관", description: "서비스 이용 조건" },
-      { href: "/privacy", label: "개인정보처리방침", description: "개인정보 처리 기준" },
-    ],
-  },
-];
+const routes = [
+  ["/", "홈", "통합 카탈로그와 추천 진입점"],
+  ["/ranking", "통합 랭킹", "작품 랭킹"],
+  ["/search", "검색", "작품·작가 검색"],
+  ["/recommend", "맞춤 추천", "취향 기반 추천"],
+  ["/explore", "스펙트럼 탐색", "장르·태그 탐색"],
+  ["/calendar", "연재 캘린더", "요일별 연재"],
+  ["/reviews", "리뷰", "리뷰 피드"],
+  ["/community", "커뮤니티", "커뮤니티 허브"],
+  ["/community/cafes", "장르 카페", "카페 목록"],
+  ["/community/cafes/:slug", "카페 상세", "카페별 게시판"],
+  ["/community/post/:id", "게시글", "커뮤니티 글 상세"],
+  ["/community/:scope", "커뮤니티 범위", "범위별 커뮤니티"],
+  ["/library", "내 서재", "저장 작품"],
+  ["/compare", "작품 비교", "작품 비교 도구"],
+  ["/random", "랜덤 발견", "랜덤 추천"],
+  ["/insights", "트렌드 인사이트", "트렌드 대시보드"],
+  ["/feedback", "제보·제안 커뮤니티", "버그·아이디어·기능 요청과 처리 현황"],
+  ["/tags", "태그로 찾기", "태그 목록"],
+  ["/authors", "작가별 보기", "작가 디렉터리"],
+  ["/u/:userId", "회원 프로필", "사용자 공개 프로필"],
+  ["/news", "소식", "웹툰·웹소설 뉴스"],
+  ["/settings", "설정", "사용자 설정"],
+  ["/about", "소개", "서비스 소개"],
+  ["/guide", "랭킹 산정 방식", "랭킹 설명"],
+  ["/terms", "이용약관", "정책 문서"],
+  ["/privacy", "개인정보처리방침", "정책 문서"],
+  ["/copyright", "저작권 안내", "콘텐츠 안내"],
+  ["/contact", "광고·제휴 문의", "비즈니스 문의"],
+  ["/support", "문의", "공개 문의 게시판"],
+  ["/create", "창작 게시판", "창작 홈"],
+  ["/create/challenges", "창작 챌린지", "챌린지 목록"],
+  ["/create/series/:id", "시리즈 편집", "시리즈 창작"],
+  ["/create/:id", "창작물 상세", "작품 창작"],
+  ["/studio", "창작 스튜디오", "창작 도구"],
+  ["/references", "만화 레퍼런스", "KMAS 자료 탐색·개인 연구노트"],
+  ["/shaper", "캐릭터 셰이퍼", "3D 웹툰 캐릭터 프리셋 도구 안내"],
+  ["/market", "창작 마켓", "스튜디오 공유 리소스 마켓"],
+  ["/market/browse", "마켓 탐색", "리소스 검색·필터"],
+  ["/market/resource/:id", "리소스 상세", "공유 리소스 상세"],
+  ["/me", "내 정보", "계정 페이지"],
+  ["/title/:slug", "작품 상세", "작품 상세 정보"],
+  ["/author/:name", "작가 상세", "작가 작품"],
+  ["/pencafe/:name", "펜카페", "팬 커뮤니티"],
+  ["/admin", "관리자 콘솔", "운영 관리"],
+  ["/admin/community", "커뮤니티 관리", "운영자 모더레이션"],
+  ["/admin/members", "회원 관리", "운영자 회원 관리"],
+  ["/auth/callback", "인증 콜백", "로그인 처리"],
+  ["/design", "디자인 시스템", "토큰과 컴포넌트 스타일가이드"],
+] as const;
 
 export function SitemapPage() {
-  const t = useT();
-
   return (
-    <Container size="wide" className="py-6 sm:py-10">
-      <section
-        className="rounded-2xl border border-line bg-card p-5 sm:p-6"
-        aria-labelledby="sitemap-title"
-      >
-        <p className="eyebrow text-accent">BETA · 전체 메뉴</p>
-        <h1
-          id="sitemap-title"
-          className="mt-2 font-display text-[clamp(1.6rem,7vw,1.875rem)] font-bold sm:text-4xl"
-        >
-          {t("app.name")} 전체 메뉴
-        </h1>
+    <main className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6 sm:py-10">
+      <section className="rounded-2xl border border-line bg-card p-5 sm:p-6">
+        <p className="eyebrow text-accent">BETA Sitemap</p>
+        <h1 className="mt-2 font-display text-[clamp(1.6rem,7vw,1.875rem)] font-bold sm:text-4xl">툰스펙트럼 사이트맵</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-2">
-          만들기, 작품, 에셋, 리서치, 배우기와 발견 기능을 목적별로 모았습니다. 데이터 출처와
-          공개 수집 정책도 함께 확인할 수 있습니다.
+          탐색, 커뮤니티, 창작, 계정, 정책, 디자인 시스템 경로를 한 화면에 정리했습니다.
         </p>
       </section>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        {SECTIONS.map((section) => (
-          <section
-            key={section.title}
-            className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5"
-            aria-labelledby={`sitemap-${section.title}`}
+      <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {routes.map(([href, label, helper]) => (
+          <Link
+            key={href}
+            href={href}
+            className="grid min-h-28 gap-2 rounded-xl border border-line bg-card/70 p-4 transition-colors hover:border-accent/60"
           >
-            <h2 id={`sitemap-${section.title}`} className="text-lg font-bold text-fg">
-              {section.title}
-            </h2>
-            <p className="mt-1 text-sm text-fg-3">{section.description}</p>
-            <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-              {section.links.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className="group flex h-full min-h-20 flex-col justify-center rounded-xl border border-line bg-card/70 px-4 py-3 transition-colors hover:border-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-                  >
-                    <strong className="text-sm text-fg transition-colors group-hover:text-accent">
-                      {item.label}
-                    </strong>
-                    <span className="mt-1 text-xs leading-5 text-fg-3">
-                      {item.description}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+            <strong>{label}</strong>
+            <small className="text-sm leading-5 text-fg-2">{helper}</small>
+            <code className="text-xs text-fg-3 [overflow-wrap:anywhere]">{href}</code>
+          </Link>
         ))}
-      </div>
-    </Container>
+      </section>
+    </main>
   );
 }

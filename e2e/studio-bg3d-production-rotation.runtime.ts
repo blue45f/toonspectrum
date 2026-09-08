@@ -226,15 +226,6 @@ test("WebGPU 기즈모 연속 회전은 이전 실루엣을 누적하지 않는�
   });
   await page.setViewportSize({ width: 1_440, height: 1_000 });
   await page.goto("/studio", { waitUntil: "domcontentloaded" });
-  // New workspaces keep professional launchers in the real hidden-tools menu.
-  // Expose BG3D through that user action before exercising the unchanged renderer oracle.
-  const toolbarSettings = page.locator('[data-studio-tool-rail-settings="true"]').getByRole("button");
-  await expect(toolbarSettings).toBeVisible({ timeout: READINESS_TIMEOUT_MS });
-  await toolbarSettings.click();
-  const hiddenTools = page.getByRole("dialog", { name: "숨긴 도구", exact: true });
-  await expect(hiddenTools).toBeVisible();
-  await hiddenTools.getByRole("button", { name: /^(?:3D 배경|3D Background)$/iu }).click();
-  await expect(hiddenTools).toBeHidden();
   await expect(page.locator('[data-studio-rail-tool-id="bg3d"]').first())
     .toBeVisible({ timeout: READINESS_TIMEOUT_MS });
   try {

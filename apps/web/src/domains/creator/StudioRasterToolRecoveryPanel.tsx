@@ -28,7 +28,6 @@ import {
   type StudioInspectorRasterToolPolicy,
 } from "./studio-inspector-raster-tool-policy";
 import { STUDIO_EASE, STUDIO_FOCUS_RING, StudioContextPill } from "./studio-panel-ui";
-import { useStudioFilterDialogIntent } from "./studio-filter-dialog-intent";
 
 import type { StudioFilterKind } from "./filter/studio-filter-menu";
 import type {
@@ -530,7 +529,6 @@ export function StudioInspectorFilterLauncher({
   onRecover,
   onSelect,
 }: StudioInspectorFilterLauncherProps): ReactElement {
-  const preloadStudioFilterDialog = useStudioFilterDialogIntent();
   const descriptionId = useId();
   const gate = availability.entry;
   const policy = resolveStudioInspectorRasterToolPolicy(availability);
@@ -593,9 +591,6 @@ export function StudioInspectorFilterLauncher({
           aria-label={`${targetLabel} 필터 선택`}
           defaultValue=""
           disabled={disabled}
-          onFocus={disabled ? undefined : preloadStudioFilterDialog}
-          onPointerDown={disabled ? undefined : preloadStudioFilterDialog}
-          onPointerEnter={disabled ? undefined : preloadStudioFilterDialog}
           onChange={(event) => {
             const kind = event.currentTarget.value as StudioFilterKind;
             if (!kind) return;

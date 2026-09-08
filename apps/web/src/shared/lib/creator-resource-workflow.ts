@@ -6,32 +6,26 @@ export interface ProviderAvailability {
   provider: ResourceProvider;
   availability: "keyless" | "configured" | "not_configured";
 }
-const KEYLESS_PROVIDERS = new Set<ResourceProvider>(["met", "openlibrary", "openbd"]);
-const EXPECTED_PROVIDERS: ResourceProvider[] = ["met", "openlibrary", "openbd", "kakao", "bizinfo"];
 /** Public configuration summary only; it is not a health check or a credential endpoint. */
 export function providerAvailability(configured: { kakao: boolean; bizinfo: boolean }): ProviderAvailability[] {
   return [
     { provider: "met", availability: "keyless" },
-    { provider: "openlibrary", availability: "keyless" },
-    { provider: "openbd", availability: "keyless" },
     { provider: "kakao", availability: configured.kakao ? "configured" : "not_configured" },
     { provider: "bizinfo", availability: configured.bizinfo ? "configured" : "not_configured" },
   ];
 }
 export function parseProviderAvailability(value: unknown): ProviderAvailability[] | null {
-  if (!Array.isArray(value) || value.length !== EXPECTED_PROVIDERS.length) return null;
+  if (!Array.isArray(value) || value.length !== 3) return null;
   const entries: ProviderAvailability[] = [];
   for (const raw of value) {
     if (raw === null || typeof raw !== "object") return null;
     const item = raw as Record<string, unknown>;
-    if (!EXPECTED_PROVIDERS.includes(item.provider as ResourceProvider)) return null;
-    const provider = item.provider as ResourceProvider;
+    if (item.provider !== "met" && item.provider !== "kakao" && item.provider !== "bizinfo") return null;
     if (item.availability !== "keyless" && item.availability !== "configured" && item.availability !== "not_configured") return null;
-    if (KEYLESS_PROVIDERS.has(provider) !== (item.availability === "keyless")) return null;
-    if (entries.some((entry) => entry.provider === provider)) return null;
-    entries.push({ provider, availability: item.availability });
+    if ((item.provider === "met") !== (item.availability === "keyless")) return null;
+    if (entries.some((entry) => entry.provider === item.provider)) return null;
+    entries.push({ provider: item.provider, availability: item.availability });
   }
-  if (EXPECTED_PROVIDERS.some((provider) => !entries.some((entry) => entry.provider === provider))) return null;
   return entries;
 }
 /** Non-destructive restore: current resources/filled draft fields win; completion steps are unioned. */

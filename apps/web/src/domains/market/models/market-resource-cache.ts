@@ -4,6 +4,7 @@ import {
   CreatorMarketplaceResourceRecordSchema,
 } from "@/shared/lib/creator-marketplace-resource-contract";
 
+
 export interface CachedMarketPage {
   readonly savedAt: string;
   readonly items: readonly CreatorMarketplaceResourceRecord[];
@@ -11,23 +12,15 @@ export interface CachedMarketPage {
   readonly nextCursor: string | null;
 }
 
-export interface CachedMarketResource {
-  readonly savedAt: string;
-  readonly record: CreatorMarketplaceResourceRecord;
-}
-
 const PAGE_KEY_PREFIX = "toonspectrum.market.page.v1:";
 const RESOURCE_KEY_PREFIX = "toonspectrum.resource.v1:";
-const AUTHORITATIVE_RESOURCE_KEY_PREFIX = "toonspectrum.resource.authority.v2:";
 const MAX_STORED_CHARACTERS = 300_000;
 export const MARKET_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
 export const MARKET_CACHE_MAX_ENTRIES = 24;
 export const MARKET_CACHE_MAX_KEY_CHARACTERS = 2_048;
 
 function isMarketCacheKey(key: string): boolean {
-  return key.startsWith(PAGE_KEY_PREFIX)
-    || key.startsWith(RESOURCE_KEY_PREFIX)
-    || key.startsWith(AUTHORITATIVE_RESOURCE_KEY_PREFIX);
+  return key.startsWith(PAGE_KEY_PREFIX) || key.startsWith(RESOURCE_KEY_PREFIX);
 }
 
 function readJson(storage: Storage, key: string): unknown | null {
@@ -50,7 +43,7 @@ function removeStoredValue(storage: Storage, key: string): void {
   try {
     storage.removeItem(key);
   } catch {
-    // Treat failed removal as a cache miss on the next guarded read.
+    // 비공개 모드처럼 remove도 실패할 수 있다. 다음 읽기에서도 캐시 부재로 처리하면 충분하다.
   }
 }
 
@@ -70,7 +63,7 @@ function marketCacheKeys(storage: Storage): string[] {
 function pruneStoredMarketCache(
   storage: Storage,
   nowMs: number,
-  maxEntries = MARKET_CACHE_MAX_ENTRIES,
+  maxEntries = MARKET_CACHE_MAX_ENTRIES
 ): void {
   if (!Number.isFinite(nowMs)) return;
   const candidates: Array<{ key: string; savedAtMs: number }> = [];
@@ -100,7 +93,8 @@ function pruneStoredMarketCache(
 
   candidates.sort((left, right) => {
     if (left.savedAtMs !== right.savedAtMs) return right.savedAtMs - left.savedAtMs;
-    return left.key.localeCompare(right.key);
+    if (left.key === right.key) return 0;
+    return left.key < right.key ? -1 : 1;
   });
   for (const candidate of candidates.slice(Math.max(0, maxEntries))) {
     removeStoredValue(storage, candidate.key);
@@ -111,10 +105,12 @@ function prepareMarketCacheWrite(storage: Storage, key: string, nowMs: number): 
   pruneStoredMarketCache(storage, nowMs);
   try {
     if (storage.getItem(key) === null) {
+      // Reserve one slot before setItem so the new successful response always survives a
+      // same-millisecond timestamp tie and quota pressure can benefit from the eviction.
       pruneStoredMarketCache(storage, nowMs, MARKET_CACHE_MAX_ENTRIES - 1);
     }
   } catch {
-    // setItem below owns failure handling.
+    // setItem below owns failure handling; no unrelated storage is touched here.
   }
 }
 
@@ -122,7 +118,7 @@ function readFreshSavedAt(
   storage: Storage,
   key: string,
   value: unknown,
-  nowMs: number,
+  nowMs: number
 ): string | null {
   const savedAt = parseSavedAt(value);
   const savedAtMs = savedAt ? new Date(savedAt).getTime() : Number.NaN;
@@ -147,61 +143,9 @@ function parseRecords(value: unknown): CreatorMarketplaceResourceRecord[] {
   });
 }
 
-function readCachedResourceByPrefix(
-  prefix: string,
-  id: string,
-  nowMs: number,
-): CachedMarketResource | null {
-  if (typeof localStorage === "undefined") return null;
-  pruneStoredMarketCache(localStorage, nowMs);
-  const key = `${prefix}${id}`;
-  if (key.length > MARKET_CACHE_MAX_KEY_CHARACTERS) return null;
-  const cached = readJson(localStorage, key);
-  if (!cached || typeof cached !== "object") return null;
-  const savedAt = readFreshSavedAt(
-    localStorage,
-    key,
-    (cached as { savedAt?: unknown }).savedAt,
-    nowMs,
-  );
-  const [record] = parseRecords([(cached as { record?: unknown }).record]);
-  if (!savedAt) return null;
-  if (!record) {
-    removeStoredValue(localStorage, key);
-    return null;
-  }
-  return { savedAt, record };
-}
-
-function writeCachedResourceByPrefix(
-  prefix: string,
-  record: CreatorMarketplaceResourceRecord,
-): void {
-  if (typeof localStorage === "undefined") return;
-  const nowMs = Date.now();
-  const key = `${prefix}${record.id}`;
-  pruneStoredMarketCache(localStorage, nowMs);
-  if (key.length > MARKET_CACHE_MAX_KEY_CHARACTERS) return;
-  try {
-    const serialized = JSON.stringify({
-      savedAt: new Date(nowMs).toISOString(),
-      record,
-    });
-    if (serialized.length > MAX_STORED_CHARACTERS) {
-      removeStoredValue(localStorage, key);
-      pruneStoredMarketCache(localStorage, nowMs);
-      return;
-    }
-    prepareMarketCacheWrite(localStorage, key, nowMs);
-    localStorage.setItem(key, serialized);
-  } catch {
-    // A write failure is equivalent to an absent cache.
-  }
-}
-
 export function readCachedMarketPage(
   queryKey: string,
-  nowMs = Date.now(),
+  nowMs = Date.now()
 ): CachedMarketPage | null {
   if (typeof localStorage === "undefined") return null;
   pruneStoredMarketCache(localStorage, nowMs);
@@ -213,7 +157,7 @@ export function readCachedMarketPage(
     localStorage,
     key,
     (cached as { savedAt?: unknown }).savedAt,
-    nowMs,
+    nowMs
   );
   const items = parseRecords((cached as { items?: unknown }).items);
   if (!savedAt) return null;
@@ -225,15 +169,13 @@ export function readCachedMarketPage(
   const parsedCursor = typeof rawCursor === "string" && rawCursor.trim()
     ? rawCursor.trim()
     : null;
+  // v1 캐시는 nextCursor를 저장하지 않았다. 그 레코드의 hasMore=true를 그대로 노출하면
+  // 누를 수 있지만 아무 동작도 하지 않는 "더 보기"가 생기므로, cursor가 있을 때만 이어간다.
   const nextCursor = (cached as { hasMore?: unknown }).hasMore === true
     ? parsedCursor
     : null;
-  return {
-    savedAt,
-    items,
-    hasMore: nextCursor !== null,
-    nextCursor,
-  };
+  const hasMore = nextCursor !== null;
+  return { savedAt, items, hasMore, nextCursor };
 }
 
 export function writeCachedMarketPage(
@@ -242,7 +184,7 @@ export function writeCachedMarketPage(
     items: readonly CreatorMarketplaceResourceRecord[];
     hasMore: boolean;
     nextCursor: string | null;
-  },
+  }
 ): void {
   if (typeof localStorage === "undefined") return;
   const nowMs = Date.now();
@@ -250,6 +192,8 @@ export function writeCachedMarketPage(
   pruneStoredMarketCache(localStorage, nowMs);
   if (key.length > MARKET_CACHE_MAX_KEY_CHARACTERS) return;
   if (payload.items.length === 0) {
+    // A successful empty response is authoritative for this exact query. Keeping an older page
+    // would resurrect delisted or newly filtered records the next time the network is unavailable.
     removeStoredValue(localStorage, key);
     return;
   }
@@ -271,16 +215,33 @@ export function writeCachedMarketPage(
     prepareMarketCacheWrite(localStorage, key, nowMs);
     localStorage.setItem(key, serialized);
   } catch {
-    // A write failure is equivalent to an absent cache.
+    // 저장 실패(비공개 모드·quota)는 캐시 부재와 동일하게 취급한다.
   }
 }
 
-/** Legacy mixed cache retained only for explicit migration/eviction callers. */
 export function readCachedMarketResource(
   id: string,
-  nowMs = Date.now(),
-): CachedMarketResource | null {
-  return readCachedResourceByPrefix(RESOURCE_KEY_PREFIX, id, nowMs);
+  nowMs = Date.now()
+): { savedAt: string; record: CreatorMarketplaceResourceRecord } | null {
+  if (typeof localStorage === "undefined") return null;
+  pruneStoredMarketCache(localStorage, nowMs);
+  const key = `${RESOURCE_KEY_PREFIX}${id}`;
+  if (key.length > MARKET_CACHE_MAX_KEY_CHARACTERS) return null;
+  const cached = readJson(localStorage, key);
+  if (!cached || typeof cached !== "object") return null;
+  const savedAt = readFreshSavedAt(
+    localStorage,
+    key,
+    (cached as { savedAt?: unknown }).savedAt,
+    nowMs
+  );
+  const [record] = parseRecords([(cached as { record?: unknown }).record]);
+  if (!savedAt) return null;
+  if (!record) {
+    removeStoredValue(localStorage, key);
+    return null;
+  }
+  return { savedAt, record };
 }
 
 export function removeCachedMarketResource(id: string): void {
@@ -289,26 +250,25 @@ export function removeCachedMarketResource(id: string): void {
 }
 
 export function writeCachedMarketResource(
-  record: CreatorMarketplaceResourceRecord,
+  record: CreatorMarketplaceResourceRecord
 ): void {
-  writeCachedResourceByPrefix(RESOURCE_KEY_PREFIX, record);
-}
-
-/** Detail fallback written only after a successful authoritative server response. */
-export function readAuthoritativeCachedMarketResource(
-  id: string,
-  nowMs = Date.now(),
-): CachedMarketResource | null {
-  return readCachedResourceByPrefix(AUTHORITATIVE_RESOURCE_KEY_PREFIX, id, nowMs);
-}
-
-export function removeAuthoritativeCachedMarketResource(id: string): void {
   if (typeof localStorage === "undefined") return;
-  removeStoredValue(localStorage, `${AUTHORITATIVE_RESOURCE_KEY_PREFIX}${id}`);
-}
-
-export function writeAuthoritativeCachedMarketResource(
-  record: CreatorMarketplaceResourceRecord,
-): void {
-  writeCachedResourceByPrefix(AUTHORITATIVE_RESOURCE_KEY_PREFIX, record);
+  const nowMs = Date.now();
+  const key = `${RESOURCE_KEY_PREFIX}${record.id}`;
+  pruneStoredMarketCache(localStorage, nowMs);
+  if (key.length > MARKET_CACHE_MAX_KEY_CHARACTERS) return;
+  try {
+    const serialized = JSON.stringify({
+      savedAt: new Date(nowMs).toISOString(),
+      record,
+    });
+    if (serialized.length > MAX_STORED_CHARACTERS) {
+      pruneStoredMarketCache(localStorage, nowMs);
+      return;
+    }
+    prepareMarketCacheWrite(localStorage, key, nowMs);
+    localStorage.setItem(key, serialized);
+  } catch {
+    // 저장 실패는 캐시 부재와 동일하게 취급한다.
+  }
 }

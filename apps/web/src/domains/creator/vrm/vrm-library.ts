@@ -1,5 +1,3 @@
-import { QUATERNIUS_FANTASY_VRMS } from "./quaternius-fantasy-catalog";
-import { QUATERNIUS_MODULAR_VRMS } from "./quaternius-modular-catalog";
 import {
   getProductStudioVrmAssetSqliteOpfsRepository,
   StudioVrmAssetRepositoryError,
@@ -206,15 +204,13 @@ export function isBundledVrmRightsBlocked(id: string): boolean {
 //  그 중 OldMoustache·Eugenia는 "노인" 카테고리 보강).
 export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "루미", thumbnailUrl: "/assets/3d/characters/thumbnails/sample-vrm.png", url: SAMPLE_VRM_URL },
-  ...QUATERNIUS_FANTASY_VRMS,
-  ...QUATERNIUS_MODULAR_VRMS,
   { id: "avatar-a", name: "하린", thumbnailUrl: "/assets/3d/characters/thumbnails/avatar-a.png", url: "/vrm/AvatarSample_A.vrm" },
   { id: "avatar-b", name: "세라", thumbnailUrl: "/assets/3d/characters/thumbnails/avatar-b.png", url: "/vrm/AvatarSample_B.vrm" },
   { id: "avatar-c", name: "유나", thumbnailUrl: "/assets/3d/characters/thumbnails/avatar-c.png", url: "/vrm/AvatarSample_C.vrm" },
   { id: "shion", name: "시온", thumbnailUrl: "/assets/3d/characters/thumbnails/shion.png", url: "/vrm/Sendagaya_Shibu.vrm" },
-  { id: "vivi", name: "비비", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v1/vivi.png", url: "/vrm/Vivi.vrm" },
+  { id: "vivi", name: "비비", thumbnailUrl: "/assets/3d/characters/thumbnails/vivi.png", url: "/vrm/Vivi.vrm" },
   { id: "vita", name: "비타", thumbnailUrl: "/assets/3d/characters/thumbnails/vita.png", url: "/vrm/Vita.vrm" },
-  { id: "rubin", name: "루빈", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v1/rubin.png", url: "/vrm/Victoria_Rubin.vrm" },
+  { id: "rubin", name: "루빈", thumbnailUrl: "/assets/3d/characters/thumbnails/rubin.png", url: "/vrm/Victoria_Rubin.vrm" },
   { id: "orion", name: "오리온 (로봇)", thumbnailUrl: "/assets/3d/characters/thumbnails/orion.png", url: "/vrm/Avatar_Orion.vrm" },
   {
     id: "cryptovoxel",
@@ -240,9 +236,9 @@ export const SAMPLE_VRMS: SampleVrm[] = [
     url: "/vrm/Darkness_Shibu.vrm",
     limitations: ["heavy-payload"],
   },
-  { id: "mio", name: "미오 (인체 베이스)", thumbnailUrl: "/assets/3d/characters/thumbnails/mio.png", url: "/vrm/fem_vroid.vrm" },
-  { id: "noa", name: "노아 (인체 베이스)", thumbnailUrl: "/assets/3d/characters/thumbnails/noa.png", url: "/vrm/masc_vroid.vrm" },
-  { id: "alicia", name: "아리시아", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v1/alicia.png", url: "/vrm/AliciaSolid.vrm" },
+  { id: "mio", name: "미오", thumbnailUrl: "/assets/3d/characters/thumbnails/mio.png", url: "/vrm/fem_vroid.vrm" },
+  { id: "noa", name: "노아", thumbnailUrl: "/assets/3d/characters/thumbnails/noa.png", url: "/vrm/masc_vroid.vrm" },
+  { id: "alicia", name: "아리시아", thumbnailUrl: "/assets/3d/characters/thumbnails/alicia.png", url: "/vrm/AliciaSolid.vrm" },
   { id: "devil", name: "데빌 (악마)", thumbnailUrl: "/assets/3d/characters/thumbnails/devil.png", url: "/vrm/Devil.vrm" },
   { id: "polydancer", name: "폴리댄서", thumbnailUrl: "/assets/3d/characters/thumbnails/polydancer.png", url: "/vrm/Polydancer.vrm" },
   { id: "rose", name: "로즈", thumbnailUrl: "/assets/3d/characters/thumbnails/rose.png", url: "/vrm/Rose.vrm" },
@@ -281,7 +277,7 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "avocado", name: "아보카도", thumbnailUrl: "/assets/3d/characters/thumbnails/avocado.png", url: "/vrm/Avocado.vrm" },
   { id: "ice-cream", name: "아이스크림", thumbnailUrl: "/assets/3d/characters/thumbnails/ice-cream.png", url: "/vrm/IceCream.vrm" },
   { id: "pyre-sorcerer", name: "파이어소서러 (화염술사)", thumbnailUrl: "/assets/3d/characters/thumbnails/pyre-sorcerer.png", url: "/vrm/PyreSorcerer.vrm" },
-  { id: "unicorn-person", name: "유니콘퍼슨 (유니콘)", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v1/unicorn-person.png", url: "/vrm/UnicornPerson.vrm" },
+  { id: "unicorn-person", name: "유니콘퍼슨 (유니콘)", thumbnailUrl: "/assets/3d/characters/thumbnails/unicorn-person.png", url: "/vrm/UnicornPerson.vrm" },
   { id: "lalo-bot", name: "랄로봇 (로봇)", thumbnailUrl: "/assets/3d/characters/thumbnails/lalo-bot.png", url: "/vrm/LaloBot.vrm" },
   { id: "shark-person", name: "샤크퍼슨 (상어)", thumbnailUrl: "/assets/3d/characters/thumbnails/shark-person.png", url: "/vrm/SharkPerson.vrm" },
   { id: "chill-penguin", name: "칠펭귄 (펭귄)", thumbnailUrl: "/assets/3d/characters/thumbnails/chill-penguin.png", url: "/vrm/ChillPenguin.vrm" },
@@ -313,7 +309,7 @@ export const SAMPLE_VRMS: SampleVrm[] = [
     limitations: ["limited-hand-rig"],
   },
   { id: "stitch-witch", name: "스티치위치 (마녀 인형)", thumbnailUrl: "/assets/3d/characters/thumbnails/stitch-witch.png", url: "/vrm/StitchWitch.vrm" },
-  { id: "mega-angel", name: "메가엔젤 (천사)", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v1/mega-angel.png", url: "/vrm/MegaAngel.vrm" },
+  { id: "mega-angel", name: "메가엔젤 (천사)", thumbnailUrl: "/assets/3d/characters/thumbnails/mega-angel.png", url: "/vrm/MegaAngel.vrm" },
   { id: "mushroom-fairy", name: "머시룸페어리 (버섯 요정)", thumbnailUrl: "/assets/3d/characters/thumbnails/mushroom-fairy.png", url: "/vrm/MushroomFairy.vrm" },
   { id: "weird-cat", name: "위어드캣 (고양이)", thumbnailUrl: "/assets/3d/characters/thumbnails/weird-cat.png", url: "/vrm/WeirdCat.vrm" },
   { id: "cute-saurus", name: "큐트사우루스 (공룡)", thumbnailUrl: "/assets/3d/characters/thumbnails/cute-saurus.png", url: "/vrm/CuteSaurus.vrm" },

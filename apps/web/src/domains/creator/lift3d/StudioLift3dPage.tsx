@@ -719,7 +719,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                   role="tab"
                   aria-selected={tab === candidate}
                   onClick={() => setTab(candidate)}
-                  className={`min-h-11 flex-1 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                  className={`min-h-9 flex-1 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                     tab === candidate ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"
                   }`}
                 >

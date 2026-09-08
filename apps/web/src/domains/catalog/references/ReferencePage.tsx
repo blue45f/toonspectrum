@@ -49,18 +49,6 @@ function SearchForm({ field, q, onSearch }: { field: ReferenceField; q: string; 
     setDraftField(field);
     setDraft(q);
   }, [field, q]);
-  useEffect(() => {
-    // Back can cancel a pending Router transition before q ever changes. In that case the
-    // current form stays mounted with the next search's draft, so restore from the popped URL.
-    const restoreHistoryDraft = () => {
-      const params = new URLSearchParams(window.location.search);
-      const restoredField = params.get("field");
-      setDraftField(isReferenceField(restoredField) ? restoredField : "title");
-      setDraft(params.get("q") ?? "");
-    };
-    window.addEventListener("popstate", restoreHistoryDraft);
-    return () => window.removeEventListener("popstate", restoreHistoryDraft);
-  }, []);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSearch(draftField, draft);

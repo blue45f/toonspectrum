@@ -79,7 +79,7 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "lease.throwIfRevoked()",
       "const combinedSignal = combineStudioBg3dAbortSignals(",
       "signal: combinedSignal.signal",
-      "if (!lease.isCurrent() || !args.isActive() || !isPolicyCurrent())",
+      "if (!lease.isCurrent() || !args.isActive())",
       "loaded.dispose()",
       "args.cache.set(args.record.id, entry)",
       "combinedSignal.dispose()",
@@ -104,10 +104,8 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
     );
     expectInOrder(cachedBranch, [
       "assertStudioBg3dModelPlacementAdmission({",
-      "if (!cached.admissionPolicyKeys?.has(policyKey))",
+      "if (!cached.admittedProfiles.has(policy.profile))",
       "admitStoredBg3dModelForRendering(args.record.id",
-      "cached.admissionPolicyKeys ??= new Set<string>()",
-      "cached.admissionPolicyKeys.add(policyKey)",
       "cached.admittedProfiles.add(policy.profile)",
     ]);
     expect(cachedBranch.match(/assertStudioBg3dModelPlacementAdmission/gu)).toHaveLength(1);

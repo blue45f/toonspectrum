@@ -6,7 +6,6 @@ import {
 } from "./ai/studio-ai-image-reference-roles";
 import { createEmptyStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { createDefaultStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
-import { captureLayerComp } from "./layer/studio-layer-comps";
 import {
   createEmptyStudioCharacterBible,
   normalizeStudioCharacterBible,
@@ -305,18 +304,6 @@ describe("studioProjectSnapshotHasMeaningfulContent", () => {
     expect(studioProjectSnapshotHasMeaningfulContent(empty, {
       canvasWidth: CANVAS_WIDTH,
     })).toBe(false);
-  });
-
-  it("preserves a valid preset as the only work on an empty page", () => {
-    const comp = captureLayerComp("빈 캔버스 상태", [], "comp-1", 1);
-    const value = snapshot((input) => { input.pagesList[0]!.layerComps = [comp]; });
-    expect(studioProjectSnapshotHasMeaningfulContent(value, { canvasWidth: CANVAS_WIDTH })).toBe(true);
-    const restored = parseStudioProjectFile(JSON.parse(serializeStudioProjectFile(value)));
-    expect(restored?.pagesList[0]?.layerComps).toEqual([comp]);
-    for (const layerComps of [[], [comp, comp], [{ ...comp, name: "" }]]) {
-      expect(studioProjectSnapshotHasMeaningfulContent({ ...value, pagesList: [{ ...value.pagesList[0]!, layerComps }] },
-        { canvasWidth: CANVAS_WIDTH })).toBe(false);
-    }
   });
 
   it("recognizes canvas, drawing-assist, master, planning, review, publishing, and text content", () => {

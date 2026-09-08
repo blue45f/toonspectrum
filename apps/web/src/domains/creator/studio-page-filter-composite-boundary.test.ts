@@ -356,8 +356,10 @@ describe("StudioPage page-composite filter integration boundary", () => {
       "const [studioFilterSession, setStudioFilterSession] = useState<",
       "const [studioFilterPreview, setStudioFilterPreview] =",
     );
-    const dialogTarget = jsxCallback("StudioFilterDialog", "targetKind");
-    const dialogClose = jsxCallback("StudioFilterDialog", "onClose");
+    const dialog = sourceBetween(
+      "<StudioFilterDialog",
+      "</Suspense>\n      ) : null}",
+    );
     const mobileDock = sourceBetween(
       "<StudioMobileEditingDock",
       "ui={STUDIO_MOBILE_EDITING_DOCK_UI}",
@@ -369,8 +371,8 @@ describe("StudioPage page-composite filter integration boundary", () => {
 
     expect(sessionState).toContain('target: "page-composite"');
     expect(sessionState).toContain("image: ImageEl & El");
-    expect(dialogTarget.expression.getText(dialogTarget.sourceFile)).toBe("studioFilterSession.target");
-    expect(dialogClose.expression.getText(dialogClose.sourceFile)).toBe("closeStudioFilterDialog");
+    expect(dialog).toContain("targetKind={studioFilterSession.target}");
+    expect(dialog).toContain("onClose={closeStudioFilterDialog}");
     expect(mobileDock).toContain("filterMutationLocked={menuFilterDisabled}");
     expect(mobileDock).toContain("filterPreparationBusy={studioFilterPreparationBusy}");
     expect(mobileDock).toContain("filterTargetLabel={studioFilterTargetLabel}");

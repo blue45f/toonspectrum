@@ -83,7 +83,7 @@ interface LayoutEpochs {
 }
 
 interface DryMediaGpuResources {
-  readonly release: () => void;
+  readonly device: GPUDevice;
   readonly surface: StudioEngineWebGpuPresentationSurface;
   readonly runtime: StudioEngineWebGpuTexturedBrushRuntime;
   readonly controller: StudioCanonicalVNextDryMediaPresentationController;
@@ -112,13 +112,13 @@ async function createResources(
 ): Promise<DryMediaGpuResources | null> {
   const acquired = await acquireStudioGpuPresentationDevice();
   if (!acquired) return null;
-  const { device, deviceEpoch, canvasFormat, release } = acquired;
+  const { device, deviceEpoch, canvasFormat } = acquired;
   let surface: StudioEngineWebGpuPresentationSurface | null = null;
   let runtime: StudioEngineWebGpuTexturedBrushRuntime | null = null;
   try {
     const context = canvas.getContext("webgpu") as GPUCanvasContext | null;
     if (!context) {
-      release();
+      device.destroy();
       return null;
     }
     const surfaceResult = createStudioEngineWebGpuPresentationSurface({
@@ -131,7 +131,7 @@ async function createResources(
       onDeviceLost,
     });
     if (surfaceResult.status !== "ready") {
-      release();
+      device.destroy();
       return null;
     }
     surface = surfaceResult.surface;
@@ -144,12 +144,12 @@ async function createResources(
     });
     if (runtimeResult.status !== "ready") {
       surface.dispose();
-      release();
+      device.destroy();
       return null;
     }
     runtime = runtimeResult.runtime;
     return {
-      release,
+      device,
       surface,
       runtime,
       controller: new StudioCanonicalVNextDryMediaPresentationController({
@@ -170,7 +170,7 @@ async function createResources(
   } catch {
     runtime?.dispose();
     surface?.dispose();
-    release();
+    device.destroy();
     return null;
   }
 }
@@ -254,7 +254,7 @@ function disposeResources(resources: DryMediaGpuResources | null): void {
   if (!resources) return;
   resources.surface.dispose();
   resources.runtime.dispose();
-  resources.release();
+  resources.device.destroy();
 }
 
 function disposeResourcesAfterTail(resources: DryMediaGpuResources | null): void {

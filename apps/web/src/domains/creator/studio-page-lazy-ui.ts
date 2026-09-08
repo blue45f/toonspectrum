@@ -1,6 +1,12 @@
 import { loadStudioBackground3DModule } from "./studio-background-3d-loader";
 import { createStudioIntentLazyLoader } from "./studio-intent-lazy-loader";
 
+import type { StudioExportMenuPanelProps } from "./export/StudioExportMenuPanel";
+import type { StudioAssetMenuPanelProps } from "./StudioAssetMenuPanel";
+import type { StudioColorPopoverProps } from "./StudioColorPopover";
+import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsSettingsPanel";
+import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
+import type { ComponentType } from "react";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
@@ -691,37 +697,55 @@ function loadStudioColorWheelOverlay() {
 }
 const StudioColorWheelOverlay = lazyRetry(loadStudioColorWheelOverlay, "StudioColorWheelOverlay");
 
-const studioAssetMenuPanelLoader = createStudioIntentLazyLoader(() =>
-  import("./StudioAssetMenuPanel").then((mod) => ({ default: mod.StudioAssetMenuPanel }))
-);
+type StudioAssetMenuPanelModule = { default: ComponentType<StudioAssetMenuPanelProps> };
+let studioAssetMenuPanelPromise: Promise<StudioAssetMenuPanelModule> | null = null;
 
-const StudioAssetMenuPanel = lazyRetry(studioAssetMenuPanelLoader.load, "StudioAssetMenuPanel");
+function loadStudioAssetMenuPanel(): Promise<StudioAssetMenuPanelModule> {
+  studioAssetMenuPanelPromise ??= import("./StudioAssetMenuPanel").then((mod) => ({
+    default: mod.StudioAssetMenuPanel,
+  }));
+  return studioAssetMenuPanelPromise;
+}
+
+const StudioAssetMenuPanel = lazyRetry(loadStudioAssetMenuPanel, "StudioAssetMenuPanel");
 
 function preloadStudioAssetMenuPanel(): void {
-  studioAssetMenuPanelLoader.preload();
+  void loadStudioAssetMenuPanel();
 }
 
-const studioStockImagePanelLoader = createStudioIntentLazyLoader(() =>
-  import("./StudioStockImagePanel").then((mod) => ({ default: mod.StudioStockImagePanel }))
-);
+type StudioStockImagePanelModule = { default: ComponentType<StudioStockImagePanelProps> };
+let studioStockImagePanelPromise: Promise<StudioStockImagePanelModule> | null = null;
 
-const StudioStockImagePanel = lazyRetry(studioStockImagePanelLoader.load, "StudioStockImagePanel");
+function loadStudioStockImagePanel(): Promise<StudioStockImagePanelModule> {
+  studioStockImagePanelPromise ??= import("./StudioStockImagePanel").then((mod) => ({
+    default: mod.StudioStockImagePanel,
+  }));
+  return studioStockImagePanelPromise;
+}
+
+const StudioStockImagePanel = lazyRetry(loadStudioStockImagePanel, "StudioStockImagePanel");
 
 function preloadStudioStockImagePanel(): void {
-  studioStockImagePanelLoader.preload();
+  void loadStudioStockImagePanel();
 }
 
-const studioIntegrationsSettingsPanelLoader = createStudioIntentLazyLoader(() =>
-  import("./StudioIntegrationsSettingsPanel").then((mod) => ({ default: mod.StudioIntegrationsSettingsPanel }))
-);
+type StudioIntegrationsSettingsPanelModule = { default: ComponentType<StudioIntegrationsSettingsPanelProps> };
+let studioIntegrationsSettingsPanelPromise: Promise<StudioIntegrationsSettingsPanelModule> | null = null;
+
+function loadStudioIntegrationsSettingsPanel(): Promise<StudioIntegrationsSettingsPanelModule> {
+  studioIntegrationsSettingsPanelPromise ??= import("./StudioIntegrationsSettingsPanel").then((mod) => ({
+    default: mod.StudioIntegrationsSettingsPanel,
+  }));
+  return studioIntegrationsSettingsPanelPromise;
+}
 
 const StudioIntegrationsSettingsPanel = lazyRetry(
-  studioIntegrationsSettingsPanelLoader.load,
+  loadStudioIntegrationsSettingsPanel,
   "StudioIntegrationsSettingsPanel"
 );
 
 function preloadStudioIntegrationsSettingsPanel(): void {
-  studioIntegrationsSettingsPanelLoader.preload();
+  void loadStudioIntegrationsSettingsPanel();
 }
 
 const StudioAppSettingsPanel = lazyRetry(
@@ -729,14 +753,20 @@ const StudioAppSettingsPanel = lazyRetry(
   "StudioAppSettingsPanel"
 );
 
-const studioExportMenuPanelLoader = createStudioIntentLazyLoader(() =>
-  import("./export/StudioExportMenuPanel").then((mod) => ({ default: mod.StudioExportMenuPanel }))
-);
+type StudioExportMenuPanelModule = { default: ComponentType<StudioExportMenuPanelProps> };
+let studioExportMenuPanelPromise: Promise<StudioExportMenuPanelModule> | null = null;
 
-const StudioExportMenuPanel = lazyRetry(studioExportMenuPanelLoader.load, "StudioExportMenuPanel");
+function loadStudioExportMenuPanel(): Promise<StudioExportMenuPanelModule> {
+  studioExportMenuPanelPromise ??= import( "./export/StudioExportMenuPanel").then((mod) => ({
+    default: mod.StudioExportMenuPanel,
+  }));
+  return studioExportMenuPanelPromise;
+}
+
+const StudioExportMenuPanel = lazyRetry(loadStudioExportMenuPanel, "StudioExportMenuPanel");
 
 function preloadStudioExportMenuPanel(): void {
-  studioExportMenuPanelLoader.preload();
+  void loadStudioExportMenuPanel();
   preloadStudioCaptureReadinessRuntime();
 }
 
@@ -751,11 +781,18 @@ function loadStudioWebtoonGuides(): Promise<StudioWebtoonGuidesModule> {
   return studioWebtoonGuidesPromise;
 }
 
-const studioColorPopoverLoader = createStudioIntentLazyLoader(() =>
-  import("./StudioColorPopover").then((mod) => ({ default: mod.StudioColorPopover }))
-);
+type StudioColorPopoverModule = { default: ComponentType<StudioColorPopoverProps> };
 
-const StudioColorPopoverContent = lazyRetry(studioColorPopoverLoader.load, "StudioColorPopover");
+let studioColorPopoverPromise: Promise<StudioColorPopoverModule> | null = null;
+
+function loadStudioColorPopover(): Promise<StudioColorPopoverModule> {
+  studioColorPopoverPromise ??= import("./StudioColorPopover").then((mod) => ({
+    default: mod.StudioColorPopover,
+  }));
+  return studioColorPopoverPromise;
+}
+
+const StudioColorPopoverContent = lazyRetry(loadStudioColorPopover, "StudioColorPopover");
 
 type StudioComipoAssemblyModule = typeof import("./studio-comipo-assembly");
 type StudioComipoShippedModule = typeof import("./studio-comipo-shipped");
@@ -780,7 +817,7 @@ function loadStudioComipoShipped(): Promise<StudioComipoShippedModule> {
 }
 
 function preloadStudioColorPopover(): void {
-  studioColorPopoverLoader.preload();
+  void loadStudioColorPopover();
 }
 
 export {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { STUDIO_CRDT_PROTOCOL_VERSION } from "./studio-crdt-protocol";
-import { StudioLiveCollaborationProvider, type StudioCrdtSceneGraphRuntime } from "./StudioLiveCollaborationProvider";
+import { StudioLiveCollaborationProvider } from "./StudioLiveCollaborationProvider";
 
 import type { StudioCrdtRecoveryVaultEntry } from "./studio-crdt-recovery-vault";
 import type { StudioLiveCollaborationContextValue } from "./studio-live-collaboration-context";
@@ -188,8 +188,6 @@ const lifecycle = vi.hoisted(() => ({
     closeCount: number;
     closeGracefullyCount: number;
     authoritativeBarrierCount: number;
-    deliveryTimeouts: Array<number | undefined>;
-    deliveryBarrier: Promise<void> | null;
     document: { destroyCount: number };
     onStatus?: (status: MockBindingStatus) => void;
   }>,
@@ -338,8 +336,6 @@ vi.mock("./studio-crdt-room-binding", () => ({
         closeCount: 0,
         closeGracefullyCount: 0,
         authoritativeBarrierCount: 0,
-        deliveryTimeouts: [],
-        deliveryBarrier: null,
         document: options.document.record,
         onStatus: options.onStatus,
       };
@@ -375,11 +371,6 @@ vi.mock("./studio-crdt-room-binding", () => ({
     }> {
       this.record.authoritativeBarrierCount += 1;
       return { serverSequence: "41", acknowledgedAt: 1_234 };
-    }
-
-    async flushAndWaitForDelivery(timeoutMs?: number): Promise<void> {
-      this.record.deliveryTimeouts.push(timeoutMs);
-      await this.record.deliveryBarrier;
     }
   },
 }));
@@ -995,41 +986,6 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
 
     hooks.unmount();
     expect(onAuthoritativeSaveBarrierChange).toHaveBeenLastCalledWith(null);
-  });
-
-  it("exposes delivery on the document runtime and rejects retained callbacks after teardown", async () => {
-    lifecycle.roomStart = "resolve";
-    const onCrdtDocumentChange = vi.fn();
-    await renderProvider({ onCrdtDocumentChange });
-    await vi.waitFor(() => expect(onCrdtDocumentChange).toHaveBeenCalledWith(expect.anything(), expect.anything()));
-    const runtime = onCrdtDocumentChange.mock.calls.find(([document]) => document !== null)![1] as StudioCrdtSceneGraphRuntime;
-    await runtime.flushAndWaitForDelivery(321);
-    expect(lifecycle.bindings[0]?.deliveryTimeouts).toEqual([321]);
-    expect(lifecycle.bindings[0]?.authoritativeBarrierCount).toBe(0);
-    hooks.unmount();
-    expect(onCrdtDocumentChange).toHaveBeenLastCalledWith(null, null);
-    await expect(runtime.flushAndWaitForDelivery()).rejects.toThrow("원고가 변경되었습니다");
-    expect(lifecycle.bindings[0]?.deliveryTimeouts).toEqual([321]);
-  });
-
-  it("rejects a late delivery completion from an older binding without affecting the new document runtime", async () => {
-    lifecycle.roomStart = "resolve";
-    const onCrdtDocumentChange = vi.fn();
-    await renderProvider({ onCrdtDocumentChange });
-    await vi.waitFor(() => expect(onCrdtDocumentChange).toHaveBeenCalledWith(expect.anything(), expect.anything()));
-    const previous = onCrdtDocumentChange.mock.calls.find(([document]) => document !== null)![1] as StudioCrdtSceneGraphRuntime;
-    let release!: () => void;
-    lifecycle.bindings[0]!.deliveryBarrier = new Promise<void>((resolve) => { release = resolve; });
-    const rejected = expect(previous.flushAndWaitForDelivery()).rejects.toThrow("원고가 변경되었습니다");
-    await renderProvider({ workId: "work-b", onCrdtDocumentChange });
-    await vi.waitFor(() => expect(lifecycle.bindings).toHaveLength(2));
-    const current = onCrdtDocumentChange.mock.calls.filter(([document]) => document !== null).at(-1)![1] as StudioCrdtSceneGraphRuntime;
-    expect(current).not.toBe(previous);
-    await current.flushAndWaitForDelivery(456);
-    release();
-    await rejected;
-    expect(lifecycle.bindings[0]?.deliveryTimeouts).toEqual([undefined]);
-    expect(lifecycle.bindings[1]?.deliveryTimeouts).toEqual([456]);
   });
 
   it("reports fail-closed edit safety when both the server and browser outbox are unavailable", async () => {

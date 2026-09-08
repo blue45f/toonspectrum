@@ -24,11 +24,6 @@ function equalAtomic(left: unknown, right: unknown): boolean {
   if (Array.isArray(left) && Array.isArray(right)) {
     return left.length === right.length && left.every((item, index) => equalAtomic(item, right[index]));
   }
-  if (isRecord(left) && isRecord(right)) {
-    const keys = Object.keys(left);
-    return keys.length === Object.keys(right).length
-      && keys.every((key) => Object.hasOwn(right, key) && equalAtomic(left[key], right[key]));
-  }
   return false;
 }
 

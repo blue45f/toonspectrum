@@ -99,37 +99,6 @@ describe("StudioPage optional UI registry", () => {
     }
   });
 
-  it("injects filter intent from the Host while the registry owns the single activation loader", () => {
-    const intent = moduleEdges("./studio-filter-dialog-intent.ts");
-    const registry = moduleEdges("./studio-page-lazy-ui.ts");
-    const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
-
-    expect(intent.valueImports).toEqual(["react"]);
-    expect(intent.dynamicImports).toEqual([]);
-    expect(intent.source).toContain("useContext(StudioFilterDialogIntentContext)");
-    expect(page.source).toContain("<StudioFilterDialogIntentContext value={preloadStudioFilterDialog}>");
-    expect(page.source.indexOf("<StudioFilterDialogIntentContext value="))
-      .toBeLessThan(page.source.indexOf("<StudioDccWorkbenchRoute"));
-    expect(registry.dynamicImports.filter((specifier) => specifier === "./filter/StudioFilterDialog"))
-      .toEqual(["./filter/StudioFilterDialog"]);
-    expect(registry.valueImports).not.toContain("./filter/StudioFilterDialog");
-    expect(page.valueImports).not.toContain("./filter/StudioFilterDialog");
-    expect(page.dynamicImports).not.toContain("./filter/StudioFilterDialog");
-    for (const consumerPath of [
-      "./StudioMobileEditingDock.tsx",
-      "./StudioRasterToolRecoveryPanel.tsx",
-      "./StudioMainMenu.tsx",
-    ]) {
-      const consumer = moduleEdges(consumerPath);
-      expect(consumer.valueImports).toContain("./studio-filter-dialog-intent");
-      expect(consumer.valueImports).not.toContain("./studio-page-lazy-ui");
-      expect(consumer.dynamicImports).not.toContain("./filter/StudioFilterDialog");
-    }
-    const menuIntent = moduleEdges("./studio-main-menu-intent-preload.ts");
-    expect(menuIntent.valueImports).toEqual([]);
-    expect(menuIntent.source).toContain("preloadFilterDialog();");
-  });
-
   it("defers capture readiness and save projection until user intent", () => {
     const page = moduleEdges("./StudioCuttoonEditorHost.tsx");
     // Intentional change (2026-08, B-09): the save orchestration that consumes the
@@ -174,42 +143,11 @@ describe("StudioPage optional UI registry", () => {
   it("keeps shared preload promises in the registry instead of recreating them per render", () => {
     const registry = moduleEdges("./studio-page-lazy-ui.ts").source;
 
-    expect(registry).toContain("const studioAssetMenuPanelLoader = createStudioIntentLazyLoader(");
-    expect(registry).toContain("studioAssetMenuPanelLoader.load,");
-    expect(registry).toContain("studioAssetMenuPanelLoader.preload();");
-    expect(registry).toContain("const studioStockImagePanelLoader = createStudioIntentLazyLoader(");
-    expect(registry).toContain("studioStockImagePanelLoader.load,");
-    expect(registry).toContain("studioStockImagePanelLoader.preload();");
-    expect(registry).toContain("const studioIntegrationsSettingsPanelLoader = createStudioIntentLazyLoader(");
-    expect(registry).toContain("studioIntegrationsSettingsPanelLoader.load,");
-    expect(registry).toContain("studioIntegrationsSettingsPanelLoader.preload();");
-    expect(registry).toContain("const studioExportMenuPanelLoader = createStudioIntentLazyLoader(");
-    expect(registry).toContain("studioExportMenuPanelLoader.load,");
-    expect(registry).toContain("studioExportMenuPanelLoader.preload();");
-    expect(registry).toContain("const studioColorPopoverLoader = createStudioIntentLazyLoader(");
-    expect(registry).toContain("studioColorPopoverLoader.load,");
-    expect(registry).toContain("studioColorPopoverLoader.preload();");
-  });
-
-  it("loads the filter dialog from user intent and shares the registry request with activation", () => {
-    const page = moduleEdges("./StudioCuttoonEditorHost.tsx").source;
-    const registry = moduleEdges("./studio-page-lazy-ui.ts").source;
-    const openStart = page.indexOf("async function openStudioFilter(");
-    const firstAwait = page.indexOf("await ", openStart);
-    const intentPreload = page.indexOf("preloadStudioFilterDialog();", openStart);
-
-    // The Host owns the import, explicit command and context value. In particular, idle
-    // callbacks/timers must not quietly pull the optional dialog back into startup.
-    expect(page.match(/\bpreloadStudioFilterDialog\b/gu)).toHaveLength(3);
-    expect(openStart).toBeGreaterThan(0);
-    expect(intentPreload).toBeGreaterThan(openStart);
-    expect(intentPreload).toBeLessThan(firstAwait);
-    expect(registry).toMatch(
-      /const StudioFilterDialog = lazyRetry\(\s*studioFilterDialogLoader\.load,/u,
-    );
-    expect(registry).toMatch(
-      /function preloadStudioFilterDialog\(\): void \{\s*studioFilterDialogLoader\.preload\(\);\s*\}/u,
-    );
+    expect(registry).toContain("studioAssetMenuPanelPromise ??=");
+    expect(registry).toContain("studioStockImagePanelPromise ??=");
+    expect(registry).toContain("studioIntegrationsSettingsPanelPromise ??=");
+    expect(registry).toContain("studioExportMenuPanelPromise ??=");
+    expect(registry).toContain("studioColorPopoverPromise ??=");
   });
 
   it("keeps the mobile Inspector modal boundary active while its lazy chunk loads", () => {

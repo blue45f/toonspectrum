@@ -57,7 +57,7 @@ export type StudioCrdtBindingStatusPayload =
     };
 
 export interface StudioCrdtBindingTelemetry {
-  /** Update batches awaiting local-only delivery, authoritative acknowledgement, or recovery. */
+  /** Number of local Yjs update batches awaiting an authoritative acknowledgement or recovery. */
   pendingCount: number;
   /** Browser-durable recovery capability, independent from the authoritative server path. */
   persistenceDurability:
@@ -274,49 +274,6 @@ export class StudioCrdtRoomBinding {
     if (this.recoveryState) return;
     this.batchSubscription?.flush();
     void this.drainPending();
-  }
-
-  /** Holds a collaborative edit lease through delivery without treating peer receipts as server ACKs. */
-  async flushAndWaitForDelivery(timeoutMs = 2_000): Promise<void> {
-    this.assertDeliveryActive();
-    if (this.room.mode !== "local" || this.outboxScope !== null) {
-      await this.flushAndWaitForAuthoritativeAck(timeoutMs);
-      this.assertDeliveryActive();
-      return;
-    }
-
-    const deadline = Date.now() + Math.max(100, Math.min(10_000, timeoutMs));
-    const timeoutMessage = "공동 편집 변경의 전송을 기다리는 시간이 초과됐습니다.";
-    this.batchSubscription?.flush();
-    // A sync started before acquiring the edit lease may represent an older peer frontier.
-    // Join it first, then request a fresh frontier while the caller still holds that lease.
-    if (this.syncPromise) {
-      await this.completeBeforeDeadline(this.syncPromise, deadline, timeoutMessage);
-      this.assertDeliveryActive();
-    }
-    await this.completeBeforeDeadline(this.syncNow(), deadline, timeoutMessage);
-    this.assertDeliveryActive();
-    while (this.pending.size > 0) {
-      if (this.retryTimer !== null) {
-        this.cancelTimeout(this.retryTimer);
-        this.retryTimer = null;
-      }
-      await this.completeBeforeDeadline(this.drainPending(), deadline, timeoutMessage);
-      this.assertDeliveryActive();
-      if (this.pending.size > 0) {
-        await this.completeBeforeDeadline(new Promise<void>((resolve) => {
-          this.scheduleTimeout(resolve, 25);
-        }), deadline, timeoutMessage);
-        this.assertDeliveryActive();
-      }
-    }
-  }
-
-  private assertDeliveryActive(): void {
-    if (this.closed) throw new Error("이미 닫힌 CRDT 바인딩입니다.");
-    if (!this.started) throw new Error("CRDT 바인딩이 아직 시작되지 않았습니다.");
-    if (this.recoveryState) throw new Error(this.recoveryState.message);
-    if (!this.room.ready) throw new Error("공동 편집 전송 채널의 연결이 끊겼습니다.");
   }
 
   async flushAndWaitForAuthoritativeAck(
@@ -721,12 +678,9 @@ export class StudioCrdtRoomBinding {
       try {
         const acknowledgement = await this.room.publishCrdtUpdate(pending.request);
         this.reconcileAuthoritativeAcknowledgement(acknowledgement);
-        if (
-          !this.hasAuthoritativeServer() &&
-          (this.room.mode !== "local" || this.outboxScope !== null)
-        ) {
-          // Scoped local fallbacks and server-backed P2P still require an authoritative ACK.
-          // Local-only rooms need no replay backlog: late peers receive the Y.Doc frontier.
+        if (!this.hasAuthoritativeServer()) {
+          // BroadcastChannel/P2P delivery is peer visibility, not durable authority. Keep the
+          // exact request in both this backlog and the browser outbox for a future server ACK.
           pending.localBroadcasted = true;
           continue;
         }

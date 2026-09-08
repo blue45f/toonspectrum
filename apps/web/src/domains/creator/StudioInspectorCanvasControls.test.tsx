@@ -291,7 +291,7 @@ describe("StudioInspectorCanvasControls", () => {
 
   it("스냅·그리드·규격과 사용자 가이드 조작을 controlled callback으로 전달한다", () => {
     const props = canvasProps();
-    const { rerender } = render(<StudioInspectorCanvasControls {...props} />);
+    render(<StudioInspectorCanvasControls {...props} />);
 
     // 기본 티어 — 스냅·그리드·웹툰 규격은 접기 뒤가 아니다.
     const snapGuideCheckbox = screen.getByRole("checkbox", {
@@ -321,15 +321,10 @@ describe("StudioInspectorCanvasControls", () => {
 
     openSection("가이드선");
     const alignmentGuideCheckbox = screen.getByRole("checkbox", {
-      name: /정렬 안내선 표시/u,
-    }) as HTMLInputElement;
-    expect(alignmentGuideCheckbox.checked).toBe(true);
+      name: /정렬선 표시/u,
+    });
     fireEvent.click(alignmentGuideCheckbox);
     expect(props.onShowAlignmentGuidesChange).toHaveBeenCalledWith(false);
-    rerender(<StudioInspectorCanvasControls {...props} showAlignmentGuides={false} />);
-    expect(alignmentGuideCheckbox.checked).toBe(false);
-    fireEvent.click(alignmentGuideCheckbox);
-    expect(props.onShowAlignmentGuidesChange).toHaveBeenNthCalledWith(2, true);
 
     fireEvent.click(screen.getByRole("button", { name: "+ 세로 가이드" }));
     fireEvent.click(screen.getByRole("button", { name: "+ 가로 가이드" }));
@@ -417,10 +412,6 @@ describe("StudioInspectorCanvasControls", () => {
     ).toBe(true);
     expect(
       (screen.getByRole("button", { name: "세로 가이드 25% 추가" }) as HTMLButtonElement)
-        .disabled
-    ).toBe(true);
-    expect(
-      (screen.getByRole("checkbox", { name: /정렬 안내선 표시/u }) as HTMLInputElement)
         .disabled
     ).toBe(true);
 

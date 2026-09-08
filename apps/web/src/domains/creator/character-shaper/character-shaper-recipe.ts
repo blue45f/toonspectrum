@@ -315,12 +315,6 @@ export function deriveCharacterRecipe(
     slots,
     colors: deriveColors(snapshot),
     handSide: HAND_SIDES.includes(snapshot.handSide) ? snapshot.handSide : "both",
-    ...(snapshot.handPoseTypes === undefined ? {} : { handPoses: Object.fromEntries(
-      (["left", "right"] as const).flatMap((side) => {
-        const id = deriveById(entriesOf(index, "hand-pose"), snapshot.handPoseTypes?.[side] ?? null, "hand-pose");
-        return id ? [[side, id]] : [];
-      }),
-    ) }),
   };
 }
 
@@ -383,8 +377,7 @@ function sameSelection(a: string | readonly string[] | null, b: string | readonl
 
 /** Slots whose selection differs between two recipes, in rail order. */
 export function diffCharacterRecipes(a: CharacterRecipe, b: CharacterRecipe): readonly CharacterSlotKind[] {
-  return CHARACTER_SLOT_KINDS.filter((slot) => !sameSelection(a.slots[slot], b.slots[slot])
-    || (slot === "hand-pose" && (a.handPoses?.left !== b.handPoses?.left || a.handPoses?.right !== b.handPoses?.right)));
+  return CHARACTER_SLOT_KINDS.filter((slot) => !sameSelection(a.slots[slot], b.slots[slot]));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -397,7 +390,6 @@ export function serializeCharacterRecipe(recipe: CharacterRecipe): string {
     slots: recipe.slots,
     colors: recipe.colors,
     handSide: recipe.handSide,
-    handPoses: recipe.handPoses,
   });
 }
 
@@ -453,12 +445,5 @@ export function parseCharacterRecipe(raw: unknown, catalog: CharacterSlotCatalog
     ? (source.handSide as CharacterHandSide)
     : "both";
 
-  const rawHands = source.handPoses;
-  const handPoses = isRecord(rawHands) ? Object.fromEntries(
-    (["left", "right"] as const).flatMap((side) => {
-      const id = validId("hand-pose", rawHands[side]);
-      return id ? [[side, id]] : [];
-    }),
-  ) : undefined;
-  return { version: 1, slots, colors, handSide, ...(handPoses === undefined ? {} : { handPoses }) };
+  return { version: 1, slots, colors, handSide };
 }

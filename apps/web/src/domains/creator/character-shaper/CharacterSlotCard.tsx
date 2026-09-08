@@ -5,10 +5,9 @@
  * check) / partial (warn badge + reason) / unavailable (dimmed + reason, still focusable,
  * `aria-disabled`). Hover never mutates the scene — it only reports the id for the inspector.
  */
-import { Ban, Check, Image, TriangleAlert } from "lucide-react";
+import { Ban, Check, TriangleAlert } from "lucide-react";
 import { useId } from "react";
 
-import { useCharacterRuntimeThumbnail } from "../character-platform/thumbnail/character-runtime-thumbnail-store";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
 import { CharacterSlotPreview } from "./character-shaper-preview";
@@ -36,7 +35,6 @@ export function CharacterSlotCard({
   onKeyNavigate,
 }: CharacterSlotCardProps) {
   const detailId = useId();
-  const runtimeThumbnail = useCharacterRuntimeThumbnail(entry.id);
   const badge = describeAvailabilityBadge(availability);
   const unavailable = availability.status === "unavailable";
   const showBadge = availability.status !== "available";
@@ -62,7 +60,6 @@ export function CharacterSlotCard({
       data-character-slot-card={entry.id}
       data-character-slot-card-availability={availability.status}
       data-character-slot-card-selected={selected ? "true" : undefined}
-      data-character-slot-card-runtime-thumbnail={runtimeThumbnail ? "true" : undefined}
       className={cn(
         "group relative flex min-h-11 w-full min-w-0 flex-col overflow-hidden rounded-2xl border text-left",
         "transition-[transform,border-color,box-shadow,background-color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
@@ -70,7 +67,9 @@ export function CharacterSlotCard({
         selected
           ? "border-accent bg-accent-soft/40 shadow-[0_0_0_1px_var(--color-accent)]"
           : "border-line bg-card hover:border-line-strong hover:bg-raised/70",
-        unavailable ? "cursor-not-allowed" : "hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
+        unavailable
+          ? "cursor-not-allowed"
+          : "hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
       )}
       onClick={() => {
         if (unavailable) return;
@@ -87,22 +86,7 @@ export function CharacterSlotCard({
           unavailable && "opacity-45 grayscale-[0.4]",
         )}
       >
-        {runtimeThumbnail ? (
-          <img
-            src={runtimeThumbnail}
-            alt=""
-            draggable={false}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <CharacterSlotPreview spec={entry.preview} selected={selected} className="h-full w-full" title={entry.label} />
-        )}
-        {runtimeThumbnail ? (
-          <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-full border border-line/70 bg-panel/85 px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2 backdrop-blur">
-            <Image size={9} aria-hidden />
-            실제 모델
-          </span>
-        ) : null}
+        <CharacterSlotPreview spec={entry.preview} selected={selected} className="h-full w-full" title={entry.label} />
         {showBadge ? (
           <span
             className={cn(
@@ -115,7 +99,10 @@ export function CharacterSlotCard({
           </span>
         ) : null}
         {selected ? (
-          <span aria-hidden className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-accent text-on-accent shadow-sm">
+          <span
+            aria-hidden
+            className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-accent text-on-accent shadow-sm"
+          >
             <Check size={14} />
           </span>
         ) : null}

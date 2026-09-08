@@ -13,7 +13,6 @@
  *
  * Run: pnpm run build && pnpm exec tsx scripts/verify-studio-filter-dialog.mts
  * Expects production build in dist/ (vite preview) — see studio-verify skill §2.
- * TOONSPECTRUM_VERIFY_ORIGIN reuses an existing production preview and its configured API origin.
  *
  * Exit codes: 0 = every filter case applied, visibly changed pixels and undid cleanly
  *             1 = dialog, preview, apply, pixel-diff or browser-diagnostic failure
@@ -24,7 +23,7 @@ import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 
 
-import { chromium, type Browser, type Page } from "playwright";
+import { chromium, type Page } from "playwright";
 
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
 import {
@@ -423,12 +422,9 @@ async function main(): Promise<void> {
   });
 
   const startedAt = new Date().toISOString();
-  const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim().replace(/\/+$/, "");
-  const port = externalOrigin ? null : await findFreePort({ unavailableMessage: "could not allocate preview port" });
-  const origin = externalOrigin ?? `http://127.0.0.1:${port}`;
-  const url = `${origin}/studio`;
+  const port = await findFreePort({ unavailableMessage: "could not allocate preview port" });
+  const url = `http://127.0.0.1:${port}/studio`;
   let child: ChildProcess | null = null;
-  let browser: Browser | null = null;
 
   const results: FilterCaseResult[] = [];
   const browserErrors: { messages: string[]; failedResponses: string[] } = {
@@ -437,18 +433,18 @@ async function main(): Promise<void> {
   };
 
   try {
-    child = port === null ? null : spawnVitePreview({
+    child = spawnVitePreview({
       port,
       runner: "pnpm-exec",
       logPath: LOG_PATH,
     });
-    await waitForServer(`${origin}/`, {
+    await waitForServer(`http://127.0.0.1:${port}/`, {
       timeoutMs: 20_000,
-      notReadyMessage: `preview not ready: ${origin}/`,
+      notReadyMessage: `preview not ready: http://127.0.0.1:${port}/`,
     });
     log(`preview ready @ ${url}`);
 
-    browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 1100 },
       locale: "ko-KR",
@@ -786,12 +782,9 @@ async function main(): Promise<void> {
       }
     }
 
+    await browser.close();
   } finally {
-    try {
-      await browser?.close();
-    } finally {
-      if (child) await stopChildProcess(child);
-    }
+    if (child) await stopChildProcess(child);
   }
 
   const report: FilterDialogReport = {

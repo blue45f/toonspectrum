@@ -859,7 +859,7 @@ describe("StudioLeftToolRail", () => {
     expect(dialog.className).toContain("fixed");
     expect(dialog.className).toContain("overflow-y-auto");
 
-    fireEvent.click(screen.getByRole("button", { name: "화면 이동" }));
+    fireEvent.click(screen.getByRole("button", { name: "핸드(팬)" }));
 
     expect(props.stableHandlers.commitAppSettings).toHaveBeenCalledWith({
       ...props.appSettings,

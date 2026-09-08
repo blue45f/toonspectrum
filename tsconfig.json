@@ -56,7 +56,6 @@
   ],
   "exclude": [
     "node_modules",
-    "artifacts/**",
     "apps/api/**",
     "dist/**",
     "**/__diag*"

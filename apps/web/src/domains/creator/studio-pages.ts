@@ -1,4 +1,3 @@
-import { remapStudioLayerComps } from "./layer/studio-layer-comps-document";
 /**
  * Studio Pages — pure multi-page state operations for cuttoon editor.
  * 페이지 추가/복제/삭제/이동/재배치/일괄 적용 등 다중 페이지 조작의 순수 로직.
@@ -45,7 +44,6 @@ export interface PageLike {
   grade?: unknown;
   groups?: Array<{ id: string }>;
   drawingAssist?: unknown;
-  layerComps?: unknown;
   shared3dStage?: unknown;
   linked3dRender?: unknown;
 }
@@ -86,11 +84,6 @@ export function duplicatePageState<P extends PageLike>(page: P, makeId: () => st
     id: nextPageId,
     elements: copiedElements.map(({ source, nextId }) => ({ ...source, id: nextId })),
   } as P;
-  if (page.layerComps !== undefined) {
-    const comps = remapStudioLayerComps(page.layerComps, elementIdMap);
-    if (comps) duplicated.layerComps = comps;
-    else delete duplicated.layerComps;
-  }
   if (page.shared3dStage !== undefined) {
     const linkedIds = studioShared3dStageLinkedCharacterElementIds(page.shared3dStage);
     for (const elementId of linkedIds ?? []) {
@@ -260,11 +253,6 @@ export function duplicateMirroredPage<P extends PageLike>(
       ? { drawingAssist: mirrorStudioDrawingAssistDocument(drawingAssist, canvasW) }
       : {}),
   } as P;
-  if (page.layerComps !== undefined) {
-    const comps = remapStudioLayerComps(page.layerComps, elementIdMap);
-    if (comps) mirrored.layerComps = comps;
-    else delete mirrored.layerComps;
-  }
   if (page.shared3dStage !== undefined) {
     const linkedIds = studioShared3dStageLinkedCharacterElementIds(page.shared3dStage);
     for (const elementId of linkedIds ?? []) {

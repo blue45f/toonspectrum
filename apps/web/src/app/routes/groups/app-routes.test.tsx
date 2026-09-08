@@ -15,6 +15,7 @@ function byId(a: RouteSurface, b: RouteSurface): number {
   return a.id.localeCompare(b.id);
 }
 
+/** Independent public pages under /studio that never boot the editor (PR #794 manual, PR #816 brush lab). */
 const STUDIO_PUBLIC_SURFACES: readonly RouteSurface[] = [
   { id: "creator-studio-manual", path: "/studio/manual" },
   { id: "creator-studio-manual-article", path: "/studio/manual/:articleId" },
@@ -30,20 +31,19 @@ describe("application route registry", () => {
   });
 
   it("keeps the catch-all last so domain routes remain explicit", () => {
-    expect(appRoutes.at(-1)).toMatchObject({ id: "not-found", path: "*" });
+    expect(appRoutes.at(-1)).toMatchObject({
+      id: "not-found",
+      path: "*",
+    });
   });
 
   it("keeps Character Shaper in the creator route registry", () => {
     expect(appRoutes).toContainEqual(
-      expect.objectContaining({ id: "creator-character-shaper", path: "/shaper" }),
+      expect.objectContaining({
+        id: "creator-character-shaper",
+        path: "/shaper",
+      }),
     );
-  });
-
-  it("keeps Admin behind one canonical wildcard entry", () => {
-    const adminRoutes = appRoutes.filter((route) => route.path.startsWith("/admin"));
-    expect(adminRoutes).toEqual([
-      expect.objectContaining({ id: "admin", path: "/admin/*" }),
-    ]);
   });
 
   it("keeps Studio behind one canonical wildcard entry", () => {
@@ -51,10 +51,15 @@ describe("application route registry", () => {
     const editorEntries = studioRoutes.filter((route) => route.path.includes("*"));
 
     expect(editorEntries).toEqual([
-      expect.objectContaining({ id: "creator-studio", path: "/studio/*" }),
+      expect.objectContaining({
+        id: "creator-studio",
+        path: "/studio/*",
+      }),
     ]);
     expect(studioRoutes.at(-1)).toMatchObject({ id: "creator-studio", path: "/studio/*" });
 
+    // Every other /studio path is an independent public surface that must stay on this
+    // allowlist. Registering a second editor entry (or any new /studio route) fails here.
     const publicSurfaces = studioRoutes
       .filter((route) => route.path !== "/studio/*")
       .map(({ id, path }) => ({ id, path }))

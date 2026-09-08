@@ -6,21 +6,17 @@ import {
 } from "../../studio-comments";
 import { StudioTeamCommentOperationScopeRegistry } from "../../studio-team-comment-operation-scope";
 
-import { useStudioDocumentMutationSetter } from "./useStudioDocumentMutationSetter";
-
 import type { StudioCommentPinReanchorPayload } from "../../live/StudioLiveCanvasOverlay";
 import type { StudioTeamCommentCapabilities } from "../../studio-team-comment-client";
 import type { StudioTeamCommentRefreshSession } from "../../studio-team-comment-refresh-session";
 
 interface UseStudioCommentDocumentsRuntimeOptions {
   readonly markStudioDocumentChanged: () => boolean;
-  readonly onAcceptedMutation: () => void;
 }
 
 /** Owns local/team comment documents and all in-flight collaboration registries. */
 export function useStudioCommentDocumentsRuntime({
   markStudioDocumentChanged,
-  onAcceptedMutation,
 }: UseStudioCommentDocumentsRuntimeOptions) {
   const [studioComments, setStudioCommentsState] = useState<StudioCommentsDocument>(
     createEmptyStudioCommentsDocument,
@@ -70,10 +66,13 @@ export function useStudioCommentDocumentsRuntime({
     studioTeamCommentLiveRefreshFlightRef.current.clear();
   }, []);
 
-  const setStudioComments = useStudioDocumentMutationSetter(studioComments, setStudioCommentsState, {
-    markStudioDocumentChanged,
-    onAcceptedMutation,
-  });
+  function setStudioComments(
+    next: Parameters<typeof setStudioCommentsState>[0],
+  ): boolean {
+    if (!markStudioDocumentChanged()) return false;
+    setStudioCommentsState(next);
+    return true;
+  }
 
   return {
     setStudioCommentInteractionNotice,

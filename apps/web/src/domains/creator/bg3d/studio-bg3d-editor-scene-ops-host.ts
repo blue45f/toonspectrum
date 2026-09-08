@@ -257,14 +257,14 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
   const generateId = () => "template-" + Math.random().toString(36).substring(2, 15);
 
   h.generateId = generateId;
-  const handleSaveSceneAsTemplate = async (): Promise<boolean> => {
+  const handleSaveSceneAsTemplate = async () => {
     if (
       primitives.length === 0 && customModels.length === 0 ||
       applyingTemplateId !== null ||
       isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)
-    ) return false;
+    ) return;
     const session = modalAssetSessionRef.current;
-    if (!session || !isModalAssetSessionCurrent(session)) return false;
+    if (!session || !isModalAssetSessionCurrent(session)) return;
     const currentView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
     const adaptation = tryAdaptStudioBg3dRuntimeToDocument({
       primitives,
@@ -274,7 +274,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     });
     if (!adaptation.ok) {
       setError("현재 장면이 안전 예산을 초과해 템플릿 저장을 시작하지 않았습니다. 장면을 나누거나 일부 오브젝트를 정리해 주세요.");
-      return false;
+      return;
     }
     const adapted = adaptation.value;
     if (
@@ -286,7 +286,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
       adapted.counts.emittedCustomModels !== customModels.length
     ) {
       setError("현재 장면을 손실 없는 템플릿 원본으로 만들 수 없습니다. 문제가 있는 도형이나 모델을 확인해 주세요.");
-      return false;
+      return;
     }
     setIsSavingTemplate(true);
     try {
@@ -297,19 +297,16 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
         createdAt: Date.now(),
         document: adapted.document,
       });
-      if (!isModalAssetSessionCurrent(session)) return false;
       studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
         setTemplateLibrary(entries);
         setTemplateLibraryStatus("ready");
         setError(null);
       });
-      return true;
     } catch (err) {
       console.error(err);
       studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
         setError("현재 장면 템플릿을 저장하지 못했습니다. 저장 공간을 확인한 뒤 다시 시도해 주세요.");
       });
-      return false;
     } finally {
       studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
         setIsSavingTemplate(false);

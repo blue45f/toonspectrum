@@ -20,11 +20,6 @@ vi.mock("./render/studio-raster-retouch-preload", () => ({
   preloadStudioRasterRetouchRuntime: preloadRasterRetouchRuntime,
 }));
 
-const preloadStudioFilterDialog = vi.hoisted(() => vi.fn());
-vi.mock("./studio-filter-dialog-intent", () => ({
-  useStudioFilterDialogIntent: () => preloadStudioFilterDialog,
-}));
-
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -134,43 +129,6 @@ describe("StudioRasterToolRecoveryPanel", () => {
     fireEvent.change(select, { target: { value: "gaussian-blur" } });
     expect(onSelect).toHaveBeenCalledWith("gaussian-blur");
   });
-
-  it.each(["focus", "pointerEnter", "pointerDown"] as const)(
-    "preloads an available inspector filter on %s without preparing or changing the document",
-    (intent) => {
-      const onSelect = vi.fn();
-      const onRecover = vi.fn();
-      const availability = resolveStudioRasterToolAvailability("filter", {
-        selectedType: "draw",
-        visibleVectorDrawCount: 1,
-        exactRenderableVisibleCount: 1,
-      });
-      const { rerender } = render(
-        <StudioInspectorFilterLauncher
-          availability={availability}
-          onRecover={onRecover}
-          onSelect={onSelect}
-        />,
-      );
-      const select = screen.getByRole("combobox", { name: "현재 페이지 합성본 필터 선택" });
-      expect(preloadStudioFilterDialog).not.toHaveBeenCalled();
-      fireEvent[intent](select);
-      expect(preloadStudioFilterDialog).toHaveBeenCalledTimes(1);
-      expect(onSelect).not.toHaveBeenCalled();
-      expect(onRecover).not.toHaveBeenCalled();
-
-      rerender(
-        <StudioInspectorFilterLauncher
-          availability={availability}
-          busy
-          onRecover={onRecover}
-          onSelect={onSelect}
-        />,
-      );
-      fireEvent[intent](select);
-      expect(preloadStudioFilterDialog).toHaveBeenCalledTimes(1);
-    },
-  );
 
   it("deduplicates one shared recovery action across related retouch tools", () => {
     const onRecover = vi.fn();

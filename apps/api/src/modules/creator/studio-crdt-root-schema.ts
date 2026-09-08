@@ -442,7 +442,6 @@ const STUDIO_CRDT_PAGE_KEYS = new Set([
   "drawingAssist",
   "paperSurface",
   "paperGrainVisible",
-  "layerComps",
 ]);
 
 const STUDIO_CRDT_PAPER_GRAIN_KINDS = new Set([
@@ -2334,50 +2333,6 @@ function validateSceneElementRoot(id: string, record: Y.Map<unknown>): boolean {
   return byteLength !== null && byteLength <= STUDIO_CRDT_SCENE_PAYLOAD_MAX_BYTES;
 }
 
-function isStudioCrdtLayerCompObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function isStudioCrdtLayerCompText(value: unknown, maximum = 160): value is string {
-  return boundedString(value, maximum) && value.length > 0;
-}
-
-function isValidStudioCrdtLayerCompStates(value: unknown, kind: "layer" | "group"): boolean {
-  if (!isStudioCrdtLayerCompObject(value) || Object.keys(value).length > 10_000) return false;
-  const allowed = new Set(kind === "layer"
-    ? ["layerId", "visible", "opacity", "blendMode", "groupId"]
-    : ["groupId", "visible"]);
-  return Object.entries(value).every(([id, state]) => {
-    if (!isStudioCrdtLayerCompText(id) || !isStudioCrdtLayerCompObject(state)
-      || !hasOnlyJsonKeys(state, allowed) || state[`${kind}Id`] !== id
-      || typeof state.visible !== "boolean") return false;
-    return kind === "group" || (finiteNumberInRange(state.opacity, 0, 1)
-      && (!("blendMode" in state) || boundedString(state.blendMode, 80))
-      && (!("groupId" in state) || isStudioCrdtLayerCompText(state.groupId)));
-  });
-}
-
-/** Validate every wire candidate, including baselines hidden by a newer property winner. */
-function isValidStudioCrdtLayerComps(value: unknown): boolean {
-  if (!Array.isArray(value) || value.length > 64) return false;
-  const ids = new Set<string>();
-  const allowed = new Set(["id", "name", "createdAt", "notes", "layerStates", "groupStates"]);
-  for (const comp of value) {
-    if (!isStudioCrdtLayerCompObject(comp) || !hasOnlyJsonKeys(comp, allowed)
-      || !isStudioCrdtLayerCompText(comp.id) || ids.has(comp.id)
-      || !isStudioCrdtLayerCompText(comp.name) || !Number.isInteger(comp.createdAt)
-      || !finiteNumberInRange(comp.createdAt, 0, Number.MAX_SAFE_INTEGER)
-      || ("notes" in comp && !boundedString(comp.notes, 8_192))
-      || !isValidStudioCrdtLayerCompStates(comp.layerStates, "layer")
-      || ("groupStates" in comp && !isValidStudioCrdtLayerCompStates(comp.groupStates, "group"))) {
-      return false;
-    }
-    ids.add(comp.id);
-  }
-  const byteLength = encodedJsonByteLength(value);
-  return byteLength !== null && byteLength <= STUDIO_CRDT_PAGE_PAYLOAD_MAX_BYTES;
-}
-
 function validatePageRoot(id: string, record: Y.Map<unknown>): boolean {
   const metadataKeys = new Set(["id", "payloadVersion", "deleted"]);
   if (
@@ -2404,19 +2359,12 @@ function validatePageRoot(id: string, record: Y.Map<unknown>): boolean {
   if ("hideMaster" in props && typeof props.hideMaster !== "boolean") return false;
   if ("paperGrainVisible" in props && typeof props.paperGrainVisible !== "boolean") return false;
   if ("paperSurface" in props && !isValidStudioCrdtPaperSurface(props.paperSurface)) return false;
-  if ("layerComps" in props && !isValidStudioCrdtLayerComps(props.layerComps)) return false;
   if ("drawingAssist" in props && !isValidStudioCrdtDrawingAssist(props.drawingAssist)) {
     return false;
   }
   // A valid `prop:` winner can hide an invalid `base:` candidate until a later unset. Validate
   // both candidates now so every future effective page payload remains safe to materialize.
   for (const [key, value] of record) {
-    if (
-      (key === "base:layerComps" || key === "prop:layerComps") &&
-      !isValidStudioCrdtLayerComps(value)
-    ) {
-      return false;
-    }
     if (
       (key === "base:drawingAssist" || key === "prop:drawingAssist") &&
       !isValidStudioCrdtDrawingAssist(value)

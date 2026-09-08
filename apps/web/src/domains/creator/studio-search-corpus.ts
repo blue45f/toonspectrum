@@ -204,8 +204,7 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
         krita("Transform Tool"),
         procreate("Transform"),
       ],
-      keywords: ["transform", "layout", "position", "size", "rotation", "x", "y", "width", "height", "위치", "크기", "회전", "배치"],
-      supersedes: ["selection-layout"],
+      keywords: ["transform", "x", "y", "width", "height", "회전", "배치"],
       helpNodeId: "help/property/transform-numeric",
       target: {
         type: "inspector",

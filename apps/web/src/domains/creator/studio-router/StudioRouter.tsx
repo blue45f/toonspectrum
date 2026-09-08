@@ -9,7 +9,6 @@ import { StudioPublishRoute } from "./routes/StudioPublishRoute";
 import { StudioStoryworldRoute } from "./routes/StudioStoryworldRoute";
 import { resolveStudioRoute } from "./studio-route-manifest";
 import { StudioRouteFailure, StudioRoutePlaceholder } from "./StudioRouteFallbacks";
-import { useStudioI18nPriorityLoading } from "./useStudioI18nPriorityLoading";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
@@ -28,7 +27,6 @@ const StudioToolsCompanionPage = lazyRetry(
 );
 
 export function StudioRouter() {
-  useStudioI18nPriorityLoading();
   const location = useLocation();
   const navigate = useNavigate();
   const resolution = resolveStudioRoute({

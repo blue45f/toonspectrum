@@ -215,12 +215,7 @@ export function projectCharacterRecipeV1(
   const accessories = recipe.slots.accessory.map((entryId) => selectionFor(entryId, resolved));
   const handPoseEntryId = recipe.slots["hand-pose"];
   const handPose: Partial<Record<"left" | "right", CharacterSlotSelectionV2>> = {};
-  if (recipe.handPoses !== undefined) {
-    for (const side of ["left", "right"] as const) {
-      const entryId = recipe.handPoses[side];
-      if (typeof entryId === "string" && entryId.length > 0) handPose[side] = selectionFor(entryId, resolved);
-    }
-  } else if (typeof handPoseEntryId === "string" && handPoseEntryId.length > 0) {
+  if (typeof handPoseEntryId === "string" && handPoseEntryId.length > 0) {
     const selection = selectionFor(handPoseEntryId, resolved);
     if (recipe.handSide === "left" || recipe.handSide === "both") handPose.left = selection;
     if (recipe.handSide === "right" || recipe.handSide === "both") handPose.right = selection;

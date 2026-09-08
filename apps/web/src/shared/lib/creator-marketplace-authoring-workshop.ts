@@ -747,7 +747,6 @@ export function buildCreatorMarketplaceAuthoringManifest(
     schemaVersion: CREATOR_MARKETPLACE_AUTHORING_SCHEMA_VERSION,
     generatedAt: draft.updatedAt,
     resource: {
-      draftId: draft.id,
       kind: draft.kind,
       title: draft.title,
       summary: draft.summary,

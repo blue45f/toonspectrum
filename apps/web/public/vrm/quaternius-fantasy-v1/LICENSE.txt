@@ -1,9 +1,0 @@
-CC0 1.0 Universal (CC0 1.0)
-Public Domain Dedication
-https://creativecommons.org/publicdomain/zero/1.0/
-
-Original models by Quaternius.
-https://quaternius.com/packs/universalbasecharacters.html
-https://quaternius.com/packs/modularcharacteroutfitsfantasy.html
-
-ToonStudio modifications: assembled four free Standard outfits with their authored skinned heads and hairstyles; corrected one source texture URI typo; limited textures to 1024px; added explicit VRM1 humanoid mapping and license metadata. No facial expression morphs were added or claimed.

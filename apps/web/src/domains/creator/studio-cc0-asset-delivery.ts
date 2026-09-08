@@ -6,18 +6,7 @@ const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 export type StudioCc0AssetKind = "model" | "effect-mask" | "surface-texture";
-export interface StudioCc0OriginalDelivery {
-  readonly path: string;
-  readonly bytes: number;
-  readonly sha256: string;
-  readonly estimatedDecodedImageBytes: number;
-  readonly licenseId: "CC0-1.0";
-  readonly sourceUrl: string;
-  readonly visuallyEquivalentToDefault: boolean;
-}
-
 export interface StudioCc0Asset {
-  readonly original?: StudioCc0OriginalDelivery;
   readonly id: string;
   readonly name: string;
   readonly kind: StudioCc0AssetKind;
@@ -31,15 +20,6 @@ export interface StudioCc0Asset {
   readonly browserRenderVerified: boolean;
   readonly provider: string;
   readonly sourceUrl: string;
-  /** Expression style is independent of technical and visual approval. */
-  readonly style?: string;
-  readonly visualReviewed?: boolean;
-  readonly visualReviewLevel?: string;
-  readonly visualReviewSource?: string;
-  readonly role?: string;
-  readonly curationStatus?: string;
-  readonly studioRuntimeVerified?: boolean;
-  readonly allAnglesArtisticallyApproved?: boolean;
 }
 
 export const STUDIO_CC0_CATEGORY_LABELS: Readonly<Record<string, string>> = Object.freeze({
@@ -57,86 +37,6 @@ function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
-}
-
-function originalDelivery(asset: Record<string, unknown>): StudioCc0OriginalDelivery | undefined {
-  if (asset.original === undefined) return undefined;
-  const original = record(asset.original);
-  const license = record(asset.license);
-  if (
-    asset.kind !== "model"
-    || typeof asset.path !== "string"
-    || !original
-    || typeof original.path !== "string"
-    || !/^assets\/[a-z0-9-]+\/[a-z0-9][a-z0-9._-]*\.glb$/u.test(original.path)
-    || original.path.slice(0, original.path.lastIndexOf("/") + 1)
-      !== asset.path.slice(0, asset.path.lastIndexOf("/") + 1)
-    || original.path === asset.path
-    || typeof original.bytes !== "number"
-    || !Number.isSafeInteger(original.bytes)
-    || original.bytes <= 0
-    || typeof original.sha256 !== "string"
-    || !/^[a-f0-9]{64}$/u.test(original.sha256)
-    || typeof original.estimatedDecodedImageBytes !== "number"
-    || !Number.isSafeInteger(original.estimatedDecodedImageBytes)
-    || original.estimatedDecodedImageBytes <= 0
-    || original.licenseId !== "CC0-1.0"
-    || license?.id !== "CC0-1.0"
-    || typeof original.sourceUrl !== "string"
-    || !original.sourceUrl.startsWith("https://")
-    || original.sourceUrl !== license.sourceUrl
-    || typeof original.visuallyEquivalentToDefault !== "boolean"
-  ) {
-    throw new TypeError("에셋 원본 파일의 경로·무결성·CC0 출처 기록이 올바르지 않습니다.");
-  }
-  return Object.freeze({
-    path: original.path,
-    bytes: original.bytes,
-    sha256: original.sha256,
-    estimatedDecodedImageBytes: original.estimatedDecodedImageBytes,
-    licenseId: original.licenseId,
-    sourceUrl: original.sourceUrl,
-    visuallyEquivalentToDefault: original.visuallyEquivalentToDefault,
-  });
-}
-
-function curationText(asset: Record<string, unknown>, key: string, fallback: string, maximum = 160): string {
-  const value = asset[key];
-  if (value === undefined) return fallback;
-  if (
-    typeof value !== "string"
-    || value.length > maximum
-    || Array.from(value).some((character) => {
-      const code = character.charCodeAt(0);
-      return code <= 0x1f || code === 0x7f;
-    })
-  ) {
-    throw new TypeError("에셋 검수 기록 형식이 올바르지 않습니다.");
-  }
-  return value.trim() || fallback;
-}
-
-function curationBoolean(asset: Record<string, unknown>, key: string): boolean {
-  const value = asset[key];
-  if (value !== undefined && typeof value !== "boolean") {
-    throw new TypeError("에셋 검수 기록 형식이 올바르지 않습니다.");
-  }
-  return value === true;
-}
-
-function parseCurationMetadata(asset: Record<string, unknown>) {
-  const original = originalDelivery(asset);
-  return {
-    ...(original ? { original } : {}),
-    style: curationText(asset, "style", "unspecified", 80),
-    visualReviewed: curationBoolean(asset, "visualReviewed"),
-    visualReviewLevel: curationText(asset, "visualReviewLevel", "unreviewed", 80),
-    visualReviewSource: curationText(asset, "visualReviewSource", "", 512),
-    role: curationText(asset, "role", "unclassified", 80),
-    curationStatus: curationText(asset, "curationStatus", "unreviewed", 80),
-    studioRuntimeVerified: curationBoolean(asset, "studioRuntimeVerified"),
-    allAnglesArtisticallyApproved: curationBoolean(asset, "allAnglesArtisticallyApproved"),
-  };
 }
 
 export function studioCc0AssetUrl(relativePath: string): string {
@@ -185,8 +85,7 @@ export function parseStudioCc0Catalog(value: unknown): readonly StudioCc0Asset[]
       bytes: Number(asset.bytes), sha256: asset.sha256,
       ...(kind !== "model" ? {width: Number(asset.width), height: Number(asset.height)} : {}),
       browserRenderVerified: asset.browserRenderVerified === true,
-      provider: license.provider, sourceUrl: license.sourceUrl,
-      ...parseCurationMetadata(asset)});
+      provider: license.provider, sourceUrl: license.sourceUrl});
   }));
 }
 

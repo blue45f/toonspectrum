@@ -10,7 +10,6 @@ import {
   CharacterDocumentValidationError,
   createCharacterDocumentV2,
   isCharacterDocumentV2,
-  parseCharacterDocumentV2,
   projectCharacterRecipeV1,
 } from "./document/character-document-v2";
 import { createCharacterExportPreflight } from "./export/character-export-preflight";
@@ -167,58 +166,6 @@ describe("Character Platform V2 foundation", () => {
       (current) => current,
     )).toMatchObject({ ok: false, code: "revision-conflict" });
   });
-
-  it("does not commit an unchanged document restored from JSON with accessory selections", () => {
-    const before = document();
-    const restored = parseCharacterDocumentV2(JSON.parse(JSON.stringify(before)));
-
-    expect(restored.recipe.accessories[0]).not.toBe(before.recipe.accessories[0]);
-    expect(diffCharacterDocuments(before, restored)).toEqual([]);
-    expect(dispatchCharacterCommand(
-      before,
-      {
-        commandId: "command:restore",
-        kind: "character.restore",
-        label: "동일한 문서 복원",
-        expectedRevision: before.revision,
-        source: "migration",
-        payload: restored,
-      },
-      (_current, restoredDocument) => restoredDocument,
-    )).toMatchObject({ ok: false, code: "no-change", currentRevision: before.revision });
-    expect(before.revision).toBe(3);
-  });
-
-  it.each(["reordered", "changed", "added", "removed"] as const)(
-    "still detects %s accessory selections after JSON restoration",
-    (change) => {
-      const base = document();
-      const first = base.recipe.accessories[0]!;
-      const before = parseCharacterDocumentV2({
-        ...base,
-        recipe: {
-          ...base.recipe,
-          accessories: [first, { ...first, entryId: "accessory:hat", overrides: { visible: true } }],
-        },
-      });
-      const restored = parseCharacterDocumentV2(JSON.parse(JSON.stringify(before)));
-      const selections = restored.recipe.accessories;
-      const changedSelections = {
-        reordered: [selections[1]!, selections[0]!],
-        changed: [selections[0]!, { ...selections[1]!, overrides: { visible: false } }],
-        added: [...selections, { ...first, entryId: "accessory:scarf" }],
-        removed: [selections[0]!],
-      }[change];
-      const after = parseCharacterDocumentV2({
-        ...restored,
-        recipe: { ...restored.recipe, accessories: changedSelections },
-      });
-
-      expect(diffCharacterDocuments(before, after)).toEqual([
-        { path: "recipe.accessories", kind: "changed", before: before.recipe.accessories, after: changedSelections },
-      ]);
-    },
-  );
 
   it("derives honest model compatibility and export strategy", () => {
     const report = createCharacterCompatibilityReport(profile);

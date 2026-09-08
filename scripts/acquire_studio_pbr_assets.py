@@ -8,7 +8,6 @@ Technical and browser checks never imply artistic approval.
 from __future__ import annotations
 import argparse
 from collections import Counter
-from datetime import date
 import hashlib
 import io
 import json
@@ -63,9 +62,8 @@ def safe_path(root: Path, relative: str) -> Path:
 
 
 class Fetcher:
-    def __init__(self, max_total: int = MAX_TOTAL) -> None:
+    def __init__(self) -> None:
         self.total = 0
-        self.max_total = max_total
         self.last_api = 0.0
         self.opener = build_opener(SafeRedirects())
 
@@ -77,7 +75,7 @@ class Fetcher:
             if int(response.headers.get('Content-Length', '0')) > limit:
                 raise ValueError('Response exceeds per-file budget')
             data = response.read(limit + 1)
-        if len(data) > limit or self.total + len(data) > self.max_total:
+        if len(data) > limit or self.total + len(data) > MAX_TOTAL:
             raise ValueError('Acquisition byte budget exhausted')
         self.total += len(data)
         return data
@@ -136,34 +134,20 @@ def choose_file(files: dict, role: str) -> tuple[tuple[str, ...], dict]:
     return min(candidates, key=lambda pair: pair[1]['size'])
 
 
-def select_assets(metadata: dict, *, exclude_ids: set[str] | None = None,
-                  profile: str = 'pilot') -> list[tuple[str, str, str, dict]]: # NOSONAR python:S3776
+def select_assets(metadata: dict) -> list[tuple[str, str, str, dict]]: # NOSONAR python:S3776
     # Select by intended use, not a fabricated quality score. Pixel review follows.
     result, seen = [], set()
-    excluded = exclude_ids or set()
     groups = [
         ('model', 2, ('chair', 'table', 'potted', 'lamp', 'sofa', 'book', 'bowl', 'barrel', 'bench'), 2),
         ('surface-texture', 1, ('wood', 'fabric', 'brick', 'metal', 'plaster', 'asphalt', 'concrete', 'stone', 'leather', 'tile', 'paper', 'ground'), 3),
     ]
-    if profile == 'expansion':
-        groups = [
-            ('model', 2, ('chair', 'stool', 'table', 'sofa', 'bench', 'cabinet', 'wardrobe', 'bed'), 2),
-            ('model', 2, ('lamp', 'mirror', 'clock', 'book', 'ceramic', 'vase', 'frame', 'potted'), 2),
-            ('model', 2, ('suitcase', 'backpack', 'telephone', 'camera', 'radio', 'television', 'helmet', 'bicycle'), 1),
-            ('model', 2, ('plate', 'cup', 'teapot', 'pan', 'kettle', 'fruit', 'bread'), 1),
-            ('model', 2, ('hydrant', 'bin', 'sign', 'crate', 'rock', 'tree', 'plant', 'gate'), 2),
-            ('surface-texture', 1, ('marble', 'tile', 'wood', 'painted', 'plaster', 'fabric',
-                                   'leather', 'metal', 'brick', 'grass', 'forest', 'sand'), 2),
-        ]
-    elif profile != 'pilot':
-        raise ValueError('Unknown acquisition profile')
     for kind, asset_type, terms, limit in groups:
         ordered = sorted(((key, value) for key, value in metadata.items() if isinstance(value, dict) and value.get('type') == asset_type),
                          key=lambda pair: pair[1].get('download_count', 0), reverse=True)
         for term in terms:
             count = 0
             for key, value in ordered:
-                if key in seen or 'polyhaven-' + key.replace('_', '-') in excluded or not re.fullmatch(r'[a-z0-9_-]{1,100}', key):
+                if key in seen or not re.fullmatch(r'[a-z0-9_-]{1,100}', key):
                     continue
                 if term not in (key + ' ' + value.get('name', '') + ' ' + str(value.get('category', ''))).lower():
                     continue
@@ -177,19 +161,15 @@ def select_assets(metadata: dict, *, exclude_ids: set[str] | None = None,
     return result
 
 
-def acquire(output: Path, *, exclude_manifest: Path | None = None, profile: str = 'pilot',
-            max_total: int = MAX_TOTAL) -> dict: # NOSONAR python:S3776
+def acquire(output: Path) -> dict: # NOSONAR python:S3776
     if output.exists() and any(output.iterdir()):
         raise ValueError('Use an empty review directory; existing assets are never overwritten')
     output.mkdir(parents=True, exist_ok=True)
-    existing = json.loads(exclude_manifest.read_text(encoding='utf-8'))['assets'] if exclude_manifest else []
-    if not isinstance(existing, list):
-        raise ValueError('Invalid existing catalog')
-    fetch = Fetcher(max_total)
+    fetch = Fetcher()
     metadata = fetch.api('assets')
-    selected = select_assets(metadata, exclude_ids={asset['id'] for asset in existing}, profile=profile)
+    selected = select_assets(metadata)
     write_json(output / 'acquisition-plan.json', [{'id': k, 'kind': kind, 'selectionTerm': term, 'metadata': meta} for k, kind, term, meta in selected])
-    assets, errors, receipts, seen = [], [], {}, {asset['geometrySha256'] for asset in existing if asset.get('geometrySha256')}
+    assets, errors, receipts, seen = [], [], {}, set()
     for source_id, kind, term, source_meta in selected:
         identifier = 'polyhaven-' + source_id.replace('_', '-')
         folder = output / 'assets' / identifier
@@ -197,7 +177,7 @@ def acquire(output: Path, *, exclude_manifest: Path | None = None, profile: str 
             files = fetch.api('files/' + source_id)
             license_info = {'id': 'CC0-1.0', 'url': 'https://creativecommons.org/publicdomain/zero/1.0/',
                             'provider': 'Poly Haven', 'sourceUrl': 'https://polyhaven.com/a/' + source_id,
-                            'commercialUse': True, 'redistributionAllowed': True, 'checkedOn': date.today().isoformat()}
+                            'commercialUse': True, 'redistributionAllowed': True, 'checkedOn': '2026-09-06'}
             common = {'id': identifier, 'name': source_meta.get('name', source_id), 'kind': kind,
                       'category': 'pbr-detailed-prop' if kind == 'model' else 'surface-material',
                       'style': 'pbr-detailed', 'selectionTerm': term, 'license': license_info,
@@ -281,10 +261,9 @@ def acquire(output: Path, *, exclude_manifest: Path | None = None, profile: str 
         except Exception as error:
             errors.append({'id': identifier, 'kind': kind, 'reason': str(error)[:600]})
             print('PBR EXCLUDED', identifier, str(error)[:300], flush=True)
-        if fetch.total >= max_total - MAX_FILE:
+        if fetch.total >= MAX_TOTAL - MAX_FILE:
             break
     report = {'schema': 'toonspectrum.asset-delivery.v1', 'selectedCandidates': len(selected),
-              'acquisitionProfile': profile, 'existingOriginalsExcluded': len(existing),
               'deliveredOriginals': len(assets), 'byKind': dict(Counter(a['kind'] for a in assets)),
               'byCategory': dict(Counter(a['category'] for a in assets)), 'downloadedBytes': fetch.total,
               'errors': errors, 'approvedVisualOriginals': 0, 'productionPublished': 0,
@@ -301,14 +280,8 @@ def acquire(output: Path, *, exclude_manifest: Path | None = None, profile: str 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--exclude-manifest', type=Path)
-    parser.add_argument('--profile', choices=('pilot', 'expansion'), default='pilot')
-    parser.add_argument('--max-download-mib', type=int, default=640)
     args = parser.parse_args()
     destination = args.output.resolve()
-    if destination == ROOT or destination.is_relative_to(ROOT / 'apps/web/public'):
+    if destination == ROOT or destination.is_relative_to(ROOT / 'public'):
         parser.error('Use an empty staging directory outside apps/web/public/')
-    if not 128 <= args.max_download_mib <= 2048:
-        parser.error('Download budget must be between 128 and 2048 MiB')
-    acquire(destination, exclude_manifest=args.exclude_manifest, profile=args.profile,
-            max_total=args.max_download_mib * 1024 * 1024)
+    acquire(destination)

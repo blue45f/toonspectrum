@@ -3,13 +3,17 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { compileCreatorResourceCases } from "./lib/compile-creator-resource-cases.mjs";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
+const root = fileURLToPath(new URL("../", import.meta.url));
 const output = mkdtempSync(path.join(tmpdir(), "toonstudio-resources-"));
 let failed = 0;
 try {
-  compileCreatorResourceCases(output);
+  const tsc = require.resolve("typescript/lib/tsc.js");
+  const result = spawnSync(process.execPath, [tsc, "--strict", "--skipLibCheck", "--target", "es2022", "--module", "commonjs", "--lib", "es2023,dom,dom.iterable", "--outDir", output, "tests/creator-resources-cases.ts", "tests/creator-resource-workflow-cases.ts", "tests/creator-workspace-persistence-cases.ts"], { cwd: root, stdio: "inherit" });
+  if (result.status !== 0) throw new Error("Creator resources typecheck failed");
   const { creatorResourceCases } = require(path.join(output, "tests/creator-resources-cases.js"));
   const { creatorResourceWorkflowCases } = require(path.join(output, "tests/creator-resource-workflow-cases.js"));
   const { creatorWorkspacePersistenceCases } = require(path.join(output, "tests/creator-workspace-persistence-cases.js"));
