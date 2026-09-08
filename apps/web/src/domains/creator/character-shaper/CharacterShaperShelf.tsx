@@ -29,6 +29,7 @@ import type { CharacterGridDirection } from "./character-shaper-ui-model";
 import { cn } from "@/shared/lib/utils";
 
 const SEARCH_DEBOUNCE_MS = 120;
+const AUDITION_DELAY_MS = 140;
 const COLLECTIONS: readonly { readonly id: CharacterShelfCollection; readonly label: string }[] = [
   { id: "all", label: "모두" },
   { id: "favorites", label: "즐겨찾기" },
@@ -55,6 +56,8 @@ function CharacterShaperShelfContent({
   const [syncedQuery, setSyncedQuery] = useState(query);
   const [composing, setComposing] = useState(false);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const auditionTimerRef = useRef<number | null>(null);
+  const activeAuditionRef = useRef<string | null>(null);
   const queryChangeRef = useRef(onQueryChange);
   useEffect(() => { queryChangeRef.current = onQueryChange; });
 
@@ -121,8 +124,42 @@ function CharacterShaperShelfContent({
   const clearFilters = () => {
     clearSearch(); onTagChange(null); setCollection("all"); setOnlyAvailable(false);
   };
+  const clearAuditionTimer = () => {
+    if (auditionTimerRef.current === null) return;
+    window.clearTimeout(auditionTimerRef.current);
+    auditionTimerRef.current = null;
+  };
+  const startAudition = (entry: CharacterSlotEntry) => {
+    clearAuditionTimer();
+    const status = availability.get(entry.id) ?? binding.evaluate(entry);
+    if (
+      lockReason
+      || status.status === "unavailable"
+      || isCharacterEntrySelected(binding.recipe, entry)
+      || typeof binding.preview !== "function"
+    ) return;
+    auditionTimerRef.current = window.setTimeout(() => {
+      auditionTimerRef.current = null;
+      const result = binding.preview?.(entry);
+      if (result?.ok && result.plan.steps.length > 0) activeAuditionRef.current = entry.id;
+    }, AUDITION_DELAY_MS);
+  };
+  const endAudition = (entryId: string) => {
+    clearAuditionTimer();
+    if (activeAuditionRef.current !== entryId && binding.previewEntryId !== entryId) return;
+    activeAuditionRef.current = null;
+    binding.cancelPreview?.();
+  };
+  const cancelAuditionPreview = binding.cancelPreview;
+  useEffect(() => () => {
+    if (auditionTimerRef.current !== null) window.clearTimeout(auditionTimerRef.current);
+    activeAuditionRef.current = null;
+    cancelAuditionPreview?.();
+  }, [cancelAuditionPreview, slot]);
   const commitEntry = (entry: CharacterSlotEntry) => {
     if (lockReason || binding.evaluate(entry).status === "unavailable") return;
+    clearAuditionTimer();
+    activeAuditionRef.current = null;
     onCommitEntry(entry);
   };
   const presentAvailability = (entry: CharacterSlotEntry): CharacterSlotAvailability => {
@@ -196,6 +233,11 @@ function CharacterShaperShelfContent({
         ) : null}
         </div>
         {lockReason ? <p role="status" className="m-3 rounded-lg border border-warn/45 bg-warn/10 p-2 text-[0.7rem] text-warn">{lockReason}</p> : null}
+        {binding.previewEntryId ? (
+          <p role="status" className="mx-3 mt-2 rounded-xl border border-accent/45 bg-accent-soft px-3 py-2 text-[0.7rem] font-semibold text-accent">
+            실제 3D 화면에서 후보를 미리 보는 중입니다. 클릭하면 한 번만 기록되고, Esc로 원래 상태로 돌아갑니다.
+          </p>
+        ) : null}
         {favorites.notice ? (
           <div className="mx-3 mt-2 space-y-1.5">
             <p role="status" className="text-[0.65rem] text-warn">{favorites.notice}</p>
@@ -231,8 +273,9 @@ function CharacterShaperShelfContent({
                 const blocked = status.status === "unavailable";
                 return <button key={entry.id} type="button" aria-pressed={selected} aria-disabled={blocked || undefined}
                   title={status.reason ?? entry.hint} data-character-shaper-featured={entry.id}
-                  onClick={() => commitEntry(entry)} onPointerEnter={() => onHoverEntry(entry.id)}
-                  onPointerLeave={() => onHoverEntry(null)} onFocus={() => onHoverEntry(entry.id)}
+                  onClick={() => commitEntry(entry)} onPointerEnter={() => { onHoverEntry(entry.id); startAudition(entry); }}
+                  onPointerLeave={() => { onHoverEntry(null); endAudition(entry.id); }}
+                  onFocus={() => { onHoverEntry(entry.id); startAudition(entry); }} onBlur={() => endAudition(entry.id)}
                   className={cn("flex min-h-11 shrink-0 items-center gap-2 rounded-xl border py-1 pl-1 pr-3 text-left text-[0.72rem] font-semibold", STUDIO_FOCUS_RING, selected ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg", blocked && "cursor-not-allowed opacity-55")}>
                   <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-canvas/70"><CharacterSlotPreview spec={entry.preview} size={36} selected={selected} title={entry.label} /></span>
                   <span className="max-w-[7.5rem] truncate">{entry.label}</span>
@@ -249,8 +292,11 @@ function CharacterShaperShelfContent({
             {visible.map((entry, index) => (
               <div key={entry.id} className="min-w-0">
                 <CharacterSlotCard entry={entry} availability={presentAvailability(entry)} selected={isCharacterEntrySelected(binding.recipe, entry)}
+                  previewed={binding.previewEntryId === entry.id}
                   tabIndex={index === rovingIndex ? 0 : -1} onCommit={commitEntry} onHover={onHoverEntry}
-                  onFocus={(id) => { setFocusedId(id); onHoverEntry(id); }} onKeyNavigate={(direction) => navigateFrom(index, direction)} />
+                  onFocus={(id) => { setFocusedId(id); onHoverEntry(id); }}
+                  onPreviewStart={startAudition} onPreviewEnd={endAudition}
+                  onKeyNavigate={(direction) => navigateFrom(index, direction)} />
                 <button type="button" tabIndex={index === rovingIndex ? 0 : -1} aria-pressed={favoriteSet.has(entry.id)}
                   aria-label={`${entry.label} 즐겨찾기 ${favoriteSet.has(entry.id) ? "해제" : "추가"}`}
                   onFocus={() => setFocusedId(entry.id)}
@@ -266,7 +312,7 @@ function CharacterShaperShelfContent({
             ))}
           </div>}
         <p className="px-3 pb-3 text-[0.62rem] leading-relaxed text-fg-3">
-          프리셋 그림은 형태 안내입니다. 실제 메시·재질 결과는 3D 화면에서 확인하세요. 즐겨찾기는 이 브라우저에만 저장됩니다.
+          카드에 잠시 머물면 실제 3D 화면에서 후보를 안전하게 시험합니다. 클릭 전에는 저장·Undo 기록이 바뀌지 않습니다. 즐겨찾기는 이 브라우저에만 저장됩니다.
         </p>
       </div>
     </div>

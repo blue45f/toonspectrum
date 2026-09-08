@@ -8,6 +8,7 @@
 import { Maximize2 } from "lucide-react";
 import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaborationProvider";
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "../studio-chrome-ui";
+import { StudioDraftSaveCenter } from "../StudioDraftSaveCenter";
 import { StudioHelpCenterHost } from "../StudioHelpCenterHost";
 import { StudioToolHintPreferencesProvider } from "../StudioToolHint";
 import { StudioWorkspaceNavigator } from "../StudioWorkspaceNavigator";
@@ -130,6 +131,31 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
         )}
       >
         <StudioCuttoonEditorChrome {...s} />
+        <StudioDraftSaveCenter
+          key={s.effectiveWorkId ?? s.workId ?? "new-work"}
+          saving={s.saving}
+          workId={s.workId}
+          workHydrated={s.workHydrated}
+          workHydrationFailed={s.workHydrationFailed}
+          pendingSaveIntent={s.pendingSaveIntent}
+          loadedWork={s.loadedWork}
+          sharedDocument={s.sharedDocument}
+          localCheckpointCount={s.checkpoints?.length ?? 0}
+          serverCurrentRevision={s.serverCurrentRevision}
+          serverRevisions={s.serverRevisions}
+          serverRevisionLoading={s.serverRevisionLoading}
+          serverRevisionError={s.serverRevisionError}
+          autosaveDocumentLeadership={s.autosaveDocumentLeadership}
+          collaborationOperationSyncPending={s.collaborationOperationSyncPending}
+          collaborationDocumentLocked={s.collaborationDocumentLocked}
+          error={s.error}
+          mobileImmersive={s.mobileImmersive}
+          canvasOnlyMode={s.canvasOnlyMode}
+          onSaveDraft={() => s.studioMenubarContentHandlers.handleSave("draft")}
+          onContinuePendingSave={() => s.onContinuePendingSave()}
+          onOpenVersions={() => s.setCheckpointPanelOpen(true)}
+          onExportBackup={() => s.studioMenubarContentHandlers.handleExportProject()}
+        />
         <StudioCuttoonEditorWorkspace {...s} />
         <StudioCuttoonEditorContextMenu {...s} />
       </Container>

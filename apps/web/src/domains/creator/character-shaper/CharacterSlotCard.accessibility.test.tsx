@@ -43,4 +43,24 @@ describe("CharacterSlotCard touch and keyboard accessibility", () => {
   it("wraps a long label rather than truncating the only visible name", () => {
     render(card("available")); expect(screen.getByText(entry.label).className.split(" ")).not.toContain("truncate");
   });
+  it("owns live audition across pointer and keyboard focus and labels the transient state", () => {
+    const start = vi.fn(), end = vi.fn();
+    render(<CharacterSlotCard entry={entry} selected={false} previewed tabIndex={0}
+      availability={{ status: "available", reason: null, missing: [] }}
+      onCommit={vi.fn()} onHover={vi.fn()} onFocus={vi.fn()} onKeyNavigate={vi.fn()}
+      onPreviewStart={start} onPreviewEnd={end} />);
+    const button = screen.getByRole("button");
+    expect(button.dataset.characterSlotCardPreviewed).toBe("true");
+    expect(screen.getByText("3D 미리보기")).toBeTruthy();
+
+    fireEvent.pointerEnter(button);
+    expect(start).toHaveBeenCalledWith(entry);
+    fireEvent.pointerLeave(button);
+    expect(end).toHaveBeenCalledWith(entry.id);
+
+    fireEvent.focus(button);
+    expect(start).toHaveBeenCalledTimes(2);
+    fireEvent.blur(button);
+    expect(end).toHaveBeenCalledTimes(2);
+  });
 });
