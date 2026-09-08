@@ -476,6 +476,7 @@ export function NowPage() {
               const checked = selectedProgress.includes(step.id);
               return (
                 <label
+                  aria-label={`${step.label}: ${step.detail}`}
                   key={step.id}
                   className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
                     checked ? "border-good/35 bg-good/10" : "border-line bg-canvas/50 hover:border-accent/35"
