@@ -19,14 +19,36 @@ const FAVORITE_STORAGE_KEY =
 const RECENT_STORAGE_KEY =
   "toonspectrum-studio-project-center:recent-actions:v1";
 
+vi.mock("./StudioFileControlCenter", () => ({
+  StudioFileControlCenter: () => (
+    <section data-studio-file-control-center="true">파일 제어 센터</section>
+  ),
+}));
+
+function resultActionButtons(): readonly HTMLButtonElement[] {
+  return Array.from(
+    document.querySelectorAll<HTMLButtonElement>(
+      '[data-project-center-search-result="true"] > button:first-of-type',
+    ),
+  );
+}
+
+function findResultAction(label: string): HTMLButtonElement | undefined {
+  return resultActionButtons().find((button) =>
+    button.textContent?.includes(label),
+  );
+}
+
 function Fixture({
   onBackup = () => undefined,
   onPreflight = () => undefined,
   onVersion = () => undefined,
+  backupDisabled = false,
 }: {
   onBackup?: () => void;
   onPreflight?: () => void;
   onVersion?: () => void;
+  backupDisabled?: boolean;
 }) {
   return (
     <div data-studio-project-actions-menu="true">
@@ -39,6 +61,7 @@ function Fixture({
         type="button"
         title="프로젝트를 안전하게 보관"
         onClick={onBackup}
+        disabled={backupDisabled}
       >
         아카이브 백업
       </button>
@@ -82,19 +105,18 @@ describe("StudioProjectCenterSearch", () => {
     fireEvent.change(search, { target: { value: "검사" } });
 
     await waitFor(() => {
-      expect(screen.getByText("게시 사전검사")).not.toBeNull();
+      expect(findResultAction("게시 사전검사")).toBeDefined();
       const hidden = document.querySelector<HTMLButtonElement>(
         'button[title="프로젝트를 안전하게 보관"]',
       );
       expect(hidden?.hidden).toBe(true);
-      expect(
-        document.querySelectorAll('[data-project-center-search-result="true"]'),
-      ).toHaveLength(1);
+      expect(resultActionButtons()).toHaveLength(1);
     });
 
     fireEvent.change(search, { target: { value: "체크포인트" } });
     await waitFor(() => {
-      expect(screen.getByText("버전 체크포인트 열기")).not.toBeNull();
+      expect(findResultAction("버전 체크포인트 열기")).toBeDefined();
+      expect(resultActionButtons()).toHaveLength(1);
     });
   });
 
@@ -135,7 +157,9 @@ describe("StudioProjectCenterSearch", () => {
     }) as HTMLInputElement;
 
     fireEvent.change(search, { target: { value: "archive" } });
-    await screen.findByText("아카이브 백업");
+    await waitFor(() => {
+      expect(findResultAction("아카이브 백업")).toBeDefined();
+    });
     fireEvent.keyDown(search, { key: "Enter" });
 
     expect(onBackup).toHaveBeenCalledTimes(1);
@@ -148,9 +172,10 @@ describe("StudioProjectCenterSearch", () => {
     const recent = document.querySelector<HTMLButtonElement>(
       '[data-project-center-scope="recent"]',
     );
+    expect(recent).not.toBeNull();
     fireEvent.click(recent as HTMLButtonElement);
     await waitFor(() => {
-      expect(screen.getByText("아카이브 백업")).not.toBeNull();
+      expect(findResultAction("아카이브 백업")).toBeDefined();
     });
   });
 
@@ -175,16 +200,17 @@ describe("StudioProjectCenterSearch", () => {
     const favorites = document.querySelector<HTMLButtonElement>(
       '[data-project-center-scope="favorites"]',
     );
+    expect(favorites).not.toBeNull();
     fireEvent.click(favorites as HTMLButtonElement);
     await waitFor(() => {
-      expect(screen.getByText("게시 사전검사")).not.toBeNull();
+      expect(findResultAction("게시 사전검사")).toBeDefined();
       expect(
         screen.getByRole("button", { name: "게시 사전검사 즐겨찾기 해제" }),
       ).not.toBeNull();
     });
   });
 
-  it("filters the authored command catalogue by project section", async () => {
+  it("filters the authored command catalogue by project section and restores it", async () => {
     render(<Fixture />);
     const scope = await waitFor(() => {
       const button = Array.from(
@@ -207,5 +233,34 @@ describe("StudioProjectCenterSearch", () => {
       expect(backup?.hidden).toBe(false);
       expect(preflight?.hidden).toBe(true);
     });
+
+    const all = document.querySelector<HTMLButtonElement>(
+      '[data-project-center-scope="all"]',
+    );
+    expect(all).not.toBeNull();
+    fireEvent.click(all as HTMLButtonElement);
+    await waitFor(() => {
+      expect(backup?.hidden).toBe(false);
+      expect(preflight?.hidden).toBe(false);
+    });
+  });
+
+  it("never bypasses the disabled state of the original command", async () => {
+    const onBackup = vi.fn();
+    render(<Fixture onBackup={onBackup} backupDisabled />);
+    const search = screen.getByRole("searchbox", {
+      name: "프로젝트 센터 도구 검색",
+    }) as HTMLInputElement;
+
+    fireEvent.change(search, { target: { value: "archive" } });
+    const result = await waitFor(() => {
+      const action = findResultAction("아카이브 백업");
+      expect(action).toBeDefined();
+      return action as HTMLButtonElement;
+    });
+
+    expect(result.disabled).toBe(true);
+    fireEvent.click(result);
+    expect(onBackup).not.toHaveBeenCalled();
   });
 });
