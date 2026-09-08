@@ -103,6 +103,16 @@ The focused regression suite verifies:
 - round-trip through the real scene document adapter;
 - panel accessibility, pagination, disabled states, and insertion announcements.
 
+## Final validation
+
+GitHub Actions run `34268561861` completed successfully on the materialized product tree.
+
+- 5 focused test files passed with **29 of 29 tests**.
+- ESLint passed with zero warnings for every changed TypeScript and TSX file.
+- The complete repository TypeScript check passed with the repository-standard 8 GiB Node heap.
+- `git diff --check` passed.
+- One-shot integration scripts and their temporary workflow were removed before the validated product commit was pushed.
+
 ## Scope boundary
 
 This MR adds a high-quality stylized and editable procedural layer. Photoreal textures, skeletal animation, facial morphs, cloth simulation, and LOD-generated binary models remain in the existing GLB/VRM/PBR pipelines and are not imitated with primitive geometry.
