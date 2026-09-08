@@ -37,7 +37,7 @@ describe("PSD custom draw node capture", () => {
   beforeEach(() => {
     // Konva owns the real scene graph and bounds. Only the browser pixel surface is substituted;
     // the PSD encoder/decoder and document-view capture arguments remain real.
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => new Proxy({}, {
+    const context = new Proxy({}, {
       get: (_target, key) => {
         if (key === "getImageData") return (_x: number, _y: number, width: number, height: number) => ({
           width, height, data: new Uint8ClampedArray(width * height * 4),
@@ -48,7 +48,9 @@ describe("PSD custom draw node capture", () => {
         return () => undefined;
       },
       set: () => true,
-    }) as CanvasRenderingContext2D);
+    }) as CanvasRenderingContext2D;
+    const getContext = ((contextId: string) => contextId === "2d" ? context : null) as HTMLCanvasElement["getContext"];
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(getContext);
     container = document.createElement("div");
     document.body.appendChild(container);
     stage = new Konva.Stage({ container, width: 32, height: 48, x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 });
