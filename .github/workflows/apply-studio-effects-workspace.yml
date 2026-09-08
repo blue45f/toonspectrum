@@ -16,17 +16,24 @@ concurrency:
 
 jobs:
   apply-validate-commit:
-    runs-on: ubuntu-24.04-arm
+    name: apply-validate-commit (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-24.04-arm
+          - ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     env:
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
       BRANCH_NAME: feat/studio-effects-workspace-20260909
     steps:
-      - name: Check out isolated feature branch
+      - name: Check out isolated feature commit
         uses: actions/checkout@v6
         with:
-          ref: feat/studio-effects-workspace-20260909
+          ref: ${{ github.sha }}
           fetch-depth: 1
 
       - name: Set up pnpm
@@ -126,4 +133,10 @@ jobs:
             exit 1
           fi
           git commit -m "feat(studio): add non-destructive effects workspace"
+          git fetch origin "${BRANCH_NAME}"
+          remote_sha="$(git rev-parse "origin/${BRANCH_NAME}")"
+          if [[ "${remote_sha}" != "${GITHUB_SHA}" ]]; then
+            echo "Another validated matrix job already advanced the feature branch."
+            exit 0
+          fi
           git push origin "HEAD:refs/heads/${BRANCH_NAME}"
