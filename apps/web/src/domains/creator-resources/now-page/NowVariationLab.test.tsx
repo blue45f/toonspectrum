@@ -67,10 +67,10 @@ describe("daily variation lab", () => {
 
   it("rerolls a deterministic set and copies the selected brief with notes", async () => {
     renderLab();
-    expect(screen.getByText(/세트 1 · 선택 규칙을 유지한 3개 경로/u)).toBeTruthy();
+    expect(screen.getByText(/세트 1 · 선택 규칙을 기준으로 펼친 3개 경로/u)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "같은 규칙으로 다시 섞기" }));
-    expect(screen.getByText(/세트 2 · 선택 규칙을 유지한 3개 경로/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "같은 기준으로 다시 섞기" }));
+    expect(screen.getByText(/세트 2 · 선택 규칙을 기준으로 펼친 3개 경로/u)).toBeTruthy();
     fireEvent.change(screen.getByRole("textbox", { name: "개인 제작 메모" }), {
       target: { value: "빛은 출입문 위 한 점에서만 나온다." },
     });
