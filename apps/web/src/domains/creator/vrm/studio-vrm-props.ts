@@ -889,8 +889,9 @@ function propUidCandidate(seed?: string): string {
   if (uuid) return `${prefix}-${uuid}-${counter}`;
 
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).slice(2, 12).padEnd(10, "0");
-  return `${prefix}-${timestamp}-${counter}-${random}`;
+  // This fallback is a local UI instance key, never an authentication token.
+  // The counter and issued-key registry ensure uniqueness without weak randomness.
+  return `${prefix}-${timestamp}-${counter}`;
 }
 
 /** 저장·재실행 뒤에도 충돌하기 어려운 UI 인스턴스 키(테스트에서는 uid를 직접 주입할 수 있다). */

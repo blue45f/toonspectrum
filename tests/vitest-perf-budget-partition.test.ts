@@ -12,6 +12,8 @@ const CATALOGUE_TIMING_CALL = /\bevaluateStudioBrushCataloguePaint(?:PerfMatrix|
 
 function measuresWallClock(source: string): boolean {
   return source.includes("performance.now(")
+    || source.includes("process.cpuUsage(")
+    || source.includes("process.threadCpuUsage(")
     || source.includes("evaluateStudioCalibrated")
     || (source.includes('from "./studio-brush-catalogue-perf-matrix"')
       && CATALOGUE_TIMING_CALL.test(source));
@@ -33,6 +35,7 @@ describe("wall-clock budget partition", () => {
   it("lists only files that measure wall-clock time", () => {
     // The clock can be owned by a shared helper. Both calibrated budgets and the catalogue
     // matrix are live measurements even though the test does not call performance.now itself.
+    // CPU-time ratios also measure execution cost and must avoid coverage instrumentation.
     const notTimed = PERF_BUDGET_TEST_FILES.filter((file) =>
       !measuresWallClock(readFileSync(path.join(root, file), "utf8")));
     expect(

@@ -29,6 +29,7 @@ export interface WgslVariantAdmissionRequest {
 }
 
 export type WgslVariantAdmissionIssueCode =
+  | "shader-source-invalid"
   | "request-invalid"
   | "device-limit-invalid"
   | "pixel-count-overflow"
@@ -89,17 +90,56 @@ function isPositiveSafeInteger(value: number): boolean {
   return Number.isSafeInteger(value) && value > 0;
 }
 
-function stripWgslComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//gu, " ")
-    .replace(/\/\/[^\n\r]*/gu, " ");
+// WGSL block comments can nest. A single lexical pass avoids retrying an
+// unterminated opener at every offset, and never reveals nested comment text.
+function stripWgslComments(source: string): string | null {
+  const output: string[] = [];
+  let blockDepth = 0;
+  let lineComment = false;
+  for (let index = 0; index < source.length; index++) {
+    const character = source[index];
+    const next = source[index + 1];
+    if (lineComment) {
+      if (character === "\n" || character === "\r") {
+        lineComment = false;
+        output.push(character);
+      }
+    } else if (blockDepth > 0) {
+      if (character === "/" && next === "*") {
+        blockDepth++;
+        index++;
+      } else if (character === "*" && next === "/") {
+        blockDepth--;
+        index++;
+      } else if (character === "\n" || character === "\r") {
+        output.push(character);
+      }
+    } else if (character === "/" && next === "*") {
+      blockDepth = 1;
+      output.push(" ");
+      index++;
+    } else if (character === "/" && next === "/") {
+      lineComment = true;
+      output.push(" ");
+      index++;
+    } else {
+      output.push(character);
+    }
+  }
+  return blockDepth === 0 ? output.join("") : null;
 }
 
 function inspectShaderSource(
   variant: ComposedWgslVariant,
 ): WgslVariantAdmissionIssue[] {
   const issues: WgslVariantAdmissionIssue[] = [];
+  if (typeof variant.wgsl !== "string" || variant.wgsl.length > 262_144) {
+    return [issue("shader-source-invalid", "WGSL source must be at most 262144 characters")];
+  }
   const source = stripWgslComments(variant.wgsl);
+  if (source === null) {
+    return [issue("shader-source-invalid", "WGSL source contains an unterminated block comment")];
+  }
   const declaredBindings = [...source.matchAll(/@group\((\d+)\)\s*@binding\((\d+)\)/gu)]
     .map((match) => `${match[1]}:${match[2]}`);
   const expectedBindings = variant.usesLut

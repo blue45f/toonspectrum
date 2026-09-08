@@ -5,13 +5,23 @@ import { signSession } from "../../server/session";
 import { AUTH_SESSION_COOKIE_NAME } from "../../session-cookie";
 
 import { resolveAuthSessionUser } from "./auth-session-profile";
-import { AuthController, authResponseUser } from "./auth.controller";
+import { AuthController, authResponseUser, isValidSignupEmail } from "./auth.controller";
 import { AuthSessionResponseSchema } from "./auth.dto";
 
 import type { Request, Response } from "express";
 
 const revokeUserSessions = vi.hoisted(() => vi.fn());
 const revokeRealtimeSession = vi.fn();
+
+describe("signup email validation", () => {
+  it("bounds hostile dotted domains and rejects malformed separators", () => {
+    expect(isValidSignupEmail(`reader@${".".repeat(100_000)}`)).toBe(false);
+    for (const value of ["reader@", "reader@@example.com", "reader@example.", "reader@.com", "a b@example.com"]) {
+      expect(isValidSignupEmail(value)).toBe(false);
+    }
+    expect(isValidSignupEmail("reader+studio@example.co.kr")).toBe(true);
+  });
+});
 
 vi.mock("../../server/user-lifecycle", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../server/user-lifecycle")>()),

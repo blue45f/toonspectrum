@@ -1,4 +1,7 @@
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 import { parseCLI } from "vitest/node";
@@ -30,7 +33,7 @@ function usesActions(job) {
 
 const PLAYWRIGHT_INSTALL = "pnpm exec playwright install --with-deps chromium";
 const ROOT_SHARD_COMMAND =
-  "pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }}";
+  "pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }} --testTimeout=120000";
 const HEADED_PARITY_COMMAND =
   'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console';
 
@@ -106,7 +109,7 @@ describe("database integration runner CI policy", () => {
     // pnpm 11 forwards a standalone `--` verbatim; Vitest puts everything after it in
     // options["--"] instead of parsing --shard. Inspect the real parser, not just the YAML text.
     const argumentsText = command.slice(prefix.length)
-      .replace("${{ matrix.shard }}", String(shard))
+      .replaceAll("${{ matrix.shard }}", String(shard))
       .replace("${{ strategy.job-total }}", String(total));
     const parsed = parseCLI([
       ...packageManifest.scripts["test:root"].split(/\s+/u),
@@ -114,8 +117,73 @@ describe("database integration runner CI policy", () => {
     ]);
 
     expect(parsed.options.shard).toBe(`${shard}/${total}`);
+    expect(parsed.options.coverage).toMatchObject({ enabled: true, reportsDirectory: `coverage/shard-${shard}` });
     expect(parsed.options["--"]).toEqual([]);
     expect(parsed.filter).toEqual([]);
+  });
+
+  it("imports every shard's measured coverage before SonarQube analysis", () => {
+    const workflow = readYaml(".github/workflows/ci.yml");
+    const sonar = readYaml(".github/workflows/sonarqube.yml");
+    expect(workflow.jobs.sonarqube).toMatchObject({
+      needs: "test", uses: "./.github/workflows/sonarqube.yml", secrets: "inherit",
+    });
+    expect(sonar.on).toHaveProperty("workflow_call");
+    expect(sonar.on).not.toHaveProperty("pull_request");
+    const upload = workflow.jobs.test.steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
+    expect(upload.with).toMatchObject({
+      name: "sonar-coverage-${{ matrix.shard }}",
+      path: "coverage/shard-${{ matrix.shard }}/lcov.info",
+      "if-no-files-found": "error",
+    });
+    const steps = sonar.jobs.sonarqube.steps;
+    const downloadIndex = steps.findIndex((step) => step.uses?.startsWith("actions/download-artifact@"));
+    const scanIndex = steps.findIndex((step) => step.uses?.startsWith("SonarSource/sonarqube-scan-action@"));
+    expect(downloadIndex).toBeGreaterThan(0);
+    expect(scanIndex).toBeGreaterThan(downloadIndex);
+    expect(steps[downloadIndex].with).toMatchObject({ pattern: "sonar-coverage-*", path: "coverage" });
+    const properties = readText("sonar-project.properties");
+    for (const shard of workflow.jobs.test.strategy.matrix.shard) {
+      expect(properties).toContain(`coverage/sonar-coverage-${shard}/lcov.info`);
+    }
+  });
+
+  it("fails the actual SonarQube report guard when any shard is missing or empty", () => {
+    const workflow = readYaml(".github/workflows/ci.yml");
+    const sonar = readYaml(".github/workflows/sonarqube.yml");
+    const steps = sonar.jobs.sonarqube.steps;
+    const guardIndex = steps.findIndex((step) => step.name === "Require all three nonempty coverage reports");
+    const downloadIndex = steps.findIndex((step) => step.uses?.startsWith("actions/download-artifact@"));
+    const scanIndex = steps.findIndex((step) => step.uses?.startsWith("SonarSource/sonarqube-scan-action@"));
+    expect(guardIndex).toBeGreaterThan(downloadIndex);
+    expect(guardIndex).toBeLessThan(scanIndex);
+
+    const directory = mkdtempSync(join(tmpdir(), "sonar-coverage-policy-"));
+    const reports = workflow.jobs.test.strategy.matrix.shard.map((shard) => {
+      const artifactDirectory = join(directory, "coverage", `sonar-coverage-${shard}`);
+      mkdirSync(artifactDirectory, { recursive: true });
+      return join(artifactDirectory, "lcov.info");
+    });
+    // Match the fail-fast Bash semantics used by GitHub Actions' run steps.
+    const runGuard = () => spawnSync("bash", ["-e", "-o", "pipefail", "-c", steps[guardIndex].run], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+    const coverage = "TN:\nSF:apps/web/src/app/main.tsx\nDA:1,1\nend_of_record\n";
+    try {
+      for (const report of reports) writeFileSync(report, coverage);
+      expect(runGuard().status).toBe(0);
+      for (const report of reports) {
+        rmSync(report);
+        expect(runGuard().status, `missing ${report}`).toBe(1);
+        writeFileSync(report, "");
+        expect(runGuard().status, `empty ${report}`).toBe(1);
+        writeFileSync(report, coverage);
+      }
+      expect(runGuard().status).toBe(0);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("shards the root Vitest suite behind a Postgres service and runs the serial lane once", () => {
@@ -255,6 +323,7 @@ describe("database integration runner CI policy", () => {
     // The checks that used to live inside the single core job each keep their own runner.
     expect(runCommands(workflow.jobs?.lint)).toEqual([
       "pnpm install --frozen-lockfile",
+      "pnpm run audit:security",
       "pnpm run validate:architecture",
       "pnpm run verify:csp",
       "pnpm run verify:toolchain-coverage",

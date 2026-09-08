@@ -190,12 +190,9 @@ async function main(): Promise<void> {
   };
 
   const realSw = readFileSync(join(DIST, "sw.js"), "utf8");
-  // A "next deploy": same behaviour, different build id, so the precache bucket
-  // name changes and the browser sees a byte-different worker script.
-  const nextSw = realSw.replace(
-    /toonspectrum-sw-/u,
-    "toonspectrum-sw-",
-  ) + `\n// deploy:${createHash("sha256").update(String(Date.now())).digest("hex").slice(0, 8)}\n`;
+  // Simulate a deploy with the same behavior and cache schema but byte-different
+  // script content so the browser installs a new worker and parks the update.
+  const nextSw = realSw + `\n// deploy:${createHash("sha256").update(String(Date.now())).digest("hex").slice(0, 8)}\n`;
   let serveNextSw = false;
 
   const port = await findFreePort({ unavailableMessage: "sw verify port" });

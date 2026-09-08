@@ -369,7 +369,7 @@ async function main() {
       "| Result | Severity | Case | Details |",
       "|---|---|---|---|",
       ...results.map((item) =>
-        `| ${item.passed ? "PASS" : "FAIL"} | ${item.severity} | ${item.id} | ${text(JSON.stringify(item.details), 260).replace(/\|/gu, "\\|")} |`
+        `| ${item.passed ? "PASS" : "FAIL"} | ${item.severity} | ${item.id} | ${text(JSON.stringify(item.details), 260).replace(/[\\|]/gu, "\\$&")} |`
       ),
       "",
     ].join("\n"),

@@ -103,7 +103,16 @@ type AuthCompletionResponse = Readonly<{
   demo?: true;
 }>;
 
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+export function isValidSignupEmail(email: string): boolean {
+  // Bound the address before any validation and avoid overlapping regexp
+  // quantifiers on an attacker-controlled domain containing many dots.
+  if (email.length > 254 || /\s/.test(email)) return false;
+  const at = email.indexOf("@");
+  if (at < 1 || at !== email.lastIndexOf("@")) return false;
+  const domain = email.slice(at + 1);
+  const dot = domain.lastIndexOf(".");
+  return dot > 0 && dot < domain.length - 1;
+}
 const AUTH_RATE_LIMIT_LOCAL_LIMITER = new LocalAuthRateLimiter();
 
 @Controller("auth")
@@ -371,7 +380,7 @@ export class AuthController {
     const avatar = resolveSignupAvatar(body.avatar);
     const image = resolveSignupAvatarImage(body.image);
 
-    if (!EMAIL_RE.test(email))
+    if (!isValidSignupEmail(email))
       throw new BadRequestException({
         error: "이메일 형식이 올바르지 않아요.",
       });

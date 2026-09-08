@@ -25,6 +25,16 @@ export type SortKey =
   | "newest"
   | "title";
 
+export const MAX_SEARCH_QUERY_LENGTH = 512;
+
+// Search is a short user-entered phrase. Validate before string methods so
+// array-like objects and oversized token streams never reach the scoring loops.
+function searchQuery(value: unknown): string {
+  if (typeof value !== "string") throw new TypeError("Search query must be a string");
+  if (value.length > MAX_SEARCH_QUERY_LENGTH) throw new RangeError(`Search query exceeds ${MAX_SEARCH_QUERY_LENGTH} characters`);
+  return value.trim();
+}
+
 function norm(s: string): string {
   return s.toLowerCase().replace(/\s+/g, "");
 }
@@ -36,8 +46,7 @@ function score(t: Title, nq: string, tokens: string[]): number {
   const title = norm(t.title);
   const author = norm(t.author + (t.artist ?? ""));
 
-  for (let i = 0; i < tokens.length; i++) {
-    const tok = tokens[i];
+  for (const tok of tokens) {
     if (title === tok) s += 120;
     else if (title.startsWith(tok)) s += 80;
     else if (title.includes(tok)) s += 55;
@@ -165,7 +174,8 @@ export function searchTitles(
   filters: SearchFilters,
   sort: SortKey = "relevance"
 ): Title[] {
-  const q = filters.q?.trim() ?? "";
+  if (!Array.isArray(all)) throw new TypeError("Search catalog must be an array");
+  const q = searchQuery(filters.q ?? "");
   const nq = norm(q);
 
   let tokens: string[] = [];
@@ -173,8 +183,8 @@ export function searchTitles(
     // 쉼표/공백 분토큰 및 원본 분토큰 조합으로 세밀한 검색 토큰 생성
     const rawTokens = q.split(/[\s,]+/).filter(Boolean);
     const set = new Set<string>();
-    for (let i = 0; i < rawTokens.length; i++) {
-      const nt = norm(rawTokens[i]);
+    for (const token of rawTokens) {
+      const nt = norm(token);
       if (nt) set.add(nt);
     }
     if (nq) set.add(nq);
@@ -255,13 +265,14 @@ export function sortTitles(list: Title[], sort: SortKey, q = ""): Title[] {
 
 // 인스턴트 자동완성 (상위 N)
 export function suggest(all: Title[], q: string, limit = 6): Title[] {
-  const trimmed = q.trim();
+  if (!Array.isArray(all)) throw new TypeError("Search catalog must be an array");
+  const trimmed = searchQuery(q);
   if (!trimmed) return [];
   const nq = norm(trimmed);
   const rawTokens = trimmed.split(/[\s,]+/).filter(Boolean);
   const set = new Set<string>();
-  for (let i = 0; i < rawTokens.length; i++) {
-    const nt = norm(rawTokens[i]);
+  for (const token of rawTokens) {
+    const nt = norm(token);
     if (nt) set.add(nt);
   }
   if (nq) set.add(nq);

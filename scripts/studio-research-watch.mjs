@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { decodeXmlText } from "./lib/html-text.mjs";
 import { buildStudioCompetitorWatchReport } from "./studio-competitor-watch.mjs";
 
 export const STUDIO_RESEARCH_REGISTRY_PATH = "docs/benchmarks/studio-research-registry.json";
@@ -103,12 +104,7 @@ export function validateStudioResearchRegistry(registry) { // NOSONAR javascript
 }
 
 function decodeXml(value) {
-  return String(value ?? "")
-    .replaceAll("&amp;", "&")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&#39;", "'")
+  return decodeXmlText(value)
     .replace(/\s+/gu, " ")
     .trim();
 }

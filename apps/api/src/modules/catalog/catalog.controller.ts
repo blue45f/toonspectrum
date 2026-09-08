@@ -19,6 +19,7 @@ import { coverImagePolicy } from "../../../../../packages/core/src/server";
 import { getAppConfig } from "../../server/app-config";
 
 import { CatalogService } from "./catalog.service";
+import { resolveAffiliateDestination, resolveCoverFetchUrl } from "./catalog-url-policy";
 
 import type { Request, Response } from "express";
 
@@ -85,26 +86,21 @@ export class CatalogController {
     if (coverImagePolicy() === "off") return res.status(404).send("cover image disabled");
     if (!rawUrl) return res.status(400).send("missing u");
 
-    let url: URL;
-    try {
-      url = new URL(rawUrl);
-    } catch {
-      return res.status(400).send("bad url");
-    }
-
-    if (!allowedCoverUrl(url)) return res.status(403).send("forbidden host");
+    let url = resolveCoverFetchUrl(rawUrl);
+    if (!url) return res.status(403).send("forbidden host");
 
     try {
       let upstream: globalThis.Response | null = null;
       for (let hop = 0; hop < 4; hop++) {
         // Referer 를 플랫폼 도메인으로 위조하지 않는다(핫링크 보호 우회 금지). 원본 CDN 이
         // 핫링크를 거부하면 그 거부를 존중해 표지를 표시하지 않고 타이포그래픽 커버로 폴백한다.
-        const response = await fetch(url.toString(), {
+        const response = await fetch(url, {
           headers: {
             "User-Agent": COVER_USER_AGENT,
             Accept: "image/avif,image/webp,image/*,*/*;q=0.8",
           },
           redirect: "manual",
+          signal: AbortSignal.timeout(10_000),
         });
         if (response.status >= 300 && response.status < 400) {
           const location = response.headers.get("location");
@@ -115,8 +111,9 @@ export class CatalogController {
           } catch {
             return res.status(502).send("bad redirect");
           }
-          if (!allowedCoverUrl(nextUrl)) return res.status(403).send("forbidden redirect");
-          url = nextUrl;
+          const nextFetchUrl = resolveCoverFetchUrl(nextUrl.toString());
+          if (!nextFetchUrl) return res.status(403).send("forbidden redirect");
+          url = nextFetchUrl;
           continue;
         }
         upstream = response;
@@ -285,13 +282,15 @@ export class CatalogController {
     if (!toUrl) {
       return res.status(400).send("missing destination url ('to')");
     }
+    const destination = resolveAffiliateDestination(platformId, toUrl);
+    if (!destination) return res.status(400).send("unsupported destination url");
 
     const referrer = req.headers["referer"] || "direct";
     const userAgent = req.headers["user-agent"] || "unknown";
     const timestamp = new Date().toISOString();
     console.log(`[Affiliate Click] platform=${platformId} timestamp=${timestamp} to=${toUrl} referrer=${referrer} ua=${userAgent}`);
 
-    const finalUrl = buildAffiliateUrl(platformId, toUrl);
+    const finalUrl = buildAffiliateUrl(platformId, destination);
     res.redirect(302, finalUrl);
   }
 }
@@ -318,15 +317,9 @@ function normalizeQueryMap(query: QueryMap): Record<string, string> {
   return out;
 }
 
-const COVER_ALLOWED_HOST =
-  /(^|\.)(pstatic\.net|kakaopagecdn\.com|kakaocdn\.net|ccdn\.lezhin\.com|ridicdn\.net|dn-img-page\.kakao\.com|cdn1\.munpia\.com|cf-image\.joara\.com|d3mcojo3jv0dbr\.cloudfront\.net|img\.mrblue\.com|bookimg\.bookcube\.com|img-books\.onestore\.co\.kr|image\.yes24\.com|novelpia\.com|balcony\.studio|toptoon\.com|toomics\.com|kyobobook\.co\.kr|comico\.kr)$/;
 const COVER_OK_TYPE = /^image\/(jpeg|jpg|png|webp|avif|gif)\b/i;
 const COVER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-
-function allowedCoverUrl(url: URL) {
-  return url.protocol === "https:" && COVER_ALLOWED_HOST.test(url.hostname);
-}
 
 // 응답 바이트의 매직넘버로 이미지 포맷 판별 (헤더가 octet-stream/누락이어도 실제 이미지면 인식).
 // HTML 에러페이지 등 비이미지는 null → 415 유지.

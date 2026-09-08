@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CatalogController } from "./catalog.controller";
 import { CatalogService } from "./catalog.service";
@@ -12,6 +12,14 @@ function createController(): CatalogController {
 }
 
 describe("CatalogController affiliate redirection", () => {
+  it("rejects an external destination before logging or redirecting", async () => {
+    const res = { status: vi.fn().mockReturnThis(), send: vi.fn(), redirect: vi.fn() };
+    await createController().redirectAffiliate(
+      "ridi", "https://evil.test/login", { headers: {} } as Request, res as unknown as Response,
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.redirect).not.toHaveBeenCalled();
+  });
   it("to 쿼리 파라미터가 없으면 400 에러를 반환한다", async () => {
     const controller = createController();
     const req = {
@@ -87,7 +95,66 @@ describe("CatalogController affiliate redirection", () => {
   });
 });
 
+describe("CatalogController cover SSRF boundary", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("rejects a private address without making any upstream request", async () => {
+    vi.stubEnv("COVER_IMAGE_POLICY", "proxy");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const res = { status: vi.fn().mockReturnThis(), send: vi.fn() };
+    await createController().proxyCover("https://127.0.0.1/private", res as unknown as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("revalidates a trusted CDN redirect before following it", async () => {
+    vi.stubEnv("COVER_IMAGE_POLICY", "proxy");
+    const fetchMock = vi.fn().mockResolvedValue(new globalThis.Response(null, {
+      status: 302, headers: { location: "https://169.254.169.254/latest/meta-data/" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = { status: vi.fn().mockReturnThis(), send: vi.fn() };
+    await createController().proxyCover("https://image-comic.pstatic.net/cover.png", res as unknown as Response);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      new URL("https://image-comic.pstatic.net/cover.png"),
+      expect.objectContaining({ redirect: "manual", signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it("serves an allowed CDN image after a same-origin redirect", async () => {
+    vi.stubEnv("COVER_IMAGE_POLICY", "proxy");
+    const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new globalThis.Response(null, { status: 302, headers: { location: "/actual.png" } }))
+      .mockResolvedValueOnce(new globalThis.Response(png, { headers: { "content-type": "image/png" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = { status: vi.fn().mockReturnThis(), send: vi.fn(), setHeader: vi.fn() };
+    await createController().proxyCover("https://image-comic.pstatic.net/cover.png", res as unknown as Response);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[0]).toEqual(new URL("https://image-comic.pstatic.net/actual.png"));
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.send).toHaveBeenCalledWith(Buffer.from(png));
+  });
+});
+
 describe("CatalogService getHomeData & withKmasImages", () => {
+  it.each(["getSearchData", "getTitles"] as const)(
+    "%s rejects malformed or oversized search input before catalogue side effects",
+    async (method) => {
+      const service = new CatalogService();
+      const merge = vi.spyOn(service, "mergeKmasOnSiteAccess");
+      for (const q of ["x".repeat(513), ["one", "two"], { length: 1_000_000 }, null, 123]) {
+        await expect(service[method]({ q } as never)).rejects.toMatchObject({ status: 400 });
+      }
+      expect(merge).not.toHaveBeenCalled();
+    },
+  );
+
   it("getHomeData returns valid response structure", async () => {
     const service = new CatalogService();
     const data = await service.getHomeData();
@@ -108,4 +175,3 @@ describe("CatalogService getHomeData & withKmasImages", () => {
     expect(typeof data.stats.reviews).toBe("number");
   });
 });
-

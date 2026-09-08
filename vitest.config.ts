@@ -66,6 +66,13 @@ export default defineConfig({
     // and memory, which is slower and can turn sub-second assertions into
     // load-dependent timeouts. Four workers keeps local hooks and CI bounded.
     maxWorkers: 4,
+    coverage: {
+      provider: "v8",
+      reportOnFailure: true,
+      reporter: ["lcov", "text-summary"],
+      include: ["apps/web/src/**/*.{ts,tsx}", "apps/api/src/**/*.ts"],
+      exclude: ["**/*.{test,spec}.*", "**/*.d.ts", "**/generated/**", "**/fixtures/**"],
+    },
     // .claude/worktrees/ 는 에이전트 워크플로가 격리 작업용으로 만드는 임시 git worktree(전역
     // gitignore 대상이라 커밋되진 않지만, vitest 기본 include 는 gitignore 를 안 따라가므로 이
     // 안에 있는 이 저장소의 사본까지 전부 다시 스캔해버린다) — 명시적으로 제외한다.

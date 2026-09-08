@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import {
   BadGatewayException,
+  BadRequestException,
   ConflictException,
   HttpException,
   HttpStatus,
@@ -12,7 +13,7 @@ import { desc, eq, inArray, sql } from "drizzle-orm";
 import { fromDb } from "../../../../web/src/shared/lib/api-helpers";
 import { rateLimit } from "../../../../web/src/shared/lib/rate-limit";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../web/src/shared/lib/recommend";
-import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../web/src/shared/lib/search";
+import { MAX_SEARCH_QUERY_LENGTH, searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../web/src/shared/lib/search";
 import {
   activeTags,
   getAuthorData,
@@ -268,8 +269,9 @@ export class CatalogService implements OnModuleInit {
   }
 
   async getSearchData(query: SearchRouteQuery) {
+    const q = validatedSearchQuery(query.q);
     void this.mergeKmasOnSiteAccess().catch(() => {});
-    const kmasLive = await getKmasSearchData({ q: query.q }).catch((error) => {
+    const kmasLive = await getKmasSearchData({ q }).catch((error) => {
       console.error("KMAS live search failed; falling back to existing catalog search", error);
       return null;
     });
@@ -277,7 +279,7 @@ export class CatalogService implements OnModuleInit {
 
     const sort = validSorts.has(query.sort as SortKey) ? (query.sort as SortKey) : "popular";
     const filters: SearchFilters = {
-      q: query.q ?? "",
+      q,
       types: list(query.types, validTypes),
       genres: list(query.genres),
       tags: list(query.tags),
@@ -367,6 +369,7 @@ export class CatalogService implements OnModuleInit {
   }
 
   async getTitles(query: TitleQuery) {
+    const q = validatedSearchQuery(query.q);
     await this.mergeKmasOnSiteAccess();
     const sort = SORTS.includes((query.sort as SortKey) ? (query.sort as SortKey) : "popular")
       ? (query.sort as SortKey)
@@ -377,7 +380,6 @@ export class CatalogService implements OnModuleInit {
       .map((id) => id.trim())
       .filter(Boolean);
 
-    const q = (query.q ?? "").trim();
     const limit = clampLimit(query.limit);
     const seen = new Set<string>();
     let items: Title[];
@@ -592,6 +594,16 @@ function platformCoverage(titles: Title[]) {
       share: titles.length ? Math.round((count / titles.length) * 100) : 0,
     }))
     .sort((a, b) => b.count - a.count);
+}
+
+function validatedSearchQuery(value: unknown): string {
+  if (value === undefined) return "";
+  if (typeof value !== "string" || value.length > MAX_SEARCH_QUERY_LENGTH) {
+    throw new BadRequestException({
+      error: `검색어는 ${MAX_SEARCH_QUERY_LENGTH}자 이하의 문자열이어야 합니다.`,
+    });
+  }
+  return value.trim();
 }
 
 function list<T extends string>(raw: string | null | undefined, allowed?: Set<T>): T[] | undefined {

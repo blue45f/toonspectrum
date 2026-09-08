@@ -31,6 +31,13 @@ function mismatchedExtendedWebpDataUrl(): string {
 }
 
 describe("creator asset image inspection", () => {
+  it("rejects oversized base64 before decoding and preserves optional padding support", () => {
+    expect(() => inspectCreatorAssetDataUrl(`data:image/png;base64,${"A".repeat(3_000_033)}`, 1, 1))
+      .toThrow("2.25MB");
+    expect(inspectCreatorAssetDataUrl(PNG_1X1.slice(0, -1), 1, 1).sha256)
+      .toBe(inspectCreatorAssetDataUrl(PNG_1X1, 1, 1).sha256);
+    expect(() => inspectCreatorAssetDataUrl(`${PNG_1X1}=`, 1, 1)).toThrow("base64");
+  });
   it("매직 바이트와 IHDR 크기를 읽고 안정적인 해시를 만든다", () => {
     const inspected = inspectCreatorAssetDataUrl(PNG_1X1, 1, 1);
     expect(inspected).toMatchObject({

@@ -223,10 +223,7 @@ describe("Studio BG3D LT user preset persistence", () => {
   it("rejects prototype-pollution keys, hostile prototypes, accessors, and oversized JSON", () => {
     const serialized = serializeStudioBg3dLtPresetPayload(payload(userPreset()));
     expect(serialized).not.toBeNull();
-    const pollutedRoot = serialized!.replace(
-      "{",
-      '{"__proto__":{"polluted":true},'
-    );
+    const pollutedRoot = `{"__proto__":{"polluted":true},${serialized!.slice(1)}`;
     expect(parseStudioBg3dLtPresetPayload(pollutedRoot)).toBeNull();
     const pollutedLine = serialized!.replace(
       '"line":{',

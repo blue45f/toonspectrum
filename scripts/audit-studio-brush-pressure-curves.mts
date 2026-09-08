@@ -177,7 +177,7 @@ const report = {
 
 function escapeMarkdown(value: unknown): string {
   return String(value ?? "")
-    .replace(/\|/gu, "\\|")
+    .replace(/[\\|]/gu, "\\$&")
     .replace(/\r?\n/gu, " ");
 }
 

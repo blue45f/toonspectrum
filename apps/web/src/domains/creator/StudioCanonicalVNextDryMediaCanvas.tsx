@@ -84,6 +84,7 @@ interface LayoutEpochs {
 
 interface DryMediaGpuResources {
   readonly device: GPUDevice;
+  readonly release: () => void;
   readonly surface: StudioEngineWebGpuPresentationSurface;
   readonly runtime: StudioEngineWebGpuTexturedBrushRuntime;
   readonly controller: StudioCanonicalVNextDryMediaPresentationController;
@@ -118,7 +119,7 @@ async function createResources(
   try {
     const context = canvas.getContext("webgpu") as GPUCanvasContext | null;
     if (!context) {
-      device.destroy();
+      acquired.release();
       return null;
     }
     const surfaceResult = createStudioEngineWebGpuPresentationSurface({
@@ -131,7 +132,7 @@ async function createResources(
       onDeviceLost,
     });
     if (surfaceResult.status !== "ready") {
-      device.destroy();
+      acquired.release();
       return null;
     }
     surface = surfaceResult.surface;
@@ -144,12 +145,13 @@ async function createResources(
     });
     if (runtimeResult.status !== "ready") {
       surface.dispose();
-      device.destroy();
+      acquired.release();
       return null;
     }
     runtime = runtimeResult.runtime;
     return {
       device,
+      release: acquired.release,
       surface,
       runtime,
       controller: new StudioCanonicalVNextDryMediaPresentationController({
@@ -170,7 +172,7 @@ async function createResources(
   } catch {
     runtime?.dispose();
     surface?.dispose();
-    device.destroy();
+    acquired.release();
     return null;
   }
 }
@@ -185,7 +187,7 @@ function configureSurface(
     | "documentScale"
     | "flipX"
   >,
-): boolean {
+): string | null {
   const { surfaceBounds } = input;
   if (
     !Number.isFinite(surfaceBounds.left)
@@ -200,7 +202,7 @@ function configureSurface(
     || input.documentHeight <= 0
     || !Number.isFinite(input.documentScale)
     || input.documentScale <= 0
-  ) return false;
+  ) return "invalid-layout";
   const dpr = surfaceDevicePixelRatio(surfaceBounds.width, surfaceBounds.height);
   const resizeSignature = [
     surfaceBounds.width,
@@ -247,14 +249,16 @@ function configureSurface(
     },
   };
   const configured = resources.surface.configure(layout);
-  return configured.status === "ready" || configured.status === "unchanged";
+  return configured.status === "ready" || configured.status === "unchanged"
+    ? null
+    : configured.reason;
 }
 
 function disposeResources(resources: DryMediaGpuResources | null): void {
   if (!resources) return;
   resources.surface.dispose();
   resources.runtime.dispose();
-  resources.device.destroy();
+  resources.release();
 }
 
 function disposeResourcesAfterTail(resources: DryMediaGpuResources | null): void {
@@ -499,7 +503,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
           controller.signal.aborted
           || jobEpoch !== jobEpochRef.current
         ) return;
-        if (!configureSurface(resources, {
+        const configurationFailure = configureSurface(resources, {
           surfaceBounds: {
             left: surfaceLeft,
             top: surfaceTop,
@@ -510,8 +514,9 @@ export function StudioCanonicalVNextDryMediaCanvas({
           documentHeight,
           documentScale,
           flipX,
-        })) {
-          rejectAndRelease("surface-config-rejected");
+        });
+        if (configurationFailure) {
+          rejectAndRelease(`surface-config:${configurationFailure}`);
           return;
         }
         compileEpochRef.current += 1;

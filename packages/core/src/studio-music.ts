@@ -104,7 +104,14 @@ export function buildMusicPrompt(brief: MusicBrief): string {
   ].join("\n");
 }
 export function musicFilename(title: string): string {
-  return (title.replace(/[\\/:*?"<>|]/g, "_").split("").map((character) => character.charCodeAt(0) < 32 ? "_" : character).join("").replace(/^\.+|\.+$/g, "").trim().slice(0, 80) || "toonstudio-music") + ".mp3";
+  if (typeof title !== "string") throw new TypeError("Music title must be a string");
+  const safe = title.replace(/[\\/:*?"<>|]/g, "_").split("")
+    .map((character) => character.charCodeAt(0) < 32 ? "_" : character).join("");
+  let start = 0;
+  let end = safe.length;
+  while (start < end && safe[start] === ".") start++;
+  while (end > start && safe[end - 1] === ".") end--;
+  return (safe.slice(start, end).trim().slice(0, 80) || "toonstudio-music") + ".mp3";
 }
 export function isMp3(bytes: Uint8Array): boolean {
   return bytes.length > 10 && ((bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0));

@@ -1,3 +1,5 @@
+import { decodeHtmlText as decodeHtmlEntities } from "./lib/html-text.mjs";
+
 const IMAGE_EXT_RE = /\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i;
 const ALLOWED_IMAGE_HOST_RE = /(^|\.)(pstatic\.net|kakaopagecdn\.com|kakaocdn\.net|ccdn\.lezhin\.com)$/i;
 const IMAGE_KEY_RE = /(cover|thumbnail|thumb|poster|image|banner|wide|tall)/i;
@@ -117,12 +119,4 @@ function scoreImageKey(key) {
   return 1;
 }
 
-export function decodeHtmlEntities(value) {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
-}
+export { decodeHtmlEntities };

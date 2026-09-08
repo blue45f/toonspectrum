@@ -33,7 +33,7 @@ const LEAKY = {
   workId: "work-9f3a7c21",
   layerName: "주인공 얼굴 클로즈업",
   filePath: "/Users/hjunkim/Desktop/원고-3화.psd",
-  token: "sk_live_51ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+  token: "synthetic_diagnostic_redaction_fixture_0123456789",
   dataUri: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg",
   href: "https://toonspectrum.app/studio/work-9f3a7c21?share=secret-token&user=artist",
 } as const;

@@ -2,6 +2,8 @@
 // 공식 API(네이버 검색·YouTube Data) 응답은 실제 키가 있어야 크롤러로 검증되므로, 응답 shape 를
 // 목킹해 여기서 변환 로직을 테스트한다(scripts/__tests__/related-info-parse.test.mjs).
 
+import { htmlToText } from "./lib/html-text.mjs";
+
 // JSON 문자열 리터럴 정확 언이스케이프(\", \\, \uXXXX, \n 등). ytInitialData 스크래핑 제목용.
 export function jsonUnescape(s) {
   try {
@@ -15,13 +17,7 @@ export function jsonUnescape(s) {
 
 // HTML 엔티티·태그 정제(네이버 API title 은 <b> 강조태그 + 엔티티 포함).
 export function decodeEntities(s) {
-  return String(s || "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;|&#x27;/gi, "'")
-    .replace(/<[^>]+>/g, "")
+  return htmlToText(s)
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -232,6 +232,36 @@ describe("studio dialogue interchange", () => {
     expect(file.warnings.join(" ")).toContain("자동 배정");
   });
 
+  it("imports supported subtitle formatting and retains unknown markup as literal text", () => {
+    const parsed = parseStudioDialogueInterchange("vtt", [
+      "WEBVTT", "", "00:00:00.000 --> 00:00:03.000",
+      '<v Hana><b>Hello</b> <c.green>world</c></v> <00:00:01.000><script>alert(1)</script>',
+    ].join("\n"));
+    expect(parsed.document.cues[0]?.text).toBe("Hello world <script>alert(1)</script>");
+  });
+
+  it("imports WebVTT classes with Unicode names without leaking presentation tags into dialogue", () => {
+    const parsed = parseStudioDialogueInterchange("vtt", [
+      "WEBVTT", "", "00:00:00.000 --> 00:00:03.000",
+      "<c.한국어.강조>안녕하세요</c> <c.日本語>こんにちは</c>",
+    ].join("\n"));
+    expect(parsed.document.cues[0]?.text).toBe("안녕하세요 こんにちは");
+  });
+
+  it.each([
+    ["<B><I>Hello</I></B>", "Hello"],
+    ['<font color="red">Hi</font><ruby>字<rt>じ</rt></ruby>', "Hi字じ"],
+    ["<v.Hana annotation>Hi</v><00:01.000>!", "Hi!"],
+    ["before <scr<b>ipt>literal</script> after", "before <script>literal</script> after"],
+    ["before <b unfinished", "before <b unfinished"],
+    ["<c.>literal</c>", "<c.>literal"],
+  ])("parses subtitle presentation tokens without changing literal text: %s", (source, expected) => {
+    const parsed = parseStudioDialogueInterchange("vtt", [
+      "WEBVTT", "", "00:00:00.000 --> 00:00:03.000", source,
+    ].join("\n"));
+    expect(parsed.document.cues[0]?.text).toBe(expected);
+  });
+
   it("UTF-8 BOM을 제거하고 잘못된 UTF-8은 거부한다", () => {
     expect(decodeStudioDialogueInterchangeText(new TextEncoder().encode("\uFEFF안녕"))).toBe("안녕");
     expect(() => decodeStudioDialogueInterchangeText(new Uint8Array([0xc3, 0x28]))).toThrowError(

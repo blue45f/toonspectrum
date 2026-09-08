@@ -2,6 +2,8 @@
 // 출력 row 는 lib/types.ts 의 Title 형태(+ 교차연결용 _normTitle)와 일치해야 한다.
 // 표지는 핫링크 회피를 위해 coverProxy()로 /api/cover 프록시 URL을 만든다(호스트는 catalog.controller allowlist에 등록).
 
+import { decodeHtmlText, htmlToText } from "../lib/html-text.mjs";
+
 export const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -72,18 +74,11 @@ export function cleanTitle(s) {
 }
 
 export function decodeEntities(s) {
-  return String(s || "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)));
+  return decodeHtmlText(s).replaceAll("\u00a0", " ");
 }
 
 export function stripTags(s) {
-  return decodeEntities(String(s || "").replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+  return htmlToText(s).replace(/\s+/g, " ").trim();
 }
 
 // 평점 분포(1~5) 합성 — 평균 주변 정규분포.

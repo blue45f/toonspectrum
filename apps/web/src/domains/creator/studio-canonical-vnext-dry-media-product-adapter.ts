@@ -35,6 +35,7 @@ import {
   type StudioEngineWebGpuTexturedBrushPlan,
 } from "./render/studio-engine-webgpu-textured-brush-plan";
 import { adaptStudioDrawElementToCanonicalBrushPlan } from "./studio-canonical-brush-draw-adapter";
+import { studioCanonicalDryMediaEligibilityFailure } from "./studio-canonical-vnext-dry-media-eligibility";
 import {
   hashStudioCanonicalBrushPlan,
   parseStudioCanonicalBrushPlan,
@@ -482,43 +483,15 @@ export async function compileStudioCanonicalVNextDryMediaProductFrame(
 ): Promise<StudioCanonicalVNextDryMediaProductCompileResult> {
   const { element } = request;
   if (
-    !element
-    || element.type !== "draw"
-    || element.kind && element.kind !== "freehand"
-    || element.mode === "eraser"
-    || element.brush !== "dry-media"
-    || !positiveSafeInteger(request.sessionEpoch)
+    !positiveSafeInteger(request.sessionEpoch)
     || !positiveSafeInteger(request.strokeEpoch)
     || !positiveSafeInteger(request.commandSequence)
   ) return unavailableResult("invalid-input");
   if (request.signal?.aborted) return unavailableResult("invalid-input", "cancelled");
+  const eligibilityFailure = studioCanonicalDryMediaEligibilityFailure(element);
+  if (eligibilityFailure) return unavailableResult(eligibilityFailure.reason, eligibilityFailure.detail);
   const classification = classifyStudioDryMediaCatalogIdV1(element.brushCatalogId);
-  if (classification?.kind !== "anisotropic-continuous") {
-    return unavailableResult("ineligible-material");
-  }
-  if (element.brushCatalogId === "paint-roller") {
-    return unavailableResult("unsupported-paint-roller");
-  }
-  if ((element.symmetry?.type ?? "none") !== "none") {
-    return unavailableResult("unsupported-symmetry");
-  }
-  if (
-    element.blendMode !== undefined
-      && element.blendMode !== "normal"
-      && element.blendMode !== "source-over"
-  ) return unavailableResult("unsupported-composite");
-  if (
-    element.paintModel !== undefined
-    && (
-      element.paintModel !== "bounded-flow-v2"
-      || (element.opacity ?? 1) !== 1
-    )
-  ) {
-    return unavailableResult(
-      "unsupported-paint-model",
-      `${element.paintModel}:${element.opacity ?? 1}`,
-    );
-  }
+  if (classification?.kind !== "anisotropic-continuous") return unavailableResult("ineligible-material");
 
   const dynamicPlanResult = planStudioDynamicBrushRender(element, "dry-media", false);
   if (dynamicPlanResult.status !== "ready") {

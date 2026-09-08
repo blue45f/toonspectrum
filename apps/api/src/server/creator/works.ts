@@ -21,6 +21,7 @@ import {
   users,
 } from "../../db";
 import { toPublicCreatorDoc } from "../creator-doc-visibility";
+import { jsonStringLikePattern } from "../sql-like";
 import { assertCreatorDraftCollaborationStatusMutationAllowed } from "../creator-provisional-work-status";
 import {
   CREATOR_WORK_REVISION_MAX,
@@ -145,7 +146,7 @@ export async function listWorks(opts: {
     }
     const tag = String(opts.tag ?? "").trim().replace(/^#/, "").toLowerCase();
     if (tag) {
-      addWhere(sql`lower(${creatorWorks.tags}::text) LIKE ${`%"${tag.replace(/[%_]/g, "\\$&")}"%`} ESCAPE '\\'`);
+      addWhere(sql`lower(${creatorWorks.tags}::text) LIKE ${jsonStringLikePattern(tag)} ESCAPE '\\'`);
     }
 
     const likeCountExpr = sql<number>`(
@@ -833,4 +834,3 @@ export async function assertPublicCreatorWork(workId: string): Promise<void> {
     throw new Error("공개된 작품을 찾을 수 없습니다.");
   }
 }
-

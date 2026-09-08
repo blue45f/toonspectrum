@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
 const VERCEL_CONFIG_URL = new URL("../../../../vercel.json", import.meta.url);
@@ -32,11 +33,10 @@ function directive(csp: string, name: string): string {
 
 function inlineJsonLdHash(): string {
   const html = readFileSync(fileURLToPath(INDEX_HTML_URL), "utf8");
-  const match = html.match(
-    /<script type="application\/ld\+json">([\s\S]*?)<\/script>/,
-  );
-  if (!match?.[1]) throw new Error("index.html JSON-LD data block is missing");
-  return `'sha256-${createHash("sha256").update(match[1]).digest("base64")}'`;
+  const content = new JSDOM(html).window.document
+    .querySelector('script[type="application/ld+json"]')?.textContent;
+  if (!content) throw new Error("index.html JSON-LD data block is missing");
+  return `'sha256-${createHash("sha256").update(content).digest("base64")}'`;
 }
 
 describe("Vercel static security headers", () => {
@@ -78,11 +78,11 @@ describe("Vercel static security headers", () => {
 
   it("keeps executable bootstraps external and hashes the only inline data block", () => {
     const html = readFileSync(fileURLToPath(INDEX_HTML_URL), "utf8");
-    const inlineScripts = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)]
-      .filter((match) => !/\bsrc=/.test(match[1] ?? ""));
+    const inlineScripts = new JSDOM(html).window.document
+      .querySelectorAll("script:not([src])");
 
     expect(inlineScripts).toHaveLength(1);
-    expect(inlineScripts[0]?.[1]).toContain('type="application/ld+json"');
+    expect(inlineScripts[0]?.getAttribute("type")).toBe("application/ld+json");
     expect(html).toContain('<script src="/bootstrap-theme.js"></script>');
     expect(html).toContain('<script src="/bootstrap-compat.js"></script>');
   });

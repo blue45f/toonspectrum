@@ -85,15 +85,15 @@ describe("Studio mobile immersive preference", () => {
     expect(studioGlobalsSource).toContain("--studio-canvas-bottom-inset");
   });
 
-  it("keeps compact desktop HUD actions named and at least 24px tall", () => {
+  it("keeps desktop HUD actions named and at least 44px in both dimensions", () => {
     expect(studioCanvasStageHudSource).toContain(
-      'className="inline-flex min-h-6 min-w-0 items-center gap-1 rounded-full px-1.5',
+      'className="inline-flex min-h-11 min-w-11 items-center gap-1 rounded-full px-1.5',
     );
     expect(studioCanvasStageHudSource).toContain(
       'localizeText(t, "` · 캔버스만 보기", "studio.canvas.canvasOnlyModeShowCanvasOnly")',
     );
     expect(studioCanvasStageHudSource).toContain(
-      'className="min-h-6 min-w-6 rounded-full px-1.5 py-0.5',
+      'className="min-h-11 min-w-11 rounded-full px-1.5 py-0.5',
     );
   });
 
