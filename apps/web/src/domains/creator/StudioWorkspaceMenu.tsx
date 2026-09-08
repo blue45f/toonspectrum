@@ -1142,7 +1142,7 @@ export function StudioWorkspaceMenu({
         className={cn(
           // StudioWorkspaceMenuGate 트리거와 같은 칩 박스 규약(이름만 shrink, 배지는 shrink-0).
           // `overflow-hidden` 을 더하지 않는 이유는 그쪽 주석 참고 — 배지를 잘리게 만든다.
-          "inline-flex min-h-11 max-w-52 items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg pointer-coarse:min-h-11 lg:min-h-8",
+          "inline-flex min-h-11 max-w-52 items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg pointer-coarse:min-h-11",
           open && "border-accent/60 bg-accent-soft text-fg",
           focusClass
         )}
