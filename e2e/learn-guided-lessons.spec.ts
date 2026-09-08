@@ -13,8 +13,9 @@ test("lesson detail exposes an outcome, jump navigation, progress requirements a
   await page.goto(`/learn/lessons/${lesson.id}`);
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(lesson.title);
-  await expect(page.getByRole("heading", { name: "이 수업을 마치면", exact: true })).toBeVisible();
-  await expect(page.getByText(lesson.task, { exact: true })).toBeVisible();
+  const outcome = page.locator(".learn-outcome-card");
+  await expect(outcome.getByRole("heading", { name: "이 수업을 마치면", exact: true })).toBeVisible();
+  await expect(outcome.getByText(lesson.task, { exact: true })).toBeVisible();
 
   const outline = page.getByRole("navigation", { name: "이 강좌 목차" });
   await expect(outline).toBeVisible();
