@@ -1,4 +1,4 @@
-name: agent-ai-composer-diagnostic
+name: agent-ai-composer-integration
 
 on:
   push:
@@ -6,31 +6,141 @@ on:
       - feat/studio-ai-comic-composer-20260909
     paths:
       - .github/workflows/agent-ai-composer-diagnostic.yml
+      - scripts/agent-ai-composer-patch.part-01
+      - scripts/agent-ai-composer-patch.part-02
+      - scripts/agent-ai-composer-patch.part-03
+      - scripts/agent-ai-composer-patch.part-04
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: agent-ai-composer-integration
+  cancel-in-progress: true
 
 jobs:
-  inspect:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
-      - name: Inspect scenario integration seams
+        with:
+          ref: feat/studio-ai-comic-composer-20260909
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply guarded composer integration patch
         shell: bash
         run: |
           set -euo pipefail
-          file='apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
-          for needle in \
-            'createStudioScenarioImageGenerationExecutors' \
-            'function onChangeScenarioScene' \
-            'function onGenerateScenarioImages' \
-            'onGenerateScenarioImages,' \
-            'function onRemoveScenarioScene'; do
-            echo "===== ${needle} ====="
-            grep -n -F -B 18 -A 36 "$needle" "$file" || true
-          done
-          echo '===== modal apply ====='
-          grep -n -F -B 20 -A 28 'onApplyPrompt(firstBatchPrompt)' apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx || true
-          echo '===== scenario panel preview map ====='
-          grep -n -F -B 20 -A 60 'preview.map' apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.tsx || true
+          cat \
+            scripts/agent-ai-composer-patch.part-01 \
+            scripts/agent-ai-composer-patch.part-02 \
+            scripts/agent-ai-composer-patch.part-03 \
+            scripts/agent-ai-composer-patch.part-04 \
+            > scripts/agent-apply-ai-composer.py
+          python scripts/agent-apply-ai-composer.py
+          rm scripts/agent-apply-ai-composer.py
+
+      - name: Format changed production surfaces
+        run: >-
+          pnpm exec prettier --write
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.ts
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
+          apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts
+          apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.tsx
+          apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts
+          apps/web/src/domains/creator/studio-scenario-layout.ts
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.tsx
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.tsx
+          apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.test.tsx
+          apps/web/src/domains/creator/StudioThreeDPreviewPanelStack.tsx
+          apps/web/src/domains/creator/StudioLazyPanelStack.tsx
+          apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx
+          docs/studio-ai-comic-composer-benchmark-2026-09.md
+          .github/workflows/studio-ai-comic-composer-quality.yml
+
+      - name: Verify targeted production behavior
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts
+          apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts
+
+      - name: Lint changed production surfaces
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.ts
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
+          apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.tsx
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx
+          apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.tsx
+          apps/web/src/domains/creator/StudioThreeDPreviewPanelStack.tsx
+          apps/web/src/domains/creator/StudioLazyPanelStack.tsx
+
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Build production Studio
+        run: pnpm run build
+
+      - name: Commit verified integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/web/src/domains/creator/ai \
+            apps/web/src/domains/creator/studio-scenario-layout.ts \
+            apps/web/src/domains/creator/StudioScenarioCandidateDesk.tsx \
+            apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx \
+            apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.tsx \
+            apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.test.tsx \
+            apps/web/src/domains/creator/StudioThreeDPreviewPanelStack.tsx \
+            apps/web/src/domains/creator/StudioLazyPanelStack.tsx \
+            apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx \
+            docs/studio-ai-comic-composer-benchmark-2026-09.md \
+            .github/workflows/studio-ai-comic-composer-quality.yml
+          git diff --cached --check
+          git diff --cached --quiet && exit 0
+          git commit -m "feat(studio): connect episode plans to reviewed AI cut candidates"
+          git push origin HEAD:feat/studio-ai-comic-composer-20260909
