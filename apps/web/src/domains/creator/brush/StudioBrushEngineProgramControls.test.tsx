@@ -3,8 +3,10 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createStudioBrushCompositionBaseline } from "./studio-brush-composition-catalog";
 import {
   STUDIO_OIL_PROGRAM_MATRIX_BRUSH_IDS,
+  studioBrushEngineProgramSetFromComposition,
   studioBrushEngineProgramSetFromOil,
 } from "./studio-brush-engine-program-set";
 import { studioBrushPresetById } from "./studio-draw-ux";
@@ -13,14 +15,58 @@ import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramCont
 describe("StudioBrushEngineProgramControls", () => {
   afterEach(cleanup);
 
-  it("describes the family boundary honestly for non-oil brushes", () => {
+  it("exposes the universal BrushGraph composer for non-oil brushes", () => {
+    const onChange = vi.fn();
     render(
-      <StudioBrushEngineProgramControls brushId="pen" programSet={null} onChange={vi.fn()} />,
+      <StudioBrushEngineProgramControls brushId="pen" programSet={null} onChange={onChange} />,
     );
-    expect(screen.getByText("이 브러시는 아직 조합할 엔진이 없습니다")).toBeTruthy();
+    expect(screen.getByText("범용 BrushGraph 컴포저")).toBeTruthy();
+    expect(screen.getByLabelText("필기감 선택")).toHaveValue("adaptive-ema");
+    expect(screen.getByLabelText("물리 엔진 선택")).toHaveValue("no-physics");
+    expect(screen.getByText("authority 충돌 없이 컴파일 가능한 조합입니다.")).toBeTruthy();
   });
 
-  it("shows the preset baseline and literal paint-order toggles", () => {
+  it("persists a distinctive pattern selection instead of reducing it to a scalar", () => {
+    const onChange = vi.fn();
+    render(
+      <StudioBrushEngineProgramControls brushId="pen" programSet={null} onChange={onChange} />,
+    );
+    fireEvent.change(screen.getByLabelText("패턴·문양 선택"), {
+      target: { value: "kaleido-symmetry" },
+    });
+    const next = onChange.mock.calls[0]![0];
+    expect(next?.composition?.pattern).toBe("kaleido-symmetry");
+    expect(next?.composition?.carrier).toBe("webgpu-causal-ink");
+  });
+
+  it("compiles the living-chroma recipe into the connected watercolor program", () => {
+    const onChange = vi.fn();
+    render(
+      <StudioBrushEngineProgramControls
+        brushId="inkwash-pen"
+        programSet={null}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^리빙 크로마 잉크/u }));
+    const next = onChange.mock.calls[0]![0];
+    expect(next?.composition?.physics).toBe("inkwash-fluid");
+    expect(next?.watercolor).toEqual({ livingInkBakeProgramId: "sumi-flow-bake" });
+  });
+
+  it("resets composition and its connected family patch together", () => {
+    const onChange = vi.fn();
+    const initial = studioBrushEngineProgramSetFromComposition(
+      createStudioBrushCompositionBaseline("pen", "pen"),
+    );
+    render(
+      <StudioBrushEngineProgramControls brushId="pen" programSet={initial} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "기본 조합" }));
+    expect(onChange).toHaveBeenCalledWith(null);
+  });
+
+  it("shows the preset baseline and literal oil paint-order toggles", () => {
     render(
       <StudioBrushEngineProgramControls
         brushId="oil--impasto-ribbon"
@@ -37,7 +83,7 @@ describe("StudioBrushEngineProgramControls", () => {
       .toBe("false");
   });
 
-  it("exposes all eight combinations exactly once", () => {
+  it("exposes all eight connected oil combinations exactly once", () => {
     render(
       <StudioBrushEngineProgramControls
         brushId="oil--filbert-ribbon"
@@ -77,6 +123,23 @@ describe("StudioBrushEngineProgramControls", () => {
         impastoRelief: true,
       }),
     );
+  });
+
+  it("preserves the generic composition when a connected oil pass changes", () => {
+    const onChange = vi.fn();
+    const composition = createStudioBrushCompositionBaseline("oil--filbert-ribbon", "oil");
+    const initial = studioBrushEngineProgramSetFromComposition(composition);
+    render(
+      <StudioBrushEngineProgramControls
+        brushId="oil--filbert-ribbon"
+        programSet={initial}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /물감 소모/u }));
+    const next = onChange.mock.calls[0]![0];
+    expect(next?.composition).toEqual(composition);
+    expect(next?.oil?.bristleLoadDynamics).toBe(true);
   });
 
   it("sends a set after a detailed toggle and names matching shipped presets", () => {
@@ -194,7 +257,7 @@ describe("StudioBrushEngineProgramControls", () => {
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it("shows preset restore only for changed combinations", () => {
+  it("shows preset restore only for changed oil combinations", () => {
     const onChange = vi.fn();
     const { rerender } = render(
       <StudioBrushEngineProgramControls
