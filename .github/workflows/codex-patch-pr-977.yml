@@ -21,18 +21,10 @@ jobs:
           from pathlib import Path
           path = Path('apps/web/src/domains/creator/StudioPublishingCommandCenter.tsx')
           source = path.read_text()
-          import_old = '''  writeCreatorPublicationDirective,
-            type CreatorPublicationDirective,
-          } from "@/shared/lib/creator-publication-contract";'''
-          import_new = '''  writeCreatorPublicationDirective,
-            type CreatorPublicationDirective,
-            type CreatorPublicationWorkStatus,
-          } from "@/shared/lib/creator-publication-contract";'''
-          status_old = '''    const requestedStatus = intent === "draft" ? "draft" : "published";
-            let effectiveStatus = requestedStatus;'''
-          status_new = '''    const requestedStatus: CreatorPublicationWorkStatus =
-              intent === "draft" ? "draft" : "published";
-            let effectiveStatus: CreatorPublicationWorkStatus = requestedStatus;'''
+          import_old = '  type CreatorPublicationDirective,\n} from "@/shared/lib/creator-publication-contract";'
+          import_new = '  type CreatorPublicationDirective,\n  type CreatorPublicationWorkStatus,\n} from "@/shared/lib/creator-publication-contract";'
+          status_old = 'const requestedStatus = intent === "draft" ? "draft" : "published";\n    let effectiveStatus = requestedStatus;'
+          status_new = 'const requestedStatus: CreatorPublicationWorkStatus =\n      intent === "draft" ? "draft" : "published";\n    let effectiveStatus: CreatorPublicationWorkStatus = requestedStatus;'
           if source.count(import_old) != 1:
               raise SystemExit(f'expected one import target, found {source.count(import_old)}')
           if source.count(status_old) != 1:
