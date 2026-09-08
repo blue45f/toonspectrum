@@ -277,6 +277,59 @@ describe("StudioProjectCenterSearch", () => {
     });
   });
 
+  it("keeps file lifecycle diagnostics out of the sticky default view", async () => {
+    render(<Fixture />);
+    const panel = document.querySelector<HTMLElement>(
+      '[data-studio-project-actions-menu="true"]',
+    );
+    const searchRoot = document.querySelector<HTMLElement>(
+      '[data-project-center-search="true"]',
+    );
+    const backup = document.querySelector<HTMLButtonElement>(
+      'button[title="프로젝트를 안전하게 보관"]',
+    );
+    const host = await waitFor(() => {
+      const candidate = document.querySelector<HTMLElement>(
+        '[data-project-center-file-control-host="true"]',
+      );
+      expect(candidate).not.toBeNull();
+      return candidate as HTMLElement;
+    });
+
+    expect(host.parentElement).toBe(panel);
+    expect(searchRoot?.contains(host)).toBe(false);
+    expect(host.hidden).toBe(true);
+    expect(screen.queryByText("파일 제어 센터")).toBeNull();
+    expect(backup?.hidden).toBe(false);
+
+    const fileControlScope = await waitFor(() => {
+      const candidate = document.querySelector<HTMLButtonElement>(
+        '[data-project-center-scope="file-control"]',
+      );
+      expect(candidate).not.toBeNull();
+      return candidate as HTMLButtonElement;
+    });
+    fireEvent.click(fileControlScope);
+
+    await waitFor(() => {
+      expect(host.hidden).toBe(false);
+      expect(screen.getByText("파일 제어 센터")).toBeTruthy();
+      expect(backup?.hidden).toBe(true);
+    });
+
+    const all = document.querySelector<HTMLButtonElement>(
+      '[data-project-center-scope="all"]',
+    );
+    expect(all).not.toBeNull();
+    fireEvent.click(all as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(host.hidden).toBe(true);
+      expect(screen.queryByText("파일 제어 센터")).toBeNull();
+      expect(backup?.hidden).toBe(false);
+    });
+  });
+
   it("filters the authored command catalogue by project section and restores it", async () => {
     render(<Fixture />);
     const scope = await waitFor(() => {
