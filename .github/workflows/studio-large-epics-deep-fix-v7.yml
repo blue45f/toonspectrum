@@ -1,0 +1,178 @@
+name: Studio large epics deep fixes
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-large-epics-deep-fix-v7.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      BRANCH: codex/studio-large-epics-closure-20260909
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Rewrite adapter against inferred canonical signatures
+        run: |
+          cat > apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.ts <<'TS'
+          import {
+            planStudioAdjustmentEffectGraph,
+            validateStudioAdjustmentEffectGraph,
+          } from "../filter/studio-adjustment-effect-graph";
+          import type {
+            StudioLayerEffect,
+            StudioLayerEffectsStack,
+          } from "./studio-layer-effects-stack";
+
+          function effectParameters(effect: StudioLayerEffect): Readonly<Record<string, unknown>> {
+            switch (effect.kind) {
+              case "glow":
+                return Object.freeze({
+                  type: effect.type,
+                  color: effect.color,
+                  blur: effect.blur,
+                  intensity: effect.intensity,
+                });
+              case "drop-shadow":
+                return Object.freeze({
+                  color: effect.color,
+                  blur: effect.blur,
+                  offsetX: effect.offsetX,
+                  offsetY: effect.offsetY,
+                  opacity: effect.opacity,
+                  angleDeg: effect.angleDeg,
+                  distance: effect.distance,
+                });
+              case "relief":
+                return Object.freeze({
+                  elevationDeg: effect.elevationDeg,
+                  azimuthDeg: effect.azimuthDeg,
+                  depth: effect.depth,
+                  smoothness: effect.smoothness,
+                  lightIntensity: effect.lightIntensity,
+                  ambient: effect.ambient,
+                  invert: effect.invert,
+                });
+              case "border":
+                return Object.freeze({
+                  thickness: effect.thickness,
+                  color: effect.color,
+                  type: effect.type,
+                  respectTransparency: effect.respectTransparency,
+                  antiAliased: effect.antiAliased,
+                });
+            }
+          }
+
+          function liveEffectKind(effect: StudioLayerEffect): "glow" | "drop-shadow" | "inflate" {
+            if (effect.kind === "drop-shadow") return "drop-shadow";
+            if (effect.kind === "relief") return "inflate";
+            return "glow";
+          }
+
+          export function studioLayerEffectsStackToGraph(
+            stack: StudioLayerEffectsStack,
+            sourceHash: string,
+          ) {
+            const nodes: Array<Record<string, unknown>> = [
+              {
+                id: "layer-source",
+                kind: "source",
+                source: {
+                  mode: "embedded",
+                  contentHash: sourceHash,
+                  colorSpace: "sRGB",
+                },
+              },
+            ];
+            let inputNodeId = "layer-source";
+            stack.effects.forEach((effect, index) => {
+              const nodeId = `layer-effect-${index}-${effect.id}`;
+              nodes.push({
+                id: nodeId,
+                kind: "live-effect",
+                inputNodeId,
+                effect: liveEffectKind(effect),
+                enabled: effect.enabled,
+                opacity: 1,
+                blendMode: "normal",
+                parameters: {
+                  sourceKind: effect.kind,
+                  ...effectParameters(effect),
+                },
+              });
+              inputNodeId = nodeId;
+            });
+            nodes.push({
+              id: "layer-output",
+              kind: "output",
+              inputNodeId,
+            });
+            const input = {
+              schemaVersion: 1,
+              id: "layer-effects-live-graph",
+              revision: stack.effects.length,
+              nodes,
+              outputNodeId: "layer-output",
+            } as unknown as Parameters<typeof validateStudioAdjustmentEffectGraph>[0];
+            return validateStudioAdjustmentEffectGraph(input);
+          }
+
+          export function planStudioLayerEffectsStack(
+            stack: StudioLayerEffectsStack,
+            sourceHash: string,
+            backend: "cpu" | "webgpu" = "webgpu",
+          ) {
+            const context = {
+              purpose: "preview",
+              backend,
+              colorSpace: "sRGB",
+              deviceProfile: backend === "webgpu" ? "studio-webgpu" : "studio-cpu",
+            } as unknown as Parameters<typeof planStudioAdjustmentEffectGraph>[1];
+            return planStudioAdjustmentEffectGraph(
+              studioLayerEffectsStackToGraph(stack, sourceHash),
+              context,
+            );
+          }
+          TS
+          rm -f .github/workflows/studio-large-epics-deep-fix-v7.yml
+
+      - name: Verify and publish
+        run: |
+          pnpm exec eslint --fix --max-warnings=0 \
+            apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.ts \
+            apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts \
+            apps/web/src/domains/creator/layer/StudioLayerEffectsGraphStatus.tsx
+          pnpm exec vitest run apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps .github/workflows/studio-large-epics-deep-fix-v7.yml
+          git commit -m "fix(studio): bind layer effect adapter to canonical graph types"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$BRANCH"
+            if git rebase "origin/$BRANCH" && git push origin HEAD:"$BRANCH"; then exit 0; fi
+            git rebase --abort || true
+            sleep $((attempt * 7))
+          done
+          exit 1
