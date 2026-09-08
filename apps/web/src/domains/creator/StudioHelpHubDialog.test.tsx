@@ -44,7 +44,7 @@ describe("StudioHelpHubDialog", () => {
 
   it("routes troubleshooting cards to the measured technical surfaces", () => {
     const { onOpenLegacySection } = renderHub();
-    fireEvent.click(screen.getByRole("button", { name: "문제 해결" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "문제 해결" })[0]);
     fireEvent.click(screen.getByRole("button", { name: /느림 · 검은 화면 · 입력 문제/u }));
     expect(onOpenLegacySection).toHaveBeenCalledExactlyOnceWith("diagnostics");
   });
@@ -54,7 +54,7 @@ describe("StudioHelpHubDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "따라 배우기" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "기본 조작 확인" }));
     expect(window.localStorage.getItem("toonspectrum-studio-help:guide-progress:v1")).toContain(
-      '\"canvas\"',
+      '"canvas"',
     );
   });
 
