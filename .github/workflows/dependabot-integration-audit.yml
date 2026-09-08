@@ -1,0 +1,50 @@
+name: Dependabot integration audit
+
+on:
+  push:
+    branches:
+      - security/audit-pr919-77c107e-20260908
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install the exact integration lockfile
+        run: pnpm install --frozen-lockfile
+      - name: Require zero advisories at every severity
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          pnpm audit --json --audit-level low > /tmp/dependabot-audit.json 2> /tmp/dependabot-audit.err
+          audit_exit="$?"
+          set -e
+          AUDIT_EXIT="$audit_exit" node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const report = JSON.parse(readFileSync("/tmp/dependabot-audit.json", "utf8"));
+          const source = report?.metadata?.vulnerabilities ?? {};
+          const counts = Object.fromEntries(
+            ["info", "low", "moderate", "high", "critical"].map((severity) => [
+              severity,
+              Number(source[severity] ?? 0),
+            ]),
+          );
+          counts.total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+          const auditExit = Number(process.env.AUDIT_EXIT ?? "1");
+          console.log(JSON.stringify({ counts, auditExit }, null, 2));
+          if (auditExit !== 0 || counts.total !== 0) {
+            console.error(readFileSync("/tmp/dependabot-audit.err", "utf8"));
+            console.error(JSON.stringify(report, null, 2));
+            process.exit(1);
+          }
+          NODE
