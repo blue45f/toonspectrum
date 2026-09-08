@@ -1,0 +1,98 @@
+name: Final reusable CodeQL repair round
+
+on:
+  workflow_call:
+    inputs:
+      round:
+        type: string
+        required: true
+      branch:
+        type: string
+        required: true
+    outputs:
+      clean:
+        value: ${{ jobs.repair.outputs.clean }}
+      finding_count:
+        value: ${{ jobs.repair.outputs.finding_count }}
+
+permissions:
+  contents: write
+  models: read
+  security-events: read
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    outputs:
+      clean: ${{ steps.result.outputs.clean }}
+      finding_count: ${{ steps.result.outputs.finding_count }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_MODELS_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: ${{ inputs.branch }}
+      ROUND: ${{ inputs.round }}
+    steps:
+      - name: Checkout latest branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Initialize CodeQL security and quality suite
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - name: Analyze current branch
+        uses: github/codeql-action/analyze@v3
+        with:
+          upload: false
+          output: /tmp/codeql-v6-${{ inputs.round }}
+          category: /language:javascript-typescript
+
+      - name: Inspect and repair residual findings
+        id: result
+        shell: bash
+        run: |
+          set -euo pipefail
+          findings="/tmp/codeql-v6-${ROUND}-findings.json"
+          set +e
+          python3 scripts/codeql-residual-remediation-v6.py \
+            --sarif-root "/tmp/codeql-v6-${ROUND}" \
+            --output "$findings"
+          status=$?
+          set -e
+          if [[ "$status" == "0" ]]; then
+            echo "clean=true" >> "$GITHUB_OUTPUT"
+            echo "finding_count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [[ "$status" == "2" ]] || exit "$status"
+
+          count="$(jq 'length' "$findings")"
+          echo "clean=false" >> "$GITHUB_OUTPUT"
+          echo "finding_count=$count" >> "$GITHUB_OUTPUT"
+          python3 scripts/codeql-residual-remediation-v6.py \
+            --sarif-root "/tmp/codeql-v6-${ROUND}" \
+            --output "$findings" \
+            --fix
+
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && { echo "No repair changes were produced." >&2; exit 1; }
+          git commit -m "fix(security): remediate CodeQL findings (pass ${ROUND})"
+          git push origin "HEAD:${TARGET_BRANCH}"
+
+      - name: Upload round diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-v6-round-${{ inputs.round }}
+          path: /tmp/codeql-v6-${{ inputs.round }}-findings.json
+          if-no-files-found: ignore
+          retention-days: 1
