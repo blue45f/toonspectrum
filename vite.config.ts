@@ -390,7 +390,8 @@ export default defineConfig(({ mode }) => ({
   // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.
   assetsInclude: ["**/*.wasm"],
   optimizeDeps: {
-    exclude: ["opencascade.js"],
+    // SQLite locates its WASM beside the ESM entry; prebundling loses that asset URL.
+    exclude: ["opencascade.js", "@sqlite.org/sqlite-wasm"],
   },
   build: {
     outDir: path.resolve(repositoryRoot, "dist"),

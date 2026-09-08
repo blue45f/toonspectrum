@@ -471,6 +471,7 @@ interface ResolvedPaintHit extends ResolvedBaseColorHit {
 
 interface PendingStroke {
   readonly pointerId: number;
+  readonly channel: StudioVrmTexturePaintChannel;
   readonly originMaterial: BaseColorMaterial;
   readonly sourceTexture: THREE.Texture;
   readonly style: StudioVrmTextureStrokeStyle;
@@ -500,6 +501,7 @@ interface ActiveStroke {
 
 interface SurfacePaintSessionState {
   readonly id: string;
+  readonly channel: StudioVrmTexturePaintChannel;
   readonly originMaterial: BaseColorMaterial;
   readonly sourceTexture: THREE.Texture;
   readonly paintWrap: StudioVrmTexturePaintApplyOptions;
@@ -2043,6 +2045,7 @@ export class StudioVrmTexturePaintRuntime {
     const controller = resolved.target ? null : new AbortController();
     const state: SurfacePaintSessionState = {
       id: `surface-${this.surfaceSessionSequence}`,
+      channel: this.selectedChannel,
       originMaterial: resolved.material,
       sourceTexture: resolved.sourceTexture,
       paintWrap: resolved.paintWrap,
@@ -2071,7 +2074,7 @@ export class StudioVrmTexturePaintRuntime {
         }
         if (!readable.ok) return failSession(readable.error.code);
         try {
-          if (state.originMaterial.map !== state.sourceTexture) {
+          if (this.materialChannels.get(state.originMaterial, state.channel) !== state.sourceTexture) {
             return failSession("source-changed");
           }
         } catch {
@@ -2310,6 +2313,7 @@ export class StudioVrmTexturePaintRuntime {
     const resolved = hitResult.value;
     const request: PendingStroke = {
       pointerId: input.pointerId,
+      channel: this.selectedChannel,
       originMaterial: resolved.material,
       sourceTexture: resolved.sourceTexture,
       style: copyStrokeStyle(input.style),
@@ -2341,7 +2345,7 @@ export class StudioVrmTexturePaintRuntime {
         return this.fail(readableResult.error.code);
       }
       try {
-        if (request.originMaterial.map !== request.sourceTexture) {
+        if (this.materialChannels.get(request.originMaterial, request.channel) !== request.sourceTexture) {
           this.pending = null;
           return this.fail("source-changed");
         }
