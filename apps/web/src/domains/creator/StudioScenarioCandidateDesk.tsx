@@ -23,7 +23,9 @@ export interface StudioScenarioCandidateDeskProps {
 
 const VARIANT_OPTIONS = [1, 2, 4] as const;
 
-function preferredVariantCount(items: readonly ScenarioPreviewItem[]): StudioScenarioImageVariantCount {
+function preferredVariantCount(
+  items: readonly ScenarioPreviewItem[],
+): StudioScenarioImageVariantCount {
   return items.find((item) => item.preferredVariantCount)?.preferredVariantCount ?? 1;
 }
 
@@ -48,7 +50,7 @@ export function StudioScenarioCandidateDesk({
       if (valid.length > 0 || current.length > 0) return valid;
       return items.flatMap((item, index) => (item.imageDataUrl ? [] : [index]));
     });
-  }, [items.length]);
+  }, [items]);
 
   const importedVariantPreference = preferredVariantCount(items);
   useEffect(() => {
@@ -74,12 +76,16 @@ export function StudioScenarioCandidateDesk({
     >
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">
-          <h3 id="scenario-candidate-desk-title" className="flex items-center gap-1.5 text-xs font-bold text-fg">
+          <h3
+            id="scenario-candidate-desk-title"
+            className="flex items-center gap-1.5 text-xs font-bold text-fg"
+          >
             <Images size={14} className="text-accent" aria-hidden />
             컷 후보 보드
           </h3>
           <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-            필요한 컷만 골라 1·2·4개 후보를 만들고 비교한 뒤 승인하세요. 새 생성은 기존 후보와 승인을 덮어쓰지 않습니다.
+            필요한 컷만 골라 1·2·4개 후보를 만들고 비교한 뒤 승인하세요. 새 생성은
+            기존 후보와 승인을 덮어쓰지 않습니다.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1">
@@ -104,7 +110,11 @@ export function StudioScenarioCandidateDesk({
 
       <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-panel/70 p-2">
         <span className="text-[0.68rem] font-semibold text-fg-2">컷당 후보</span>
-        <div role="radiogroup" aria-label="컷당 생성 후보 수" className="flex rounded-lg border border-line bg-card p-0.5">
+        <div
+          role="radiogroup"
+          aria-label="컷당 생성 후보 수"
+          className="flex rounded-lg border border-line bg-card p-0.5"
+        >
           {VARIANT_OPTIONS.map((count) => (
             <button
               key={count}
@@ -114,7 +124,9 @@ export function StudioScenarioCandidateDesk({
               onClick={() => setVariants(count)}
               disabled={busy}
               className={`min-h-10 min-w-10 rounded-md px-2 text-xs font-bold transition-colors sm:min-h-7 ${
-                variants === count ? "bg-accent text-on-accent" : "text-fg-3 hover:bg-raised"
+                variants === count
+                  ? "bg-accent text-on-accent"
+                  : "text-fg-3 hover:bg-raised"
               }`}
             >
               {count}
@@ -126,7 +138,9 @@ export function StudioScenarioCandidateDesk({
         </span>
         <button
           type="button"
-          onClick={() => onGenerate({ indexes: [...selected].sort((a, b) => a - b), variants })}
+          onClick={() =>
+            onGenerate({ indexes: [...selected].sort((a, b) => a - b), variants })
+          }
           disabled={!canGenerate}
           title={disabledReason}
           className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-8"
@@ -136,22 +150,28 @@ export function StudioScenarioCandidateDesk({
         </button>
       </div>
       <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-        작업량은 모델·요금과 무관한 요청 개수입니다. 실제 비용과 처리 시간은 연결한 이미지 제공자에서 확인하세요.
+        작업량은 모델·요금과 무관한 요청 개수입니다. 실제 비용과 처리 시간은 연결한 이미지
+        제공자에서 확인하세요.
       </p>
 
       <div className="mt-3 grid gap-2 lg:grid-cols-2">
         {items.map((item, index) => {
           const candidates = scenarioImageCandidates(item);
           const selectedCandidateId =
-            item.selectedImageCandidateId
-            ?? candidates.find((candidate) => candidate.imageDataUrl === item.imageDataUrl)?.id
-            ?? candidates.at(-1)?.id;
-          const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId);
+            item.selectedImageCandidateId ??
+            candidates.find((candidate) => candidate.imageDataUrl === item.imageDataUrl)?.id ??
+            candidates.at(-1)?.id;
+          const selectedCandidate = candidates.find(
+            (candidate) => candidate.id === selectedCandidateId,
+          );
           const selectedCandidateStale = selectedCandidate
             ? isScenarioImageCandidateStale(selectedCandidate, item, referenceSignature)
             : false;
           return (
-            <article key={index} className="min-w-0 rounded-lg border border-line bg-card/75 p-2">
+            <article
+              key={index}
+              className="min-w-0 rounded-lg border border-line bg-card/75 p-2"
+            >
               <div className="flex items-center gap-2">
                 <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-[0.7rem] font-semibold text-fg-2 sm:min-h-7">
                   <input
@@ -164,7 +184,10 @@ export function StudioScenarioCandidateDesk({
                   />
                   컷 {index + 1}
                 </label>
-                <span className="min-w-0 flex-1 truncate text-[0.65rem] text-fg-3" title={item.summary}>
+                <span
+                  className="min-w-0 flex-1 truncate text-[0.65rem] text-fg-3"
+                  title={item.summary}
+                >
                   {item.summary}
                 </span>
                 {item.approvedImageCandidateId ? (
@@ -179,7 +202,11 @@ export function StudioScenarioCandidateDesk({
                   {candidates.map((candidate, candidateIndex) => {
                     const active = candidate.id === selectedCandidateId;
                     const approved = candidate.id === item.approvedImageCandidateId;
-                    const stale = isScenarioImageCandidateStale(candidate, item, referenceSignature);
+                    const stale = isScenarioImageCandidateStale(
+                      candidate,
+                      item,
+                      referenceSignature,
+                    );
                     return (
                       <button
                         key={candidate.id}
@@ -199,7 +226,9 @@ export function StudioScenarioCandidateDesk({
                         />
                         <span className="flex items-center justify-between gap-1 px-1.5 py-1 text-[0.58rem] text-fg-3">
                           <span>후보 {candidateIndex + 1}</span>
-                          {active ? <Check size={10} className="text-accent" aria-hidden /> : null}
+                          {active ? (
+                            <Check size={10} className="text-accent" aria-hidden />
+                          ) : null}
                         </span>
                         {approved ? (
                           <span className="absolute left-1 top-1 rounded bg-good/90 px-1 py-0.5 text-[0.55rem] font-bold text-white">
@@ -216,7 +245,8 @@ export function StudioScenarioCandidateDesk({
                 </div>
               ) : (
                 <p className="mt-2 rounded-md border border-dashed border-line px-2 py-2 text-[0.65rem] text-fg-3">
-                  아직 후보가 없습니다. 이 컷을 선택해 생성하거나 기존 단일 생성 버튼을 사용하세요.
+                  아직 후보가 없습니다. 이 컷을 선택해 생성하거나 기존 단일 생성 버튼을
+                  사용하세요.
                 </p>
               )}
 
@@ -228,16 +258,24 @@ export function StudioScenarioCandidateDesk({
                       : "이전 생성 결과"}
                   </span>
                   {selectedCandidateStale ? (
-                    <span className="text-[0.6rem] font-semibold text-warn">현재 프롬프트·참조와 다름</span>
+                    <span className="text-[0.6rem] font-semibold text-warn">
+                      현재 프롬프트·참조와 다름
+                    </span>
                   ) : null}
                   <button
                     type="button"
                     onClick={() => onApproveCandidate(index, selectedCandidate.id)}
-                    disabled={busy || selectedCandidateStale || item.approvedImageCandidateId === selectedCandidate.id}
+                    disabled={
+                      busy ||
+                      selectedCandidateStale ||
+                      item.approvedImageCandidateId === selectedCandidate.id
+                    }
                     className="inline-flex min-h-10 items-center gap-1 rounded-md border border-good/35 bg-good/10 px-2 text-[0.63rem] font-semibold text-good hover:bg-good/15 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-7"
                   >
                     <ShieldCheck size={11} aria-hidden />
-                    {item.approvedImageCandidateId === selectedCandidate.id ? "승인 완료" : "이 후보 승인"}
+                    {item.approvedImageCandidateId === selectedCandidate.id
+                      ? "승인 완료"
+                      : "이 후보 승인"}
                   </button>
                 </div>
               ) : null}
