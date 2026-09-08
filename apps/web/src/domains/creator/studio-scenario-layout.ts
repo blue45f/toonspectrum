@@ -43,6 +43,15 @@ export interface ScenarioSceneInput {
 /** 패널 가로세로 비를 3단계로 단순화 — AI 이미지 생성 사이즈 프리셋(정사각/세로/가로) 선택에만 쓰인다
  *  (studio-ai-client.StudioAiImageSize로의 매핑은 호출부 책임 — 이 모듈은 AI 클라이언트를 모른다). */
 export type ScenarioPanelAspect = "square" | "portrait" | "landscape";
+export type ScenarioImageVariantCount = 1 | 2 | 4;
+
+export interface ScenarioImageCandidate {
+  id: string;
+  imageDataUrl: string;
+  imageProvenance?: StudioPublishAiProvenance;
+  inputFingerprint: string;
+  createdAt: string;
+}
 
 export function scenarioPanelAspect(width: number, height: number): ScenarioPanelAspect {
   if (height <= 0) return "square";
@@ -71,6 +80,10 @@ export interface ScenarioPreviewItem extends ScenarioPanelSeed {
   imageDataUrl?: string;
   imageError?: string;
   imageProvenance?: StudioPublishAiProvenance;
+  imageCandidates?: ScenarioImageCandidate[];
+  selectedImageCandidateId?: string;
+  approvedImageCandidateId?: string;
+  preferredVariantCount?: ScenarioImageVariantCount;
 }
 
 export interface ScenarioLayoutResult {
