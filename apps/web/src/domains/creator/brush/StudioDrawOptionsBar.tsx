@@ -1005,7 +1005,7 @@ export function StudioDrawOptionsBar({
               aria-label={advancedOpen ? "빠른 세부 옵션 접기" : "빠른 세부 옵션 펼치기"}
               data-studio-draw-advanced-toggle="true"
               className={cn(
-                "flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border px-1.5",
+                "flex h-11 min-w-11 items-center justify-center gap-1 rounded-lg border px-1.5",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 advancedOpen
@@ -1043,7 +1043,7 @@ export function StudioDrawOptionsBar({
                 aria-label="캔버스 좌우 반전"
                 className={cn(
                   iconBtn,
-                  "size-7",
+                  "size-11",
                   canvasFlipH
                     ? "border-accent bg-accent-soft text-accent"
                     : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
@@ -1067,7 +1067,7 @@ export function StudioDrawOptionsBar({
                 type="button"
                 onClick={onOpenBrushStudio}
                 aria-label="브러시 고급 설정"
-                className={cn(iconBtn, "size-7 border-line bg-card text-fg-2 hover:bg-raised")}
+                className={cn(iconBtn, "size-11 border-line bg-card text-fg-2 hover:bg-raised")}
               >
                 <Wand2 size={13} strokeWidth={1.75} aria-hidden />
               </button>
@@ -1094,7 +1094,7 @@ export function StudioDrawOptionsBar({
                 aria-label="스마트 도형"
                 className={cn(
                   iconBtn,
-                  "size-7",
+                  "size-11",
                   quickShapeActive
                     ? "border-accent bg-accent-soft text-accent"
                     : "border-line bg-card text-fg-2 hover:bg-raised"

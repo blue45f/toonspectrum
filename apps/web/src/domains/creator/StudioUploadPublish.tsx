@@ -735,10 +735,10 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
     >
       <div className="mb-5 flex flex-wrap items-center gap-3">
         {/* 인앱 브라우저에는 주소창도 뒤로 가기 크롬도 없다 — 이 링크가 게시 화면을 벗어나는
-            유일한 문이다. 20px 텍스트 링크로 두면 손가락으로 잡기 어려우니 터치에서만 44px 로 올린다. */}
+            유일한 문이다. 모든 입력 방식에서 링크를 누를 수 있도록 44px 클릭 영역을 유지한다. */}
         <Link
           href="/create"
-          className="inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg pointer-coarse:min-h-11 pointer-coarse:-mx-1 pointer-coarse:px-1"
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg pointer-coarse:min-h-11 pointer-coarse:-mx-1 pointer-coarse:px-1"
         >
           <ArrowLeft size={15} />
           창작 게시판
@@ -746,7 +746,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
         {!workId && (
           <Link
             href={buildStudioHref({ seriesId, challengeId, titleId })}
-            className={buttonClass({ size: "sm", variant: "outline", className: "ml-auto gap-1.5" })}
+            className={buttonClass({ size: "sm", variant: "outline", className: "ml-auto min-h-11 gap-1.5" })}
           >
             <PenLine size={14} />
             컷툰 스튜디오로 전환
@@ -1035,7 +1035,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
               className={buttonClass({
                 size: "md",
                 variant: "outline",
-                className: "w-full pointer-coarse:h-11 pointer-coarse:min-h-11",
+                className: "min-h-11 w-full",
               })}
             >
               {workId && sharedMeta?.role !== "owner" ? "공동 변경사항 저장" : workId ? "초안으로 저장" : "임시저장"}
@@ -1048,7 +1048,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
               className={buttonClass({
                 size: "md",
                 variant: "solid",
-                className: "w-full gap-1.5 pointer-coarse:h-11 pointer-coarse:min-h-11",
+                className: "min-h-11 w-full gap-1.5",
               })}
             >
               {saving ? (

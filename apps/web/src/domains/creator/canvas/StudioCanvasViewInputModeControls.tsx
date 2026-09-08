@@ -47,11 +47,11 @@ export function StudioViewInputModeControls({
         title={`${wheelLabel} · ${localizeText(t, "클릭해서 줌/스크롤 전환", "studio.canvas.wheelMode.toggleHint")}`}
         onClick={onToggleWheelMode}
         className={cn(
-          "inline-flex min-h-7 items-center justify-center gap-1 rounded-full px-2 text-[0.65rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+          "inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 text-[0.65rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
           wheelScrollMode
             ? "bg-accent-soft text-accent"
             : "text-fg-2 hover:bg-raised hover:text-fg",
-          compact && "size-7 px-0",
+          compact && "size-11 shrink-0 px-0",
         )}
       >
         <Mouse className="size-3.5" aria-hidden />
@@ -68,7 +68,7 @@ export function StudioViewInputModeControls({
         title={lockLabel}
         onClick={onToggleZoomLock}
         className={cn(
-          "grid size-7 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+          "grid size-11 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
           zoomLocked
             ? "bg-warning-soft text-warning"
             : "text-fg-2 hover:bg-raised hover:text-fg",

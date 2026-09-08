@@ -7,10 +7,11 @@
  */
 
 import { spawn } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 import { chromium, firefox, webkit } from "playwright";
 
 const OUTPUT_DIR = resolve(process.env.TOONSPECTRUM_VERIFY_DIR ?? "artifacts/studio-cross-browser");
@@ -19,13 +20,13 @@ const COLOR_SCHEME = process.env.TOONSPECTRUM_VERIFY_COLOR_SCHEME === "dark" ? "
 const REDUCED_MOTION = process.env.TOONSPECTRUM_VERIFY_REDUCED_MOTION === "reduce" ? "reduce" : "no-preference";
 const MIN_TAP = 43.5;
 
-const ENGINES = Object.freeze([
+export const ENGINES = Object.freeze([
   { id: "chromium", type: chromium },
   { id: "firefox", type: firefox },
   { id: "webkit", type: webkit },
 ]);
 
-const PROFILES = Object.freeze([
+export const PROFILES = Object.freeze([
   {
     id: "desktop-1440",
     width: 1440,
@@ -70,7 +71,7 @@ const PROFILES = Object.freeze([
   },
 ]);
 
-const ROUTES = Object.freeze([
+export const ROUTES = Object.freeze([
   { id: "editor", path: "/studio" },
   { id: "comic", path: "/studio/comic" },
   { id: "animation", path: "/studio/animation" },
@@ -137,7 +138,7 @@ function stopProcess(child) {
   }, 5_000).unref?.();
 }
 
-async function installGuestBoundary(page) {
+export async function installGuestBoundary(page) {
   await page.route("**/api/auth/session", async (route) => {
     if (route.request().method() !== "GET") return route.fallback();
     return route.fulfill({
@@ -148,7 +149,7 @@ async function installGuestBoundary(page) {
   });
 }
 
-async function auditPage(page) {
+export async function auditPage(page) {
   return page.evaluate((minimumTap) => { // NOSONAR javascript:S3776
     const viewportWidth = window.innerWidth;
     const selectors = "button, a[href], [role='button'], input:not([type='hidden']), select, textarea";
@@ -184,10 +185,12 @@ async function auditPage(page) {
     const offscreen = [];
     const smallTargets = [];
     const unnamed = [];
+    const controls = [];
     for (const element of candidates) {
       if (!isVisible(element)) continue;
       const rect = element.getBoundingClientRect();
       const inScrollRow = Boolean(scrollContainer(element));
+      controls.push({ label: label(element), tag: element.tagName.toLowerCase(), width: rect.width, height: rect.height, inScrollRow });
       const disabled = element.matches(":disabled") || element.getAttribute("aria-disabled") === "true";
       if (!inScrollRow && (rect.left < -0.5 || rect.right > viewportWidth + 0.5)) {
         offscreen.push(`${element.tagName.toLowerCase()}“${label(element)}” rect=[${rect.left.toFixed(1)}, ${rect.right.toFixed(1)}] vw=${viewportWidth}`);
@@ -211,34 +214,44 @@ async function auditPage(page) {
     }
 
     return {
+      controls,
       documentOverflowX: Math.max(0, document.documentElement.scrollWidth - viewportWidth),
-      offscreen: [...new Set(offscreen)].slice(0, 20),
-      smallTargets: [...new Set(smallTargets)].slice(0, 20),
-      unnamed: [...new Set(unnamed)].slice(0, 20),
+      offscreen: [...new Set(offscreen)],
+      smallTargets: [...new Set(smallTargets)],
+      unnamed: [...new Set(unnamed)],
     };
   }, MIN_TAP);
 }
 
 async function main() { // NOSONAR javascript:S3776
   await mkdir(OUTPUT_DIR, { recursive: true });
-  const port = await findFreePort();
-  const baseUrl = `http://127.0.0.1:${port}`;
-  const preview = spawn(
+  const externalBaseUrl = process.env.TOONSPECTRUM_VERIFY_BASE_URL;
+  const port = externalBaseUrl ? 0 : await findFreePort();
+  const baseUrl = externalBaseUrl ?? `http://127.0.0.1:${port}`;
+  const preview = externalBaseUrl ? null : spawn(
     "pnpm",
     ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
     { detached: true, env: { ...process.env, CI: "1" }, stdio: ["ignore", "pipe", "pipe"] },
   );
-  preview.stdout.on("data", (chunk) => process.stdout.write(chunk));
-  preview.stderr.on("data", (chunk) => process.stderr.write(chunk));
+  preview?.stdout.on("data", (chunk) => process.stdout.write(chunk));
+  preview?.stderr.on("data", (chunk) => process.stderr.write(chunk));
 
   let hardFailures = 0;
   let warnings = 0;
+  const results = [];
+  const selected = (values, key) => {
+    const filter = process.env[key]?.split(",");
+    if (!filter) return values;
+    const unknown = filter.filter((id) => !values.some((value) => value.id === id));
+    if (unknown.length) throw new Error(`Unknown ${key}: ${unknown.join(", ")}`);
+    return values.filter((value) => filter.includes(value.id));
+  };
   try {
     await waitForServer(baseUrl);
-    for (const engine of ENGINES) {
+    for (const engine of selected(ENGINES, "TOONSPECTRUM_VERIFY_ENGINES")) {
       const browser = await engine.type.launch({ headless: true });
       try {
-        for (const profile of PROFILES) {
+        for (const profile of selected(PROFILES, "TOONSPECTRUM_VERIFY_PROFILES")) {
           const context = await browser.newContext({
             viewport: { width: profile.width, height: profile.height },
             deviceScaleFactor: profile.deviceScaleFactor,
@@ -250,22 +263,41 @@ async function main() { // NOSONAR javascript:S3776
             reducedMotion: REDUCED_MOTION,
           });
           try {
-            for (const route of ROUTES) {
+            for (const route of selected(ROUTES, "TOONSPECTRUM_VERIFY_ROUTES")) {
               const page = await context.newPage();
               const scope = `${engine.id}/${profile.id}/${route.id}`;
               const consoleErrors = [];
               const pageErrors = [];
+              const failedResponses = [];
+              const consoleDetails = [];
+              page.on("response", (response) => {
+                if (response.status() >= 400) failedResponses.push({ url: response.url(), status: response.status() });
+              });
               page.on("pageerror", (error) => pageErrors.push(error.message));
               page.on("console", (message) => {
                 if (message.type() !== "error") return;
                 const text = message.text();
+                consoleDetails.push({ text, location: message.location() });
                 if (!IGNORED_CONSOLE.some((ignored) => text.includes(ignored))) consoleErrors.push(text);
               });
               await installGuestBoundary(page);
               try {
                 await page.goto(`${baseUrl}${route.path}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
                 await page.locator("body").waitFor({ state: "visible", timeout: 20_000 });
+                const readySelector = route.id === "lift3d"
+                  ? "#studio-lift3d-title"
+                  : route.id === "publish" ? "input" : '[data-studio-app-menubar="true"]';
+                await page.locator(readySelector).first().waitFor({ state: "visible", timeout: 60_000 });
+                if (!["lift3d", "publish"].includes(route.id)) {
+                  await page.locator('[data-studio-command-bar-settings-trigger="true"]').waitFor({ state: "attached", timeout: 60_000 });
+                }
                 await page.waitForTimeout(route.path.startsWith("/studio") ? 2_500 : 1_000);
+                // Measure the settled hit area, including reduced-motion and entrance transitions.
+                await page.evaluate(async () => {
+                  await Promise.allSettled(document.getAnimations().filter((animation) =>
+                    animation.effect?.getComputedTiming().iterations !== Infinity
+                  ).map((animation) => animation.finished));
+                });
                 const metrics = await auditPage(page);
                 const failures = [];
                 if (metrics.documentOverflowX > 1) failures.push(`document horizontal overflow ${metrics.documentOverflowX}px`);
@@ -273,6 +305,11 @@ async function main() { // NOSONAR javascript:S3776
                 for (const item of pageErrors.slice(0, 5)) failures.push(`page error: ${item}`);
                 for (const item of consoleErrors.slice(0, 5)) failures.push(`console error: ${item}`);
 
+                if (process.env.TOONSPECTRUM_VERIFY_STRICT_A11Y === "1") {
+                  failures.push(...metrics.smallTargets.map((item) => `small tap target: ${item}`));
+                  failures.push(...metrics.unnamed.map((item) => `unnamed control: ${item}`));
+                }
+                results.push({ scope, metrics, pageErrors, consoleErrors, consoleDetails, failedResponses, failures });
                 for (const failure of failures) {
                   hardFailures += 1;
                   log(`${scope} FAIL: ${failure}`);
@@ -285,7 +322,7 @@ async function main() { // NOSONAR javascript:S3776
                   warnings += 1;
                   log(`${scope} warn: unnamed control: ${item}`);
                 }
-                if (failures.length) {
+                if (failures.length || process.env.TOONSPECTRUM_VERIFY_SCREENSHOTS === "1") {
                   await page.screenshot({
                     path: join(OUTPUT_DIR, `${scope.replaceAll("/", "--")}.png`),
                     fullPage: false,
@@ -294,6 +331,7 @@ async function main() { // NOSONAR javascript:S3776
                 log(`${scope}: overflowX=${metrics.documentOverflowX} offscreen=${metrics.offscreen.length} small=${metrics.smallTargets.length} unnamed=${metrics.unnamed.length} errors=${pageErrors.length + consoleErrors.length} ok=${failures.length === 0}`);
               } catch (error) {
                 hardFailures += 1;
+                results.push({ scope, navigationError: error?.message ?? String(error) });
                 log(`${scope} FAIL: navigation or audit error: ${error?.message ?? error}`);
               } finally {
                 await page.close().catch(() => undefined);
@@ -309,13 +347,17 @@ async function main() { // NOSONAR javascript:S3776
     }
   } finally {
     stopProcess(preview);
+    await writeFile(join(OUTPUT_DIR, "report.json"), JSON.stringify({
+      baseUrl, locale: LOCALE, colorScheme: COLOR_SCHEME, reducedMotion: REDUCED_MOTION,
+      hardFailures, warnings, results,
+    }, null, 2));
   }
 
   log(`RESULT: ${hardFailures ? "FAIL" : "PASS"} hardFailures=${hardFailures} warnings=${warnings} locale=${LOCALE} color=${COLOR_SCHEME} motion=${REDUCED_MOTION}`);
   if (hardFailures) process.exitCode = 1;
 }
 
-main().catch((error) => {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch((error) => {
   log(`FATAL: ${error?.stack ?? error}`);
   process.exitCode = 2;
 });
