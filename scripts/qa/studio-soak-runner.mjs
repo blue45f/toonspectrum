@@ -10,6 +10,8 @@ import { spawn } from "node:child_process";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
+import { studioWebGpuSoakCommand } from "./studio-webgpu-soak-command.mjs";
+
 const phase = process.env.SOAK_PHASE ?? "ux-persistence";
 const durationMinutes = positiveInt(process.env.SOAK_DURATION_MINUTES, 310);
 const repeatThreshold = positiveInt(process.env.SOAK_REPEAT_THRESHOLD, 2);
@@ -66,12 +68,12 @@ const tests = {
     t("living-ink-integration", "pnpm run verify:studio-living-ink-integration", 30, "living-ink"),
     t("hybrid-dcc-integration", "pnpm run verify:studio-hybrid-dcc-integration", 34, "hybrid-dcc"),
     t("p5-brush-runtime", "pnpm run verify:studio-p5-brush-real-runtime", 24, "brush-p5"),
-    t("webgpu-brush-parity", "pnpm run verify:studio-engine-webgpu-brush-parity", 24, "webgpu"),
+    t("webgpu-brush-parity", studioWebGpuSoakCommand("verify:studio-engine-webgpu-brush-parity"), 24, "webgpu"),
     t("webgpu-filter-parity", "pnpm run verify:studio-engine-webgpu-filter-parity", 24, "webgpu"),
     t("bg3d-physics", "pnpm run verify:studio-bg3d-physics", 28, "bg3d-physics"),
     t("studio-3d-console", 'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console', 24, "bg3d-console"),
     t("vello-candidate", "pnpm run verify:studio-vello-candidate", 26, "renderer-vello"),
-    t("professional-bristle-webgpu", "pnpm run verify:studio-professional-bristle-webgpu", 24, "brush-webgpu"),
+    t("professional-bristle-webgpu", studioWebGpuSoakCommand("verify:studio-professional-bristle-webgpu"), 24, "brush-webgpu"),
     t("dynamic-dual-tip-webgpu-v2", "pnpm run verify:studio-dynamic-dual-tip-webgpu-v2", 24, "brush-webgpu"),
     t("canvaskit-quality-worker", "pnpm run verify:studio-canvaskit-quality-worker", 24, "renderer-canvaskit"),
   ],
