@@ -163,6 +163,7 @@ export function normalizeCreatorPublicationDirective(
 ): CreatorPublicationDirective {
   const source = isRecord(value) ? value : {};
   const fallback = createDefaultCreatorPublicationDirective(options.fallbackTimeZone);
+  const mode = oneOf(source.mode, CREATOR_PUBLICATION_MODES, fallback.mode);
   const visibility = oneOf(
     source.visibility,
     CREATOR_PUBLICATION_VISIBILITIES,
@@ -178,11 +179,20 @@ export function normalizeCreatorPublicationDirective(
     CREATOR_PUBLICATION_READING_DIRECTIONS,
     fallback.readingDirection,
   );
+  const scheduledAt = canonicalIso(source.scheduledAt);
+  const storedPublishedAt = canonicalIso(source.publishedAt);
+  const publishedAt =
+    mode === "scheduled" &&
+    scheduledAt !== null &&
+    storedPublishedAt !== null &&
+    Date.parse(scheduledAt) > Date.parse(storedPublishedAt)
+      ? null
+      : storedPublishedAt;
   return {
     version: CREATOR_PUBLICATION_VERSION,
-    mode: oneOf(source.mode, CREATOR_PUBLICATION_MODES, fallback.mode),
+    mode,
     visibility,
-    scheduledAt: canonicalIso(source.scheduledAt),
+    scheduledAt,
     timeZone: normalizeCreatorPublicationTimeZone(source.timeZone ?? fallback.timeZone),
     comments: oneOf(
       source.comments,
@@ -213,7 +223,7 @@ export function normalizeCreatorPublicationDirective(
       CREATOR_PUBLICATION_MAX_SOCIAL_DESCRIPTION_LENGTH,
     ),
     canonicalSlug: normalizeCreatorPublicationSlug(source.canonicalSlug),
-    publishedAt: canonicalIso(source.publishedAt),
+    publishedAt,
   };
 }
 
@@ -364,7 +374,6 @@ export function isCreatorPublicationDue(
   return (
     directive.mode === "scheduled" &&
     directive.visibility !== "private" &&
-    directive.publishedAt === null &&
     directive.scheduledAt !== null &&
     Date.parse(directive.scheduledAt) <= now.getTime()
   );
