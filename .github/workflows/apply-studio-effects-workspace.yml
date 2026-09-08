@@ -82,28 +82,21 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
-      - name: Format changed sources
-        run: |
-          pnpm exec prettier --write \
-            apps/web/src/domains/creator/studio-effects-workspace.ts \
-            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.tsx \
-            apps/web/src/domains/creator/studio-effects-workspace.test.ts \
-            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx \
-            apps/web/src/domains/creator/StudioSmartFiltersPanel.tsx \
-            apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx \
-            docs/rewrite/studio-effects-workspace-benchmark-2026-09-09.md
-
-      - name: Validate architecture and changed-file lint
+      - name: Auto-fix and validate changed sources
+        shell: bash
         run: |
           set -euo pipefail
-          pnpm run validate:architecture
-          pnpm exec eslint --max-warnings=0 \
-            apps/web/src/domains/creator/studio-effects-workspace.ts \
-            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.tsx \
-            apps/web/src/domains/creator/studio-effects-workspace.test.ts \
-            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx \
-            apps/web/src/domains/creator/StudioSmartFiltersPanel.tsx \
+          changed=(
+            apps/web/src/domains/creator/studio-effects-workspace.ts
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.tsx
+            apps/web/src/domains/creator/studio-effects-workspace.test.ts
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.tsx
             apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx
+          )
+          pnpm exec eslint --fix "${changed[@]}"
+          pnpm run validate:architecture
+          pnpm exec eslint --max-warnings=0 "${changed[@]}"
 
       - name: Typecheck repository contracts
         run: pnpm run typecheck
