@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
-import { readPsd } from "ag-psd";
+import { initializeCanvas, readPsd } from "ag-psd";
 import { describe, expect, it, vi } from "vitest";
+
+import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "../render/studio-konva-filters";
 
 import { parseDialogueRubyExportXmp } from "../lettering/studio-dialogue-ruby-export";
 
@@ -396,6 +398,31 @@ describe("PSD export capability and loss preflight", () => {
     await expect(exportPagePsd(stage, [], 720, 1_080, 1, {
       container: "psb",
     })).rejects.toThrow("PSB 내보내기");
+  });
+
+  it("retains the preview smart-filter opacity pixels in the exported PSD layer", async () => {
+    const smartFilters = { version: 1 as const, entries: [{
+      id: "partial", engine: "invert" as const, enabled: true, opacity: 0.25, params: {},
+    }] };
+    const preview = { width: 1, height: 1, data: new Uint8ClampedArray([40, 80, 120, 255]) };
+    const registry: KonvaLike = { Filters: {} };
+    registerStudioKonvaFilters(registry);
+    const built = buildImageFilters({ smartFilters }, registry);
+    applyImageFilters(preview, built.filters, built.attrs);
+    const image: PsdExportEl = { id: "filtered", type: "image", x: 0, y: 0, width: 1, height: 1, smartFilters };
+    const { stage } = fakeStage([{ id: image.id, documentRect: { x: 0, y: 0, width: 1, height: 1 }, canvas: pixelCanvas(1, 1, Array.from(preview.data)) }]);
+    const result = await exportPagePsd(stage, [image], 1, 1, 1, { includeBackground: false });
+    // Decode actual PSD channel bytes without requiring a native canvas package in jsdom.
+    initializeCanvas(() => document.createElement("canvas"), (width, height) => ({
+      width, height, colorSpace: "srgb", data: new Uint8ClampedArray(width * height * 4),
+    }));
+    const parsed = readPsd(new Uint8Array(await result.blob.arrayBuffer()), {
+      useImageData: true, skipCompositeImageData: true, skipThumbnail: true,
+    });
+    expect(Array.from(parsed.children?.[0]?.imageData?.data ?? [])).toEqual([84, 104, 124, 255]);
+    expect(result.lossManifest?.decisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ feature: "adjustment-layer", disposition: "rasterized", count: 1 }),
+    ]));
   });
 
   it("reports masks, smart filters, groups, and editable 3D scenes as rasterized/dropped", async () => {

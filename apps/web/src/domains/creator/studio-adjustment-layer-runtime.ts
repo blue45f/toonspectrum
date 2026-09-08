@@ -579,6 +579,7 @@ function cloneOperation(
     id: operation.id,
     engine: operation.engine,
     enabled: operation.enabled,
+    ...(operation.opacity === undefined ? {} : { opacity: operation.opacity }),
     params: Object.freeze({ ...operation.params }),
   });
 }
