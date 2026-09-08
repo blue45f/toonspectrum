@@ -1,5 +1,5 @@
 /**
- * Public-UI regression: selecting a saved dry-media stroke must not change the picture.
+ * Public-UI regression: reopening and selecting a saved dry-media stroke must not change it.
  * Run against a production preview with TOONSPECTRUM_VERIFY_ORIGIN set. The default lane uses
  * native Metal on macOS and explicit SwiftShader on Linux; the report identifies the actual
  * application adapters. A preserved ordinary frame is not reported as a WebGPU rendering pass.
@@ -120,6 +120,13 @@ try {
       assert.equal(stroke.kind, "freehand");
       assert.equal(stroke.brush, "dry-media");
       result.stroke = stroke;
+      // Establish the saved-document renderer through the real recovery flow. A freshly created
+      // stroke can still have a retained gesture frame; that lifecycle is a separate ink gate.
+      await page.reload({ waitUntil: "domcontentloaded" });
+      const recover = page.getByRole("button", { name: "복구하기", exact: true });
+      await recover.click();
+      await recover.waitFor({ state: "detached" });
+      result.recoveredThroughPublicUi = true;
       await page.locator('[data-studio-rail-tool-id="select"]').click();
       await page.locator('[data-studio-inspector-primary-tab="layers"]').filter({ visible: true }).click();
       const row = page.locator(`[id="studio-layer-${stroke.id}"]`);
