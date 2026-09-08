@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const VERCEL_CONFIG_URL = new URL("../../../../vercel.json", import.meta.url);
-const INDEX_HTML_URL = new URL("../../../../index.html", import.meta.url);
+// The Vite HTML entry moved from the repository root to `apps/web/index.html` in the
+// 2026-09 apps/web move; `vercel.json` above is still workspace-root infrastructure.
+const INDEX_HTML_URL = new URL("../../../../apps/web/index.html", import.meta.url);
 
 type Header = Readonly<{ key: string; value: string }>;
 type VercelConfig = Readonly<{

@@ -1,11 +1,11 @@
 import { useState, type AnimationEvent, type ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
-import { resolveStudioRoute } from "@/src/domains/creator/studio-router/studio-route-manifest";
+import { resolveStudioRoute } from "@/domains/creator/studio-router/studio-route-manifest";
 import {
   isStudioRoutePathname,
   studioRouteStageKey,
-} from "@/src/domains/creator/studio-workspace-route";
+} from "@/domains/creator/studio-workspace-route";
 
 interface RouteStageProps {
   pathname: string;

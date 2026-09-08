@@ -4,7 +4,7 @@ node_modules
 dist
 **/dist
 apps/api/dist
-public/data
+apps/web/public
 .git
 .github
 *.log
@@ -14,3 +14,7 @@ public/data
 .vercel
 coverage
 .DS_Store
+crates/**/target/
+docs/
+tests/
+e2e/

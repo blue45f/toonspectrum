@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { adminFetch, type AdminApiError, type AdminMe } from "./admin-client";
 
-import { useSession } from "@/src/compat/auth-session-store";
+import { useSession } from "@/compat/auth-session-store";
 
 // 관리자 콘솔 진입 게이트 — /admin과 분할 라우트(/admin/community, /admin/members)가 공유한다.
 export type AdminGate =

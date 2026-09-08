@@ -375,7 +375,10 @@ async function startHarnessServer(modelBytes: Uint8Array): Promise<Readonly<{
     appType: "custom",
     logLevel: "warn",
     resolve: {
-      alias: { "@": STUDIO_VRM_AVATAR_REFERENCE_ROOT },
+      // `root` stays at the repository root because the harness entry is loaded through an
+      // absolute `/scripts/…` URL, but `@` must resolve where the web app now lives or the two
+      // `@/shared/…` imports in this graph fail to resolve.
+      alias: { "@": resolve(STUDIO_VRM_AVATAR_REFERENCE_ROOT, "apps/web/src") },
     },
     define: {
       "process.env": JSON.stringify({ NODE_ENV: "production" }),

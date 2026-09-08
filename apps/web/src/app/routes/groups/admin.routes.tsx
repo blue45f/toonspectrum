@@ -3,19 +3,19 @@ import { defineAppRoutes } from "../app-route-definition";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const AdminPage = lazyRetry(
-  () => import("@/src/domains/admin/AdminPage").then((module) => ({
+  () => import("@/domains/admin/AdminPage").then((module) => ({
     default: module.AdminPage,
   })),
   "AdminPage",
 );
 const AdminCommunityPage = lazyRetry(
-  () => import("@/src/domains/admin/AdminCommunityPage").then((module) => ({
+  () => import("@/domains/admin/AdminCommunityPage").then((module) => ({
     default: module.AdminCommunityPage,
   })),
   "AdminCommunityPage",
 );
 const AdminMembersPage = lazyRetry(
-  () => import("@/src/domains/admin/AdminMembersPage").then((module) => ({
+  () => import("@/domains/admin/AdminMembersPage").then((module) => ({
     default: module.AdminMembersPage,
   })),
   "AdminMembersPage",

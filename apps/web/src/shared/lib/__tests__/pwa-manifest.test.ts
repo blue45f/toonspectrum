@@ -101,7 +101,8 @@ describe("PWA manifest", () => {
   });
 
   it("serves a raster apple-touch-icon (iOS does not render SVG touch icons)", () => {
-    const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
+    // The Vite HTML entry moved to `apps/web/index.html` in the 2026-09 apps/web move.
+    const html = readFileSync(join(process.cwd(), "apps/web/index.html"), "utf8");
     const href = html.match(/<link rel="apple-touch-icon"[^>]*href="([^"]+)"/)?.[1];
 
     expect(href).toBe("/apple-touch-icon.png");

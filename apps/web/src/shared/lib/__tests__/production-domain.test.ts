@@ -20,7 +20,8 @@ describe("toonstudio.cloud production domain", () => {
   });
 
   it("publishes canonical, OG, JSON-LD, robots and LLM links on the www origin", () => {
-    const html = read("index.html");
+    // The Vite HTML entry moved to `apps/web/index.html` in the 2026-09 apps/web move.
+    const html = read("apps/web/index.html");
     expect(html).toContain(`<link rel="canonical" href="${CANONICAL_ORIGIN}/"`);
     expect(html).toContain(`<meta property="og:url" content="${CANONICAL_ORIGIN}/"`);
     expect(html).toContain(`"@id": "${CANONICAL_ORIGIN}/#website"`);

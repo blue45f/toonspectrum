@@ -11,7 +11,7 @@ import { getCreatorMarketplaceResource } from "../remotes/market-resource-remote
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { findStarterMarketplaceResourceById } from "@/shared/lib/creator-marketplace-starter-catalog";
-import { NotFoundError } from "@/src/infrastructure/use-api-resource";
+import { NotFoundError } from "@/infrastructure/use-api-resource";
 
 export interface MarketResourceDetail {
   readonly record: CreatorMarketplaceResourceRecord | null;

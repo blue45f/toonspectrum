@@ -15,9 +15,7 @@
     "jsx": "react-jsx",
     "incremental": true,
     "paths": {
-      "@/*": ["./apps/web/*"],
-      "@/shared/*": ["./apps/web/src/shared/*"],
-      "@/domains/*": ["./apps/web/src/domains/*"],
+      "@/*": ["./apps/web/src/*"],
       "canvaskit-wasm": ["./apps/web/src/types/canvaskit-wasm-shim.d.ts"],
       "canvaskit-wasm/bin/canvaskit.wasm?url": ["./apps/web/src/types/canvaskit-wasm-url-shim.d.ts"],
       "@toonspectrum/studio-engine-skia": ["./apps/web/src/types/studio-engine-skia-shim.d.ts"]
@@ -26,12 +24,10 @@
   "include": [
     "apps/web/src/**/*.ts",
     "apps/web/src/**/*.tsx",
-    "apps/web/src/shared/components/**/*.ts",
-    "apps/web/src/shared/components/**/*.tsx",
-    "apps/web/src/shared/lib/**/*.ts",
-    "apps/web/src/shared/lib/**/*.tsx",
     "tools/**/*.ts",
     "tools/**/*.tsx",
+    "apps/web/tools/**/*.ts",
+    "apps/web/tools/**/*.tsx",
     "vite.config.ts",
     "drizzle.config.ts",
     "eslint.config.mjs",

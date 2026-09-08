@@ -23,7 +23,28 @@ import { describe, expect, it } from "vitest";
  */
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, "../../..");
+/**
+ * Repository root, found by walking up to the pnpm workspace manifest rather than counting
+ * `..` segments. The 2026-09 apps/web move shifted this file two directories deeper; the
+ * hardcoded count then resolved to `apps/web`, every `path.join(ROOT, file)` gained a second
+ * `apps/web/` prefix, and the whole suite died at collection instead of guarding anything.
+ */
+function findRepositoryRoot(from: string): string {
+  for (let directory = from; ; ) {
+    if (existsSync(path.join(directory, "pnpm-workspace.yaml"))) return directory;
+    const parent = path.dirname(directory);
+    if (parent === directory) {
+      throw new Error(`No pnpm-workspace.yaml above ${from}; cannot locate the repository root.`);
+    }
+    directory = parent;
+  }
+}
+
+const ROOT = findRepositoryRoot(HERE);
+/** Source root behind the `@/…` alias (tsconfig paths, vite and vitest all point here). */
+const WEB_SRC = "apps/web/src";
+/** Specifier suffixes that are assets rather than TypeScript modules, so failing to resolve one is expected. */
+const NON_MODULE_SUFFIXES = [".css", ".json", ".wgsl", ".glsl", ".svg", ".png", ".txt", ".html"];
 
 /** Durable render surfaces: retained Canvas, SVG export, and the shared alias/bake boundary. */
 const ROUTE_ROOTS = [
@@ -63,8 +84,9 @@ function resolveSpecifier(fromFile: string, specifier: string): string | null {
   if (bare.startsWith(".")) {
     absolute = path.resolve(ROOT, path.dirname(fromFile), bare);
   } else if (bare.startsWith("@/")) {
-    absolute = path.resolve(ROOT, bare.slice(2));
+    absolute = path.resolve(ROOT, WEB_SRC, bare.slice(2));
   } else {
+    // A bare specifier is a package dependency; those are never part of this first-party walk.
     return null;
   }
   const candidates = [
@@ -77,6 +99,14 @@ function resolveSpecifier(fromFile: string, specifier: string): string | null {
   for (const candidate of candidates) {
     if (!/\.tsx?$/u.test(candidate)) continue;
     if (existsSync(candidate)) return path.relative(ROOT, candidate);
+  }
+  // An alias import that resolves to nothing means this walk just skipped a first-party module,
+  // which is how the gate silently shrinks to nothing after a tree move. Fail loudly instead.
+  if (bare.startsWith("@/") && !NON_MODULE_SUFFIXES.some((suffix) => bare.endsWith(suffix))) {
+    throw new Error(
+      `Unresolvable alias import "${specifier}" in ${fromFile}. The import-boundary walk would `
+      + `silently skip it, so the boundary assertions below would pass vacuously.`,
+    );
   }
   return null;
 }

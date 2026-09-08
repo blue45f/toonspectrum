@@ -85,7 +85,7 @@ import {
   studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
 } from "../apps/web/src/domains/creator/studio-cc0-mypaint-preset-import-v1";
 
-import { DIST_DIR } from "./lib/repo-paths.mjs";
+import { DIST_DIR, viteManifestKey } from "./lib/repo-paths.mjs";
 import {
   enabledStudioHistoryControl,
 } from "./lib/studio-verify-history-controls.mjs";
@@ -2432,7 +2432,9 @@ function resolveBuiltAutosaveSqliteModulePath(): string {
     string,
     { file?: unknown }
   >;
-  const entry = manifest["apps/web/src/domains/creator/studio-autosave-sqlite-store.ts"];
+  const entry = manifest[
+    viteManifestKey("apps/web/src/domains/creator/studio-autosave-sqlite-store.ts")
+  ];
   invariant(
     entry && typeof entry.file === "string" && entry.file.length > 0,
     "production manifest is missing the Studio autosave SQLite module",

@@ -134,7 +134,9 @@ export default defineConfig(
         pattern: 'apps/web/src/{components,hooks,styles,compat,catalog-static,catalog-static-engine}*/**/*',
         mode: 'full',
       },
-      { type: 'shared', pattern: 'apps/web/src/catalog-static*.ts', mode: 'full' },
+      // The move created apps/web/src/shared/; without this the whole tree stayed unclassified
+      // and boundaries/element-types silently allowed every import into and out of it.
+      { type: 'shared', pattern: 'apps/web/src/shared/**/*', mode: 'full' },
       { type: 'infrastructure', pattern: 'apps/web/src/infrastructure/**/*', mode: 'full' },
     ],
     rules: [
@@ -177,9 +179,10 @@ export default defineConfig(
     },
   },
 
-  // 서버/DB/스크립트 유틸은 Node 런타임.
+  // 서버/스크립트 유틸은 Node 런타임. (구 lib/db 는 apps/api/src/db 로 옮겨져 이 목록에서 빠졌고,
+  // 구 lib/server 는 웹 앱과 함께 apps/web/src/shared/lib/server 로 이동했다.)
   {
-    files: ['lib/db/**/*.ts', 'lib/server/**/*.ts', 'scripts/**/*.{ts,tsx,mts,cts}'],
+    files: ['apps/web/src/shared/lib/server/**/*.ts', 'scripts/**/*.{ts,tsx,mts,cts}'],
     languageOptions: { globals: globals.node },
   },
 

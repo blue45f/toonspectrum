@@ -7,7 +7,9 @@ export default defineConfig({
   base: "./",
   publicDir: false,
   plugins: [react()],
-  resolve: { alias: { "@": fileURLToPath(new URL(".", import.meta.url)) } },
+  // The web app moved to apps/web; `@` must resolve to its source root or every
+  // `@/shared/...` import in the feedback page fails to resolve at build time.
+  resolve: { alias: { "@": fileURLToPath(new URL("./apps/web/src", import.meta.url)) } },
   build: {
     outDir: "dist-feedback-review",
     rolldownOptions: { input: "e2e/feedback-community.html" },

@@ -14,7 +14,12 @@ const runtimeSource = readFileSync(
   "utf8"
 );
 const studioPageSource = readStudioPageCompositionSource();
-const viteConfigSource = readFileSync(new URL("../../../vite.config.ts", import.meta.url), "utf8");
+// The manual-chunk policy moved out of `vite.config.ts` into `apps/web/config/vite-manual-chunks.ts`
+// in the 2026-09 apps/web move; `vite.config.ts` now only calls `createStudioManualChunks()`.
+const viteConfigSource = readFileSync(
+  new URL("../../../config/vite-manual-chunks.ts", import.meta.url),
+  "utf8",
+);
 
 describe("Studio work-asset hydrator lazy boundary", () => {
   it("keeps the synchronous façade free of the request client value graph", () => {

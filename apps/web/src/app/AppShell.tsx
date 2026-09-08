@@ -11,7 +11,7 @@ import { pingVisit } from "@/shared/lib/visits-api";
 import {
   isStudioRoutePathname,
   shouldPreserveStudioRouteLifecycle,
-} from "@/src/domains/creator/studio-workspace-route";
+} from "@/domains/creator/studio-workspace-route";
 
 // 공용 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역에서 한 번만 import 합니다.
 import "@toonspectrum/core/fx/fx.css";

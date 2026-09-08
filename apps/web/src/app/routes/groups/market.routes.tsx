@@ -3,35 +3,35 @@ import { defineAppRoutes } from "../app-route-definition";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const MarketHomePage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketHomePage").then((module) => ({ default: module.MarketHomePage })),
+  () => import("@/domains/market/pages/MarketHomePage").then((module) => ({ default: module.MarketHomePage })),
   "MarketHomePage",
 );
 const MarketBrowsePage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketBrowsePage").then((module) => ({ default: module.MarketBrowsePage })),
+  () => import("@/domains/market/pages/MarketBrowsePage").then((module) => ({ default: module.MarketBrowsePage })),
   "MarketBrowsePage",
 );
 const MarketResourceDetailPage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketResourceDetailPage").then((module) => ({ default: module.MarketResourceDetailPage })),
+  () => import("@/domains/market/pages/MarketResourceDetailPage").then((module) => ({ default: module.MarketResourceDetailPage })),
   "MarketResourceDetailPage",
 );
 const MarketPublishPage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketPublishPage").then((module) => ({ default: module.MarketPublishPage })),
+  () => import("@/domains/market/pages/MarketPublishPage").then((module) => ({ default: module.MarketPublishPage })),
   "MarketPublishPage",
 );
 const MarketManagePage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketManagePage").then((module) => ({ default: module.MarketManagePage })),
+  () => import("@/domains/market/pages/MarketManagePage").then((module) => ({ default: module.MarketManagePage })),
   "MarketManagePage",
 );
 const MarketLibraryPage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketLibraryPage").then((module) => ({ default: module.MarketLibraryPage })),
+  () => import("@/domains/market/pages/MarketLibraryPage").then((module) => ({ default: module.MarketLibraryPage })),
   "MarketLibraryPage",
 );
 const MarketWishlistPage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketWishlistPage").then((module) => ({ default: module.MarketWishlistPage })),
+  () => import("@/domains/market/pages/MarketWishlistPage").then((module) => ({ default: module.MarketWishlistPage })),
   "MarketWishlistPage",
 );
 const MarketComparePage = lazyRetry(
-  () => import("@/src/domains/market/pages/MarketComparePage").then((module) => ({ default: module.MarketComparePage })),
+  () => import("@/domains/market/pages/MarketComparePage").then((module) => ({ default: module.MarketComparePage })),
   "MarketComparePage",
 );
 

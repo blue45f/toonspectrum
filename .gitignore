@@ -104,7 +104,7 @@ test-accounts.local.*
 /*.jpg
 
 # cargo build artifacts
-crates/*/target/
+crates/**/target/
 
 # Local AI assistant sessions & configs
 /.continue/
@@ -121,3 +121,7 @@ crates/*/target/
 *.swp
 *.swo
 *~
+dist-feedback-review/
+playwright-report/
+reference-playwright-report/
+reference-test-results/

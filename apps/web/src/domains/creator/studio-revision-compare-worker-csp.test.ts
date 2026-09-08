@@ -28,7 +28,11 @@ import {
 } from "./studio-server-revision-comparison";
 
 const CREATOR_DIRECTORY = dirname(fileURLToPath(import.meta.url));
-const REPOSITORY_ROOT = resolve(CREATOR_DIRECTORY, "../../..");
+// Target of the `@` alias — a single `@` -> `apps/web/src` since the 2026-09 apps/web move.
+// This used to be the repository root because `@` then pointed there and specifiers read
+// `@/src/...`; pointing the fixture build at `apps/web` made every `@/...` import miss and
+// the in-test Vite build fail.
+const WEB_SRC_ROOT = resolve(CREATOR_DIRECTORY, "../..");
 const BOOTSTRAP_PATH = join(
   CREATOR_DIRECTORY,
   "studio-revision-compare.worker-bootstrap.ts"
@@ -411,7 +415,7 @@ describe("revision comparison Worker strict-CSP bootstrap", () => {
         resolve: {
           alias: [
             { find: "virtual:revision-client", replacement: CLIENT_PATH },
-            { find: "@", replacement: REPOSITORY_ROOT },
+            { find: "@", replacement: WEB_SRC_ROOT },
           ],
         },
         build: {

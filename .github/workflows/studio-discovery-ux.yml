@@ -75,10 +75,17 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build:bundle
+      # The brush verifier resolves the built Studio autosave SQLite module through
+      # `dist/.vite/manifest.json`. `.vite/` is a dotted directory, and upload-artifact
+      # drops hidden files unless told otherwise, so without this the manifest never
+      # reaches the browser job and every SQLite durability wait dies on ENOENT.
+      - name: Require the production manifest used by SQLite durability checks
+        run: test -s dist/.vite/manifest.json
       - uses: actions/upload-artifact@v6
         with:
           name: studio-discovery-dist
           path: dist
+          include-hidden-files: true
           retention-days: 2
 
   browser:
@@ -110,6 +117,8 @@ jobs:
         with:
           name: studio-discovery-dist
           path: dist
+      - name: Verify hidden manifest survived artifact transport
+        run: test -s dist/.vite/manifest.json
       - name: Real component responsive keyboard and production editor integration
         if: matrix.suite == 'discovery'
         run: pnpm exec tsx scripts/verify-studio-discovery-ux.mts

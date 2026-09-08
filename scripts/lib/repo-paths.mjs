@@ -16,7 +16,7 @@
  * tsx/tsc resolve from an `.mts` consumer, and plain `.mjs`/`.js` scripts
  * import this file directly.
  */
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Absolute path of the repository root (this file lives in `<root>/scripts/lib`). */
@@ -42,3 +42,20 @@ export const WEB_VITE_CONFIG = join(REPO_ROOT, "vite.config.ts");
 
 /** Production build output directory (`<web root>/dist`). */
 export const DIST_DIR = join(REPO_ROOT, "dist");
+
+/**
+ * Vite manifest key for a frontend source file, given its **repository-relative**
+ * path (`apps/web/src/...`).
+ *
+ * `dist/.vite/manifest.json` indexes modules relative to the *Vite root*
+ * (`apps/web`), not the repository root: the autosave SQLite store is keyed
+ * `src/domains/creator/studio-autosave-sqlite-store.ts`, never
+ * `apps/web/src/domains/creator/studio-autosave-sqlite-store.ts`. Callers keep
+ * writing the repo-relative path they use everywhere else and this helper
+ * rebases it, so a future move of `WEB_ROOT` cannot desynchronise the two.
+ */
+export function viteManifestKey(repositoryRelativePath) {
+  return relative(WEB_ROOT, join(REPO_ROOT, repositoryRelativePath))
+    .split(sep)
+    .join("/");
+}

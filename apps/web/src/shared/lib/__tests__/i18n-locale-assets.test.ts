@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -60,7 +61,9 @@ describe("published app locale assets", () => {
   it("keeps the generated catalog in sync with the assets on disk", () => {
     const regenerated = buildCatalogSource(readAppLocaleDictionaries());
     const committed = readFileSync(
-      path.resolve(process.cwd(), "lib", "i18n-locale-catalog.ts"),
+      // The 2026-09 apps/web move relocated `<root>/lib` to `apps/web/src/shared/lib`;
+      // anchor on this file rather than `process.cwd()`.
+      fileURLToPath(new URL("../i18n-locale-catalog.ts", import.meta.url)),
       "utf8",
     );
 

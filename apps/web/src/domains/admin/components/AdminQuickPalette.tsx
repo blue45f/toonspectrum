@@ -26,7 +26,7 @@ import {
 import { useAdminToast } from "./use-admin-toast";
 
 import { useT } from "@/shared/lib/i18n";
-import { useRouter } from "@/src/compat/navigation";
+import { useRouter } from "@/compat/navigation";
 
 interface AdminQuickPaletteProps {
   userId: string;

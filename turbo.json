@@ -7,10 +7,6 @@
       ],
       "outputs": [
         "dist/**",
-        "build/**",
-        "out/**",
-        "storybook-static/**",
-        "public/**",
         "!**/node_modules/**"
       ]
     },

@@ -14,21 +14,49 @@ import path from "node:path";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const assetDirectory = path.join(repoRoot, "apps", "web", "public", "i18n", "app");
-const catalogPath = path.join(repoRoot, "apps", "web", "lib", "i18n-locale-catalog.ts");
+const catalogPath = path.join(repoRoot, "apps", "web", "src", "shared", "lib", "i18n-locale-catalog.ts");
 
 /** Locales compiled into the app shell so the fallback chain never awaits I/O. */
 const BUILT_IN_LOCALES = ["ko", "en"];
 const REFERENCE_LOCALE = "en";
 const TRANSLATED_LOCALE_THRESHOLD = 0.5;
 
+/**
+ * One merged dictionary per locale, assembled from the published namespace directories.
+ *
+ * The namespace files are the authored source — commit 9b9112c4f replaced the monolithic
+ * `<locale>.json` assets with them and the browser fetches only the namespace paths. Reading the
+ * leftover monolithic files instead would let this catalog describe a dictionary the app never
+ * serves. A namespace that has no strings in a locale is not published at all, so an absent file
+ * is skipped rather than treated as an error, exactly as the runtime loaders treat a 404.
+ *
+ * Namespaces are merged in sorted order purely for determinism; no key is defined in two
+ * namespaces, which `apps/web/src/shared/lib/__tests__/i18n-asset-manifest.test.ts` enforces.
+ */
 export function readAppLocaleDictionaries(directory = assetDirectory) {
-  const dictionaries = new Map();
-  for (const fileName of readdirSync(directory).sort()) {
-    if (!fileName.endsWith(".json")) continue;
-    const locale = fileName.slice(0, -".json".length);
-    dictionaries.set(locale, JSON.parse(readFileSync(path.join(directory, fileName), "utf8")));
+  const namespaces = readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  if (namespaces.length === 0) {
+    throw new Error(
+      `No locale namespace directories under ${directory}. `
+      + "The app dictionaries are published as <namespace>/<locale>.json.",
+    );
   }
-  return dictionaries;
+
+  const dictionaries = new Map();
+  for (const namespace of namespaces) {
+    for (const fileName of readdirSync(path.join(directory, namespace)).sort()) {
+      if (!fileName.endsWith(".json")) continue;
+      const locale = fileName.slice(0, -".json".length);
+      const part = JSON.parse(readFileSync(path.join(directory, namespace, fileName), "utf8"));
+      const existing = dictionaries.get(locale);
+      if (existing) Object.assign(existing, part);
+      else dictionaries.set(locale, part);
+    }
+  }
+  return new Map([...dictionaries].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
 }
 
 /**

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import * as THREE from "three";
@@ -21,15 +22,33 @@ import {
 
 (globalThis as unknown as { self: typeof globalThis }).self = globalThis;
 
+/**
+ * Bundled VRM fixtures, anchored on this file rather than `process.cwd()`.
+ *
+ * These used to be `path.resolve("public/vrm/...")`, i.e. cwd-relative. The 2026-09 apps/web
+ * move put `public/` under `apps/web/`, so every resolve missed, every `existsSync` guard fired
+ * and the suite passed while examining zero characters. Resolving from `import.meta.url` and
+ * asserting the fixture set below keeps that failure loud.
+ */
+const VRM_DIR = fileURLToPath(new URL("../../../../public/vrm/", import.meta.url));
+
+function vrmFixture(name: string): string {
+  const file = path.join(VRM_DIR, name);
+  if (!fs.existsSync(file)) {
+    throw new Error(`Bundled VRM fixture is missing: ${path.relative(process.cwd(), file)}`);
+  }
+  return file;
+}
+
 const CORE = [
-  { id: "sample-vrm", name: "루미", file: "public/vrm/sample.vrm" },
-  { id: "avatar-a", name: "하린", file: "public/vrm/AvatarSample_A.vrm" },
-  { id: "avatar-b", name: "세라", file: "public/vrm/AvatarSample_B.vrm" },
-  { id: "avatar-c", name: "유나", file: "public/vrm/AvatarSample_C.vrm" },
-  { id: "mio", name: "미오", file: "public/vrm/fem_vroid.vrm" },
-  { id: "noa", name: "노아", file: "public/vrm/masc_vroid.vrm" },
-  { id: "alicia", name: "아리시아", file: "public/vrm/AliciaSolid.vrm" },
-  { id: "jennifer", name: "제니퍼", file: "public/vrm/Jennifer.vrm" },
+  { id: "sample-vrm", name: "루미", file: "sample.vrm" },
+  { id: "avatar-a", name: "하린", file: "AvatarSample_A.vrm" },
+  { id: "avatar-b", name: "세라", file: "AvatarSample_B.vrm" },
+  { id: "avatar-c", name: "유나", file: "AvatarSample_C.vrm" },
+  { id: "mio", name: "미오", file: "fem_vroid.vrm" },
+  { id: "noa", name: "노아", file: "masc_vroid.vrm" },
+  { id: "alicia", name: "아리시아", file: "AliciaSolid.vrm" },
+  { id: "jennifer", name: "제니퍼", file: "Jennifer.vrm" },
 ] as const;
 
 function extractFingers(bones: PoseBoneMap): FingerRotationMap {
@@ -43,7 +62,7 @@ function extractFingers(bones: PoseBoneMap): FingerRotationMap {
 }
 
 async function load(file: string) {
-  const buf = fs.readFileSync(path.resolve(file)).buffer;
+  const buf = fs.readFileSync(file).buffer;
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
   const gltf = await new Promise<{ userData: { vrm: import("@pixiv/three-vrm").VRM } }>(
@@ -69,8 +88,7 @@ describe("VRM finger curl polarity", () => {
   it("curls middle fingertips into the palm for core humanoids (including Lumi axis flip)", async () => {
     const failures: string[] = [];
     for (const character of CORE) {
-      if (!fs.existsSync(path.resolve(character.file))) continue;
-      const vrm = await load(character.file);
+      const vrm = await load(vrmFixture(character.file));
       const pose = pickNaturalIdlePose(character.id);
       const bones = stripFingerBones(pose.bones as PoseBoneMap);
       const fingers = extractFingers(pose.bones as PoseBoneMap);
@@ -101,8 +119,7 @@ describe("VRM finger curl polarity", () => {
 
   it("keeps the untouched hand's finger pose when only one side is overridden", async () => {
     for (const character of CORE) {
-      if (!fs.existsSync(path.resolve(character.file))) continue;
-      const vrm = await load(character.file);
+      const vrm = await load(vrmFixture(character.file));
       const pose = pickNaturalIdlePose(character.id);
       const bones = stripFingerBones(pose.bones as PoseBoneMap);
       const fingers = extractFingers(pose.bones as PoseBoneMap);
@@ -128,8 +145,7 @@ describe("VRM finger curl polarity", () => {
 
   it("caches polarity so repeated applies do not flip between curl and hyperextension", async () => {
     for (const character of CORE) {
-      if (!fs.existsSync(path.resolve(character.file))) continue;
-      const vrm = await load(character.file);
+      const vrm = await load(vrmFixture(character.file));
       const pose = pickNaturalIdlePose(character.id);
       const bones = stripFingerBones(pose.bones as PoseBoneMap);
       const fingers = extractFingers(pose.bones as PoseBoneMap);

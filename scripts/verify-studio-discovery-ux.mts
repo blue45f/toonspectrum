@@ -8,28 +8,36 @@ import { chromium } from "playwright";
 
 import { STUDIO_FILTER_DIALOG_CATALOG } from "../apps/web/src/domains/creator/filter/studio-filter-catalog";
 
+import { WEB_ROOT } from "./lib/repo-paths.mjs";
 import { findFreePort, spawnVitePreview, stopChildProcess, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 import type { Page } from "playwright";
 
 const output = process.env.STUDIO_DISCOVERY_QA_DIR ?? "/tmp/studio-discovery-ux";
 mkdirSync(output, { recursive: true });
+// The dev server this verifier spawns inherits vite.config.ts, whose `root` is the Vite
+// package root (apps/web) — not the repository root. A harness written next to the repo
+// root is therefore never served: the request falls through to Vite's SPA fallback, which
+// returns the full application index.html, and the app's own request waterfall keeps the
+// page from ever reaching `networkidle`. The harness has to live inside the Vite root.
 const html = "studio-discovery-qa.html";
 const entry = "studio-discovery-qa.tsx";
+const htmlPath = join(WEB_ROOT, html);
+const entryPath = join(WEB_ROOT, entry);
 const runtimeErrors: string[] = [];
-const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[]; failure?: string } = { checks: [], runtimeErrors, screenshots: [] };
+const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[]; devNavigationMs: number[]; failure?: string } = { checks: [], runtimeErrors, screenshots: [], devNavigationMs: [] };
 const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
 const devPort = await findFreePort();
 const previewPort = await findFreePort();
 const devOrigin = `http://127.0.0.1:${devPort}`;
 const previewOrigin = `http://127.0.0.1:${previewPort}`;
-writeFileSync(html, '<!doctype html><html lang="ko" class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/studio-discovery-qa.tsx"></script></body></html>');
-writeFileSync(entry, `
+writeFileSync(htmlPath, '<!doctype html><html lang="ko" class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/studio-discovery-qa.tsx"></script></body></html>');
+writeFileSync(entryPath, `
 import {useState} from "react";
 import {createRoot} from "react-dom/client";
-import "../apps/web/src/styles/globals.css";
-import {StudioSubToolPalette} from "../apps/web/src/domains/creator/brush/StudioSubToolPalette";
-import {studioSubToolPaletteCategoryIdForBrushId} from "../apps/web/src/domains/creator/brush/studio-sub-tool-palette-data";
+import "./src/styles/globals.css";
+import {StudioSubToolPalette} from "./src/domains/creator/brush/StudioSubToolPalette";
+import {studioSubToolPaletteCategoryIdForBrushId} from "./src/domains/creator/brush/studio-sub-tool-palette-data";
 function App(){
   const [category,setCategory]=useState("pen");
   const [selected,setSelected]=useState("gpen");
@@ -56,6 +64,13 @@ async function screenshot(page: Page, name: string) {
 async function assertNoOverflow(page: Page) {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "horizontal document overflow");
 }
+/**
+ * The first harness navigation pays for the dev server's cold transform of the palette
+ * module graph plus the Tailwind entry stylesheet — tens of seconds on a CI runner, far
+ * beyond the 15s default this page otherwise keeps for element waits. Only the navigation
+ * gets the longer budget; every assertion below still runs on the 15s default.
+ */
+const DEV_NAVIGATION_TIMEOUT_MS = 120_000;
 
 try {
   await Promise.all([waitForServer(devOrigin), waitForServer(previewOrigin)]);
@@ -63,7 +78,9 @@ try {
     const context = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 1 });
     const page = await context.newPage();
     watch(page);
-    await page.goto(`${devOrigin}/${html}`, { waitUntil: "networkidle" });
+    const navigationStartedAt = Date.now();
+    await page.goto(`${devOrigin}/${html}`, { waitUntil: "networkidle", timeout: DEV_NAVIGATION_TIMEOUT_MS });
+    receipt.devNavigationMs.push(Date.now() - navigationStartedAt);
     const palette = page.locator('[data-studio-subtool-palette="true"]');
     await palette.waitFor({ state: "visible" });
     assert.equal(await palette.getByRole("tab").count(), 6);
@@ -165,6 +182,6 @@ try {
   await browser.close();
   stopChildProcess(dev);
   stopChildProcess(preview);
-  rmSync(html, { force: true });
-  rmSync(entry, { force: true });
+  rmSync(htmlPath, { force: true });
+  rmSync(entryPath, { force: true });
 }

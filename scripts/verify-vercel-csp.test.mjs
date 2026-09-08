@@ -10,7 +10,9 @@ const ROOT = new URL("../", import.meta.url);
 
 function fixture() {
   return {
-    html: readFileSync(fileURLToPath(new URL("index.html", ROOT)), "utf8"),
+    // The Vite HTML entry moved to `apps/web/index.html` in the 2026-09 apps/web move;
+    // `vercel.json` stayed workspace-root infrastructure.
+    html: readFileSync(fileURLToPath(new URL("apps/web/index.html", ROOT)), "utf8"),
     vercelConfig: JSON.parse(
       readFileSync(fileURLToPath(new URL("vercel.json", ROOT)), "utf8"),
     ),

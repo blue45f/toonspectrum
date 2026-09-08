@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { acquireCreatorMarketplaceCloudLibraryRelease } from "@/src/infrastructure/creator-marketplace-client";
+import { acquireCreatorMarketplaceCloudLibraryRelease } from "@/infrastructure/creator-marketplace-client";
 
 export interface AcquiredMarketItem {
   id: string;

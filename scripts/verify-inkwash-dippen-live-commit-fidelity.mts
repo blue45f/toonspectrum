@@ -30,12 +30,26 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import {
+  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
+} from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
+
 interface FidelityCaseDefinition {
+  /**
+   * Stable saved brush id. The product treats ids as the durable contract and display names as
+   * presentation — `STUDIO_BRUSH_DISCOVERY` renamed 16 catalogue entries without touching a single
+   * id — so pinning a name here only re-breaks this gate on the next copy pass.
+   */
   readonly id: "inkwash-pen" | "pen";
-  readonly brushName: string;
-  /** Catalogue default width, pinned so a preview build measures the shipped configuration. */
-  readonly brushWidth: number;
   readonly contract: string;
+}
+
+/** A case resolved against the shipped picker: name and width come from the catalogue, not literals. */
+interface FidelityCase extends FidelityCaseDefinition {
+  readonly brushName: string;
+  /** Catalogue default width, so a preview build measures the shipped configuration. */
+  readonly brushWidth: number;
+  readonly brushOperation: "paint" | "erase";
 }
 
 interface LongStrokeAssertion {
@@ -70,22 +84,41 @@ interface CaseResult {
  * thin-line representative, but the quarantine ledger delisted it — "선언된 \"잉크 흐름\"으로
  * 분기하는 렌더러가 없어" — so the catalogue never lists it and the probe timed out selecting a
  * brush that is not there. The ledger names its replacements; `pen` is the one that survived the
- * later feel-cull (fineliner is quarantined too).
+ * later feel-cull (fineliner is quarantined too). `resolveCase` now turns that same class of
+ * mistake into an immediate, named failure instead of a fifteen-second locator timeout.
  */
 const FIDELITY_CASES = Object.freeze([
   {
     id: "inkwash-pen",
-    brushName: "잉크워시 딥펜(유체 잉크)",
-    brushWidth: 8,
     contract: "fluid wet-ink live overlay → committed document pixels",
   },
   {
     id: "pen",
-    brushName: "펜(매끈)",
-    brushWidth: 6,
     contract: "thin-line causal filtering → committed document geometry",
   },
 ] as const satisfies readonly FidelityCaseDefinition[]);
+
+/**
+ * Bind a case to the brush the shipped picker actually lists. The child probe drives the desktop
+ * catalogue by its accessible label, so the label has to come from the same source the UI renders
+ * from; reading it here also keeps the "selected brush matches the case" assertion meaningful
+ * instead of echoing a literal back at itself.
+ */
+function resolveCase(definition: FidelityCaseDefinition): FidelityCase {
+  const item = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.find((entry) => entry.id === definition.id);
+  if (!item) {
+    throw new Error(
+      `fidelity case "${definition.id}" is not listed in the shipped brush picker;`
+      + " a delisted or renamed id must be replaced here, not selected by a stale label",
+    );
+  }
+  return {
+    ...definition,
+    brushName: item.name,
+    brushWidth: item.defaultWidth,
+    brushOperation: item.operation,
+  };
+}
 
 const SPAWN_PREVIEW = process.env.TOONSPECTRUM_INK_FIDELITY_SPAWN_PREVIEW === "1";
 const VERIFY_ROOT = process.env.TOONSPECTRUM_VERIFY_DIR ?? tmpdir();
@@ -98,19 +131,19 @@ function log(message: string): void {
   console.log(`[verify-studio-ink-live-commit] ${message}`);
 }
 
-function selectedCases(): readonly FidelityCaseDefinition[] {
+function selectedCases(): readonly FidelityCase[] {
   const requested = process.env.TOONSPECTRUM_INK_FIDELITY_CASES
     ?.split(",")
     .map((value) => value.trim())
     .filter(Boolean);
-  if (!requested || requested.length === 0) return FIDELITY_CASES;
+  if (!requested || requested.length === 0) return FIDELITY_CASES.map(resolveCase);
   const unknown = requested.filter(
     (id) => !FIDELITY_CASES.some((definition) => definition.id === id),
   );
   if (unknown.length > 0) {
     throw new Error(`알 수 없는 fidelity case: ${unknown.join(", ")}`);
   }
-  return FIDELITY_CASES.filter((definition) => requested.includes(definition.id));
+  return FIDELITY_CASES.filter((definition) => requested.includes(definition.id)).map(resolveCase);
 }
 
 function readChildReport(reportPath: string): LongStrokeReport {
@@ -124,7 +157,7 @@ function readChildReport(reportPath: string): LongStrokeReport {
   return decoded as LongStrokeReport;
 }
 
-async function runCase(definition: FidelityCaseDefinition): Promise<CaseResult> {
+async function runCase(definition: FidelityCase): Promise<CaseResult> {
   const caseRoot = join(OUT_DIR, "cases", definition.id);
   const reportPath = join(caseRoot, "studio-long-stroke", "report.json");
   mkdirSync(caseRoot, { recursive: true });
@@ -137,10 +170,12 @@ async function runCase(definition: FidelityCaseDefinition): Promise<CaseResult> 
       TOONSPECTRUM_VERIFY_DIR: caseRoot,
       TOONSPECTRUM_LONG_STROKE_BRUSH: definition.brushName,
       // A preview build cannot serve the /src catalogue module the child probe reads, so without
-      // these two pins it falls back to a 12px default and measures a width the product never
-      // ships. The id also lands in the child report, making the selected brush auditable.
+      // these pins it falls back to a 12px paint default and measures a configuration the product
+      // never ships. This parent reads the same module in Node, so the pins carry the shipped
+      // values. The id also lands in the child report, making the selected brush auditable.
       TOONSPECTRUM_LONG_STROKE_BRUSH_ID: definition.id,
       TOONSPECTRUM_LONG_STROKE_BRUSH_WIDTH: String(definition.brushWidth),
+      TOONSPECTRUM_LONG_STROKE_OPERATION: definition.brushOperation,
       TOONSPECTRUM_LONG_STROKE_SPAWN_PREVIEW: SPAWN_PREVIEW ? "1" : "0",
       // The required gate measures the deterministic shipped compatibility path. Hardware/WebGPU
       // device-loss coverage is kept in its dedicated fault-injection suites, not silently mixed

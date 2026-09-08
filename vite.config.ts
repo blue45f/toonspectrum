@@ -8,6 +8,9 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { build as viteBuild, defineConfig, type Plugin } from "vite";
 
 import { createStudioManualChunks } from "./apps/web/config/vite-manual-chunks";
+// The warm list must name exactly the namespaces the Studio loader fetches; a second hand-kept
+// copy of that list would drift silently and leave the route waiting on an uncached asset.
+import { STUDIO_I18N_NAMESPACES } from "./apps/web/src/shared/lib/i18n-asset-manifest";
 
 import {
   planStudioServiceWorkerPrecache,
@@ -261,12 +264,6 @@ function studioCrossOriginIsolationPlugin(): Plugin {
  * module graph: `AppRouter` `Promise.all`s these two dictionaries with the route
  * chunk, so the route cannot commit until they resolve.
  */
-const STUDIO_I18N_NAMESPACES = [
-  "aiNotice", "aiToolPopover", "assetMenu", "background", "bubble", "bubbleTail", "canvas",
-  "commandBar", "commandSearch", "community", "creativeModes", "customFonts", "hub",
-  "imageAdjustments", "mainMenu", "mobileDock", "quickShape", "quickStart", "settings",
-  "shortcuts", "toolsCompanion", "tutorial", "tutorialTry",
-];
 const STUDIO_SERVICE_WORKER_WARM_URLS = STUDIO_I18N_NAMESPACES.flatMap((namespace) =>
   ["ko", "en"].map((locale) => `/i18n/studio/${namespace}/${locale}.json`),
 );
@@ -389,9 +386,7 @@ export default defineConfig(({ mode }) => ({
   publicDir: path.resolve(webRoot, "public"),
   resolve: {
     alias: {
-      "@/shared": path.resolve(webRoot, "src/shared"),
-      "@/domains": path.resolve(webRoot, "src/domains"),
-      "@": webRoot,
+      "@": path.resolve(webRoot, "src"),
     },
   },
   // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.

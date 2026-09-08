@@ -228,7 +228,7 @@ function propertyInitializers(sourceFile: ts.SourceFile, name: string): ts.Expre
 
 const CAPTURE_RUNTIME = "@/domains/creator/studio/components/runtime/studio-companion-reference-capture-runtime";
 const SOURCE_RUNTIME = "./studio-companion-reference-source-runtime";
-const PREVIEW_RUNTIME = "@/src/domains/creator/studio-companion-reference-preview";
+const PREVIEW_RUNTIME = "@/domains/creator/studio-companion-reference-preview";
 const REFERENCE_DISPLAY = "./StudioCompanionReferenceDisplay";
 
 describe("Studio companion Reference runtime boundaries", () => {
@@ -244,7 +244,7 @@ describe("Studio companion Reference runtime boundaries", () => {
 
   it("keeps source decoding and preview composition behind coordinator demand imports", () => {
     const coordinator = moduleEdges(
-      "../../../components/studio/runtime/studio-companion-reference-capture-runtime.ts"
+      "./studio/components/runtime/studio-companion-reference-capture-runtime.ts"
     );
 
     for (const specifier of [SOURCE_RUNTIME, PREVIEW_RUNTIME]) {
@@ -333,7 +333,7 @@ describe("Studio companion Reference runtime boundaries", () => {
     expect(pageSource.match(/setReferenceBoardState\(/gu)?.length).toBeGreaterThanOrEqual(2);
 
     const coordinator = moduleEdges(
-      "../../../components/studio/runtime/studio-companion-reference-capture-runtime.ts"
+      "./studio/components/runtime/studio-companion-reference-capture-runtime.ts"
     ).sourceFile.getFullText();
     expect(coordinator).toContain("getSnapshot(): StudioCompanionReferenceCaptureSnapshot");
     expect(coordinator).not.toContain("getDocument():");

@@ -41,7 +41,10 @@ const loadFs = async (): Promise<NodeFsPromisesModule> =>
 // packages/studio-engine-registry/src/__tests__/ -> repo root
 const REPO_ROOT_URL = new URL("../../../../", import.meta.url);
 
-const SCAN_ROOTS = ["src", "apps"] as const;
+// Roots the ledger markdown declares. The browser tree moved from `<root>/src` to
+// `apps/web/src` in the 2026-09 apps/web move; scanning the stale `src` returned zero
+// files, which the floor in the last test below caught.
+const SCAN_ROOTS = ["apps/web/src", "apps"] as const;
 const IGNORED_DIRECTORIES = new Set([
   "node_modules",
   "dist",
@@ -257,10 +260,10 @@ describe("lab engines have zero product import sites", () => {
     ).toEqual(["planted-engine", "plantedSymbol"]);
   });
 
-  it("has zero violations against the real src/ and apps/ trees", async () => {
+  it("has zero violations against the real apps/web/src and apps trees", async () => {
     const { filesByRoot, contents } = await collectProductSources(SCAN_ROOTS);
     // 스캐너가 조용히 0개 파일을 읽고 초록으로 통과하는 회귀를 막는다.
-    expect((filesByRoot.get("src") ?? []).length).toBeGreaterThan(100);
+    expect((filesByRoot.get("apps/web/src") ?? []).length).toBeGreaterThan(100);
 
     const violations = findLabEngineProductImports({
       roots: [...SCAN_ROOTS],

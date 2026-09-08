@@ -32,7 +32,12 @@ const creatorModuleSource = readFileSync(
   new URL("../../../../../apps/api/src/modules/creator/creator.module.ts", import.meta.url),
   "utf8"
 );
-const ciSource = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+// Workspace-root `.github/`, five levels above `apps/web/src/shared/lib/` — the same anchor
+// the `apps/api` reads above use.
+const ciSource = readFileSync(
+  new URL("../../../../../.github/workflows/ci.yml", import.meta.url),
+  "utf8",
+);
 const productionMigrationManifestSource = readFileSync(
   new URL("../../../../../scripts/production-database-migrations.manifest",
     import.meta.url

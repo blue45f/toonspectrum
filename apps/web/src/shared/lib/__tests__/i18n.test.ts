@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -83,8 +84,17 @@ async function withLocalStorage<T>(fn: () => T | Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * Browser source root behind the `@` alias.
+ *
+ * This scan used to walk the cwd-relative roots `["components", "lib", "src"]`. The 2026-09
+ * apps/web move folded all three under `apps/web/src` (`src/components`, `src/shared/lib`,
+ * and the per-domain component trees), so the old list threw ENOENT on `components`.
+ */
+const WEB_SRC_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+
 function collectSourceI18nKeys(): Set<string> {
-  const roots = ["components", "lib", "src"];
+  const roots = [WEB_SRC_ROOT];
   const visited = new Set<string>();
   const used = new Set<string>();
   const keyRe = /\bt\(\s*["'`]([^"'`]+)["'`]\s*\)/g;
@@ -347,9 +357,16 @@ describe("runtime translation bundles", () => {
 describe("translation dictionary completeness", () => {
   it("keeps every t() key covered by its shell or lazy route dictionaries", () => {
     const usedKeys = collectSourceI18nKeys();
+    // A scan that silently reaches zero files would satisfy every assertion below, so keep the
+    // floor explicit: the browser tree calls t() thousands of times.
+    expect(usedKeys.size).toBeGreaterThan(200);
     const shellKeys = new Set([...Object.keys(i18nDict.ko), ...Object.keys(i18nDict.en)]);
-    const adminEn = readRouteDictionary("apps/web/public/i18n/admin");
-    const adminKo = readRouteDictionary("apps/web/public/i18n/admin");
+    // `public/i18n/admin` became a directory in the 2026-09 split (flat `<locale>.json` beside
+    // per-namespace subdirectories), so both reads hit EISDIR. They also both named the same
+    // path, which made `adminKoMissing` a second check of the English file — the Korean
+    // dictionary was never verified. Read each locale's own flat asset.
+    const adminEn = readRouteDictionary("apps/web/public/i18n/admin/en.json");
+    const adminKo = readRouteDictionary("apps/web/public/i18n/admin/ko.json");
     const adminKeys = [...usedKeys].filter((key) => key.startsWith("admin."));
     const shellMissing = [...usedKeys]
       .filter((key) => !key.startsWith("admin.") && !shellKeys.has(key))

@@ -19,7 +19,7 @@ import { useEffect, useRef, type RefObject } from "react";
 
 import { cx } from "@/shared/lib/cx";
 import { useT } from "@/shared/lib/i18n";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 const MOBILE_NAV = [
   { i18n: "nav.home", href: "/", icon: Home, exact: true },

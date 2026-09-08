@@ -1,4 +1,4 @@
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 const routes = [
   ["/", "홈", "통합 카탈로그와 추천 진입점"],

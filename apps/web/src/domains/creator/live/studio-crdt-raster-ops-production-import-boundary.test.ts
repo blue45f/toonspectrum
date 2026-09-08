@@ -9,7 +9,9 @@ import { STUDIO_RASTER_CRDT_VERSION } from "../../../shared/lib/studio-crdt-rast
 import { STUDIO_RASTER_CRDT_VERSION as liveFacadeVersion } from "./studio-crdt-raster-ops";
 
 const CREATOR_ROOT = fileURLToPath(new URL("..", import.meta.url));
-const LIB_ROOT = fileURLToPath(new URL("../../../../lib", import.meta.url));
+// The shared `lib/` tree moved from the repository root to `apps/web/src/shared/lib` in the
+// 2026-09 apps/web move; anchoring on the old root made this walk throw at collection.
+const LIB_ROOT = fileURLToPath(new URL("../../../shared/lib", import.meta.url));
 const TEST_MODULE_IMPORT = /\.test\.tsx?(?:["']|$)/u;
 const PRODUCTION_IMPORT = /^\s*import\s[\s\S]*?from\s+["']([^"']+)["']/gmu;
 

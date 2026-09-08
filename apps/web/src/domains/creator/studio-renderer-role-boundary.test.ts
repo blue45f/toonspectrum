@@ -18,13 +18,19 @@ import {
 } from "@toonspectrum/studio-engine-registry/renderer-roles";
 import { describe, expect, it } from "vitest";
 
-// src/domains/creator -> repo root
+// apps/web/src/domains/creator -> repository root (five levels).
+// Before the 2026-09 apps/web move this counted three; that now lands on `apps/web`, so the
+// walk below scanned `apps/web/src` while calling it `src` and every reported path was wrong.
 const REPO_ROOT = resolve(
   fileURLToPath(new URL(".", import.meta.url)),
   "..",
   "..",
   "..",
+  "..",
+  "..",
 );
+/** Browser source root behind the `@` alias — the tree this boundary guards. */
+const WEB_SRC = "apps/web/src";
 
 const IGNORED_DIRECTORIES = new Set([
   "node_modules",
@@ -80,9 +86,9 @@ describe("studio renderer role boundary", () => {
     }
   });
 
-  it("no lab engine has a product import site under src/", () => {
+  it("no lab engine has a product import site under apps/web/src", () => {
     const violations = findLabEngineProductImports({
-      roots: ["src"],
+      roots: [WEB_SRC],
       ledger: STUDIO_RENDERER_ROLE_LEDGER,
       listFiles: walkOnce,
       readFile: readCached,
@@ -97,6 +103,6 @@ describe("studio renderer role boundary", () => {
 
   it("scanned a non-trivial slice of the product tree", () => {
     // 스캐너가 조용히 0개 파일을 읽고 초록으로 통과하는 회귀를 막는다.
-    expect(walkOnce("src").length).toBeGreaterThan(100);
+    expect(walkOnce(WEB_SRC).length).toBeGreaterThan(100);
   });
 });

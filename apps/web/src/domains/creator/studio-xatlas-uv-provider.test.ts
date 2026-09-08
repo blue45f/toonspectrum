@@ -610,7 +610,9 @@ describe("StudioXAtlasUvProvider", () => {
       throw new TypeError("xatlasjs API constructor is unavailable");
     }
     const wasmPath = fileURLToPath(
-      new URL("../../../node_modules/xatlasjs/dist/node/xatlas.wasm", import.meta.url),
+      // Workspace-root `node_modules/` — five levels above `apps/web/src/domains/creator/`.
+      // pnpm hoists xatlasjs to the root store link, and `apps/web/` has no `node_modules/`.
+      new URL("../../../../../node_modules/xatlasjs/dist/node/xatlas.wasm", import.meta.url),
     );
     const api = await new Promise<object>((resolve, reject) => {
       const holder: { instance: object | null } = { instance: null };

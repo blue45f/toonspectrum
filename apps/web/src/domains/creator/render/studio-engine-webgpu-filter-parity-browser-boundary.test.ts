@@ -3,7 +3,9 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const root = resolve(import.meta.dirname, "../../../..");
+// Workspace root, six levels above `apps/web/src/domains/creator/render/` (the 2026-09
+// apps/web move added two; the old count landed on `apps/web`, which has no `scripts/`).
+const root = resolve(import.meta.dirname, "../../../../../..");
 const browserEntry = readFileSync(
   resolve(root, "scripts/studio-engine-webgpu-filter-parity-browser.ts"),
   "utf8",

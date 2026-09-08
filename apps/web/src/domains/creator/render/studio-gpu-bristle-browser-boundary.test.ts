@@ -31,7 +31,10 @@ import {
  * has no GPU.
  */
 
-const ROOT = resolve(import.meta.dirname, "../../../..");
+// Workspace root, six levels above `apps/web/src/domains/creator/render/` (the 2026-09
+// apps/web move added two of them; the old count landed on `apps/web` and doubled the
+// `apps/web/` prefix of every path joined below).
+const ROOT = resolve(import.meta.dirname, "../../../../../..");
 const WGSL_MODULE = readFileSync(
   resolve(ROOT, "apps/web/src/domains/creator/render/studio-gpu-bristle-wgsl.ts"),
   "utf8",

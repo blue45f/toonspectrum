@@ -156,10 +156,10 @@ describe("/shaper registration", () => {
       '{ path: "/shaper", label: "route.shaper" }',
     );
     expect(readRepoFile("scripts/build-static-catalog.ts")).toContain('"/shaper"');
-    expect(readRepoFile("components/site-footer.tsx")).toContain(
+    expect(readRepoFile("apps/web/src/shared/components/site-footer.tsx")).toContain(
       '{ key: "footer.link.shaper", href: "/shaper" }',
     );
-    expect(readRepoFile("components/site-header-mobile-nav.tsx")).toContain('href: "/shaper"');
+    expect(readRepoFile("apps/web/src/shared/components/site-header-mobile-nav.tsx")).toContain('href: "/shaper"');
   });
 
   it("publishes the new app-shell keys in the built-in locales", () => {

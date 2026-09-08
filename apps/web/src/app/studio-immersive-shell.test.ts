@@ -5,7 +5,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 
 import { useUi } from "@/shared/lib/ui-store";
-import { isImmersiveMobileRoute } from "@/src/app/routes/immersive-mobile-route";
+import { isImmersiveMobileRoute } from "@/app/routes/immersive-mobile-route";
 
 describe("studio immersive shell", () => {
   beforeEach(() => {

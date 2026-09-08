@@ -65,7 +65,7 @@ import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,
   SharedAssetCatalogItem,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 const STUDIO_CANVAS_IMAGE_ACCEPT =
   "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff";

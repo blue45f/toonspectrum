@@ -3,7 +3,9 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const root = resolve(import.meta.dirname, "../../..");
+// Workspace root, five levels above `apps/web/src/domains/creator/` (the 2026-09 apps/web
+// move added two; the old count landed on `apps/web`, which has no `scripts/`).
+const root = resolve(import.meta.dirname, "../../../../..");
 const browserEntry = readFileSync(
   resolve(root, "scripts/studio-professional-bristle-webgpu-browser.ts"),
   "utf8",

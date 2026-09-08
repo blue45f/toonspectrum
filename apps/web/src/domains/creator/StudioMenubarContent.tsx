@@ -105,7 +105,7 @@ import type {
   StudioWorkspaceState,
 } from "./studio-workspaces";
 import type { StudioWriterRoomDocument } from "./studio-writer-room";
-import type { WorkDetail } from "@/src/infrastructure/creator-client";
+import type { WorkDetail } from "@/infrastructure/creator-client";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useT } from "@/shared/lib/i18n";

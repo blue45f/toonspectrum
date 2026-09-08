@@ -148,7 +148,8 @@ describe("Avatar Forge reference catalogue generator", () => {
       "scripts/studio-vrm-avatar-reference-catalogue-browser.tsx",
     ), "utf8");
     expect(source).toMatch(
-      /from\s+["']\.\.\/src\/domains\/creator\/vrm\/StudioVrmAvatarForge(?:\.tsx)?["']/,
+      // The browser tree moved to `apps/web/src` in the 2026-09 apps/web move.
+      /from\s+["']\.\.\/apps\/web\/src\/domains\/creator\/vrm\/StudioVrmAvatarForge(?:\.tsx)?["']/,
     );
     expect(source).toContain("<StudioVrmAvatarForge");
     expect(source).toContain("createAvatarForgeState(presetId)");

@@ -10,8 +10,10 @@ const pageOrchestrationBoundarySource = readFileSync(
   new URL("./studio-page-orchestration-boundary.test.ts", import.meta.url),
   "utf8",
 );
+// The manual-chunk policy moved out of `vite.config.ts` into `apps/web/config/vite-manual-chunks.ts`
+// in the 2026-09 apps/web move; `vite.config.ts` now only calls `createStudioManualChunks()`.
 const viteConfigSource = readFileSync(
-  new URL("../../../vite.config.ts", import.meta.url),
+  new URL("../../../config/vite-manual-chunks.ts", import.meta.url),
   "utf8",
 );
 
@@ -69,8 +71,10 @@ describe("Studio quality-first build-size policy", () => {
   });
 
   it("allows Babylon only through one exact lazy specialist boundary", () => {
+    // Vite manifest keys are relative to the Vite `root` (`apps/web`), not to the repository
+    // root, so this one stays `src/…` after the 2026-09 apps/web move.
     expect(bundleCheckSource).toContain(
-      '"apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts"',
+      '"src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts"',
     );
     expect(bundleCheckSource).toContain(
       "const babylonManifestPattern = /(?:@babylonjs|babylon(?:\\.js)?)/i",

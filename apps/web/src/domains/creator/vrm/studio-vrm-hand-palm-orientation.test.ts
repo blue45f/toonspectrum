@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import * as THREE from "three";
@@ -31,8 +32,25 @@ function extractFingers(bones: PoseBoneMap): FingerRotationMap {
   return fingers;
 }
 
-async function loadBundledVrm(relativePath: string) {
-  const buf = fs.readFileSync(path.resolve(relativePath)).buffer;
+/**
+ * Bundled VRM fixtures, anchored on this file rather than `process.cwd()`.
+ *
+ * These used to be `path.resolve("public/vrm/...")`, i.e. cwd-relative. The 2026-09 apps/web
+ * move put `public/` under `apps/web/`, so every resolve missed, the `existsSync` guard below
+ * fired for every character and the palm sweep passed while examining none of them.
+ */
+const VRM_DIR = fileURLToPath(new URL("../../../../public/vrm/", import.meta.url));
+
+function vrmFixture(name: string): string {
+  const file = path.join(VRM_DIR, name);
+  if (!fs.existsSync(file)) {
+    throw new Error(`Bundled VRM fixture is missing: ${path.relative(process.cwd(), file)}`);
+  }
+  return file;
+}
+
+async function loadBundledVrm(fixtureName: string) {
+  const buf = fs.readFileSync(vrmFixture(fixtureName)).buffer;
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
   const gltf = await new Promise<{ userData: { vrm: import("@pixiv/three-vrm").VRM } }>(
@@ -44,12 +62,12 @@ async function loadBundledVrm(relativePath: string) {
 }
 
 const CHARACTERS = [
-  { id: "sample", name: "루미", file: "public/vrm/sample.vrm" },
-  { id: "avatar-a", name: "하린", file: "public/vrm/AvatarSample_A.vrm" },
-  { id: "avatar-b", name: "세라", file: "public/vrm/AvatarSample_B.vrm" },
-  { id: "avatar-c", name: "유나", file: "public/vrm/AvatarSample_C.vrm" },
-  { id: "alicia", name: "아리시아", file: "public/vrm/AliciaSolid.vrm" },
-  { id: "mio", name: "미오", file: "public/vrm/fem_vroid.vrm" },
+  { id: "sample", name: "루미", file: "sample.vrm" },
+  { id: "avatar-a", name: "하린", file: "AvatarSample_A.vrm" },
+  { id: "avatar-b", name: "세라", file: "AvatarSample_B.vrm" },
+  { id: "avatar-c", name: "유나", file: "AvatarSample_C.vrm" },
+  { id: "alicia", name: "아리시아", file: "AliciaSolid.vrm" },
+  { id: "mio", name: "미오", file: "fem_vroid.vrm" },
 ] as const;
 
 function applyNaturalIdle(vrm: import("@pixiv/three-vrm").VRM, characterId: string) {
@@ -91,7 +109,6 @@ describe("relaxed hand palm orientation across bundled characters", () => {
     const failures: string[] = [];
 
     for (const character of CHARACTERS) {
-      if (!fs.existsSync(path.resolve(character.file))) continue;
       const vrm = await loadBundledVrm(character.file);
       // Skip non-humanoid / missing hands.
       if (
@@ -137,7 +154,7 @@ describe("relaxed hand palm orientation across bundled characters", () => {
   }, 180_000);
 
   it("does not force palm twist on a clearly raised arm (wave-like)", async () => {
-    const vrm = await loadBundledVrm("public/vrm/AvatarSample_A.vrm");
+    const vrm = await loadBundledVrm("AvatarSample_A.vrm");
     const bones: PoseBoneMap = {
       rightUpperArm: { direction: { sideX: 0.48, y: 0.66, z: 0.08 } },
       rightLowerArm: { direction: { sideX: 0.18, y: 0.96, z: 0.1 } },

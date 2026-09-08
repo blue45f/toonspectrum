@@ -37,6 +37,10 @@ const signalPatterns = [
   /(?:^|\b)(?:mismatch|panic|uncaught|pageerror|requestfailed|offscreen|clipped|overflow|blank screen|WebGL|WebGPU|aria-modal|accessible name|not found|not visible|did not open|outside viewport)(?:\b|:)/iu,
 ];
 const hasSignal = (value) => signalPatterns.some((pattern) => pattern.test(value));
+// Noise that must never be reported as a failure signal: dependency/lockfile chatter,
+// license text, and the bundler's own advisory output.
+const ignorablePattern =
+  /(?:node_modules|package-lock|pnpm-lock|THIRD_PARTY|license text|deoptimised the styling|chunk.*larger than|PLUGIN_TIMINGS|externalized for browser compatibility)/iu;
 
 function rel(file) {
   return path.relative(inputRoot, file).replaceAll(path.sep, "/");

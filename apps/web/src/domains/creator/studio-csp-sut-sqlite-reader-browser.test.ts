@@ -28,7 +28,9 @@ describeBrowser("real Chromium SUT sqlite-wasm Worker fixture", () => {
   beforeAll(async () => {
     const { createServer } = await import("vite");
     vite = await createServer({
-      root: resolve(import.meta.dirname, "../../.."),
+      // Workspace root, five levels above `apps/web/src/domains/creator/` — the harness page
+      // below is served from `tests/format-gateway/`, which lives at the workspace root.
+      root: resolve(import.meta.dirname, "../../../../.."),
       logLevel: "error",
       server: { host: "127.0.0.1", port: 0 },
     });

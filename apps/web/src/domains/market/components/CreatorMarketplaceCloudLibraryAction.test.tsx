@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreatorMarketplaceCloudLibraryAction } from "./CreatorMarketplaceCloudLibraryAction";
 
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
-import type { SessionContextValue } from "@/src/compat/auth-session-store";
+import type { SessionContextValue } from "@/compat/auth-session-store";
 
 import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
-import { SessionContext } from "@/src/compat/auth-session-store";
+import { SessionContext } from "@/compat/auth-session-store";
 
 const mocks = vi.hoisted(() => ({
   acquire: vi.fn(),
@@ -28,7 +28,7 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
-vi.mock("@/src/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/infrastructure/creator-marketplace-client", () => ({
   acquireCreatorMarketplaceCloudLibraryRelease: mocks.acquire,
   listCreatorMarketplaceCloudLibrary: mocks.list,
   resolveCreatorMarketplaceCloudLibraryAcquisitionTarget: mocks.resolveTarget,

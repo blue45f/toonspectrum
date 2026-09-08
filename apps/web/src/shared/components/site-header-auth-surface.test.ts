@@ -9,9 +9,14 @@ import { describe, expect, it } from "vitest";
  */
 describe("site header auth surface", () => {
   it("exposes a single canonical session auth control and never remounts Firebase member auth", () => {
-    const header = readFileSync(join(process.cwd(), "components/site-header.tsx"), "utf8");
+    const header = readFileSync(join(process.cwd(), "apps/web/src/shared/components/site-header.tsx"), "utf8");
 
-    expect(header).toMatch(/import\s+\{\s*AuthMenuShell\s*\}\s+from\s+"\.\/auth\/auth-menu-shell"/);
+    // The auth shell moved to `apps/web/src/domains/auth/components/` in the 2026-09 apps/web
+    // move, so the header now reaches it through `../../domains/…`. Pin the module identity,
+    // not the number of `../` segments in front of it.
+    expect(header).toMatch(
+      /import\s+\{\s*AuthMenuShell\s*\}\s+from\s+"[^"]*\/domains\/auth\/components\/auth-menu-shell"/,
+    );
     expect(header).toMatch(/<AuthMenuShell\s*\/>/);
 
     expect(header).not.toMatch(/MemberAuth/);

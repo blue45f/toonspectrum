@@ -110,16 +110,19 @@ test("control-plane workflow changes do not impersonate a runtime deployment", (
 });
 
 test("paths are normalized, deduplicated, and sorted deterministically", () => {
+  // The first two entries are the same file in Windows and POSIX form, so normalization must
+  // fold them into one. The 2026-09 apps/web move rewrote only the second one and the expected
+  // pair, which broke both the dedupe and the sort this case exists to prove.
   const classification = classifyStudioChanges([
-    ".\\src\\domains\\creator\\canvas\\StudioCanvas.tsx",
+    ".\\apps\\web\\src\\domains\\creator\\canvas\\StudioCanvas.tsx",
     "apps/web/src/domains/creator/canvas/StudioCanvas.tsx",
-    "  components/studio/brush/studio-brush-runtime.ts  ",
+    "  apps/web/src/domains/creator/studio/components/brush/studio-brush-runtime.ts  ",
     "",
   ]);
 
   assert.deepEqual(classification.paths, [
-    "apps/web/src/domains/creator/studio/components/brush/studio-brush-runtime.ts",
     "apps/web/src/domains/creator/canvas/StudioCanvas.tsx",
+    "apps/web/src/domains/creator/studio/components/brush/studio-brush-runtime.ts",
   ]);
   assert.equal(classification.changedCount, 2);
   assert.equal(classification.categories.canvas, true);

@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const root = resolve(import.meta.dirname, "../../../..");
+// Workspace root, six levels above `apps/web/src/domains/creator/render/`.
+const root = resolve(import.meta.dirname, "../../../../../..");
 const browserEntry = readFileSync(
   resolve(root, "scripts/studio-engine-webgpu-presentation-browser.ts"),
   "utf8",

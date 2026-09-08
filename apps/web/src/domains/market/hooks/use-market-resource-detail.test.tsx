@@ -12,7 +12,7 @@ import { getCreatorMarketplaceResource } from "../remotes/market-resource-remote
 
 import { useMarketResourceDetail } from "./use-market-resource-detail";
 
-import { NotFoundError } from "@/src/infrastructure/use-api-resource";
+import { NotFoundError } from "@/infrastructure/use-api-resource";
 
 vi.mock("../models/market-resource-cache", () => ({
   readCachedMarketResource: vi.fn(),

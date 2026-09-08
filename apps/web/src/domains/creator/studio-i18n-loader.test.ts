@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,19 +14,48 @@ import {
   studioI18nAssetUrl,
 } from "./studio-i18n-loader";
 
+const STUDIO_ASSET_DIRECTORY = fileURLToPath(
+  new URL("../../../public/i18n/studio/", import.meta.url),
+);
+
+/**
+ * Merged studio dictionary per locale, memoised.
+ *
+ * The branch split each locale's studio pack into 23 namespace files, so one `readAsset` call
+ * now costs 23 reads plus 23 `JSON.parse` passes instead of one. The assertions below call it
+ * once per (key, locale) pair — roughly a thousand times — which took this file from a few
+ * seconds to 85s, past the 30s suite timeout. The files do not change during a run, so read
+ * and parse each locale exactly once and hand every assertion the same string. Memoising the
+ * validated dictionary as well keeps `parseStudioI18nDictionary` covered (every locale still
+ * goes through it) without re-validating 1_334 keys a thousand times.
+ */
+const assetCache = new Map<string, string>();
 function readAsset(locale: string): string {
+  const cached = assetCache.get(locale);
+  if (cached !== undefined) return cached;
   const merged: Record<string, string> = {};
   for (const namespace of STUDIO_I18N_NAMESPACES) {
-    const file = path.resolve(process.cwd(), "apps/web/public/i18n/studio", namespace, `${locale}.json`);
+    const file = path.resolve(STUDIO_ASSET_DIRECTORY, namespace, `${locale}.json`);
     Object.assign(merged, JSON.parse(readFileSync(file, "utf8")));
   }
-  return JSON.stringify(merged);
+  const serialized = JSON.stringify(merged);
+  assetCache.set(locale, serialized);
+  return serialized;
+}
+
+const dictionaryCache = new Map<string, Record<string, string> | null>();
+/** `parseStudioI18nDictionary(readAsset(locale))`, memoised per locale. */
+function assetDictionary(locale: string): Record<string, string> | null {
+  if (dictionaryCache.has(locale)) return dictionaryCache.get(locale) ?? null;
+  const parsed = parseStudioI18nDictionary(readAsset(locale));
+  dictionaryCache.set(locale, parsed);
+  return parsed;
 }
 
 describe("Studio lazy i18n assets", () => {
   it("keeps complete, validated Korean and English dictionaries", () => {
     for (const locale of STUDIO_I18N_ASSET_LOCALES) {
-      const dictionary = parseStudioI18nDictionary(readAsset(locale));
+      const dictionary = assetDictionary(locale);
       expect(dictionary).not.toBeNull();
       // 1_323 → 1_325: 컴패니언 창의 막다른 상태에 붙인 탈출구 두 줄
       // (studio.toolsCompanion.exit.disconnected / .editor).
@@ -60,7 +90,7 @@ describe("Studio lazy i18n assets", () => {
       "studio.creativeModes.title",
     ]) {
       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
-        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toBeTruthy();
+        expect(assetDictionary(locale)?.[key]).toBeTruthy();
       }
       expect(resolveI18nValue("ko", key)).not.toBe(key);
     }
@@ -80,7 +110,7 @@ describe("Studio lazy i18n assets", () => {
       "studio.mainMenu.item.filter.wave-warp",
     ]) {
       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
-        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toBeTruthy();
+        expect(assetDictionary(locale)?.[key]).toBeTruthy();
       }
     }
     expect(resolveI18nValue("en", "studio.mainMenu.item.filter.lens-blur")).toBe("Lens blur");
@@ -129,13 +159,13 @@ describe("Studio lazy i18n assets", () => {
       ]
     ) {
       const values = STUDIO_I18N_ASSET_LOCALES.map(
-        (locale) => parseStudioI18nDictionary(readAsset(locale))?.[key],
+        (locale) => assetDictionary(locale)?.[key],
       );
       for (const value of values) expect(value).toBeTruthy();
       // A key left untranslated shows up as ~75 copies of the English value. The
       // ceiling is loose rather than 1 because loanwords legitimately collide —
       // "Slot {index}" is the same string in Dutch, German, Czech, Malay and more.
-      const english = parseStudioI18nDictionary(readAsset("en"))?.[key];
+      const english = assetDictionary("en")?.[key];
       expect(values.filter((value) => value === english).length).toBeLessThan(20);
     }
     // Korean stays the authored source of truth for the literals these replaced.
@@ -155,7 +185,7 @@ describe("Studio lazy i18n assets", () => {
     // Both slot rows interpolate the same placeholder the rest of the packs use.
     for (const key of ["studio.commandBar.slot", "studio.commandBar.slotAria"]) {
       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
-        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toContain("{index}");
+        expect(assetDictionary(locale)?.[key]).toContain("{index}");
       }
     }
   });
@@ -195,39 +225,24 @@ describe("Studio lazy i18n assets", () => {
   });
 
   it("keeps Studio strings out of the eagerly loaded global dictionary source", () => {
-    const i18nSource = readFileSync(
-      path.resolve(process.cwd(), "lib", "i18n.ts"),
-      "utf8",
-    );
+    // The 2026-09 apps/web move relocated the browser tree from `<root>/{src,lib}` to
+    // `apps/web/src/{,shared/lib}`; these four reads still pointed at the old cwd-relative
+    // paths and threw ENOENT. Anchor on this file instead of `process.cwd()` so the paths
+    // travel with the tree.
+    const webSrc = (...segments: readonly string[]): string =>
+      path.resolve(fileURLToPath(new URL("../../", import.meta.url)), ...segments);
+
+    const i18nSource = readFileSync(webSrc("shared", "lib", "i18n.ts"), "utf8");
     const studioPageSource = readFileSync(
-      path.resolve(
-        process.cwd(),
-        "src",
-        "domains",
-        "creator",
-        "StudioPage.tsx",
-      ),
+      webSrc("domains", "creator", "StudioPage.tsx"),
       "utf8",
     );
     const companionSource = readFileSync(
-      path.resolve(
-        process.cwd(),
-        "src",
-        "domains",
-        "creator",
-        "StudioToolsCompanionPage.tsx",
-      ),
+      webSrc("domains", "creator", "StudioToolsCompanionPage.tsx"),
       "utf8",
     );
     const creatorRoutesSource = readFileSync(
-      path.resolve(
-        process.cwd(),
-        "src",
-        "app",
-        "routes",
-        "groups",
-        "creator.routes.tsx",
-      ),
+      webSrc("app", "routes", "groups", "creator.routes.tsx"),
       "utf8",
     );
 

@@ -12,6 +12,20 @@ const MODEL_PATHS = [
 const CONTEXT_PATH = "apps/web/src/domains/creator/bg3d/studio-bg3d-pro-suite-runtime-context.tsx";
 const GROUP_PATHS = [...MODEL_PATHS, CONTEXT_PATH];
 
+/**
+ * The manual-chunk policy moved out of `vite.config.ts` into this module in the 2026-09
+ * apps/web move; `vite.config.ts` now only calls `createStudioManualChunks()`.
+ */
+const MANUAL_CHUNKS = "apps/web/config/vite-manual-chunks.ts";
+
+/**
+ * Rollup ids are absolute, so the policy matches on a path suffix that starts at the browser
+ * `src/` root (`id.endsWith("/src/domains/…")`) rather than on the repo-relative path.
+ */
+function chunkIdSuffix(repoRelativeFile: string): string {
+  return repoRelativeFile.replace(/^apps\/web\//u, "/");
+}
+
 function parseFile(file: string): ts.SourceFile {
   return ts.createSourceFile(
     file,
@@ -30,7 +44,7 @@ describe("BG3D production UI contract chunk boundary", () => {
   it("co-locates exactly the production models and their shared context, not panels or engines", () => {
     const matchedPaths: string[] = [];
     let matchingGroups = 0;
-    visitTree(parseFile("vite.config.ts"), (node) => {
+    visitTree(parseFile(MANUAL_CHUNKS), (node) => {
       if (!ts.isIfStatement(node) || !ts.isBlock(node.thenStatement)) return;
       const returnsModelChunk = node.thenStatement.statements.some((statement) =>
         ts.isReturnStatement(statement) &&
@@ -45,7 +59,7 @@ describe("BG3D production UI contract chunk boundary", () => {
       });
     });
     expect(matchingGroups).toBe(1);
-    expect(matchedPaths.toSorted()).toEqual(GROUP_PATHS.map((file) => `/${file}`).toSorted());
+    expect(matchedPaths.toSorted()).toEqual(GROUP_PATHS.map(chunkIdSuffix).toSorted());
   });
 
   it.each(GROUP_PATHS)("keeps %s within its explicit runtime dependency boundary", (file) => {
@@ -78,7 +92,7 @@ describe("Studio startup capability chunk boundary", () => {
   it("co-locates the initial tool leaf with existing tiny capability contracts", () => {
     const matchedPaths: string[] = [];
     let matchingGroups = 0;
-    visitTree(parseFile("vite.config.ts"), (node) => {
+    visitTree(parseFile(MANUAL_CHUNKS), (node) => {
       if (!ts.isIfStatement(node) || !ts.isBlock(node.thenStatement)) return;
       const returnsCapabilityChunk = node.thenStatement.statements.some((statement) =>
         ts.isReturnStatement(statement) &&
