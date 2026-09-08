@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { STUDIO_LIVE_UNSUPPORTED_JAM_MESSAGE } from "./studio-live-admission-support";
+import { presentStudioLiveSyncSnapshot, projectStudioLiveSyncSnapshot } from "./studio-live-sync-safety";
 
 import {
   STUDIO_CRDT_BINARY_WIRE_VERSION,
@@ -310,6 +312,135 @@ function activate(transport: StudioLiveSocketTransport): void {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllEnvs();
+});
+
+describe("Studio live admission support boundaries", () => {
+  const jamId = "work-instant-mfvctkw0-ab12";
+  const jamContext = (): StudioLiveTransportContext => ({
+    ...context(),
+    workId: jamId,
+    participant: {
+      ...localParticipant,
+      sessionId: "00000000-0000-4000-8000-0000000000a1",
+    },
+  });
+  function socketOnly() {
+    vi.stubEnv("VITE_STUDIO_LIVE_ORIGIN", "http://127.0.0.1:52870");
+    vi.stubEnv("VITE_STUDIO_REALTIME_ORIGIN", "");
+    vi.stubEnv("VITE_STUDIO_REALTIME_PROVIDER_ID", "cloudflare-realtime-v1");
+  }
+
+  it("reports unsupported unsaved jams without opening a saved-work socket or claiming persistence", async () => {
+    socketOnly();
+    const createSocket = vi.fn(() => new FakeSocket({ sessionToken: TOKEN }));
+    const transport = createStudioServerLiveTransportFactory(TOKEN, { createSocket })(jamContext());
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl?.((event) => controls.push(event));
+    try {
+      await expect(transport.connect()).rejects.toThrow(STUDIO_LIVE_UNSUPPORTED_JAM_MESSAGE);
+      expect(createSocket).not.toHaveBeenCalled();
+      expect(transport.mode).toBe("server");
+      expect(transport.ready).toBe(false);
+      expect(transport.publishCrdtUpdate).toBeUndefined();
+      expect(transport.requestCrdtSync).toBeUndefined();
+      expect(controls).toEqual([{
+        type: "status",
+        status: { state: "error", recoverable: true, message: STUDIO_LIVE_UNSUPPORTED_JAM_MESSAGE },
+      }]);
+      const snapshot = projectStudioLiveSyncSnapshot({
+        availability: "error", mode: "server", canEdit: true, telemetry: null,
+        transportMessage: STUDIO_LIVE_UNSUPPORTED_JAM_MESSAGE,
+      });
+      expect(snapshot).toMatchObject({
+        phase: "unsupported-jam", editsDurablyProtected: false, operationSyncReady: false,
+        transportReady: false, lastAckAt: null, lastAckServerSequence: null,
+      });
+      const presentation = presentStudioLiveSyncSnapshot(snapshot);
+      expect(presentation.shortLabel).toBe("저장 전 공동 작업 미지원");
+      expect(presentation.detail).toContain("먼저 초안으로 저장");
+      expect(presentation.detail).not.toContain("권한 회수");
+    } finally {
+      transport.close();
+    }
+  });
+
+  it("re-evaluates supported jam configuration on retry without a terminal revocation latch", async () => {
+    socketOnly();
+    const createSocket = vi.fn(() => new FakeSocket({ sessionToken: TOKEN }));
+    const factory = createStudioServerLiveTransportFactory(TOKEN, { createSocket });
+    const unsupported = factory(jamContext());
+    await expect(unsupported.connect()).rejects.toThrow(STUDIO_LIVE_UNSUPPORTED_JAM_MESSAGE);
+    unsupported.close();
+    vi.stubEnv("VITE_STUDIO_REALTIME_ORIGIN", "https://realtime.toonstudio.test");
+    const supported = factory(jamContext());
+    try {
+      expect(supported.mode).toBe("server");
+      expect(supported.crdtFanout).not.toBe("authoritative");
+      expect(createSocket).not.toHaveBeenCalled();
+    } finally {
+      supported.close();
+    }
+  });
+
+  it.each(["", "https://realtime.toonstudio.test"])(
+    "never lets a jam-shaped room name bypass saved-work admission with provider %s",
+    (realtimeOrigin) => {
+      socketOnly();
+      vi.stubEnv("VITE_STUDIO_REALTIME_ORIGIN", realtimeOrigin);
+      const socket = new FakeSocket({ sessionToken: TOKEN });
+      const createSocket = vi.fn(() => socket);
+      const transport = createStudioServerLiveTransportFactory(TOKEN, { createSocket })({
+        ...jamContext(), workId: context().workId, roomName: jamId,
+      });
+      try {
+        expect(createSocket).toHaveBeenCalledOnce();
+        expect(transport.crdtFanout).toBe("authoritative");
+        expect(transport.ready).toBe(false);
+        expect(socket.emitted).toEqual([]);
+      } finally {
+        transport.close();
+      }
+    },
+  );
+
+  it.each([false, true])("keeps a denied saved-work join terminal and distinguishes prior membership=%s", async (everJoined) => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, { createSocket: () => socket });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+    const denied = { ok: false, code: "forbidden", message: "작품 팀에 참여할 권한이 없습니다." };
+    try {
+      if (everJoined) {
+        await transport.connect();
+        expect(transport.ready).toBe(true);
+        socket.joinResponse = denied;
+        socket.serverDisconnect();
+        socket.serverReconnect();
+      } else {
+        socket.joinResponse = denied;
+        await expect(transport.connect()).rejects.toThrow("참여할 권한");
+      }
+      const event = controls.findLast((value) => value.type === "status" && value.status.state === "revoked");
+      expect(event?.type).toBe("status");
+      if (event?.type !== "status") throw new Error("missing terminal status");
+      expect(event.status.recoverable).toBe(false);
+      expect(transport.accessRevoked).toBe(true);
+      expect(transport.ready).toBe(false);
+      expect(socket.auth).toEqual({});
+      const snapshot = projectStudioLiveSyncSnapshot({
+        availability: "error", mode: "server", canEdit: true, telemetry: null,
+        terminalTransportState: "revoked", transportMessage: event.status.message,
+      });
+      expect(snapshot.phase).toBe(everJoined ? "revoked" : "admission-denied");
+      expect(snapshot.editsDurablyProtected).toBe(false);
+      expect(presentStudioLiveSyncSnapshot(snapshot).shortLabel).toBe(
+        everJoined ? "편집 권한 회수됨" : "작업실 참여 권한 없음",
+      );
+      expect(JSON.stringify(controls)).not.toContain(TOKEN);
+    } finally {
+      transport.close();
+    }
+  });
 });
 
 describe("StudioLiveSocketTransport", () => {

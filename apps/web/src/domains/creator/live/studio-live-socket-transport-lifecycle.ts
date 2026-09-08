@@ -1,4 +1,6 @@
 /** Implementation helpers for `StudioLiveSocketTransport`; not a public entry. */
+import { formatStudioLiveAdmissionDeniedMessage } from "./studio-live-admission-support";
+
 import {
   createStudioCrdtBinarySelectionRequest,
   parseStudioCrdtBinarySelection,
@@ -565,6 +567,9 @@ export function reconcilePendingPresence(this: StudioLiveSocketTransportHost, sn
 }
 
 export function failJoin(this: StudioLiveSocketTransportHost, message: string, recoverable: boolean, code?: string): void {
+  if (!recoverable && !this.everJoined) {
+    message = formatStudioLiveAdmissionDeniedMessage(message);
+  }
   this.joined = false;
   this.selectedCrdtWireFormat = null;
   this.clearCrdtWireSelectionTimeout();
