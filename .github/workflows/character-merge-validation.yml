@@ -2,25 +2,35 @@ name: Character merge validation
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, release/salvage-integration-20260908]
     paths:
+      - 'scripts/check-studio-bundle.mjs'
+      - 'scripts/lib/studio-crdt-bundle-boundary*'
+      - 'scripts/lib/repo-paths.mjs'
+      - 'scripts/integration-test-runner-ci-policy.test.mjs'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - ".github/workflows/character-merge-validation.yml"
       - "apps/web/src/domains/creator/vrm/**"
       - "apps/web/src/domains/creator/character-shaper/**"
       - "apps/web/src/domains/creator/studio-router/**"
       - "scripts/verify-character-contact-naturalness.mjs"
-      - "package.json"
-      - "pnpm-lock.yaml"
   push:
-    branches: [main]
+    branches: [main, release/salvage-integration-20260908]
     paths:
+      - 'scripts/check-studio-bundle.mjs'
+      - 'scripts/lib/studio-crdt-bundle-boundary*'
+      - 'scripts/lib/repo-paths.mjs'
+      - 'scripts/integration-test-runner-ci-policy.test.mjs'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - ".github/workflows/character-merge-validation.yml"
       - "apps/web/src/domains/creator/vrm/**"
       - "apps/web/src/domains/creator/character-shaper/**"
       - "apps/web/src/domains/creator/studio-router/**"
       - "scripts/verify-character-contact-naturalness.mjs"
-      - "package.json"
-      - "pnpm-lock.yaml"
 
 permissions:
   contents: read
