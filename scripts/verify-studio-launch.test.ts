@@ -37,8 +37,11 @@ describe("Studio launch static-preview diagnostics", () => {
     );
   });
 
-  it("opens the mobile page dialog through its explicit launcher contract", () => {
+  it("opens the page sheet through the workspace toolbar even when the primary toolbar also offers pages", () => {
     expect(launchHarness).toContain(
+      'secondaryToolbar.locator(\'button[aria-label="페이지 목록 열기"]\')',
+    );
+    expect(launchHarness).not.toContain(
       'dock.locator(\'button[aria-label="페이지 목록 열기"]\')',
     );
     expect(launchHarness).not.toContain(

@@ -26,6 +26,7 @@ import { deflateSync } from "node:zlib";
 import { chromium, type Page } from "playwright";
 
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
+import { isOptionalStudioPreviewApiError } from "./lib/studio-verify-preview-errors.mjs";
 import {
   cleanScratchDir,
   findFreePort,
@@ -136,38 +137,22 @@ function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-/** Static-preview noise that is not a product failure (copied idiom from verify-studio-menus). */
-/**
- * `vite preview` serves the static bundle and nothing else — the NestJS API is a separate service
- * this gate deliberately does not start, so its dev proxy answers /api/* with 502. The studio's
- * filter path does not touch the API, and treating those as defects would leave the gate permanently
- * red for a reason that has nothing to do with filters. Only /api/* is forgiven: a 5xx from any
- * other origin still fails, so a broken asset or worker chunk is still caught.
- */
-function isExpectedPreviewNoise(message: string): boolean {
-  return (
-    message.includes("ECONNREFUSED")
-    || message.includes("proxy error")
-    || message.includes("Unexpected response code: 400")
-    || /\s\S*\/api\//.test(message)
-    || message.includes("Failed to load resource: the server responded with a status of 502")
-  );
-}
-
 function collectBrowserErrors(
   page: Page,
   collector: { messages: string[]; failedResponses: string[] },
+  previewUrl: string,
 ): void {
   page.on("console", (entry) => {
     if (entry.type() !== "error") return;
-    const message = entry.text();
-    if (!isExpectedPreviewNoise(message)) collector.messages.push(message);
+    const location = entry.location().url;
+    const message = location ? `${entry.text()} @ ${location}` : entry.text();
+    if (!isOptionalStudioPreviewApiError(message, previewUrl)) collector.messages.push(message);
   });
   page.on("pageerror", (error) => collector.messages.push(String(error)));
   page.on("response", (response) => {
-    if (response.status() < 500) return;
+    if (response.status() < 400) return;
     const message = `${response.status()} ${response.url()}`;
-    if (!isExpectedPreviewNoise(message)) collector.failedResponses.push(message);
+    if (!isOptionalStudioPreviewApiError(message, previewUrl)) collector.failedResponses.push(message);
   });
 }
 
@@ -450,7 +435,7 @@ async function main(): Promise<void> {
       locale: "ko-KR",
     });
     const page = await context.newPage();
-    collectBrowserErrors(page, browserErrors);
+    collectBrowserErrors(page, browserErrors, url);
     await page.addInitScript(
       ({ quickstartKey, autosavePrefix }) => {
         try {

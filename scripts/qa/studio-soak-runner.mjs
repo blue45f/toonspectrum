@@ -69,7 +69,7 @@ const tests = {
     t("webgpu-brush-parity", "pnpm run verify:studio-engine-webgpu-brush-parity", 24, "webgpu"),
     t("webgpu-filter-parity", "pnpm run verify:studio-engine-webgpu-filter-parity", 24, "webgpu"),
     t("bg3d-physics", "pnpm run verify:studio-bg3d-physics", 28, "bg3d-physics"),
-    t("studio-3d-console", "pnpm run verify:studio-3d-console", 24, "bg3d-console"),
+    t("studio-3d-console", 'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console', 24, "bg3d-console"),
     t("vello-candidate", "pnpm run verify:studio-vello-candidate", 26, "renderer-vello"),
     t("professional-bristle-webgpu", "pnpm run verify:studio-professional-bristle-webgpu", 24, "brush-webgpu"),
     t("dynamic-dual-tip-webgpu-v2", "pnpm run verify:studio-dynamic-dual-tip-webgpu-v2", 24, "brush-webgpu"),

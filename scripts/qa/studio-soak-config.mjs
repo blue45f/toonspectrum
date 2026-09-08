@@ -40,7 +40,7 @@ export const TESTS = {
     ["webgpu-brush", "pnpm run verify:studio-engine-webgpu-brush-parity", 24, "webgpu"],
     ["webgpu-filter", "pnpm run verify:studio-engine-webgpu-filter-parity", 24, "webgpu"],
     ["bg3d-physics", "pnpm run verify:studio-bg3d-physics", 28, "bg3d-physics"],
-    ["3d-console", "pnpm run verify:studio-3d-console", 24, "bg3d-console"],
+    ["3d-console", 'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console', 24, "bg3d-console"],
     ["vello", "pnpm run verify:studio-vello-candidate", 26, "renderer-vello"],
     ["bristle-webgpu", "pnpm run verify:studio-professional-bristle-webgpu", 24, "brush-webgpu"],
     ["dual-tip-webgpu", "pnpm run verify:studio-dynamic-dual-tip-webgpu-v2", 24, "brush-webgpu"],

@@ -1395,7 +1395,7 @@ async function runMobileDockLayout(
   // Role locators can be re-resolved inconsistently while an overflow toolbar is scrolled in
   // Playwright/WebKit-style mobile layouts. The explicit labels are also the product's stable
   // accessibility contract, so keep the launcher identity independent of clipping geometry.
-  const pagesLauncher = dock.locator('button[aria-label="페이지 목록 열기"]');
+  const pagesLauncher = secondaryToolbar.locator('button[aria-label="페이지 목록 열기"]');
   const brushDockLauncher = dock.getByRole("button", {
     name: "브러시 설정 (굵기·색·프리셋)",
     exact: true,

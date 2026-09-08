@@ -251,10 +251,18 @@ async function selectBrush(
   const searchName = brush.operation === "erase" ? "전체 지우개 검색" : "전체 브러시 검색";
   await catalog.getByRole("searchbox", { name: searchName }).fill(brush.id);
   await catalog.locator(`[data-studio-brush-select="${brush.id}"]`).click();
-  await catalog.waitFor({ state: "detached" });
   await toolbar.getByRole("button", {
     name: new RegExp(`^현재 도구 ${escapeRegExp(brush.name)},`, "u"),
   }).waitFor({ state: "visible" });
+  // The desktop catalogue stays open for repeated selections. Close its actual surface before
+  // measuring canvas input; selecting a brush is no longer a request to dismiss the catalogue.
+  if (await catalog.isVisible()) {
+    await catalog.getByRole("button", {
+      name: brush.operation === "erase" ? "지우개 선택 닫기" : "브러시 전체 라이브러리 닫기",
+      exact: true,
+    }).click();
+  }
+  await catalog.waitFor({ state: "detached" });
   await page.mouse.move(4, 4);
   await page.waitForTimeout(80);
 }
@@ -302,7 +310,7 @@ async function assertRouteVisible(page: Page, points: readonly ScreenPoint[]): P
   invariant(misses.length === 0, `latency route is covered by editor chrome: ${JSON.stringify(misses)}`);
 }
 
-async function armInputProbe(
+export async function armInputProbe(
   page: Page,
   phase: "pointerdown" | "pointermove",
   sampleIndex: number,
@@ -343,7 +351,9 @@ async function armInputProbe(
       sampleContext.clearRect(0, 0, cssPatchSize, cssPatchSize);
       for (const canvas of compositorRoot.querySelectorAll<HTMLCanvasElement>("canvas")) {
         const rect = canvas.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) continue;
+        // Inactive GPU/coverage layers keep their CSS footprint after reclaiming their bitmap.
+        // drawImage rejects a zero-sized backing store even when the DOM rectangle is visible.
+        if (canvas.width <= 0 || canvas.height <= 0 || rect.width <= 0 || rect.height <= 0) continue;
         const sourceX = (center.x - cssPatchSize / 2 - rect.left) * canvas.width / rect.width;
         const sourceY = (center.y - cssPatchSize / 2 - rect.top) * canvas.height / rect.height;
         const sourceWidth = cssPatchSize * canvas.width / rect.width;
@@ -478,7 +488,7 @@ async function inputProbeResult(page: Page): Promise<StudioBrushInputLatencySamp
   });
 }
 
-async function armSettleProbe(
+export async function armSettleProbe(
   page: Page,
   clip: ScreenshotClip,
 ): Promise<void> {
@@ -499,7 +509,7 @@ async function armSettleProbe(
       context.clearRect(0, 0, width, height);
       for (const layer of compositorRoot.querySelectorAll<HTMLCanvasElement>("canvas")) {
         const rect = layer.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) continue;
+        if (layer.width <= 0 || layer.height <= 0 || rect.width <= 0 || rect.height <= 0) continue;
         const sourceX = (sampleRect.x - rect.left) * layer.width / rect.width;
         const sourceY = (sampleRect.y - rect.top) * layer.height / rect.height;
         const sourceWidth = sampleRect.width * layer.width / rect.width;
