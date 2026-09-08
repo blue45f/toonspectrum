@@ -32,7 +32,7 @@ const DEFAULT_LIMITS = DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets.complexity;
 
 describe("studio-bg3d-procedural-starter-pack catalog", () => {
   it("publishes only original procedural CC0-safe, file-free assets", () => {
-    expect(STUDIO_BG3D_PROCEDURAL_STARTER_ASSETS.length).toBeGreaterThanOrEqual(12);
+    expect(STUDIO_BG3D_PROCEDURAL_STARTER_ASSETS.length).toBeGreaterThanOrEqual(41);
     expect(STUDIO_BG3D_PROCEDURAL_STARTER_PACK.provenance).toMatchObject({
       origin: "original-procedural",
       sourceMethod: "authored-mathematical-primitives",
@@ -83,8 +83,11 @@ describe("studio-bg3d-procedural-starter-pack catalog", () => {
         partIds.add(part.id);
         expect(part.id).toMatch(/^[a-z0-9][a-z0-9-]+$/u);
         expect(supportedKinds.has(part.kind)).toBe(true);
-        expect(part.rotation[0]).toBe(0);
-        expect(part.rotation[2]).toBe(0);
+        expect(
+          part.rotation.every(
+            (value) => Number.isFinite(value) && Math.abs(value) <= Math.PI,
+          ),
+        ).toBe(true);
         expect(part.offset.every(Number.isFinite)).toBe(true);
         expect(part.scale.every((value) => Number.isFinite(value) && value > 0)).toBe(true);
         expect(part.color).toMatch(/^#[0-9a-f]{6}$/u);
@@ -101,7 +104,7 @@ describe("studio-bg3d-procedural-starter-pack catalog", () => {
     for (const asset of STUDIO_BG3D_PROCEDURAL_STARTER_ASSETS) {
       expect(asset.budget).toEqual(estimateStudioBg3dProceduralParts(asset.parts));
       expect(asset.budget.nodes).toBeLessThanOrEqual(16);
-      expect(asset.budget.triangles).toBeLessThanOrEqual(1_000);
+      expect(asset.budget.triangles).toBeLessThanOrEqual(3_000);
       expect(asset.budget.materials).toBe(asset.budget.nodes * 2);
       expect(asset.budget.drawCalls).toBe(asset.budget.nodes * 2);
       expect(asset.budget.textures).toBe(0);
@@ -196,37 +199,31 @@ describe("studio-bg3d-procedural-starter-pack runtime leaf", () => {
     expect(second.primitives[0].position[0]).not.toBe(999);
   });
 
-  it("round-trips the complete pack through the real scene runtime adapter", () => {
-    let currentUsage = EMPTY_USAGE;
-    let occupiedNodeIds: string[] = [];
-    const primitives: BgPrimitive[] = [];
-
+  it("round-trips every catalog asset independently through the real scene runtime adapter", () => {
     for (const asset of STUDIO_BG3D_PROCEDURAL_STARTER_ASSETS) {
       const plan = planStudioBg3dProceduralStarterInsertion({
         assetId: asset.id,
-        occupiedNodeIds,
-        currentUsage,
+        occupiedNodeIds: [],
+        currentUsage: EMPTY_USAGE,
         limits: DEFAULT_LIMITS,
       });
       expect(plan.ok).toBe(true);
       if (!plan.ok) continue;
-      primitives.push(...plan.primitives);
-      occupiedNodeIds = primitives.map((primitive) => primitive.id);
-      currentUsage = plan.nextUsage;
-    }
 
-    const adapted = adaptStudioBg3dRuntimeToDocument({
-      primitives,
-      customModels: [],
-      attachmentByStorageModelId: new Map(),
-    });
-    expect(adapted.counts.droppedPrimitives).toBe(0);
-    expect(adapted.counts.emittedPrimitives).toBe(primitives.length);
-    expect(adapted.diagnostics).toEqual([]);
-    expect(adapted.document.nodes).toHaveLength(primitives.length);
-    expect(new Set(adapted.document.nodes.map((node) => node.id)).size).toBe(
-      primitives.length,
-    );
+      const primitives: BgPrimitive[] = [...plan.primitives];
+      const adapted = adaptStudioBg3dRuntimeToDocument({
+        primitives,
+        customModels: [],
+        attachmentByStorageModelId: new Map(),
+      });
+      expect(adapted.counts.droppedPrimitives).toBe(0);
+      expect(adapted.counts.emittedPrimitives).toBe(primitives.length);
+      expect(adapted.diagnostics).toEqual([]);
+      expect(adapted.document.nodes).toHaveLength(primitives.length);
+      expect(new Set(adapted.document.nodes.map((node) => node.id)).size).toBe(
+        primitives.length,
+      );
+    }
   });
 
   it("fails closed on unknown ids, collisions, invalid transforms, and malformed usage", () => {

@@ -106,7 +106,8 @@ export function CharacterShaperSummaryBar({
   const changedTitle = changedCount > 0 ? `변경된 슬롯: ${changedSlots.map(slotLabel).join(", ")}` : "아직 바꾼 슬롯이 없습니다";
   const styleText = summary.style.trim().length > 0 ? summary.style : "직접 조합";
   const recentLabel = binding.history.recentLabels[0] ?? null;
-  const canCompare = changedCount > 0 && binding.busyReason === null;
+  const previewActive = binding.previewEntryId != null;
+  const canCompare = changedCount > 0 && binding.busyReason === null && !previewActive;
   const fullStateName: string = typeof h.fullStateName === "string" ? h.fullStateName : "";
   const savedStates = h.savedFullStates as Readonly<Record<string, unknown>> | undefined;
 
@@ -198,6 +199,7 @@ export function CharacterShaperSummaryBar({
   };
 
   const submitSave = () => {
+    if (previewActive) return;
     const name = saveName.normalize("NFKC").trim().replace(/\s+/gu, " ");
     if (!name) return;
     h.setFullStateName(name);
@@ -222,6 +224,7 @@ export function CharacterShaperSummaryBar({
         value={activeModelId ?? ""}
         disabled={loading}
         onChange={(event) => {
+          binding.cancelPreview?.();
           const entry = entries.find((candidate) => candidate.id === event.currentTarget.value);
           if (entry) h.loadModelFromLibraryEntry(entry);
         }}

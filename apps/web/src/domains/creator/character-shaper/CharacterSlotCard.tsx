@@ -3,10 +3,11 @@
  *
  * States follow the design brief §3: default / hover / focus-visible / selected (accent ring +
  * check) / partial (warn badge + reason) / unavailable (dimmed + reason, still focusable,
- * `aria-disabled`). Hover never mutates the scene — it only reports the id for the inspector.
+ * `aria-disabled`). A deliberate hover or keyboard focus may enter a reversible runtime audition;
+ * only a click promotes that candidate into document history.
  */
-import { Ban, Check, Image, TriangleAlert } from "lucide-react";
-import { useId } from "react";
+import { Ban, Check, Eye, Image, TriangleAlert } from "lucide-react";
+import { useId, useRef } from "react";
 
 import { useCharacterRuntimeThumbnail } from "../character-platform/thumbnail/character-runtime-thumbnail-store";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
@@ -29,18 +30,31 @@ export function CharacterSlotCard({
   entry,
   availability,
   selected,
+  previewed = false,
   tabIndex,
   onCommit,
   onHover,
   onFocus,
+  onPreviewStart,
+  onPreviewEnd,
   onKeyNavigate,
 }: CharacterSlotCardProps) {
   const detailId = useId();
-  const runtimeThumbnail = useCharacterRuntimeThumbnail(entry.id);
+  const capturedThumbnail = useCharacterRuntimeThumbnail(entry.id);
+  // The recorder captures the committed composite, not an isolated candidate. Only the selected
+  // card may truthfully label that image as its own runtime result.
+  const runtimeThumbnail = selected ? capturedThumbnail : null;
+  const pointerInsideRef = useRef(false);
+  const focusedRef = useRef(false);
   const badge = describeAvailabilityBadge(availability);
   const unavailable = availability.status === "unavailable";
   const showBadge = availability.status !== "available";
   const title = badge.detail ? `${entry.label} · ${badge.label} — ${badge.detail}` : `${entry.label} · ${entry.hint}`;
+
+  const startPreview = () => {
+    if (!unavailable) onPreviewStart?.(entry);
+  };
+  const endPreview = () => onPreviewEnd?.(entry.id);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -62,23 +76,42 @@ export function CharacterSlotCard({
       data-character-slot-card={entry.id}
       data-character-slot-card-availability={availability.status}
       data-character-slot-card-selected={selected ? "true" : undefined}
+      data-character-slot-card-previewed={previewed ? "true" : undefined}
       data-character-slot-card-runtime-thumbnail={runtimeThumbnail ? "true" : undefined}
       className={cn(
         "group relative flex min-h-11 w-full min-w-0 flex-col overflow-hidden rounded-2xl border text-left",
         "transition-[transform,border-color,box-shadow,background-color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
         STUDIO_FOCUS_RING,
-        selected
-          ? "border-accent bg-accent-soft/40 shadow-[0_0_0_1px_var(--color-accent)]"
-          : "border-line bg-card hover:border-line-strong hover:bg-raised/70",
+        previewed
+          ? "border-accent bg-accent-soft/55 shadow-[0_0_0_2px_var(--color-accent)]"
+          : selected
+            ? "border-accent bg-accent-soft/40 shadow-[0_0_0_1px_var(--color-accent)]"
+            : "border-line bg-card hover:border-line-strong hover:bg-raised/70",
         unavailable ? "cursor-not-allowed" : "hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
       )}
       onClick={() => {
         if (unavailable) return;
         onCommit(entry);
       }}
-      onPointerEnter={() => onHover(entry.id)}
-      onPointerLeave={() => onHover(null)}
-      onFocus={() => onFocus(entry.id)}
+      onPointerEnter={() => {
+        pointerInsideRef.current = true;
+        onHover(entry.id);
+        startPreview();
+      }}
+      onPointerLeave={() => {
+        pointerInsideRef.current = false;
+        onHover(null);
+        if (!focusedRef.current) endPreview();
+      }}
+      onFocus={() => {
+        focusedRef.current = true;
+        onFocus(entry.id);
+        startPreview();
+      }}
+      onBlur={() => {
+        focusedRef.current = false;
+        if (!pointerInsideRef.current) endPreview();
+      }}
       onKeyDown={handleKeyDown}
     >
       <span
@@ -103,7 +136,12 @@ export function CharacterSlotCard({
             실제 모델
           </span>
         ) : null}
-        {showBadge ? (
+        {previewed ? (
+          <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full border border-accent/60 bg-panel/90 px-1.5 py-0.5 text-[0.6rem] font-bold text-accent backdrop-blur">
+            <Eye size={10} aria-hidden />
+            3D 미리보기
+          </span>
+        ) : showBadge ? (
           <span
             className={cn(
               "absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[0.6rem] font-semibold backdrop-blur",
@@ -112,6 +150,11 @@ export function CharacterSlotCard({
           >
             {unavailable ? <Ban size={10} aria-hidden /> : <TriangleAlert size={10} aria-hidden />}
             {badge.label}
+          </span>
+        ) : null}
+        {previewed ? (
+          <span className="absolute bottom-1.5 right-1.5 rounded-full border border-accent/50 bg-panel/90 px-2 py-0.5 text-[0.58rem] font-bold text-accent backdrop-blur">
+            클릭해 확정
           </span>
         ) : null}
         {selected ? (

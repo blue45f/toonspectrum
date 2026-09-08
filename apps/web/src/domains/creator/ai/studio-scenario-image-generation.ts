@@ -15,6 +15,13 @@ import {
   type StudioAiSettings,
   type StudioTextAiProvenance,
 } from "./studio-ai-client";
+import {
+  appendScenarioImageCandidate,
+  planStudioScenarioImageGeneration,
+  scenarioImageInputFingerprint,
+  scenarioImageReferenceSignature,
+  type StudioScenarioImageGenerationRequest,
+} from "./studio-scenario-candidate-workflow";
 import { captureStudioAiGeneratedAssetProvenance } from "./studio-ai-generated-asset-model";
 import {
   parseStudioAiRequestedSize,
@@ -35,7 +42,7 @@ export interface StudioScenarioImageGenerationSnapshot {
   items: ScenarioPreviewItem[];
   nextCanvasH: number;
   characterDescription: string;
-  textAiProvenance: StudioTextAiProvenance;
+  textAiProvenance: StudioTextAiProvenance | null;
 }
 
 /**
@@ -83,7 +90,7 @@ export interface StudioScenarioImageGenerationContext {
 }
 
 export interface StudioScenarioImageGenerationExecutors {
-  readonly executeGenerateScenarioImages: () => Promise<void>;
+  readonly executeGenerateScenarioImages: (request?: StudioScenarioImageGenerationRequest) => Promise<void>;
   readonly executeRegenerateScenarioImage: (index: number) => Promise<void>;
 }
 
@@ -145,7 +152,7 @@ export function createStudioScenarioImageGenerationExecutors(
     ];
   }
 
-  async function executeGenerateScenarioImages() {
+  async function executeGenerateScenarioImages(request: StudioScenarioImageGenerationRequest = {}) {
     if (collaborationAccessRef.current.locked) return;
     if (scenarioAbortControllerRef.current) return;
     const mutationTicket = captureStudioMutationTicket();
@@ -173,27 +180,34 @@ export function createStudioScenarioImageGenerationExecutors(
       );
       return;
     }
-    const targetIndexes = snapshot.items.flatMap((item, index) => (item.imageDataUrl ? [] : [index]));
-    if (targetIndexes.length === 0) return;
+    const tasks = planStudioScenarioImageGeneration(snapshot.items, request);
+    if (tasks.length === 0) return;
+    const referenceSignature = scenarioImageReferenceSignature(
+      scenarioImageReferenceDocument.references
+    );
 
     scenarioCancelRef.current = false;
     const controller = beginScenarioRequest();
     setScenarioBusy(true);
     setScenarioError(null);
     setScenarioStageLabel("검토한 장면 이미지 생성 중…");
-    setScenarioProgress({ done: 0, total: targetIndexes.length });
+    setScenarioProgress({ done: 0, total: tasks.length });
     let referenceImageDataUrl = snapshot.items.find((item) => item.imageDataUrl)?.imageDataUrl ?? null;
     const characterContext = buildStudioCharacterBiblePromptContext(characterBible, 4_000);
 
     try {
-      for (let taskIndex = 0; taskIndex < targetIndexes.length; taskIndex++) {
+      for (let taskIndex = 0; taskIndex < tasks.length; taskIndex++) {
         if (scenarioCancelRef.current || controller.signal.aborted) break;
-        const index = targetIndexes[taskIndex];
+        const task = tasks[taskIndex];
+        const index = task.index;
         const panel = snapshot.items[index];
         let imageResult: StudioAiResult<{ dataUrl: string }>;
         const reviewedImagePrompt = [
           characterContext ? `[캐릭터 바이블 — [고정] 설정 유지]\n${characterContext}` : "",
           panel.imagePrompt,
+          task.variantCount > 1
+            ? `[후보 ${task.variant}/${task.variantCount}] 같은 연출 요구를 유지하되 표정·실루엣·카메라 미세 선택지를 달리합니다.`
+            : "",
         ]
           .filter((value) => value.trim().length > 0)
           .join("\n\n");
@@ -275,7 +289,16 @@ export function createStudioScenarioImageGenerationExecutors(
                   ...previous,
                   items: previous.items.map((item, itemIndex) =>
                     itemIndex === index
-                      ? { ...item, imageDataUrl: dataUrl, imageError: undefined, imageProvenance: requestProvenance }
+                      ? appendScenarioImageCandidate(item, {
+                          id: operationId,
+                          imageDataUrl: dataUrl,
+                          imageProvenance: requestProvenance,
+                          inputFingerprint: scenarioImageInputFingerprint(
+                            panel,
+                            referenceSignature
+                          ),
+                          createdAt: requestProvenance.createdAt,
+                        })
                       : item
                   ),
                 }
@@ -287,15 +310,13 @@ export function createStudioScenarioImageGenerationExecutors(
               ? {
                   ...previous,
                   items: previous.items.map((item, itemIndex) =>
-                    itemIndex === index
-                      ? { ...item, imageDataUrl: undefined, imageError: imageResult.error, imageProvenance: undefined }
-                      : item
+                    itemIndex === index ? { ...item, imageError: imageResult.error } : item
                   ),
                 }
               : previous
           );
         }
-        setScenarioProgress({ done: taskIndex + 1, total: targetIndexes.length });
+        setScenarioProgress({ done: taskIndex + 1, total: tasks.length });
       }
     } finally {
       setScenarioBusy(false);
@@ -335,6 +356,9 @@ export function createStudioScenarioImageGenerationExecutors(
       );
       return;
     }
+    const referenceSignature = scenarioImageReferenceSignature(
+      scenarioImageReferenceDocument.references
+    );
     const controller = beginScenarioRequest();
     setScenarioRegeneratingIndex(index);
     setScenarioError(null);
@@ -425,14 +449,18 @@ export function createStudioScenarioImageGenerationExecutors(
               items: previous.items.map((item, itemIndex) =>
                 itemIndex === index
                   ? imageResult.ok
-                    ? {
-                        ...item,
-                        imageDataUrl: imageResult.data.dataUrl,
-                        imageError: undefined,
-                        imageProvenance: requestProvenance,
-                      }
-                    // The failed attempt belongs in the operation ledger. The reviewed image
-                    // and its provenance remain authoritative until a replacement succeeds.
+                    ? appendScenarioImageCandidate(item, {
+                      id: operationId,
+                      imageDataUrl: imageResult.data.dataUrl,
+                      imageProvenance: requestProvenance,
+                      inputFingerprint: scenarioImageInputFingerprint(
+                        panel,
+                        referenceSignature
+                      ),
+                      createdAt: requestProvenance.createdAt,
+                    })
+                    // The failed attempt belongs in the operation ledger. The reviewed image,
+                    // alternatives and approval remain authoritative until a replacement succeeds.
                     : { ...item, imageError: imageResult.error }
                   : item
               ),
