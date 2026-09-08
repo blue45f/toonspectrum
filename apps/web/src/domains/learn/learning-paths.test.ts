@@ -10,6 +10,7 @@ import {
   SKILL_IDS,
   buildSessionPlan,
   getLessonMeta,
+  getLessonRequirementProgress,
   getLessonState,
   getPathLessons,
   getPathStats,
@@ -71,6 +72,22 @@ describe("learning path progress", () => {
     assert.equal(getLessonState(progress, lesson.id), "completed");
   });
 
+  it("derives bounded requirement progress from valid unique checks and the correct answer", () => {
+    const lesson = LESSONS[0];
+    const progress = emptyProgress();
+    progress.lessons[lesson.id] = {
+      checks: [0, 0, -1, lesson.checks.length + 5],
+      answer: lesson.quiz.answer,
+      notes: "직접 만든 비정상 입력도 안전하게 처리",
+      completed: false,
+    };
+    const expected = Math.round((2 / (lesson.checks.length + 1)) * 100);
+    assert.equal(getLessonRequirementProgress(lesson, progress), expected);
+    assert.ok(getLessonRequirementProgress(lesson, progress) <= 100);
+    progress.lessons[lesson.id].completed = true;
+    assert.equal(getLessonRequirementProgress(lesson, progress), 100);
+  });
+
   it("calculates path completion and remaining time from the shared progress record", () => {
     const path = LEARNING_PATHS[0];
     const lessons = getPathLessons(path);
@@ -89,6 +106,16 @@ describe("learning path progress", () => {
     assert.equal(stats.completed, 1);
     assert.equal(stats.percent, 25);
     assert.equal(stats.remainingMinutes, stats.totalMinutes - first.minutes);
+  });
+
+  it("resumes an active lesson before earlier untouched lessons", () => {
+    const path = LEARNING_PATHS[0];
+    const lessons = getPathLessons(path);
+    const progress = emptyProgress();
+    progress.lessons[lessons[1].id] = { checks: [0], answer: null, notes: "여기서 멈춤", completed: false };
+    const plan = buildSessionPlan(path, progress, 30);
+    assert.equal(plan[0].id, lessons[1].id);
+    assert.ok(plan.reduce((sum, lesson) => sum + lesson.minutes, 0) <= 30);
   });
 
   it("builds a bounded session and falls back to a review lesson after completion", () => {

@@ -133,6 +133,50 @@ async function waitForRoomUrl(page: Page): Promise<string> {
   return page.url();
 }
 
+
+/**
+ * A production verification keeps the authenticated server-backed lane. A static Vite preview has
+ * no Nest realtime-ticket endpoint, so its truthful browser contract is the user-visible
+ * same-origin fallback. Switching through the real recovery UI keeps this proof end-to-end while
+ * avoiding a false failure caused by an intentionally absent preview backend.
+ */
+async function ensureLocalPreviewTransport(page: Page, label: string): Promise<void> {
+  if (EXISTING_ORIGIN) return;
+
+  const liveMode = page.locator("[data-studio-live-mode]").first();
+  const currentMode = await liveMode
+    .getAttribute("data-studio-live-mode", { timeout: 800 })
+    .catch(() => null);
+  if (currentMode === "local") return;
+
+  const presenceDock = page.locator('[data-studio-presence-dock="true"]').first();
+  await presenceDock.waitFor({ state: "visible", timeout: 20_000 });
+
+  const fallback = page.getByRole("button", { name: "로컬 탭 모드", exact: true }).first();
+  if (!(await fallback.isVisible().catch(() => false))) {
+    const teamAction = page.locator('[data-studio-presence-team-action="true"]').first();
+    if (await teamAction.isVisible().catch(() => false)) {
+      await teamAction.click({ force: true });
+    } else {
+      await presenceDock.click({ force: true });
+    }
+  }
+
+  await fallback.waitFor({ state: "visible", timeout: 20_000 });
+  await fallback.click();
+  await page.waitForFunction(
+    () => document
+      .querySelector<HTMLElement>("[data-studio-live-mode]")
+      ?.dataset.studioLiveMode === "local",
+    undefined,
+    { timeout: 20_000 },
+  );
+  await page.getByRole("button", { name: "팀 작업 공간 닫기" }).first()
+    .click({ timeout: 1_500 })
+    .catch(() => undefined);
+  log(`${label} uses the explicit same-origin collaboration fallback`);
+}
+
 async function waitForDocumentLane(
   page: Page,
   diagnostics: PageDiagnostics,
@@ -367,6 +411,7 @@ try {
   await pageA.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
   await dismissOverlays(pageA);
   const roomUrl = await waitForRoomUrl(pageA);
+  await ensureLocalPreviewTransport(pageA, "A");
   const phaseA = await waitForDocumentLane(pageA, attachedA.diagnostics);
 
   const attachedB = await attachPage(context, "B");
@@ -376,6 +421,7 @@ try {
   await pageB.goto(roomUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await pageB.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
   await dismissOverlays(pageB);
+  await ensureLocalPreviewTransport(pageB, "B");
   const phaseB = await waitForDocumentLane(pageB, attachedB.diagnostics);
 
   await pageA.waitForTimeout(700);
@@ -406,6 +452,7 @@ try {
   await pageC.goto(roomUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await pageC.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
   await dismissOverlays(pageC);
+  await ensureLocalPreviewTransport(pageC, "C");
   const phaseC = await waitForDocumentLane(pageC, attachedC.diagnostics);
   const lateJoinC = await settleCanvas(pageC);
   assert.ok(

@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useParams } from "react-router-dom";
 
+import { MarketProductionFitWorkbench } from "../components/MarketProductionFitWorkbench";
 import { MarketResourceDetailArticle } from "../components/MarketResourceDetailArticle";
 import { useMarketResourceDetail } from "../hooks/use-market-resource-detail";
 import { useMarketResources } from "../hooks/use-market-resources";
@@ -96,12 +97,15 @@ export function MarketResourceDetailPage() {
           </button>
         </div>
       ) : (
-        <MarketResourceDetailArticle
-          record={record}
-          relatedItems={relatedItems}
-          staleSavedAt={staleSavedAt}
-          onRetry={reload}
-        />
+        <div className="mt-6 space-y-6">
+          <MarketProductionFitWorkbench record={record} />
+          <MarketResourceDetailArticle
+            record={record}
+            relatedItems={relatedItems}
+            staleSavedAt={staleSavedAt}
+            onRetry={reload}
+          />
+        </div>
       )}
     </Container>
   );
