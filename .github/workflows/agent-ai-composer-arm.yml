@@ -24,6 +24,12 @@ jobs:
         with:
           ref: feat/studio-ai-comic-composer-20260909
           fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            apps/web/src/domains/creator
+            docs
+            scripts
+            .github/workflows
       - name: Apply guarded integration patch
         shell: bash
         run: |
