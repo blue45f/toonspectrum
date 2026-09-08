@@ -7,16 +7,30 @@ import {
   FlipHorizontal2,
   GripVertical,
   LayoutTemplate,
+  ListFilter,
+  LocateFixed,
+  LockKeyhole,
   Maximize2,
   Minimize2,
   Move,
   PanelLeft,
   Pencil,
   Plus,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
-import { Suspense, lazy, memo, useEffect, useId, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  memo,
+  useDeferredValue,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { StudioEdgeRailButton } from "./studio-chrome-ui";
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
@@ -34,13 +48,24 @@ import {
   studioMobileSheetSizeStyle,
   type StudioMobileSheetSnap,
 } from "./studio-mobile-sheet-snap";
+import {
+  filterStudioPageNavigationEntries,
+  resolveStudioPageNavigationTarget,
+  resolveStudioPageSelection,
+  STUDIO_PAGE_NAVIGATION_KEYS,
+  type StudioPageListFilter,
+  type StudioPageNavigationKey,
+} from "./studio-page-navigation";
 import { StudioPageThumbnail } from "./studio-page-lazy-ui";
 import {
   PAGE_NAME_MAX,
   PAGE_NOTE_MAX,
   autoPageName,
-  pageDisplayName,
 } from "./studio-page-meta";
+import {
+  PAGE_REVIEW_STATUS_LABELS,
+  normalizePageReviewState,
+} from "./studio-page-review";
 import { shotTagBadgeText, shotTagBadgeTitle } from "./studio-panel-shot-tags";
 import { STUDIO_WORKSPACE_LEFT_PANEL_WIDTH } from "./studio-workspaces";
 import { StudioDetachablePanelSlot } from "./StudioDetachablePanelSlot";
@@ -55,7 +80,13 @@ import type {
 } from "./studio-ui-preferences-sqlite";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 import type { Resizable } from "@/hooks/use-resizable";
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import type {
+  Dispatch,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  RefObject,
+  SetStateAction,
+} from "react";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -66,6 +97,16 @@ const LazyStudioMobileSheetHandle = lazy(() =>
 );
 
 const PAGE_PREVIEW_SIZE_VALUES = ["compact", "comfortable", "large"] as const satisfies readonly StudioPagePreviewSize[];
+
+const PAGE_FILTER_OPTIONS = [
+  { value: "all", label: "전체" },
+  { value: "content", label: "내용 있음" },
+  { value: "empty", label: "빈 페이지" },
+  { value: "notes", label: "메모 있음" },
+  { value: "needs-review", label: "검토 필요" },
+  { value: "approved", label: "승인됨" },
+  { value: "locked", label: "잠긴 페이지" },
+] as const satisfies readonly { value: StudioPageListFilter; label: string }[];
 
 async function acquireProductStudioUiPreferencesRepository(): Promise<StudioUiPreferencesRepository> {
   const module = await import("./studio-ui-preferences-sqlite");
@@ -268,11 +309,151 @@ export const StudioPageListPane = memo(function StudioPageListPane({
         if (preferenceMountedRef.current) setPreferenceAuthority("memory-only");
       });
   };
-  // CSP EX 스타일 다중 페이지 선택 — currentPageId 와 별도로 벌크 이동/삭제 대상 id 목록.
+
   const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
-  const pageIdSet = new Set(pages.map((page) => page.id));
-  const liveSelectedPageIds = selectedPageIds.filter((id) => pageIdSet.has(id));
+  const [selectionAnchorPageId, setSelectionAnchorPageId] = useState<string | null>(currentPageId);
+  const [pageQuery, setPageQuery] = useState("");
+  const deferredPageQuery = useDeferredValue(pageQuery);
+  const [pageFilter, setPageFilter] = useState<StudioPageListFilter>("all");
+  const [autoFollowCurrent, setAutoFollowCurrent] = useState(true);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const pageButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const pageItemRefs = useRef(new Map<string, HTMLDivElement>());
+  const pageResultsId = useId();
+  const navigationHelpId = useId();
+
+  const pageIdSet = useMemo(() => new Set(pages.map((page) => page.id)), [pages]);
+  const liveSelectedPageIds = useMemo(() => {
+    const selected = new Set(selectedPageIds);
+    return pages.filter((page) => selected.has(page.id)).map((page) => page.id);
+  }, [pages, selectedPageIds]);
+  const liveSelectedPageIdSet = useMemo(
+    () => new Set(liveSelectedPageIds),
+    [liveSelectedPageIds],
+  );
+  const navigationEntries = useMemo(
+    () => filterStudioPageNavigationEntries(pages, deferredPageQuery, pageFilter),
+    [deferredPageQuery, pageFilter, pages],
+  );
+  const visiblePageIds = useMemo(
+    () => navigationEntries.map(({ page }) => page.id),
+    [navigationEntries],
+  );
+  const visiblePageIdSet = useMemo(() => new Set(visiblePageIds), [visiblePageIds]);
+  const hiddenSelectedPageCount = liveSelectedPageIds.filter(
+    (id) => !visiblePageIdSet.has(id),
+  ).length;
   const multiSelectActive = liveSelectedPageIds.length > 1;
+  const navigationActive = pageQuery.trim().length > 0 || pageFilter !== "all";
+  const currentPageVisible = visiblePageIdSet.has(currentPageId);
+
+  useEffect(() => {
+    if (selectionAnchorPageId && pageIdSet.has(selectionAnchorPageId)) return;
+    setSelectionAnchorPageId(pageIdSet.has(currentPageId) ? currentPageId : pages[0]?.id ?? null);
+  }, [currentPageId, pageIdSet, pages, selectionAnchorPageId]);
+
+  useEffect(() => {
+    if (!autoFollowCurrent || !visibleLeftPanelOpen || !currentPageVisible) return;
+    if (isMobile && mobileSheet !== "pages") return;
+    const item = pageItemRefs.current.get(currentPageId);
+    if (item && typeof item.scrollIntoView === "function") {
+      item.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [
+    autoFollowCurrent,
+    currentPageId,
+    currentPageVisible,
+    isMobile,
+    mobileSheet,
+    navigationEntries,
+    visibleLeftPanelOpen,
+  ]);
+
+  const selectPageFromPointer = (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    pageId: string,
+  ): void => {
+    const result = resolveStudioPageSelection({
+      orderedPageIds: visiblePageIds,
+      selectedPageIds: liveSelectedPageIds,
+      targetPageId: pageId,
+      anchorPageId: selectionAnchorPageId,
+      additive: event.metaKey || event.ctrlKey,
+      range: event.shiftKey,
+    });
+    setSelectedPageIds(result.selectedPageIds);
+    setSelectionAnchorPageId(result.anchorPageId);
+    setCurrentPageId(pageId);
+  };
+
+  const focusPageButton = (pageId: string): void => {
+    const focus = () => pageButtonRefs.current.get(pageId)?.focus();
+    if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(focus);
+    else focus();
+  };
+
+  const selectAllVisiblePages = (): void => {
+    setSelectedPageIds(visiblePageIds);
+    if (!selectionAnchorPageId || !visiblePageIdSet.has(selectionAnchorPageId)) {
+      setSelectionAnchorPageId(
+        visiblePageIdSet.has(currentPageId) ? currentPageId : visiblePageIds[0] ?? null,
+      );
+    }
+  };
+
+  const handlePageSelectionKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    pageId: string,
+  ): void => {
+    if (
+      (event.metaKey || event.ctrlKey)
+      && event.key.toLocaleLowerCase("en-US") === "a"
+    ) {
+      event.preventDefault();
+      selectAllVisiblePages();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      if (navigationActive) {
+        setPageQuery("");
+        setPageFilter("all");
+      } else {
+        setSelectedPageIds([pageId]);
+        setSelectionAnchorPageId(pageId);
+      }
+      return;
+    }
+
+    if (!STUDIO_PAGE_NAVIGATION_KEYS.includes(event.key as StudioPageNavigationKey)) return;
+    event.preventDefault();
+    const targetPageId = resolveStudioPageNavigationTarget(
+      visiblePageIds,
+      pageId,
+      event.key as StudioPageNavigationKey,
+    );
+    if (!targetPageId) return;
+    const result = resolveStudioPageSelection({
+      orderedPageIds: visiblePageIds,
+      selectedPageIds: liveSelectedPageIds,
+      targetPageId,
+      anchorPageId: selectionAnchorPageId,
+      additive: event.metaKey || event.ctrlKey,
+      range: event.shiftKey,
+    });
+    setSelectedPageIds(result.selectedPageIds);
+    setSelectionAnchorPageId(result.anchorPageId);
+    setCurrentPageId(targetPageId);
+    focusPageButton(targetPageId);
+  };
+
+  const clearNavigation = (): void => {
+    setPageQuery("");
+    setPageFilter("all");
+    searchInputRef.current?.focus();
+  };
+
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;
@@ -285,29 +466,30 @@ export const StudioPageListPane = memo(function StudioPageListPane({
     saveStudioDetachablePanelState("page-list", next);
     if (next) setLeftPanelOpen(true);
   };
+
   return (
     <>
-        {!visibleLeftPanelOpen && !presentationPanelsHidden && (
-          <StudioEdgeRailButton
-            side="left"
-            label="페이지"
-            icon={LayoutTemplate}
-            onClick={() => setLeftPanelOpen(true)}
-            title="페이지 목록 펼치기"
-          />
-        )}
-        <StudioDetachablePanelSlot
-          detached={desktopDetached && visibleLeftPanelOpen}
-          surfaceId="page-list"
-          label="페이지 목록"
-          defaultLayout={DEFAULT_STUDIO_PAGE_LIST_FLOATING_LAYOUT}
-          minWidth={320}
-          minHeight={420}
-          maxWidth={720}
-          maxHeight={1_100}
-          allowedDockEdges={["left", "right"]}
-          onClose={() => setLeftPanelOpen(false)}
-        >
+      {!visibleLeftPanelOpen && !presentationPanelsHidden && (
+        <StudioEdgeRailButton
+          side="left"
+          label="페이지"
+          icon={LayoutTemplate}
+          onClick={() => setLeftPanelOpen(true)}
+          title="페이지 목록 펼치기"
+        />
+      )}
+      <StudioDetachablePanelSlot
+        detached={desktopDetached && visibleLeftPanelOpen}
+        surfaceId="page-list"
+        label="페이지 목록"
+        defaultLayout={DEFAULT_STUDIO_PAGE_LIST_FLOATING_LAYOUT}
+        minWidth={320}
+        minHeight={420}
+        maxWidth={720}
+        maxHeight={1_100}
+        allowedDockEdges={["left", "right"]}
+        onClose={() => setLeftPanelOpen(false)}
+      >
         <div
           id={STUDIO_MOBILE_PAGES_SHEET_ID}
           ref={pagesSheetRef}
@@ -323,15 +505,27 @@ export const StudioPageListPane = memo(function StudioPageListPane({
           aria-hidden={isMobile && mobileSheet !== "pages" ? true : undefined}
           tabIndex={isMobile && mobileSheet === "pages" ? -1 : undefined}
           inert={isMobile && mobileSheet !== "pages" ? true : undefined}
+          onKeyDown={(event) => {
+            const tagName = (event.target as HTMLElement).tagName;
+            const editing = tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
+            if (
+              !editing
+              && !event.metaKey
+              && !event.ctrlKey
+              && !event.altKey
+              && event.key === "/"
+            ) {
+              event.preventDefault();
+              searchInputRef.current?.focus();
+            }
+          }}
           className={cn(
             "flex flex-col gap-1.5 border border-line p-2",
-            // 모바일: 하단에서 올라오는 바텀시트
             "fixed inset-x-0 bottom-0 z-[60] overflow-hidden rounded-t-3xl bg-panel pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-[transform,height,max-height] duration-300 ease-out motion-reduce:transition-none",
-            // 데스크톱: 엣지 도크(라운드·여백 최소, 캔버스 폭 최대)
             "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:overflow-hidden lg:rounded-none lg:border-y-0 lg:border-l-0 lg:bg-panel/50 lg:pb-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
             desktopDetached && "lg:h-full lg:w-full lg:flex-1 lg:border-0 lg:bg-transparent lg:p-0",
-            !visibleLeftPanelOpen && "lg:hidden"
+            !visibleLeftPanelOpen && "lg:hidden",
           )}
           style={
             isMobile
@@ -370,6 +564,11 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                   <ChevronLeft size={13} />
                 </button>
                 페이지
+                <span className="font-normal tabular-nums text-fg-3">
+                  {navigationEntries.length === pages.length
+                    ? pages.length
+                    : `${navigationEntries.length}/${pages.length}`}
+                </span>
               </span>
               <div className="flex shrink-0 items-center gap-1">
                 {!isMobile ? (
@@ -407,10 +606,158 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                 </button>
               </div>
             </div>
+
+            <div
+              role="search"
+              aria-label="페이지 검색 및 필터"
+              className="mt-1 flex flex-wrap items-center gap-1"
+            >
+              <div className="relative min-w-[10rem] flex-1">
+                <Search
+                  size={14}
+                  aria-hidden
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
+                />
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  value={pageQuery}
+                  maxLength={200}
+                  aria-label="페이지 검색"
+                  onChange={(event) => setPageQuery(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Escape" || !pageQuery) return;
+                    event.stopPropagation();
+                    setPageQuery("");
+                  }}
+                  aria-controls={pageResultsId}
+                  aria-describedby={navigationHelpId}
+                  data-testid="studio-page-search"
+                  placeholder="이름·메모·태그·담당자 검색"
+                  title="페이지 검색 · / 키로 포커스"
+                  className="min-h-11 w-full rounded-lg border border-line bg-card pl-9 pr-9 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/30"
+                />
+                {pageQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPageQuery("");
+                      searchInputRef.current?.focus();
+                    }}
+                    aria-label="페이지 검색어 지우기"
+                    className="absolute right-0 top-0 grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg"
+                  >
+                    <X size={14} aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+              <label className="relative flex min-h-11 min-w-[7rem] items-center rounded-lg border border-line bg-card pl-8 text-fg-2 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/30">
+                <ListFilter
+                  size={14}
+                  aria-hidden
+                  className="pointer-events-none absolute left-2.5 text-fg-3"
+                />
+                <span className="sr-only">페이지 필터</span>
+                <select
+                  value={pageFilter}
+                  onChange={(event) => setPageFilter(event.currentTarget.value as StudioPageListFilter)}
+                  aria-label="페이지 필터"
+                  className="min-h-11 w-full appearance-none bg-transparent pr-7 text-[0.7rem] font-semibold outline-none"
+                >
+                  {PAGE_FILTER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={12}
+                  aria-hidden
+                  className="pointer-events-none absolute right-2.5 text-fg-3"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setAutoFollowCurrent((value) => !value)}
+                aria-label={autoFollowCurrent
+                  ? "현재 페이지 자동 추적 끄기"
+                  : "현재 페이지 자동 추적 켜기"}
+                aria-pressed={autoFollowCurrent}
+                title={autoFollowCurrent
+                  ? "현재 페이지를 목록 안에 자동으로 유지"
+                  : "현재 페이지 자동 추적 꺼짐"}
+                className={cn(
+                  "grid size-11 shrink-0 place-items-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                  autoFollowCurrent
+                    ? "border-accent/50 bg-accent-soft/40 text-accent"
+                    : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+                )}
+              >
+                <LocateFixed size={14} aria-hidden />
+              </button>
+            </div>
+            <span id={navigationHelpId} className="sr-only">
+              검색은 페이지 이름, 번호, 콘티 메모, 샷 태그, 검토 상태와 담당자를 함께 찾습니다.
+              페이지 카드에서 방향키, Home, End, Page Up, Page Down으로 이동하고 Shift를 함께
+              눌러 연속 선택할 수 있습니다. Control 또는 Command+A는 현재 표시 결과를 모두 선택합니다.
+            </span>
+            <div className="mt-1 flex min-h-8 flex-wrap items-center gap-1 text-[0.65rem] text-fg-3">
+              <span aria-live="polite" aria-atomic="true" className="mr-auto tabular-nums">
+                {navigationEntries.length}개 표시
+                {hiddenSelectedPageCount > 0 ? ` · 선택 ${hiddenSelectedPageCount}개 숨김` : ""}
+                {!currentPageVisible && navigationActive ? " · 현재 페이지 숨김" : ""}
+              </span>
+              <button
+                type="button"
+                data-testid="studio-page-select-visible"
+                onClick={selectAllVisiblePages}
+                disabled={visiblePageIds.length === 0}
+                className="min-h-8 rounded-md px-2 font-semibold text-fg-2 hover:bg-raised disabled:opacity-40"
+              >
+                표시 전체 선택
+              </button>
+              {liveSelectedPageIds.length > 0 ? (
+                <button
+                  type="button"
+                  data-testid="studio-page-clear-selection"
+                  onClick={() => {
+                    setSelectedPageIds([]);
+                    setSelectionAnchorPageId(currentPageId);
+                  }}
+                  className="min-h-8 rounded-md px-2 font-semibold text-fg-2 hover:bg-raised"
+                >
+                  선택 해제
+                </button>
+              ) : null}
+              {!currentPageVisible && navigationActive ? (
+                <button
+                  type="button"
+                  data-testid="studio-page-show-current"
+                  onClick={clearNavigation}
+                  className="min-h-8 rounded-md px-2 font-semibold text-fg-2 hover:bg-raised"
+                >
+                  현재 페이지 보기
+                </button>
+              ) : null}
+              {navigationActive ? (
+                <button
+                  type="button"
+                  onClick={clearNavigation}
+                  className="min-h-8 rounded-md px-2 font-semibold text-accent hover:bg-accent-soft"
+                >
+                  검색·필터 초기화
+                </button>
+              ) : null}
+            </div>
+            {navigationActive ? (
+              <p className="mt-1 rounded-md border border-line/70 bg-raised/40 px-2 py-1 text-[0.62rem] leading-snug text-fg-3">
+                검색·필터 중에는 숨은 페이지 사이로 잘못 놓이지 않도록 드래그 정렬을 잠급니다.
+                순서 변경 버튼과 일괄 이동은 전체 문서 순서를 기준으로 계속 동작합니다.
+              </p>
+            ) : null}
+
             <div
               role="toolbar"
               aria-label="페이지 일괄 작업"
-              className="flex items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:overflow-x-visible"
+              className="mt-1 flex items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:overflow-x-visible"
             >
               <button
                 type="button"
@@ -430,7 +777,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
               </button>
               <button
                 type="button"
-                onClick={() => setMasterPanelOpen((v) => !v)}
+                onClick={() => setMasterPanelOpen((value) => !value)}
                 disabled={collaborationDocumentLocked}
                 aria-pressed={masterPanelOpen}
                 className={cn(
@@ -439,9 +786,11 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                     ? "border-accent bg-accent-soft/50 text-accent"
                     : masterPanelOpen
                       ? "border-accent/60 text-fg-2 hover:bg-raised"
-                      : "border-line text-fg-3 hover:bg-raised"
+                      : "border-line text-fg-3 hover:bg-raised",
                 )}
-                title={collaborationDocumentLocked ? collaborationLockMessage() : "마스터 페이지(모든 페이지 공통 요소) 관리"}
+                title={collaborationDocumentLocked
+                  ? collaborationLockMessage()
+                  : "마스터 페이지(모든 페이지 공통 요소) 관리"}
               >
                 마스터{master.elements.length > 0 ? ` ${master.elements.length}` : ""}
               </button>
@@ -512,7 +861,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                     void (async () => {
                       if (
                         !(await confirmStudioDestructiveAction(
-                          studioDeletePagesBulkRequest(liveSelectedPageIds.length)
+                          studioDeletePagesBulkRequest(liveSelectedPageIds.length),
                         ))
                       ) return;
                       deletePagesBulk(liveSelectedPageIds);
@@ -529,64 +878,101 @@ export const StudioPageListPane = memo(function StudioPageListPane({
               </div>
             ) : null}
           </div>
-          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain pr-0.5">
-            {pages.map((p, idx) => {
+
+          <div
+            id={pageResultsId}
+            data-testid="studio-page-results"
+            aria-label="페이지 검색 결과"
+            aria-busy={pageQuery !== deferredPageQuery}
+            data-studio-page-navigation-active={navigationActive ? "true" : undefined}
+            className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain pr-0.5"
+          >
+            {navigationEntries.length === 0 ? (
+              <div
+                aria-live="polite"
+                className="grid min-h-40 place-items-center rounded-xl border border-dashed border-line bg-card/50 p-5 text-center"
+              >
+                <div>
+                  <Search size={22} aria-hidden className="mx-auto mb-2 text-fg-3" />
+                  <p className="text-sm font-bold text-fg-2">조건에 맞는 페이지가 없습니다</p>
+                  <p className="mt-1 text-xs leading-relaxed text-fg-3">
+                    이름, 번호, 콘티 메모, 샷 태그, 검토 상태와 담당자를 검색할 수 있습니다.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearNavigation}
+                    className="mt-3 min-h-11 rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent hover:bg-accent-hover"
+                  >
+                    검색·필터 초기화
+                  </button>
+                </div>
+              </div>
+            ) : navigationEntries.map(({ page: p, index: idx, displayName }, visibleIndex) => {
               const isActive = p.id === currentPageId;
-              const isMultiSelected = liveSelectedPageIds.includes(p.id);
-              const dropIndicator = pageDnd.indicatorFor(idx);
+              const isMultiSelected = liveSelectedPageIdSet.has(p.id);
+              const dropIndicator = navigationActive ? null : pageDnd.indicatorFor(idx);
+              const dndProps = navigationActive ? null : pageDnd.itemProps(idx);
+              const review = normalizePageReviewState(p.review);
               return (
                 <div
                   key={p.id}
+                  ref={(node) => {
+                    if (node) pageItemRefs.current.set(p.id, node);
+                    else pageItemRefs.current.delete(p.id);
+                  }}
                   data-testid="studio-page-item"
+                  data-page-index={idx}
+                  data-visible-index={visibleIndex}
                   data-selected={isMultiSelected ? "true" : undefined}
-                  {...pageDnd.itemProps(idx)}
-                  title="드래그하여 순서 변경 · Shift/⌘/Ctrl+클릭으로 다중 선택"
+                  {...(dndProps ?? { draggable: false })}
+                  title={navigationActive
+                    ? "검색·필터 중에는 드래그 정렬이 잠깁니다 · Shift/⌘/Ctrl+클릭으로 다중 선택"
+                    : "드래그하여 순서 변경 · Shift 연속 선택 · ⌘/Ctrl+클릭 개별 선택 · 더블클릭 이름 편집"}
                   className={cn(
-                    "relative flex w-full flex-col gap-0.5 rounded-lg border p-1.5 transition-all hover:bg-raised/50",
+                    "relative flex w-full flex-col gap-0.5 rounded-lg border p-1.5 transition-all hover:bg-raised/50 [content-visibility:auto] [contain-intrinsic-size:auto_12rem]",
                     isActive || isMultiSelected
                       ? "border-accent bg-accent-soft/40"
                       : "border-line bg-card",
                     isMultiSelected && !isActive && "ring-1 ring-accent/50",
-                    pageDnd.dragIndex === idx && "opacity-50"
+                    !navigationActive && pageDnd.dragIndex === idx && "opacity-50",
                   )}
                 >
-                  {/* 페이지 선택 — 접근성: 카드를 role=button 으로 만들면 내부 액션 버튼(편집·이동)이
-                      중첩 인터랙티브가 되어 위반이므로, 카드 전체를 덮는 "늘린 버튼"으로 선택을 처리하고
-                      액션 버튼은 z-index 로 그 위에 띄운다. 카드 div 는 드래그 정렬(draggable) 컨테이너로 유지. */}
                   <button
-                    type="button"
-                    onClick={(event) => {
-                      const multi = event.metaKey || event.ctrlKey || event.shiftKey;
-                      if (multi) {
-                        setSelectedPageIds((prev) => {
-                          const kept = prev.filter((id) => pageIdSet.has(id));
-                          return kept.includes(p.id)
-                            ? kept.filter((id) => id !== p.id)
-                            : [...kept, p.id];
-                        });
-                        setCurrentPageId(p.id);
-                        return;
-                      }
-                      setSelectedPageIds([p.id]);
-                      setCurrentPageId(p.id);
+                    ref={(node) => {
+                      if (node) pageButtonRefs.current.set(p.id, node);
+                      else pageButtonRefs.current.delete(p.id);
                     }}
-                    aria-label={`${pageDisplayName(p, idx)} 선택`}
+                    type="button"
+                    onClick={(event) => selectPageFromPointer(event, p.id)}
+                    onDoubleClick={(event) => {
+                      event.stopPropagation();
+                      setMetaEditPageId(p.id);
+                    }}
+                    onKeyDown={(event) => handlePageSelectionKeyDown(event, p.id)}
+                    aria-label={`${displayName} 선택`}
                     aria-pressed={isActive || isMultiSelected}
+                    aria-current={isActive ? "page" : undefined}
+                    aria-describedby={navigationHelpId}
                     className="absolute inset-0 z-10 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   />
-                  {/* 드롭 삽입선(PPT식) — 카드 위/아래 절반 판정 결과 시각화. overflow 클리핑 없게 카드 가장자리에 겹쳐 그린다. */}
-                  {dropIndicator && (
+                  {dropIndicator ? (
                     <span
                       aria-hidden
                       className={cn(
                         "pointer-events-none absolute inset-x-1 z-10 h-[3px] rounded-full bg-accent",
-                        dropIndicator === "before" ? "top-0" : "bottom-0"
+                        dropIndicator === "before" ? "top-0" : "bottom-0",
                       )}
                     />
-                  )}
+                  ) : null}
                   <div className="flex min-w-0 flex-wrap items-center justify-between gap-1">
-                    <span className="min-w-0 flex-1 truncate text-xs font-bold text-fg-2 lg:min-w-[3.5rem] lg:text-[10px]" title={pageDisplayName(p, idx)}>
-                      {pageDisplayName(p, idx)}
+                    <span
+                      className="min-w-0 flex-1 truncate text-xs font-bold text-fg-2 lg:min-w-[3.5rem] lg:text-[10px]"
+                      title={displayName}
+                    >
+                      {displayName}
+                    </span>
+                    <span className="shrink-0 text-[0.6rem] tabular-nums text-fg-3">
+                      {idx + 1}/{pages.length}
                     </span>
                     {shotTagBadgeText(p) ? (
                       <span
@@ -596,25 +982,55 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                         {shotTagBadgeText(p)}
                       </span>
                     ) : null}
-                    {/* 액션 버튼은 늘린 선택 버튼(z-10) 위로 띄운다. */}
+                    {review.status !== "draft" ? (
+                      <span
+                        data-testid={`studio-page-review-${p.id}`}
+                        className={cn(
+                          "shrink-0 rounded px-1 py-0.5 text-[0.62rem] font-semibold lg:text-[8px]",
+                          review.status === "approved"
+                            ? "bg-good-soft/30 text-good"
+                            : review.status === "changes-requested"
+                              ? "bg-bad-soft/30 text-bad"
+                              : "bg-warning/15 text-warning",
+                        )}
+                        title={review.assignee
+                          ? `${PAGE_REVIEW_STATUS_LABELS[review.status]} · ${review.assignee}`
+                          : PAGE_REVIEW_STATUS_LABELS[review.status]}
+                      >
+                        {PAGE_REVIEW_STATUS_LABELS[review.status]}
+                      </span>
+                    ) : null}
+                    {review.locked ? (
+                      <span
+                        role="img"
+                        className="grid size-6 shrink-0 place-items-center rounded text-fg-3"
+                        title="검토 잠금"
+                        aria-label="검토 잠금"
+                      >
+                        <LockKeyhole size={11} aria-hidden />
+                      </span>
+                    ) : null}
                     <div className="relative z-20 flex max-w-[70%] items-center gap-0.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:max-w-none lg:flex-wrap lg:justify-end lg:overflow-visible">
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMetaEditPageId((v) => (v === p.id ? null : p.id));
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setMetaEditPageId((value) => (value === p.id ? null : p.id));
                         }}
-                        className={cn("grid size-11 shrink-0 place-items-center rounded-xl hover:bg-raised lg:rounded", metaEditPageId === p.id ? "text-accent" : "text-fg-3")}
+                        className={cn(
+                          "grid size-11 shrink-0 place-items-center rounded-xl hover:bg-raised lg:rounded",
+                          metaEditPageId === p.id ? "text-accent" : "text-fg-3",
+                        )}
                         title="이름·콘티 메모 편집"
-                        aria-label={`${pageDisplayName(p, idx)} 이름·콘티 메모 편집`}
+                        aria-label={`${displayName} 이름·콘티 메모 편집`}
                         aria-expanded={metaEditPageId === p.id}
                       >
                         <Pencil size={14} aria-hidden />
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={(event) => {
+                          event.stopPropagation();
                           movePageUp(p.id);
                         }}
                         disabled={idx === 0}
@@ -626,8 +1042,8 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={(event) => {
+                          event.stopPropagation();
                           movePageDown(p.id);
                         }}
                         disabled={idx === pages.length - 1}
@@ -639,8 +1055,8 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={(event) => {
+                          event.stopPropagation();
                           movePageToTop(p.id);
                         }}
                         disabled={idx === 0}
@@ -652,8 +1068,8 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={(event) => {
+                          event.stopPropagation();
                           movePageToBottom(p.id);
                         }}
                         disabled={idx === pages.length - 1}
@@ -665,13 +1081,14 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                       </button>
                     </div>
                   </div>
-                  {/* 실내용 미니 썸네일 — 마스터 요소를 페이지 요소 아래에 합성해 경량 SVG 프록시로 축소 렌더.
-                      마스터 없음/페이지 숨김이면 원본 page 를 동일 참조로 넘겨 RC 메모이제이션을 보존한다. */}
                   <Suspense
                     fallback={(
                       <div
                         aria-hidden="true"
-                        className="h-24 animate-pulse rounded border border-line/60 bg-raised/40"
+                        className={cn(
+                          PAGE_PREVIEW_SIZE_CLASS[pagePreviewSize],
+                          "animate-pulse rounded border border-line/60 bg-raised/40",
+                        )}
                       />
                     )}
                   >
@@ -681,10 +1098,9 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                     />
                   </Suspense>
                   {metaEditPageId === p.id ? (
-                    // 인라인 편집 입력은 늘린 선택 버튼(z-10) 위로 올려 포커스·타이핑을 받게 한다.
                     <div className="relative z-20 flex flex-col gap-1 pt-1">
                       <input
-                        // eslint-disable-next-line jsx-a11y/no-autofocus -- 연필 버튼 클릭으로만 열리는 인라인 편집 — 열릴 때 이름란 포커스가 올바른 패턴(기존 텍스트 편집 모달과 동일)
+                        // eslint-disable-next-line jsx-a11y/no-autofocus -- explicit rename command should focus the editable page name.
                         autoFocus
                         type="text"
                         defaultValue={p.name ?? ""}
@@ -692,17 +1108,17 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                         maxLength={PAGE_NAME_MAX}
                         aria-label="페이지 이름"
                         className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-xs font-semibold text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none lg:min-h-0 lg:rounded lg:px-1.5 lg:py-1 lg:text-[10px]"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                          if (e.key === "Enter") {
-                            commitPageMeta(p.id, { name: e.currentTarget.value });
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => {
+                          event.stopPropagation();
+                          if (event.key === "Enter") {
+                            commitPageMeta(p.id, { name: event.currentTarget.value });
                             setMetaEditPageId(null);
-                          } else if (e.key === "Escape") {
+                          } else if (event.key === "Escape") {
                             setMetaEditPageId(null);
                           }
                         }}
-                        onBlur={(e) => commitPageMeta(p.id, { name: e.target.value })}
+                        onBlur={(event) => commitPageMeta(p.id, { name: event.target.value })}
                       />
                       <textarea
                         rows={2}
@@ -712,14 +1128,14 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                         spellCheck
                         aria-label="콘티 메모"
                         className="min-h-16 w-full resize-none rounded-lg border border-line bg-card px-2 py-2 text-xs leading-tight text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none lg:min-h-0 lg:rounded lg:px-1.5 lg:py-1 lg:text-[9px]"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onBlur={(e) => commitPageMeta(p.id, { note: e.target.value })}
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        onBlur={(event) => commitPageMeta(p.id, { note: event.target.value })}
                       />
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={(event) => {
+                          event.stopPropagation();
                           setMetaEditPageId(null);
                         }}
                         className="min-h-11 self-end rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent hover:bg-accent-hover lg:min-h-0 lg:rounded lg:px-2 lg:py-0.5 lg:text-[9px]"
@@ -735,8 +1151,8 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                   <div className="relative z-20 flex items-center justify-start gap-1 overflow-x-auto overscroll-x-contain pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:justify-end lg:overflow-visible">
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={(event) => {
+                        event.stopPropagation();
                         insertPageBefore(p.id);
                       }}
                       className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:rounded"
@@ -747,8 +1163,8 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                     </button>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={(event) => {
+                        event.stopPropagation();
                         insertPageAfter(p.id);
                       }}
                       className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:rounded"
@@ -759,8 +1175,8 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                     </button>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={(event) => {
+                        event.stopPropagation();
                         duplicatePage(p.id);
                       }}
                       className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:rounded"
@@ -771,8 +1187,8 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                     </button>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={(event) => {
+                        event.stopPropagation();
                         duplicatePageMirrored(p.id);
                       }}
                       className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:rounded"
@@ -783,8 +1199,8 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                     </button>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={(event) => {
+                        event.stopPropagation();
                         clearPageFor(p.id);
                       }}
                       className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:rounded"
@@ -795,8 +1211,8 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                     </button>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={(event) => {
+                        event.stopPropagation();
                         if (pages.length <= 1) return;
                         void (async () => {
                           if (
@@ -804,7 +1220,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                               studioDeletePageRequest({
                                 pageNumber: idx + 1,
                                 elementCount: p.elements.length,
-                              })
+                              }),
                             ))
                           ) return;
                           deletePage(p.id);
@@ -823,12 +1239,11 @@ export const StudioPageListPane = memo(function StudioPageListPane({
             })}
           </div>
         </div>
-        </StudioDetachablePanelSlot>
+      </StudioDetachablePanelSlot>
 
-        {/* 페이지 목록 ↔ 캔버스 너비 스플리터(데스크톱) */}
-        {visibleLeftPanelOpen && !desktopDetached && (
-          <StudioPageListResizeHandle leftResize={leftResize} />
-        )}
+      {visibleLeftPanelOpen && !desktopDetached ? (
+        <StudioPageListResizeHandle leftResize={leftResize} />
+      ) : null}
     </>
   );
 });
