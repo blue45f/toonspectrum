@@ -7,6 +7,7 @@ import { RESOURCE_BUTTON } from "./navigation";
 import { ProviderStatus } from "./ProviderStatus";
 import { ResearchCoverageMap } from "./ResearchCoverageMap";
 import { ResearchMissionPanel } from "./ResearchMissionPanel";
+import { ResearchSynthesisBoard } from "./ResearchSynthesisBoard";
 import {
   buildResearchBriefMarkdown,
   researchNextAction,
@@ -20,9 +21,11 @@ import {
   recordResearchSearch,
   researchDeskBriefContext,
 } from "./research-desk-session";
+import { buildResearchNotebookMarkdown } from "./research-notebook";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { SavedBoard } from "./SavedBoard";
 import { useResearchDeskSession } from "./useResearchDeskSession";
+import { useResearchNotebook } from "./useResearchNotebook";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
 import { attributionMarkdown, deadlineLabel, parseWorkspace } from "@/shared/lib/creator-resources";
@@ -76,6 +79,7 @@ const DESK_SECTIONS = [
   ["#research-command", "질문·검색"],
   ["#workspace-overview", "작업 상태"],
   ["#research-coverage", "근거 공백"],
+  ["#research-synthesis", "판단 노트"],
   ["#research-tools", "목적별 도구"],
   ["#saved-board", "저장 보드"],
   ["#research-export", "내보내기"],
@@ -101,6 +105,15 @@ export function CreatorHubPage() {
     writable: researchSessionWritable,
     error: researchSessionError,
   } = useResearchDeskSession();
+  const {
+    notebook: researchNotebook,
+    update: updateResearchNotebook,
+    restore: restoreResearchNotebook,
+    reset: resetResearchNotebook,
+    ready: researchNotebookReady,
+    writable: researchNotebookWritable,
+    error: researchNotebookError,
+  } = useResearchNotebook();
   const [providerStatusOpen, setProviderStatusOpen] = useState(false);
   const [restoreMode, setRestoreMode] = useState<"merge" | "replace">("merge");
   const [restoring, setRestoring] = useState(false);
@@ -114,6 +127,12 @@ export function CreatorHubPage() {
     updateResearchSession((session) => recordResearchSearch(session, mode, query));
     navigate(researchSearchHref(mode, query));
   }, [navigate, updateResearchSession]);
+
+  const exportResearchBrief = () => {
+    const brief = buildResearchBriefMarkdown(workspace, new Date(), briefContext);
+    const synthesis = buildResearchNotebookMarkdown(researchNotebook, workspace.saved);
+    downloadText("toonstudio-research-brief.md", [brief, synthesis].filter(Boolean).join("\n\n"));
+  };
 
   const importBackup = async (file: File | undefined) => {
     if (!file || restoring || saving) return;
@@ -183,6 +202,18 @@ export function CreatorHubPage() {
 
     <div id="research-coverage" className="scroll-mt-24"><ResearchCoverageMap summary={summary} /></div>
 
+    <ResearchSynthesisBoard
+      notebook={researchNotebook}
+      resources={workspace.saved}
+      ready={researchNotebookReady}
+      writable={researchNotebookWritable}
+      error={researchNotebookError}
+      onChange={updateResearchNotebook}
+      onReset={resetResearchNotebook}
+      onRestore={restoreResearchNotebook}
+      onInvestigate={(query) => launchSearch(researchSession.lastMode, query)}
+    />
+
     <section id="research-tools" className="scroll-mt-24 space-y-5" aria-labelledby="research-tools-title">
       <header><p className="text-sm font-semibold text-accent">목적별 도구</p><h2 id="research-tools-title" className="mt-1 text-2xl font-bold">찾는 데서 끝나지 않는 작업 경로</h2><p className="mt-2 max-w-3xl leading-7 text-fg-2">필요한 도구만 열고, 결과는 같은 브라우저 작업공간에서 이어서 사용하세요.</p></header>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -220,13 +251,13 @@ export function CreatorHubPage() {
     </section>
 
     <section id="research-export" className="scroll-mt-24 space-y-4 rounded-2xl border border-line bg-panel p-5 sm:p-6" aria-labelledby="research-export-title">
-      <header><p className="text-sm font-semibold text-accent">휴대·복구 가능한 기록</p><h2 id="research-export-title" className="mt-1 text-xl font-bold">내보내기와 백업</h2><p className="mt-2 leading-7 text-fg-2">리서치 초점·검색 기록·기획·출처를 읽기 쉬운 문서로 내보내거나, 전체 작업공간을 JSON으로 백업하세요.</p></header>
+      <header><p className="text-sm font-semibold text-accent">휴대·복구 가능한 기록</p><h2 id="research-export-title" className="mt-1 text-xl font-bold">내보내기와 백업</h2><p className="mt-2 leading-7 text-fg-2">리서치 초점·검색 기록·판단 노트·기획·출처를 읽기 쉬운 문서로 내보내거나, 자료·기획서 작업공간을 JSON으로 백업하세요.</p></header>
       <div className="flex flex-wrap gap-3">
-        <button className={RESOURCE_BUTTON} disabled={!workspace.saved.length && summary.storyCompleted === 0 && !researchSession.title && !researchSession.question && !researchSession.context && !researchSession.history.length} onClick={() => downloadText("toonstudio-research-brief.md", buildResearchBriefMarkdown(workspace, new Date(), briefContext))}>리서치 브리프 내보내기</button>
+        <button className={RESOURCE_BUTTON} disabled={!workspace.saved.length && summary.storyCompleted === 0 && !researchSession.title && !researchSession.question && !researchSession.context && !researchSession.history.length && !researchNotebook.entries.length} onClick={exportResearchBrief}>리서치 브리프 내보내기</button>
         <button className={RESOURCE_BUTTON} disabled={!workspace.saved.length} onClick={() => downloadText("toonstudio-sources.md", attributionMarkdown(workspace.saved))}>출처 목록 내보내기</button>
         <button className={RESOURCE_BUTTON} onClick={() => downloadText("toonstudio-creator-board.json", JSON.stringify(workspace, null, 2), "application/json")}>자료·기획서 백업</button>
       </div>
-      <p className="text-xs leading-5 text-fg-2">리서치 브리프에는 현재 초점과 최근 검색 경로가 포함됩니다. JSON 백업은 기존 자료·기획서 스키마만 보존하며 브라우저 세션 메모는 포함하지 않습니다.</p>
+      <p className="text-xs leading-5 text-fg-2">리서치 브리프에는 현재 초점, 최근 검색, 관찰·질문·결정과 연결 근거가 포함됩니다. 자료·기획서 JSON과 판단 노트 JSON은 스키마 경계를 분리해 각각 복구합니다.</p>
       <details className="rounded-xl border border-line bg-canvas p-4">
         <summary className="cursor-pointer font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">백업 가져오기 · 합치기 또는 완전 대체</summary>
         <div className="mt-4 space-y-4 border-t border-line pt-4">

@@ -1,11 +1,14 @@
-# Production-loop gate for editable episode handoff and non-destructive image candidates.
-name: Studio AI comic composer quality
+# Production-loop gate for editable episode handoff, directed panel planning and non-destructive candidates.
+name: Studio AI comic director quality
 
 on:
   pull_request:
     branches: [main]
     paths:
       - "apps/web/src/domains/creator/ai/studio-ai-comic-composer-*.ts"
+      - "apps/web/src/domains/creator/ai/studio-ai-comic-director*.ts"
+      - "apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel*.tsx"
+      - "apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad*.tsx"
       - "apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow*.ts"
       - "apps/web/src/domains/creator/ai/studio-scenario-image-generation*.ts"
       - "apps/web/src/domains/creator/ai/StudioAiEpisodeProduction*.tsx"
@@ -23,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: studio-ai-comic-composer-${{ github.event.pull_request.number || github.ref }}
+  group: studio-ai-comic-director-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -49,11 +52,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify episode handoff, candidate review and scenario reliability
+      - name: Verify director, episode handoff, candidate review and scenario reliability
         run: >-
           pnpm exec vitest run
           apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
           apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-director.test.ts
+          apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx
           apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
           apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
           apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts
@@ -62,13 +68,19 @@ jobs:
           apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.test.tsx
           apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts
 
-      - name: Lint composer production surfaces
+      - name: Lint comic director production surfaces
         run: >-
           pnpm exec eslint --max-warnings=0
           apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.ts
           apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
           apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.ts
           apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-director.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-director.test.ts
+          apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx
+          apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx
+          apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx
           apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.ts
           apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
           apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts
