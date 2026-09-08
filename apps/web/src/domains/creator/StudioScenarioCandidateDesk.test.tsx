@@ -113,10 +113,14 @@ describe("StudioScenarioCandidateDesk", () => {
     );
 
     expect(screen.getByRole("button", { name: "미생성·실패" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "승인 필요" })).toBeDisabled();
+    expect(
+      (screen.getByRole("button", { name: "승인 필요" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
     expect(screen.getByRole("alert").textContent).toContain("선택한 요청 28개");
-    const generate = screen.getByRole("button", { name: "선택 컷 후보 28개 생성" });
-    expect(generate).toBeDisabled();
+    const generate = screen.getByRole("button", {
+      name: "선택 컷 후보 28개 생성",
+    }) as HTMLButtonElement;
+    expect(generate.disabled).toBe(true);
     fireEvent.click(generate);
     expect(onGenerate).not.toHaveBeenCalled();
   });
