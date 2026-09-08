@@ -154,7 +154,7 @@ const LOW_INFORMATION_MIME_TYPES = Object.freeze([
 ] as const);
 
 function normalizeText(value: string): string {
-  return value.normalize("NFKC").trim().toLocaleLowerCase();
+  return value.normalize("NFKC").trim().toLowerCase();
 }
 
 export function studioFileExtension(name: string): string {
