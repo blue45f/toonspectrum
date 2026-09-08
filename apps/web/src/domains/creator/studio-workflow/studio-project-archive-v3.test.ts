@@ -5,21 +5,14 @@ import { createEmptyStudioVersionCoordinates } from "../studio-foundation/studio
 import type { StudioProjectSnapshot } from "../studio-project-snapshot";
 
 import {
-  STUDIO_PROJECT_ARCHIVE_SECTION_KEYS,
   migrateStudioProjectSnapshotV2ToArchiveV3,
   projectStudioArchiveV3ToV2Snapshot,
   serializeStudioProjectArchiveV3,
   validateStudioProjectArchiveV3,
-  type StudioProjectArchiveSectionKey,
+  type StudioProjectArchiveV3,
 } from "./studio-project-archive-v3";
 
 const NOW = "2026-09-07T00:00:00.000Z";
-
-function sectionDigests(): Readonly<Record<StudioProjectArchiveSectionKey, string>> {
-  return Object.fromEntries(
-    STUDIO_PROJECT_ARCHIVE_SECTION_KEYS.map((key) => [key, `digest-${key}`]),
-  ) as Readonly<Record<StudioProjectArchiveSectionKey, string>>;
-}
 
 function snapshot(): StudioProjectSnapshot {
   return {
@@ -70,8 +63,6 @@ function migrate(source = snapshot()) {
     workScope: "work:episode-1",
     createdAt: NOW,
     sourceCoordinates: createEmptyStudioVersionCoordinates(),
-    contentDigest: "digest-content-root",
-    sectionDigests: sectionDigests(),
     selectedElementIds: ["element-1"],
     primarySelectionId: "element-1",
     zoom: 1.25,
@@ -129,24 +120,154 @@ describe("Studio project archive v3", () => {
       workScope: "work:episode-1",
       createdAt: NOW,
       sourceCoordinates: createEmptyStudioVersionCoordinates(),
-      contentDigest: "digest-content-root",
-      sectionDigests: sectionDigests(),
       selectedElementIds: [],
       primarySelectionId: "element-1",
     })).toThrow(/Primary selection/u);
   });
 
   it("rejects a missing section digest", () => {
-    const digests = { ...sectionDigests(), story: "" };
+    const digests = { ...migrate().archive.manifest.sectionDigests, story: "" };
     expect(() => migrateStudioProjectSnapshotV2ToArchiveV3({
       snapshot: snapshot(),
       archiveId: "archive-1",
       workScope: "work:episode-1",
       createdAt: NOW,
       sourceCoordinates: createEmptyStudioVersionCoordinates(),
-      contentDigest: "digest-content-root",
       sectionDigests: digests,
     })).toThrow(/section digest is missing: story/u);
+  });
+
+  it.each([
+    ["metadata", "metadata"],
+    ["content", "content"],
+    ["story", "story"],
+    ["bible", "bible"],
+    ["identity", "identity"],
+    ["provenance", "provenance"],
+    ["assets", "assets"],
+    ["publish-draft", "publishDraft"],
+    ["operations", "operations"],
+    ["local-drafts", "localDrafts"],
+  ] as const)("rejects altered %s content before serialization or v2 projection", (key, property) => {
+    const { archive, workspace } = migrate();
+    const tampered = { ...archive, [property]: { ...archive[property], tampered: true } };
+    expect(validateStudioProjectArchiveV3(tampered)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "section-digest-mismatch", path: `manifest.sectionDigests.${key}` }),
+      expect.objectContaining({ code: "content-digest-mismatch" }),
+    ]));
+    expect(() => serializeStudioProjectArchiveV3(tampered)).toThrow(/digest/u);
+    expect(() => projectStudioArchiveV3ToV2Snapshot({ archive: tampered, workspace })).toThrow(/digest/u);
+  });
+
+  it("rejects forged section and root digest claims", () => {
+    const { archive } = migrate();
+    const forged = `sha256:${"0".repeat(64)}`;
+    expect(validateStudioProjectArchiveV3({
+      ...archive,
+      manifest: {
+        ...archive.manifest,
+        sectionDigests: { ...archive.manifest.sectionDigests, metadata: forged },
+      },
+    })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "section-digest-mismatch", path: "manifest.sectionDigests.metadata" }),
+    ]));
+    expect(validateStudioProjectArchiveV3({
+      ...archive,
+      manifest: { ...archive.manifest, contentDigest: forged },
+    })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "content-digest-mismatch" }),
+    ]));
+  });
+
+  it("binds the v2 compatibility payload in the root digest", () => {
+    const { archive, workspace } = migrate();
+    const tampered = {
+      ...archive,
+      compatibility: { characterBibleV1: { version: 1 as const, characters: [] } },
+    };
+    expect(validateStudioProjectArchiveV3(tampered)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "content-digest-mismatch" }),
+    ]));
+    expect(() => projectStudioArchiveV3ToV2Snapshot({ archive: tampered, workspace })).toThrow(/digest/u);
+  });
+
+  it("accepts matching migration claims but rejects mismatches instead of overwriting them", () => {
+    const { archive } = migrate();
+    const input = {
+      snapshot: snapshot(),
+      archiveId: "archive-1",
+      workScope: "work:episode-1",
+      createdAt: NOW,
+      sourceCoordinates: createEmptyStudioVersionCoordinates(),
+      contentDigest: archive.manifest.contentDigest,
+      sectionDigests: archive.manifest.sectionDigests,
+    };
+    expect(migrateStudioProjectSnapshotV2ToArchiveV3(input).archive.manifest).toEqual(archive.manifest);
+    expect(() => migrateStudioProjectSnapshotV2ToArchiveV3({
+      ...input,
+      contentDigest: `sha256:${"0".repeat(64)}`,
+    })).toThrow(/content digest does not match/u);
+    expect(() => migrateStudioProjectSnapshotV2ToArchiveV3({
+      ...input,
+      sectionDigests: { ...input.sectionDigests, story: `sha256:${"0".repeat(64)}` },
+    })).toThrow(/section digest does not match/u);
+  });
+
+  it("matches JSON storage semantics and remains stable across key ordering and round trips", () => {
+    const writerRoom = {
+      date: new Date(NOW),
+      missing: undefined,
+      values: [undefined, Number.NaN, Number.POSITIVE_INFINITY, -0],
+      shaped: { toJSON: () => ({ b: 2, a: 1 }) },
+    } as unknown as StudioProjectSnapshot["writerRoom"];
+    const { archive } = migrate({ ...snapshot(), writerRoom });
+    const restored = JSON.parse(serializeStudioProjectArchiveV3(archive)) as StudioProjectArchiveV3;
+    expect(restored.story.writerRoom).toEqual({
+      date: NOW,
+      values: [null, null, null, 0],
+      shaped: { b: 2, a: 1 },
+    });
+    expect(restored.manifest).toEqual(archive.manifest);
+    expect(validateStudioProjectArchiveV3(restored)).toEqual([]);
+    expect(validateStudioProjectArchiveV3({
+      ...restored,
+      metadata: Object.fromEntries(Object.entries(restored.metadata).reverse()) as StudioProjectArchiveV3["metadata"],
+    })).toEqual([]);
+  });
+
+  it("serializes the same normalized payload that was validated without a second toJSON call", () => {
+    const { archive } = migrate();
+    let calls = 0;
+    const input = {
+      ...archive,
+      toJSON: () => {
+        calls += 1;
+        return calls === 1 ? archive : { ...archive, metadata: { ...archive.metadata, title: "tampered" } };
+      },
+    };
+    expect(JSON.parse(serializeStudioProjectArchiveV3(input)).metadata.title).toBe(archive.metadata.title);
+    expect(calls).toBe(1);
+  });
+
+  it.each(["null", "missing-section", "bigint", "cycle"])("fails closed on malformed or unserializable input: %s", (kind) => {
+    const { archive } = migrate();
+    const cycle: Record<string, unknown> = {};
+    cycle.self = cycle;
+    const invalid = (kind === "null" ? null
+      : kind === "missing-section" ? { ...archive, content: null }
+        : { ...archive, story: { writerRoom: kind === "bigint" ? BigInt(1) : cycle } }) as unknown as StudioProjectArchiveV3;
+    expect(validateStudioProjectArchiveV3(invalid)).toEqual([
+      expect.objectContaining({ code: "invalid-archive" }),
+    ]);
+    expect(() => serializeStudioProjectArchiveV3(invalid)).toThrow();
+  });
+
+  it("keeps external workspace state outside all archive digests", () => {
+    const first = migrate();
+    const second = migrate({ ...snapshot(), currentPageId: "page-2" });
+    expect(second.workspace.currentPageId).not.toBe(first.workspace.currentPageId);
+    expect(second.archive.manifest.contentDigest).toBe(first.archive.manifest.contentDigest);
+    expect(second.archive.manifest.sectionDigests).toEqual(first.archive.manifest.sectionDigests);
   });
 
   it("detects workspace or review state smuggled into authoring content", () => {

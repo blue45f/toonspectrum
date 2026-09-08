@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import net from "node:net";
 
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, ServiceUnavailableException } from "@nestjs/common";
 import { eq, sql, type SQL, type Table } from "drizzle-orm";
 
 import {
@@ -750,154 +750,70 @@ export async function countDistinctActiveUsers(from: number) {
   return toNumber(row?.total ?? (Array.isArray(row) ? row[0] : undefined));
 }
 
-export async function ensureAdminSchema() {
-  if (adminSchemaReady) return;
+// Resolve columns with the runtime connection, without reading account data or
+// attempting DDL. Canonical migrations and bootstrap own all schema changes.
+const ADMIN_READINESS_COLUMNS = {
+  creator_profile: ["id", "userId", "displayName", "profile", "payoutChannel", "payoutHandle", "isVerifiedCreator", "createdAt", "updatedAt"],
+  monetization_plan: ["id", "code", "name", "description", "intervalDays", "currency", "priceCents", "perks", "isActive", "createdAt", "updatedAt"],
+  creator_campaign: ["id", "creatorId", "titleId", "planId", "title", "description", "targetAmountCents", "raisedAmountCents", "isActive", "startsAt", "endsAt", "createdAt", "updatedAt"],
+  revenue_ledger: ["id", "payerId", "recipientId", "planId", "campaignId", "kind", "status", "amountCents", "currency", "metadata", "reviewedBy", "reviewedAt", "reviewNote", "settledAt", "createdAt"],
+  admin_audit_logs: ["id", "adminId", "adminEmail", "action", "targetType", "targetId", "details", "createdAt"],
+  admin_banned_words: ["id", "word", "category", "createdBy", "createdAt"],
+  admin_promos: ["id", "code", "discountType", "discountValue", "maxUses", "usedCount", "isActive", "expiresAt", "createdAt"],
+  admin_announcements: ["id", "title", "content", "level", "placement", "targetRole", "isActive", "startsAt", "endsAt", "createdBy", "createdAt"],
+  admin_security_policies: ["id", "ipAddress", "reason", "action", "createdBy", "createdAt"],
+  admin_content_reports: ["id", "reporterId", "targetType", "targetId", "reason", "status", "resolvedBy", "resolvedAt", "resolutionNote", "createdAt"],
+} as const;
+
+const ADMIN_READINESS_INDEXES = [
+  ["idx_admin_audit_logs_createdat", "admin_audit_logs"],
+  ["idx_admin_audit_logs_action", "admin_audit_logs"],
+  ["idx_admin_announcements_active", "admin_announcements"],
+  ["idx_admin_reports_status", "admin_content_reports"],
+  ["idx_revenue_ledger_createdat", "revenue_ledger"],
+  ["idx_revenue_ledger_status_createdat", "revenue_ledger"],
+  ["idx_revenue_ledger_reviewedat", "revenue_ledger"],
+  ["idx_revenue_ledger_settledat", "revenue_ledger"],
+] as const;
+
+let adminSchemaReadiness: Promise<void> | null = null;
+
+async function assertAdminSchemaReadiness(): Promise<void> {
   await ensureUserLifecycleSchema();
+  const relations = Object.entries(ADMIN_READINESS_COLUMNS);
+  const columns = relations.flatMap(([table, names]) => names.map(name => `"${table}"."${name}"`));
+  await dbClient.execute(`SELECT ${columns.join(", ")} FROM ${relations.map(([table]) => `public."${table}"`).join(" CROSS JOIN ")} WHERE FALSE`);
 
-  // runtime role(toonspectrum_runtime) 은 보통 public schema CREATE 권한이 없다.
-  // 테이블이 이미 있으면 DDL 없이 통과하고, 없을 때만 CREATE 를 시도한다.
-  // (CREATE IF NOT EXISTS 도 테이블이 있어도 CREATE 권한이 필요 — PG 규칙)
-  const requiredTables = [
-    "creator_profile",
-    "monetization_plan",
-    "creator_campaign",
-    "revenue_ledger",
-    "admin_audit_logs",
-    "admin_banned_words",
-    "admin_promos",
-    "admin_announcements",
-    "admin_security_policies",
-    "admin_content_reports",
-  ] as const;
-
-  const existing = await listPublicTables(requiredTables);
-  const missing = requiredTables.filter((name) => !existing.has(name));
-
-  const userInfo = await dbClient.execute({
-    sql: `SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,
-    args: ["user", "role"],
-  });
-  const hasRole = userInfo.rows.length > 0;
-  if (!hasRole) {
-    try {
-      await dbClient.execute(
-        `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user'`
-      );
-    } catch (error) {
-      if (!isInsufficientPrivilegeError(error)) throw error;
-      // role 컬럼이 이미 있는데 ALTER 권한만 없는 경우는 위에서 hasRole 로 걸러진다.
-      throw error;
-    }
+  const missingIndexes = await dbClient.execute(`
+    SELECT expected.name
+    FROM (VALUES ${ADMIN_READINESS_INDEXES.map(([name, table]) => `('${name}', '${table}')`).join(", ")}) AS expected(name, table_name)
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_index AS i
+      JOIN pg_catalog.pg_class AS index_relation ON index_relation.oid = i.indexrelid
+      JOIN pg_catalog.pg_class AS table_relation ON table_relation.oid = i.indrelid
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = table_relation.relnamespace
+      WHERE namespace.nspname = 'public' AND table_relation.relname = expected.table_name
+        AND index_relation.relname = expected.name AND i.indisvalid AND i.indisready
+    )
+  `);
+  if (missingIndexes.rows.length > 0) {
+    throw new Error("Admin schema is missing required migration indexes");
   }
+}
 
-  if (missing.length > 0) {
-    try {
-      for (const sqlText of getAdminMigrationSql()) {
-        await dbClient.execute(sqlText);
-      }
-    } catch (error) {
-      if (!isInsufficientPrivilegeError(error)) throw error;
-      // migrator 가 이미 채워 둔 경우: 다시 조회해 전부 있으면 통과, 아니면 원인 노출.
-      const after = await listPublicTables(requiredTables);
-      const stillMissing = requiredTables.filter((name) => !after.has(name));
-      if (stillMissing.length > 0) {
-        throw new Error(
-          `admin schema incomplete and runtime role cannot CREATE (missing: ${stillMissing.join(", ")})`,
-          { cause: error },
-        );
-      }
-    }
-  }
-
+export async function ensureAdminSchema(): Promise<void> {
+  const pending = adminSchemaReadiness ??= assertAdminSchemaReadiness();
   try {
-    await ensureRevenueLedgerAuditColumns();
-  } catch (error) {
-    if (!isInsufficientPrivilegeError(error)) throw error;
-    // 읽기 경로에서 컬럼 부재는 이후 쿼리 단계에서 드러난다. 권한 없으면 스킵.
-  }
-
-  adminSchemaReady = true;
-}
-
-export async function listPublicTables(names: readonly string[]): Promise<Set<string>> {
-  if (names.length === 0) return new Set();
-  const result = await dbClient.execute({
-    sql: `SELECT table_name AS name
-          FROM information_schema.tables
-          WHERE table_schema = 'public' AND table_name = ANY(?::text[])`,
-    args: [names as unknown as string[]],
-  });
-  const out = new Set<string>();
-  for (const row of result.rows as Array<Record<string, unknown>>) {
-    const name = String(row.name ?? row.table_name ?? "");
-    if (name) out.add(name);
-  }
-  return out;
-}
-
-export function isInsufficientPrivilegeError(error: unknown): boolean {
-  const err = error as { code?: string; message?: string };
-  if (err?.code === "42501") return true; // insufficient_privilege
-  const message = String(err?.message ?? error ?? "").toLowerCase();
-  return message.includes("permission denied") || message.includes("must be owner");
-}
-
-export function getAdminMigrationSql() {
-  // PostgreSQL DDL — apps/api/src/db/schema.ts(pgTable)와 컬럼 타입을 일치시킨다.
-  //  camelCase 식별자는 PG에서 소문자 폴딩되므로 큰따옴표로 보존, "user"는 예약어라 항상 인용.
-  //  타입: ms 타임스탬프→timestamp, boolean INTEGER→boolean, *Cents→bigint, json TEXT→jsonb.
-  return [
-    "CREATE TABLE IF NOT EXISTS creator_profile ( id text PRIMARY KEY, \"userId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"displayName\" text NOT NULL DEFAULT '', profile text NOT NULL DEFAULT '', \"payoutChannel\" text NOT NULL DEFAULT '', \"payoutHandle\" text NOT NULL DEFAULT '', \"isVerifiedCreator\" boolean NOT NULL DEFAULT false, \"createdAt\" timestamp NOT NULL DEFAULT now(), \"updatedAt\" timestamp NOT NULL DEFAULT now() )",
-    "CREATE TABLE IF NOT EXISTS monetization_plan ( id text PRIMARY KEY, code text NOT NULL UNIQUE, name text NOT NULL, description text NOT NULL DEFAULT '', \"intervalDays\" integer NOT NULL DEFAULT 30, currency text NOT NULL DEFAULT 'KRW', \"priceCents\" bigint NOT NULL, perks jsonb NOT NULL DEFAULT '[]'::jsonb, \"isActive\" boolean NOT NULL DEFAULT true, \"createdAt\" timestamp NOT NULL DEFAULT now(), \"updatedAt\" timestamp NOT NULL DEFAULT now() )",
-    "CREATE TABLE IF NOT EXISTS creator_campaign ( id text PRIMARY KEY, \"creatorId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"titleId\" text, \"planId\" text REFERENCES monetization_plan(id) ON DELETE SET NULL, title text NOT NULL, description text NOT NULL DEFAULT '', \"targetAmountCents\" bigint NOT NULL DEFAULT 0, \"raisedAmountCents\" bigint NOT NULL DEFAULT 0, \"isActive\" boolean NOT NULL DEFAULT true, \"startsAt\" timestamp, \"endsAt\" timestamp, \"createdAt\" timestamp NOT NULL DEFAULT now(), \"updatedAt\" timestamp NOT NULL DEFAULT now() )",
-    "CREATE TABLE IF NOT EXISTS revenue_ledger ( id text PRIMARY KEY, \"payerId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"recipientId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"planId\" text REFERENCES monetization_plan(id) ON DELETE SET NULL, \"campaignId\" text REFERENCES creator_campaign(id) ON DELETE SET NULL, kind text NOT NULL DEFAULT 'plan', status text NOT NULL DEFAULT 'paid', \"amountCents\" bigint NOT NULL, currency text NOT NULL DEFAULT 'KRW', metadata jsonb NOT NULL DEFAULT '{}'::jsonb, \"reviewedBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"reviewedAt\" timestamp, \"reviewNote\" text DEFAULT '', \"settledAt\" timestamp, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
-    "CREATE INDEX IF NOT EXISTS idx_revenue_ledger_createdAt ON revenue_ledger(\"createdAt\")",
-    "CREATE INDEX IF NOT EXISTS idx_revenue_ledger_status_createdAt ON revenue_ledger(status, \"createdAt\")",
-    "CREATE TABLE IF NOT EXISTS admin_audit_logs ( id text PRIMARY KEY, \"adminId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"adminEmail\" text, action text NOT NULL, \"targetType\" text NOT NULL DEFAULT 'system', \"targetId\" text, details jsonb NOT NULL DEFAULT '{}'::jsonb, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
-    "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_createdAt ON admin_audit_logs(\"createdAt\")",
-    "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs(action)",
-    "CREATE TABLE IF NOT EXISTS admin_banned_words ( id text PRIMARY KEY, word text NOT NULL UNIQUE, category text NOT NULL DEFAULT 'general', \"createdBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
-    "CREATE TABLE IF NOT EXISTS admin_promos ( id text PRIMARY KEY, code text NOT NULL UNIQUE, \"discountType\" text NOT NULL DEFAULT 'percent', \"discountValue\" integer NOT NULL DEFAULT 10, \"maxUses\" integer NOT NULL DEFAULT 100, \"usedCount\" integer NOT NULL DEFAULT 0, \"isActive\" boolean NOT NULL DEFAULT true, \"expiresAt\" timestamp, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
-    "CREATE TABLE IF NOT EXISTS admin_announcements ( id text PRIMARY KEY, title text NOT NULL, content text NOT NULL DEFAULT '', level text NOT NULL DEFAULT 'info', placement text NOT NULL DEFAULT 'top_banner', \"targetRole\" text NOT NULL DEFAULT 'all', \"isActive\" boolean NOT NULL DEFAULT true, \"startsAt\" timestamp, \"endsAt\" timestamp, \"createdBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
-    "CREATE INDEX IF NOT EXISTS idx_admin_announcements_active ON admin_announcements(\"isActive\")",
-    "CREATE TABLE IF NOT EXISTS admin_security_policies ( id text PRIMARY KEY, \"ipAddress\" text NOT NULL UNIQUE, reason text NOT NULL DEFAULT '', action text NOT NULL DEFAULT 'block', \"createdBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
-    "CREATE TABLE IF NOT EXISTS admin_content_reports ( id text PRIMARY KEY, \"reporterId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"targetType\" text NOT NULL, \"targetId\" text NOT NULL, reason text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'pending', \"resolvedBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"resolvedAt\" timestamp, \"resolutionNote\" text DEFAULT '', \"createdAt\" timestamp NOT NULL DEFAULT now() )",
-    "CREATE INDEX IF NOT EXISTS idx_admin_reports_status ON admin_content_reports(status)",
-  ];
-}
-
-export async function ensureRevenueLedgerAuditColumns() {
-  // information_schema로 컬럼 존재를 확인(PRAGMA 대체). 컬럼명은 camelCase로 인용 비교.
-  const info = await dbClient.execute({
-    sql: `SELECT column_name AS name FROM information_schema.columns WHERE table_name = ?`,
-    args: ["revenue_ledger"],
-  });
-  const rows = info.rows as Array<Record<string, unknown>>;
-  if (!hasColumn(rows, "reviewedBy")) {
-    await dbClient.execute(
-      `ALTER TABLE revenue_ledger ADD COLUMN IF NOT EXISTS "reviewedBy" text REFERENCES "user"(id) ON DELETE SET NULL`
+    await pending;
+    adminSchemaReady = true;
+  } catch (cause) {
+    if (adminSchemaReadiness === pending) adminSchemaReadiness = null;
+    throw new ServiceUnavailableException(
+      "관리자 데이터 준비가 완료되지 않았습니다. 잠시 후 다시 시도해 주세요.",
+      { cause },
     );
   }
-  if (!hasColumn(rows, "reviewedAt")) {
-    await dbClient.execute(`ALTER TABLE revenue_ledger ADD COLUMN IF NOT EXISTS "reviewedAt" timestamp`);
-  }
-  if (!hasColumn(rows, "reviewNote")) {
-    await dbClient.execute(`ALTER TABLE revenue_ledger ADD COLUMN IF NOT EXISTS "reviewNote" text DEFAULT ''`);
-  }
-  if (!hasColumn(rows, "settledAt")) {
-    await dbClient.execute(`ALTER TABLE revenue_ledger ADD COLUMN IF NOT EXISTS "settledAt" timestamp`);
-  }
-  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_revenue_ledger_reviewedAt ON revenue_ledger("reviewedAt")`);
-  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_revenue_ledger_settledAt ON revenue_ledger("settledAt")`);
-}
-
-export function hasColumn(rows: Record<string, unknown>[], columnName: string) {
-  return rows.some((row) => {
-    if (Array.isArray(row)) {
-      return String((row as unknown[])[1] ?? "") === columnName;
-    }
-    return String((row as { name?: unknown }).name ?? "") === columnName;
-  });
 }
 
 export async function logAuditAction(

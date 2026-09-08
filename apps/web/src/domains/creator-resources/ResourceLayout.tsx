@@ -18,7 +18,7 @@ export function ResourceLayout({ title, intro, children }: { title: string; intr
     </nav>
     {children}
     <footer className="flex flex-wrap gap-3 border-t border-line pt-6">
-      <Link className={RESOURCE_BUTTON} to="/studio">스튜디오 열기</Link>
+      <Link className={RESOURCE_BUTTON} to="/studio" reloadDocument>스튜디오 열기</Link>
       <Link className={RESOURCE_BUTTON} to="/create">작품 갤러리</Link>
       <Link className={RESOURCE_BUTTON} to="/create/challenges">창작 챌린지</Link>
       <Link className={RESOURCE_BUTTON} to="/community">창작 커뮤니티</Link>

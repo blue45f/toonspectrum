@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { and, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, sql, type SQL } from "drizzle-orm";
 
 import {
   creatorCampaigns,
@@ -25,6 +25,20 @@ import {
   toNumber,
 } from "./admin-types";
 
+function campaignRaisedAmountCents() {
+  const total = db
+    .select({ amount: sql`coalesce(sum(${revenueLedger.amountCents}), 0)` })
+    .from(revenueLedger)
+    .where(and(
+      eq(revenueLedger.campaignId, creatorCampaigns.id),
+      eq(revenueLedger.status, "paid"),
+      eq(revenueLedger.currency, "KRW"),
+    ));
+  // Keep the correlated query nested so RETURNING cannot strip the outer
+  // campaign qualifier. Summing before the display joins also avoids fan-out.
+  return sql<number>`(${total})`.mapWith(Number);
+}
+
 @Injectable()
 export class AdminCampaignsService {
   async getCampaigns(userId: string, query: CampaignQuery = {}) {
@@ -41,7 +55,7 @@ export class AdminCampaignsService {
         title: creatorCampaigns.title,
         description: creatorCampaigns.description,
         targetAmountCents: creatorCampaigns.targetAmountCents,
-        raisedAmountCents: creatorCampaigns.raisedAmountCents,
+        raisedAmountCents: campaignRaisedAmountCents(),
         isActive: creatorCampaigns.isActive,
         startsAt: creatorCampaigns.startsAt,
         endsAt: creatorCampaigns.endsAt,
@@ -140,7 +154,10 @@ export class AdminCampaignsService {
           updatedAt: new Date(),
         })
         .where(eq(creatorCampaigns.id, parsed.id))
-        .returning();
+        .returning({
+          ...getTableColumns(creatorCampaigns),
+          raisedAmountCents: campaignRaisedAmountCents(),
+        });
 
       void logAuditAction(
         userId,
@@ -173,7 +190,10 @@ export class AdminCampaignsService {
         startsAt: parsed.startsAt,
         endsAt: parsed.endsAt,
       })
-      .returning();
+      .returning({
+        ...getTableColumns(creatorCampaigns),
+        raisedAmountCents: campaignRaisedAmountCents(),
+      });
 
     if (inserted) {
       void logAuditAction(

@@ -5,7 +5,12 @@ import {
   type AnchorHTMLAttributes,
   type ReactNode,
 } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import {
+  Link as RouterLink,
+  useLocation,
+  useResolvedPath,
+  type LinkProps as RouterLinkProps,
+} from "react-router-dom";
 
 type Href =
   | string
@@ -54,6 +59,22 @@ function isExternalHref(href: string): boolean {
   return /^[a-z][a-z\d+.-]*:/i.test(href) || href.startsWith("//");
 }
 
+function isStudioPathname(pathname: string): boolean {
+  return pathname === "/studio" || pathname.startsWith("/studio/");
+}
+
+// Only internal links require router context; external/target anchors remain usable without it.
+const InternalRouterLink = forwardRef<HTMLAnchorElement, RouterLinkProps>(function InternalRouterLink(
+  { to, ...props },
+  ref,
+) {
+  const current = useLocation();
+  const resolved = useResolvedPath(to);
+  const reloadDocument = isStudioPathname(current.pathname) !== isStudioPathname(resolved.pathname);
+  // Native default navigation runs after user and ancestor guards, unlike a capture redirect.
+  return <RouterLink {...props} ref={ref} to={to} reloadDocument={reloadDocument} />;
+});
+
 function appendPreservedQueryParams(
   href: string,
   preserved: PreservedLinkQueryParams,
@@ -86,7 +107,7 @@ const Link = forwardRef<HTMLAnchorElement, LinkProps>(function LinkCompat(
     // eslint-disable-next-line jsx-a11y/anchor-has-content
     return <a ref={ref} href={to} {...linkProps} />;
   }
-  return <RouterLink ref={ref} to={to} replace={replaceFlag} {...linkProps} />;
+  return <InternalRouterLink ref={ref} to={to} replace={replaceFlag} {...linkProps} />;
 });
 
 export default Link;

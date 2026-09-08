@@ -5,7 +5,6 @@ import {
   communityCafeMembers,
   communityCafes,
   db,
-  dbClient,
   fanPostReplies,
   fanPosts,
   reviewReplies,
@@ -24,6 +23,8 @@ import type {
   ReviewReply,
 } from "../../../web/src/shared/lib/types";
 import type { SQL } from "drizzle-orm";
+
+import { createSchemaReadinessCheck } from "./schema-readiness";
 
 export interface ValidatedFanPostInput {
   scope: FanCafeScope;
@@ -48,100 +49,20 @@ const MAX_POST_TITLE_LENGTH = 80;
 const COMMUNITY_PAGE_SIZE = 20;
 export type CommunityPostSort = "recent" | "popular";
 
-let ensured = false;
-
-async function ensureColumn(tableName: string, columnName: string, columnDef = "TEXT") {
-  const info = await dbClient.execute({
-    sql: "SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
-    args: [tableName, columnName],
-  });
-  const hasColumn = info.rows.length > 0;
-  if (!hasColumn) {
-    await dbClient.execute({
-      sql: `ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS "${columnName}" ${columnDef}`,
-      args: [],
-    });
-  }
-}
-
-export async function ensureCommunityTables() {
-  if (ensured) return;
-  await dbClient.execute(`
-    CREATE TABLE IF NOT EXISTS review_reply (
-      id TEXT PRIMARY KEY,
-      "reviewId" TEXT NOT NULL,
-      "parentId" TEXT,
-      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-      text TEXT NOT NULL,
-      spoiler BOOLEAN NOT NULL DEFAULT false,
-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await dbClient.execute('CREATE INDEX IF NOT EXISTS idx_review_reply_review ON review_reply("reviewId", "createdAt")');
-  await dbClient.execute(`
-    CREATE TABLE IF NOT EXISTS fan_post (
-      id TEXT PRIMARY KEY,
-      scope TEXT NOT NULL,
-      "targetId" TEXT NOT NULL,
-      "targetLabel" TEXT NOT NULL,
-      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-      kind TEXT NOT NULL DEFAULT 'talk',
-      title TEXT NOT NULL,
-      text TEXT NOT NULL,
-      tags JSONB NOT NULL DEFAULT '[]'::jsonb,
-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await dbClient.execute('CREATE INDEX IF NOT EXISTS idx_fan_post_target ON fan_post(scope, "targetId", "createdAt")');
-  await dbClient.execute(`
-    CREATE TABLE IF NOT EXISTS fan_post_reply (
-      id TEXT PRIMARY KEY,
-      "postId" TEXT NOT NULL REFERENCES fan_post(id) ON DELETE CASCADE,
-      "parentId" TEXT,
-      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-      text TEXT NOT NULL,
-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await dbClient.execute('CREATE INDEX IF NOT EXISTS idx_fan_post_reply_post ON fan_post_reply("postId", "createdAt")');
-  await dbClient.execute(
-    'CREATE INDEX IF NOT EXISTS idx_fan_post_scope_target_kind_created ON fan_post(scope, "targetId", kind, "createdAt")'
-  );
-  await ensureColumn("fan_post_reply", "parentId");
-  await dbClient.execute(
-    'CREATE INDEX IF NOT EXISTS idx_fan_post_reply_parent ON fan_post_reply("parentId", "createdAt")'
-  );
-  // 라운드2 증분 마이그레이션 — 첨부 이미지·답글 소프트 삭제·숨김 플래그.
-  await ensureColumn("fan_post", "images", "JSONB NOT NULL DEFAULT '[]'::jsonb");
-  await ensureColumn("fan_post", "hidden", "BOOLEAN NOT NULL DEFAULT false");
-  await ensureColumn("fan_post_reply", "deletedAt", "TIMESTAMPTZ");
-  await ensureColumn("review_reply", "deletedAt", "TIMESTAMPTZ");
-  // 장르 카페(소모임) — 카페 엔티티 + 멤버십. 게시글은 fan_post(scope='cafe', targetId=slug) 재사용.
-  await dbClient.execute(`
-    CREATE TABLE IF NOT EXISTS community_cafe (
-      id TEXT PRIMARY KEY,
-      slug TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      genre TEXT NOT NULL DEFAULT '',
-      "createdBy" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-      hidden BOOLEAN NOT NULL DEFAULT false,
-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await dbClient.execute(`
-    CREATE TABLE IF NOT EXISTS community_cafe_member (
-      "cafeId" TEXT NOT NULL REFERENCES community_cafe(id) ON DELETE CASCADE,
-      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-      role TEXT NOT NULL DEFAULT 'member',
-      "joinedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-      PRIMARY KEY ("cafeId", "userId")
-    )
-  `);
-  await dbClient.execute('CREATE INDEX IF NOT EXISTS idx_community_cafe_genre ON community_cafe(genre, "createdAt")');
-  await dbClient.execute('CREATE INDEX IF NOT EXISTS idx_community_cafe_member_user ON community_cafe_member("userId")');
-  ensured = true;
-}
+// The canonical schema owns tables and indexes. Check columns without reading user rows
+// or requiring CREATE/ALTER privileges from the server's runtime connection.
+export const ensureCommunityTables = createSchemaReadinessCheck([
+  `SELECT "id", "reviewId", "parentId", "userId", "text", "spoiler", "deletedAt", "createdAt"
+   FROM "review_reply" WHERE FALSE`,
+  `SELECT "id", "scope", "targetId", "targetLabel", "userId", "kind", "title", "text",
+          "tags", "images", "hidden", "createdAt"
+   FROM "fan_post" WHERE FALSE`,
+  `SELECT "id", "postId", "parentId", "userId", "text", "deletedAt", "createdAt"
+   FROM "fan_post_reply" WHERE FALSE`,
+  `SELECT "id", "slug", "name", "description", "genre", "createdBy", "hidden", "createdAt"
+   FROM "community_cafe" WHERE FALSE`,
+  `SELECT "cafeId", "userId", "role", "joinedAt" FROM "community_cafe_member" WHERE FALSE`,
+]);
 
 function clampId(value: unknown, max: number) {
   return String(value ?? "").trim().slice(0, max);

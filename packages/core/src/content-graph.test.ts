@@ -42,6 +42,55 @@ describe("content usage authorization", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it.each([
+    { surface: "studio-import", permission: "projectImport" },
+    { surface: "marketplace-download", permission: "originalDownload" },
+  ] as const)("requires explicit $permission permission for $surface", ({ surface, permission }) => {
+    const context: UsageContext = {
+      ...usage,
+      surface,
+      commercialProject: false,
+      willModify: false,
+      willRedistribute: false,
+      willUseForAi: false,
+    };
+    const snapshot: RightsDecision = { ...rights, allowedSurfaces: [surface] };
+    for (const value of [false, null]) {
+      expect(authorizeContentUsage({ ...snapshot, [permission]: value }, context)).toEqual({
+        allowed: false,
+        reason: "SURFACE_NOT_ALLOWED",
+      });
+    }
+    expect(authorizeContentUsage(snapshot, context)).toEqual({ allowed: true });
+
+    const unrelatedPermission = permission === "projectImport" ? "originalDownload" : "projectImport";
+    expect(authorizeContentUsage({ ...snapshot, [unrelatedPermission]: null }, context))
+      .toEqual({ allowed: true });
+  });
+
+  it.each(["research-board", "studio-reference"] as const)(
+    "preserves %s reference use without download or import permissions",
+    (surface) => {
+      const context: UsageContext = {
+        ...usage,
+        surface,
+        commercialProject: false,
+        willModify: false,
+        willRedistribute: false,
+        willUseForAi: false,
+      };
+      for (const value of [false, null]) {
+        const snapshot: RightsDecision = {
+          ...rights,
+          allowedSurfaces: [surface],
+          originalDownload: value,
+          projectImport: value,
+        };
+        expect(authorizeContentUsage(snapshot, context)).toEqual({ allowed: true });
+      }
+    },
+  );
+
   it("preserves verified permissions without an expiry", () => {
     expect(authorizeContentUsage(rights, usage)).toEqual({ allowed: true });
     vi.setSystemTime(new Date("2036-09-08T09:00:00.000Z"));

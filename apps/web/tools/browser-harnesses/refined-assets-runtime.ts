@@ -45,7 +45,7 @@ const ANCHOR_ASSETS = new Set(["ice_cream_cone", "bubble_tea", "fox_mask"]);
 
 function inspectAnchor(root: THREE.Object3D, id: string, bounds: THREE.Box3) {
   if (!ANCHOR_ASSETS.has(id)) return null;
-  const definition = propDefById(`blender_${id}`);
+  const definition = propDefById(`blender_${id}_v8`);
   const anchor = definition?.anchors.find((candidate) => candidate.role === "primary" || candidate.role === "surface");
   if (!anchor || !definition) throw new Error(`${id}: missing production attachment metadata`);
   const radius = anchor.gripRadius ?? definition.grip?.radius ?? definition.fit.designReference * 0.25;

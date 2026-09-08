@@ -1,4 +1,5 @@
 import { dbPool } from "../../db";
+import { ADMIN_SCHEMA_COLUMNS_SQL } from "../../db/admin-schema-contract";
 
 import type { Pool, QueryConfig } from "pg";
 
@@ -17,6 +18,12 @@ export const HEALTH_READINESS_QUERY_TIMEOUT_MS = 3_000;
  */
 export const REQUIRED_DATABASE_RELATIONS = [
   "account",
+  "admin_announcements",
+  "admin_audit_logs",
+  "admin_banned_words",
+  "admin_content_reports",
+  "admin_promos",
+  "admin_security_policies",
   "app_setting",
   "catalog_ingest_run",
   "catalog_snapshot",
@@ -112,6 +119,7 @@ interface DatabasePingRow {
 
 interface SchemaCatalogRow {
   relationNames: string[] | null;
+  adminColumnsReady: boolean;
   authUserColumnsReady: boolean;
   authUserConstraintsReady: boolean;
   authUserStatusIndexReady: boolean;
@@ -198,6 +206,7 @@ export class PostgresHealthReadinessRepository
                 FILTER (WHERE relation.relname IS NOT NULL),
               ARRAY[]::text[]
             ) AS "relationNames",
+            ${ADMIN_SCHEMA_COLUMNS_SQL} AS "adminColumnsReady",
             NOT EXISTS (
               SELECT 1
               FROM (VALUES
@@ -1490,6 +1499,7 @@ export class PostgresHealthReadinessRepository
     if (
       !state ||
       !containsEvery(state.relationNames, REQUIRED_DATABASE_RELATIONS) ||
+      state.adminColumnsReady !== true ||
       state.authUserColumnsReady !== true ||
       state.authUserConstraintsReady !== true ||
       state.authUserStatusIndexReady !== true ||

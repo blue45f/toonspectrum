@@ -82,8 +82,15 @@ describe("execution-time budget partition", () => {
     expect([...PERF_BUDGET_TEST_FILES]).toEqual([...PERF_BUDGET_TEST_FILES].sort());
   });
 
-  it("does not list itself or any other partition bookkeeping", () => {
-    expect(PERF_BUDGET_TEST_FILES.some((file) => file.startsWith("tests/"))).toBe(false);
+  it.each([
+    "tests/vitest-perf-budget-partition.test.ts",
+    "scripts/integration-test-runner-ci-policy.test.mjs",
+  ])("keeps partition bookkeeping %s in the covered root lane", (file) => {
+    // Visual quality tests can measure real time; exclude the bookkeeping files,
+    // not their directories, from the mandatory serial lane.
+    expect(SERIAL_TEST_FILES).not.toContain(file);
+    expect(rootConfig.test?.exclude).not.toContain(file);
+    expect(serialConfig.test?.include).not.toContain(file);
   });
 });
 

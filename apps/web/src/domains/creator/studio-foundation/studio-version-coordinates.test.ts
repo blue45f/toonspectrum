@@ -39,6 +39,60 @@ function approvedCoordinates(): StudioVersionCoordinates {
 }
 
 describe("studio version coordinates", () => {
+  it.each(["draft", "in-review", "changes-requested", "superseded"] as const)(
+    "invalidates matching approvals and publish packages for a %s review",
+    (status) => {
+      const coordinates = approvedCoordinates();
+      const review = coordinates.review;
+      if (review === null) throw new Error("approved fixture must include a review");
+
+      for (const serverRevision of [7, 8]) {
+        const unapproved: StudioVersionCoordinates = {
+          ...coordinates,
+          server: { revision: serverRevision, contentDigest: `digest-r${serverRevision}` },
+          review: { ...review, status },
+          publish: {
+            packageId: "package-1",
+            approvalId: "approval-1",
+            sourceRevision: 7,
+            profileId: "webtoon",
+            profileVersion: 1,
+          },
+        };
+
+        expect(validateStudioVersionCoordinates(unapproved).map((issue) => issue.code))
+          .toContain("approval-review-not-approved");
+        expect(resolveStudioVersionProjection(unapproved)).toMatchObject({
+          approvalState: "invalid",
+          publishState: "invalid",
+          publishableRevision: null,
+        });
+        expect(canCreateStudioPublishPackage(unapproved, 7)).toBe(false);
+
+        const reviewOnly: StudioVersionCoordinates = { ...unapproved, approval: null, publish: null };
+        expect(validateStudioVersionCoordinates(reviewOnly)).toEqual([]);
+        expect(resolveStudioVersionProjection(reviewOnly)).toMatchObject({
+          approvalState: "none",
+          publishState: "none",
+          publishableRevision: null,
+        });
+      }
+    },
+  );
+
+  it.each([7, 8])("preserves an approved snapshot when the server head is revision %s", (serverRevision) => {
+    const coordinates: StudioVersionCoordinates = {
+      ...approvedCoordinates(),
+      server: { revision: serverRevision, contentDigest: `digest-r${serverRevision}` },
+    };
+    expect(validateStudioVersionCoordinates(coordinates)).toEqual([]);
+    expect(resolveStudioVersionProjection(coordinates)).toMatchObject({
+      approvalState: serverRevision === 7 ? "current" : "stale",
+      publishableRevision: 7,
+    });
+    expect(canCreateStudioPublishPackage(coordinates, 7)).toBe(true);
+  });
+
   it("starts as a local-only memory document", () => {
     const coordinates = createEmptyStudioVersionCoordinates();
     expect(validateStudioVersionCoordinates(coordinates)).toEqual([]);

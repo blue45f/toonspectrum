@@ -240,6 +240,12 @@ jobs:
           psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
             -X -v ON_ERROR_STOP=1 <<'SQL'
           DROP TABLE IF EXISTS
+            "admin_announcements",
+            "admin_audit_logs",
+            "admin_banned_words",
+            "admin_content_reports",
+            "admin_promos",
+            "admin_security_policies",
             "creator_work_asset_storage_reference",
             "creator_asset_storage_object",
             "creator_marketplace_library_item",

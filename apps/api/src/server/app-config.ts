@@ -2,10 +2,11 @@
 // 기본값은 전부 비활성(초반엔 전 기능 무료·광고 없음). 관리자만 켤 수 있다.
 import { eq } from "drizzle-orm";
 
-import { appSettings, db, dbClient, users } from "../db";
+import { appSettings, db, users } from "../db";
 
 import { isWhitelistedAdminEmail } from "./admin-emails";
 import { getSessionUserCached } from "./session";
+import { createSchemaReadinessCheck } from "./schema-readiness";
 import {
   ensureUserLifecycleSchema,
   normalizeUserAccountStatus,
@@ -38,18 +39,10 @@ export async function isAdminUser(
   }
 }
 
-let ensured = false;
-async function ensureSettingsTable() {
-  if (ensured) return;
-  await dbClient.execute(`
-    CREATE TABLE IF NOT EXISTS app_setting (
-      key TEXT PRIMARY KEY,
-      value JSONB NOT NULL DEFAULT '{}'::jsonb,
-      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  ensured = true;
-}
+// Installation and upgrades own DDL. Runtime only verifies that migrated columns resolve.
+const ensureSettingsTable = createSchemaReadinessCheck([
+  'SELECT "key", "value", "updatedAt" FROM "app_setting" WHERE FALSE',
+]);
 
 export interface AppConfig {
   // 광고형 수익화(제휴 링크·스폰서 슬롯) 전역 스위치. 기본 false = 전 기능 무료·광고 없음.

@@ -125,6 +125,7 @@ export type StudioMutationValidationIssueCode =
   | "base-local-digest-mismatch"
   | "base-server-revision-mismatch"
   | "base-server-digest-mismatch"
+  | "idempotency-key-conflict"
   | "cross-domain-invariant";
 
 export interface StudioMutationValidationIssue {
@@ -315,6 +316,15 @@ export function createStudioMutationCoordinator(
   async function executeMutation(envelope: StudioMutationEnvelopeV2): Promise<StudioMutationReceipt> {
     const existing = await options.durability.findCommittedReceipt(envelope.idempotencyKey);
     if (existing) {
+      if (
+        existing.mutationId !== envelope.mutationId
+        || existing.transactionId !== envelope.transactionId
+      ) {
+        throw new StudioMutationConflictError([{
+          code: "idempotency-key-conflict",
+          message: "Studio idempotency key belongs to another mutation or transaction.",
+        }]);
+      }
       return { ...existing, status: "idempotent-replay" };
     }
 

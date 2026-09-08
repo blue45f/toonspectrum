@@ -41,8 +41,10 @@ describe("asset platform production migration", () => {
     expect(manifest[38]).toBe(migrationPath);
     expect(manifest[39]).toBe("apps/api/src/db/migrations/0040_creator_asset_platform_integrity.sql");
     expect(manifest[40]).toBe("apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql");
-    expect(manifest.at(-1)).toBe("apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql");
-    expect(manifest).toHaveLength(42);
+    expect(manifest[41]).toBe("apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql");
+    expect(manifest[42]).toBe("apps/api/src/db/migrations/0043_admin_runtime_schema.sql");
+    expect(manifest.at(-1)).toBe("apps/api/src/db/migrations/0044_creator_work_entitlement_authorization.sql");
+    expect(manifest).toHaveLength(44);
     expect(new Set(manifest).size).toBe(manifest.length);
   });
 
@@ -56,6 +58,21 @@ describe("asset platform production migration", () => {
     expect(migration).toContain("FROM PUBLIC;");
     expect(migration).not.toMatch(/\bDROP\s+TABLE\b/iu);
     expect(migration).not.toMatch(/\bTRUNCATE\b/iu);
+  });
+
+  it("authorizes new work references without rewriting historical entitlement evidence", () => {
+    const migration = read("apps/api/src/db/migrations/0044_creator_work_entitlement_authorization.sql");
+    expect(migration).toContain('BEFORE INSERT OR UPDATE ON public."creator_work_catalog_asset_binding"');
+    expect(migration).toContain('NEW."insertedAt" := statement_timestamp()');
+    expect(migration).toContain('release."publisherId" IS DISTINCT FROM work_owner');
+    expect(migration).toContain('entitlement."subjectType" <> \'user\'');
+    expect(migration).toContain('entitlement."subjectId" IS DISTINCT FROM work_owner');
+    expect(migration).toContain('entitlement."revokedAt" IS NOT NULL');
+    expect(migration).toContain('entitlement."validFrom" > statement_timestamp()');
+    expect(migration).toContain('entitlement."validUntil" < statement_timestamp()');
+    expect(migration).toContain("FOR SHARE;");
+    expect(migration).toContain("creator_work_catalog_asset_binding_entitlement_evidence");
+    expect(migration).not.toMatch(/\b(?:UPDATE|DELETE\s+FROM)\s+public\."creator_work_catalog_asset_binding"/u);
   });
 
   it("enforces the lifecycle and immutable release boundaries in PostgreSQL", () => {

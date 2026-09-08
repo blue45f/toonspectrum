@@ -244,11 +244,15 @@ export function transitionStudio3dAssetRefinery(
   if (Date.parse(event.at) < Date.parse(receipt.history.at(-1)?.at ?? "")) {
     throw new RangeError("Refinery 이벤트 시각은 이전 이벤트보다 빠를 수 없습니다.");
   }
+  // Re-diagnosing a code updates its current outcome; history retains every finding.
+  // Advancing a stage without explicitly re-diagnosing an error never clears it.
+  const currentDiagnostics = new Map(receipt.diagnostics.map(entry => [entry.code, entry]));
+  for (const entry of event.diagnostics) currentDiagnostics.set(entry.code, entry);
   return Object.freeze({
     ...receipt,
     stage: input.to,
     history: Object.freeze([...receipt.history, event]),
-    diagnostics: Object.freeze([...receipt.diagnostics, ...event.diagnostics]),
+    diagnostics: Object.freeze([...currentDiagnostics.values()]),
     outputs: Object.freeze([...receipt.outputs, ...event.outputs]),
   });
 }
