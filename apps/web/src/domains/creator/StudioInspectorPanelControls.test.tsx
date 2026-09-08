@@ -65,7 +65,7 @@ describe("Studio Inspector panel controls", () => {
     render(<NavigatorHarness />);
     fireEvent.click(screen.getByRole("button", { name: "작업 패널 구성" }));
 
-    const options = screen.getByRole("region", { name: "작업 패널 구성" });
+    const options = screen.getByRole("dialog", { name: "작업 패널 구성" });
     const activeToggle = within(options).getByRole("button", {
       name: "선택 항목 탭 숨기기",
     });
@@ -101,7 +101,7 @@ describe("Studio Inspector panel controls", () => {
     render(<NavigatorHarness />);
     fireEvent.click(screen.getByRole("button", { name: "현재 전문 탭 고정" }));
     fireEvent.click(screen.getByRole("button", { name: "작업 패널 구성" }));
-    const options = screen.getByRole("region", { name: "작업 패널 구성" });
+    const options = screen.getByRole("dialog", { name: "작업 패널 구성" });
     fireEvent.click(within(options).getByRole("button", { name: "레이어 탭 숨기기" }));
     fireEvent.click(within(options).getByRole("button", { name: /탭 이름을 아이콘으로 접기/u }));
 
@@ -115,6 +115,27 @@ describe("Studio Inspector panel controls", () => {
     expect(
       screen.getByRole("tablist", { name: "스튜디오 설정" })
         .getAttribute("data-studio-inspector-primary-tabs-compact"),
+    ).toBeNull();
+  });
+
+  it("opens configuration as a bounded non-modal popover and dismisses it outside", () => {
+    render(<NavigatorHarness />);
+    const trigger = screen.getByRole("button", { name: "작업 패널 구성" });
+    expect(trigger.getAttribute("aria-haspopup")).toBe("dialog");
+
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "작업 패널 구성" });
+    expect(dialog.getAttribute("aria-modal")).toBe("false");
+    expect(
+      dialog.getAttribute("data-studio-inspector-panel-options-surface"),
+    ).toBe("popover");
+    expect(
+      within(dialog).getByRole("button", { name: "작업 패널 구성 닫기" }),
+    ).toBeTruthy();
+
+    fireEvent.pointerDown(document.body);
+    expect(
+      screen.queryByRole("dialog", { name: "작업 패널 구성" }),
     ).toBeNull();
   });
 });
