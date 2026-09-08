@@ -1,5 +1,6 @@
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
 import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
+import { useStudioRecentColors } from "./useStudioRecentColors";
 import { copyStudioSmartShapeSnapshot } from "./studio-smart-shape-copy";
 /** Editor host extracted from the /studio page entry.
  * StudioPage.tsx stays the route-facing re-export so the lazy Studio chunk
@@ -4799,32 +4800,9 @@ export function StudioCuttoonEditor({
         : "레이어 솔로 해제"
     );
   }
-  // 최근 사용 색(색상 팝오버 공용) — 색상 선택기를 실제로 열 때만 복원해 초기 Studio 진입을 가볍게 유지한다.
-  const [recentColors, setRecentColors] = useState<string[]>([]);
-  const recentColorsRef = useRef(recentColors);
-  const recentColorsUserRevisionRef = useRef(0);
-  recentColorsRef.current = recentColors;
-  const recentColorsLoadRef = useRef<Promise<void> | null>(null);
-  const ensureRecentColorsLoaded = () => {
-    if (recentColorsLoadRef.current) return;
-    const revisionAtStart = recentColorsUserRevisionRef.current;
-    recentColorsLoadRef.current = acquireProductStudioUiPreferencesRepository()
-      .then((repository) => repository.loadRecentColors())
-      .then(async (loaded) => {
-        if (recentColorsUserRevisionRef.current === revisionAtStart) {
-          recentColorsRef.current = loaded;
-          setRecentColors(loaded);
-          return;
-        }
-        const repository = await acquireProductStudioUiPreferencesRepository();
-        await repository.saveRecentColors(recentColorsRef.current);
-      })
-      .catch((err) => {
-        recentColorsLoadRef.current = null;
-        setAppSettingsPersistenceState("session-only");
-        console.error("Failed to load SQLite/OPFS studio recent colors:", err);
-      });
-  };
+  const { recentColors, ensureRecentColorsLoaded, rememberColor, clearRecentColors } = useStudioRecentColors({
+    onPersistenceUnavailable: () => setAppSettingsPersistenceState("session-only"),
+  });
   // 저장된 클립 복원 — 클립 메뉴를 열 때만 V12 SQLite repository를 로드해 초기 진입을 가볍게
   // 유지한다. 이전 브라우저 키는 LEGACY_DATA_MIGRATION=FALSE에 따라 자동으로 읽지 않는다.
   useEffect(() => {
@@ -4935,22 +4913,6 @@ export function StudioCuttoonEditor({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [canvasOnlyMode]);
-  const rememberColor = (c: string) => {
-    void import("./studio-color-utils")
-      .then(({ pushRecentColor }) => {
-        const next = pushRecentColor(recentColorsRef.current, c);
-        if (next === recentColorsRef.current) return;
-        recentColorsUserRevisionRef.current += 1;
-        recentColorsRef.current = next;
-        setRecentColors(next);
-        void acquireProductStudioUiPreferencesRepository()
-          .then((repository) => repository.saveRecentColors(next))
-          .catch(() => setAppSettingsPersistenceState("session-only"));
-      })
-      .catch((err) => {
-        console.error("Failed to store studio recent color:", err);
-      });
-  };
   const [strokeWidth, setStrokeWidthState] = useState(
     initialToolOperationMemory.paint.strokeWidth,
   );
@@ -24053,9 +24015,7 @@ const puppetWarpArmed =
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 캡처할 수 있어요.");
     }
-    const {
-      waitForStudioCaptureReady,
-    } = await loadStudioCaptureReadinessRuntime();
+    const { waitForStudioCaptureReady } = await loadStudioCaptureReadinessRuntime();
     return waitForStudioCaptureReady({
       pageId: page.id,
       getRenderedPageId: () => {
@@ -26779,6 +26739,10 @@ function clearSelectionForEdit() {
     revisionProjectGenerationRef: studioRevisionProjectGenerationRef,
     projectDocumentSessionRef: studioProjectDocumentSessionRef,
     ensureSharedDocumentAvailableForExport,
+    prepareDocumentForExport: async () => (await loadStudioCaptureReadinessRuntime()).flushStudioDocumentInkForExport({
+      drawingRef, drawingPointerTransportRef, pendingStrokeCommitsRef,
+      flushPendingStrokes: () => flushSync(() => flushPendingStrokeCommitsRef.current()),
+    }),
     currentStudioProjectSnapshot,
     filterMaskSurfaceArchiveDependencies,
     loadStudioReleaseScheduleRuntime,
@@ -27124,6 +27088,7 @@ function clearSelectionForEdit() {
     queueBrushDelete,
     regenerateTemplate,
     rememberColor,
+    clearRecentColors,
     rememberEffectRecent,
     removeSelected,
     removeAdvancedRuler,

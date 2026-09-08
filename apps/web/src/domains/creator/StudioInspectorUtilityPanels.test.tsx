@@ -194,6 +194,10 @@ describe("StudioInspectorPageGradeSurface", () => {
     const onColorChange = vi.fn();
     render(
       <StudioInspectorDrawColorControls
+        recentColors={[]}
+        ensureRecentColorsLoaded={vi.fn()}
+        rememberColor={vi.fn()}
+        clearRecentColors={vi.fn()}
         color="#fcd5b5"
         eyedropperActive={false}
         onColorChange={onColorChange}
@@ -211,6 +215,10 @@ describe("StudioInspectorPageGradeSurface", () => {
   it("toggles approximate and history color palettes from StudioInspectorDrawColorControls", () => {
     render(
       <StudioInspectorDrawColorControls
+        recentColors={[]}
+        ensureRecentColorsLoaded={vi.fn()}
+        rememberColor={vi.fn()}
+        clearRecentColors={vi.fn()}
         color="#fcd5b5"
         eyedropperActive={false}
         onColorChange={vi.fn()}

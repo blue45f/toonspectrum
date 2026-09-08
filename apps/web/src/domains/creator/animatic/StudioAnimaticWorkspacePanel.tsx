@@ -145,6 +145,7 @@ export function StudioAnimaticWorkspacePanel({ workScope, pages, workspace, pers
       }); }}
       onExportVideo={() => { void run(async () => {
         const controller = new AbortController(); exportAbort.current = controller;
+        setProgress(0);
         try { const blob = await exportStudioAnimaticVideo({ snapshot: current, images: media.images, audioBuffers: media.audio, signal: controller.signal, onProgress: setProgress }); downloadBlob(blob, "storyboard-animatic.webm"); }
         finally { if (exportAbort.current === controller) exportAbort.current = null; }
       }); }} onCancel={() => exportAbort.current?.abort()} />}

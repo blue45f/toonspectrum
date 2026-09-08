@@ -21,6 +21,9 @@ export interface StudioColorHistoryPanelProps {
   readonly activeColor: string;
   readonly onSelectColor: (hex: string) => void;
   readonly initialHistory?: readonly string[];
+  readonly history?: readonly string[];
+  readonly onRegisterCurrent?: () => void;
+  readonly onClearHistory?: () => void;
   readonly className?: string;
 }
 
@@ -28,16 +31,22 @@ export function StudioColorHistoryPanel({
   activeColor,
   onSelectColor,
   initialHistory = INITIAL_COLOR_HISTORY,
+  history: controlledHistory,
+  onRegisterCurrent,
+  onClearHistory,
   className,
 }: StudioColorHistoryPanelProps) {
-  const [history, setHistory] = useState<readonly string[]>(initialHistory);
+  const [localHistory, setHistory] = useState<readonly string[]>(initialHistory);
+  const history = controlledHistory ?? localHistory;
   const [hoveredHex, setHoveredHex] = useState<string | null>(null);
 
   const handleRegisterCurrent = () => {
+    if (controlledHistory) { onRegisterCurrent?.(); return; }
     setHistory((prev) => addColorToHistory(prev, activeColor));
   };
 
   const handleClearHistory = () => {
+    if (controlledHistory) { onClearHistory?.(); return; }
     setHistory(clearColorHistory());
   };
 
