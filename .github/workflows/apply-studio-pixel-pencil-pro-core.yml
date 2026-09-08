@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: apply-studio-pixel-pencil-pro-core-macos-v3
+  group: apply-studio-pixel-pencil-pro-core-shallow-v4
   cancel-in-progress: false
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: feat/studio-pixel-pencil-pro-v2-20260909
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Apply focused source patch
         run: python3 scripts/apply-studio-pixel-pencil-pro-core.py
