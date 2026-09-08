@@ -769,7 +769,7 @@ export function toggleBrushStudioV5Finish(draft: BrushStudioV5Draft, id: BrushSt
 
 export function optimizeBrushStudioV5Draft(draft: BrushStudioV5Draft): BrushStudioV5Draft {
   const physics = new Set(draft.physicsIds);
-  let strokeEngineId: BrushStudioV5StrokeEngineId = draft.strokeEngineId;
+  let strokeEngineId: BrushStudioV5StrokeEngineId;
   let geometryId: BrushStudioV5GeometryId = draft.geometryId;
   let pigmentId: BrushStudioV5PigmentId = draft.pigmentId;
 
