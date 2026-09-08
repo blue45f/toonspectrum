@@ -16,7 +16,10 @@ vi.mock("react-dom", () => ({ createPortal: createPortalMock }));
 
 const panelSource = readFileSync(new URL("./StudioAppSettingsPanel.tsx", import.meta.url), "utf8");
 
-function renderSettings(initialTab: StudioAppSettingsTab = "general", persistenceState: "loading" | "saved" | "session-only" = "saved") {
+function renderSettings(
+  initialTab: StudioAppSettingsTab = "general",
+  persistenceState: "loading" | "saved" | "session-only" = "saved",
+) {
   const body = { nodeName: "BODY" };
   vi.stubGlobal("document", { body });
   const html = renderToStaticMarkup(
@@ -63,7 +66,7 @@ describe("StudioAppSettingsPanel", () => {
   it("기존 일곱 카테고리와 탭별 복구를 설정 홈에 노출한다", () => {
     const { html } = renderSettings();
 
-    for (const label of ["일반", "단축키", "마우스", "터치·펜", "도구막대", "그리드·가이드", "기타"]) {
+    for (const label of ["일반", "단축키", "마우스", "터치", "도구막대", "가이드", "기타"]) {
       expect(html).toContain(label);
     }
     expect(html.match(/이 섹션 초기화/g)).toHaveLength(7);
