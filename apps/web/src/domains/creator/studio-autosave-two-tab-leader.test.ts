@@ -591,6 +591,248 @@ describe("two-tab autosave persistence", () => {
       ]);
     });
 
+  it("released-handle regression: rechecks leadership after a delayed writer acquisition", async () => {
+    const store = new SharedJournalStore();
+    const locks = new FakeLockManager();
+    const oldLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    const nextLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    let announceAcquire!: () => void;
+    let finishAcquire!: () => void;
+    const entered = new Promise<void>((resolve) => { announceAcquire = resolve; });
+    const gate = new Promise<void>((resolve) => { finishAcquire = resolve; });
+    const oldJournal = new TabJournal(store);
+    const acquireWriter = oldJournal.acquireWriter.bind(oldJournal);
+    oldJournal.acquireWriter = async (input) => {
+      announceAcquire();
+      await gate;
+      return acquireWriter(input);
+    };
+    const oldSession = new StudioAutosaveOpfsSession({
+      autosaveKey: AUTOSAVE_KEY, journal: oldJournal, ownerId: "waiting-old-owner",
+      now: () => store.now, documentLease: oldLease,
+    });
+    const nextSession = new StudioAutosaveOpfsSession({
+      autosaveKey: AUTOSAVE_KEY, journal: new TabJournal(store), ownerId: "new-owner",
+      now: () => store.now, documentLease: nextLease,
+    });
+    const storage = memoryStorage();
+    const sqlite = memorySqliteStore();
+    const persist = (session: StudioAutosaveOpfsSession, ids: string[]) =>
+      persistStudioAutosaveWithOpfsPrimary({
+        session, sqlite, storage, key: AUTOSAVE_KEY,
+        payload: payload("2026-08-13T00:00:00.000Z", ids),
+      });
+    let oldWrite: Promise<unknown> | null = null;
+    try {
+      oldWrite = persist(oldSession, ["late-old-checkpoint"]);
+      await entered;
+      await oldLease.release();
+      expect(await nextLease.waitForLeadership({ timeoutMs: 1_000 })).toBe(true);
+      await persist(nextSession, ["new-leader-finished"]);
+      finishAcquire();
+      await expect(oldWrite).rejects.toBeInstanceOf(StudioAutosaveDocumentBusyError);
+      expect(store.lease).toBeNull();
+      const latest = await nextSession.readLatest();
+      expect(strokeIdsOf(latest?.state === "snapshot" ? latest.payload : null))
+        .toEqual(["new-leader-finished"]);
+      const mirrored = sqlite.values.get(AUTOSAVE_KEY);
+      expect(strokeIdsOf(mirrored?.state === "snapshot" ? mirrored.payload : null))
+        .toEqual(["new-leader-finished"]);
+    } finally {
+      finishAcquire();
+      await oldWrite?.catch(() => undefined);
+      await oldSession.dispose();
+      await nextSession.dispose();
+      await oldLease.release();
+      await nextLease.release();
+    }
+  });
+
+  it("released-handle regression: refuses the old leader's OPFS and SQLite writes after handover", async () => {
+    const store = new SharedJournalStore();
+    const locks = new FakeLockManager();
+    const oldLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    const nextLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    const makeSession = (ownerId: string, documentLease: typeof oldLease) =>
+      new StudioAutosaveOpfsSession({
+        autosaveKey: AUTOSAVE_KEY, journal: new TabJournal(store), ownerId,
+        now: () => store.now, documentLease,
+      });
+    const oldSession = makeSession("released-owner", oldLease);
+    const nextSession = makeSession("current-owner", nextLease);
+    const storage = memoryStorage();
+    const sqlite = memorySqliteStore();
+    const persist = (session: StudioAutosaveOpfsSession, ids: string[]) =>
+      persistStudioAutosaveWithOpfsPrimary({
+        session, sqlite, storage, key: AUTOSAVE_KEY,
+        payload: payload("2026-08-13T00:00:00.000Z", ids),
+      });
+    try {
+      await persist(oldSession, ["old-checkpoint"]);
+      await oldLease.release();
+      expect(await nextLease.waitForLeadership({ timeoutMs: 1_000 })).toBe(true);
+      await persist(nextSession, ["current-leader"]);
+      await expect(persist(oldSession, ["stale-overwrite"]))
+        .rejects.toBeInstanceOf(StudioAutosaveDocumentBusyError);
+      const mirrored = sqlite.values.get(AUTOSAVE_KEY);
+      expect(strokeIdsOf(mirrored?.state === "snapshot" ? mirrored.payload : null))
+        .toEqual(["current-leader"]);
+      const recovered = await nextSession.readLatest();
+      expect(strokeIdsOf(recovered?.state === "snapshot" ? recovered.payload : null))
+        .toEqual(["current-leader"]);
+      const { withStudioAutosaveDocumentLeadership } = await import("./studio-autosave-opfs-session");
+      expect(withStudioAutosaveDocumentLeadership(sqlite, oldLease)).toBeNull();
+      expect(oldLease.role).toBe("follower");
+      expect(await oldLease.waitForLeadership({ timeoutMs: 0 })).toBe(false);
+    } finally {
+      await oldSession.dispose();
+      await nextSession.dispose();
+      await oldLease.release();
+      await nextLease.release();
+    }
+  });
+
+  it("released-handle regression: settles only the released follower's pending leadership wait", async () => {
+    const locks = new FakeLockManager();
+    const leader = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    const registry = createStudioAutosaveDocumentLeadershipRegistry();
+    const releasedFollower = await requestStudioAutosaveDocumentLeadership({ autosaveKey: AUTOSAVE_KEY, locks, registry });
+    const retainedFollower = await requestStudioAutosaveDocumentLeadership({ autosaveKey: AUTOSAVE_KEY, locks, registry });
+    const releasedWait = releasedFollower.waitForLeadership();
+    const retainedWait = retainedFollower.waitForLeadership();
+    let retainedSettled = false;
+    void retainedWait.then(() => { retainedSettled = true; });
+    try {
+      await releasedFollower.release();
+      const outcome = await Promise.race([
+        releasedWait.then((value) => ({ settled: true, value })),
+        new Promise<{ settled: false }>((resolve) => setTimeout(() => resolve({ settled: false }), 0)),
+      ]);
+      expect(outcome).toEqual({ settled: true, value: false });
+      expect(retainedSettled).toBe(false);
+      expect(retainedFollower.role).toBe("follower");
+      await leader.release();
+      expect(await retainedWait).toBe(true);
+      expect(retainedFollower.role).toBe("leader");
+      expect(releasedFollower.role).toBe("follower");
+    } finally {
+      await leader.release();
+      await releasedFollower.release();
+      await retainedFollower.release();
+    }
+  });
+
+  it("released-handle regression: preserves another same-tab live lease and its writer", async () => {
+    const store = new SharedJournalStore();
+    const locks = new FakeLockManager();
+    const registry = createStudioAutosaveDocumentLeadershipRegistry();
+    const releasedLease = await requestStudioAutosaveDocumentLeadership({ autosaveKey: AUTOSAVE_KEY, locks, registry });
+    const retainedLease = await requestStudioAutosaveDocumentLeadership({ autosaveKey: AUTOSAVE_KEY, locks, registry });
+    const otherTabLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    const target = new StudioAutosaveOpfsSession({
+      autosaveKey: AUTOSAVE_KEY, journal: new TabJournal(store), ownerId: "retained-owner",
+      now: () => store.now, documentLease: retainedLease,
+    });
+    try {
+      await releasedLease.release();
+      expect(releasedLease.role).toBe("follower");
+      expect(await releasedLease.waitForLeadership()).toBe(false);
+      expect(retainedLease.role).toBe("leader");
+      expect(await retainedLease.waitForLeadership({ timeoutMs: 0 })).toBe(true);
+      expect(await otherTabLease.waitForLeadership({ timeoutMs: 0 })).toBe(false);
+      await target.write(payload("2026-08-13T00:00:00.000Z", ["retained-write"]));
+      expect(store.lease).toBeNull();
+      await target.dispose();
+      await retainedLease.release();
+      expect(await otherTabLease.waitForLeadership({ timeoutMs: 1_000 })).toBe(true);
+    } finally {
+      await target.dispose();
+      await releasedLease.release();
+      await retainedLease.release();
+      await otherTabLease.release();
+    }
+  });
+
+  it("released-handle regression: retains locks-unavailable fencing but not released-handle authority", async () => {
+    const store = new SharedJournalStore();
+    const lease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks: null, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    const target = new StudioAutosaveOpfsSession({
+      autosaveKey: AUTOSAVE_KEY, journal: new TabJournal(store), ownerId: "lease-only-owner",
+      now: () => store.now, documentLease: lease,
+    });
+    try {
+      await target.write(payload("2026-08-13T00:00:00.000Z", ["fenced-write"]));
+      expect(store.lease).not.toBeNull();
+      expect(lease.basis).toBe("locks-unavailable");
+      await lease.release();
+      await expect(target.write(payload("2026-08-13T00:00:01.000Z", ["stale-write"])))
+        .rejects.toBeInstanceOf(StudioAutosaveDocumentBusyError);
+    } finally {
+      await target.dispose();
+      await lease.release();
+    }
+    expect(store.lease).toBeNull();
+  });
+
+  it("resumes after browser lock handover without waiting for React cleanup or disk lease expiry", async () => {
+    const store = new SharedJournalStore();
+    const locks = new FakeLockManager();
+    const leaderLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    const nextLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    const makeSession = (ownerId: string, documentLease: typeof leaderLease) =>
+      new StudioAutosaveOpfsSession({
+        autosaveKey: AUTOSAVE_KEY, journal: new TabJournal(store), ownerId,
+        now: () => store.now, documentLease,
+      });
+    const leader = makeSession("before-reload", leaderLease);
+    const follower = makeSession("follower", nextLease);
+    const storage = memoryStorage();
+    const sqlite = memorySqliteStore();
+    const persist = (target: StudioAutosaveOpfsSession, ids: string[]) =>
+      persistStudioAutosaveWithOpfsPrimary({
+        session: target, sqlite, storage, key: AUTOSAVE_KEY,
+        payload: payload("2026-08-13T00:00:00.000Z", ids),
+      });
+    await persist(leader, ["corrected-ellipse"]);
+    expect(store.lease).toBeNull();
+    await expect(persist(follower, ["wrong-tab"])).rejects.toBeInstanceOf(StudioAutosaveDocumentBusyError);
+    const mirrored = sqlite.values.get(AUTOSAVE_KEY);
+    expect(strokeIdsOf(mirrored?.state === "snapshot" ? mirrored.payload : null))
+      .toEqual(["corrected-ellipse"]);
+    // On navigation the browser releases Web Locks, while no React session.dispose runs.
+    await leaderLease.release();
+    expect(await nextLease.waitForLeadership({ timeoutMs: 1_000 })).toBe(true);
+    const reloaded = makeSession("after-reload", nextLease);
+    expect((await persist(reloaded, ["restored-freehand"])).authority).toBe("opfs-journal");
+    expect(store.now).toBe(1_000);
+    const recovered = await reconcileStudioAutosaveWithOpfsPrimary({
+      session: reloaded, sqlite, storage, key: AUTOSAVE_KEY,
+    });
+    expect(strokeIdsOf(recovered.candidate?.payload)).toEqual(["restored-freehand"]);
+    await leader.dispose();
+    await follower.dispose();
+    await reloaded.dispose();
+    await nextLease.release();
+  });
+
   it("lets the next tab take over once the leading tab releases its writer", async () => {
     const store = new SharedJournalStore();
     const storage = memoryStorage();

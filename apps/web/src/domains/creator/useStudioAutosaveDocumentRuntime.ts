@@ -98,6 +98,7 @@ export function useStudioAutosaveDocumentRuntime({
                   reopenStudioAutosaveDocumentSessionForLeadership({
                     session: opened.session,
                     autosaveKey,
+                    documentLease: opened.lease,
                   });
                 autosaveOpfsSessionRef.current = promotedSessionPromise;
                 const promotedSession = await promotedSessionPromise;

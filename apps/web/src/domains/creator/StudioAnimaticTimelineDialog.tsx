@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
+import { StudioAnimaticWorkspacePanel, type StudioAnimaticWorkspacePanelProps } from "./animatic/StudioAnimaticWorkspacePanel";
 import { StudioAnimaticTimelinePanel } from "./StudioAnimaticTimelinePanel";
 import { StudioFloatingSurface } from "./StudioFloatingSurface";
 import { useStudioFloatingSurfaceLayout } from "./use-studio-floating-surface-layout";
@@ -17,6 +18,7 @@ export interface StudioAnimaticTimelineDialogProps {
   /** Deterministic responsive seam; product callers normally omit it. */
   readonly isMobile?: boolean;
   readonly onClose: () => void;
+  readonly workspaceIntegration?: Pick<StudioAnimaticWorkspacePanelProps, "workspace" | "persistenceStatus" | "onHydrate" | "onCommit" | "capturePages">;
 }
 
 const DEFAULT_STUDIO_ANIMATIC_FLOATING_LAYOUT = Object.freeze({
@@ -55,6 +57,7 @@ export function StudioAnimaticTimelineDialog({
   reducedMotion,
   isMobile: isMobileOverride,
   onClose,
+  workspaceIntegration,
 }: StudioAnimaticTimelineDialogProps) {
   const responsiveMobile = useIsMobile();
   const isMobile = isMobileOverride ?? responsiveMobile;
@@ -87,6 +90,11 @@ export function StudioAnimaticTimelineDialog({
   }, [isMobile, onClose, open]);
 
   if (!open || typeof document === "undefined") return null;
+  const panel = (className: string, withClose = false) => workspaceIntegration
+    ? <StudioAnimaticWorkspacePanel key={workScope} {...workspaceIntegration} workScope={workScope} pages={pages}
+      reducedMotion={reducedMotion} className={className} onClose={withClose ? onClose : undefined} />
+    : <StudioAnimaticTimelinePanel key={workScope} workScope={workScope} pages={pages}
+      reducedMotion={reducedMotion} className={className} onClose={withClose ? onClose : undefined} />;
 
   if (!isMobile) {
     return createPortal(
@@ -121,13 +129,7 @@ export function StudioAnimaticTimelineDialog({
           "[&>section>header]:hidden",
         ].join(" ")}
       >
-        <StudioAnimaticTimelinePanel
-          key={workScope}
-          workScope={workScope}
-          pages={pages}
-          reducedMotion={reducedMotion}
-          className="h-full max-h-none"
-        />
+        {panel("h-full max-h-none")}
       </StudioFloatingSurface>,
       document.body,
     );
@@ -151,14 +153,7 @@ export function StudioAnimaticTimelineDialog({
         aria-label="웹툰 애니매틱"
         className="relative z-10 flex max-h-[100dvh] w-full max-w-6xl"
       >
-        <StudioAnimaticTimelinePanel
-          key={workScope}
-          workScope={workScope}
-          pages={pages}
-          reducedMotion={reducedMotion}
-          onClose={onClose}
-          className="max-h-[100dvh] rounded-b-none sm:max-h-[calc(100dvh-2rem)] sm:rounded-b-2xl"
-        />
+        {panel("max-h-[100dvh] rounded-b-none sm:max-h-[calc(100dvh-2rem)] sm:rounded-b-2xl", true)}
       </div>
     </div>,
     document.body,

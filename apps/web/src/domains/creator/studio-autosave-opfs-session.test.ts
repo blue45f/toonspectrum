@@ -295,6 +295,86 @@ describe("StudioAutosaveOpfsSession", () => {
     expect(journal.acquireCount).toBe(2);
   });
 
+  it("releases a completed journal transaction while the document Web Lock keeps leadership", async () => {
+    const journal = new FakeAutosaveJournal();
+    let finishAppend!: () => void;
+    journal.appendGate = new Promise<void>((resolve) => { finishAppend = resolve; });
+    const target = new StudioAutosaveOpfsSession({
+      autosaveKey: "autosave-primary", journal, ownerId: "before-reload",
+      now: () => journal.now, documentLease: { role: "leader", basis: "web-lock" },
+    });
+    const writing = target.write(payload("2026-07-30T01:00:00.000Z"));
+    await vi.waitFor(() => expect(journal.acquireCount).toBe(1));
+    expect(journal.releaseCount).toBe(0);
+    finishAppend();
+    await writing;
+    expect(journal.releaseCount).toBe(1);
+    // The same live document reacquires a fenced writer for its next checkpoint. No navigation
+    // cleanup is needed to clear an idle disk lease before the reloaded tab resumes writing.
+    await target.write(payload("2026-07-30T01:01:00.000Z", "second"));
+    expect(journal.acquireCount).toBe(2);
+    expect(journal.releaseCount).toBe(2);
+    expect((await target.readLatest())?.state).toBe("snapshot");
+    await target.dispose();
+    expect(journal.releaseCount).toBe(2);
+  });
+
+  it("released-handle regression: returns an in-flight writer after leadership is released", async () => {
+    const journal = new FakeAutosaveJournal();
+    let finishAppend!: () => void;
+    journal.appendGate = new Promise<void>((resolve) => { finishAppend = resolve; });
+    const documentLease: { role: "leader" | "follower"; basis: "web-lock" } = {
+      role: "leader", basis: "web-lock",
+    };
+    const target = new StudioAutosaveOpfsSession({
+      autosaveKey: "autosave-primary", journal, ownerId: "closing-leader",
+      now: () => journal.now, documentLease,
+    });
+    const writing = target.write(payload("2026-07-30T01:00:00.000Z"));
+    await vi.waitFor(() => expect(journal.acquireCount).toBe(1));
+    documentLease.role = "follower";
+    finishAppend();
+    try {
+      await writing;
+      expect(journal.releaseCount).toBe(1);
+      await expect(target.write(payload("2026-07-30T01:01:00.000Z")))
+        .rejects.toMatchObject({ name: "StudioAutosaveDocumentBusyError" });
+      expect(journal.acquireCount).toBe(1);
+    } finally {
+      await target.dispose();
+    }
+  });
+
+  it("retains journal fencing when document Web Locks are unavailable", async () => {
+    const journal = new FakeAutosaveJournal();
+    const target = new StudioAutosaveOpfsSession({
+      autosaveKey: "autosave-primary", journal, ownerId: "lease-only",
+      now: () => journal.now, documentLease: { role: "leader", basis: "locks-unavailable" },
+    });
+    await target.write(payload("2026-07-30T01:00:00.000Z"));
+    await target.write(payload("2026-07-30T01:01:00.000Z"));
+    expect(journal.acquireCount).toBe(1);
+    expect(journal.releaseCount).toBe(0);
+    await target.dispose();
+    expect(journal.releaseCount).toBe(1);
+  });
+
+  it("refuses follower persistence before acquiring an idle journal or changing SQLite", async () => {
+    const journal = new FakeAutosaveJournal();
+    const sqlite = memorySqliteStore();
+    const target = new StudioAutosaveOpfsSession({
+      autosaveKey: "autosave-primary", journal, ownerId: "follower",
+      documentLease: { role: "follower", basis: "web-lock" },
+    });
+    await expect(persistStudioAutosaveWithOpfsPrimary({
+      session: target, sqlite, storage: memoryStorage(), key: "autosave-primary",
+      payload: payload("2026-07-30T01:00:00.000Z"),
+    })).rejects.toMatchObject({ name: "StudioAutosaveDocumentBusyError" });
+    expect(journal.acquireCount).toBe(0);
+    expect(journal.entries).toHaveLength(0);
+    expect(sqlite.values.size).toBe(0);
+  });
+
   it("closes admission before waiting for an in-flight checkpoint during disposal", async () => {
     const journal = new FakeAutosaveJournal();
     let releaseAppend!: () => void;

@@ -391,6 +391,10 @@ import {
 } from "./studio-dodge-burn";
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
 import { createStudioAutoActionsController } from "./studio-auto-actions-controller";
+import {
+  describeStudioCollaborationLock,
+  labelStudioCollaborationRole,
+} from "./studio-collaboration-lock-copy";
 import { createStudioDrawingAssistHandlers } from "./studio-drawing-assist-handlers";
 
 import { shouldStartStudioSpacePan } from "./studio-space-pan-shortcut";
@@ -1846,6 +1850,11 @@ export function StudioCuttoonEditor({
 
   const {
     aiProvenance,
+    animaticWorkspace,
+    animaticPersistenceBusy,
+    animaticPersistenceError,
+    hydrateAnimaticWorkspace,
+    commitAnimaticWorkspace,
     characterBible,
     hydrateStudioSidecarDocuments,
     hydrateStudioSidecarSource,
@@ -2246,61 +2255,30 @@ export function StudioCuttoonEditor({
   ]);
 
   // useCallback: 렌더 중 호출되는 메시지 헬퍼 — memo 자식(메뉴바/툴벨트)의 prop 안정성 유지.
-  const collaborationLockMessage = useCallback((): string => {
-    if (documentReloadRequired) {
-      return "서버 문서가 변경되어 안전하게 잠갔어요. 로컬 원고를 내보낸 뒤 페이지를 다시 불러와 주세요.";
-    }
-    if (sourceHydrationPending) {
-      return workHydrationFailed
-        ? "원본 원고를 열지 못해 편집·저장·가져오기를 잠갔어요. 다시 시도해 주세요."
-        : "원본 원고를 불러오는 동안 편집·저장·가져오기를 잠갔어요. 불러오기가 끝나면 자동으로 열립니다.";
-    }
-    if (!sharedDocument) {
-      return workHydrated
-        ? "공동 문서를 열지 못해 편집과 저장을 잠갔어요. 연결을 확인한 뒤 다시 시도해 주세요."
-        : "공동 문서를 불러오는 동안 편집과 저장을 사용할 수 없어요.";
-    }
-    if (collaborationOperationSyncPending) {
-      return "같은 화면의 원고 연산을 동기화하고 있어요. CRDT 문서와 장면 런타임이 모두 준비되면 편집이 자동으로 열립니다.";
-    }
-    if (sharedDocument.role === "commenter") {
-      if (studioTeamCommentCapabilities?.comment === true) {
-        return "검토 전용 권한입니다. 원고 편집은 잠겨 있지만 댓글 도구로 캔버스 위치에 피드백을 남길 수 있어요.";
-      }
-      if (studioTeamCommentCapabilities === null) {
-        return "검토 전용 권한입니다. 원고 편집은 잠겨 있으며 팀 댓글 권한과 기록을 확인하고 있어요.";
-      }
-      return "검토 전용 권한입니다. 원고와 댓글 작성은 읽기 전용이며 기존 피드백을 확인할 수 있어요.";
-    }
-    if (sharedDocument.role === "viewer") {
-      return "열람 전용 권한입니다. 원고 편집과 저장은 할 수 없지만 스크롤과 내보내기는 계속 사용할 수 있어요.";
-    }
-    return "현재 서버 권한이 열람 전용입니다. 원고 편집과 저장은 할 수 없지만 스크롤과 내보내기는 계속 사용할 수 있어요.";
-  }, [
-    documentReloadRequired,
-    sourceHydrationPending,
-    workHydrationFailed,
-    sharedDocument,
-    studioTeamCommentCapabilities,
-    workHydrated,
-    collaborationOperationSyncPending,
-  ]);
+  const collaborationLockMessage = useCallback(
+    () =>
+      describeStudioCollaborationLock({
+        collaborationOperationSyncPending,
+        documentReloadRequired,
+        sharedDocument,
+        sourceHydrationPending,
+        studioTeamCommentCapabilities,
+        workHydrated,
+        workHydrationFailed,
+      }),
+    [
+      collaborationOperationSyncPending,
+      documentReloadRequired,
+      sharedDocument,
+      sourceHydrationPending,
+      studioTeamCommentCapabilities,
+      workHydrated,
+      workHydrationFailed,
+    ],
+  );
 
   function collaborationRoleLabel(): string {
-    switch (sharedDocument?.role) {
-      case "owner":
-        return "소유자";
-      case "admin":
-        return "관리자";
-      case "editor":
-        return "편집자";
-      case "commenter":
-        return "검토자";
-      case "viewer":
-        return "열람자";
-      default:
-        return "권한 확인 중";
-    }
+    return labelStudioCollaborationRole(sharedDocument?.role);
   }
 
   function ensureSharedDocumentAvailableForExport(): boolean {
@@ -28396,6 +28374,12 @@ function clearSelectionForEdit() {
       aiSettings={aiSettings}
       animTimeline={animTimeline}
       animaticTimelineOpen={animaticTimelineOpen}
+      animaticWorkspace={animaticWorkspace}
+      animaticPersistenceBusy={animaticPersistenceBusy}
+      animaticPersistenceError={animaticPersistenceError}
+      hydrateAnimaticWorkspace={hydrateAnimaticWorkspace}
+      commitAnimaticWorkspace={commitAnimaticWorkspace}
+      handleCapturePagesForIndices={handleCapturePagesForIndices}
       announceDrawingShortcut={announceDrawingShortcut}
       appSettings={appSettings}
       appSettingsInitialTab={appSettingsInitialTab}
