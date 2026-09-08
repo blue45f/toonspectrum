@@ -390,8 +390,14 @@ export function resolveStudioDraftSaveCenter(
     detail = "문서별 로컬 저장 담당과 서버 revision을 확인하는 동안 작업을 계속할 수 있습니다.";
   }
 
-  const activeServerConflict = phase === "server-risk" && serverConflict;
-  const primaryAction: StudioDraftSavePrimaryAction = phase === "load-risk" || activeServerConflict
+  const actionableServerConflict = serverConflict
+    && input.hydrated
+    && !input.hydrationFailed
+    && !input.metadataRequired
+    && !input.collaborationLocked
+    && !input.saving;
+  const primaryAction: StudioDraftSavePrimaryAction = phase === "load-risk"
+    || actionableServerConflict
     ? "versions"
     : phase === "metadata-required"
       ? "metadata"
@@ -402,19 +408,28 @@ export function resolveStudioDraftSaveCenter(
       ? "원고 불러오는 중"
       : phase === "metadata-required"
         ? "초안 저장 계속"
-        : activeServerConflict
+        : actionableServerConflict
           ? "버전 비교·복원"
           : input.saving
             ? "저장 중"
             : input.collaborationLocked
               ? "저장 권한 확인"
-              : !input.isOnline
-                ? input.deferredSave
-                  ? "연결 후 저장 예약됨"
-                  : "연결 후 저장 예약"
-                : input.serverSaveError
-                  ? "서버 저장 다시 시도"
-                  : "지금 서버에 저장";
+              : !input.hydrated
+                ? "원고 불러오는 중"
+                : !input.isOnline
+                  ? input.deferredSave
+                    ? "연결 후 저장 예약됨"
+                    : "연결 후 저장 예약"
+                  : input.serverSaveError
+                    ? "서버 저장 다시 시도"
+                    : "지금 서버에 저장";
+  const saveActionDisabled = primaryAction === "save"
+    && (
+      input.saving
+      || !input.hydrated
+      || input.hydrationFailed
+      || input.collaborationLocked
+    );
 
   return {
     phase,
@@ -426,7 +441,7 @@ export function resolveStudioDraftSaveCenter(
     server,
     primaryAction,
     saveActionLabel,
-    saveActionDisabled: phase === "saving" || phase === "loading" || phase === "blocked",
+    saveActionDisabled,
     canOpenVersions: true,
     shouldPromoteBackup: localRisk
       || phase === "load-risk"
