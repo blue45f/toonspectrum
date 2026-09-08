@@ -37,6 +37,19 @@ jobs:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+      - name: Verify presence/document readiness policy and transport contracts
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.test.ts
+          apps/web/src/domains/creator/live/studio-crdt-room-binding.test.ts
+          apps/web/src/domains/creator/live/studio-live-collaboration-transport.test.ts
+      - name: Lint focused collaboration changes
+        run: >-
+          pnpm exec eslint
+          apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.ts
+          apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.test.ts
+          apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioCollaborationAccessRuntime.ts
+          scripts/verify-studio-collaboration-sync.mts
       - name: Resolve collaboration evidence directories
         run: |
           mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/production"
