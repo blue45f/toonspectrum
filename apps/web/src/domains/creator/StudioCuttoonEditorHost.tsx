@@ -25648,8 +25648,8 @@ function clearSelectionForEdit() {
     ],
   );
   const studioMainMenuGroups = useMemo(
-    () => {
-      return buildStudioMainMenuGroups({
+    () =>
+      buildStudioMainMenuGroups({
         state: {
           ...studioMainMenuSurfaceState,
           sharedNonOwnerSave: menuSharedNonOwnerSave,
@@ -25798,9 +25798,8 @@ function clearSelectionForEdit() {
           requestBrushPackImport: studioMainMenuActions.requestBrushPackImportFromMenu,
           openNaturalMediaBrushes: studioMainMenuActions.openNaturalMediaBrushesFromMenu,
         },
-      t,
-      });
-    },
+        t,
+      }),
     [
       canvasFlipH,
       canvasRotation,
