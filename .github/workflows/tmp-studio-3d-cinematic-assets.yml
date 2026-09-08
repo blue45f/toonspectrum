@@ -15,7 +15,7 @@ permissions:
 
 concurrency:
   group: studio-3d-cinematic-assets-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   integrate-and-validate:
