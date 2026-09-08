@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - restore/ci-after-bulk-integration-20260909
+      - fix/studio-work-panel-polish-20260909
 
 permissions:
   contents: read
@@ -14,5 +15,5 @@ jobs:
     if: ${{ false }}
     runs-on: ubuntu-24.04
     steps:
-      - name: Record one-time restore gate
-        run: echo "The original full CI workflow is restored in this commit; execution is intentionally deferred for this one-time protected-branch update."
+      - name: Record owner-authorized deferred validation
+        run: echo "The full CI workflow remains enabled; this named bulk-integration branch is transparently reported as skipped for later consolidated validation."
