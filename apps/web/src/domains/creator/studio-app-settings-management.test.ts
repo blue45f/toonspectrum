@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defaultStudioAppSettings } from "./studio-app-settings";
 import {
   STUDIO_APP_SETTINGS_EXPORT_KIND,
+  STUDIO_APP_SETTINGS_EXPORT_VERSION,
   STUDIO_APP_SETTINGS_IMPORT_MAX_BYTES,
   applyStudioAppSettingsProfile,
   countStudioAppSettingsDifferences,
@@ -90,13 +91,29 @@ describe("Studio application settings management", () => {
     }
   });
 
-  it("손상·미지원·과대 설정 파일을 거부한다", () => {
+  it("손상·무관·미지원·과대 설정 파일을 거부한다", () => {
     expect(importStudioAppSettings("not-json")).toMatchObject({ ok: false, reason: "invalid-json" });
     expect(importStudioAppSettings(JSON.stringify({
       kind: STUDIO_APP_SETTINGS_EXPORT_KIND,
       version: 999,
       settings: {},
     }))).toMatchObject({ ok: false, reason: "unsupported-version" });
+    expect(importStudioAppSettings(JSON.stringify({
+      kind: STUDIO_APP_SETTINGS_EXPORT_KIND,
+      version: STUDIO_APP_SETTINGS_EXPORT_VERSION,
+      settings: {},
+    }))).toMatchObject({ ok: false, reason: "invalid-settings" });
+    expect(importStudioAppSettings(JSON.stringify({
+      kind: STUDIO_APP_SETTINGS_EXPORT_KIND,
+      version: STUDIO_APP_SETTINGS_EXPORT_VERSION,
+      settings: {
+        ...defaultStudioAppSettings(),
+        general: "broken",
+      },
+    }))).toMatchObject({ ok: false, reason: "invalid-settings" });
+    expect(importStudioAppSettings(JSON.stringify({
+      unrelated: { value: true },
+    }))).toMatchObject({ ok: false, reason: "invalid-settings" });
     expect(importStudioAppSettings("x".repeat(STUDIO_APP_SETTINGS_IMPORT_MAX_BYTES + 1)))
       .toMatchObject({ ok: false, reason: "too-large" });
   });
