@@ -298,7 +298,7 @@ import {
 } from "./studio-character-bible";
 import { svgToDataUrl } from "./studio-characters";
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
-import { deleteSavedClipInMemory, upsertSavedClipInMemory } from "./studio-clips";
+import { deleteSavedClipInMemory, prepareStudioSavedClipElements, upsertSavedClipInMemory } from "./studio-clips";
 import {
   COLOR_RANGE_FUZZINESS_DEFAULT,
   COLOR_RANGE_MAX_SAMPLES,
@@ -19979,9 +19979,10 @@ const puppetWarpArmed =
     const name = globalThis.prompt("클립 이름을 정해주세요", fallbackName)?.trim();
     if (!name) return;
     const clip: StudioClip = { id: uid(), name, createdAt: Date.now(), els };
+    const preparedClip = () => ({ ...clip, els: prepareStudioSavedClipElements(clip.els) });
     await commitSavedClipMutation(
-      (repository) => repository.save(clip),
-      (current) => upsertSavedClipInMemory(current, clip),
+      (repository) => repository.save(preparedClip()),
+      (current) => upsertSavedClipInMemory(current, preparedClip()),
     );
     if (editorMountedRef.current) setMenu("clip");
   }
@@ -25260,7 +25261,7 @@ function clearSelectionForEdit() {
     closeMenu: () => setMenu(null), setError,
     onApplied: (stroke) => {
       activatePrimaryCanvasTool("select");
-      setNodeEditTool("move");
+      setNodeEditTool("move", stroke.id);
       announceDrawingShortcut(stroke.smartShape ? "도형을 확정했어요. 캔버스의 점을 끌어 편집하세요." : "원래 자유선을 복원했어요.");
     },
   });
@@ -25608,8 +25609,8 @@ function clearSelectionForEdit() {
     ],
   );
   const studioMainMenuGroups = useMemo(
-    () => {
-      return buildStudioMainMenuGroups({
+    () =>
+      buildStudioMainMenuGroups({
         state: {
           ...studioMainMenuSurfaceState,
           sharedNonOwnerSave: menuSharedNonOwnerSave,
@@ -25758,9 +25759,8 @@ function clearSelectionForEdit() {
           requestBrushPackImport: studioMainMenuActions.requestBrushPackImportFromMenu,
           openNaturalMediaBrushes: studioMainMenuActions.openNaturalMediaBrushesFromMenu,
         },
-      t,
-      });
-    },
+        t,
+      }),
     [
       canvasFlipH,
       canvasRotation,

@@ -259,7 +259,7 @@ describe("applyFilterMaskToPixels", () => {
     expect([...filtered]).toEqual([...original]);
   });
 
-  it("회색 마스크는 선형 블렌드(알파 채널 포함 4채널 전부)", () => {
+  it("회색 마스크는 알파를 보간하고 투명 픽셀의 숨은 RGB를 제외한다", () => {
     const filtered = rgba([255, 0, 255, 255]);
     const original = rgba([0, 255, 0, 0]);
     applyFilterMaskToPixels({
@@ -269,11 +269,7 @@ describe("applyFilterMaskToPixels", () => {
       height: 1,
       coverage: coverageOf(1, 1, [128]),
     });
-    const m = 128 / 255;
-    expect(filtered[0]).toBe(Math.round(255 * m));
-    expect(filtered[1]).toBe(Math.round(255 * (1 - m)));
-    expect(filtered[2]).toBe(Math.round(255 * m));
-    expect(filtered[3]).toBe(Math.round(255 * m));
+    expect([...filtered]).toEqual([255, 0, 255, 128]);
   });
 
   it("마스크 해상도 != 대상 해상도면 정규화 좌표로 스케일 샘플한다", () => {
@@ -288,8 +284,10 @@ describe("applyFilterMaskToPixels", () => {
       coverage: coverageOf(2, 1, [0, 255]),
     });
     expect(filtered[0]).toBe(0); // u=0.125 → 마스크 왼끝 클램프
-    expect(filtered[4]).toBe(64); // u=0.375 → 보간 63.75 → 반올림 64
-    expect(filtered[8]).toBe(191); // u=0.625 → 보간 191.25 → 반올림 191
+    expect(filtered[4]).toBe(255); // White remains white while alpha carries coverage.
+    expect(filtered[7]).toBe(64); // u=0.375 → 보간 63.75 → 반올림 64
+    expect(filtered[8]).toBe(255);
+    expect(filtered[11]).toBe(191); // u=0.625 → 보간 191.25 → 반올림 191
     expect(filtered[12]).toBe(255); // u=0.875 → 마스크 오른끝 클램프
   });
 

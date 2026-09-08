@@ -44,7 +44,7 @@ import {
   type PixelData,
 } from "ag-psd";
 
-import { planStudioStageDocumentViewBox } from "../canvas/studio-stage-document-view";
+import { planStudioStageDocumentViewBox, readStudioStageInDocumentView } from "../canvas/studio-stage-document-view";
 import {
   buildDialogueRubyExportXmp,
   createDialogueRubyMetadataRecord,
@@ -53,6 +53,8 @@ import {
   type DialogueRubyExportWarning,
   type DialogueRubyExportMetadataRecord,
 } from "../lettering/studio-dialogue-ruby-export";
+import { bakeStudioPageGradeIntoCanvas } from "../render/studio-raster-export-orchestration-runtime";
+import { normalizePageGrade, isDefaultPageGrade, type PageGrade } from "../studio-page-grade";
 import { readStudioExportResolutionDpi } from "../render/studio-raster-resolution-metadata";
 
 import type {
@@ -79,6 +81,7 @@ interface PsdElMeta {
   maskSrc?: string;
   filterMaskSrc?: string;
   smartFilters?: { entries?: readonly unknown[] };
+  adjustmentLayer?: { version: 1; scope: "composite-below" | "clip-previous" };
   bg3dScene?: unknown;
   vrmScene?: unknown;
 }
@@ -193,6 +196,8 @@ export type PsdExportEl =
 export interface PsdExportOptions {
   /** 출력 배율 — 래스터 크기·left/top 좌표에 곱한다. 기본 1(캔버스 원본 크기). */
   scale?: number;
+  /** Whole-document grade is baked when a live adjustment graph requires composite export. */
+  pageGrade?: Partial<PageGrade>;
   /** 배경(단색/그라데이션) 레이어를 맨 아래에 추가할지. `background` 가 없으면 무의미. 기본 true. */
   includeBackground?: boolean;
   /** 페이지 배경 — StudioPage 의 bg/bgGrad 를 그대로 전달(모듈 스스로는 페이지 상태를 모름). */
@@ -1142,6 +1147,95 @@ function withPsdExportLossDecisions(
 // 메인 — 페이지 → 레이어별 PSD
 // ---------------------------------------------------------------------------
 
+/** Preserve the live composite when an adjustment depends on other source layers. */
+function exportAdjustmentGraphPsd(input: {
+  stage: Konva.Stage;
+  elements: readonly PsdExportEl[];
+  canvasW: number;
+  canvasH: number;
+  scale: number;
+  opts: PsdExportOptions;
+  preflight: PsdExportPreflight;
+  rubyReceipts: readonly PsdRubyExportReceipt[];
+  rubyMetadata: readonly DialogueRubyExportMetadataRecord[];
+}): PsdExportResult {
+  const { stage, elements, canvasW, canvasH, scale, opts, preflight, rubyReceipts, rubyMetadata } = input;
+  const adjustments = elements.filter((element) => element.type === "image" && element.adjustmentLayer);
+  for (const element of adjustments) {
+    if (element.adjustmentLayer?.version !== 1
+      || !["composite-below", "clip-previous"].includes(element.adjustmentLayer.scope)) {
+      throw new Error("지원하지 않는 보정 레이어 설정이 있어 PSD로 내보낼 수 없어요.");
+    }
+  }
+  const metadata = JSON.stringify({
+    schema: "toonspectrum-psd-adjustment-graph/v1",
+    sourceLayerOrder: elements.map((element) => element.id),
+    adjustments: adjustments.map((element) => ({
+      id: element.id,
+      adjustmentLayer: element.adjustmentLayer,
+      smartFilters: element.smartFilters,
+      opacity: element.opacity ?? 1,
+      blendMode: element.blendMode ?? "source-over",
+      // External/inline mask bytes remain in the project archive; the raster includes their effect.
+      hasFilterMask: !!element.filterMaskSrc,
+    })),
+  });
+  if (new TextEncoder().encode(metadata).byteLength > 4 * 1024 * 1024) {
+    throw new Error("보정 레이어 설정이 PSD 메타데이터 한도를 넘어요. 프로젝트 아카이브로 보관해 주세요.");
+  }
+  const escaped = metadata.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;");
+  const graphXmp = '<rdf:Description rdf:about="" xmlns:tsadjust="https://toonstudio.cloud/ns/adjustment-graph/1.0/">'
+    + `<tsadjust:manifest>${escaped}</tsadjust:manifest></rdf:Description>`;
+  const xmpMetadata = buildDialogueRubyExportXmp(rubyMetadata).replace("</rdf:RDF>", `${graphXmp}</rdf:RDF>`);
+  const width = Math.round(canvasW * scale);
+  const height = Math.round(canvasH * scale);
+  // Both the captured surface and its decoded ImageData are alive until the readback completes.
+  const grade = normalizePageGrade(opts.pageGrade);
+  assertPsdPixelBudget(width * height * (isDefaultPageGrade(grade) ? 8 : 12));
+  const backgroundNodes = opts.includeBackground === false
+    ? [...stage.find(".bg"), ...stage.find(".paper-grain")].map((node) => ({ node, visible: node.visible() }))
+    : [];
+  let canvas: HTMLCanvasElement | undefined;
+  let gradedCanvas: HTMLCanvasElement | undefined;
+  let imageData: ImageData;
+  try {
+    for (const { node } of backgroundNodes) node.visible(false);
+    canvas = readStudioStageInDocumentView(stage, {
+      documentWidth: canvasW, documentHeight: canvasH, effectiveScale: scale,
+    }, () => stage.toCanvas({ pixelRatio: 1 }));
+    if (canvas.width !== width || canvas.height !== height) {
+      throw new Error("PSD 보정 합성의 출력 크기가 문서와 일치하지 않아요.");
+    }
+    gradedCanvas = bakeStudioPageGradeIntoCanvas(canvas, grade);
+    const context = gradedCanvas.getContext("2d");
+    if (!context) throw new Error("PSD 보정 합성 픽셀을 읽을 수 없어요.");
+    imageData = context.getImageData(0, 0, width, height);
+  } finally {
+    if (gradedCanvas && gradedCanvas !== canvas) { gradedCanvas.width = 0; gradedCanvas.height = 0; }
+    if (canvas) { canvas.width = 0; canvas.height = 0; }
+    for (const { node, visible } of backgroundNodes) node.visible(visible);
+  }
+  const published = publishedPsdResolutionInfo();
+  const buffer = writePsd({
+    width, height,
+    children: [{ name: "보정 적용 합성", left: 0, top: 0, opacity: 1, blendMode: "normal", imageData }],
+    imageResources: { ...(published.imageResources ?? {}), xmpMetadata },
+  }, { noBackground: true });
+  assertPsdOutputBudget(buffer);
+  const message = "다중 레이어 보정의 화면 결과를 한 PSD 레이어로 합성했어요. 보정 설정과 적용 순서는 XMP에 기록하며, 원본 레이어·마스크 재편집은 프로젝트 아카이브를 함께 보관해 주세요.";
+  return {
+    blob: new Blob([buffer], { type: PSD_EXPORT_MIME }),
+    skipped: [message], layerCount: 1, rubyReceipts,
+    lossManifest: {
+      ...preflight.lossManifest,
+      decisions: [...preflight.lossManifest.decisions,
+        exportDecision("layers", "rasterized", elements.length, "원본 레이어의 합성 결과를 하나의 PSD 래스터 레이어로 기록합니다."),
+        exportDecision("adjustment-layer", "rasterized", adjustments.length, message),
+      ],
+    },
+  };
+}
+
 /**
  * 현재 페이지를 요소별 레이어를 가진 .psd 파일로 조립한다.
  *
@@ -1208,6 +1302,12 @@ export async function exportPagePsd(
       lossManifest: withPsdExportLossDecisions(preflight.lossManifest, elements, [], 0, 0),
       rubyReceipts,
     };
+  }
+
+  if (elements.some((element) => element.type === "image" && element.adjustmentLayer)) {
+    return exportAdjustmentGraphPsd({
+      stage, elements, canvasW, canvasH, scale, opts, preflight, rubyReceipts, rubyMetadata,
+    });
   }
 
   const includeBg = opts.includeBackground ?? true;

@@ -3,13 +3,15 @@
  *
  * Professional Precision Sliders Panel for Studio Color Picker.
  * Features:
- * - RGB, HSV/HSB, and CIELAB color space sliders.
+ * - RGB, HSV/HSB, HSL, device CMYK, and CIELAB color space sliders.
  * - Dynamic live-updating gradient slider tracks reflecting current channels.
  * - Exact numerical inputs and slider controls.
  * - High-definition visual tracks and badge labels.
  */
 
-import { useState } from "react";
+import { useId, useState } from "react";
+
+import { StudioHslCmykSliders } from "./StudioHslCmykSliders";
 
 import {
   hexToHsv,
@@ -30,7 +32,8 @@ export function StudioColorSlidersPanel({
   value,
   onChange,
 }: StudioColorSlidersPanelProps) {
-  const [colorSpace, setColorSpace] = useState<"rgb" | "hsv" | "lab">("rgb");
+  const [colorSpace, setColorSpace] = useState<"rgb" | "hsv" | "hsl" | "cmyk" | "lab">("rgb");
+  const panelId = useId();
 
   const rgb: RgbColor = hexToRgb(value);
   const hsv: HsvColor = hexToHsv(value);
@@ -61,20 +64,32 @@ export function StudioColorSlidersPanel({
       <div
         role="tablist"
         aria-label="색상 공간 선택"
-        className="flex rounded-xl border border-line/70 bg-raised/50 p-1 backdrop-blur-sm"
+        className="flex flex-wrap rounded-xl border border-line/70 bg-raised/50 p-1 backdrop-blur-sm"
       >
-        {(["rgb", "hsv", "lab"] as const).map((space) => {
+        {(["rgb", "hsv", "hsl", "cmyk", "lab"] as const).map((space, index, spaces) => {
           const isActive = colorSpace === space;
-          const labels = { rgb: "RGB", hsv: "HSV / HSB", lab: "CIELAB" };
+          const labels = { rgb: "RGB", hsv: "HSV / HSB", hsl: "HSL", cmyk: "CMYK", lab: "CIELAB" };
           return (
             <button
               key={space}
               type="button"
               role="tab"
+              id={`${panelId}-${space}`}
+              aria-controls={panelId}
               aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              onKeyDown={(event) => {
+                const next = event.key === "ArrowRight" ? (index + 1) % spaces.length
+                  : event.key === "ArrowLeft" ? (index + spaces.length - 1) % spaces.length
+                    : event.key === "Home" ? 0 : event.key === "End" ? spaces.length - 1 : null;
+                if (next === null) return;
+                event.preventDefault();
+                setColorSpace(spaces[next]!);
+                event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
+              }}
               aria-label={`${labels[space]} 슬라이더`}
               onClick={() => setColorSpace(space)}
-              className={`flex-1 rounded-lg py-1 text-[0.64rem] font-medium uppercase transition-all ${
+              className={`min-w-12 flex-1 rounded-lg px-1 py-1 text-[0.64rem] font-medium uppercase transition-all ${
                 isActive
                   ? "bg-card text-accent font-semibold shadow-sm border border-accent/40"
                   : "text-fg-3 hover:text-fg-1"
@@ -86,6 +101,10 @@ export function StudioColorSlidersPanel({
         })}
       </div>
 
+      <div id={panelId} role="tabpanel" aria-labelledby={`${panelId}-${colorSpace}`}>
+      {(colorSpace === "hsl" || colorSpace === "cmyk") && (
+        <StudioHslCmykSliders key={colorSpace} mode={colorSpace} value={value} onChange={onChange} />
+      )}
       {/* RGB Mode */}
       {colorSpace === "rgb" && (
         <div className="space-y-2.5">
@@ -322,6 +341,7 @@ export function StudioColorSlidersPanel({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
