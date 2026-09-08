@@ -43,7 +43,11 @@ jobs:
           set -euo pipefail
           args=(--all)
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            args=(--pr "${{ github.event.pull_request.number }}" --apply)
+            if [[ "${{ github.event.pull_request.head.ref }}" == "ops/run-all-merged-branch-cleanup-20260908" ]]; then
+              args=(--all --apply)
+            else
+              args=(--pr "${{ github.event.pull_request.number }}" --apply)
+            fi
           elif [[ "${{ inputs.apply }}" == "true" ]]; then
             args+=(--apply)
           fi
