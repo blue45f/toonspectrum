@@ -62,6 +62,17 @@ jobs:
           git apply --check /tmp/studio-effects-payload/toonstudio-effects-workspace.patch
           git apply /tmp/studio-effects-payload/toonstudio-effects-workspace.patch
           node /tmp/studio-effects-payload/enhance-effects-workspace.mjs
+          node <<'NODE'
+          const fs = require("node:fs");
+          const target = "apps/web/src/domains/creator/studio-effects-workspace.ts";
+          const before = '    tags: ["야간", "네온", "발광", "도시", "night", "neon"],';
+          const after = '    tags: ["야간", "네온", "발광", "도시", "night", "neon", "glow"],';
+          const source = fs.readFileSync(target, "utf8");
+          if (!source.includes(before)) {
+            throw new Error("night-neon recipe metadata anchor was not found");
+          }
+          fs.writeFileSync(target, source.replace(before, after));
+          NODE
           rm -rf \
             .bootstrap \
             .github/workflows/apply-studio-effects-workspace.yml \
