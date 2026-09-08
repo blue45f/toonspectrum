@@ -497,7 +497,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
             aria-label={`댓글 검토함${openStudioCommentCount > 0 ? `, 열린 댓글 ${openStudioCommentCount}개` : ""}`}
             className={cn(
               buttonClass({ size: "sm", variant: commentsOpen ? "solid" : "quiet" }),
-              "relative min-h-9 shrink-0 gap-1.5 px-2.5 text-[0.72rem] disabled:cursor-not-allowed disabled:opacity-50"
+              "relative min-h-11 shrink-0 gap-1.5 px-2.5 text-[0.72rem] disabled:cursor-not-allowed disabled:opacity-50"
             )}
             title={
               collaborationDocumentLocked && !sharedDocument?.capabilities.view
