@@ -69,7 +69,7 @@ overrides:
   piscina: '>=4.9.3'
   drizzle-orm: '>=0.45.2'
   vitest: '>=4.1.9'
-  '@vitest/coverage-v8': '>=4.1.9'
+  '@vitest/coverage-v8': '4.1.9'
   '@vitest/ui': '>=4.1.9'
   vite: '>=8.0.16'
   jspdf: '>=4.2.1'
