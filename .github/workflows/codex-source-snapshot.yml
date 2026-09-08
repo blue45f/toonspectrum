@@ -1,0 +1,73 @@
+name: Codex source snapshot
+
+on:
+  push:
+    branches:
+      - codex/studio-epic-completion-20260909
+    paths:
+      - .github/workflows/codex-source-snapshot.yml
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Pack tracked source and configuration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from __future__ import annotations
+          import pathlib
+          import subprocess
+          import tarfile
+
+          root = pathlib.Path.cwd()
+          allowed_suffixes = {
+              '.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs',
+              '.json', '.jsonc', '.yaml', '.yml', '.md', '.css', '.scss',
+              '.html', '.txt', '.toml', '.rs', '.py', '.sh', '.sql'
+          }
+          allowed_names = {
+              '.nvmrc', '.gitignore', '.gitattributes', 'Dockerfile',
+              'LICENSE', 'Makefile'
+          }
+          excluded_prefixes = (
+              'public/', 'artifacts/', '.claude/', '.codex/', 'node_modules/',
+              'apps/web/public/', 'apps/api/dist/', 'dist/'
+          )
+          paths: list[pathlib.Path] = []
+          listed = subprocess.check_output(['git', 'ls-files', '-z'])
+          for raw in listed.split(b'\0'):
+              if not raw:
+                  continue
+              rel = raw.decode('utf-8')
+              if rel.startswith(excluded_prefixes):
+                  continue
+              path = root / rel
+              if not path.is_file():
+                  continue
+              if path.stat().st_size > 4 * 1024 * 1024:
+                  continue
+              if path.suffix.lower() not in allowed_suffixes and path.name not in allowed_names:
+                  continue
+              paths.append(path)
+
+          archive = pathlib.Path('/tmp/toonspectrum-source.tar.gz')
+          with tarfile.open(archive, 'w:gz', compresslevel=6) as tar:
+              for path in sorted(paths):
+                  tar.add(path, arcname=path.relative_to(root))
+          print(f'packed {len(paths)} files into {archive} ({archive.stat().st_size} bytes)')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codex-source-${{ github.sha }}
+          path: /tmp/toonspectrum-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
