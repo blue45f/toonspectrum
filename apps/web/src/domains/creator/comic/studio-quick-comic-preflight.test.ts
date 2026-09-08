@@ -47,21 +47,43 @@ describe("studio quick comic preflight", () => {
     expect(report.status).toBe("review");
   });
 
-  it("does not recommend a preset bubble layout when real dialogue is present", () => {
+  it("warns only when preset dialogue placeholders would remain in the output", () => {
     const layoutWithBubbles = PANEL_LAYOUTS.find(
       (layout) => (layout.bubbles?.length ?? 0) > 0,
     )!;
-    const report = createQuickComicPreflightReport({
+    const placeholderReport = createQuickComicPreflightReport({
+      layoutId: layoutWithBubbles.id,
+      sceneTemplateId: null,
+      dialogueScript: "",
+      assemblyComposable: true,
+      assemblyBubbleCount: layoutWithBubbles.bubbles?.length ?? 0,
+    });
+    const scenePlaceholderReport = createQuickComicPreflightReport({
+      layoutId: "layout_two_rows",
+      sceneTemplateId: "confession",
+      dialogueScript: "",
+      assemblyComposable: true,
+      assemblyBubbleCount: 1,
+    });
+    const dialogueReport = createQuickComicPreflightReport({
       layoutId: layoutWithBubbles.id,
       sceneTemplateId: null,
       dialogueScript: "민수: 안녕\n지영: 반가워",
       assemblyComposable: true,
+      assemblyBubbleCount: 2,
     });
 
-    expect(report.issues.map((issue) => issue.code)).toContain(
-      "layout-dialogue-collision",
+    expect(placeholderReport.issues.map((issue) => issue.code)).toContain(
+      "placeholder-dialogue",
     );
-    expect(report.recommendation.layoutId).not.toBe(layoutWithBubbles.id);
+    expect(placeholderReport.status).toBe("review");
+    expect(scenePlaceholderReport.issues.map((issue) => issue.code)).toContain(
+      "placeholder-dialogue",
+    );
+    expect(scenePlaceholderReport.issues[0]?.detail).toContain("1개");
+    expect(dialogueReport.issues.map((issue) => issue.code)).not.toContain(
+      "placeholder-dialogue",
+    );
   });
 
   it("normalizes speaker punctuation and splits long dialogue without losing speaker sides", () => {

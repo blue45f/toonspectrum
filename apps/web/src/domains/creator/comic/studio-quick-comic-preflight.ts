@@ -1,4 +1,4 @@
-import { parseDialogueScript, type DialogueLine } from "../studio-dialogue";
+import { parseDialogueScript } from "../studio-dialogue";
 import { PANEL_LAYOUTS, type PanelLayoutPreset } from "../studio-panel-layouts";
 
 export const QUICK_COMIC_LONG_DIALOGUE_CHARACTERS = 52;
@@ -8,13 +8,12 @@ export type QuickComicPreflightSeverity = "blocker" | "warning" | "info";
 export type QuickComicPreflightStatus = "blocked" | "review" | "ready";
 export type QuickComicPreflightAction =
   | "apply-recommended-layout"
-  | "normalize-dialogue"
   | "split-long-dialogue";
 
 export type QuickComicPreflightIssueCode =
   | "assembly-overlap"
   | "empty-page"
-  | "layout-dialogue-collision"
+  | "placeholder-dialogue"
   | "long-dialogue"
   | "missing-scene-anchor"
   | "mixed-speaker-labels"
@@ -71,11 +70,11 @@ export interface QuickComicPreflightInput {
   sceneTemplateId: string | null;
   dialogueScript: string;
   assemblyComposable?: boolean | null;
+  /** 실제 조립 결과의 말풍선 수. 대사가 없을 때 예시 문구 잔존 판정에 사용한다. */
+  assemblyBubbleCount?: number | null;
 }
 
-interface DialogueAnalysis extends QuickComicDialogueMetrics {
-  lines: readonly DialogueLine[];
-}
+type DialogueAnalysis = QuickComicDialogueMetrics;
 
 const SPEAKER_PREFIX_RE = /^([^:：]{1,16})[:：]\s*(.+)$/u;
 const NARRATION_RE = /^[([](.*)[)\]]$/u;
@@ -95,7 +94,6 @@ function analyzeDialogue(script: string): DialogueAnalysis {
   const totalCharacters = lengths.reduce((sum, length) => sum + length, 0);
 
   return {
-    lines,
     total: lines.length,
     speech: speech.length,
     narration,
@@ -134,7 +132,6 @@ function layoutFitScore(
   let score = 100 - Math.abs(frameCount - targetCount) * 16;
   score -= Math.max(0, maxDialogueInPanel - 1) * 12;
 
-  if (dialogue.total > 0 && (layout.bubbles?.length ?? 0) > 0) score -= 30;
   if (dialogue.maxCharacters > QUICK_COMIC_LONG_DIALOGUE_CHARACTERS && minFrameWidth < 500) {
     score -= 18;
   }
@@ -247,6 +244,10 @@ export function createQuickComicPreflightReport(
   const layout = PANEL_LAYOUTS.find((candidate) => candidate.id === input.layoutId)
     ?? PANEL_LAYOUTS[0]!;
   const panelCount = Math.max(1, layout.frames.length);
+  const placeholderBubbleCount = Math.max(
+    0,
+    Math.trunc(input.assemblyBubbleCount ?? layout.bubbles?.length ?? 0),
+  );
   const maxDialogueInPanel = Math.ceil(dialogue.total / panelCount);
   const recommendation = recommendQuickComicLayout(input);
   const currentLayoutFit = layoutFitScore(layout, dialogue, input.sceneTemplateId);
@@ -265,24 +266,21 @@ export function createQuickComicPreflightReport(
     });
   }
 
-  if (dialogue.total === 0 && input.sceneTemplateId === null) {
+  if (dialogue.total === 0 && placeholderBubbleCount > 0) {
+    issues.push({
+      id: "placeholder-dialogue",
+      code: "placeholder-dialogue",
+      severity: "warning",
+      title: "예시 말풍선 문구가 남아 있어요",
+      detail: `현재 조립 결과의 예시 말풍선 ${placeholderBubbleCount}개가 그대로 적용됩니다. 대사를 입력하면 조립 엔진이 예시 말풍선을 자동으로 대체합니다.`,
+    });
+  } else if (dialogue.total === 0 && input.sceneTemplateId === null) {
     issues.push({
       id: "empty-page",
       code: "empty-page",
       severity: "info",
       title: "빈 컷으로 시작합니다",
       detail: "레이아웃만 만든 뒤 캔버스에서 직접 장면과 말풍선을 추가할 수 있습니다.",
-    });
-  }
-
-  if (dialogue.total > 0 && (layout.bubbles?.length ?? 0) > 0) {
-    issues.push({
-      id: "layout-dialogue-collision",
-      code: "layout-dialogue-collision",
-      severity: "warning",
-      title: "기본 말풍선과 입력 대사가 함께 배치돼요",
-      detail: "말풍선이 포함된 프리셋은 입력 대사와 공간을 경쟁합니다. 빈 컷 기반 추천 레이아웃이 더 안전합니다.",
-      action: "apply-recommended-layout",
     });
   }
 
@@ -305,7 +303,7 @@ export function createQuickComicPreflightReport(
       code: "long-dialogue",
       severity: "warning",
       title: "긴 말풍선이 있어요",
-      detail: `${QUICK_COMIC_LONG_DIALOGUE_CHARACTERS}자를 넘는 대사 ${dialogue.longDialogueCount}개가 있습니다. 가장 긴 대사는 ${dialogue.maxCharacters}자입니다.`,
+      detail: `${QUICK_COMIC_LONG_DIALOGUE_CHARACTERS}자를 넘는 대사 ${dialogue.longDialogueCount}개가 있습니다. 가장 긴 문구는 ${dialogue.maxCharacters}자입니다.`,
       action: "split-long-dialogue",
     });
   }
