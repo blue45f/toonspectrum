@@ -36,7 +36,7 @@ const PROJECT_CENTER_SYNONYMS = (() => {
 export function normalizeStudioProjectCenterText(value: string): string {
   return value
     .normalize("NFKC")
-    .toLocaleLowerCase()
+    .toLowerCase()
     .replace(/[\p{P}\p{S}_]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
