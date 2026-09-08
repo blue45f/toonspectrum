@@ -37,6 +37,8 @@ ToonSpectrum에는 이미 다음 전문 기능이 존재한다.
 | --- | --- | --- |
 | Toon Boom Storyboard Pro 25/27 | sequence/scene/panel 구조, 패널 타이밍, 대사·액션·노트 캡션, 오디오와 카메라가 결합된 애니매틱 타임라인, 3D 카메라, PDF·movie·데이터 내보내기. v27은 실제 수행 시간을 기록하는 Panel Timer와 scratch audio를 추가 | 정적인 썸네일만 보지 않고 페이지 상태·샷 메타·검토 진행을 함께 보여 주며, 기존 애니매틱 시스템과 연결 가능한 메타 모델 유지 |
 | Boords | 스크립트→프레임·샷리스트, 프레임 재배열과 노트, 캐릭터 일관성 참조, 타이밍·오디오 애니매틱, 프레임 댓글, 버전별 상태, 활동 로그, 승인, review-only 공유 링크, PDF/MP4/이미지 내보내기 | 상태별 검토 큐, 페이지·샷·검토 메타 통합 검색, 승인 진행률, 검토표 내보내기, 향후 버전 승인·공유 링크로 확장 가능한 구조 |
+| Adobe Firefly Boards | 텍스트·스크립트·참조 이미지 기반 장면 생성, 패널 간 캐릭터·스타일·배경 일관성, 패널 리믹스·부분 개선, 댓글 협업, 개별 프레임/전체 시퀀스 JPEG·PNG·MP4 내보내기, 패널 카메라 움직임 프리뷰 | 기존 AI 스토리보드 디렉터와 애니매틱을 중복하지 않고, 생성 결과를 사람이 검토 상태·샷 메타·담당자 기준으로 통제하는 운영 계층을 강화 |
+| Canva Storyboard | 템플릿, 드래그 앤 드롭, 대규모 스톡 라이브러리, AI 스토리·이미지 생성, 웹툰·영상·광고를 한 프로젝트에 구성, 실시간 공동 편집과 클라이언트 공유 | 범용 디자인 캔버스와 자산 수량 경쟁보다 전문 제작 상태·샷 정보·승인 흐름을 전면에 두되, 검색·밀도 조절·터치 접근성은 소비자 도구 수준으로 단순화 |
 | StudioBinder | 스크립트 가져오기, 장면/샷 태그, 위치·촬영일·상태 등의 사용자 정의 그룹, 댓글·작업, 뷰 전용 공유, 커스텀 PDF, 샷리스트·스케줄 연계 | 웹툰에서도 원본 순서와 상태별 작업 큐를 분리해 제공하고, 담당자·상태·잠금을 제작 운영 정보로 승격 |
 | Wonder Unit Storyboarder | 매우 빠른 드로잉, shot type·timing·dialogue·details, Photoshop 왕복, export, 3D Shot Generator | 기존 샷 태그와 3D 도구를 유지하고, 그리드에서 누락 여부를 즉시 발견하도록 함 |
 | KROCK.io | 프레임 단위 리뷰, 핀·댓글·첨부, 버전 비교, 실시간 동기화, 상태·Kanban·일정·작업, PDF | 검토 상태별 4열 보드, 수정 요청·검토 요청 중심의 운영 필터, 향후 프레임 주석과 버전 diff 우선순위 설정 |
@@ -207,6 +209,9 @@ ToonSpectrum에는 이미 다음 전문 기능이 존재한다.
 - Boords collaboration: https://boords.com/storyboard-collaboration
 - Boords animatic: https://boords.com/animatic
 - Boords shot list: https://boords.com/shot-list
+- Adobe Firefly Boards storyboard: https://www.adobe.com/products/firefly/features/storyboard.html
+- Adobe Firefly Boards consistent commercial storyboard workflow: https://helpx.adobe.com/firefly/how-to/create-commercial-storyboard-firefly-boards.html
+- Canva storyboard maker: https://www.canva.com/ko_kr/create/storyboards/
 - StudioBinder storyboard software: https://www.studiobinder.com/storyboard-creator/
 - StudioBinder shot list: https://www.studiobinder.com/shot-list-storyboard/
 - Wonder Unit Storyboarder: https://wonderunit.com/storyboarder/
