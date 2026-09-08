@@ -1,0 +1,7 @@
+/Users/runner/work/toonspectrum/toonspectrum/scripts/apply-studio-publishing-reader-followup.py:651: SyntaxWarning: "\/" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\/"? A raw string is also an option.
+  if (/^https?:\/\//u.test(source)) return source;
+studio publishing reader policy follow-up applied
+Traceback (most recent call last):
+  File "/Users/runner/work/toonspectrum/toonspectrum/scripts/fix-studio-publishing-reader-followup.py", line 24, in <module>
+    raise RuntimeError(f"unexpected robots hook anchor count: {count}")
+RuntimeError: unexpected robots hook anchor count: 0
