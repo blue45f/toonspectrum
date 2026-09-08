@@ -1,0 +1,95 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/wooden_stool_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "donated": true,
+    "date_published": 1634688000,
+    "name": "Wooden Stool 01",
+    "type": 2,
+    "authors": {
+      "Kuutti Siitonen": "All"
+    },
+    "categories": [
+      "seating",
+      "furniture",
+      "collection: the_shed"
+    ],
+    "tags": [
+      "old",
+      "worn",
+      "dirty",
+      "workshop",
+      "outdoor",
+      "stool",
+      "woodwork",
+      "shop"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 10946,
+    "texel_density": 10354.855086104666,
+    "dimensions": [
+      425.3551661968231,
+      442.36281514167786,
+      437.35266576914
+    ],
+    "files_hash": "8649ad7ef50e62cfd22d57a62ac0c3d525fb93f3",
+    "description": "Free 8K model of an old, worn wooden stool with a cracked round seat, turned legs and weathered grain, dusty finish and workshop-aged patina.",
+    "category_id": "302a40f3-e544-5721-b63b-ca3574e9975a",
+    "category": "Furniture/Seating/Stools & Bar Seating",
+    "collections": [
+      "the_shed"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood"
+      ]
+    },
+    "download_count": 12672,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_stool_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_stool_01/wooden_stool_01_2k.gltf",
+      "bytes": 2715,
+      "sha256": "c422f2acd7a8635996651f1efdc795b3711b5245633b4fae7687d96e94155cbb",
+      "sourceMd5": "c02502685cece3b0418bea9e9f7c0861"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_stool_01/wooden_stool_01.bin",
+      "bytes": 290924,
+      "sha256": "a9b21b8c75719057db549dfee5b8c1cc76edc2727367790fb9fc49963e34ae7a",
+      "sourceMd5": "883e9617a69e90be7e19447dca83041c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_stool_01/wooden_stool_01_rough_2k.jpg",
+      "bytes": 794678,
+      "sha256": "5d0515bb149aedd20195a5751d2e6640911f7edd3f67b9d023a14c580ddafec6",
+      "sourceMd5": "f22525d65238293e60ef7abc720cd5f5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_stool_01/wooden_stool_01_diff_2k.jpg",
+      "bytes": 908336,
+      "sha256": "42eb354a7693df6e363d84de9c17adc579a8479ec6c5c258f37ecf738059cefa",
+      "sourceMd5": "ee6190745468180c358e2f0c39da8871"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_stool_01/wooden_stool_01_nor_gl_2k.jpg",
+      "bytes": 1161595,
+      "sha256": "42fe0492e7d4bafd9977949144560dfd97eae177636d1804d30c3389ff52a1d7",
+      "sourceMd5": "cdaccb09cc95589de6de34a8e0e3f224"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/gate_latch_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "donated": true,
+    "date_published": 1671753600,
+    "name": "Gate Latch 01",
+    "type": 2,
+    "info": null,
+    "authors": {
+      "Desktoy": "All"
+    },
+    "categories": [
+      "industrial",
+      "buildings",
+      "structures",
+      "collection: the_shed"
+    ],
+    "tags": [
+      "outdoor",
+      "metal",
+      "gate",
+      "lock",
+      "latch",
+      "bolt",
+      "fence",
+      "door",
+      "wooden",
+      "shed",
+      "farm",
+      "farmhouse"
+    ],
+    "max_resolution": [
+      4096,
+      4096
+    ],
+    "polycount": 5480,
+    "texel_density": 17528.210749900663,
+    "dimensions": [
+      205.09500801563263,
+      74.74934868514538,
+      85.42444556951523
+    ],
+    "files_hash": "bfe033e15d12c2513652457660c429e5ede95e1a",
+    "description": "Free 4K model. Weathered metal gate latch with bent bolt, mounting plates and screw holes - scratched, rusted finish with hand-forged farmhouse character.",
+    "category_id": "925239d7-a533-51a5-8d9e-c3498aebe4d3",
+    "category": "Architecture/Gates/Gate Hardware",
+    "collections": [
+      "the_shed"
+    ],
+    "attributes": {
+      "condition": [
+        "rusted"
+      ],
+      "material": [
+        "metal"
+      ]
+    },
+    "download_count": 3072,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/gate_latch_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/gate_latch_01/gate_latch_01_2k.gltf",
+      "bytes": 5885,
+      "sha256": "4248604faec18287b5ab9cb07ecaa34b7df72bbb02802a9f79d485b606e52e5d",
+      "sourceMd5": "d6988fde2296ba07a282bd0094dd10bc"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/gate_latch_01/gate_latch_01_nor_gl_2k.jpg",
+      "bytes": 2123321,
+      "sha256": "34c88cf01fb0fdda23c2a4722b6ed280ac818d1d6397b70daa34e556cb2ecf75",
+      "sourceMd5": "ebb9085b347894b677bd481245125bc5"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/gate_latch_01/gate_latch_01.bin",
+      "bytes": 154608,
+      "sha256": "26defdbd7815ff7370a17eea9597b13087c9ab3e1ec34c5185decfff3256e471",
+      "sourceMd5": "44351d7254f3941b4b32c5d4fe085d37"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/gate_latch_01/gate_latch_01_diff_2k.jpg",
+      "bytes": 2411611,
+      "sha256": "ea24b645072fbbf612d4829448ccd1b65ae9cce0bd7b9ee48c5966a3ad3cc7d8",
+      "sourceMd5": "8363117381f73fffda110482ad4a9897"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/gate_latch_01/gate_latch_01_arm_2k.jpg",
+      "bytes": 2407231,
+      "sha256": "aa6e3cb4441302a2d8a35805a0fe3d5d44a12aa0cdfcc1b8b447a35ef7f61f59",
+      "sourceMd5": "54e70b249fe637af09e1b8adce7459c7"
+    }
+  ]
+}

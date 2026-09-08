@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/castle_brick_02_red",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "rough",
+      "red",
+      "sewer",
+      "damp",
+      "old",
+      "uneven"
+    ],
+    "date_published": 1571797760,
+    "name": "Castle Brick 02 Red",
+    "categories": [
+      "brick",
+      "outdoor",
+      "man made",
+      "wall",
+      "dirty"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      1500,
+      1500
+    ],
+    "sponsors": [
+      "540619",
+      "4714267"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "d4d70e454efd6d2c76008afe609d58c87d54cfb1",
+    "description": "Free 8K texture of old red castle brick with rough, uneven surfaces, damp discoloration, weathered mortar and gritty, dirty detailing.",
+    "category_id": "9ef0955b-87fa-5826-aa87-98b047ad9143",
+    "category": "Brick & Block/Clay Brick/Running-Bond",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "damaged"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "download_count": 132501,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/castle_brick_02_red.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/castle_brick_02_red/castle_brick_02_red_diff_2k.jpg",
+      "bytes": 2696274,
+      "sha256": "f77a7f1d6dbb9c833d26a2aa5e64cf6ca6d93e040cfd9728381bbf5e3fc45a6d",
+      "sourceMd5": "22796a9637bf2e2b33b74a41bb309dcb"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/castle_brick_02_red/castle_brick_02_red_rough_2k.jpg",
+      "bytes": 896560,
+      "sha256": "ad76d07ca47355ea28c2ee12d4ca32d2af01fa18935c9368538f8be725195c7b",
+      "sourceMd5": "ebeda8729ab42b52ef1064c387d494b2"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/castle_brick_02_red/castle_brick_02_red_nor_gl_2k.jpg",
+      "bytes": 4278113,
+      "sha256": "d21fb91b248ac836ab072984ae14228a044e96646e75fada26bc3f5e7d415566",
+      "sourceMd5": "cc52d2424af6b195754ee49106c3f564"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/castle_brick_02_red/castle_brick_02_red_ao_2k.jpg",
+      "bytes": 2031204,
+      "sha256": "10d11eb01ed71391dc31b950fa49348d85aaf728d444bb9e21041ab4efed43d1",
+      "sourceMd5": "397d2a8d0fbef07c9bcb4eaa72f54e4f"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/castle_brick_02_red/castle_brick_02_red_disp_2k.jpg",
+      "bytes": 600859,
+      "sha256": "f0fd78c323c7a16c4071eae1f4db9b007deddd6322c6b601b26a919a50696ac7",
+      "sourceMd5": "c3b622a0363a34aa12d9fb222a42053d"
+    }
+  ]
+}

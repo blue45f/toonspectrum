@@ -1,0 +1,93 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/modern_wooden_cabinet",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Modern Wooden Cabinet",
+    "categories": [
+      "furniture",
+      "table"
+    ],
+    "type": 2,
+    "tags": [
+      "cabinet",
+      "wood",
+      "modern",
+      "minimalist",
+      "interrior",
+      "living room",
+      "contemporary",
+      "design"
+    ],
+    "authors": {
+      "Patrik Pangerl": "All"
+    },
+    "info": null,
+    "date_published": 1690934400,
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 24976,
+    "texel_density": 1684.9824044896511,
+    "dimensions": [
+      2440.0004148483276,
+      520.0000107288361,
+      680.1425069570541
+    ],
+    "files_hash": "ef2d266b0823d230f465b29bb32b110b4c71b3b2",
+    "description": "Free 8K model of a modern wooden cabinet with dark frame, vertical light-wood slatted curved doors on slim metal legs, minimalist contemporary design.",
+    "category_id": "14debc4f-6ceb-597a-a824-8de173aa95a9",
+    "category": "Furniture/Storage Furniture/Cabinets & Cupboards",
+    "attributes": {
+      "condition": [
+        "clean"
+      ],
+      "material": [
+        "wood",
+        "metal"
+      ]
+    },
+    "download_count": 16757,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/modern_wooden_cabinet.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/modern_wooden_cabinet/modern_wooden_cabinet_2k.gltf",
+      "bytes": 10960,
+      "sha256": "7ecfeb5162c669c937f9b3e85534fc5237bce6ba5e8e3ed4e1666fa721e2e91b",
+      "sourceMd5": "b247d5f6401d67eb70d07feee3021dc6"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_wooden_cabinet/modern_wooden_cabinet_arm_2k.jpg",
+      "bytes": 2250188,
+      "sha256": "a47934495149aa079eaaa3cef18f751e4d9e4a4931461bd8e67c181609acbf32",
+      "sourceMd5": "d4eefc096b2e9c8c367b0d305fac7c4a"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modern_wooden_cabinet/modern_wooden_cabinet.bin",
+      "bytes": 1170136,
+      "sha256": "04e664a95f52c48d0caa8c3148ab7e4ad4a0554b37a2a5c0e39dc6ed6c46cafe",
+      "sourceMd5": "0a619e6311e6b04b92e9f226f3d0978d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_wooden_cabinet/modern_wooden_cabinet_diff_2k.jpg",
+      "bytes": 2750362,
+      "sha256": "27fbd19573bdb8ab8587c63eddd9d350824f28a2f847796d63bd5f4813d45f0c",
+      "sourceMd5": "56ff732ed0f359711f87b27bffbb1146"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/modern_wooden_cabinet/modern_wooden_cabinet_nor_gl_2k.jpg",
+      "bytes": 2038931,
+      "sha256": "f6d328f1fe3dd8e0ca89d7b107edc7b3ed779f5e0c6f566a87685af7a910ccdd",
+      "sourceMd5": "4c91c010871ab3cf8316013a4eb57d15"
+    }
+  ]
+}

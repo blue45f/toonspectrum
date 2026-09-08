@@ -1,0 +1,92 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/floor_tiles_02",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 1,
+    "date_published": 1587699360,
+    "name": "Floor Tiles 02",
+    "categories": [
+      "floor",
+      "wall",
+      "outdoor",
+      "indoor",
+      "clean",
+      "man made"
+    ],
+    "authors": {
+      "Rob Tuytel": "All"
+    },
+    "dimensions": [
+      4000,
+      4000
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "files_hash": "df8145d800a603e035f6ba995fd991c5e6ddc4ab",
+    "tags": [
+      "marble",
+      "floor",
+      "square tiles",
+      "smooth surface",
+      "stone",
+      "wall",
+      "dirty",
+      "uneven",
+      "marble blocks"
+    ],
+    "description": "Free 8K texture: warm beige marble floor tiles with smooth yet slightly uneven square blocks, subtle veining, dirt speckles and worn grout lines.",
+    "category_id": "332a7c92-1556-5937-b7a9-8a0f52d20df4",
+    "category": "Stone/Slabs & Tiles/Marble",
+    "attributes": {
+      "surface_use": "floor",
+      "condition": [
+        "worn"
+      ],
+      "origin": "man_made",
+      "setting": "either"
+    },
+    "download_count": 121300,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/floor_tiles_02.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_02/floor_tiles_02_diff_2k.jpg",
+      "bytes": 1381118,
+      "sha256": "9a4e5acbb6c71e03979cc75fe1121ae0dc66583153cab9f32116c79e33707634",
+      "sourceMd5": "9266824013917ad1a25678fd95c866c1"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_02/floor_tiles_02_rough_2k.jpg",
+      "bytes": 1214592,
+      "sha256": "95007052c6cc7a92284a5cea92ebdaecbfae6fcdd6dfd6ac443e2af43ddcd9a6",
+      "sourceMd5": "0c9b0ec7f5fabc3f1708c8193a1807ff"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_02/floor_tiles_02_nor_gl_2k.jpg",
+      "bytes": 540151,
+      "sha256": "0c0d11a6ee43f523131db810720e4232ff35f05c126a7959d499a715294a1ad6",
+      "sourceMd5": "358c5f021781a448e2e3357d42bd1f81"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_02/floor_tiles_02_ao_2k.jpg",
+      "bytes": 1748232,
+      "sha256": "b5579dd40e6182a8d077db04e9d008d1f240c5a4fa8e4a11c54cb409c444328b",
+      "sourceMd5": "e973015529cd28677cd44a9ec5a9f32e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/floor_tiles_02/floor_tiles_02_disp_2k.jpg",
+      "bytes": 302553,
+      "sha256": "430e09bfbbf0edd6661fabd18dfb66766fa4cf4c2838146cf6bab578739b472f",
+      "sourceMd5": "deb4babfd83d70bbf3cbb1fd43f83d69"
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/fire_hydrant",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Fire Hydrant",
+    "type": 2,
+    "authors": {
+      "Gonçalo Felício": "All"
+    },
+    "info": null,
+    "date_published": 1698364800,
+    "categories": [
+      "industrial",
+      "structures",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "city",
+      "urban",
+      "street",
+      "road",
+      "emergency",
+      "valve",
+      "extinguisher",
+      "utility",
+      "municipal",
+      "infrastructure"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 86316,
+    "texel_density": 6126.643205564119,
+    "dimensions": [
+      874.623566865921,
+      317.74356961250305,
+      799.4560238003032
+    ],
+    "files_hash": "392eed954362d55b55022af83c0b7150bf977853",
+    "description": "Free 8K model: red street fire hydrant with clean and worn variants. Chipped paint, rusted metal caps and chain, realistic urban wear and detailed base.",
+    "category_id": "63c978b5-4c95-544b-864b-64dbd89ba09a",
+    "category": "Industrial & Infrastructure/Traffic & Safety/Hydrants & Fire Safety",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "metal"
+      ]
+    },
+    "download_count": 11277,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/fire_hydrant.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/fire_hydrant/fire_hydrant_2k.gltf",
+      "bytes": 20926,
+      "sha256": "f0155cab93de9dd289a75d7fe3624008c344d69b99d1e18ed3212ad682556c42",
+      "sourceMd5": "1b90a8106f3d5827016a9e792eddab4d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fire_hydrant/fire_hydrant_aged_nor_gl_2k.jpg",
+      "bytes": 2097229,
+      "sha256": "b27858fb50356fd5bd1b76350a1ea689b5e570c5f04a641bab7b25d16ce695cf",
+      "sourceMd5": "c81733bb9a71d3cd59681b1ec422432d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/fire_hydrant/fire_hydrant.bin",
+      "bytes": 1928772,
+      "sha256": "a3c7ed023bc4aff190902764326e7f83ae1a108f6bac2a1b637c38a8e03eb516",
+      "sourceMd5": "636cd237cd1c9a793e3fc3edbf7f6a15"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fire_hydrant/fire_hydrant_arm_2k.jpg",
+      "bytes": 2322663,
+      "sha256": "9422e07195a865958594ba65d9446f284a5032b07cfc4fe766486d3a69f934d3",
+      "sourceMd5": "254425b57f8d70f3410d3cc5a27a25f3"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fire_hydrant/fire_hydrant_diff_2k.jpg",
+      "bytes": 2012585,
+      "sha256": "d7d3181b80ccf18e60614b21104e39218e8483d2c999c7d96867deba2f13bb38",
+      "sourceMd5": "2baa646929446dd229c1859ec3923de0"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fire_hydrant/fire_hydrant_nor_gl_2k.jpg",
+      "bytes": 1847102,
+      "sha256": "2edf5b7ac369f5657db079bf6913e1b971136e8218bd1c7ace12a3d77263896d",
+      "sourceMd5": "44a25b6356f63335369af805d65b899d"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fire_hydrant/fire_hydrant_aged_arm_2k.jpg",
+      "bytes": 2268350,
+      "sha256": "edcc286284098e20d6f29215f05efb11658a71d7ed5664c8680a747c3721f329",
+      "sourceMd5": "9af5c05ceced3edee35dcda0a0f69b1c"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/fire_hydrant/fire_hydrant_aged_diff_2k.jpg",
+      "bytes": 2191944,
+      "sha256": "02cc548f6c88a7c0c2062cb201ba542fa33e9f836c602bac69405e848ff232c3",
+      "sourceMd5": "6de3683836cd0e6a39fdc58df2d61bf0"
+    }
+  ]
+}

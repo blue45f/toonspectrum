@@ -19,7 +19,7 @@
     "@socket.io/postgres-adapter": "^0.5.0",
     "@toonspectrum/core": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "express": "^4.21.0",
+    "express": "^4.22.2",
     "image-js": "^1.7.0",
     "js-base64": "^3.9.0",
     "nestjs-pino": "^4.6.1",
@@ -34,9 +34,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
-    "@types/node": "^24",
-    "tsx": "^4.20.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.13.2",
+    "tsx": "^4.22.3",
     "typescript": "~6.0.3"
   }
 }

@@ -27,11 +27,11 @@ export const STUDIO_ROOM_LAYOUT_PRESETS: readonly StudioRoomLayoutPreset[] = [
     id: "classroom",
     label: "교실 레이아웃 (책상 6 + 의자 6 + 칠판)",
     objects: [
-      { modelUrl: "/assets/3d/blackboard.glb", name: "칠판", position: [0, 1.5, -4], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
-      { modelUrl: "/assets/3d/desk.glb", name: "학생 책상 1", position: [-1.2, 0, -1], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
-      { modelUrl: "/assets/3d/chair.glb", name: "학생 의자 1", position: [-1.2, 0, -0.4], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
-      { modelUrl: "/assets/3d/desk.glb", name: "학생 책상 2", position: [1.2, 0, -1], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
-      { modelUrl: "/assets/3d/chair.glb", name: "학생 의자 2", position: [1.2, 0, -0.4], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
+      { modelUrl: "/assets/3d/refined-v8/blackboard.glb", name: "칠판", position: [0, 1.5, -4], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
+      { modelUrl: "/assets/3d/refined-v8/desk.glb", name: "학생 책상 1", position: [-1.2, 0, -1], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
+      { modelUrl: "/assets/3d/refined-v8/chair.glb", name: "학생 의자 1", position: [-1.2, 0, -0.4], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
+      { modelUrl: "/assets/3d/refined-v8/desk.glb", name: "학생 책상 2", position: [1.2, 0, -1], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
+      { modelUrl: "/assets/3d/refined-v8/chair.glb", name: "학생 의자 2", position: [1.2, 0, -0.4], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
     ],
   },
   {
@@ -39,7 +39,7 @@ export const STUDIO_ROOM_LAYOUT_PRESETS: readonly StudioRoomLayoutPreset[] = [
     label: "카페 레이아웃 (원형 테이블 2 + 소파 + 램프)",
     objects: [
       { modelUrl: "/assets/3d/round_table.glb", name: "원형 테이블 A", position: [-1.5, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true },
-      { modelUrl: "/assets/3d/sofa.glb", name: "소파 B", position: [1.5, 0, 0.5], rotation: [0, -1.57, 0], scale: [1, 1, 1], visible: true },
+      { modelUrl: "/assets/3d/refined-v8/sofa.glb", name: "소파 B", position: [1.5, 0, 0.5], rotation: [0, -1.57, 0], scale: [1, 1, 1], visible: true },
     ],
   },
 ];

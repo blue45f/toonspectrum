@@ -39,14 +39,15 @@ describe("studio immersive shell", () => {
     );
   });
 
-  it("mounts the retained 3D host only inside the Studio document", () => {
+  it("keeps one retained 3D host in the AppShell chrome layer", () => {
     const appSource = readFileSync(
       path.resolve(process.cwd(), "apps/web/src/app/App.tsx"),
       "utf8",
     );
     expect(appSource).toMatch(
-      /studioImmersive \? \([\s\S]*?<StudioBg3dRetainedOwnerHost \/>/,
+      /chromeOverlay=\{[\s\S]*?<StudioBg3dRetainedOwnerHost \/>/,
     );
+    expect(appSource.match(/<StudioBg3dRetainedOwnerHost \/>/g)).toHaveLength(1);
   });
 
   it("keeps the shared immersive lifecycle mirror scoped and idempotent", () => {
