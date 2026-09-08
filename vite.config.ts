@@ -384,6 +384,8 @@ export default defineConfig(({ mode }) => ({
   publicDir: path.resolve(webRoot, "public"),
   resolve: {
     alias: { "@": path.resolve(webRoot, "src") },
+    // Workspace hooks and their auto-installed peers must share the app renderer's dispatcher.
+    dedupe: ["react", "react-dom"],
   },
   // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.
   assetsInclude: ["**/*.wasm"],
