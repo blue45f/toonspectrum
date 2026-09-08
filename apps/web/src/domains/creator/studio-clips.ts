@@ -75,6 +75,7 @@ function canonicalizeJsonValue(
   value: unknown,
   budget: CanonicalJsonBudget,
   depth = 0,
+  omitUndefinedObjectProperties = false,
 ): CanonicalJsonValue {
   budget.nodes += 1;
   if (depth > MAX_CLIP_JSON_DEPTH || budget.nodes > MAX_CLIP_JSON_NODES) {
@@ -91,7 +92,7 @@ function canonicalizeJsonValue(
     return value;
   }
   if (Array.isArray(value)) {
-    return value.map((item) => canonicalizeJsonValue(item, budget, depth + 1));
+    return Array.from(value, (item) => canonicalizeJsonValue(item, budget, depth + 1, omitUndefinedObjectProperties));
   }
   if (!value || typeof value !== "object") {
     throw new StudioSavedClipLibraryError("invalid-clip", "클립 요소는 canonical JSON 값이어야 합니다.");
@@ -107,9 +108,36 @@ function canonicalizeJsonValue(
   }
   const result: Record<string, CanonicalJsonValue> = {};
   for (const key of keys) {
-    result[key] = canonicalizeJsonValue(source[key], budget, depth + 1);
+    const property = Object.getOwnPropertyDescriptor(source, key)!;
+    if (omitUndefinedObjectProperties && !("value" in property)) {
+      throw new StudioSavedClipLibraryError("invalid-clip", "클립 요소에 직렬화할 수 없는 접근자 속성이 있습니다.");
+    }
+    if (omitUndefinedObjectProperties && property.value === undefined) continue;
+    Object.defineProperty(result, key, {
+      value: canonicalizeJsonValue(source[key], budget, depth + 1, omitUndefinedObjectProperties),
+      enumerable: true, configurable: true, writable: true,
+    });
   }
   return result;
+}
+
+/**
+ * Authored elements use explicit undefined for absent optional fields, including retained Smart
+ * Shape originals. Project only those object properties away at the selection-to-clip boundary.
+ * The storage parser stays strict; array holes/undefined and non-JSON values still fail closed.
+ */
+export function prepareStudioSavedClipElements(elements: readonly unknown[]): unknown[] {
+  if (elements.length === 0 || elements.length > MAX_CLIP_ELEMENTS) {
+    throw new StudioSavedClipLibraryError("invalid-clip", "클립 요소 수가 저장 계약에 맞지 않습니다.");
+  }
+  const budget = { nodes: 0 };
+  return Array.from(elements, (element) => {
+    const value = canonicalizeJsonValue(element, budget, 0, true);
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new StudioSavedClipLibraryError("invalid-clip", "클립 요소는 객체여야 합니다.");
+    }
+    return value;
+  });
 }
 
 function exactClipRecord(value: unknown): Record<string, unknown> | null {
