@@ -6,6 +6,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { flushSync } from "react-dom";
+import { captureStudioNodeEditPointer } from "../vector/studio-node-edit-pointer-session";
 
 import { resolveStudioCapturedBrushDynamicsPresetId } from "../brush/studio-brush-dynamics";
 import {
@@ -327,6 +328,7 @@ export function bindStudioCuttoonStagePointersDownArmed(
   } = h;
 
   function tryStageDownArmedTools(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>, stagePointerEvent: PointerEvent): boolean {
+    if (nodeEditDragRef.current) return true;
     // Auto-color canvas scribble — armed panel places color seeds on the selected line-art image
     // (click starts a freehand path; move/up sample the stroke).
     if (autoColorScribbleCanvasArmed && selected?.type === "image") {
@@ -507,7 +509,7 @@ export function bindStudioCuttoonStagePointersDownArmed(
       if (hitIdx !== null) {
         const session = beginNodeDrag(selected.points, selected.pressures, hitIdx, nodeEditTool!, pos);
         if (session) {
-          nodeEditDragRef.current = { elId: selected.id, session };
+          nodeEditDragRef.current = captureStudioNodeEditPointer(selected, session, stagePointerEvent);
           // "스무딩" 드래그의 강도 기준선을 스냅샷(다른 도구에선 참조되지 않아 무해).
           nodeSmoothStrengthAtDragStartRef.current = nodeSmoothStrength;
         }

@@ -65,6 +65,18 @@ function typedTag(type: string, extra: number[] = []): Uint8Array {
   return out;
 }
 
+function replaceRgbCurve(signature: string, data: Uint8Array | null): Uint8Array {
+  const original = buildMatrixTrcIccProfile();
+  const tags = parseOk(original).tags.flatMap((tag) =>
+    tag.signature === signature
+      ? data === null ? [] : [{ signature, data }]
+      : [{ signature: tag.signature, data: original.slice(tag.offset, tag.offset + tag.size) }],
+  );
+  const bytes = buildProfile(tags, { colorSpace: "RGB ", deviceClass: "mntr" });
+  bytes.set([0x58, 0x59, 0x5a, 0x20], 20); // XYZ PCS, as in the generated RGB profile.
+  return bytes;
+}
+
 describe("합성 프로파일 왕복", () => {
   const bytes = buildMatrixTrcIccProfile();
 
@@ -145,6 +157,29 @@ describe("합성 프로파일 왕복", () => {
 
 describe("손상·악의적 입력", () => {
   const good = buildMatrixTrcIccProfile();
+
+  it.each(["rTRC", "gTRC", "bTRC"])("누락된 %s를 항등 곡선으로 대체하지 않는다", (signature) => {
+    expect(parseErr(replaceRgbCurve(signature, null))).toContain("TRC");
+  });
+
+  it.each(Array.from({ length: 12 }, (_, size) => size))(
+    "%i바이트로 선언한 curv 헤더는 태그 밖 count가 0이어도 거부한다",
+    (size) => {
+      const bytes = buildMatrixTrcIccProfile();
+      const profile = parseOk(bytes);
+      const index = profile.tags.findIndex((tag) => tag.signature === "rTRC");
+      const tag = profile.tags[index]!;
+      const view = new DataView(bytes.buffer);
+      view.setUint32(132 + index * 12 + 8, size);
+      view.setUint32(tag.offset + 8, 0);
+      expect(parseErr(bytes)).toContain("곡선");
+    },
+  );
+
+  it.each([8, 9, 10, 11, 12, 15])("%i바이트로 잘린 para 곡선을 거부한다", (size) => {
+    const para = typedTag("para", [0, 0, 0, 0, 0, 2, 0, 0]).slice(0, size);
+    expect(parseErr(replaceRgbCurve("rTRC", para))).toContain("곡선");
+  });
 
   it("128바이트 미만은 거절한다", () => {
     expect(parseErr(new Uint8Array(64))).toContain("너무 짧아요");
@@ -272,6 +307,19 @@ describe("지원 범위 판정 — 정직한 미지원 보고", () => {
 });
 
 describe("TRC 곡선 평가", () => {
+  it.each([
+    { name: "identity", data: typedTag("curv", [0, 0, 0, 0]), expected: 0.5 },
+    { name: "gamma", data: typedTag("curv", [0, 0, 0, 1, 2, 0]), expected: 0.25 },
+    { name: "table", data: typedTag("curv", [0, 0, 0, 2, 0, 0, 255, 255]), expected: 0.5 },
+    { name: "parametric", data: typedTag("para", [0, 0, 0, 0, 0, 2, 0, 0]), expected: 0.25 },
+  ])("유효 $name 곡선은 ICC 왕복 후 RGB→XYZ 변환에 사용한다", ({ data, expected }) => {
+    const profile = parseOk(replaceRgbCurve("rTRC", data));
+    expect(evaluateIccCurve(profile.matrixTrc!.redTrc, 0.5)).toBeCloseTo(expected, 12);
+    const xyz = iccRgbToXyz(profile, { r: 0.5, g: 0, b: 0 });
+    expect(xyz).not.toBeNull();
+    expect(xyz!.y).toBeCloseTo(profile.matrixTrc!.matrix[1][0] * expected, 12);
+  });
+
   it("identity는 입력을 그대로 돌려주고 0..1로 클램프한다", () => {
     expect(evaluateIccCurve({ kind: "identity" }, 0.3)).toBe(0.3);
     expect(evaluateIccCurve({ kind: "identity" }, -1)).toBe(0);

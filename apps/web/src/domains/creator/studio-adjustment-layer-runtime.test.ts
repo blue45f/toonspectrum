@@ -34,6 +34,7 @@ import type { StudioImageDataLike } from "./studio-filters";
 type OperationInput = {
   readonly id: string;
   readonly engine: StudioAdjustmentEngineId;
+  readonly opacity?: number;
   readonly params?: Record<string, number | string | boolean>;
 };
 
@@ -54,6 +55,7 @@ function stack(entries: readonly OperationInput[]): StudioAdjustmentStack {
       id: entry.id,
       engine: entry.engine,
       enabled: true,
+      ...(entry.opacity === undefined ? {} : { opacity: entry.opacity }),
       params: { ...entry.params },
     })),
   };
@@ -232,6 +234,17 @@ function expectRuntimeError(
 }
 
 describe("studio adjustment-layer runtime", () => {
+  it("retains operation opacity in immutable recipes and their CPU execution", async () => {
+    const source = sourceFor(rgbaImage(1, 1, () => [40, 80, 120, 255]));
+    const plan = planFor([{ id: "invert", engine: "invert", opacity: 0.25 }]);
+    const recipe = createStudioAdjustmentLayerRuntimeRecipe({ plan, source });
+    expect(recipe.passes[0]?.operations[0]).toMatchObject({ opacity: 0.25 });
+    const encoded = serializeStudioAdjustmentLayerRuntimeRecipe(recipe);
+    const result = await executeStudioAdjustmentLayerRuntime(JSON.parse(encoded), source);
+    expect(Array.from(result.imageData.data)).toEqual([84, 104, 124, 255]);
+    expect(Array.from(source.imageData.data)).toEqual([40, 80, 120, 255]);
+  });
+
   it("accepts a compositor revision containing raster, vector, text, shape, group, and 3D sources", async () => {
     const image = rgbaImage(4, 3, (x, y) => [20 + x * 10, 50 + y * 20, 90, 255]);
     const sourceSnapshot = new Uint8ClampedArray(image.data);

@@ -28,6 +28,7 @@ export const STUDIO_QUICK_ACCESS_COMMAND_IDS = [
   "quick-mask",
   "wet-mix",
   "dodge-burn",
+  "correct-current-stroke",
 ] as const;
 
 export type StudioQuickAccessCommandId =
@@ -47,7 +48,8 @@ export type StudioQuickAccessExecutionIntent =
   }>
   | Readonly<{
     kind: "pixel-transform";
-  }>;
+  }>
+  | Readonly<{ kind: "correct-current-stroke" }>;
 
 export type StudioQuickAccessSaveStatus =
   | "persisted"
@@ -216,11 +218,13 @@ const COMMAND_CATALOG: readonly Omit<
     category: "보정",
     keywords: ["밝게", "어둡게", "dodge", "burn"],
   },
+  { id: "correct-current-stroke", label: "현재 스트로크 교정", description: "최근 펜 스트로크를 편집 가능한 도형으로 다듬습니다.", category: "도구", keywords: ["도형", "Smart Shape", "Edit Shape"], shortcut: "⌥⇧Q" },
 ]);
 
 const EXECUTION_INTENTS: Readonly<
   Record<StudioQuickAccessCommandId, StudioQuickAccessExecutionIntent>
 > = Object.freeze({
+  "correct-current-stroke": Object.freeze({ kind: "correct-current-stroke" }),
   undo: Object.freeze({ kind: "quick-action", action: "undo" }),
   redo: Object.freeze({ kind: "quick-action", action: "redo" }),
   save: Object.freeze({ kind: "save-draft" }),

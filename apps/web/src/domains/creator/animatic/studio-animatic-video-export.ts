@@ -47,10 +47,15 @@ export async function exportStudioAnimaticVideo(request: StudioAnimaticVideoRequ
   let frame: number | null = null;
   let recorder: ReturnType<MotionExportDeps["createRecorder"]> | null = null;
   let interrupt: ((reason: Error) => void) | null = null;
-  const aborted = () => interrupt?.(new DOMException("내보내기를 취소했습니다.", "AbortError"));
+  let interruption: Error | null = null;
+  const stopExport = (reason: Error) => {
+    interruption ??= reason;
+    interrupt?.(interruption);
+  };
+  const aborted = () => stopExport(new DOMException("내보내기를 취소했습니다.", "AbortError"));
   request.signal?.addEventListener("abort", aborted, { once: true });
   const hidden = () => {
-    if (document.visibilityState === "hidden") interrupt?.(new Error("화면이 숨겨져 영상 기록을 중단했습니다. 스토리보드 화면을 열고 다시 내보내세요."));
+    if (document.visibilityState === "hidden") stopExport(new Error("화면이 숨겨져 영상 기록을 중단했습니다. 스토리보드 화면을 열고 다시 내보내세요."));
   };
   if (typeof document !== "undefined") document.addEventListener("visibilitychange", hidden);
   try {
@@ -61,7 +66,19 @@ export async function exportStudioAnimaticVideo(request: StudioAnimaticVideoRequ
     let audioDestination: MediaStreamAudioDestinationNode | null = null;
     if (audible.length) {
       audioContext = new AudioContext();
-      await audioContext.resume();
+      const preparingAudio = audioContext;
+      // Autoplay restrictions can leave resume pending. Cancellation must release the captured
+      // video stream now; a late resume result must never start an abandoned recording.
+      await new Promise<void>((resolve, reject) => {
+        interrupt = reject;
+        preparingAudio.resume().then(resolve, reject);
+        if (request.signal?.aborted) aborted();
+        if (typeof document !== "undefined") hidden();
+        if (interruption) reject(interruption);
+      });
+      interrupt = null;
+      // An abort may land between resume's resolution and this continuation.
+      if (interruption) throw interruption;
       audioDestination = audioContext.createMediaStreamDestination();
       for (const track of audioDestination.stream.getAudioTracks()) stream.addTrack(track);
     }

@@ -24,7 +24,7 @@
  *   - 헤더의 profileSize 가 실제 바이트 수와 불일치(잘림·덧붙임)
  *   - 태그 개수가 남은 바이트로 담을 수 없는 값(개수 위조로 인한 대용량 할당 유도)
  *   - 태그 오프셋/크기가 파일 밖이거나 헤더(0..127)를 침범
- *   - 곡선 포인트 수가 태그 크기를 초과
+ *   - RGB TRC 누락 / 곡선 헤더 또는 포인트 수가 선언한 태그 크기를 초과
  *
  * 모든 함수는 순수·결정적이다. 시간·난수·DOM 없음.
  */
@@ -55,7 +55,7 @@ export const STUDIO_ICC_RENDERING_INTENT_LABELS: Readonly<Record<StudioIccRender
 export type StudioIccProfileKind = "matrix-trc-rgb" | "gray-trc" | "lut-based" | "unsupported";
 
 export interface StudioIccCurve {
-  /** `identity` = 곡선 데이터 없음(감마 1.0), `gamma` = 단일 지수, `table` = 균등 샘플 배열. */
+  /** `identity` = 명시적 count=0 곡선(감마 1.0), `gamma` = 단일 지수, `table` = 균등 샘플 배열. */
   kind: "identity" | "gamma" | "table" | "parametric";
   /** kind === "gamma" 일 때 지수. */
   gamma?: number;
@@ -327,7 +327,10 @@ function readXyzTag(bytes: Uint8Array, tag: StudioIccTag | undefined): { x: numb
 const PARAMETRIC_PARAM_COUNTS: readonly number[] = [1, 3, 4, 5, 7];
 
 function readCurveTag(bytes: Uint8Array, tag: StudioIccTag | undefined): StudioIccCurve {
-  if (!tag || tag.size < 8) return { kind: "identity" };
+  if (!tag) fail("ICC RGB 매트릭스 프로파일에 필요한 TRC 곡선 태그가 없습니다.");
+  // Both curv and para have a 12-byte header. An explicit curv count of zero
+  // denotes identity; missing/truncated data must never imply a linear channel.
+  if (tag.size < 12) fail(`ICC 곡선 태그 '${tag.signature}'의 헤더가 잘렸어요.`);
   const type = readSignature(bytes, tag.offset);
   if (type === "para") {
     const functionType = readUint16(bytes, tag.offset + 8);

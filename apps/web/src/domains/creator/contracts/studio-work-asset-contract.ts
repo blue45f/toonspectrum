@@ -212,6 +212,7 @@ export const StudioWorkAssetSmartFiltersSchema = z
       id: z.string().min(1).max(80),
       engine: z.enum(STUDIO_WORK_ASSET_ADJUSTMENT_ENGINE_IDS),
       enabled: z.boolean(),
+      opacity: z.number().finite().min(0).max(1).optional(),
       params: StudioWorkAssetAdjustmentParamsSchema,
     }).strict()).max(24),
   })

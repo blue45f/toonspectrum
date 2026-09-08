@@ -162,6 +162,7 @@ export interface StudioMainMenuUiActions extends StudioMainMenuSurfaceActions {
   openShortcuts: () => unknown;
   selectDrawMode: (mode: Extract<DrawMode, "pen" | "eraser">) => unknown;
   enableSmartShape: () => unknown;
+  correctCurrentStroke?: () => unknown;
   /** Free-transform / pixel-selection transform, whatever the selection turns out to be. */
   activateTransformTool: () => unknown;
   /** Inspector 보정 섹션 — where Levels and the tone curve actually live. */

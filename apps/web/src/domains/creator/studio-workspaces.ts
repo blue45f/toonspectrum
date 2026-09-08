@@ -195,6 +195,7 @@ export const STUDIO_COMMAND_BAR_COMMAND_IDS = [
   "assets",
   "bubbles",
   "project",
+  "correct-current-stroke",
 ] as const;
 
 export type StudioCommandBarCommandId = (typeof STUDIO_COMMAND_BAR_COMMAND_IDS)[number];
