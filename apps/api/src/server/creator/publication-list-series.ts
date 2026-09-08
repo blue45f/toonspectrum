@@ -12,12 +12,20 @@ export interface CreatorPublicationSeriesListOptions {
  * Keep the public creator barrel's sort contract explicit. TypeScript includes `undefined` in the
  * parameter tuple of a defaulted function, which otherwise collapses an inferred conditional sort
  * type to `never` even though the runtime implementation accepts the same options object.
+ *
+ * A series containing only link-public/private episodes must not reveal itself through discovery;
+ * owners still retain the complete management view, including intentionally empty series.
  */
-export function listSeries(
+export async function listSeries(
   options: CreatorPublicationSeriesListOptions = {},
 ): Promise<CreatorSeriesSummary[]> {
   const invoke = listPublicationSeries as unknown as (
     input: CreatorPublicationSeriesListOptions,
   ) => Promise<CreatorSeriesSummary[]>;
-  return invoke(options);
+  const series = await invoke(options);
+  const ownerView =
+    Boolean(options.userId) &&
+    Boolean(options.viewerId) &&
+    options.userId === options.viewerId;
+  return ownerView ? series : series.filter((candidate) => candidate.episodes > 0);
 }
