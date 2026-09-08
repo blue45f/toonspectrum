@@ -16,7 +16,7 @@ const { apiGet, apiPost, toApiError } = vi.hoisted(() => ({
   toApiError: vi.fn(async (error: unknown) => (error instanceof Error ? error : new Error("실패"))),
 }));
 
-vi.mock("@/src/infrastructure/api", () => ({
+vi.mock("@/infrastructure/api", () => ({
   api: { get: apiGet, post: apiPost },
   toApiError,
 }));

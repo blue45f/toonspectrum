@@ -7,6 +7,7 @@ import {
   STUDIO_BRUSH_DYNAMICS_PRESETS,
   STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
   normalizeStudioBrushDynamicsSample,
@@ -347,7 +348,7 @@ describe("studio brush dynamics settings safety", () => {
     for (const preset of STUDIO_BRUSH_DYNAMICS_PRESETS) {
       expect(JSON.parse(JSON.stringify(preset.settings))).toEqual(preset.settings);
       expect(preset.settings.depositPipeline).toBe(
-        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
       );
       expectFiniteRecipe(resolveStudioBrushDynamics({}, studioBrushDynamicsPresetSettings(preset.id)));
     }
@@ -370,7 +371,7 @@ describe("studio brush dynamics settings safety", () => {
       const value = studioBrushDynamicsSettingsForBrushId(brushId);
       expect(value).not.toBeNull();
       expect(value?.depositPipeline).toBe(
-        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
       );
       return value!;
     });
@@ -1296,7 +1297,7 @@ describe("studio dynamic brush arc-length dab planner", () => {
       const fresh = studioBrushDynamicsSettingsForBrushId(brushId);
       expect(fresh?.causalStampGridRule, brushId).toBe(v2);
       expect(fresh?.depositPipeline, brushId)
-        .toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3);
+        .toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4);
       // Fresh dynamics select the width-appropriate lattice once the authored width grows.
       const gridFor = (baseWidth: number) => selectStudioDynamicBrushCausalStampGrid({
         rule: studioDynamicBrushCausalStampGridRuleOf(normalizeStudioBrushDynamicsSettings({

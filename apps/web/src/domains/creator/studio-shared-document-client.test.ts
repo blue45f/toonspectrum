@@ -25,7 +25,7 @@ const { apiGet, apiPatch, toApiError } = vi.hoisted(() => ({
   toApiError: vi.fn(async () => new Error("안전한 API 오류")),
 }));
 
-vi.mock("@/src/infrastructure/api", () => ({
+vi.mock("@/infrastructure/api", () => ({
   api: {
     get: apiGet,
     patch: apiPatch,

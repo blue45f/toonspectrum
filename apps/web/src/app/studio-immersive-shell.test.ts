@@ -1,11 +1,14 @@
 /**
- * Studio immersive shell — site GNB/footer must not render when surface is studio.
- * Drives the real ui-store helpers used by App.tsx chrome gates.
+ * Studio immersive shell — site GNB/footer must not render on the first /studio render.
+ * Route truth owns web chrome; the ui-store remains a lifecycle mirror for other consumers.
  */
-import { describe, expect, it, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { useUi } from "@/shared/lib/ui-store";
-import { isImmersiveMobileRoute } from "@/src/app/routes/immersive-mobile-route";
+import { isImmersiveMobileRoute } from "@/app/routes/immersive-mobile-route";
 
 describe("studio immersive shell", () => {
   beforeEach(() => {
@@ -20,25 +23,40 @@ describe("studio immersive shell", () => {
     expect(isImmersiveMobileRoute("/")).toBe(false);
   });
 
-  it("acquireImmersiveSurface('studio') is the App chrome gate condition", () => {
+  it("derives the App chrome gate from the current route before effects run", () => {
     expect(useUi.getState().immersiveSurface).toBeNull();
-    useUi.getState().acquireImmersiveSurface("studio");
-    expect(useUi.getState().immersiveSurface).toBe("studio");
-    // App renders: header={studioImmersive ? null : <SiteHeader />}
-    const hideSiteChrome = useUi.getState().immersiveSurface === "studio";
-    expect(hideSiteChrome).toBe(true);
-    useUi.getState().releaseImmersiveSurface("studio");
-    expect(useUi.getState().immersiveSurface).toBeNull();
-    expect(useUi.getState().immersiveSurface === "studio").toBe(false);
+    expect(isImmersiveMobileRoute("/studio/work/1/canvas")).toBe(true);
+
+    const appSource = readFileSync(
+      path.resolve(process.cwd(), "apps/web/src/app/App.tsx"),
+      "utf8",
+    );
+    expect(appSource).toContain(
+      "const studioImmersive = isImmersiveMobileRoute(pathname);",
+    );
+    expect(appSource).not.toContain(
+      'useUi((state) => state.immersiveSurface === "studio")',
+    );
   });
 
-  it("release is scoped so only the matching surface clears", () => {
+  it("keeps one retained 3D host in the AppShell chrome layer", () => {
+    const appSource = readFileSync(
+      path.resolve(process.cwd(), "apps/web/src/app/App.tsx"),
+      "utf8",
+    );
+    expect(appSource).toMatch(
+      /chromeOverlay=\{[\s\S]*?<StudioBg3dRetainedOwnerHost \/>/,
+    );
+    expect(appSource.match(/<StudioBg3dRetainedOwnerHost \/>/g)).toHaveLength(1);
+  });
+
+  it("keeps the shared immersive lifecycle mirror scoped and idempotent", () => {
     useUi.getState().acquireImmersiveSurface("studio");
+    expect(useUi.getState().immersiveSurface).toBe("studio");
+
     useUi.getState().releaseImmersiveSurface("studio");
     expect(useUi.getState().immersiveSurface).toBeNull();
-    useUi.getState().acquireImmersiveSurface("studio");
-    // Double-release is safe
-    useUi.getState().releaseImmersiveSurface("studio");
+
     useUi.getState().releaseImmersiveSurface("studio");
     expect(useUi.getState().immersiveSurface).toBeNull();
   });

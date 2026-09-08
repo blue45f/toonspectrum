@@ -29,13 +29,13 @@ import {
   CreatorMarketplaceResourceSearchQuerySchema,
 } from "@/shared/lib/creator-marketplace-resource-contract";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 import {
   useDocumentTitle,
   useJsonLd,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/src/hooks/use-document-title";
+} from "@/hooks/use-document-title";
 
 const PAGE_SIZE = 12;
 const MARKET_BROWSE_DESCRIPTION =

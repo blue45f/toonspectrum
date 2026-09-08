@@ -7,9 +7,9 @@ import { AuthModal } from "./auth-modal";
 import { resolveSignupAvatarImage } from "@/shared/lib/avatar";
 import { useT } from "@/shared/lib/i18n";
 import { cn, keepInlineText } from "@/shared/lib/utils";
-import { useSession, signOut } from "@/src/compat/auth-session-store";
-import Link from "@/src/compat/router-link";
-import { adminFetch, type AdminMe } from "@/src/domains/admin/components/admin-client";
+import { useSession, signOut } from "@/compat/auth-session-store";
+import Link from "@/compat/router-link";
+import { adminFetch, type AdminMe } from "@/domains/admin/components/admin-client";
 
 function safeProfileImageSrc(value: string | null | undefined): string | null {
   if (!value) return null;

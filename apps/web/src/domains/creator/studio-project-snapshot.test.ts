@@ -6,6 +6,7 @@ import {
 } from "./ai/studio-ai-image-reference-roles";
 import { createEmptyStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { createDefaultStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
+import { captureLayerComp } from "./layer/studio-layer-comps";
 import {
   createEmptyStudioCharacterBible,
   normalizeStudioCharacterBible,
@@ -107,6 +108,22 @@ function snapshot(
   mutate(input);
   return buildStudioProjectFileSnapshot(input);
 }
+
+it("marks V4 strokes in raw autosave snapshots without upgrading historical stroke snapshots", () => {
+  for (const [pipeline, expectedVersion] of [
+    ["causal-deposit-v3-segmented", 2],
+    ["causal-deposit-v4-taper-spacing", 3],
+  ] as const) {
+    const stroke = testElement("stroke", {
+      type: "draw", brushDynamics: { version: 1, depositPipeline: pipeline },
+    });
+    const saved = snapshot((input) => { input.pagesList[0].elements = [stroke]; });
+    expect(saved.version).toBe(expectedVersion);
+    expect(saved.pagesList[0].elements[0]).toBe(stroke);
+    expect(JSON.parse(serializeStudioProjectFile(saved)).version).toBe(expectedVersion);
+    expect(snapshot((input) => { input.master = { elements: [stroke] }; }).version).toBe(expectedVersion);
+  }
+});
 
 describe("resolveStudioDurableProjectPages", () => {
   it("uses ref-backed history over a stale render and overlays the deferred stroke once", () => {
@@ -304,6 +321,18 @@ describe("studioProjectSnapshotHasMeaningfulContent", () => {
     expect(studioProjectSnapshotHasMeaningfulContent(empty, {
       canvasWidth: CANVAS_WIDTH,
     })).toBe(false);
+  });
+
+  it("preserves a valid preset as the only work on an empty page", () => {
+    const comp = captureLayerComp("빈 캔버스 상태", [], "comp-1", 1);
+    const value = snapshot((input) => { input.pagesList[0]!.layerComps = [comp]; });
+    expect(studioProjectSnapshotHasMeaningfulContent(value, { canvasWidth: CANVAS_WIDTH })).toBe(true);
+    const restored = parseStudioProjectFile(JSON.parse(serializeStudioProjectFile(value)));
+    expect(restored?.pagesList[0]?.layerComps).toEqual([comp]);
+    for (const layerComps of [[], [comp, comp], [{ ...comp, name: "" }]]) {
+      expect(studioProjectSnapshotHasMeaningfulContent({ ...value, pagesList: [{ ...value.pagesList[0]!, layerComps }] },
+        { canvasWidth: CANVAS_WIDTH })).toBe(false);
+    }
   });
 
   it("recognizes canvas, drawing-assist, master, planning, review, publishing, and text content", () => {

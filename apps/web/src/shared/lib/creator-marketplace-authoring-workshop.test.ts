@@ -41,6 +41,7 @@ describe("creator marketplace authoring workshop", () => {
     const brush = manifest.brush as Record<string, unknown>;
 
     expect(draft.source.mode).toBe("brush-studio");
+    expect(manifest.resource).toMatchObject({ draftId: draft.id });
     expect(draft.brush.originalEnginePrograms).toEqual(enginePrograms);
     expect(draft.brush.engineNodes).toHaveLength(2);
     expect(draft.brush.engineNodes[0]?.engine).toBe("dry-media");

@@ -151,7 +151,7 @@ export function StudioAnimTimelinePanel({
   return (
     <section
       aria-label="다중 레이어 타임라인"
-      className="absolute right-3 top-3 z-40 flex max-h-[calc(100%-5rem)] w-[min(46rem,calc(100%-1.5rem))] flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur"
+      className="fixed inset-x-2 top-16 z-40 flex max-h-[calc(100svh-5rem)] w-auto flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur sm:absolute sm:inset-x-auto sm:right-3 sm:top-3 sm:max-h-[calc(100%-5rem)] sm:w-[min(46rem,calc(100%-1.5rem))]"
     >
       {/* 헤더 */}
       <div className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2">

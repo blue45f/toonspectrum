@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { CharacterShaperLandingPage } from "./CharacterShaperLandingPage";
 
+import { useI18n } from "@/shared/lib/i18n";
+
 const SLOT_LABELS = [
   "얼굴형",
   "눈",
@@ -49,6 +51,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  useI18n.setState({ lang: "en" });
   document.head.innerHTML = `
     <meta name="description" content="기본 설명">
     <link rel="canonical" href="https://www.toonstudio.cloud/">
@@ -122,10 +125,14 @@ describe("CharacterShaperLandingPage", () => {
     }
   });
 
-  it("owns the document title, description, canonical URL and JSON-LD for /shaper", () => {
+  it.each([
+    ["en", "ToonStudio"],
+    ["ko", "툰스튜디오"],
+  ] as const)("owns the %s title, description, canonical URL and JSON-LD for /shaper", (lang, brand) => {
+    useI18n.setState({ lang });
     renderPage();
 
-    expect(document.title).toBe("캐릭터 셰이퍼 · 툰스펙트럼");
+    expect(document.title).toBe(`캐릭터 셰이퍼 · ${brand}`);
     expect(document.querySelector('meta[name="description"]')?.getAttribute("content")).toContain(
       "투명 PNG와 레이어 PSD",
     );
@@ -133,7 +140,7 @@ describe("CharacterShaperLandingPage", () => {
       "https://www.toonstudio.cloud/shaper",
     );
     expect(document.querySelector('meta[property="og:title"]')?.getAttribute("content")).toBe(
-      "캐릭터 셰이퍼 · 툰스펙트럼",
+      `캐릭터 셰이퍼 · ${brand}`,
     );
 
     const jsonLd = document.head.querySelector('script[type="application/ld+json"]');

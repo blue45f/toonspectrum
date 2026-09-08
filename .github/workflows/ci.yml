@@ -37,10 +37,10 @@ on:
 permissions:
   contents: read
 
-# PR 은 PR 번호로 묶어 새 커밋이 오면 진행 중 실행을 취소한다. main 푸시는 커밋 SHA 로 묶이므로
-# 서로 간섭하지 않는다 — 커밋마다 어느 커밋이 main 을 깨뜨렸는지 신호가 남아야 한다.
+# PR 는 PR 번호 단위로 묶어 동일 PR의 진행 중인 CI를 취소하고 새 커밋은 새 신호로 갱신합니다.
+# main 푸시는 SHA 단위로 분리해 각 커밋의 변경 신호를 그대로 남겨 둡니다.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}-release-final-g2
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Core is backed by executed checks; no fast-merge bypass is permitted.
@@ -241,6 +241,26 @@ jobs:
           psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
             -X -v ON_ERROR_STOP=1 <<'SQL'
           DROP TABLE IF EXISTS
+            "admin_announcements",
+            "admin_audit_logs",
+            "admin_banned_words",
+            "admin_content_reports",
+            "admin_promos",
+            "admin_security_policies",
+            "creator_asset_artifact",
+            "creator_asset_artifact_set",
+            "creator_asset_license_snapshot",
+            "creator_asset_processing_run",
+            "creator_asset_processing_step",
+            "creator_asset_qa_report",
+            "creator_asset_rights_evidence",
+            "creator_asset_upload_session",
+            "creator_marketplace_draft",
+            "creator_marketplace_draft_revision",
+            "creator_marketplace_entitlement_grant",
+            "creator_marketplace_release_artifact_binding",
+            "creator_marketplace_release_availability",
+            "creator_work_catalog_asset_binding",
             "creator_work_asset_storage_reference",
             "creator_asset_storage_object",
             "creator_marketplace_library_item",
@@ -339,7 +359,7 @@ jobs:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Run the wall-clock perf-budget pass one file at a time
+      - name: Run timing budgets and exhaustive CPU references one file at a time
         run: pnpm run test:perf
       # The root Vitest run intentionally skips Redis without a disposable target.
       # This runner owns a password-protected loopback container and always removes it.
@@ -612,6 +632,16 @@ jobs:
         run: |
           xvfb-run -a --server-args="-screen 0 1920x1200x24" \
             pnpm run verify:studio-bg3d-inapp-editor
+        env:
+          TOONSPECTRUM_BG3D_INAPP_VERIFY_DIR: ${{ runner.temp }}/studio-bg3d-inapp-editor
+      - name: Preserve in-app 3D touch and viewport evidence
+        if: always()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
+        with:
+          name: studio-bg3d-inapp-${{ github.run_id }}
+          path: ${{ runner.temp }}/studio-bg3d-inapp-editor/
+          if-no-files-found: warn
+          retention-days: 7
 
   studio-filter-dialog:
     # 상단 필터 메뉴 → StudioFilterDialog → 미리보기 → 적용 → 실행취소를 프로덕션 빌드에서
@@ -632,11 +662,32 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Build for vite preview
+        id: build
         run: pnpm run build:bundle
       - name: Verify the shipped filter dialog end to end
         run: pnpm run verify:studio-filter-dialog
+        env:
+          TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR: ${{ runner.temp }}/studio-filter-dialog
       - name: Verify drawing recovery, exact PNG export, and source hydration
         run: pnpm run verify:studio-lifecycle
+        env:
+          TOONSPECTRUM_LIFECYCLE_VERIFY_DIR: ${{ runner.temp }}/studio-lifecycle
+      - name: Verify AI image reference autosave, recovery, and edit history
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm run verify:studio-ai-image-references
+        env:
+          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/studio-ai-image-references
+      - name: Preserve filter, lifecycle, and AI reference browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
+        with:
+          name: studio-filter-lifecycle-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/studio-filter-dialog/
+            ${{ runner.temp }}/studio-lifecycle/
+            ${{ runner.temp }}/studio-ai-image-references/
+          if-no-files-found: warn
+          retention-days: 7
 
   studio-p5-brush-real-runtime:
     runs-on: ubuntu-24.04

@@ -9,6 +9,12 @@ import { downloadText, useCreatorWorkspace } from "./workspace";
 
 import { attributionMarkdown, parseWorkspace } from "@/shared/lib/creator-resources";
 
+const WORKFLOW = [
+  { step: "01", title: "발견", body: "작품·판본·복식·소품·지원사업을 목적에 맞게 찾습니다." },
+  { step: "02", title: "검토", body: "원문, 제공처, 조회일과 이용조건을 함께 확인하고 보드에 저장합니다." },
+  { step: "03", title: "제작", body: "정리한 자료를 Story Lab·Studio·출판 준비로 이어갑니다." },
+] as const;
+
 export function CreatorHubPage() {
   const { workspace, update, restore, readSnapshot, ready, writable, saving, error } = useCreatorWorkspace();
   const [restoreMode, setRestoreMode] = useState<"merge" | "replace">("merge");
@@ -31,8 +37,15 @@ export function CreatorHubPage() {
     } catch (cause) { setImportNotice(cause instanceof Error ? cause.message : "백업을 읽지 못했습니다."); }
     finally { setRestoring(false); }
   };
-  return <ResourceLayout title="아이디어를 다음 작업으로" intro="소재를 모으고, 이야기를 설계하고, 한 장면을 완성하세요. 외부 자료는 출처와 이용조건을 함께 확인합니다.">
+  return <ResourceLayout title="창작 리서치 데스크" intro="작품과 판본을 찾고, 출처가 있는 창작 자료를 모아 이야기 설계와 Studio 작업으로 연결하세요. 외부 데이터는 제공처·조회일·이용조건을 함께 보존합니다.">
     <ProviderStatus />
+    <section className="grid gap-3 rounded-2xl border border-line bg-card/40 p-5 sm:grid-cols-3 sm:p-6" aria-label="리서치 작업 흐름">
+      {WORKFLOW.map((item) => <article key={item.step} className="rounded-xl border border-line bg-panel p-4">
+        <span className="text-xs font-bold text-accent">{item.step}</span>
+        <h2 className="mt-2 font-bold text-fg">{item.title}</h2>
+        <p className="mt-2 text-sm leading-6 text-fg-2">{item.body}</p>
+      </article>)}
+    </section>
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {RESOURCE_PAGES.slice(1).map((page, index) => <Link to={page.path} key={page.path} className="group rounded-2xl border border-line bg-panel p-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent hover:bg-raised">
         <span className="text-sm text-accent">{String(index + 1).padStart(2, "0")}</span>

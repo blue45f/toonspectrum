@@ -4,7 +4,7 @@
   "private": true,
   "description": "Isolated Remotion authoring toolchain; never imported by the website",
   "scripts": {
-    "studio": "remotion studio src/index.tsx --public-dir=../../public",
+    "studio": "remotion studio src/index.tsx --public-dir=../../apps/web/public",
     "render": "node render.mjs",
     "typecheck": "tsc --noEmit"
   },

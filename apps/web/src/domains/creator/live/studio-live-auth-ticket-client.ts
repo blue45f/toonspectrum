@@ -8,7 +8,7 @@ import {
 import { readOrCreateStudioLiveGuestCredential } from "./studio-live-client-identity";
 
 import { withCsrfHeader } from "@/shared/lib/csrf";
-import { apiPath } from "@/src/infrastructure/api";
+import { apiPath } from "@/infrastructure/api";
 
 const DEFAULT_TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_BYTES = STUDIO_LIVE_AUTH_TICKET_MAX_CODE_UNITS + 2_048;

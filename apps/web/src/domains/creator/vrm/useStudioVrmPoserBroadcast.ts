@@ -545,6 +545,12 @@ export function useStudioVrmPoserBroadcast(h: StudioVrmPoserHost): void {
       }
 
       const dialog = dialogRef.current;
+      const childTool = dialog?.querySelector('[data-studio-vrm-child-tool="true"]');
+      // A child tool owns Escape even when its compact drawing controls leave the viewport exposed.
+      // Modal tools also own Tab; non-modal controls remain in this dialog's normal focus order.
+      if (childTool && (e.key === "Escape" || (e.key === "Tab" && childTool.getAttribute("aria-modal") === "true"))) return;
+      if (childTool?.getAttribute("data-studio-vrm-child-history") === "surface-ink"
+        && (e.metaKey || e.ctrlKey) && !e.altKey && ["z", "y"].includes(e.key.toLowerCase())) return;
       const topElement = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
       const dialogIsTopmost = !!dialog && (!topElement || topElement === dialog || dialog.contains(topElement));
       if (e.key === "Escape") {

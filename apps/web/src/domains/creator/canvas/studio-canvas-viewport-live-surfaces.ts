@@ -29,7 +29,6 @@ import type {
   StudioRenderSurfaceAuthority,
 } from "../render/StudioRenderSurface";
 import { CANVAS_W } from "../studio-assets";
-import { studioCanonicalDryMediaEligibilityFailure } from "../studio-canonical-vnext-dry-media-eligibility";
 import { containingPanel } from "../studio-element-geometry";
 import { isEffectivelyHidden } from "../studio-layers";
 import { planStudioCanvasStageLayout } from "../studio-view-controls";
@@ -39,6 +38,7 @@ import {
 } from "./studio-canvas-viewport-primitives";
 import {
   resolveStudioCanonicalDryMediaViewportAuthority,
+  resolveStudioCanonicalDryMediaSelectedElement,
 } from "./studio-canonical-dry-media-authority";
 import {
   applyStudioStageViewportClip,
@@ -669,10 +669,10 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
       canonicalDryMediaVisibleElements.length - 1
     ] ?? null;
   const canonicalDryMediaSelectedElement =
-    canonicalDryMediaTopElement?.id === selectedId
-      && canonicalDryMediaTopElement.type === "draw"
-      ? canonicalDryMediaTopElement
-      : null;
+    resolveStudioCanonicalDryMediaSelectedElement(
+      canonicalDryMediaTopElement,
+      selectedId,
+    );
   const canonicalDryMediaPanelClip =
     canonicalDryMediaSelectedElement
       && !canonicalDryMediaSelectedElement.noClip
@@ -699,7 +699,6 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     && !webGpuPreviewAuthorized
     && studioRasterHiddenOperationIds.size === 0
     && canonicalDryMediaSelectedElement !== null
-    && studioCanonicalDryMediaEligibilityFailure(canonicalDryMediaSelectedElement) === null
     && canonicalDryMediaSelectedElement.clipBelow !== true
     && canonicalDryMediaSelectedElement.maskSrc === undefined
     && canonicalDryMediaPanelClip === null

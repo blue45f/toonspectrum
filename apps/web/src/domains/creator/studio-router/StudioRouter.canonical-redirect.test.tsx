@@ -17,7 +17,7 @@ const probe = vi.hoisted(() => ({
   fallbackHrefs: [] as string[],
 }));
 
-vi.mock("@/src/compat/auth-session-store", () => ({
+vi.mock("@/compat/auth-session-store", () => ({
   useSession: () => ({
     data: null,
     ready: true,

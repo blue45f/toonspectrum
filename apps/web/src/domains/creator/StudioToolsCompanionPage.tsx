@@ -91,8 +91,8 @@ import { useStudioCompanionWindowLayout } from "./use-studio-companion-window-la
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
-import { studioCanOpenAuxiliaryWindow } from "@/src/compat/in-app-browser";
-import Link from "@/src/compat/router-link";
+import { studioCanOpenAuxiliaryWindow } from "@/compat/in-app-browser";
+import Link from "@/compat/router-link";
 
 const HEARTBEAT_INTERVAL_MS = 4_000;
 const PRIMARY_STALE_AFTER_MS = 12_000;

@@ -50,6 +50,8 @@ const REQUIRED_PENDING_MIGRATION_IDS = Object.freeze([
 const DRIZZLE_SCHEMA_PATHS = Object.freeze([
   "drizzle.config.ts",
   "apps/api/src/db/schema.ts",
+  "apps/api/src/db/schema/admin.schema.ts",
+  "apps/api/src/db/admin-schema-contract.ts",
   "apps/api/src/db/creator-marketplace-resource.schema.ts",
   "apps/api/src/db/creator-marketplace-report.schema.ts",
   "apps/api/src/db/creator-marketplace-library.schema.ts",
@@ -66,6 +68,7 @@ const BOOTSTRAP_CONTRACT_PATHS = Object.freeze([
   "scripts/run-production-database-migrations.mjs",
   "scripts/validate-production-database-url.mjs",
   "scripts/verify-production-database-capabilities.mjs",
+  "scripts/admin-database-contract.mjs",
   ...DRIZZLE_SCHEMA_PATHS,
 ]);
 const DRIZZLE_ERROR_PATTERN =
@@ -1036,6 +1039,12 @@ function executeBootstrap({
       databaseUrl,
       `
         DROP TABLE IF EXISTS
+          public.admin_announcements,
+          public.admin_audit_logs,
+          public.admin_banned_words,
+          public.admin_content_reports,
+          public.admin_promos,
+          public.admin_security_policies,
           public.creator_work_asset_storage_reference,
           public.creator_asset_storage_object,
           public.creator_marketplace_library_item,

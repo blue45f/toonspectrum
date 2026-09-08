@@ -8,7 +8,7 @@ import { persistSession, useSession } from "./auth-session-store";
 
 const apiRaw = vi.hoisted(() => vi.fn());
 
-vi.mock("@/src/infrastructure/api", () => ({
+vi.mock("@/infrastructure/api", () => ({
   api: { raw: apiRaw },
   apiPath: (path: string) => `/api${path}`,
 }));

@@ -2733,13 +2733,13 @@ describe("StudioCrdtService", () => {
       };
       const expected = hasValidBrowserStrokePaintContract(browserContract);
       expect(expected, brush).toBe(true);
-      // The authored snapshots ride the segmented causal pipeline, which both mirrors gate to
-      // payload v4; older payload versions stay rejected regardless of the marker.
+      // Newly authored snapshots use taper-aware spacing on wire v5. Older envelopes
+      // stay rejected regardless of the independent kernel marker.
       expect(
-        hasValidStudioCrdtStrokePaintContract({ payloadVersion: 4, ...browserContract }),
+        hasValidStudioCrdtStrokePaintContract({ payloadVersion: 5, ...browserContract }),
         brush,
       ).toBe(expected);
-      for (const payloadVersion of [2, 3]) {
+      for (const payloadVersion of [2, 3, 4]) {
         expect(
           hasValidStudioCrdtStrokePaintContract({ payloadVersion, ...browserContract }),
           `${brush}:v${payloadVersion}`,
@@ -2748,7 +2748,7 @@ describe("StudioCrdtService", () => {
 
       const document = createStrokeDocument();
       const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
-      stroke.set("payloadVersion", 4);
+      stroke.set("payloadVersion", 5);
       stroke.set("brush", brush);
       stroke.set("sampleSpacing", 0);
       stroke.set("brushDynamics", persistedDynamics);
@@ -2758,8 +2758,8 @@ describe("StudioCrdtService", () => {
     }
   });
 
-  it("admits v2/v3/v4 layered-flow strokes and rejects incompatible paint semantics", () => {
-    for (const payloadVersion of [2, 3, 4]) {
+  it("admits v2/v3/v4/v5 layered-flow strokes and rejects incompatible paint semantics", () => {
+    for (const payloadVersion of [2, 3, 4, 5]) {
       const valid = createStrokeDocument();
       const validStroke = valid.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
       validStroke.set("payloadVersion", payloadVersion);
@@ -2957,6 +2957,81 @@ describe("StudioCrdtService", () => {
     source.destroy();
     hydrated.destroy();
     poison.destroy();
+  });
+
+  it.each([
+    ["causal-deposit-v3-segmented", 4],
+    ["causal-deposit-v3-segmented", 5],
+    ["causal-deposit-v4-taper-spacing", 5],
+  ] as const)("preserves %s on wire %i through actual Yjs persistence and rejects incompatible versions", async (depositPipeline, wireVersion) => {
+    const dynamics = {
+      depositPipeline,
+      seed: 731,
+      taper: { enabled: true, startLength: 0.18, minSizeRatio: 0.16 },
+    };
+    const originalDynamicsJson = JSON.stringify(dynamics);
+    const createDocument = (payloadVersion: number, painted = true) => {
+      const document = createStrokeDocument();
+      const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      stroke.set("payloadVersion", payloadVersion);
+      stroke.set("brush", "dry-media");
+      stroke.set("sampleSpacing", 0);
+      stroke.set("brushDynamics", JSON.parse(originalDynamicsJson));
+      if (painted) stroke.set("extensions", { paintModel: "bounded-flow-v2" });
+      return document;
+    };
+    const paintContract = (payloadVersion: number) => ({
+      payloadVersion,
+      kind: "freehand",
+      mode: "pen",
+      brush: "dry-media",
+      sampleSpacing: 0,
+      paintModel: "bounded-flow-v2",
+      brushDynamics: dynamics,
+    });
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    for (const version of [1, 2, 3, ...(depositPipeline === "causal-deposit-v4-taper-spacing" ? [4] : []), 6]) {
+      expect(hasValidStudioCrdtStrokePaintContract(paintContract(version))).toBe(false);
+      for (const painted of [false, true]) {
+        const poison = createDocument(version, painted);
+        const workId = `work-spacing-rejected-${version}-${painted}`;
+        try {
+          expect(hasValidStudioCrdtRootSchema(poison), `${version}/${painted}`).toBe(false);
+          await expect(current.applyUpdate({
+            workId,
+            updateId: "00000000-0000-4000-8000-000000000721",
+            actorUserId: "editor",
+            data: fromUint8Array(Y.encodeStateAsUpdate(poison)),
+          })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+          expect(repository.updates.get(workId) ?? []).toEqual([]);
+        } finally {
+          poison.destroy();
+        }
+      }
+    }
+    expect(hasValidStudioCrdtStrokePaintContract(paintContract(wireVersion))).toBe(true);
+    const source = createDocument(wireVersion);
+    const hydrated = new Y.Doc();
+    try {
+      expect(hasValidStudioCrdtRootSchema(source)).toBe(true);
+      await expect(current.applyUpdate({
+        workId: "work-spacing-current",
+        updateId: "00000000-0000-4000-8000-000000000722",
+        actorUserId: "editor",
+        data: fromUint8Array(Y.encodeStateAsUpdate(source)),
+      })).resolves.toMatchObject({ duplicate: false, serverSequence: "1" });
+      // A fresh service instance must hydrate the persisted update, not an in-memory author view.
+      applySync(hydrated, await service(repository).sync("work-spacing-current"));
+      const restored = hydrated.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      expect(restored.get("payloadVersion")).toBe(wireVersion);
+      expect(JSON.stringify(restored.get("brushDynamics"))).toBe(originalDynamicsJson);
+      expect(JSON.stringify(source.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!.get("brushDynamics")))
+        .toBe(originalDynamicsJson);
+    } finally {
+      source.destroy();
+      hydrated.destroy();
+    }
   });
 
   it("persists strict content-addressed R8 grain only in stroke payload v4", async () => {

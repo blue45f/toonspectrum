@@ -101,7 +101,7 @@ function validate(result, diagnostics) { // NOSONAR javascript:S3776
     }
   }
   if (
-    result.destinationOut.gpu[3] >= result.destinationOut.beforeAlpha
+    !(result.destinationOut.gpu[3] < result.destinationOut.beforeAlpha)
   ) failures.push("destination-out did not reduce authority alpha");
   if (
     result.receipts.length !== 7

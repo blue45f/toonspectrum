@@ -1,26 +1,8 @@
 /**
- * Unified Command Search — one registry-backed index behind the four search
- * boxes the audit found (`docs/rewrite/ux-audit-v5.md` §2.8).
+ * Unified Command Search — one registry-backed index behind every Studio search surface.
  *
- * Before this module the studio had four disagreeing filters — shortcut help
- * (substring, whitespace-stripped), Quick Access (AND tokens), the inspector
- * navigator (AND tokens, ko locale) and the tutorial hub (substring, localized)
- * — over four disjoint corpora, and no terminology layer at all. A migrating
- * CSP or Photoshop user searching "Paint Bucket" or "레벨" got nothing.
- *
- * Design constraints this file answers:
- *
- * 1. **Consume, don't re-declare.** Aliases come from
- *    `STUDIO_COMMAND_CATALOG` (Wave A: 155 commands / 423 aliases) and from
- *    `STUDIO_SEARCH_CORPUS` for the non-command destinations. Nothing is
- *    duplicated here.
- * 2. **Merging four corpora must not explode the result list.** The audit
- *    warns that a query going from 10 to 165 hits is a regression, so results
- *    are *sectioned*, *ranked* and *capped* (`sectionLimit` / `totalLimit`),
- *    and the true match count stays visible as `totalMatched` instead of being
- *    dumped on screen.
- * 3. **Every result can reach help.** `helpNodeId` rides along on every row so
- *    F1 and the "도움말" affordance have a target.
+ * Results use the same command catalogue as menus and expose familiar-editor aliases,
+ * but always describe the location that is actually visible in ToonStudio's composite menu.
  */
 
 import { TerminologyIndex } from "@toonspectrum/studio-command-registry";
@@ -120,9 +102,8 @@ export interface StudioSearchIndex {
 /* ------------------------------------------------------------- sectioning */
 
 /**
- * Section order is also the tie-break order: an exact hit on a command beats an
- * equally exact hit on a tutorial, because a command is the thing a user can
- * act on right now.
+ * Section order is also the tie-break order: something the user can do now beats
+ * a settings destination, which beats a screen destination, which beats learning content.
  */
 export const STUDIO_SEARCH_SECTION_ORDER: readonly StudioSearchKind[] =
   Object.freeze(["command", "property", "panel", "tutorial"]);
@@ -130,10 +111,10 @@ export const STUDIO_SEARCH_SECTION_ORDER: readonly StudioSearchKind[] =
 export const STUDIO_SEARCH_SECTION_LABELS: Readonly<
   Record<StudioSearchKind, string>
 > = Object.freeze({
-  command: "명령",
-  property: "속성·보정",
-  panel: "패널·팔레트",
-  tutorial: "튜토리얼",
+  command: "바로 할 수 있는 작업",
+  property: "설정으로 이동",
+  panel: "열 수 있는 화면",
+  tutorial: "사용법",
 });
 
 const KIND_BONUS: Readonly<Record<StudioSearchKind, number>> = Object.freeze({
@@ -151,10 +132,7 @@ export const STUDIO_SEARCH_DEFAULT_MIN_SCORE = 15;
 
 /**
  * The navigator's vocabulary (`panel` | `property` | `tool`) mapped onto the
- * index's four sections. A `tool` action reveals a concrete control group just
- * like a `property` one — `STUDIO_SEARCH_CORPUS` already files the rows it
- * absorbs from tool actions (e.g. `image-mask`) under `property` — so both land
- * in "속성·보정"; only true navigation targets stay panels.
+ * index's four user-facing result groups.
  */
 const INSPECTOR_ACTION_KIND: Readonly<
   Record<NonNullable<StudioInspectorAction["kind"]>, StudioSearchKind>
@@ -195,39 +173,55 @@ function koDescription(
 }
 
 /**
- * `category` is the command id namespace (`view`, `filter`, …). Turning it into
- * a Korean breadcrumb keeps every row answering "그건 어디 있나요?".
+ * Command namespaces are implementation-stable, while these breadcrumbs follow the
+ * ten menu titles users actually see. Do not point at hidden catalogue groups.
  */
-const CATEGORY_LOCATION: Readonly<Record<string, string>> = Object.freeze({
-  file: "메뉴 › 파일",
-  edit: "메뉴 › 편집",
-  select: "메뉴 › 선택",
-  layer: "인스펙터 › 레이어",
-  view: "메뉴 › 보기",
-  window: "메뉴 › 창",
-  tool: "툴레일",
-  brush: "그리기 옵션바",
-  color: "컬러 팔레트",
-  transform: "메뉴 › 편집 › 변형",
-  insert: "메뉴 › 삽입",
-  text: "메뉴 › 삽입 › 텍스트",
-  filter: "메뉴 › 필터",
-  ai: "메뉴 › AI",
-  help: "메뉴 › 도움말",
-});
+export const STUDIO_COMMAND_CATEGORY_LOCATION: Readonly<Record<string, string>> =
+  Object.freeze({
+    file: "메뉴 › 파일",
+    edit: "메뉴 › 편집",
+    select: "메뉴 › 편집 › 선택 범위",
+    transform: "메뉴 › 편집 › 변형",
+    view: "메뉴 › 보기",
+    canvas: "메뉴 › 보기 › 캔버스",
+    window: "메뉴 › 보기 › 패널·작업공간",
+    insert: "메뉴 › 삽입",
+    text: "메뉴 › 삽입 › 글자·말풍선",
+    vector: "메뉴 › 삽입 › 도형·벡터",
+    "3d": "메뉴 › 삽입 › 3D",
+    layer: "메뉴 › 레이어",
+    tool: "도구막대",
+    brush: "메뉴 › 그리기",
+    color: "색상",
+    comic: "메뉴 › 만화",
+    animation: "메뉴 › 만화 › 애니메이션",
+    collaboration: "메뉴 › 파일 › 협업",
+    filter: "메뉴 › 효과",
+    ai: "메뉴 › AI",
+    help: "메뉴 › 도움말",
+  });
+
+function plainInspectorPath(path: string): string {
+  return path
+    .replace(/^대상(?:\s*›\s*)?/u, "선택 항목 › ")
+    .replace(/^문서(?:\s*›\s*)?/u, "페이지 › ")
+    .replace(/^작업 패널(?:\s*›\s*)?/u, "설정 › ")
+    .replace(/마스크/gu, "원본 유지하고 가리기")
+    .replace(/리터치/gu, "보정");
+}
 
 export function buildStudioSearchIndex(
   inspectorContext: StudioInspectorActionContext = ALL_INSPECTOR_ROUTES,
 ): StudioSearchIndex {
   const entries: StudioSearchEntry[] = [];
 
-  /* 1 — commands, straight from the Wave A catalog. */
+  /* 1 — commands, straight from the command catalogue. */
   for (const command of STUDIO_COMMAND_CATALOG) {
     const entry: StudioSearchEntry = {
       id: command.id,
       kind: "command",
       label: koLabel(command.labels),
-      location: CATEGORY_LOCATION[command.category] ?? "스튜디오",
+      location: STUDIO_COMMAND_CATEGORY_LOCATION[command.category] ?? "스튜디오",
       aliases: command.aliases,
       keywords: [command.id, command.category],
       helpNodeId: command.helpNodeId,
@@ -273,13 +267,7 @@ export function buildStudioSearchIndex(
       keywords: action.keywords,
       helpNodeId: `help/inspector/${action.id}`,
       requiresSelection: false,
-      // `location` 은 다이얼로그가 라벨 밑에 실제로 그리는 문자열이다. 액션은
-      // 이미 정확한 breadcrumb 을 `path` 로 들고 있으므로("문서 › 캔버스 ›
-      // 가이드") 통짜 "인스펙터" 로 뭉개지 않는다 — 코퍼스 행이 "인스펙터 ›
-      // 대상 › 마스크" 라고 적는 옆줄에서 혼자만 어디로 가는지 못 알려준다.
-      location: action.path ? `인스펙터 › ${action.path}` : "인스펙터",
-      // 목적지는 통째로 옮긴다. `primary` 만 실으면 탭은 맞고 서브탭은 직전
-      // 상태로 남으며, `focusTarget` 을 빠뜨리면 컨트롤 그룹이 열리지 않는다.
+      location: action.path ? `설정 › ${plainInspectorPath(action.path)}` : "설정",
       target: {
         type: "inspector",
         primary: action.route.primary,
@@ -297,7 +285,7 @@ export function buildStudioSearchIndex(
       kind: "tutorial",
       label: tutorial.title,
       description: tutorial.summary,
-      location: "도움말 › 기능 튜토리얼",
+      location: "도움말 › 배우기",
       aliases: [],
       keywords: [tutorial.category, tutorial.tryAction ?? ""].filter(
         (value) => value.length > 0,
@@ -419,8 +407,7 @@ function scoreEntry(
         bestField = field;
       }
     }
-    // AND semantics: one unmatched token disqualifies the row. This is the
-    // first and cheapest defence against the 10 → 165 blow-up.
+    // AND semantics: one unmatched token disqualifies the row.
     if (best === 0 || !bestField) return null;
     total += best;
     if (best > bestFieldScore) {
@@ -432,7 +419,6 @@ function scoreEntry(
 
   let score = (total / tokens.length) * 100;
 
-  // Whole-query exactness outranks any per-token accumulation.
   const labelKey = normalizeStudioSearchText(entry.label);
   if (labelKey === wholeQuery) score += 40;
   else if (
@@ -444,7 +430,6 @@ function scoreEntry(
   }
 
   score += KIND_BONUS[entry.kind];
-  // Shorter canonical names win ties — "채우기" over "참조 레이어 채우기".
   score -= Math.min(labelKey.length, 30) * 0.1;
 
   const result: EntryScore = { score, matchedOn };
@@ -529,7 +514,7 @@ export function searchStudio(
 
 /**
  * Vendor-wording lookup on its own — "이 이름으로 부르던 기능이 우리 쪽에서는
- * 무엇인가". Backs the "CSP/Photoshop 용어" affordance in the search dialog.
+ * 무엇인가". Backs the familiar-editor terminology affordance in search.
  */
 export function resolveStudioTerminology(
   term: string,

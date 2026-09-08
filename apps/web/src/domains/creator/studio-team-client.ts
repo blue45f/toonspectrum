@@ -1,4 +1,4 @@
-import { api, toApiError } from "@/src/infrastructure/api";
+import { api, toApiError } from "@/infrastructure/api";
 
 export const STUDIO_TEAM_ROLES = ["owner", "admin", "editor", "commenter", "viewer"] as const;
 export const STUDIO_TEAM_ASSIGNABLE_ROLES = ["admin", "editor", "commenter", "viewer"] as const;

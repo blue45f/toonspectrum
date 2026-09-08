@@ -19,6 +19,9 @@ import {
   type StudioLinked3dRenderElementLike,
 } from "./studio-linked-3d-render-document";
 import { normalizePageReviewState } from "./studio-page-review";
+import { parseStudioLayerComps } from "./layer/studio-layer-comps-document";
+import { studioPageToCrdtPage } from "./live/studio-crdt-page-payload";
+import { minimumStudioProjectFileVersion } from "./studio-project-version";
 import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
 import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
 import {
@@ -81,8 +84,8 @@ const CommonProjectSchema = z.object({
   publishPack: z.unknown().optional(),
 });
 
-const ProjectV2Schema = CommonProjectSchema.extend({
-  version: z.literal(2),
+const CurrentProjectSchema = CommonProjectSchema.extend({
+  version: z.union([z.literal(2), z.literal(3)]),
   savedAt: z.string().optional(),
   pagesList: z.array(ProjectPageSchema).min(1).max(STUDIO_PROJECT_MAX_PAGES),
 }).passthrough();
@@ -98,7 +101,7 @@ const LegacyProjectSchema = z
   })
   .passthrough();
 
-export type StudioProjectFile = z.infer<typeof ProjectV2Schema>;
+export type StudioProjectFile = z.infer<typeof CurrentProjectSchema>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -168,6 +171,8 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
     if (page.drawingAssist !== undefined && !drawingAssist) {
       throw new Error("페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다.");
     }
+    const layerComps = page.layerComps === undefined ? undefined : parseStudioLayerComps(page.layerComps);
+    if (layerComps === null) throw new Error("페이지 레이어 콤프가 손상되었거나 허용 범위를 벗어났습니다.");
     const shared3dStage = page.shared3dStage === undefined
       ? undefined
       : migrateStudioShared3dStageCollectionDocument(page.shared3dStage);
@@ -197,14 +202,24 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
         throw new Error(`페이지 연결형 3D 렌더 인덱스가 Canvas 권위와 다릅니다: ${validation.message}`);
       }
     }
-    return {
+    const canonicalPage = {
       ...page,
       ...(review === undefined ? {} : { review }),
       elements,
       ...(drawingAssist ? { drawingAssist } : {}),
+      ...(layerComps ? { layerComps } : {}),
       ...(shared3dStage ? { shared3dStage } : {}),
       ...(linked3dRender ? { linked3dRender } : {}),
     };
+    if (layerComps !== undefined) {
+      try {
+        // Use the same normalized, aggregate page envelope as collaboration.
+        studioPageToCrdtPage(canonicalPage);
+      } catch (cause) {
+        throw new Error("레이어 콤프와 페이지 설정이 저장 가능한 범위를 벗어났습니다.", { cause });
+      }
+    }
+    return canonicalPage;
   });
   const master = isRecord(project.master) && Array.isArray(project.master.elements)
     ? (() => {
@@ -227,6 +242,9 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
   }
   return {
     ...project,
+    // Old readers accept arbitrary V2 elements and would discard the unknown V4 brush program.
+    // Upgrade only documents carrying that program; keep historical V2/V3 stroke files intact.
+    version: project.version === 3 ? 3 : minimumStudioProjectFileVersion(pagesList, master),
     pagesList,
     master,
     ...(referenceBoard ? { referenceBoard } : {}),
@@ -234,7 +252,7 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
 }
 
 export function parseStudioProjectFile(value: unknown): StudioProjectFile {
-  const current = ProjectV2Schema.safeParse(value);
+  const current = CurrentProjectSchema.safeParse(value);
   if (current.success) return canonicalizeProjectBg3dScenes(current.data);
   const legacy = LegacyProjectSchema.safeParse(value);
   if (!legacy.success) throw new Error("올바르지 않은 ToonSpectrum 프로젝트 파일입니다.");

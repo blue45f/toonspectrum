@@ -10,6 +10,7 @@ import { StudioWorkAssetHydrator } from "../../studio-work-asset-hydrator";
 
 import { useStudioCollaborationAccessRuntime } from "./useStudioCollaborationAccessRuntime";
 import { useStudioDraftCollaborationRuntime } from "./useStudioDraftCollaborationRuntime";
+import { useStudioDocumentMutationSetter } from "./useStudioDocumentMutationSetter";
 import { useStudioLayerLiftRuntime } from "./useStudioLayerLiftRuntime";
 import { useStudioMutationAuthorityRuntime } from "./useStudioMutationAuthorityRuntime";
 
@@ -22,6 +23,7 @@ interface UseStudioDocumentAccessRuntimeOptions {
   readonly getProjectSnapshot: () => unknown;
   readonly instantWorkId: string;
   readonly liveRoomQueryParam: string | null;
+  readonly onAcceptedMutation: () => void;
   readonly remixId: string | null;
   readonly reportError: (message: string) => void;
   readonly sessionDisplayName: string | null;
@@ -48,6 +50,7 @@ export function useStudioDocumentAccessRuntime({
   getProjectSnapshot,
   instantWorkId,
   liveRoomQueryParam,
+  onAcceptedMutation,
   remixId,
   reportError,
   sessionDisplayName,
@@ -63,7 +66,7 @@ export function useStudioDocumentAccessRuntime({
 }: UseStudioDocumentAccessRuntimeOptions) {
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
-  const [scenarioImageReferenceDocument, setScenarioImageReferenceDocument] =
+  const [scenarioImageReferenceDocument, setScenarioImageReferenceDocumentState] =
     useState<StudioAiImageReferenceDocument>(createEmptyStudioAiImageReferenceDocument);
 
   const draftRuntime = useStudioDraftCollaborationRuntime({
@@ -99,6 +102,11 @@ export function useStudioDocumentAccessRuntime({
     workId,
   });
   const layerLiftRuntime = useStudioLayerLiftRuntime();
+  const setScenarioImageReferenceDocument = useStudioDocumentMutationSetter(
+    scenarioImageReferenceDocument,
+    setScenarioImageReferenceDocumentState,
+    { markStudioDocumentChanged: mutationRuntime.markStudioDocumentChanged, onAcceptedMutation },
+  );
 
   return {
     ...collaborationRuntime,
@@ -110,5 +118,6 @@ export function useStudioDocumentAccessRuntime({
     loggedIn: Boolean(studioAuthUserId),
     scenarioImageReferenceDocument,
     setScenarioImageReferenceDocument,
+    setScenarioImageReferenceDocumentState,
   } as const;
 }

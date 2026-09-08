@@ -18,6 +18,7 @@ import {
   planNormalizedStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
+  type StudioDynamicBrushDepositPipeline,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
 } from "../apps/web/src/domains/creator/brush/studio-brush-dynamics";
@@ -319,6 +320,8 @@ export interface StudioBrushCataloguePerfRow {
    * contract-only paths that plan no geometry — those rows are determinism-unmeasured, not failed.
    */
   readonly digest: string | null;
+  /** Coverage geometry at Float32 upload precision, for cross-runtime golden comparisons. */
+  readonly geometryFloat32Digest?: string;
 }
 
 /** Same-seed double-run comparison used by the quality-receipt bench stage. */
@@ -517,6 +520,12 @@ function evaluateCausalCoverage(
     failure: null,
     freeze: elapsedMs > budgetMs,
     digest: computeStudioBrushPlanDigest(coverageMarkDigestStream(coverage.marks)),
+    // Keep the raw Float64 digest above for same-runtime replay identity. V8 math versions can
+    // differ in trailing Float64 bits; the WebGPU brush instance buffer uses Float32Array.
+    // Golden geometry at that precision is checked separately, outside the measured plan window.
+    geometryFloat32Digest: computeStudioBrushPlanDigest(
+      Float32Array.from(coverageMarkDigestStream(coverage.marks)),
+    ),
   };
 }
 
@@ -583,6 +592,9 @@ export function evaluateStudioBrushCataloguePaintPerfRow(
     readonly sampleCount?: number;
     readonly budgetMs?: number;
     readonly packById?: ReadonlyMap<string, StudioBrushPackSelection>;
+    /** Explicit persisted replay revision; omission exercises the current authored default. */
+    readonly depositPipeline?: Extract<StudioDynamicBrushDepositPipeline,
+      "causal-deposit-v3-segmented" | "causal-deposit-v4-taper-spacing">;
   },
 ): StudioBrushCataloguePerfRow {
   const sampleCount = options?.sampleCount ?? MATRIX_SAMPLE_COUNT;
@@ -592,7 +604,13 @@ export function evaluateStudioBrushCataloguePaintPerfRow(
     ?? (pack?.runtimeBrushId
       ? resolveStudioBrushDynamicsPresetId(pack.runtimeBrushId)
       : null);
-  const dynamics = planStudioBrushCataloguePaintDynamics(catalogId, options?.packById);
+  const authoredDynamics = planStudioBrushCataloguePaintDynamics(catalogId, options?.packById);
+  const dynamics = authoredDynamics && options?.depositPipeline
+    ? normalizeStudioBrushDynamicsSettings({
+      ...authoredDynamics,
+      depositPipeline: options.depositPipeline,
+    })
+    : authoredDynamics;
   const identity = resolveStudioDynamicBrushMaterialIdentity(
     pack?.runtimeBrushId ?? catalogId,
     catalogId,

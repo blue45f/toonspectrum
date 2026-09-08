@@ -35,7 +35,7 @@ export const STUDIO_DUAL_COLOR_WELL_HINTS = {
   transparent: studioToolHintFromLabel(
     "투명색 그리기",
     "현재 브러시의 모양·필압·질감을 그대로 유지한 채 지우개처럼 투명색으로 그립니다.",
-    "C",
+    "Shift+C",
     "color-palette",
     undefined
   ),
@@ -146,9 +146,9 @@ export function StudioDualColorWell({
           <button
             type="button"
             onClick={onTransparentToggle}
-            aria-label="투명색 선택 (단축키 C)"
+            aria-label="투명색 선택 (단축키 Shift+C)"
             aria-pressed={isTransparent}
-            aria-keyshortcuts="C"
+            aria-keyshortcuts="Shift+C"
             data-studio-transparent-color-well="true"
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-md border shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110 motion-reduce:transform-none",

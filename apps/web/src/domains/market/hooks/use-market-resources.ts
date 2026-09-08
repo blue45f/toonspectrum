@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getCustomPublishedResources } from "../models/market-custom-registry";
-import { readCachedMarketPage, writeCachedMarketPage } from "../models/market-resource-cache";
+import {
+  authoritativeMarketCacheKey,
+} from "../models/market-authority";
+import {
+  readCachedMarketPage,
+  writeCachedMarketPage,
+} from "../models/market-resource-cache";
 import { listCreatorMarketplaceResources } from "../remotes/market-resource-remote";
 
 import type {
-  CreatorMarketplaceResourceLicense,
   CreatorMarketplaceResourceKind,
+  CreatorMarketplaceResourceLicense,
   CreatorMarketplaceResourceRecord,
   CreatorMarketplaceResourceSort,
 } from "@/shared/lib/creator-marketplace-resource-contract";
-
-import { filterStarterMarketplaceResources } from "@/shared/lib/creator-marketplace-starter-catalog";
-
-
 
 export interface MarketResourceQuery {
   readonly search?: string;
@@ -33,39 +34,37 @@ export interface MarketResourcesPage {
   readonly error: string | null;
   readonly loadMoreError: string | null;
   readonly hasMore: boolean;
-  /** 네트워크 실패로 저장된 목록을 보여주는 저하 상태. */
+  /** 네트워크 실패로 저장된 서버 목록을 보여주는 저하 상태. */
   readonly stale: boolean;
   readonly staleSavedAt: string | null;
   readonly loadMore: () => void;
   readonly reload: () => void;
 }
 
-const MARKET_RETRY_HINT = "일시적인 장애일 수 있어요. 잠시 후 다시 시도해 주세요.";
+const MARKET_RETRY_HINT = "공개 마켓을 불러올 수 없어요. 잠시 후 다시 시도해 주세요.";
 const MARKET_LOAD_MORE_RETRY_HINT = "추가 리소스를 불러오지 못했어요.";
 
-function matchesMarketQuery(
-  item: CreatorMarketplaceResourceRecord,
+function remoteQuery(
   query: MarketResourceQuery,
-): boolean {
-  if (query.kind && item.kind !== query.kind) return false;
-  if (query.license && item.license !== query.license) return false;
-  if (query.publisher && item.publisher.id !== query.publisher) return false;
-  if (query.tag && !item.tags.some((t) => t.toLowerCase() === query.tag!.toLowerCase())) return false;
-  if (query.search) {
-    const q = query.search.toLowerCase().trim();
-    const match =
-      item.name.toLowerCase().includes(q) ||
-      item.description.toLowerCase().includes(q) ||
-      item.tags.some((t) => t.toLowerCase().includes(q));
-    if (!match) return false;
-  }
-  return true;
+  cursor?: string,
+) {
+  return {
+    limit: query.limit,
+    search: query.search,
+    kind: query.kind,
+    license: query.license,
+    tag: query.tag,
+    publisher: query.publisher,
+    sort: query.sort,
+    cursor,
+  };
 }
 
 /**
- * creator-marketplace list API를 커서 페이지네이션과 함께 래핑한다.
- * query가 null이면 비활성화(요청 없음)하고, 바뀌면 상태를 초기화해 첫 페이지부터 다시 불러온다.
- * 네트워크 실패 시 localStorage의 마지막 성공 페이지를 보여주는 저하 모드로 전환한다.
+ * Server catalog authority wrapper.
+ *
+ * Public results come only from the server or a cache written by a previous successful server
+ * response. Local authoring drafts and bundled starter fixtures are intentionally excluded.
  */
 export function useMarketResources(query: MarketResourceQuery | null): MarketResourcesPage {
   const [items, setItems] = useState<readonly CreatorMarketplaceResourceRecord[]>([]);
@@ -77,22 +76,25 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
   const [stale, setStale] = useState(false);
   const [staleSavedAt, setStaleSavedAt] = useState<string | null>(null);
   const cursorRef = useRef<string | null>(null);
-  const activeQueryKeyRef = useRef<string | null>(null);
+  const activeQueryRef = useRef<string | null>(null);
   const requestGenerationRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const loadMoreControllerRef = useRef<AbortController | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
-  const queryKey = query ? JSON.stringify(query) : null;
+  const serializedQuery = query ? JSON.stringify(query) : null;
+  const cacheKey = serializedQuery
+    ? authoritativeMarketCacheKey(serializedQuery)
+    : null;
 
   useEffect(() => {
     const generation = requestGenerationRef.current + 1;
     requestGenerationRef.current = generation;
-    activeQueryKeyRef.current = queryKey;
+    activeQueryRef.current = serializedQuery;
     loadMoreControllerRef.current?.abort();
     loadMoreControllerRef.current = null;
     loadingMoreRef.current = false;
 
-    if (!queryKey) {
+    if (!serializedQuery || !cacheKey) {
       cursorRef.current = null;
       setItems([]);
       setLoading(false);
@@ -104,7 +106,8 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
       setStaleSavedAt(null);
       return;
     }
-    const parsedQuery = JSON.parse(queryKey) as MarketResourceQuery;
+
+    const parsedQuery = JSON.parse(serializedQuery) as MarketResourceQuery;
     const controller = new AbortController();
     cursorRef.current = null;
     setItems([]);
@@ -116,107 +119,31 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
     setStale(false);
     setStaleSavedAt(null);
 
-    listCreatorMarketplaceResources(
-      {
-        limit: parsedQuery.limit,
-        search: parsedQuery.search,
-        kind: parsedQuery.kind,
-        license: parsedQuery.license,
-        tag: parsedQuery.tag,
-        publisher: parsedQuery.publisher,
-        sort: parsedQuery.sort,
-      },
-      controller.signal
-    )
+    listCreatorMarketplaceResources(remoteQuery(parsedQuery), controller.signal)
       .then((page) => {
         if (controller.signal.aborted || requestGenerationRef.current !== generation) return;
-        let finalItems = page.items;
-        let finalHasMore = page.hasMore;
-        let nextCursor = page.hasMore ? page.nextCursor : null;
-
-        if (finalItems.length === 0 && !parsedQuery.search && !parsedQuery.publisher) {
-          const starter = filterStarterMarketplaceResources({
-            limit: parsedQuery.limit,
-            search: parsedQuery.search,
-            kind: parsedQuery.kind,
-            license: parsedQuery.license,
-            tag: parsedQuery.tag,
-            sort: parsedQuery.sort,
-          });
-          if (starter.items.length > 0) {
-            finalItems = starter.items;
-            finalHasMore = starter.hasMore;
-            nextCursor = null;
-          }
-        }
-
-        const matchingCustoms = getCustomPublishedResources().filter((r) =>
-          matchesMarketQuery(r, parsedQuery)
-        );
-        if (matchingCustoms.length > 0) {
-          const itemMap = new Map<string, CreatorMarketplaceResourceRecord>();
-          for (const item of matchingCustoms) itemMap.set(item.id, item);
-          for (const item of finalItems) {
-            if (!itemMap.has(item.id)) itemMap.set(item.id, item);
-          }
-          finalItems = [...itemMap.values()];
-        }
-
-        const pageHasMore = nextCursor !== null && finalHasMore;
-        setItems(finalItems);
+        const nextCursor = page.hasMore ? page.nextCursor : null;
+        const pageHasMore = nextCursor !== null;
+        setItems(page.items);
         cursorRef.current = nextCursor;
         setHasMore(pageHasMore);
         setLoading(false);
-        writeCachedMarketPage(queryKey, {
-          items: finalItems,
+        writeCachedMarketPage(cacheKey, {
+          items: page.items,
           hasMore: pageHasMore,
           nextCursor,
         });
       })
       .catch(() => {
         if (controller.signal.aborted || requestGenerationRef.current !== generation) return;
-        const matchingCustoms = getCustomPublishedResources().filter((r) =>
-          matchesMarketQuery(r, parsedQuery)
-        );
-        const cached = readCachedMarketPage(queryKey);
+        const cached = readCachedMarketPage(cacheKey);
         if (cached) {
-          let mergedCached = cached.items;
-          if (matchingCustoms.length > 0) {
-            const itemMap = new Map<string, CreatorMarketplaceResourceRecord>();
-            for (const item of matchingCustoms) itemMap.set(item.id, item);
-            for (const item of cached.items) {
-              if (!itemMap.has(item.id)) itemMap.set(item.id, item);
-            }
-            mergedCached = [...itemMap.values()];
-          }
-          setItems(mergedCached);
+          setItems(cached.items);
+          // A cached first page must never be combined with a newly fetched tail.
           setHasMore(false);
           cursorRef.current = null;
           setStale(true);
           setStaleSavedAt(cached.savedAt);
-          setLoading(false);
-          return;
-        }
-        const starter = filterStarterMarketplaceResources({
-          limit: parsedQuery.limit,
-          search: parsedQuery.search,
-          kind: parsedQuery.kind,
-          license: parsedQuery.license,
-          tag: parsedQuery.tag,
-          publisher: parsedQuery.publisher,
-          sort: parsedQuery.sort,
-        });
-        if (starter.items.length > 0 || matchingCustoms.length > 0) {
-          const itemMap = new Map<string, CreatorMarketplaceResourceRecord>();
-          for (const item of matchingCustoms) itemMap.set(item.id, item);
-          for (const item of starter.items) {
-            if (!itemMap.has(item.id)) itemMap.set(item.id, item);
-          }
-          const mergedStarter = [...itemMap.values()];
-          setItems(mergedStarter);
-          setHasMore(starter.hasMore);
-          cursorRef.current = null;
-          setError(null);
           setLoading(false);
           return;
         }
@@ -229,21 +156,23 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
       loadMoreControllerRef.current?.abort();
       if (requestGenerationRef.current === generation) {
         requestGenerationRef.current += 1;
-        activeQueryKeyRef.current = null;
+        activeQueryRef.current = null;
         loadMoreControllerRef.current = null;
         loadingMoreRef.current = false;
       }
     };
-  }, [queryKey, refreshToken]);
+  }, [cacheKey, refreshToken, serializedQuery]);
 
   const loadMore = useCallback(() => {
     if (
-      !queryKey
-      || activeQueryKeyRef.current !== queryKey
+      !serializedQuery
+      || !cacheKey
+      || activeQueryRef.current !== serializedQuery
       || loadingMoreRef.current
       || !cursorRef.current
     ) return;
-    const parsedQuery = JSON.parse(queryKey) as MarketResourceQuery;
+
+    const parsedQuery = JSON.parse(serializedQuery) as MarketResourceQuery;
     const cursor = cursorRef.current;
     const generation = requestGenerationRef.current;
     const controller = new AbortController();
@@ -251,35 +180,31 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
     loadingMoreRef.current = true;
     setLoadingMore(true);
     setLoadMoreError(null);
+
     listCreatorMarketplaceResources(
-      {
-        limit: parsedQuery.limit,
-        search: parsedQuery.search,
-        kind: parsedQuery.kind,
-        license: parsedQuery.license,
-        tag: parsedQuery.tag,
-        publisher: parsedQuery.publisher,
-        sort: parsedQuery.sort,
-        cursor,
-      },
-      controller.signal
+      remoteQuery(parsedQuery, cursor),
+      controller.signal,
     )
       .then((page) => {
         if (
           controller.signal.aborted
           || requestGenerationRef.current !== generation
-          || activeQueryKeyRef.current !== queryKey
+          || activeQueryRef.current !== serializedQuery
         ) return;
+
         const nextCursor = page.hasMore ? page.nextCursor : null;
         const pageHasMore = nextCursor !== null;
         setItems((previous) => {
           if (
             requestGenerationRef.current !== generation
-            || activeQueryKeyRef.current !== queryKey
+            || activeQueryRef.current !== serializedQuery
           ) return previous;
           const seen = new Set(previous.map((record) => record.id));
-          const merged = [...previous, ...page.items.filter((record) => !seen.has(record.id))];
-          writeCachedMarketPage(queryKey, {
+          const merged = [
+            ...previous,
+            ...page.items.filter((record) => !seen.has(record.id)),
+          ];
+          writeCachedMarketPage(cacheKey, {
             items: merged,
             hasMore: pageHasMore,
             nextCursor,
@@ -293,21 +218,22 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
         if (
           controller.signal.aborted
           || requestGenerationRef.current !== generation
-          || activeQueryKeyRef.current !== queryKey
+          || activeQueryRef.current !== serializedQuery
         ) return;
         setLoadMoreError(MARKET_LOAD_MORE_RETRY_HINT);
       })
       .finally(() => {
         if (
           requestGenerationRef.current !== generation
-          || activeQueryKeyRef.current !== queryKey
+          || activeQueryRef.current !== serializedQuery
           || loadMoreControllerRef.current !== controller
         ) return;
         loadMoreControllerRef.current = null;
         loadingMoreRef.current = false;
         setLoadingMore(false);
       });
-  }, [queryKey]);
+  }, [cacheKey, serializedQuery]);
+
   const reload = useCallback(() => {
     setRefreshToken((token) => token + 1);
   }, []);

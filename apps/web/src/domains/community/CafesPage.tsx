@@ -8,9 +8,9 @@ import { Container } from "@/shared/components/section";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { GENRES } from "@/shared/lib/taxonomy";
 import { cn, relativeDate } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
-import { api, getApiErrorMessage } from "@/src/infrastructure/api";
+import Link from "@/compat/router-link";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { api, getApiErrorMessage } from "@/infrastructure/api";
 
 
 const CAFE_NAME_MAX = 40;

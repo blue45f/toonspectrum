@@ -21,7 +21,7 @@ import type { FormEvent } from "react";
 
 import { useT } from "@/shared/lib/i18n";
 import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchParams } from "@/shared/lib/kmas-reference";
-import { apiPath } from "@/src/infrastructure/api";
+import { apiPath } from "@/infrastructure/api";
 
 import "./reference.css";
 
@@ -49,6 +49,18 @@ function SearchForm({ field, q, onSearch }: { field: ReferenceField; q: string; 
     setDraftField(field);
     setDraft(q);
   }, [field, q]);
+  useEffect(() => {
+    // Back can cancel a pending Router transition before q ever changes. In that case the
+    // current form stays mounted with the next search's draft, so restore from the popped URL.
+    const restoreHistoryDraft = () => {
+      const params = new URLSearchParams(window.location.search);
+      const restoredField = params.get("field");
+      setDraftField(isReferenceField(restoredField) ? restoredField : "title");
+      setDraft(params.get("q") ?? "");
+    };
+    window.addEventListener("popstate", restoreHistoryDraft);
+    return () => window.removeEventListener("popstate", restoreHistoryDraft);
+  }, []);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSearch(draftField, draft);
@@ -292,7 +304,7 @@ export function ReferencePage() {
       <div className="ref-hero-top"><span className="ref-source-badge"><BookOpen size={15} aria-hidden="true" />{t("ref.source")}</span><span className="ref-eyebrow">{t("ref.eyebrow")}</span></div>
       <h1>{t("ref.title")}<br /><span>{t("ref.titleAccent")}</span></h1>
       <p className="ref-intro">{t("ref.intro")}</p>
-      <Link to="/studio" className="ref-text-link">{t("ref.studio")}<ArrowRight size={17} aria-hidden="true" /></Link>
+      <Link to="/studio" reloadDocument className="ref-text-link">{t("ref.studio")}<ArrowRight size={17} aria-hidden="true" /></Link>
     </div><aside className="ref-journey" aria-label={t("ref.journeyTitle")}>
       <p className="ref-eyebrow">FIELD NOTES / 01—03</p>
       {REFERENCE_JOURNEY_STEPS.map(({ title, body }, index) => <div key={title}><span className="ref-step-number" aria-hidden="true">0{index + 1}</span><div><h2>{t(title)}</h2><p>{t(body)}</p></div></div>)}

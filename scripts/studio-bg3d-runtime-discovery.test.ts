@@ -9,7 +9,13 @@ import {
   type Bg3dSampleSurface,
 } from "../e2e/studio-bg3d-compositor-sampler";
 
-import { compareBg3dOriginalFrames, type Bg3dComparableFrame } from "./studio-bg3d-runtime-frame-comparison";
+import {
+  BG3D_FRAME_ALIGNMENT_OFFSETS_PX,
+  BG3D_FRAME_MAX_ALIGNMENT_PX,
+  compareBg3dOriginalFrames,
+  resolveBg3dAlignedComparison,
+  type Bg3dComparableFrame,
+} from "./studio-bg3d-runtime-frame-comparison";
 
 import type { Page } from "@playwright/test";
 
@@ -34,12 +40,32 @@ describe("BG3D hardware gate discovery", () => {
     expect(source).toContain("expect(finalPeakTileDelta).toBeLessThan(8)");
     expect(source).toContain("internalDelta < 2");
     expect(source).toContain("expect(fatal).toEqual([])");
+    expect(source).toContain('await page.locator(DIALOG).getByRole("button", { name: "시점 초기화", exact: true }).click()');
+    expect(source).toContain("await page.mouse.move(0, 0)");
+    expect(source).toContain('"Both gestures must start from the same settled scene and camera").toBeLessThan(2)');
     expect(source).toContain("const SETTLE_TIMEOUT_MS = 15_000");
     expect(source).toContain("stableIntervals < 2 || settleMs > SETTLE_TIMEOUT_MS");
     expect(source).toContain("page.locator(CANVAS).screenshot()");
     expect(source).toContain("expect(referenceDelta,");
     expect(source).toContain("await compareBg3dOriginalFrames(");
     expect(source).not.toContain("peakDelta(current.frame, reference)");
+  });
+
+  it("keeps the full-frame release oracle while reporting cropped alignment diagnostics", () => {
+    const source = readFileSync(runtimeUrl, "utf8");
+    // Scene diagnostics may crop overlays, but existing same-session checks must stay full frame.
+    expect(source).toContain("BG3D_FRAME_CROP_INSET");
+    expect(source).toContain("decodeFrames(page, png, readbackOptimized, [0], 0)");
+    // Alignment reports extra diagnostics without replacing the full-frame pass/fail metric.
+    expect(source).toContain("resolveBg3dAlignedComparison(");
+    expect(source).toContain("BG3D_FRAME_ALIGNMENT_OFFSETS_PX");
+    expect(source).toContain("const finalPeakTileDelta = rawFullFramePeakTileDelta;");
+    expect(source).toContain("expect(finalPeakTileDelta).toBeLessThan(8)");
+    expect(source).toContain("croppedAlignedPeakTileDelta: aligned.peakDelta");
+    // The unaligned figure stays in the evidence, so a growing framing drift remains visible.
+    expect(source).toContain("unalignedPeakTileDelta");
+    expect(source).toContain("rawFullFramePeakTileDelta");
+    expect(source).toContain("rawFullFrames: { continuous: rawContinuous, direct: rawDirect }");
   });
 });
 
@@ -199,5 +225,81 @@ describe("BG3D homogeneous original-frame comparison", () => {
     });
     await expect(compareBg3dOriginalFrames(sampledPng, referencePng, decode)).rejects.toBe(failure);
     expect(decode).toHaveBeenCalledTimes(failureAt);
+  });
+});
+
+describe("BG3D inter-session frame alignment", () => {
+  const frame = (tiles: number[]): Bg3dComparableFrame => ({ width: 876, height: 767, tiles });
+  const base = frame([10, 100, 250]);
+  const candidate = (shiftPx: number, tiles: number[]) => ({ shiftPx, frame: frame(tiles) });
+
+  it("always offers the unaligned comparison, so alignment can only lower the judged delta", () => {
+    expect(BG3D_FRAME_ALIGNMENT_OFFSETS_PX).toContain(0);
+    expect(Math.max(...BG3D_FRAME_ALIGNMENT_OFFSETS_PX.map(Math.abs)))
+      .toBe(BG3D_FRAME_MAX_ALIGNMENT_PX);
+    expect(BG3D_FRAME_ALIGNMENT_OFFSETS_PX.every(Number.isInteger)).toBe(true);
+  });
+
+  it("reports no drift when the unaligned frames already match", () => {
+    expect(resolveBg3dAlignedComparison(base, [
+      candidate(0, [10, 100, 250]), candidate(6, [10, 100, 250]),
+    ])).toEqual({ alignmentPx: 0, peakDelta: 0 });
+  });
+
+  it("picks the offset that minimises the judged tile delta, not a proxy", () => {
+    // A candidate selected by an unrelated proxy can worsen the actual metric.
+    expect(resolveBg3dAlignedComparison(base, [
+      candidate(0, [14.75, 100, 250]), candidate(2, [16.57, 100, 250]),
+      candidate(10, [10.5, 100, 250]),
+    ])).toEqual({ alignmentPx: 10, peakDelta: 0.5 });
+  });
+
+  it("never reports more than the unaligned delta", () => {
+    const unaligned = 9;
+    const result = resolveBg3dAlignedComparison(base, [
+      candidate(0, [10 + unaligned, 100, 250]), candidate(4, [40, 100, 250]),
+      candidate(-6, [90, 100, 250]),
+    ]);
+    expect(result.peakDelta).toBeLessThanOrEqual(unaligned);
+    expect(result).toEqual({ alignmentPx: 0, peakDelta: unaligned });
+  });
+
+  it("cannot align away extra geometry: a retained silhouette stays far above the threshold", () => {
+    // Every candidate retains the extra geometry residual; no translation can remove it.
+    const result = resolveBg3dAlignedComparison(base, BG3D_FRAME_ALIGNMENT_OFFSETS_PX.map(
+      (shiftPx) => candidate(shiftPx, [10 + 27 + Math.abs(shiftPx), 100, 250]),
+    ));
+    expect(result.peakDelta).toBe(27);
+    expect(result.peakDelta).toBeGreaterThan(8);
+  });
+
+  it("prefers the smaller offset when two offsets tie", () => {
+    expect(resolveBg3dAlignedComparison(base, [
+      candidate(0, [20, 100, 250]), candidate(-4, [7, 100, 250]), candidate(12, [13, 100, 250]),
+    ]).alignmentPx).toBe(-4);
+  });
+
+  it.each([
+    { label: "no candidates", candidates: [] },
+    { label: "no unaligned candidate", candidates: [candidate(4, [10, 100, 250])] },
+    { label: "an offset beyond the band",
+      candidates: [candidate(0, [10, 100, 250]), candidate(40, [10, 100, 250])] },
+    { label: "a fractional offset",
+      candidates: [candidate(0, [10, 100, 250]), candidate(1.5, [10, 100, 250])] },
+    { label: "different frame dimensions",
+      candidates: [{ shiftPx: 0, frame: { ...base, width: base.width + 1 } }] },
+    { label: "different tile counts", candidates: [candidate(0, [10, 100])] },
+    { label: "a non-finite tile", candidates: [candidate(0, [10, Number.NaN, 250])] },
+  ])("refuses $label", ({ candidates }) => {
+    expect(() => resolveBg3dAlignedComparison(base, candidates)).toThrow();
+  });
+
+  it.each([0, -1, 1.5, Number.NaN])("refuses invalid base frame width %s", (width) => {
+    expect(() => resolveBg3dAlignedComparison({ ...base, width }, [candidate(0, base.tiles)]))
+      .toThrow("dimensions");
+  });
+
+  it("refuses an empty base frame", () => {
+    expect(() => resolveBg3dAlignedComparison(frame([]), [candidate(0, [])])).toThrow("Empty");
   });
 });

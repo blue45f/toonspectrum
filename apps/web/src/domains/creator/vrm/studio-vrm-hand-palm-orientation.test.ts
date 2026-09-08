@@ -91,7 +91,6 @@ describe("relaxed hand palm orientation across bundled characters", () => {
     const failures: string[] = [];
 
     for (const character of CHARACTERS) {
-      if (!fs.existsSync(path.resolve(character.file))) continue;
       const vrm = await loadBundledVrm(character.file);
       // Skip non-humanoid / missing hands.
       if (

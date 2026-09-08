@@ -3,7 +3,7 @@ import {
   type StudioVoiceIcePolicyMode,
   type StudioVoiceIcePolicyResponse,
 } from "@/shared/lib/studio-voice-ice-policy-contract";
-import { api, toApiError } from "@/src/infrastructure/api";
+import { api, toApiError } from "@/infrastructure/api";
 
 const STUDIO_VOICE_ICE_REFRESH_MIN_LEAD_MS = 30_000;
 const STUDIO_VOICE_ICE_REFRESH_MAX_LEAD_MS = 120_000;

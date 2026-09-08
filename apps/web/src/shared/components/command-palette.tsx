@@ -36,12 +36,12 @@ import { useApp } from "@/shared/lib/store";
 import { TYPE_LABEL } from "@/shared/lib/taxonomy";
 import { toast } from "@/shared/lib/toast-store";
 import { cn } from "@/shared/lib/utils";
-import { useRouter } from "@/src/compat/navigation";
-import { useDebouncedValue } from "@/src/hooks/use-debounced-value";
+import { useRouter } from "@/compat/navigation";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
   fetchSearchResponse,
   isSearchAbortError,
-} from "@/src/infrastructure/search-client";
+} from "@/infrastructure/search-client";
 
 export function CommandPalette({
   open,

@@ -5,7 +5,7 @@ import path from "node:path";
 import { configDefaults, defineConfig } from "vitest/config";
 
 import { resolveVitestDatabaseTarget } from "./scripts/run-postgres-integration-tests.mjs";
-import { PERF_BUDGET_TEST_FILES } from "./vitest.perf-budget-files.mjs";
+import { SERIAL_TEST_FILES } from "./vitest.serial-test-files.mjs";
 
 const root = fileURLToPath(new URL("./", import.meta.url));
 
@@ -42,14 +42,7 @@ process.env.DATABASE_URL = testDatabaseTarget.databaseUrl;
 
 export default defineConfig({
   resolve: {
-    // Array form keeps longer `@/shared` / `@/domains` / `@/src` matches ahead of bare `@`
-    // for rolldown/vite-node resolvers that do not sort by find length.
-    alias: [
-      { find: "@/shared", replacement: path.resolve(root, "apps/web/src/shared") },
-      { find: "@/domains", replacement: path.resolve(root, "apps/web/src/domains") },
-      { find: "@/src", replacement: path.resolve(root, "apps/web/src") },
-      { find: "@", replacement: path.resolve(root, "apps/web") },
-    ],
+    alias: { "@": path.resolve(root, "apps/web/src") },
   },
   test: {
     // 수집 루트를 이 설정 파일의 디렉터리에 고정한다(기본값은 process.cwd()라 어디서
@@ -84,9 +77,9 @@ export default defineConfig({
       "deploy/cloudflare-realtime/integration/**",
       // Playwright browser E2E (run via `pnpm exec playwright test`, not Vitest).
       "e2e/**",
-      // Wall-clock budget tests run in their own quiet pass after this one
-      // (vitest.perf.config.ts) — see vitest.perf-budget-files.mjs for why.
-      ...PERF_BUDGET_TEST_FILES,
+      // Timing budgets and exhaustive CPU references remain mandatory in the quiet pass
+      // (vitest.perf.config.ts), without V8's hot-loop instrumentation overhead.
+      ...SERIAL_TEST_FILES,
     ],
   },
 });

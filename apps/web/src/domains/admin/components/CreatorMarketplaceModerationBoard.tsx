@@ -21,12 +21,12 @@ import type {
 
 import { CREATOR_MARKETPLACE_RESOURCE_MODERATION_NOTE_MAX_CHARACTERS } from "@/shared/lib/creator-marketplace-resource-contract";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 import {
   dismissOrphanedReport,
   listCreatorMarketplaceModerationQueue,
   moderateCreatorMarketplaceResource,
-} from "@/src/infrastructure/creator-marketplace-client";
+} from "@/infrastructure/creator-marketplace-client";
 
 const PAGE_SIZE = 10;
 

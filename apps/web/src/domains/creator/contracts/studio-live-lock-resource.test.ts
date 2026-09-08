@@ -5,7 +5,7 @@ import {
   studioLiveLockResourcesConflict,
 } from "./studio-live-lock-resource";
 
-import { studioLiveLayerAwareLockResourcesConflict } from "@/src/domains/creator/live/studio-live-mutation-guard";
+import { studioLiveLayerAwareLockResourcesConflict } from "@/domains/creator/live/studio-live-mutation-guard";
 
 describe("studio live lock resource grammar", () => {
   it("parses canonical page/layer/element scopes and leaves legacy ids opaque", () => {

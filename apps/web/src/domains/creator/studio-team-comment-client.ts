@@ -13,7 +13,7 @@ import {
   type StudioCommentsDocument,
 } from "./studio-comments";
 
-import { api, toApiError } from "@/src/infrastructure/api";
+import { api, toApiError } from "@/infrastructure/api";
 
 const TEAM_COMMENTS_BASE = "/creator/works";
 const MAX_WORK_ID_LENGTH = 160;

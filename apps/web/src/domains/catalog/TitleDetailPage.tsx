@@ -32,12 +32,12 @@ import { useApp } from "@/shared/lib/store";
 import { AGE_LABEL, STATUS_LABEL, TYPE_LABEL } from "@/shared/lib/taxonomy";
 import { mergedUniverse } from "@/shared/lib/title-universe";
 import { formatCount } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
-import { NotFoundPage } from "@/src/components/NotFoundPage";
-import { useAppConfig } from "@/src/hooks/use-app-config";
-import { useDocumentTitle, useMetaDescription } from "@/src/hooks/use-document-title";
-import { useApiResource } from "@/src/infrastructure/use-api-resource";
+import Link from "@/compat/router-link";
+import { ErrorState } from "@/components/error-state";
+import { NotFoundPage } from "@/components/NotFoundPage";
+import { useAppConfig } from "@/hooks/use-app-config";
+import { useDocumentTitle, useMetaDescription } from "@/hooks/use-document-title";
+import { useApiResource } from "@/infrastructure/use-api-resource";
 
 
 interface TitleDetailResponse {

@@ -1,4 +1,3 @@
-// @ts-expect-error -- jsdom is a test-only runtime fixture and does not bundle TypeScript types.
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

@@ -55,8 +55,8 @@ import { GENRES } from "@/shared/lib/taxonomy";
 import { applyTitleFilters, countActiveTitleFilters } from "@/shared/lib/title-filters";
 import { useRememberedFilters } from "@/shared/lib/use-remembered-filters";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { useJsonLd } from "@/src/hooks/use-document-title";
+import Link from "@/compat/router-link";
+import { useJsonLd } from "@/hooks/use-document-title";
 
 
 const axisIcons: Record<RankAxis, ComponentType<{ size?: number; className?: string }>> = {

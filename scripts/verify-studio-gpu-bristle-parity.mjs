@@ -101,12 +101,16 @@ function validateSuccess(result, diagnostics) { // NOSONAR javascript:S3776
 
   // A tuft whose hairs all carry the same terminal load is a uniform rake, not a brush. The KS
   // judgement alone cannot see that (two identical degenerate samples agree perfectly).
-  if (result.metrics?.gpuTerminalLoadStdDev <= 0) {
+  // `!(x > 0)` rather than `x <= 0`: optional chaining yields `undefined` when the harness
+  // reported no metrics at all, and `undefined <= 0` is false — the negated form keeps a
+  // missing metric failing closed instead of silently admitting the run.
+  if (!(result.metrics?.gpuTerminalLoadStdDev > 0)) {
     failures.push(
       "G3: every bristle ended with an identical load — STIFFNESS_VARIATION/BRISTLE_JITTER collapsed",
     );
   }
-  if (result.metrics?.depositedSplatCount <= 0) {
+  // Same fail-closed shape as above: a missing `depositedSplatCount` must be a failure.
+  if (!(result.metrics?.depositedSplatCount > 0)) {
     failures.push("G3: the twin deposited nothing, so conservation compared zero against zero");
   }
 

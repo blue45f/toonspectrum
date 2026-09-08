@@ -97,11 +97,18 @@ const STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION = 1;
 const STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION = 2;
 const STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION = 3;
 const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 4;
+const STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION = 5;
+function strokePayloadSupportsContinuation(version: unknown): boolean {
+  return version === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    || version === STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION;
+}
 const STUDIO_CRDT_LAYERED_FLOW_PAINT_MODEL = "layered-flow-v1";
 const STUDIO_CRDT_BOUNDED_FLOW_PAINT_MODEL = "bounded-flow-v2";
 const STUDIO_CRDT_MATERIAL_PRESSURE_MODEL = "canonical-material-v1";
-const STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE =
-  "causal-deposit-v3-segmented";
+const STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINES = new Set<unknown>([
+  "causal-deposit-v3-segmented",
+  "causal-deposit-v4-taper-spacing",
+]);
 // Fresh-authoring dry-media routing marker (`brushDynamics.dryMediaKernelProgram`, browser
 // `studioDryMediaKernelDabProgramPin`). It travels inside the bounded brushDynamics JSON and is
 // intentionally admitted by the bounded-JSON rules without a key whitelist — tightening
@@ -442,6 +449,7 @@ const STUDIO_CRDT_PAGE_KEYS = new Set([
   "drawingAssist",
   "paperSurface",
   "paperGrainVisible",
+  "layerComps",
 ]);
 
 const STUDIO_CRDT_PAPER_GRAIN_KINDS = new Set([
@@ -2333,6 +2341,50 @@ function validateSceneElementRoot(id: string, record: Y.Map<unknown>): boolean {
   return byteLength !== null && byteLength <= STUDIO_CRDT_SCENE_PAYLOAD_MAX_BYTES;
 }
 
+function isStudioCrdtLayerCompObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isStudioCrdtLayerCompText(value: unknown, maximum = 160): value is string {
+  return boundedString(value, maximum) && value.length > 0;
+}
+
+function isValidStudioCrdtLayerCompStates(value: unknown, kind: "layer" | "group"): boolean {
+  if (!isStudioCrdtLayerCompObject(value) || Object.keys(value).length > 10_000) return false;
+  const allowed = new Set(kind === "layer"
+    ? ["layerId", "visible", "opacity", "blendMode", "groupId"]
+    : ["groupId", "visible"]);
+  return Object.entries(value).every(([id, state]) => {
+    if (!isStudioCrdtLayerCompText(id) || !isStudioCrdtLayerCompObject(state)
+      || !hasOnlyJsonKeys(state, allowed) || state[`${kind}Id`] !== id
+      || typeof state.visible !== "boolean") return false;
+    return kind === "group" || (finiteNumberInRange(state.opacity, 0, 1)
+      && (!("blendMode" in state) || boundedString(state.blendMode, 80))
+      && (!("groupId" in state) || isStudioCrdtLayerCompText(state.groupId)));
+  });
+}
+
+/** Validate every wire candidate, including baselines hidden by a newer property winner. */
+function isValidStudioCrdtLayerComps(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length > 64) return false;
+  const ids = new Set<string>();
+  const allowed = new Set(["id", "name", "createdAt", "notes", "layerStates", "groupStates"]);
+  for (const comp of value) {
+    if (!isStudioCrdtLayerCompObject(comp) || !hasOnlyJsonKeys(comp, allowed)
+      || !isStudioCrdtLayerCompText(comp.id) || ids.has(comp.id)
+      || !isStudioCrdtLayerCompText(comp.name) || !Number.isInteger(comp.createdAt)
+      || !finiteNumberInRange(comp.createdAt, 0, Number.MAX_SAFE_INTEGER)
+      || ("notes" in comp && !boundedString(comp.notes, 8_192))
+      || !isValidStudioCrdtLayerCompStates(comp.layerStates, "layer")
+      || ("groupStates" in comp && !isValidStudioCrdtLayerCompStates(comp.groupStates, "group"))) {
+      return false;
+    }
+    ids.add(comp.id);
+  }
+  const byteLength = encodedJsonByteLength(value);
+  return byteLength !== null && byteLength <= STUDIO_CRDT_PAGE_PAYLOAD_MAX_BYTES;
+}
+
 function validatePageRoot(id: string, record: Y.Map<unknown>): boolean {
   const metadataKeys = new Set(["id", "payloadVersion", "deleted"]);
   if (
@@ -2359,12 +2411,19 @@ function validatePageRoot(id: string, record: Y.Map<unknown>): boolean {
   if ("hideMaster" in props && typeof props.hideMaster !== "boolean") return false;
   if ("paperGrainVisible" in props && typeof props.paperGrainVisible !== "boolean") return false;
   if ("paperSurface" in props && !isValidStudioCrdtPaperSurface(props.paperSurface)) return false;
+  if ("layerComps" in props && !isValidStudioCrdtLayerComps(props.layerComps)) return false;
   if ("drawingAssist" in props && !isValidStudioCrdtDrawingAssist(props.drawingAssist)) {
     return false;
   }
   // A valid `prop:` winner can hide an invalid `base:` candidate until a later unset. Validate
   // both candidates now so every future effective page payload remains safe to materialize.
   for (const [key, value] of record) {
+    if (
+      (key === "base:layerComps" || key === "prop:layerComps") &&
+      !isValidStudioCrdtLayerComps(value)
+    ) {
+      return false;
+    }
     if (
       (key === "base:drawingAssist" || key === "prop:drawingAssist") &&
       !isValidStudioCrdtDrawingAssist(value)
@@ -2595,24 +2654,28 @@ export function hasValidStudioCrdtStrokePaintContract(
   if (
     input.payloadVersion !== STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION
     && input.payloadVersion !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-    && input.payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !strokePayloadSupportsContinuation(input.payloadVersion)
   ) return false;
   const brushDynamics = input.brushDynamics !== null
     && typeof input.brushDynamics === "object"
     && !Array.isArray(input.brushDynamics)
     ? input.brushDynamics as Record<string, unknown>
     : undefined;
+  if (
+    brushDynamics?.depositPipeline === "causal-deposit-v4-taper-spacing"
+    && input.payloadVersion !== STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+  ) return false;
   const r8GrainAdmission = rendererSignificantR8GrainAdmission(input.brushDynamics);
   if (
     r8GrainAdmission === "invalid"
     || (
       r8GrainAdmission === "valid"
-      && input.payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      && !strokePayloadSupportsContinuation(input.payloadVersion)
     )
   ) return false;
   if (
-    brushDynamics?.depositPipeline === STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE
-    && input.payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINES.has(brushDynamics?.depositPipeline)
+    && !strokePayloadSupportsContinuation(input.payloadVersion)
   ) return false;
   if ((input.kind ?? "freehand") !== "freehand" || (input.mode ?? "pen") !== "pen") {
     return false;
@@ -2654,7 +2717,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     (payloadVersion !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION &&
       payloadVersion !== STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION &&
       payloadVersion !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION &&
-      payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION) ||
+      !strokePayloadSupportsContinuation(payloadVersion)) ||
     record.get("type") !== "draw" ||
     (record.get("mode") !== "pen" && record.get("mode") !== "eraser") ||
     !boundedExactText(record.get("kind"), 80) ||
@@ -2705,12 +2768,16 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     && Object.prototype.hasOwnProperty.call(extensions, "materialMinimumDiameterRatio");
   const hasDynamicMinimumDiameterRatio = brushDynamics !== undefined
     && Object.prototype.hasOwnProperty.call(brushDynamics, "minimumDiameterRatio");
+  if (
+    brushDynamics?.depositPipeline === "causal-deposit-v4-taper-spacing"
+    && payloadVersion !== STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+  ) return false;
   const hasSegmentedCausalDeposit =
-    brushDynamics?.depositPipeline === STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE;
+    STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINES.has(brushDynamics?.depositPipeline);
   const r8GrainAdmission = rendererSignificantR8GrainAdmission(brushDynamicsValue);
   if (
     payloadVersion !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-    && payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !strokePayloadSupportsContinuation(payloadVersion)
     && (
       hasMaterialPressureModel
       || hasMaterialMinimumDiameterRatio
@@ -2720,7 +2787,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   if (
     (
       payloadVersion === STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-      || payloadVersion === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      || strokePayloadSupportsContinuation(payloadVersion)
     )
     && (
       hasMaterialPressureModel !== hasMaterialMinimumDiameterRatio
@@ -2734,13 +2801,13 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   ) return false;
   if (
     hasSegmentedCausalDeposit
-    && payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !strokePayloadSupportsContinuation(payloadVersion)
   ) return false;
   if (
     r8GrainAdmission === "invalid"
     || (
       r8GrainAdmission === "valid"
-      && payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      && !strokePayloadSupportsContinuation(payloadVersion)
     )
   ) return false;
   const paintModel = extensions?.paintModel;

@@ -233,12 +233,12 @@ describe("StudioAutosaveOpfsSession", () => {
     ).resolves.toBeNull();
   });
 
-  it("writes one compacted checkpoint and restores the newest complete Studio payload", async () => {
+  it.each([2, 3] as const)("writes one compacted checkpoint and restores the newest complete V%s Studio payload", async (version) => {
     const journal = new FakeAutosaveJournal();
     const target = session(journal);
 
-    const first = await target.write(payload("2026-07-30T01:00:00.000Z", "first"));
-    const second = await target.write(payload("2026-07-30T01:01:00.000Z", "second"));
+    const first = await target.write({ ...payload("2026-07-30T01:00:00.000Z", "first"), version });
+    const second = await target.write({ ...payload("2026-07-30T01:01:00.000Z", "second"), version });
     const restored = await target.readLatest();
 
     expect(first).toMatchObject({ authority: "opfs-journal", sequence: 1, revision: 1 });
@@ -249,6 +249,7 @@ describe("StudioAutosaveOpfsSession", () => {
       sequence: 2,
       revision: 2,
       payload: {
+        version,
         pagesList: [{ elements: [{ id: "second" }] }],
       },
     });

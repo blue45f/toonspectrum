@@ -145,7 +145,7 @@ export default defineConfig(
     ],
   }),
   // boundaries 는 TS 임포트를 분류하려면 리졸버가 필요하다(없으면 조용히 no-op).
-  // 루트 tsconfig.json 의 paths(@/* -> apps/web/*)로 @/src/* 별칭을 해석한다.
+  // 루트 tsconfig.json 의 paths(@/* -> apps/web/src/*)로 @/* 별칭을 해석한다.
   {
     files: ['apps/web/src/**/*.{ts,tsx}'],
     settings: {

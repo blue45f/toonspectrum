@@ -98,6 +98,7 @@ function settingsFor(
   if (mode === "pinned") {
     return normalizeStudioBrushDynamicsSettings({
       ...authored,
+      depositPipeline: "causal-deposit-v3-segmented",
       dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
     });
   }
@@ -106,6 +107,7 @@ function settingsFor(
     // wave-added preset identity (normalization omits both, keeping the snapshot byte-stable).
     return normalizeStudioBrushDynamicsSettings({
       ...authored,
+      depositPipeline: "causal-deposit-v3-segmented",
       presetId: undefined,
       dryMediaKernelProgram: undefined,
     });

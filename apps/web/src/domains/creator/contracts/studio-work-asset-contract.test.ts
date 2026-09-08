@@ -28,7 +28,7 @@ import {
   type StudioLensBlurOptions,
   type StudioSelectiveGaussianBlurOptions,
   type StudioTiltShiftBlurOptions,
-} from "@/src/domains/creator/studio-advanced-blur-filter-kernels";
+} from "@/domains/creator/studio-advanced-blur-filter-kernels";
 
 
 function descriptor(id = "asset-1", type: "image" | "vrm" | "background3d" = "image") {

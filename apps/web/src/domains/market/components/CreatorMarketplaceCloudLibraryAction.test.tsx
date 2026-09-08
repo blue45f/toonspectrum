@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Profiler } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CreatorMarketplaceCloudLibraryAction } from "./CreatorMarketplaceCloudLibraryAction";
 
+import type { CreatorMarketplaceAcquisitionTarget } from "@/shared/lib/creator-marketplace-cloud-library-contract";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
-import type { SessionContextValue } from "@/src/compat/auth-session-store";
+import type { SessionContextValue } from "@/compat/auth-session-store";
 
 import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
-import { SessionContext } from "@/src/compat/auth-session-store";
+import { SessionContext } from "@/compat/auth-session-store";
 
 const mocks = vi.hoisted(() => ({
   acquire: vi.fn(),
@@ -28,7 +30,7 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
-vi.mock("@/src/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/infrastructure/creator-marketplace-client", () => ({
   acquireCreatorMarketplaceCloudLibraryRelease: mocks.acquire,
   listCreatorMarketplaceCloudLibrary: mocks.list,
   resolveCreatorMarketplaceCloudLibraryAcquisitionTarget: mocks.resolveTarget,
@@ -124,6 +126,68 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("CreatorMarketplaceCloudLibraryAction", () => {
+  it("ready commit의 이전 effect가 진행 중인 mutation의 retry focus 요청을 소비하지 않는다", async () => {
+    const acquisition = deferred<never>();
+    mocks.acquire.mockReturnValueOnce(acquisition.promise);
+    let started = false;
+    render(
+      <SessionContext.Provider value={session(true)}>
+        <Profiler id="ready-commit-focus" onRender={() => {
+          const add = screen.queryByRole<HTMLButtonElement>("button", {
+            name: "계정 라이브러리에 추가",
+          });
+          if (started || !add || add.disabled) return;
+          started = true;
+          // Dispatch after the DOM commit but before its passive effects run.
+          add.focus();
+          add.click();
+          add.blur();
+        }}>
+          <CreatorMarketplaceCloudLibraryAction record={record()} />
+        </Profiler>
+      </SessionContext.Provider>,
+    );
+
+    await waitFor(() => expect(mocks.acquire).toHaveBeenCalledOnce());
+    expect(screen.getByRole<HTMLButtonElement>("button", {
+      name: "계정 라이브러리 변경 중",
+    }).disabled).toBe(true);
+    await act(async () => {
+      acquisition.reject(new Error("현재 head가 변경되었습니다."));
+    });
+
+    expect(screen.getByRole("alert").textContent).toContain("현재 head가 변경되었습니다");
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "다시 확인" }),
+    );
+  });
+
+  it("진행 중인 mutation 실패는 사용자가 옮긴 외부 focus를 가로채지 않는다", async () => {
+    const acquisition = deferred<never>();
+    mocks.acquire.mockReturnValueOnce(acquisition.promise);
+    render(
+      <SessionContext.Provider value={session(true)}>
+        <button type="button">다른 작업</button>
+        <CreatorMarketplaceCloudLibraryAction record={record()} />
+      </SessionContext.Provider>,
+    );
+    const add = await screen.findByRole<HTMLButtonElement>("button", {
+      name: "계정 라이브러리에 추가",
+    });
+    await waitFor(() => expect(add.disabled).toBe(false));
+    add.focus();
+    fireEvent.click(add);
+    const outside = screen.getByRole<HTMLButtonElement>("button", { name: "다른 작업" });
+    outside.focus();
+    await act(async () => {
+      acquisition.reject(new Error("현재 head가 변경되었습니다."));
+    });
+
+    expect(screen.getByRole("alert").textContent).toContain("현재 head가 변경되었습니다");
+    expect(screen.getByRole("button", { name: "다시 확인" })).toBeTruthy();
+    expect(document.activeElement).toBe(outside);
+  });
+
   it("로그아웃 상태에서는 private API를 호출하거나 계정 소유를 암시하지 않는다", () => {
     renderAction(false);
 
@@ -368,6 +432,43 @@ describe("CreatorMarketplaceCloudLibraryAction", () => {
       expect.any(AbortSignal),
     ));
     expect(await screen.findByText(/현재 v3\.0\.0을 이 계정/u)).toBeTruthy();
+  });
+
+  it("처음 활성화된 action을 바로 사용해도 실패 후 retry로 초점을 이동한다", async ({ onTestFinished }) => {
+    const current = record();
+    const target = deferred<CreatorMarketplaceAcquisitionTarget>();
+    mocks.resolveTarget.mockReturnValueOnce(target.promise);
+    mocks.acquire.mockRejectedValueOnce(new Error("현재 head가 변경되었습니다."));
+    renderAction();
+
+    // Interact with the newly enabled DOM before passive effects for that commit
+    // flush; findByRole alone can finish those effects before the click.
+    await new Promise<void>((resolve) => {
+      const observer = new MutationObserver(() => {
+        const action = screen.queryByRole<HTMLButtonElement>("button", {
+          name: "계정 라이브러리에 추가",
+        });
+        if (!action || action.disabled) return;
+        observer.disconnect();
+        action.focus();
+        fireEvent.click(action);
+        action.blur();
+        resolve();
+      });
+      onTestFinished(() => observer.disconnect());
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+      target.resolve({
+        state: "available",
+        requestReleaseId: current.id,
+        publisherId: current.publisher.id,
+        packageId: current.packageId,
+        kind: current.kind,
+        logicalPackId: creatorMarketplaceStudioPackId(current),
+        currentHead: { id: current.id, resourceVersion: current.resourceVersion },
+      });
+    });
+    const retry = await screen.findByRole("button", { name: "다시 확인" });
+    await waitFor(() => expect(document.activeElement).toBe(retry));
   });
 
   it("계정 보관과 로컬 제거를 분리하고 설치 확인 범위를 account-ever로 설명한다", async () => {

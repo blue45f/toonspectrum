@@ -52,6 +52,7 @@ function makeBinding(overrides: Partial<CharacterShaperBinding> = {}): Character
     compareActive: false,
     evaluate: vi.fn(),
     plan: vi.fn(),
+    commitPreset: vi.fn(),
     commit: vi.fn(),
     clear: vi.fn(() => null),
     remove: vi.fn(() => null),

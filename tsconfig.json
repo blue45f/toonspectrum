@@ -20,13 +20,7 @@
     "incremental": true,
     "paths": {
       "@/*": [
-        "./apps/web/*"
-      ],
-      "@/shared/*": [
-        "./apps/web/src/shared/*"
-      ],
-      "@/domains/*": [
-        "./apps/web/src/domains/*"
+        "./apps/web/src/*"
       ],
       "canvaskit-wasm": [
         "./apps/web/src/types/canvaskit-wasm-shim.d.ts"
@@ -56,6 +50,7 @@
   ],
   "exclude": [
     "node_modules",
+    "artifacts/**",
     "apps/api/**",
     "dist/**",
     "**/__diag*"

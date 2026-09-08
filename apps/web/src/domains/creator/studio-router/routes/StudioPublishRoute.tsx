@@ -8,7 +8,7 @@ import { useStudioDraftScope } from "../useStudioDraftScope";
 import type { StudioPublishRouteResolution } from "../studio-route-manifest";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
-import { useSession } from "@/src/compat/auth-session-store";
+import { useSession } from "@/compat/auth-session-store";
 
 const StudioUploadPublish = lazyRetry(
   () => import("../../StudioUploadPublish").then((module) => ({

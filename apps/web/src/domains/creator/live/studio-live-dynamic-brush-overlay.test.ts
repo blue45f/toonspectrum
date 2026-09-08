@@ -5,6 +5,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
   studioBrushDynamicsPresetSettings,
   studioBrushDynamicsSeedFromKey,
   studioBrushDynamicsSettingsForBrushId,
@@ -861,7 +862,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       expect(
         selection.brushDynamics.depositPipeline,
         `${descriptor.catalogId}: authored pipeline`,
-      ).toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3);
+      ).toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4);
 
       const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
       const id = `stream-${descriptor.catalogId}`;
@@ -1477,7 +1478,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       if (!selection) throw new Error(`missing ${catalogId} selection`);
       expect(selection.runtimeBrushId).toBe("dry-media");
       expect(selection.brushDynamics.depositPipeline).toBe(
-        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
       );
       const pointPairs = Array.from({ length: 72 }, (_, index) => [
         6 + index * 7,
@@ -1541,9 +1542,13 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     },
   );
 
-  it("keeps 3,000-sample crayon live appends O(1) inside the 30ms main-thread CPU budget", () => {
+  it.each([
+    [STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3, 76_565, 320],
+    [STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4, 76_590, 345],
+  ] as const)("keeps 3,000-sample crayon %s appends O(1) inside the 30ms main-thread CPU budget", (depositPipeline, expectedMarks, expectedFirstMarks) => {
     const selection = materializeStudioBrushPackSelection("crayon-wax-bold");
     if (!selection) throw new Error("missing crayon-wax-bold selection");
+    const dynamics = normalizeStudioBrushDynamicsSettings({ ...selection.brushDynamics, depositPipeline });
     const pointPairs = Array.from({ length: 3000 }, (_, index) => [
       10 + (index % 120) * 8 + Math.cos(index / 10) * 20,
       12 + Math.floor(index / 120) * 14 + Math.sin(index / 10) * 20,
@@ -1552,7 +1557,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     const element = drawElement("crayon-3000-stress", fullPoints, {
       brush: selection.runtimeBrushId,
       brushCatalogId: selection.catalogId,
-      brushDynamics: selection.brushDynamics,
+      brushDynamics: dynamics,
       strokeWidth: selection.defaultWidth,
       opacity: selection.defaultOpacity,
       pressures: Array.from({ length: pointPairs.length }, () => 0.72),
@@ -1564,7 +1569,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     const firstChunk = drawElement("crayon-3000-stress", fullPoints.slice(0, 60), {
       brush: selection.runtimeBrushId,
       brushCatalogId: selection.catalogId,
-      brushDynamics: selection.brushDynamics,
+      brushDynamics: dynamics,
       strokeWidth: selection.defaultWidth,
       opacity: selection.defaultOpacity,
       pressures: Array.from({ length: 30 }, () => 0.72),
@@ -1623,7 +1628,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       const prefixElement = drawElement("crayon-3000-stress", prefixPoints, {
         brush: selection.runtimeBrushId,
         brushCatalogId: selection.catalogId,
-        brushDynamics: selection.brushDynamics,
+        brushDynamics: dynamics,
         strokeWidth: selection.defaultWidth,
         opacity: selection.defaultOpacity,
         pressures: Array.from({ length: pointCount / 2 }, () => 0.72),
@@ -1720,7 +1725,9 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // and deposits 1,695-1,780 marks; every other one deposits 150-240; the first, which starts a
     // 60-point stroke from a cold renderer rather than extending by 30, deposits 320.
     const totalMarkDeltas = markDeltas.reduce((sum, delta) => sum + delta, 0);
-    expect(totalMarkDeltas).toBe(76_565);
+    // V3 keeps its historical 76,565 marks. V4 adds exactly five thin start stations
+    // (25 material fibres); every timing, work-growth and per-append bound is unchanged.
+    expect(totalMarkDeltas).toBe(expectedMarks);
     expect(totalMarkDeltas).toBe(liveMarks.length);
     // No append draws more than one chunk's worth, however long the stroke behind it has grown.
     // Under a cumulative repaint the last append alone would draw all 76,565.
@@ -1828,7 +1835,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // test is run on its own, so roughly ten ordinary appends of one-time cost sit outside the
     // window. Closing that gap needs this measurement in its OWN file, the way the impasto shader
     // gates were split from their census, rather than a different statistic here.
-    expect(markDeltas[0], "cold first append marks").toBe(320);
+    expect(markDeltas[0], "cold first append marks").toBe(expectedFirstMarks);
     // The cold-start COST gates are not here, deliberately. Fourteen tests in this file build
     // renderers before this one runs, so whatever the process pays once is already paid by the
     // time the first pass is measured -- 4.05 in file order against 14.69 with the measurement

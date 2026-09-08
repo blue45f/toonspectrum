@@ -9,7 +9,7 @@ import "./creator-home.css";
 import "./creator-film.css";
 
 import { useI18n } from "@/shared/lib/i18n";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 const FEATURE_ICONS = [Brush, LayoutGrid, Box, Layers] as const;
 

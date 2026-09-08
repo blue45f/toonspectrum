@@ -31,10 +31,10 @@ import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
-import { NotFoundPage } from "@/src/components/NotFoundPage";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import Link from "@/compat/router-link";
+import { ErrorState } from "@/components/error-state";
+import { NotFoundPage } from "@/components/NotFoundPage";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   deleteWork,
   getWork,
@@ -48,7 +48,7 @@ import {
   type SeriesSummary,
   type WorkComment,
   type WorkDetail,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 const MAX_COMMENT_LENGTH = 700;
 const BUBBLE_LABEL_BY_ID: ReadonlyMap<string, string> = new Map(

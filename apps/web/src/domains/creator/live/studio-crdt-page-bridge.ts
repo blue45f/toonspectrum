@@ -1,6 +1,7 @@
 import {
   isStudioDynamicBrushMinimumDiameterRatio,
   studioDynamicBrushDepositPipelineUsesContinuation,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
 } from "../brush/studio-brush-dynamics";
 import { serializeStudioBrushR8TextureGrainSourceCanonical } from "../brush/studio-brush-r8-grain-asset-contract";
 import { isStudioInkPressureModel } from "../brush/studio-ink-pressure-model";
@@ -19,22 +20,23 @@ import {
 import {
   STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
-  STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+  studioCrdtStrokePayloadSupportsContinuation,
+  isStudioCrdtStrokePayloadVersion,
+  STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
 import {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
-  STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   isStudioCrdtPayloadSceneElementType,
   isStudioCrdtTopologyReferencePayload,
   studioCrdtLayerGroupKey,
   validateStudioCrdtLayerGroupPayload,
-  validateStudioCrdtPagePayload,
   validateStudioCrdtSceneElementPayload,
   type StudioCrdtJsonObject,
-  type StudioCrdtJsonValue,
   type StudioCrdtPayloadSceneElementType,
 } from "./studio-crdt-scene-schema";
+import { jsonObject, jsonValue } from "./studio-crdt-json-value";
+import type { StudioCrdtCompatibleOrderedPage } from "./studio-crdt-page-payload";
 
 import type {
   StudioCrdtLayerGroupInput,
@@ -45,8 +47,6 @@ import type {
   StudioCrdtStrokeRecord,
 } from "./studio-crdt-document";
 import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
-import type { StudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
-import type { StudioPaperSurfaceSettings } from "../brush/studio-paper-granulation-runtime";
 
 import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
@@ -70,6 +70,8 @@ export {
   studioDrawElementToCrdtStroke,
 } from "./studio-crdt-draw-bridge";
 export type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
+export { studioPageToCrdtPage } from "./studio-crdt-page-payload";
+export type { StudioCrdtCompatibleOrderedPage } from "./studio-crdt-page-payload";
 
 const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
 
@@ -134,34 +136,6 @@ const EXTENSION_KEYS = [
   "emeresSourceId",
 ] as const;
 
-function jsonValue(value: unknown): StudioCrdtJsonValue | undefined {
-  if (value === null || typeof value === "boolean" || typeof value === "string") return value;
-  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
-  if (Array.isArray(value)) {
-    const result: StudioCrdtJsonValue[] = [];
-    for (const item of value) {
-      const normalized = jsonValue(item);
-      if (normalized === undefined) return undefined;
-      result.push(normalized);
-    }
-    return result;
-  }
-  if (!value || typeof value !== "object") return undefined;
-  const result: StudioCrdtJsonObject = {};
-  for (const [key, item] of Object.entries(value)) {
-    const normalized = jsonValue(item);
-    if (normalized !== undefined) result[key] = normalized;
-  }
-  return result;
-}
-
-function jsonObject(value: unknown): StudioCrdtJsonObject | undefined {
-  const normalized = jsonValue(value);
-  return normalized && typeof normalized === "object" && !Array.isArray(normalized)
-    ? normalized
-    : undefined;
-}
-
 function studioElementLayerId(element: StudioCrdtCompatibleElement): string {
   const groupId = (element as StudioCrdtCompatibleElement & { groupId?: unknown }).groupId;
   return typeof groupId === "string" && groupId.length > 0 ? groupId : "page-root";
@@ -185,6 +159,9 @@ export function studioCrdtStrokeToDrawElement(
   record: StudioCrdtStrokeRecord
 ): StudioCrdtCompatibleDrawElement {
   const payload = record.payload;
+  if (!isStudioCrdtStrokePayloadVersion(payload.version)) {
+    throw new Error("지원하지 않는 획 페이로드 버전입니다.");
+  }
   const extensions = payload.extensions ?? {};
   const result: StudioCrdtCompatibleDrawElement = {
     id: record.id,
@@ -241,7 +218,7 @@ export function studioCrdtStrokeToDrawElement(
   const paperModel = extensions.paperModel;
   if (isStudioPaperSubstrateModel(paperModel)) result.paperModel = paperModel;
   if (extensions.outlineStroke !== undefined) {
-    if (payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION) {
+    if (!studioCrdtStrokePayloadSupportsContinuation(payload.version)) {
       throw new Error("외곽선 획 계약과 페이로드 버전이 호환되지 않습니다.");
     }
     const outlineStroke = normalizeStudioOutlineStrokeContract(
@@ -259,6 +236,12 @@ export function studioCrdtStrokeToDrawElement(
     }
     result.inkInput = inkInput;
   }
+  if (
+    payload.brushDynamics?.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
+    && payload.version !== STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+  ) {
+    throw new Error("테이퍼 간격 브러시는 획 페이로드 v5가 필요합니다.");
+  }
   const dynamicMinimumDiameterRatio =
     payload.brushDynamics?.minimumDiameterRatio;
   if (
@@ -266,7 +249,7 @@ export function studioCrdtStrokeToDrawElement(
     && (
       (
         payload.version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-        && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+        && !studioCrdtStrokePayloadSupportsContinuation(payload.version)
       )
       || !isStudioDynamicBrushMinimumDiameterRatio(
         dynamicMinimumDiameterRatio,
@@ -279,13 +262,13 @@ export function studioCrdtStrokeToDrawElement(
     studioDynamicBrushDepositPipelineUsesContinuation(
       payload.brushDynamics?.depositPipeline,
     )
-    && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !studioCrdtStrokePayloadSupportsContinuation(payload.version)
   ) {
     throw new Error("분할 연속 브러시 파이프라인과 페이로드 버전이 호환되지 않습니다.");
   }
   if (
     hasCanonicalRendererSignificantR8Grain(payload.brushDynamics)
-    && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !studioCrdtStrokePayloadSupportsContinuation(payload.version)
   ) {
     throw new Error("R8 브러시 그레인과 페이로드 버전이 호환되지 않습니다.");
   }
@@ -298,7 +281,7 @@ export function studioCrdtStrokeToDrawElement(
   if (
     hasMaterialPressureSnapshot
     && payload.version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-    && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !studioCrdtStrokePayloadSupportsContinuation(payload.version)
   ) {
     throw new Error("획 재질 필압 모델과 페이로드 버전이 호환되지 않습니다.");
   }
@@ -324,7 +307,7 @@ export function studioCrdtStrokeToDrawElement(
     (
       payload.version === STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
       || payload.version === STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-      || payload.version === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      || studioCrdtStrokePayloadSupportsContinuation(payload.version)
     )
     && isStudioStrokePaintModelCompatible(paintModelCandidate)
   ) {
@@ -483,39 +466,6 @@ export function studioCrdtElementToSceneElement<
   return element;
 }
 
-const PAGE_PAYLOAD_KEYS = [
-  "bg",
-  "bgGrad",
-  "canvasH",
-  "name",
-  "note",
-  "hideMaster",
-  "shotType",
-  "cameraAngle",
-  "drawingAssist",
-  "paperSurface",
-  "paperGrainVisible",
-] as const;
-
-export interface StudioCrdtCompatibleOrderedPage<
-  TElement extends StudioCrdtCompatibleElement,
-> extends StudioCrdtCompatiblePage<TElement> {
-  bg: string;
-  bgGrad: string[] | null;
-  canvasH: number;
-  name?: string;
-  note?: string;
-  hideMaster?: boolean;
-  shotType?: string;
-  cameraAngle?: string;
-  drawingAssist?: StudioDrawingAssistDocument;
-  paperSurface?: StudioPaperSurfaceSettings;
-  paperGrainVisible?: boolean;
-  /** Synchronized through the dedicated per-stage CRDT sidecar, never the 8 KiB page envelope. */
-  shared3dStage?: StudioShared3dStagePersistedState;
-  groups?: StudioCrdtCompatibleLayerGroup[];
-}
-
 export function studioLayerGroupToCrdtGroup(
   pageId: string,
   group: StudioCrdtCompatibleLayerGroup
@@ -549,27 +499,6 @@ export function studioCrdtGroupToLayerGroup(
   }
   if (collapsed !== undefined) group.collapsed = collapsed;
   return group;
-}
-
-export function studioPageToCrdtPage<
-  TElement extends StudioCrdtCompatibleElement,
->(page: StudioCrdtCompatibleOrderedPage<TElement>) {
-  const props: StudioCrdtJsonObject = {
-    bg: page.bg,
-    bgGrad: page.bgGrad,
-    canvasH: page.canvasH,
-  };
-  for (const key of PAGE_PAYLOAD_KEYS.slice(3)) {
-    const normalized = jsonValue(page[key]);
-    if (normalized !== undefined) props[key] = normalized;
-  }
-  return {
-    id: page.id,
-    payload: validateStudioCrdtPagePayload({
-      version: STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
-      props,
-    }),
-  };
 }
 
 export interface StudioCrdtPageReconcileResult<TPage> {
@@ -773,6 +702,8 @@ export function reconcileStudioCrdtSceneGraphPages<
       id: record.id,
       elements: source?.elements ?? [],
     } as TPage & { shared3dStage?: StudioShared3dStagePersistedState };
+    // An absent synchronized preset field is authoritative too, including remote removal.
+    if (!Object.hasOwn(record.payload.props, "layerComps")) delete materialized.layerComps;
     // Shared Stage state deliberately lives outside the bounded page envelope. A retained
     // inactive sidecar is authoritative too: it must remove a stale local connection instead of
     // allowing the source snapshot's optional property to survive the spread above.

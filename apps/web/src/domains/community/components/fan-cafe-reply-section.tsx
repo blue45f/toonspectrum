@@ -10,7 +10,7 @@ import { withCsrfProtection } from "@/shared/lib/csrf";
 import { ensureArray, resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
 import { useApp } from "@/shared/lib/store";
 import { cn, relativeDate } from "@/shared/lib/utils";
-import { useCelebrate } from "@/src/hooks/use-celebrate";
+import { useCelebrate } from "@/hooks/use-celebrate";
 
 export function FanPostReplySection({
   postId,

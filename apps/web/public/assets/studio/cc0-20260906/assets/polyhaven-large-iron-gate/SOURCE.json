@@ -1,0 +1,95 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/large_iron_gate",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "donated": true,
+    "name": "Large Iron Gate",
+    "type": 2,
+    "authors": {
+      "Josh Dean": "All"
+    },
+    "info": null,
+    "date_published": 1697155200,
+    "categories": [
+      "structures",
+      "buildings",
+      "collection: hidden_alley"
+    ],
+    "tags": [
+      "gate",
+      "entrance",
+      "drive way",
+      "cast iron",
+      "iron",
+      "stylish",
+      "security"
+    ],
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 38140,
+    "texel_density": 2384.2255333714465,
+    "dimensions": [
+      2950.09183883667,
+      97.33648598194122,
+      2928.6537868902087
+    ],
+    "files_hash": "93b045958194b830c41c9a16d3f3aa7a5cb8bced",
+    "description": "Free 8K model - large cast-iron double gate with arched tops, ring motifs, spear finials and weathered rust; ornate, sturdy entrance panels.",
+    "category_id": "5bb3aebe-e23c-523e-9749-a0723e1e7c0f",
+    "category": "Architecture/Gates/Gates",
+    "collections": [
+      "hidden_alley"
+    ],
+    "attributes": {
+      "condition": [
+        "rusted"
+      ],
+      "material": [
+        "metal"
+      ]
+    },
+    "download_count": 6739,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/large_iron_gate.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/large_iron_gate/large_iron_gate_2k.gltf",
+      "bytes": 7101,
+      "sha256": "a9058e591152941fab38f9951964526e2e263b0c7a1ab992462ab0c56e5bbe8c",
+      "sourceMd5": "acd8128a05c100793eb9827a9b7c942e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/large_iron_gate/large_iron_gate_diff_2k.jpg",
+      "bytes": 2170270,
+      "sha256": "0847dc0f2c7dd84bb4fed6b546cd34790899a59c4cb1e59102c0f174eef5e6a6",
+      "sourceMd5": "3b5af8b63c55e07fc95f089567c9846e"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/large_iron_gate/large_iron_gate.bin",
+      "bytes": 971848,
+      "sha256": "973f9f7b7e968a5b22bcf07aac03312af5b74bac125750c887934ee30d986c8f",
+      "sourceMd5": "fdd655246ec98282a4d2faafcf0b8317"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/large_iron_gate/large_iron_gate_nor_gl_2k.jpg",
+      "bytes": 2786152,
+      "sha256": "6c033e1c6e42d60dc8754b85d9ecd8cccda70b412fa1112fc8a2cbf79c36bd21",
+      "sourceMd5": "5aa84baa5803884e9fa1cb1177207651"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/large_iron_gate/large_iron_gate_arm_2k.jpg",
+      "bytes": 2862243,
+      "sha256": "bcb48c54914ec87e0d3358d758e9c4ad7cb7e10f6851910de4b39b508fbb894b",
+      "sourceMd5": "628398c8d74d00d504d1b39886fbff83"
+    }
+  ]
+}

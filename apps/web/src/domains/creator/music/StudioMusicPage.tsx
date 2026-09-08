@@ -11,8 +11,8 @@ import { readMusicWorkId, scopeMusicBrief } from "./studio-music-work-scope";
 import type { LocalMusicTrack } from "./studio-music-client";
 
 import { buildMusicPrompt, defaultMusicBrief, MUSIC_DURATIONS, MUSIC_INSTRUMENTS, MUSIC_MOODS, MUSIC_PURPOSES, MUSIC_TERMS_URL, parseMusicBrief, type MusicBrief, type MusicStatus } from "@toonspectrum/core/studio-music";
-import { useSession } from "@/src/compat/auth-session-store";
-import { getApiErrorMessage } from "@/src/infrastructure/api";
+import { useSession } from "@/compat/auth-session-store";
+import { getApiErrorMessage } from "@/infrastructure/api";
 
 const inputClass = "w-full rounded-xl border border-line bg-canvas px-3 py-2.5 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50";
 const buttonClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line px-4 py-2 text-sm transition-colors hover:bg-panel focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
@@ -112,7 +112,7 @@ function StudioMusicWorkspace({ ownerId }: { ownerId: string }) {
     <div className="mx-auto w-full max-w-7xl space-y-7 px-4 py-6 text-fg sm:px-6 lg:py-10" data-testid="studio-music-page">
       <header className="relative overflow-hidden rounded-3xl border border-line bg-card p-6 sm:p-9">
         <div className="pointer-events-none absolute -right-12 -top-12 size-64 rounded-full bg-accent/10 blur-3xl" aria-hidden />
-        <Link to={workId ? `/create/${encodeURIComponent(workId)}` : "/studio"} onClick={(event) => { if (needsLeaveWarning && !window.confirm("생성·저장이 진행 중이거나 저장 확인이 필요한 음원이 있습니다. MP3를 먼저 보관해 주세요. 그래도 나갈까요?")) event.preventDefault(); }} className="relative mb-6 inline-flex min-h-9 items-center gap-2 text-sm text-fg-2 hover:text-accent"><ArrowLeft size={16} aria-hidden />{workId ? "작품으로 돌아가기" : "툰스튜디오로"}</Link>
+        <Link to={workId ? `/create/${encodeURIComponent(workId)}` : "/studio"} reloadDocument={!workId} onClick={(event) => { if (needsLeaveWarning && !window.confirm("생성·저장이 진행 중이거나 저장 확인이 필요한 음원이 있습니다. MP3를 먼저 보관해 주세요. 그래도 나갈까요?")) event.preventDefault(); }} className="relative mb-6 inline-flex min-h-9 items-center gap-2 text-sm text-fg-2 hover:text-accent"><ArrowLeft size={16} aria-hidden />{workId ? "작품으로 돌아가기" : "툰스튜디오로"}</Link>
         <p className="relative mb-3 flex items-center gap-2 text-xs font-semibold tracking-widest text-accent"><Headphones size={16} aria-hidden />TOONSTUDIO SOUNDTRACK</p>
         <h1 className="relative text-3xl font-bold leading-tight sm:text-4xl">장면에 감정을,<br className="sm:hidden" /> 이야기에 음악을.</h1>
         <p className="relative mt-4 max-w-2xl text-sm leading-relaxed text-fg-2 sm:text-base">설레는 첫 만남부터 마지막 반전까지. 장면과 가사를 바탕으로 나만의 BGM, OST, 주제가를 만들어 보세요.</p>

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Hand, Outcome } from "./rps-logic";
 import type { VRM } from "@pixiv/three-vrm";
 
-import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
+import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import {
   applyExpressionWeightsToVrm,
   applyFingerRotations,
@@ -13,7 +13,7 @@ import {
   POSE_PRESETS,
   type FingerRotationMap,
   type PoseBoneMap,
-} from "@/src/domains/creator/vrm/studio-vrm-poser-utils";
+} from "@/domains/creator/vrm/studio-vrm-poser-utils";
 
 // 정적 자산 경로 헬퍼를 거쳐 VRM URL 규약을 한 곳에서 유지합니다.
 const VRM_URL = "/vrm/sample.vrm";

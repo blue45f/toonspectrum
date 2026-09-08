@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   relist: vi.fn(),
 }));
 
-vi.mock("@/src/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/infrastructure/creator-marketplace-client", () => ({
   listCreatorMarketplaceOwnedHistory: mocks.listHistory,
   relistCreatorMarketplaceResource: mocks.relist,
 }));

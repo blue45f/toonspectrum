@@ -24,6 +24,59 @@ import {
 
 (globalThis as unknown as { self: typeof globalThis }).self = globalThis;
 
+describe("VRM prop UID entropy", () => {
+  it.each(["missing", "throws"] as const)("uses Web Crypto bytes when randomUUID %s", async (mode) => {
+    vi.resetModules();
+    const getRandomValues = vi.fn((bytes: Uint8Array) => {
+      expect(bytes.byteLength).toBe(16);
+      bytes.fill(0x7b);
+      return bytes;
+    });
+    const random = vi.spyOn(Math, "random").mockImplementation(() => {
+      throw new Error("insecure randomness must not be used for a saved prop UID");
+    });
+    vi.stubGlobal("crypto", {
+      ...(mode === "throws" ? { randomUUID: () => { throw new Error("WebView UUID unavailable"); } } : {}),
+      getRandomValues,
+    });
+    try {
+      const props = await import("./studio-vrm-props");
+      const first = props.createPropInstance("mug")!;
+      const next = props.createPropInstance("mug")!;
+      const restored = props.parseVrmProps({ version: 2, items: [first, { ...first }, next] });
+      expect(getRandomValues).toHaveBeenCalledTimes(3);
+      expect(first.uid).not.toBe(next.uid);
+      expect(restored.items.map(({ uid }) => uid)[0]).toBe(first.uid);
+      expect(restored.items.map(({ uid }) => uid)[2]).toBe(next.uid);
+      expect(new Set(restored.items.map(({ uid }) => uid)).size).toBe(3);
+      expect(random).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it.each(["missing", "throws"] as const)("rejects new UID issuance when secure entropy %s but preserves stored IDs", async (mode) => {
+    vi.resetModules();
+    vi.stubGlobal("crypto", mode === "missing" ? undefined : {
+      randomUUID: () => { throw new Error("UUID unavailable"); },
+      getRandomValues: () => { throw new Error("secure bytes unavailable"); },
+    });
+    try {
+      const props = await import("./studio-vrm-props");
+      const saved = props.createPropInstance("mug", "existing-document-id")!;
+      const input = props.serializeVrmProps([saved])!;
+      expect(props.parseVrmProps(input).items[0].uid).toBe(saved.uid);
+      expect(() => props.createPropInstance("mug")).toThrow("소품 식별자");
+      const malformed = { version: 2, items: [{ ...saved, uid: "" }] };
+      expect(() => props.parseVrmProps(malformed)).toThrow("소품 식별자");
+      expect(malformed.items[0].uid).toBe("");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("VRM 소품 카탈로그", () => {
   it("id가 모두 고유하다", () => {
     const ids = VRM_PROPS.map((p) => p.id);
@@ -390,24 +443,6 @@ describe("VRM 소품 카탈로그", () => {
 });
 
 describe("부착 인스턴스 생성·직렬화", () => {
-  it("crypto가 없는 WebView에서도 약한 난수 없이 고유한 로컬 키를 만든다", () => {
-    vi.stubGlobal("crypto", undefined);
-    const now = vi.spyOn(Date, "now").mockReturnValue(123456789);
-    const random = vi.spyOn(Math, "random").mockImplementation(() => {
-      throw new Error("UI identifiers must not depend on weak randomness");
-    });
-    try {
-      const first = createPropInstance("mug")!;
-      const second = createPropInstance("mug")!;
-      expect(first.uid).not.toBe(second.uid);
-      expect(random).not.toHaveBeenCalled();
-    } finally {
-      random.mockRestore();
-      now.mockRestore();
-      vi.unstubAllGlobals();
-    }
-  });
-
   it("카탈로그 기본값으로 인스턴스를 만든다", () => {
     const inst = createPropInstance("smartphone", "fixed");
     expect(inst).not.toBeNull();

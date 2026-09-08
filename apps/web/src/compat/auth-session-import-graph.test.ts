@@ -9,8 +9,8 @@ describe("auth session import graph", () => {
     const apiClient = readFileSync(join(process.cwd(), "apps/web/src/infrastructure/api.ts"), "utf8");
 
     expect(authStore).not.toMatch(/import\s*\(\s*["']@\/src\/infrastructure\/api["']\s*\)/);
-    expect(authStore).toContain('import { api, apiPath } from "@/src/infrastructure/api"');
-    expect(apiClient).not.toContain("@/src/compat/auth-session-store");
-    expect(apiClient).toContain("@/src/compat/auth-session-state");
+    expect(authStore).toContain('import { api, apiPath } from "@/infrastructure/api"');
+    expect(apiClient).not.toContain("@/compat/auth-session-store");
+    expect(apiClient).toContain("@/compat/auth-session-state");
   });
 });

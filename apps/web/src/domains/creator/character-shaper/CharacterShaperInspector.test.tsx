@@ -153,6 +153,7 @@ function makeBinding(overrides: Partial<CharacterShaperBinding> = {}): Character
         missing: ["eyeSpacing"],
       } as CharacterSlotAvailability,
     })),
+    commitPreset: vi.fn(),
     commit: vi.fn(),
     clear: vi.fn(() => null),
     remove: vi.fn(() => null),

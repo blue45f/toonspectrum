@@ -33,13 +33,13 @@ import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { CREATOR_MARKETPLACE_RUNTIME_BY_KIND } from "@/shared/lib/creator-marketplace-resource-contract";
 import { cn } from "@/shared/lib/utils";
-import { useSession } from "@/src/compat/auth-session-store";
-import Link from "@/src/compat/router-link";
+import { useSession } from "@/compat/auth-session-store";
+import Link from "@/compat/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
-} from "@/src/hooks/use-document-title";
-import { publishCreatorMarketplaceResource } from "@/src/infrastructure/creator-marketplace-client";
+} from "@/hooks/use-document-title";
+import { publishCreatorMarketplaceResource } from "@/infrastructure/creator-marketplace-client";
 
 export function MarketPublishPage() {
   useDocumentTitle("에셋 등록 · 창작 마켓");
@@ -68,6 +68,7 @@ export function MarketPublishPage() {
   const [submitting, setSubmitting] = useState(false);
   const [publishedRecord, setPublishedRecord] =
     useState<CreatorMarketplaceResourceRecord | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const parsedTags = tagInput
     .split(",")
@@ -144,42 +145,35 @@ export function MarketPublishPage() {
     if (!name.trim() || !rightsConfirmed || submitting) return;
 
     setSubmitting(true);
-    const newId = `pub-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const finalRecord: CreatorMarketplaceResourceRecord = {
-      ...livePreviewRecord,
-      id: newId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
+    setPublishError(null);
     try {
-      // 1. Try backend publish API
-      await publishCreatorMarketplaceResource({
+      const published = await publishCreatorMarketplaceResource({
         schemaVersion: 1,
-        packageId: finalRecord.packageId,
-        name: finalRecord.name,
-        description: finalRecord.description,
+        packageId: livePreviewRecord.packageId,
+        name: livePreviewRecord.name,
+        description: livePreviewRecord.description,
         releaseNotes,
-        kind: finalRecord.kind,
-        resourceVersion: finalRecord.resourceVersion,
-        minimumStudioVersion: finalRecord.minimumStudioVersion,
-        tags: finalRecord.tags,
-        license: finalRecord.license,
-        attributionText: finalRecord.attributionText,
-        containsAi: finalRecord.containsAi,
+        kind: livePreviewRecord.kind,
+        resourceVersion: livePreviewRecord.resourceVersion,
+        minimumStudioVersion: livePreviewRecord.minimumStudioVersion,
+        tags: livePreviewRecord.tags,
+        license: livePreviewRecord.license,
+        attributionText: livePreviewRecord.attributionText,
+        containsAi: livePreviewRecord.containsAi,
         rightsConfirmed: true,
-        provenance: finalRecord.provenance,
-        compatibility: finalRecord.compatibility,
-        entries: finalRecord.entries,
+        provenance: livePreviewRecord.provenance,
+        compatibility: livePreviewRecord.compatibility,
+        entries: livePreviewRecord.entries,
       });
+      saveCustomPublishedResource(published);
+      setPublishedRecord(published);
     } catch {
-      // safe fallback to client registry
+      setPublishError(
+        "서버 게시가 완료되지 않았습니다. 입력 내용은 유지되며, 연결 상태를 확인한 뒤 다시 시도할 수 있습니다.",
+      );
+    } finally {
+      setSubmitting(false);
     }
-
-    // 2. Always persist into local custom registry for instant visibility
-    saveCustomPublishedResource(finalRecord);
-    setSubmitting(false);
-    setPublishedRecord(finalRecord);
   };
 
   return (
@@ -565,6 +559,15 @@ export function MarketPublishPage() {
                       본인이 직접 제작하였거나 적법한 배포 권리를 보유하고 있음을 확인합니다.
                     </span>
                   </label>
+
+                  {publishError ? (
+                    <div
+                      role="alert"
+                      className="rounded-xl border border-danger/40 bg-danger/10 p-3 text-xs leading-relaxed text-danger"
+                    >
+                      {publishError}
+                    </div>
+                  ) : null}
 
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
                     <button

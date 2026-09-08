@@ -5,7 +5,7 @@ import type { ResourceProvider } from "@/shared/lib/creator-resources";
 
 import { parseProviderAvailability } from "@/shared/lib/creator-resource-workflow";
 import { RESOURCE_LABELS } from "@/shared/lib/creator-resources";
-import { apiPath } from "@/src/infrastructure/api";
+import { apiPath } from "@/infrastructure/api";
 
 export function ProviderStatus({ provider }: { provider?: ResourceProvider }) {
   const [entries, setEntries] = useState<ProviderAvailability[] | null>(null);

@@ -1,66 +1,70 @@
 import { defineAppRoutes } from "../app-route-definition";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
-import { loadStudioI18nDictionaries } from "@/src/domains/creator/studio-i18n-loader";
+import { preloadStudioI18nCore } from "@/domains/creator/studio-i18n-priority-loader";
+
+function startStudioI18nCorePreload(): void {
+  // Full-catalog compatibility API `loadStudioI18nDictionaries()` remains available for
+  // explicit tooling. Route readiness intentionally starts only active-locale core strings.
+  void preloadStudioI18nCore().catch(() => undefined);
+}
 
 const StudioMusicPage = lazyRetry(
-  () => import("@/src/domains/creator/music/StudioMusicPage").then((module) => ({ default: module.StudioMusicPage })),
+  () => import("@/domains/creator/music/StudioMusicPage").then((module) => ({ default: module.StudioMusicPage })),
   "StudioMusicPage",
 );
 const CreateGalleryPage = lazyRetry(
-  () => import("@/src/domains/creator/CreateGalleryPage").then((module) => ({ default: module.CreateGalleryPage })),
+  () => import("@/domains/creator/CreateGalleryPage").then((module) => ({ default: module.CreateGalleryPage })),
   "CreateGalleryPage",
 );
 const CreateWorkPage = lazyRetry(
-  () => import("@/src/domains/creator/CreateWorkPage").then((module) => ({ default: module.CreateWorkPage })),
+  () => import("@/domains/creator/CreateWorkPage").then((module) => ({ default: module.CreateWorkPage })),
   "CreateWorkPage",
 );
 const CreateSeriesPage = lazyRetry(
-  () => import("@/src/domains/creator/CreateSeriesPage").then((module) => ({ default: module.CreateSeriesPage })),
+  () => import("@/domains/creator/CreateSeriesPage").then((module) => ({ default: module.CreateSeriesPage })),
   "CreateSeriesPage",
 );
 const CreateChallengesPage = lazyRetry(
-  () => import("@/src/domains/creator/CreateChallengesPage").then((module) => ({ default: module.CreateChallengesPage })),
+  () => import("@/domains/creator/CreateChallengesPage").then((module) => ({ default: module.CreateChallengesPage })),
   "CreateChallengesPage",
 );
 const StudioPromoPage = lazyRetry(
-  () => import("@/src/domains/creator/promo/StudioPromoPage").then((module) => ({ default: module.StudioPromoPage })),
+  () => import("@/domains/creator/promo/StudioPromoPage").then((module) => ({ default: module.StudioPromoPage })),
   "StudioPromoPage",
 );
 const CharacterShaperLandingPage = lazyRetry(
-  () => import("@/src/domains/creator/CharacterShaperLandingPage").then((module) => ({
+  () => import("@/domains/creator/CharacterShaperLandingPage").then((module) => ({
     default: module.CharacterShaperLandingPage,
   })),
   "CharacterShaperLandingPage",
 );
 const StudioBrushLabPage = lazyRetry(
-  async () => {
-    const [module] = await Promise.all([
-      import("@/src/domains/creator/brush-lab/StudioBrushLabPage"),
-      loadStudioI18nDictionaries(),
-    ]);
-    return { default: module.StudioBrushLabPage };
+  () => {
+    startStudioI18nCorePreload();
+    return import("@/domains/creator/brush-lab/StudioBrushLabPage").then((module) => ({
+      default: module.StudioBrushLabPage,
+    }));
   },
   "StudioBrushLabPage",
 );
 const LearnPage = lazyRetry(
-  () => import("@/src/domains/learn/LearnPage").then((module) => ({ default: module.LearnPage })),
+  () => import("@/domains/learn/LearnPage").then((module) => ({ default: module.LearnPage })),
   "LearnPage",
 );
 // Public reference pages must not initialize the editor or its dictionaries/GPU engines.
 const StudioManualPage = lazyRetry(
-  () => import("@/src/domains/creator/manual/StudioManualPage").then((module) => ({
+  () => import("@/domains/creator/manual/StudioManualPage").then((module) => ({
     default: module.StudioManualPage,
   })),
   "StudioManualPage",
 );
 const StudioRouter = lazyRetry(
-  async () => {
-    const [module] = await Promise.all([
-      import("@/src/domains/creator/studio-router/StudioRouter"),
-      loadStudioI18nDictionaries(),
-    ]);
-    return { default: module.StudioRouter };
+  () => {
+    startStudioI18nCorePreload();
+    return import("@/domains/creator/studio-router/StudioRouter").then((module) => ({
+      default: module.StudioRouter,
+    }));
   },
   "StudioRouter",
 );

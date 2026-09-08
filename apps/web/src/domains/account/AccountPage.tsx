@@ -25,12 +25,12 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useT } from "@/shared/lib/i18n";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
-import { useSession, signOut } from "@/src/compat/auth-session-store";
-import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
-import { api } from "@/src/infrastructure/api";
-import { listWorks, getCurrentUserId, type WorkSummary } from "@/src/infrastructure/creator-client";
-import { deleteMyAccount, updateMyProfile } from "@/src/infrastructure/me-client";
+import { useSession, signOut } from "@/compat/auth-session-store";
+import Link from "@/compat/router-link";
+import { ErrorState } from "@/components/error-state";
+import { api } from "@/infrastructure/api";
+import { listWorks, getCurrentUserId, type WorkSummary } from "@/infrastructure/creator-client";
+import { deleteMyAccount, updateMyProfile } from "@/infrastructure/me-client";
 
 type Tab = "posts" | "activity" | "profile";
 const TABS: { id: Tab; labelKey: string }[] = [

@@ -17,12 +17,13 @@ export interface StudioGpuPresentationDeviceOptions {
 }
 
 export interface StudioGpuPresentationDevice {
+  /** Native WebIDL object; never wrap it before passing it to GPUCanvasContext. */
   readonly device: GPUDevice;
+  /** Releases this owner without destroying another fabric consumer's device. */
+  readonly release: () => void;
   readonly deviceEpoch: number;
   readonly canvasFormat: StudioGpuCanvasFormat;
   readonly ownership: "fabric-lease" | "dedicated";
-  /** Idempotently releases this ownership; never destroy a borrowed physical device directly. */
-  readonly release: () => void;
 }
 
 function browserGpu(): GPU | null {
@@ -47,12 +48,12 @@ function resolvedStrategy(
   return import.meta.env.MODE === "test" ? "dedicated" : "shared";
 }
 
-function once(release: () => void): () => void {
+function releaseOnce(dispose: () => void): () => void {
   let released = false;
   return () => {
     if (released) return;
     released = true;
-    release();
+    dispose();
   };
 }
 
@@ -68,10 +69,10 @@ async function acquireDedicatedDevice(
     const device = await adapter.requestDevice();
     return Object.freeze({
       device,
+      release: releaseOnce(() => device.destroy()),
       deviceEpoch: 1,
       canvasFormat,
       ownership: "dedicated" as const,
-      release: once(() => device.destroy()),
     });
   } catch {
     return null;
@@ -90,20 +91,20 @@ async function acquireSharedDevice(
   }
   return Object.freeze({
     device: lease.device,
+    release: releaseOnce(() => lease.release()),
     deviceEpoch: lease.epoch,
     canvasFormat,
     ownership: "fabric-lease" as const,
-    release: once(() => lease.release()),
   });
 }
 
 /**
  * Acquires a presentation-capable GPUDevice without leaking ownership into React components.
  *
- * Product callers borrow the single StudioGpuFabric device and explicitly release their lease.
- * The device must remain the actual WebIDL object: a Proxy facade can call bound methods but
- * fails the native GPUCanvasContext.configure device brand check. The dedicated strategy uses
- * the same release contract and remains available for isolated harnesses.
+ * Product callers borrow the native StudioGpuFabric device and release only their lease through
+ * `release()`. Keeping the native object intact is required by WebIDL consumers such as
+ * GPUCanvasContext.configure. The explicit dedicated strategy keeps the same release contract
+ * for isolated harnesses and compatibility tests.
  */
 export async function acquireStudioGpuPresentationDevice(
   options?: StudioGpuPresentationDeviceOptions,

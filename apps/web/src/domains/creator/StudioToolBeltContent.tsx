@@ -65,7 +65,7 @@ import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,
   SharedAssetCatalogItem,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 const STUDIO_CANVAS_IMAGE_ACCEPT =
   "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff";
@@ -365,14 +365,14 @@ export interface StudioToolBeltContentHandlers {
    */
   activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   openFrameAnimationForSelected: () => void;
-  addBgScene: (bg: StudioBgScene) => void;
+  addBgScene: (bg: StudioBgScene) => boolean;
   addBubble: (
     variant: BubbleVariant,
     at?: { x: number; y: number; },
     editImmediately?: boolean
   ) => void;
   addBuiltinRasterAsset: (asset: StudioRasterAsset) => Promise<void>;
-  addCatalogElement: (item: { svg: string; width: number; height: number; label: string; }) => void;
+  addCatalogElement: (item: { svg: string; width: number; height: number; label: string; }) => boolean;
   /**
    * Elements 3D rail: open BG3D / VRM with a one-shot template·primitive·prop seed.
    * Host owns seed state so drag/drop and click share one entry.

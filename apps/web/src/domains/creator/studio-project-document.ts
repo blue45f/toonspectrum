@@ -18,7 +18,8 @@ import {
 export const STUDIO_PROJECT_DOCUMENT_FORMAT_ID =
   "toonspectrum.studio-project" as const;
 export const STUDIO_PROJECT_DOCUMENT_PAYLOAD_TYPE = "project" as const;
-export const STUDIO_PROJECT_DOCUMENT_CURRENT_VERSION = 2 as const;
+export const STUDIO_PROJECT_DOCUMENT_CURRENT_VERSION = 3 as const;
+const LEGACY_PROJECT_DOCUMENT_VERSION = 2;
 
 export interface StudioProjectDocumentMetadata {
   readonly documentId: string;
@@ -244,12 +245,12 @@ function decodeProjectDocumentInput(value: unknown): unknown {
   }
 }
 
-const studioProjectDocumentRegistry = createStudioDocumentMigratorRegistry([
+const legacyProjectDocumentRegistry = createStudioDocumentMigratorRegistry([
   {
     formatId: STUDIO_PROJECT_DOCUMENT_FORMAT_ID,
     payloadType: STUDIO_PROJECT_DOCUMENT_PAYLOAD_TYPE,
     minimumVersion: 1,
-    currentVersion: STUDIO_PROJECT_DOCUMENT_CURRENT_VERSION,
+    currentVersion: LEGACY_PROJECT_DOCUMENT_VERSION,
     migrators: [
       {
         id: "studio-project.v1-to-v2",
@@ -271,6 +272,17 @@ const studioProjectDocumentRegistry = createStudioDocumentMigratorRegistry([
   },
 ]);
 
+// V3 changes the minimum reader for V4 brush snapshots, not the bytes of existing V2 envelopes.
+const studioProjectDocumentRegistry = createStudioDocumentMigratorRegistry([
+  {
+    formatId: STUDIO_PROJECT_DOCUMENT_FORMAT_ID,
+    payloadType: STUDIO_PROJECT_DOCUMENT_PAYLOAD_TYPE,
+    minimumVersion: STUDIO_PROJECT_DOCUMENT_CURRENT_VERSION,
+    currentVersion: STUDIO_PROJECT_DOCUMENT_CURRENT_VERSION,
+    migrators: [],
+  },
+]);
+
 export function createStudioProjectDocumentEnvelope(
   value: unknown,
   metadata: StudioProjectDocumentMetadata,
@@ -278,10 +290,11 @@ export function createStudioProjectDocumentEnvelope(
 ): CanonicalStudioDocumentEnvelope<
   typeof STUDIO_PROJECT_DOCUMENT_PAYLOAD_TYPE
 > {
+  const project = detachedProjectJson(value);
   return createCanonicalStudioDocumentEnvelope({
     format: {
       id: STUDIO_PROJECT_DOCUMENT_FORMAT_ID,
-      version: STUDIO_PROJECT_DOCUMENT_CURRENT_VERSION,
+      version: project.version,
     },
     document: {
       id: metadata.documentId,
@@ -291,7 +304,7 @@ export function createStudioProjectDocumentEnvelope(
     },
     payload: {
       type: STUDIO_PROJECT_DOCUMENT_PAYLOAD_TYPE,
-      data: detachedProjectJson(value) as unknown as StudioDocumentJsonValue,
+      data: project as unknown as StudioDocumentJsonValue,
     },
     extensions,
   });
@@ -370,7 +383,11 @@ export async function parseStudioProjectDocument(
     };
   }
 
-  const migrated = await studioProjectDocumentRegistry.migrate(decoded);
+  const usesNewReader = isRecord(decoded) && isRecord(decoded.format)
+    && typeof decoded.format.version === "number"
+    && decoded.format.version > LEGACY_PROJECT_DOCUMENT_VERSION;
+  const registry = usesNewReader ? studioProjectDocumentRegistry : legacyProjectDocumentRegistry;
+  const migrated = await registry.migrate(decoded);
   if (!migrated.ok) {
     throw new StudioProjectDocumentError(
       migrated.diagnostics[0],
@@ -382,6 +399,15 @@ export async function parseStudioProjectDocument(
       typeof STUDIO_PROJECT_DOCUMENT_PAYLOAD_TYPE
     >;
   const project = parseStudioProjectFile(migratedEnvelope.payload.data);
+  if (project.version > migratedEnvelope.format.version) {
+    throw new StudioProjectDocumentError({
+      severity: "error",
+      code: "INVALID_ENVELOPE",
+      message: "프로젝트의 브러시 데이터에 필요한 파일 버전이 올바르지 않습니다.",
+      recoverable: true,
+      recovery: "repair-source",
+    }, migratedEnvelope);
+  }
 
   return {
     source: "canonical-envelope",

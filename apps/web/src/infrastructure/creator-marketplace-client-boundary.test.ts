@@ -18,7 +18,7 @@ const runtimeSource = readFileSync(
 describe("creator marketplace feature bundle boundary", () => {
   it("순수 delivery facade에서 API transport를 정적 로드하지 않는다", () => {
     expect(facadeSource).not.toContain(
-      'from "@/src/infrastructure/api"',
+      'from "@/infrastructure/api"',
     );
     expect(facadeSource).toContain(
       'import("./creator-marketplace-client-network")',
@@ -26,13 +26,13 @@ describe("creator marketplace feature bundle boundary", () => {
     expect(facadeSource).toContain("loadChunkWithReloadRecovery");
     expect(facadeSource).toContain('"CreatorMarketplaceNetworkClient"');
     expect(networkSource).toContain(
-      'from "@/src/infrastructure/api"',
+      'from "@/infrastructure/api"',
     );
   });
 
   it("creator pack runtime의 delivery 생성은 가짜 동적 import 없이 순수 facade를 사용한다", () => {
     expect(runtimeSource).toContain(
-      'from "@/src/infrastructure/creator-marketplace-client"',
+      'from "@/infrastructure/creator-marketplace-client"',
     );
     expect(runtimeSource).not.toMatch(
       /await import\(\s*"@\/src\/infrastructure\/creator-marketplace-client"\s*\)/u,

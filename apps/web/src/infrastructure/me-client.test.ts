@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { updateMyProfile } from "./me-client";
 
-import { getAuthSession, persistSession } from "@/src/compat/auth-session-state";
+import { getAuthSession, persistSession } from "@/compat/auth-session-state";
 
 const apiPatch = vi.hoisted(() => vi.fn());
 
-vi.mock("@/src/infrastructure/api", () => ({
+vi.mock("@/infrastructure/api", () => ({
   api: {
     patch: apiPatch,
     raw: vi.fn(),

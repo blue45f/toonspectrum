@@ -1,6 +1,6 @@
 import { Container } from "@/shared/components/section";
 import { useT } from "@/shared/lib/i18n";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 // 저작권·콘텐츠 안내(/copyright).
 export function CopyrightPage() {

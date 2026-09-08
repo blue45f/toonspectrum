@@ -23,13 +23,13 @@ import type { ComponentType } from "react";
 import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
 import { Container, Section } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 import {
   useDocumentTitle,
   useJsonLd,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/src/hooks/use-document-title";
+} from "@/hooks/use-document-title";
 
 // 캐릭터 셰이퍼 공개 랜딩 + 사용 가이드(/shaper). 실제 도구는 /studio/character 에 있고,
 // 이 페이지는 무엇을 할 수 있고 무엇이 모델에 따라 달라지는지를 짧고 정직하게 안내한다.

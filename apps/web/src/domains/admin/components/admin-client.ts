@@ -1,5 +1,5 @@
 // 관리자 API(Nest /api/admin/*) 공용 클라이언트 — HttpOnly 쿠키 인증을 공유한다.
-import { api, apiPath, HTTPError } from "@/src/infrastructure/api";
+import { api, apiPath, HTTPError } from "@/infrastructure/api";
 
 export interface AdminMe {
   id: string;
@@ -63,11 +63,11 @@ export interface RevenueEvent {
 }
 
 export interface RevenueSummary {
-  pendingAmount: number;
-  approvedAmount: number;
-  paidAmount: number;
-  rejectedAmount: number;
-  revokedAmount: number;
+  pendingAmountCents: number;
+  approvedAmountCents: number;
+  paidAmountCents: number;
+  rejectedAmountCents: number;
+  revokedAmountCents: number;
   pendingEvents: number;
   approvedEvents: number;
   paidEvents: number;

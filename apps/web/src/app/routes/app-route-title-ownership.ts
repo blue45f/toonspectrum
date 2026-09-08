@@ -1,4 +1,4 @@
-import { studioRouteOwnsDocumentTitle } from "@/src/domains/creator/studio-router/studio-route-manifest";
+import { studioRouteOwnsDocumentTitle } from "@/domains/creator/studio-router/studio-route-manifest";
 
 export interface AppRouteTitleLocation {
   readonly pathname: string;
@@ -6,8 +6,8 @@ export interface AppRouteTitleLocation {
 }
 
 /**
- * AppRouter owns generic/dynamic route titles. Editor-style children retain title ownership so a
- * nested route transition cannot overwrite a document title whose source state did not change.
+ * AppRouter owns generic/dynamic route titles. Editor-style and administration children retain
+ * title ownership so nested route transitions can expose the exact active workspace title.
  */
 export function shouldAppRouterOwnDocumentTitle({
   pathname,
@@ -19,7 +19,7 @@ export function shouldAppRouterOwnDocumentTitle({
   if (pathname.startsWith("/u/")) return false;
   if (pathname.startsWith("/community/cafes/")) return false;
   if (pathname.startsWith("/community/post/")) return false;
-  // The independently lazy-loaded manual supplies the active article's title.
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return false;
   if (pathname === "/studio/manual" || pathname.startsWith("/studio/manual/")) return false;
   if (pathname === "/studio" || pathname.startsWith("/studio/")) {
     return !studioRouteOwnsDocumentTitle({ pathname, search });

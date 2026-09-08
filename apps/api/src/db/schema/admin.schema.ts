@@ -80,5 +80,106 @@ export const revenueLedger = pgTable(
   (t) => [
     index("idx_revenue_ledger_recipient_created").on(t.recipientId, t.createdAt), // 크리에이터 수익 내역
     index("idx_revenue_ledger_payer_created").on(t.payerId, t.createdAt), // 후원/결제 내역
+    index("idx_revenue_ledger_createdat").on(t.createdAt),
+    index("idx_revenue_ledger_status_createdat").on(t.status, t.createdAt),
+    index("idx_revenue_ledger_reviewedat").on(t.reviewedAt),
+    index("idx_revenue_ledger_settledat").on(t.settledAt),
   ]
+);
+
+
+// Managed administrator tables. Keep persisted SQL defaults and existing FK deletion semantics.
+export const adminAuditLogs = pgTable(
+  "admin_audit_logs",
+  {
+    id: text("id").primaryKey(),
+    adminId: text("adminId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    adminEmail: text("adminEmail"),
+    action: text("action").notNull(),
+    targetType: text("targetType").notNull().default("system"),
+    targetId: text("targetId"),
+    details: jsonb("details").notNull().default({}),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_admin_audit_logs_createdat").on(t.createdAt),
+    index("idx_admin_audit_logs_action").on(t.action),
+  ],
+);
+
+export const adminBannedWords = pgTable(
+  "admin_banned_words",
+  {
+    id: text("id").primaryKey(),
+    word: text("word").notNull().unique(),
+    category: text("category").notNull().default("general"),
+    createdBy: text("createdBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+);
+
+export const adminPromos = pgTable(
+  "admin_promos",
+  {
+    id: text("id").primaryKey(),
+    code: text("code").notNull().unique(),
+    discountType: text("discountType").notNull().default("percent"),
+    discountValue: integer("discountValue").notNull().default(10),
+    maxUses: integer("maxUses").notNull().default(100),
+    usedCount: integer("usedCount").notNull().default(0),
+    isActive: boolean("isActive").notNull().default(true),
+    expiresAt: timestamp("expiresAt", { mode: "date" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+);
+
+export const adminAnnouncements = pgTable(
+  "admin_announcements",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    content: text("content").notNull().default(""),
+    level: text("level").notNull().default("info"),
+    placement: text("placement").notNull().default("top_banner"),
+    targetRole: text("targetRole").notNull().default("all"),
+    isActive: boolean("isActive").notNull().default(true),
+    startsAt: timestamp("startsAt", { mode: "date" }),
+    endsAt: timestamp("endsAt", { mode: "date" }),
+    createdBy: text("createdBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_admin_announcements_active").on(t.isActive),
+  ],
+);
+
+export const adminSecurityPolicies = pgTable(
+  "admin_security_policies",
+  {
+    id: text("id").primaryKey(),
+    ipAddress: text("ipAddress").notNull().unique(),
+    reason: text("reason").notNull().default(""),
+    action: text("action").notNull().default("block"),
+    createdBy: text("createdBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+);
+
+export const adminContentReports = pgTable(
+  "admin_content_reports",
+  {
+    id: text("id").primaryKey(),
+    reporterId: text("reporterId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    targetType: text("targetType").notNull(),
+    targetId: text("targetId").notNull(),
+    reason: text("reason").notNull().default(""),
+    status: text("status").notNull().default("pending"),
+    resolvedBy: text("resolvedBy").references(() => users.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolvedAt", { mode: "date" }),
+    resolutionNote: text("resolutionNote").default(""),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_admin_reports_status").on(t.status),
+  ],
 );

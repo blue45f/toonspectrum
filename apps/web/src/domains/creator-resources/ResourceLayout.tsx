@@ -8,17 +8,17 @@ export function ResourceLayout({ title, intro, children }: { title: string; intr
   const { pathname } = useLocation();
   return <section className="mx-auto max-w-6xl space-y-8 px-4 py-8 text-fg sm:px-6 sm:py-12">
     <header className="space-y-4">
-      <Link to="/creator-hub" className="text-sm font-semibold text-accent">TOONSTUDIO / 창작 허브</Link>
+      <Link to="/research" className="text-sm font-semibold text-accent">TOONSTUDIO / 리서치 데스크</Link>
       <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
       <p className="max-w-3xl text-base leading-7 text-fg-2">{intro}</p>
     </header>
-    <nav aria-label="창작 자료 메뉴" className="flex flex-wrap gap-2">
+    <nav aria-label="창작 리서치 메뉴" className="flex flex-wrap gap-2">
       {RESOURCE_PAGES.slice(1).map((page) => <Link key={page.path} to={page.path} aria-current={pathname === page.path ? "page" : undefined}
         className={`${RESOURCE_BUTTON} ${pathname === page.path ? "bg-accent-soft text-accent" : "bg-panel"}`}>{page.title}</Link>)}
     </nav>
     {children}
     <footer className="flex flex-wrap gap-3 border-t border-line pt-6">
-      <Link className={RESOURCE_BUTTON} to="/studio">스튜디오 열기</Link>
+      <Link className={RESOURCE_BUTTON} to="/studio" reloadDocument>스튜디오 열기</Link>
       <Link className={RESOURCE_BUTTON} to="/create">작품 갤러리</Link>
       <Link className={RESOURCE_BUTTON} to="/create/challenges">창작 챌린지</Link>
       <Link className={RESOURCE_BUTTON} to="/community">창작 커뮤니티</Link>

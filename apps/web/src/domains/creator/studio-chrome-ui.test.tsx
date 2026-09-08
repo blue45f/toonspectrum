@@ -60,17 +60,20 @@ describe("studio chrome UI", () => {
     expect(container.innerHTML).not.toContain("선택");
   });
 
-  it("keeps rail tool labels untouched in Korean", () => {
-    const { container } = render(
+  it("uses the shared Korean tool name while preserving the hand action", () => {
+    const onClick = vi.fn();
+    render(
       <StudioRailToolButton
         data-studio-rail-tool-id="hand"
         icon={Pencil}
         label="핸드 (팬)"
+        onClick={onClick}
       />
     );
-    // 한국어 카탈로그 라벨은 설정 목록용 축약형("핸드(팬)")이라 레일 문구와 글자가 다르다.
-    // 한국어에서는 갈아타지 않는 것이 계약이다.
-    expect(container.innerHTML).toContain('aria-label="핸드 (팬)"');
+    const button = screen.getByRole("button", { name: "화면 이동" });
+    expect(button.getAttribute("data-studio-rail-tool-id")).toBe("hand");
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 
   it("renders labeled toolbar dividers for competitor-style tool groups", () => {

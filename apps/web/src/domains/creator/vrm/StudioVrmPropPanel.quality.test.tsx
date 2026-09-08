@@ -23,7 +23,7 @@ afterEach(cleanup);
 
 function renderPanel(items: PropInstance[] = [], vrmReady = true, hairRisk = false) {
   const onAdd = vi.fn();
-  const onUpdate = vi.fn();
+  const onUpdate = vi.fn<(uid: string, patch: Partial<PropInstance>) => void>();
   const onRemove = vi.fn();
   const rendered = render(
     <StudioVrmPropPanel
@@ -108,6 +108,34 @@ describe("wearable visual-quality selection policy", () => {
     expect(onUpdate).not.toHaveBeenCalled();
     expect(onRemove).not.toHaveBeenCalled();
   });
+
+  it.each(["hanging_sign", "traffic_light", "mailbox", "bubble_tea", "ice_cream_cone", "fox_mask", "robot_pet"])(
+    "keeps a saved %s editable and re-saveable while adding only its explicit new revision",
+    (name) => {
+      const oldId = `blender_${name}`;
+      const definition = propDefById(oldId)!;
+      const saved = { version: 1, items: [{ uid: `saved-${name}`, propId: oldId, bone: definition.defaultBone, position: [0.12, -0.04, 0.08], rotationDeg: [10, 20, 30], scale: 0.9, color: null }] };
+      const restored = parseVrmProps(saved).items;
+      const { container, onAdd, onUpdate, onRemove } = renderPanel(restored);
+      expect(screen.getByRole("heading", { name: `${definition.label} 편집` })).not.toBeNull();
+      const position = screen.getByRole("slider", { name: "위치 X축" });
+      expect(position.getAttribute("value")).toBe("0.12");
+      fireEvent.change(position, { target: { value: "0.17" } });
+      expect(onUpdate).toHaveBeenCalledExactlyOnceWith(`saved-${name}`, { position: [0.17, -0.04, 0.08] });
+      const edited = { ...restored[0]!, ...onUpdate.mock.calls[0]![1] };
+      expect(parseVrmProps(serializeVrmProps([edited])).items).toEqual([{ ...restored[0], position: [0.17, -0.04, 0.08] }]);
+      expect(edited.propId).toBe(oldId);
+      expect(onRemove).not.toHaveBeenCalled();
+      const details = container.querySelector("details");
+      if (!details) throw new Error("Expected the actual prop catalogue");
+      details.open = true;
+      fireEvent.change(screen.getByRole("searchbox", { name: "소품 검색" }), { target: { value: definition.label } });
+      const refined = propDefById(`${oldId}_v8`)!;
+      expect(screen.queryByRole("button", { name: `${definition.label} 추가. ${definition.hint}` })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: `${refined.label} 추가. ${refined.hint}` }));
+      expect(onAdd).toHaveBeenCalledExactlyOnceWith(`${oldId}_v8`);
+    },
+  );
 
   it("keeps saved quarantined items and their transforms intact and editable", () => {
     const item = createPropInstance("sword", "saved-sword")!;

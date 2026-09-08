@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { authoritativeMarketCacheKey } from "../models/market-authority";
 import { useMarketResources } from "./use-market-resources";
 
 import {
@@ -12,17 +13,22 @@ import {
   type CreatorMarketplaceResourceListPage,
   type CreatorMarketplaceResourceRecord,
 } from "@/shared/lib/creator-marketplace-resource-contract";
-import { listCreatorMarketplaceResources } from "@/src/domains/market/remotes/market-resource-remote";
+import { listCreatorMarketplaceResources } from "@/domains/market/remotes/market-resource-remote";
 
-vi.mock("@/src/domains/market/remotes/market-resource-remote", () => ({
+vi.mock("@/domains/market/remotes/market-resource-remote", () => ({
   listCreatorMarketplaceResources: vi.fn(),
 }));
 
 const listResources = vi.mocked(listCreatorMarketplaceResources);
 const PUBLISHER_ID = randomUUID();
+const STORAGE_PREFIX = "toonspectrum.market.page.v1:";
 
 function resource(id: string, name = id): CreatorMarketplaceResourceRecord {
   return { id, name } as CreatorMarketplaceResourceRecord;
+}
+
+function cacheStorageKey(query: object): string {
+  return `${STORAGE_PREFIX}${authoritativeMarketCacheKey(JSON.stringify(query))}`;
 }
 
 function cachedResource(id: string): CreatorMarketplaceResourceRecord {
@@ -77,7 +83,7 @@ function cachedResource(id: string): CreatorMarketplaceResourceRecord {
 
 function page(
   items: CreatorMarketplaceResourceRecord[],
-  nextCursor: string | null = null
+  nextCursor: string | null = null,
 ): CreatorMarketplaceResourceListPage {
   return {
     items,
@@ -126,10 +132,10 @@ describe("useMarketResources", () => {
         limit: 12,
         sort: "newest",
       }),
-      expect.any(AbortSignal)
+      expect.any(AbortSignal),
     );
     const cachedPage = JSON.parse(
-      localStorage.getItem(`toonspectrum.market.page.v1:${JSON.stringify(query)}`) ?? "null"
+      localStorage.getItem(cacheStorageKey(query)) ?? "null",
     ) as { hasMore?: unknown; nextCursor?: unknown } | null;
     expect(cachedPage).toMatchObject({ hasMore: true, nextCursor: "cursor-2" });
 
@@ -147,7 +153,7 @@ describe("useMarketResources", () => {
         cursor: "cursor-2",
         sort: "newest",
       }),
-      expect.any(AbortSignal)
+      expect.any(AbortSignal),
     );
     expect(result.current.hasMore).toBe(false);
   });
@@ -176,12 +182,12 @@ describe("useMarketResources", () => {
     expect(listResources).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ cursor: "cursor-2" }),
-      expect.any(AbortSignal)
+      expect.any(AbortSignal),
     );
     expect(listResources).toHaveBeenNthCalledWith(
       3,
       expect.objectContaining({ cursor: "cursor-2" }),
-      expect.any(AbortSignal)
+      expect.any(AbortSignal),
     );
     expect(result.current.loadMoreError).toBeNull();
   });
@@ -195,7 +201,7 @@ describe("useMarketResources", () => {
 
     const { result, rerender } = renderHook(
       ({ search }) => useMarketResources({ limit: 12, search, sort: "newest" }),
-      { initialProps: { search: "old" } }
+      { initialProps: { search: "old" } },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -226,7 +232,7 @@ describe("useMarketResources", () => {
 
     const { result, rerender } = renderHook(
       ({ search }) => useMarketResources({ limit: 12, search, sort: "newest" }),
-      { initialProps: { search: "old" } }
+      { initialProps: { search: "old" } },
     );
     const oldSignal = listResources.mock.calls[0]?.[1];
 
@@ -240,47 +246,33 @@ describe("useMarketResources", () => {
     expect(result.current.items.map((item) => item.id)).toEqual(["new"]);
   });
 
-  it("keeps newest and relevance pages in separate cache generations", async () => {
+  it("keeps newest and relevance pages in separate authoritative cache generations", async () => {
     listResources
       .mockResolvedValueOnce(page([resource("newest-result")], null))
       .mockResolvedValueOnce(page([resource("relevance-result")], null));
 
+    const newestQuery = { limit: 12, search: "ink", sort: "newest" as const };
+    const relevanceQuery = { limit: 12, search: "ink", sort: "relevance" as const };
     const { result, rerender } = renderHook(
       ({ sort }: { sort: "newest" | "relevance" }) => useMarketResources({
         limit: 12,
         search: "ink",
         sort,
       }),
-      {
-        initialProps: {
-          sort: "newest" as "newest" | "relevance",
-        },
-      }
+      { initialProps: { sort: "newest" as "newest" | "relevance" } },
     );
     await waitFor(() => expect(result.current.items[0]?.id).toBe("newest-result"));
 
     rerender({ sort: "relevance" });
     await waitFor(() => expect(result.current.items[0]?.id).toBe("relevance-result"));
 
-    expect(localStorage.getItem(
-      `toonspectrum.market.page.v1:${JSON.stringify({
-        limit: 12,
-        search: "ink",
-        sort: "newest",
-      })}`
-    )).not.toBeNull();
-    expect(localStorage.getItem(
-      `toonspectrum.market.page.v1:${JSON.stringify({
-        limit: 12,
-        search: "ink",
-        sort: "relevance",
-      })}`
-    )).not.toBeNull();
+    expect(localStorage.getItem(cacheStorageKey(newestQuery))).not.toBeNull();
+    expect(localStorage.getItem(cacheStorageKey(relevanceQuery))).not.toBeNull();
   });
 
-  it("does not paginate or refresh a stale cached head with a newly fetched tail", async () => {
+  it("does not paginate or refresh an authoritative stale head with a newly fetched tail", async () => {
     const query = { limit: 12, sort: "newest" as const };
-    const cacheKey = `toonspectrum.market.page.v1:${JSON.stringify(query)}`;
+    const cacheKey = cacheStorageKey(query);
     const savedAt = new Date().toISOString();
     localStorage.setItem(cacheKey, JSON.stringify({
       savedAt,
@@ -307,13 +299,13 @@ describe("useMarketResources", () => {
     });
   });
 
-  it("falls back to starter catalog when network fails and no localStorage cache exists", async () => {
+  it("fails closed when the server is unavailable and no authoritative cache exists", async () => {
     listResources.mockRejectedValueOnce(new Error("503 Service Unavailable"));
     const { result } = renderHook(() => useMarketResources({ limit: 12, sort: "newest" }));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.error).toBeNull();
-    expect(result.current.items.length).toBeGreaterThanOrEqual(1);
-    expect(result.current.items.some((r) => r.kind === "3d-asset")).toBe(true);
+    expect(result.current.error).toBe("공개 마켓을 불러올 수 없어요. 잠시 후 다시 시도해 주세요.");
+    expect(result.current.items).toEqual([]);
+    expect(result.current.stale).toBe(false);
   });
 });

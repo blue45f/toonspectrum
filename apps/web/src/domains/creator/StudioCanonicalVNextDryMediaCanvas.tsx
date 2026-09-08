@@ -83,7 +83,6 @@ interface LayoutEpochs {
 }
 
 interface DryMediaGpuResources {
-  readonly device: GPUDevice;
   readonly release: () => void;
   readonly surface: StudioEngineWebGpuPresentationSurface;
   readonly runtime: StudioEngineWebGpuTexturedBrushRuntime;
@@ -113,13 +112,13 @@ async function createResources(
 ): Promise<DryMediaGpuResources | null> {
   const acquired = await acquireStudioGpuPresentationDevice();
   if (!acquired) return null;
-  const { device, deviceEpoch, canvasFormat } = acquired;
+  const { device, deviceEpoch, canvasFormat, release } = acquired;
   let surface: StudioEngineWebGpuPresentationSurface | null = null;
   let runtime: StudioEngineWebGpuTexturedBrushRuntime | null = null;
   try {
     const context = canvas.getContext("webgpu") as GPUCanvasContext | null;
     if (!context) {
-      acquired.release();
+      release();
       return null;
     }
     const surfaceResult = createStudioEngineWebGpuPresentationSurface({
@@ -132,7 +131,7 @@ async function createResources(
       onDeviceLost,
     });
     if (surfaceResult.status !== "ready") {
-      acquired.release();
+      release();
       return null;
     }
     surface = surfaceResult.surface;
@@ -145,13 +144,12 @@ async function createResources(
     });
     if (runtimeResult.status !== "ready") {
       surface.dispose();
-      acquired.release();
+      release();
       return null;
     }
     runtime = runtimeResult.runtime;
     return {
-      device,
-      release: acquired.release,
+      release,
       surface,
       runtime,
       controller: new StudioCanonicalVNextDryMediaPresentationController({
@@ -172,7 +170,7 @@ async function createResources(
   } catch {
     runtime?.dispose();
     surface?.dispose();
-    acquired.release();
+    release();
     return null;
   }
 }

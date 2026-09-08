@@ -11,9 +11,9 @@ import { ShimmerTitle } from "@/shared/components/shimmer-title";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
-import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
-import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
+import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
+import Link from "@/compat/router-link";
+import { ErrorState } from "@/components/error-state";
 import {
   listFollowingFeed,
   listSeries,
@@ -21,7 +21,7 @@ import {
   type SeriesSummary,
   type WorkSort,
   type WorkSummary,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 
 const SORTS: { value: WorkSort; label: string }[] = [

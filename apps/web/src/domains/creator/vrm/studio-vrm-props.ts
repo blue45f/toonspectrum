@@ -336,7 +336,13 @@ const VRM_PROP_BASES = [
   { id: "blender_hanging_sign", label: "블렌더 매달린 간판", category: "body", defaultBone: "chest", defaultPosition: [0.55, 0.3, -0.4], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 가게 현판." },
 ] as const satisfies readonly LegacyPropDef[];
 
-export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
+type OriginalVrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
+const REFINED_V8_PROP_IDS = [
+  "blender_hanging_sign", "blender_traffic_light", "blender_mailbox", "blender_bubble_tea",
+  "blender_ice_cream_cone", "blender_fox_mask", "blender_robot_pet",
+] as const satisfies readonly OriginalVrmPropId[];
+type RefinedV8OriginalPropId = (typeof REFINED_V8_PROP_IDS)[number];
+export type VrmPropId = OriginalVrmPropId | `${RefinedV8OriginalPropId}_v8`;
 
 type PropProfile = Pick<PropDef, "anchors" | "fit"> & {
   grip?: PropGripProfile;
@@ -376,7 +382,7 @@ function fit(reference: PropFitReference, designReference: number, minScale = 0.
  * geometry와 같은 로컬 좌표로 기록한 접촉점 카탈로그.
  * Record<VrmPropId, ...>를 사용해 소품 추가 시 프로필 누락을 컴파일 단계에서 막는다.
  */
-const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
+const PROP_PROFILES: Record<OriginalVrmPropId, PropProfile> = {
   smartphone: {
     anchors: [handAnchor("primary", "primary", [0, -0.02, -0.006], 0.009)],
     grip: grip("flat", 0.009, 38, 34),
@@ -794,15 +800,43 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   },
 };
 
-export const VRM_PROPS: readonly PropDef[] = VRM_PROP_BASES.map((def): PropDef => ({
+// Persisted IDs own both their original bytes and original attachment coordinates.
+const ORIGINAL_VRM_PROPS: readonly PropDef[] = VRM_PROP_BASES.map((def): PropDef => ({
   ...def,
   geometrySource: geometrySourceForPropId(def.id),
   wearSocket: "bone",
   ...PROP_PROFILES[def.id],
 }));
 
+const REFINED_V8_PROFILES: Partial<Record<RefinedV8OriginalPropId, Partial<PropProfile>>> = {
+  blender_ice_cream_cone: {
+    anchors: [handAnchor("primary", "primary", [0, 0.085, 0], 0.021)],
+    grip: grip("cylinder", 0.021, 42, 30),
+  },
+  blender_bubble_tea: {
+    anchors: [handAnchor("primary", "primary", [0, 0.08, 0], 0.03)],
+    grip: grip("cylinder", 0.03, 40, 28),
+  },
+  blender_fox_mask: {
+    anchors: [anchor("surface", "surface", [0, 0.04, 0.06014])],
+  },
+};
+
+/** New selections record an explicit revision; historical documents keep their authored geometry. */
+export const VRM_PROPS: readonly PropDef[] = ORIGINAL_VRM_PROPS.map((def): PropDef => {
+  const originalId = REFINED_V8_PROP_IDS.find(id => id === def.id);
+  if (!originalId) return def;
+  return {
+    ...def,
+    id: `${originalId}_v8`,
+    label: `${def.label} · 개선형`,
+    geometrySource: { kind: "gltf", url: `/assets/3d/refined-v8/${originalId.slice("blender_".length)}.glb` },
+    ...REFINED_V8_PROFILES[originalId],
+  };
+});
+
 export function propDefById(id: string): PropDef | undefined {
-  return VRM_PROPS.find((p) => p.id === id);
+  return VRM_PROPS.find((p) => p.id === id) ?? ORIGINAL_VRM_PROPS.find((p) => p.id === id);
 }
 
 export function propsByCategory(category: PropCategory): PropDef[] {
@@ -888,10 +922,16 @@ function propUidCandidate(seed?: string): string {
   const uuid = secureRandomUuid();
   if (uuid) return `${prefix}-${uuid}-${counter}`;
 
-  const timestamp = Date.now().toString(36);
-  // This fallback is a local UI instance key, never an authentication token.
-  // The counter and issued-key registry ensure uniqueness without weak randomness.
-  return `${prefix}-${timestamp}-${counter}`;
+  // WebViews may omit randomUUID while still exposing Web Crypto's random-byte source.
+  // A saved instance must never silently fall back to predictable Math.random entropy.
+  const bytes = new Uint8Array(16);
+  try {
+    globalThis.crypto.getRandomValues(bytes);
+  } catch (cause) {
+    throw new Error("안전한 소품 식별자를 생성할 수 없습니다.", { cause });
+  }
+  const entropy = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${prefix}-${entropy}-${counter}`;
 }
 
 /** 저장·재실행 뒤에도 충돌하기 어려운 UI 인스턴스 키(테스트에서는 uid를 직접 주입할 수 있다). */

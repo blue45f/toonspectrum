@@ -62,7 +62,7 @@ import {
 } from "@/shared/lib/creator-asset-contract";
 import {
   publishAsset,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 export function useStudioVrmPoserShare(h: StudioVrmPoserHost): void {
   const {

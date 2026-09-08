@@ -57,7 +57,7 @@ import { DEFAULT_VRM_CUSTOM_COLORS } from "./StudioVrmPoserTypes";
 import type { FingerRotationMap, PoseBoneMap } from "./studio-vrm-poser-utils";
 import type { StudioVrmPoserHost } from "./StudioVrmPoserHost";
 import type { CustomPose } from "./StudioVrmPoserTypes";
-import type { SharedAssetCatalogItem } from "@/src/infrastructure/creator-client";
+import type { SharedAssetCatalogItem } from "@/infrastructure/creator-client";
 import type {
   VRM,
 } from "@pixiv/three-vrm";

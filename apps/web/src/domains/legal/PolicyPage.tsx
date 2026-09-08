@@ -19,7 +19,7 @@ import {
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import { ErrorState } from "@/src/components/error-state";
+import { ErrorState } from "@/components/error-state";
 
 
 // 이용약관(/terms)·개인정보처리방침(/privacy).

@@ -35,16 +35,17 @@ describe("Studio SQLite autosave store", () => {
     await database.close();
   });
 
-  it("round-trips a normalized Studio snapshot through real sqlite-wasm", async () => {
+  it.each([2, 3] as const)("round-trips a normalized V%s Studio snapshot through real sqlite-wasm", async (version) => {
     const store = createStudioAutosaveSqliteStore(database);
-    const next = payload("2026-08-09T01:00:00.000Z", "sqlite-stroke");
+    const next = { ...payload("2026-08-09T01:00:00.000Z", "sqlite-stroke"), version };
+    const key = `project-v${version}`;
 
-    await store.write("project-a", next);
+    await store.write(key, next);
 
-    expect(await store.read("project-a")).toMatchObject({
+    expect(await store.read(key)).toMatchObject({
       state: "snapshot",
       savedAt: next.savedAt,
-      payload: { pagesList: [{ elements: [{ id: "sqlite-stroke" }] }] },
+      payload: next,
     });
   });
 

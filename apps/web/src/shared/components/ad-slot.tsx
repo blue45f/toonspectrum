@@ -8,8 +8,8 @@ import { Card3D } from "./ui/card-3d";
 
 import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
-import { adConfig } from "@/src/components/deskcloud-native/config";
-import { useAppConfig } from "@/src/hooks/use-app-config";
+import { adConfig } from "@/components/deskcloud-native/config";
+import { useAppConfig } from "@/hooks/use-app-config";
 
 // 한 지면이 묶어서 서빙하는 스폰서 슬롯들. 페이지마다 한 곳에만 두며(복잡도 ↓),
 // 여러 슬롯을 모아 스와이프 캐러셀 한 줄로 보여준다. 기본은 홈 스포트라이트 3종.

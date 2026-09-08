@@ -1,0 +1,103 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/weathered_brown_planks",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 1,
+    "tags": [
+      "wood",
+      "planks",
+      "old",
+      "worn",
+      "brown",
+      "maroon",
+      "painted",
+      "chipped",
+      "damaged",
+      "dirty",
+      "aged",
+      "stained",
+      "discolored"
+    ],
+    "name": "Weathered Brown Planks",
+    "categories": [
+      "man made",
+      "wood",
+      "dirty",
+      "wall",
+      "outdoor",
+      "floor"
+    ],
+    "authors": {
+      "Dimitrios Savva": "Photography",
+      "Rico Cilliers": "Processing"
+    },
+    "date_published": 1630972800,
+    "sponsors": [
+      "540619"
+    ],
+    "dimensions": [
+      1799.9999523162842,
+      1799.9999523162842
+    ],
+    "max_resolution": [
+      16384,
+      16384
+    ],
+    "files_hash": "bb75a87a3b6f3a9980acfd40bce5bdb4e89a5cf4",
+    "description": "Free 16K material of weathered brown wooden planks with chipped aged finish, deep grain, dirt and stain marks, worn edges and discolored, aged surfaces.",
+    "category_id": "26eb2cbb-558a-5357-ae3f-9519f081f247",
+    "category": "Wood/Boards & Planks/Painted Planks",
+    "attributes": {
+      "surface_use": "wall",
+      "condition": [
+        "weathered",
+        "damaged",
+        "worn",
+        "painted"
+      ],
+      "origin": "man_made",
+      "setting": "outdoor"
+    },
+    "download_count": 297600,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/weathered_brown_planks.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/weathered_brown_planks/weathered_brown_planks_diff_2k.jpg",
+      "bytes": 911358,
+      "sha256": "070ebc4c56a6729ca73a791f7cd3bab7670eb03bfa9ac0218864a554228bcc30",
+      "sourceMd5": "31317a56abbee4fbf7018d9f41180827"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/weathered_brown_planks/weathered_brown_planks_rough_2k.jpg",
+      "bytes": 944154,
+      "sha256": "6897855d0e2758b612fd8cf478aed01b4992d856987a8b4951e5758a48003df2",
+      "sourceMd5": "4dd58553f1d0f76bf883b71aa9fc89ea"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/weathered_brown_planks/weathered_brown_planks_nor_gl_2k.jpg",
+      "bytes": 1029733,
+      "sha256": "1c4882afd62de8da66b6e0730894e1a08db1e0cdd2370bd8bce77a6935d8812b",
+      "sourceMd5": "d6720855901b27dbdd209942f327b795"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/weathered_brown_planks/weathered_brown_planks_ao_2k.jpg",
+      "bytes": 600648,
+      "sha256": "69d2aa676f199365dd63253b36db7e1ac78eafbb835055528856c9c3d16d3e5f",
+      "sourceMd5": "afbfe9f3308edd0d532badf095ce7ca9"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/weathered_brown_planks/weathered_brown_planks_disp_2k.jpg",
+      "bytes": 374197,
+      "sha256": "4c6777538f4c84a60ad5f6ff80c32f50844d214820fffbeedf5931ba0ce739b4",
+      "sourceMd5": "18c5f810bb461bf82ed1f54b135a91c1"
+    }
+  ]
+}

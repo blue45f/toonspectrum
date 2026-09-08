@@ -19,7 +19,7 @@ import type {
 
 
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 export type RenderShadingMode =
   | "texture-color"

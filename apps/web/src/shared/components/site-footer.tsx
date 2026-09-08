@@ -2,7 +2,7 @@ import { ToonSpectrumMark } from "./visual-marks";
 
 import { spectrumGradient } from "@/shared/lib/genre-color";
 import { useT } from "@/shared/lib/i18n";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 // 약관·개인정보처리방침은 내부 페이지(/terms·/privacy)가 TermsDesk 게시 정본을 렌더한다.
 // 문의는 내부 /support(desk-platform 공개 게시판)로 통합 — 외부 지원 보드 링크는 제거했다.

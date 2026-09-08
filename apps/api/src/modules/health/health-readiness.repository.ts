@@ -1,4 +1,5 @@
 import { dbPool } from "../../db";
+import { ADMIN_SCHEMA_COLUMNS_SQL } from "../../db/admin-schema-contract";
 
 import type { Pool, QueryConfig } from "pg";
 
@@ -17,6 +18,12 @@ export const HEALTH_READINESS_QUERY_TIMEOUT_MS = 3_000;
  */
 export const REQUIRED_DATABASE_RELATIONS = [
   "account",
+  "admin_announcements",
+  "admin_audit_logs",
+  "admin_banned_words",
+  "admin_content_reports",
+  "admin_promos",
+  "admin_security_policies",
   "app_setting",
   "catalog_ingest_run",
   "catalog_snapshot",
@@ -25,16 +32,29 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "community_cafe",
   "community_cafe_member",
   "creator_asset",
+  "creator_asset_artifact",
+  "creator_asset_artifact_set",
+  "creator_asset_license_snapshot",
+  "creator_asset_processing_run",
+  "creator_asset_processing_step",
+  "creator_asset_qa_report",
   "creator_asset_report",
+  "creator_asset_rights_evidence",
   "creator_asset_storage_object",
+  "creator_asset_upload_session",
   "creator_campaign",
   "creator_challenge",
   "creator_draft_collaboration_room",
   "creator_follow",
+  "creator_marketplace_draft",
+  "creator_marketplace_draft_revision",
+  "creator_marketplace_entitlement_grant",
   "creator_marketplace_library_item",
   "creator_marketplace_package_moderation",
   "creator_marketplace_package_moderation_decision",
   "creator_marketplace_publish_gate",
+  "creator_marketplace_release_artifact_binding",
+  "creator_marketplace_release_availability",
   "creator_marketplace_resource",
   "creator_marketplace_resource_report",
   "creator_marketplace_resource_report_gate",
@@ -44,6 +64,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_work_asset",
   "creator_work_asset_storage_reference",
   "creator_work_asset_tombstone",
+  "creator_work_catalog_asset_binding",
   "creator_work_collaboration_event",
   "creator_work_collaborator",
   "creator_work_comment",
@@ -112,6 +133,7 @@ interface DatabasePingRow {
 
 interface SchemaCatalogRow {
   relationNames: string[] | null;
+  adminColumnsReady: boolean;
   authUserColumnsReady: boolean;
   authUserConstraintsReady: boolean;
   authUserStatusIndexReady: boolean;
@@ -198,6 +220,7 @@ export class PostgresHealthReadinessRepository
                 FILTER (WHERE relation.relname IS NOT NULL),
               ARRAY[]::text[]
             ) AS "relationNames",
+            ${ADMIN_SCHEMA_COLUMNS_SQL} AS "adminColumnsReady",
             NOT EXISTS (
               SELECT 1
               FROM (VALUES
@@ -1490,6 +1513,7 @@ export class PostgresHealthReadinessRepository
     if (
       !state ||
       !containsEvery(state.relationNames, REQUIRED_DATABASE_RELATIONS) ||
+      state.adminColumnsReady !== true ||
       state.authUserColumnsReady !== true ||
       state.authUserConstraintsReady !== true ||
       state.authUserStatusIndexReady !== true ||

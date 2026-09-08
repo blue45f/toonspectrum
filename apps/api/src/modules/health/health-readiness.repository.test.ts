@@ -9,9 +9,27 @@ import {
   REQUIRED_DATABASE_RELATIONS,
 } from "./health-readiness.repository";
 
+const ASSET_PLATFORM_RELATIONS = [
+  "creator_asset_artifact",
+  "creator_asset_artifact_set",
+  "creator_asset_license_snapshot",
+  "creator_asset_processing_run",
+  "creator_asset_processing_step",
+  "creator_asset_qa_report",
+  "creator_asset_rights_evidence",
+  "creator_asset_upload_session",
+  "creator_marketplace_draft",
+  "creator_marketplace_draft_revision",
+  "creator_marketplace_entitlement_grant",
+  "creator_marketplace_release_artifact_binding",
+  "creator_marketplace_release_availability",
+  "creator_work_catalog_asset_binding",
+] as const;
+
 function completeSchemaCatalog() {
   return {
     relationNames: [...REQUIRED_DATABASE_RELATIONS],
+    adminColumnsReady: true,
     authUserColumnsReady: true,
     authUserConstraintsReady: true,
     authUserStatusIndexReady: true,
@@ -40,6 +58,32 @@ function completeSchemaCatalog() {
 }
 
 describe("PostgresHealthReadinessRepository", () => {
+  it.each(ASSET_PLATFORM_RELATIONS)(
+    "rejects otherwise complete infrastructure when %s is missing",
+    async (missingRelation) => {
+      expect(REQUIRED_DATABASE_RELATIONS).toContain(missingRelation);
+      const query = vi.fn().mockResolvedValue({
+        rows: [{
+          ...completeSchemaCatalog(),
+          relationNames: REQUIRED_DATABASE_RELATIONS.filter(
+            (relation) => relation !== missingRelation,
+          ),
+        }],
+      });
+      const repository = new PostgresHealthReadinessRepository({ query } as never);
+
+      await expect(repository.isSchemaReady()).resolves.toBe(false);
+      expect(query).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("rejects otherwise complete infrastructure when administrator columns are missing", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ ...completeSchemaCatalog(), adminColumnsReady: false }] });
+    const repository = new PostgresHealthReadinessRepository({ query } as never);
+    await expect(repository.isSchemaReady()).resolves.toBe(false);
+    expect(query).toHaveBeenCalledOnce();
+  });
+
   it("uses a bounded SELECT 1 database probe", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: 1 }] });
     const repository = new PostgresHealthReadinessRepository({ query } as never);
@@ -298,7 +342,7 @@ describe("PostgresHealthReadinessRepository", () => {
     );
   });
 
-  it("tracks every relation declared across the current Drizzle schema", () => {
+  it("tracks every relation declared across Drizzle and the asset platform migration", () => {
     // db/schema.ts 는 db/schema/ 도메인 모듈들의 배럴이다 — pgTable 선언은 그 디렉터리에 있다.
     const schemaDir = new URL("../../db/schema/", import.meta.url);
     const schemaFiles = [
@@ -307,6 +351,7 @@ describe("PostgresHealthReadinessRepository", () => {
         .sort()
         .map((name) => `../../db/schema/${name}`),
       "../../db/creator-asset-object-storage.schema.ts",
+      "../../db/creator-asset-platform.schema.ts",
       "../../db/creator-marketplace-report.schema.ts",
       "../../db/creator-marketplace-library.schema.ts",
       "../../db/creator-marketplace-package-moderation.schema.ts",
@@ -314,14 +359,26 @@ describe("PostgresHealthReadinessRepository", () => {
       "../../db/studio-crdt-raster-checkpoint.schema.ts",
       "../../db/studio-raster-asset.schema.ts",
     ];
-    const declaredRelations = schemaFiles
+    const schemaRelations = schemaFiles
       .flatMap((path) => [
         ...readFileSync(new URL(path, import.meta.url), "utf8").matchAll(
           /\bpgTable\(\s*"([^"]+)"/gu,
         ),
       ])
-      .map((match) => match[1]!)
-      .sort();
+      .map((match) => match[1]!);
+    const migrationRelations = [
+      ...readFileSync(
+        new URL(
+          "../../db/migrations/0039_creator_asset_platform_foundation.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ).matchAll(/\bCREATE TABLE public\."([^"]+)"/gu),
+    ].map((match) => match[1]!);
+    expect(migrationRelations.toSorted()).toEqual(ASSET_PLATFORM_RELATIONS);
+    const declaredRelations = [
+      ...new Set([...schemaRelations, ...migrationRelations]),
+    ].sort();
 
     expect(REQUIRED_DATABASE_RELATIONS).toEqual(declaredRelations);
   });

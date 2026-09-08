@@ -25,12 +25,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(38);
+  expect(manifest).toHaveLength(44);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0038_feedback_community",
+    "0044_creator_work_entitlement_authorization",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(38);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(44);
 });
 
 test("creator marketplace release migration backfills immutable SemVer order", () => {
@@ -560,16 +560,36 @@ test("historical adoption requires structural evidence through 0019", () => {
 
 test("post-baseline relation classification stays synchronized with the CI fixture reset", () => {
   expect(POST_BASELINE_RELATIONS).toEqual([
+    "admin_announcements",
+    "admin_audit_logs",
+    "admin_banned_words",
+    "admin_content_reports",
+    "admin_promos",
+    "admin_security_policies",
+    "creator_asset_artifact",
+    "creator_asset_artifact_set",
+    "creator_asset_license_snapshot",
+    "creator_asset_processing_run",
+    "creator_asset_processing_step",
+    "creator_asset_qa_report",
+    "creator_asset_rights_evidence",
     "creator_asset_storage_object",
+    "creator_asset_upload_session",
     "creator_draft_collaboration_room",
+    "creator_marketplace_draft",
+    "creator_marketplace_draft_revision",
+    "creator_marketplace_entitlement_grant",
     "creator_marketplace_library_item",
     "creator_marketplace_package_moderation",
     "creator_marketplace_package_moderation_decision",
     "creator_marketplace_publish_gate",
+    "creator_marketplace_release_artifact_binding",
+    "creator_marketplace_release_availability",
     "creator_marketplace_resource",
     "creator_marketplace_resource_report",
     "creator_marketplace_resource_report_gate",
     "creator_work_asset_storage_reference",
+    "creator_work_catalog_asset_binding",
   ]);
   const workflow = readFileSync(
     new URL("../.github/workflows/ci.yml", import.meta.url),

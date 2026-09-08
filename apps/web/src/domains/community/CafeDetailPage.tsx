@@ -9,9 +9,9 @@ import { Container } from "@/shared/components/section";
 import { resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
 import { useApp } from "@/shared/lib/store";
 import { relativeDate } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
-import { api, apiPath, getApiErrorMessage } from "@/src/infrastructure/api";
+import Link from "@/compat/router-link";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { api, apiPath, getApiErrorMessage } from "@/infrastructure/api";
 
 
 // 장르 카페 상세(/community/cafes/:slug) — 카페 소개 + 가입/탈퇴 + 게시판(fan-cafe-panel 재사용).

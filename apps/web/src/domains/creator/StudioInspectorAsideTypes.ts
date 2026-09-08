@@ -74,9 +74,15 @@ import type { StudioViewRotation } from "./studio-view-controls";
 import type { StudioHokusaiNaturalMediaReplaceHandler } from "./StudioHokusaiNaturalMediaInspectorMount";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 import type { StudioInspectorPixelSelectionToolId } from "./StudioRasterToolRecoveryPanel";
-import type { Resizable } from "@/src/hooks/use-resizable";
+import type { Resizable } from "@/hooks/use-resizable";
 
 export interface StudioInspectorAsideHandlers {
+  onApplyLayerComp: (comp: import("./layer/studio-layer-comps").StudioLayerComp) => Promise<boolean>;
+  onCaptureLayerComp: (name: string, compId?: string) => Promise<boolean>;
+  onChangeLayerComps: (
+    next: readonly import("./layer/studio-layer-comps").StudioLayerComp[],
+    expectedComps?: readonly import("./layer/studio-layer-comps").StudioLayerComp[],
+  ) => Promise<boolean>;
   activateCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   activatePixelSelectionToolFromInspector: (
     kind: StudioInspectorPixelSelectionToolId,
@@ -211,6 +217,10 @@ export interface StudioInspectorAsideHandlers {
 }
 
 export interface StudioInspectorAsideProps {
+  commandSearchRequest?: import("./studio-help-center-channel").StudioCommandSearchRequest | null;
+  layerComps?: readonly import("./layer/studio-layer-comps").StudioLayerComp[];
+  onCommandSearchRequestHandled?: () => void;
+  onCommandSearchHostReadyChange?: (ready: boolean) => void;
   activeSavedBrushId: string | null;
   advancedRulers: StudioAdvancedRulerDocument;
   activeSurfaceReviewLocked: boolean;

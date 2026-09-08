@@ -55,14 +55,8 @@ function resolveSpecifier(fromFile: string, specifier: string): string | null {
   let absolute: string;
   if (bare.startsWith(".")) {
     absolute = path.resolve(ROOT, path.dirname(fromFile), bare);
-  } else if (bare.startsWith("@/shared/") || bare === "@/shared") {
-    // Match vite/vitest: `@/shared` -> apps/web/src/shared
-    absolute = path.resolve(ROOT, "apps/web/src/shared", bare.slice("@/shared".length).replace(/^\//u, ""));
-  } else if (bare.startsWith("@/domains/") || bare === "@/domains") {
-    absolute = path.resolve(ROOT, "apps/web/src/domains", bare.slice("@/domains".length).replace(/^\//u, ""));
   } else if (bare.startsWith("@/")) {
-    // Match vite/vitest: `@` -> apps/web (so `@/src/...` keeps working)
-    absolute = path.resolve(ROOT, "apps/web", bare.slice(2));
+    absolute = path.resolve(ROOT, "apps/web/src", bare.slice(2));
   } else {
     return null;
   }
@@ -76,6 +70,10 @@ function resolveSpecifier(fromFile: string, specifier: string): string | null {
   for (const candidate of candidates) {
     if (!/\.tsx?$/u.test(candidate)) continue;
     if (existsSync(candidate)) return path.relative(ROOT, candidate);
+  }
+  const assetSuffixes = [".css", ".json", ".wgsl", ".glsl", ".svg", ".png", ".txt", ".html"];
+  if (bare.startsWith("@/") && !assetSuffixes.some((suffix) => bare.endsWith(suffix))) {
+    throw new Error(`Unresolvable alias import "${specifier}" in ${fromFile}; the boundary walk cannot skip it.`);
   }
   return null;
 }

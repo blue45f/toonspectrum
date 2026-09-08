@@ -9,7 +9,7 @@ import {
   CreatorMarketplaceSocialPageSchema,
   UpsertCreatorMarketplaceSocialReviewSchema,
 } from "@/shared/lib/creator-marketplace-social-contract";
-import { api, toApiError } from "@/src/infrastructure/api";
+import { api, toApiError } from "@/infrastructure/api";
 
 const BASE = "/creator/marketplace/resources";
 

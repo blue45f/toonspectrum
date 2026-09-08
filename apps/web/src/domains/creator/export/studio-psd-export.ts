@@ -41,8 +41,10 @@ import {
   type Layer,
   type LayerTextData,
   type Psd,
+  type PixelData,
 } from "ag-psd";
 
+import { planStudioStageDocumentViewBox } from "../canvas/studio-stage-document-view";
 import {
   buildDialogueRubyExportXmp,
   createDialogueRubyMetadataRecord,
@@ -852,6 +854,80 @@ function cropToPanel(
   return { canvas: cropped, dx: x0, dy: y0 };
 }
 
+/** Node.toCanvas paints its own surface; resizing/redrawing the whole Stage is unnecessary. */
+function capturePsdDrawNode(
+  node: Konva.Node,
+  stage: Konva.Stage,
+  canvasW: number,
+  canvasH: number,
+  scale: number,
+): HTMLCanvasElement {
+  const previous = { position: stage.position(), scale: stage.scale(), rotation: stage.rotation() };
+  const view = planStudioStageDocumentViewBox({
+    documentWidth: canvasW, documentHeight: canvasH, effectiveScale: scale,
+  });
+  try {
+    stage.position({ x: view.x, y: view.y });
+    stage.scale({ x: view.scaleX, y: view.scaleY });
+    stage.rotation(view.rotation);
+    return node.toCanvas({ x: 0, y: 0, width: view.width, height: view.height, pixelRatio: 1 });
+  } finally {
+    stage.position(previous.position);
+    stage.scale(previous.scale);
+    stage.rotation(previous.rotation);
+  }
+}
+
+function assertPsdPixelBudget(bytes: number): void {
+  if (bytes > PSD_EXPORT_MAX_DECODED_BYTES) {
+    throw new Error("PSD 레이어 픽셀이 메모리 한도를 넘어요. 페이지를 나누거나 출력 배율을 낮춰 주세요.");
+  }
+}
+
+/** Preserve every nonzero alpha, including faint antialiasing; never guess a brush geometry box. */
+function readPsdDrawPixels(
+  canvas: HTMLCanvasElement,
+  retainedBytes: number,
+  scale: number,
+  panel: PsdFrameElLike | null,
+): { imageData: ImageData; left: number; top: number } | null {
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("PSD 획의 픽셀을 읽을 수 없어 내보내기를 중단했어요.");
+  const x0 = panel ? Math.round(Math.max(0, panel.x * scale)) : 0;
+  const y0 = panel ? Math.round(Math.max(0, panel.y * scale)) : 0;
+  const x1 = panel ? Math.round(Math.min(canvas.width, (panel.x + panel.width) * scale)) : canvas.width;
+  const y1 = panel ? Math.round(Math.min(canvas.height, (panel.y + panel.height) * scale)) : canvas.height;
+  if (x1 <= x0 || y1 <= y0) return null;
+  const transientBytes = retainedBytes + canvas.width * canvas.height * 4;
+  const rowBytes = (x1 - x0) * 4;
+  assertPsdPixelBudget(transientBytes + rowBytes);
+  const bandHeight = Math.min(64, Math.floor((PSD_EXPORT_MAX_DECODED_BYTES - transientBytes) / rowBytes));
+  let left = x1;
+  let top = y1;
+  let right = x0 - 1;
+  let bottom = y0 - 1;
+  for (let y = y0; y < y1; y += bandHeight) {
+    const height = Math.min(bandHeight, y1 - y);
+    const pixels = context.getImageData(x0, y, x1 - x0, height).data;
+    for (let index = 3; index < pixels.length; index += 4) {
+      if (pixels[index] === 0) continue;
+      const pixel = (index - 3) / 4;
+      const px = x0 + pixel % (x1 - x0);
+      const py = y + Math.floor(pixel / (x1 - x0));
+      left = Math.min(left, px);
+      top = Math.min(top, py);
+      right = Math.max(right, px);
+      bottom = Math.max(bottom, py);
+    }
+  }
+  if (right < left || bottom < top) return null;
+  const width = right - left + 1;
+  const height = bottom - top + 1;
+  assertPsdPixelBudget(transientBytes + width * height * 4);
+  // Pass exact decoded RGBA to ag-psd instead of compositing it through another Canvas surface.
+  return { imageData: context.getImageData(left, top, width, height), left, top };
+}
+
 /** 말풍선(Group) 자체 그림자를 캡처 사각형에 반영할 여유(문서 좌표 단위). 그 외 타입은 0. */
 function shadowPaddingLogical(el: PsdExportEl): number {
   if (el.type !== "bubble") return 0;
@@ -1134,6 +1210,8 @@ export async function exportPagePsd(
     };
   }
 
+  const includeBg = opts.includeBackground ?? true;
+  let capturedPixelBytes = includeBg && opts.background ? psdWidth * psdHeight * 4 : 0;
   const layers: Layer[] = [];
   const capturedElements: PsdExportEl[] = [];
   let editableTextCount = 0;
@@ -1157,9 +1235,18 @@ export async function exportPagePsd(
 
     // 뷰(화면 줌 반영) 공간 사각형 — toCanvas() 캡처 좌표계와 동일해야 한다.
     const rawAbs = node.getClientRect();
+    // Custom sceneFuncs can have zero geometry even when Konva adds a nonzero stroke/shadow
+    // box around the origin. Those decorative bounds do not enclose their painted pixels.
+    // Detect the unstyled geometry, then capture the same node over the document and trim RGBA.
+    const drawGeometry = el.type === "draw"
+      ? node.getClientRect({ skipStroke: true, skipShadow: true })
+      : null;
+    const documentCapture = drawGeometry !== null && (drawGeometry.width < 1 || drawGeometry.height < 1);
     // 문서(줌·팬 무관) 공간 사각형 — PSD left/top 좌표계.
-    const rawDoc = node.getClientRect({ relativeTo: stage });
-    if (rawAbs.width < 1 || rawAbs.height < 1) {
+    const rawDoc = documentCapture
+      ? { x: 0, y: 0, width: canvasW, height: canvasH }
+      : node.getClientRect({ relativeTo: stage });
+    if (!documentCapture && (rawAbs.width < 1 || rawAbs.height < 1)) {
       skipped.push(`${label}: 캡처 영역이 비어 있어 건너뜀`);
       continue;
     }
@@ -1174,9 +1261,16 @@ export async function exportPagePsd(
     const captureH = Math.max(1, Math.ceil(rawAbs.height + padView * 2));
     const pixelRatio = scale / safeEffScale;
 
+    const nextPixelBytes = documentCapture
+      ? psdWidth * psdHeight * 4
+      : Math.ceil(captureW * pixelRatio) * Math.ceil(captureH * pixelRatio) * 4;
+    assertPsdPixelBudget(capturedPixelBytes + nextPixelBytes);
+
     let canvas: HTMLCanvasElement;
     try {
-      canvas = node.toCanvas({ x: captureX, y: captureY, width: captureW, height: captureH, pixelRatio });
+      canvas = documentCapture
+        ? capturePsdDrawNode(node, stage, canvasW, canvasH, scale)
+        : node.toCanvas({ x: captureX, y: captureY, width: captureW, height: captureH, pixelRatio });
     } catch {
       skipped.push(`${label}: 래스터화 실패로 건너뜀`);
       continue;
@@ -1192,7 +1286,27 @@ export async function exportPagePsd(
     // 태그된 노드를 직접 캡처하면 wrapClip 의 "패널 안으로 클리핑"이 반영되지 않는다 —
     // 같은 조건으로 패널을 찾아 캡처 캔버스를 사후에 잘라 복원한다.
     const panel = !el.noClip ? containingPanel(el, elements) : null;
-    if (panel) {
+    let drawPixels: PixelData | undefined;
+    if (documentCapture) {
+      let cropped: ReturnType<typeof readPsdDrawPixels>;
+      try {
+        cropped = readPsdDrawPixels(canvas, capturedPixelBytes, scale, panel);
+      } finally {
+        // Keep only the tight RGBA rectangle between strokes, including after readback failure.
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+      if (cropped) {
+        drawPixels = cropped.imageData;
+        left = cropped.left;
+        top = cropped.top;
+      } else {
+        // Dropping a transparent base would attach a following clipping layer to different art.
+        assertPsdPixelBudget(capturedPixelBytes + 4);
+        drawPixels = { width: 1, height: 1, data: new Uint8ClampedArray(4) };
+        skipped.push(`${label}: 보이는 픽셀이 없어 투명 레이어로 보존했어요.`);
+      }
+    } else if (panel) {
       const beforeCrop = canvas;
       const cropped = cropToPanel(canvas, originDocX, originDocY, scale, panel);
       if (cropped) {
@@ -1207,8 +1321,9 @@ export async function exportPagePsd(
       name: label,
       left,
       top,
-      canvas,
-      opacity: clampOpacity(el.opacity),
+      ...(drawPixels ? { imageData: drawPixels } : { canvas }),
+      // Custom draw sceneFuncs have already baked stroke opacity into their pixel alpha.
+      opacity: documentCapture ? 1 : clampOpacity(el.opacity),
       blendMode: mapBlendMode(el.blendMode),
       clipping: !!el.clipBelow,
     };
@@ -1246,6 +1361,7 @@ export async function exportPagePsd(
     }
 
     layers.push(layer);
+    capturedPixelBytes += drawPixels ? drawPixels.data.byteLength : canvas.width * canvas.height * 4;
     capturedElements.push(el);
 
     if (el.clipBelow && layers.length < 2) {
@@ -1262,7 +1378,6 @@ export async function exportPagePsd(
   // Studio: 뒤→앞(elements[0]=BACK) → ag-psd: 위→아래(children[0]=TOP) — 반드시 뒤집는다.
   const children = [...layers].reverse();
 
-  const includeBg = opts.includeBackground ?? true;
   if (includeBg && opts.background) {
     children.push(makeBackgroundLayer(psdWidth, psdHeight, opts.background));
   }

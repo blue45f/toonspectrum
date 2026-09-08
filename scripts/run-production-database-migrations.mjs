@@ -6,6 +6,7 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { buildAdminCapabilitySql, buildAdminRuntimeAclSql } from "./admin-database-contract.mjs";
 import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";
 import {
   createPsqlEnvironment,
@@ -90,16 +91,36 @@ const HISTORICAL_BASELINE_RELATIONS = Object.freeze([
   "verificationToken",
 ]);
 export const POST_BASELINE_RELATIONS = Object.freeze([
+  "admin_announcements",
+  "admin_audit_logs",
+  "admin_banned_words",
+  "admin_content_reports",
+  "admin_promos",
+  "admin_security_policies",
+  "creator_asset_artifact",
+  "creator_asset_artifact_set",
+  "creator_asset_license_snapshot",
+  "creator_asset_processing_run",
+  "creator_asset_processing_step",
+  "creator_asset_qa_report",
+  "creator_asset_rights_evidence",
   "creator_asset_storage_object",
+  "creator_asset_upload_session",
   "creator_draft_collaboration_room",
+  "creator_marketplace_draft",
+  "creator_marketplace_draft_revision",
+  "creator_marketplace_entitlement_grant",
   "creator_marketplace_library_item",
   "creator_marketplace_package_moderation",
   "creator_marketplace_package_moderation_decision",
   "creator_marketplace_publish_gate",
+  "creator_marketplace_release_artifact_binding",
+  "creator_marketplace_release_availability",
   "creator_marketplace_resource",
   "creator_marketplace_resource_report",
   "creator_marketplace_resource_report_gate",
   "creator_work_asset_storage_reference",
+  "creator_work_catalog_asset_binding",
 ]);
 
 const MODE_CONFIRMATIONS = Object.freeze({
@@ -2366,6 +2387,8 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildAdminRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildAdminCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole));

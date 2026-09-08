@@ -5,6 +5,7 @@ import {
   planNormalizedStudioDynamicBrushDabs,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
 } from "./brush/studio-brush-dynamics";
 import { materializeStudioBrushPackSelection } from "./brush/studio-brush-pack-runtime";
 import {
@@ -83,7 +84,7 @@ describe("causal dynamic-brush deposit v2", () => {
     "opts newly materialized %s into the causal contract while legacy snapshots stay omitted",
     (id) => {
       expect(selection(id).brushDynamics.depositPipeline).toBe(
-        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
       );
     },
   );

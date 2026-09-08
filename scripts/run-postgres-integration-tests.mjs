@@ -29,6 +29,7 @@ export const POSTGRES_INTEGRATION_SUITES = Object.freeze([
   "apps/api/src/modules/studio-ai/studio-ai-admission.repository.integration.test.ts",
   "apps/api/src/modules/creator/creator-asset-schema-preflight.integration.test.ts",
   "apps/api/src/modules/creator/creator-asset-runtime.integration.test.ts",
+  "apps/api/src/modules/creator/creator-asset-platform-integrity.integration.test.ts",
   "apps/api/src/modules/creator/studio-team-comment-reanchor-migration.integration.test.ts",
   "apps/api/src/realtime/studio-postgres-io.adapter.integration.test.ts",
   "apps/api/src/modules/creator/studio-live-lock.repository.integration.test.ts",

@@ -8,13 +8,13 @@ import { marketResourceJsonLd } from "../models/market-jsonld";
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 import {
   useDocumentTitle,
   useJsonLd,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/src/hooks/use-document-title";
+} from "@/hooks/use-document-title";
 
 export function MarketResourceDetailPage() {
   const { id } = useParams<{ id: string }>();

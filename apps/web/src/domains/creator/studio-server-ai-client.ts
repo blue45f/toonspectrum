@@ -1,4 +1,4 @@
-import { api, toApiError } from "@/src/infrastructure/api";
+import { api, toApiError } from "@/infrastructure/api";
 
 export type StudioServerAiTask = "composition" | "scenario" | "translation" | "dialogue" | "palette";
 /** 서버가 구성할 수 있는 텍스트 AI 공급자. 서버 studio-ai-provider.ts의 allowlist와 일치해야 한다. */

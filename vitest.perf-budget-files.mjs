@@ -28,8 +28,8 @@
 // Do not add tests that assert only on counts, geometry or output bytes — those are deterministic
 // and belong in the main run. tests/vitest-perf-budget-partition.test.ts pins that every entry
 // exists and really times something.
-// CPU-time ratios also require an uninstrumented pass: V8 coverage changes the
-// relative cost of the hot loops even when scheduling delays are not counted.
+// CPU-time ratios also need an uninstrumented run: V8 coverage changes the hot-loop
+// instruction cost even when scheduler contention is removed by threadCpuUsage().
 export const PERF_BUDGET_TEST_FILES = Object.freeze([
   "apps/web/src/domains/creator/brush/studio-brush-stamp-engine.test.ts",
   "apps/web/src/domains/creator/brush/studio-dry-media-long-stroke-regression.test.ts",
@@ -42,9 +42,11 @@ export const PERF_BUDGET_TEST_FILES = Object.freeze([
   "apps/web/src/domains/creator/brush/studio-wet-edge-bloom-v1.test.ts",
   "apps/web/src/domains/creator/brush/studio-wet-ribbon-carrier.test.ts",
   "apps/web/src/domains/creator/live/studio-live-dynamic-brush-overlay.test.ts",
+  "apps/web/src/domains/creator/studio-croquis-capsule-pen-v1.test.ts",
   "apps/web/src/domains/creator/studio-impasto-relief-shading-v1.cpu-band.test.ts",
   "apps/web/src/domains/creator/studio-impasto-relief-shading-v1.perf.test.ts",
   "apps/web/src/domains/creator/studio-living-ink-provider.test.ts",
   "apps/web/src/domains/creator/studio-living-ink-settled-bake-v1.test.ts",
   "scripts/studio-brush-catalogue-perf-matrix.test.ts",
+  "tests/visual/bristle-quality.test.ts",
 ]);

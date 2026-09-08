@@ -1,9 +1,10 @@
+import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import { normalizeStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { recoverInterruptedStudioAiOperations } from "./ai/studio-ai-provenance-recorder";
 import { requireStudioDrawingPointerTransport } from "./brush/studio-drawing-pointer-transport";
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
-  serializeStudioAutosave,
+  serializeStudioAutosaveBackup,
   studioLifecycleAutosaveSidecarKey,
   studioSharedAutosaveCompatibility,
 } from "./studio-autosave";
@@ -165,6 +166,9 @@ export interface StudioAutosaveRestoreContext {
   readonly setReleaseSchedule: (
     next: ReturnType<StudioReleaseScheduleRuntime["normalizeStudioReleaseSchedule"]>
   ) => void;
+  readonly setScenarioImageReferenceDocumentState: (
+    next: ReturnType<typeof hydrateStudioAiImageReferenceDocument>
+  ) => void;
   readonly setStudioComments: (
     next: ReturnType<typeof normalizeStudioCommentsDocument>
   ) => unknown;
@@ -220,6 +224,7 @@ export async function restoreStudioAutosaveRecovery(
     setPublishProfile,
     setReferenceBoard,
     setReleaseSchedule,
+    setScenarioImageReferenceDocumentState,
     setStudioComments,
     setTagsText,
     setTitle,
@@ -349,6 +354,9 @@ export async function restoreStudioAutosaveRecovery(
         setReleaseSchedule(normalizeStudioReleaseSchedule(parsed.releaseSchedule));
         setPublicationAnalytics(normalizedPublicationAnalytics);
         setReferenceBoard(normalizeStudioReferenceBoardDocument(parsed.referenceBoard));
+        setScenarioImageReferenceDocumentState(
+          hydrateStudioAiImageReferenceDocument(parsed.aiImageReferences),
+        );
         // 문서 마스터 복구 — 백업에 없으면 빈 마스터(하위호환).
         setMaster(normalizeDocumentMaster(parsed.master) as DocumentMaster<El>);
         autosaveRecoveryCandidateRef.current = null;
@@ -512,7 +520,7 @@ export function downloadStudioAutosaveBackup(ctx: StudioAutosaveBackupContext): 
         setError("내려받을 임시저장 데이터를 찾지 못했어요.");
         return;
       }
-      const blob = new Blob([serializeStudioAutosave(saved.payload)], {
+      const blob = new Blob([serializeStudioAutosaveBackup(saved.payload)], {
         type: "application/json",
       });
       const url = URL.createObjectURL(blob);

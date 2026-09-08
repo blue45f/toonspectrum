@@ -19,6 +19,9 @@ const harness = vi.hoisted(() => {
     createSurfaceCalls: 0,
     createRuntimeCalls: 0,
     destroyedDevices: 0,
+    releasedLeases: 0,
+    nativeDevices: new Set<GPUDevice>(),
+    failRuntimeCreates: 0,
     disposedSurfaces: 0,
     disposedRuntimes: 0,
     onDeviceLost: null as ((info: GPUDeviceLostInfo) => void) | null,
@@ -30,11 +33,13 @@ const harness = vi.hoisted(() => {
     snapshotDraws: 0,
     pendingDeviceResolvers: [] as Array<() => void>,
     createDevice() {
-      return {
+      const device = {
         destroy() {
           harness.destroyedDevices += 1;
         },
       } as GPUDevice;
+      this.nativeDevices.add(device);
+      return device;
     },
     requestDevice() {
       if (!this.deferDeviceCreation) {
@@ -64,6 +69,9 @@ const harness = vi.hoisted(() => {
       this.createSurfaceCalls = 0;
       this.createRuntimeCalls = 0;
       this.destroyedDevices = 0;
+      this.releasedLeases = 0;
+      this.nativeDevices.clear();
+      this.failRuntimeCreates = 0;
       this.disposedSurfaces = 0;
       this.disposedRuntimes = 0;
       this.onDeviceLost = null;
@@ -78,6 +86,19 @@ const harness = vi.hoisted(() => {
     },
   };
 });
+
+vi.mock("./render/studio-gpu-fabric", () => ({
+  async acquireStudioGpuDevice() {
+    return {
+      device: await harness.requestDevice(),
+      epoch: 7,
+      lost: false,
+      release() {
+        harness.releasedLeases += 1;
+      },
+    };
+  },
+}));
 
 vi.mock("./studio-canonical-vnext-dry-media-product-adapter", () => ({
   async compileStudioCanonicalVNextDryMediaProductFrame(request: {
@@ -129,7 +150,10 @@ vi.mock("./studio-canonical-vnext-dry-media-presentation-controller", () => ({
 vi.mock("./render/studio-engine-webgpu-presentation-surface", () => ({
   createStudioEngineWebGpuPresentationSurface(options: {
     onDeviceLost: (info: GPUDeviceLostInfo) => void;
+    device: GPUDevice;
   }) {
+    // Match the native boundary's identity requirement; a GPUDevice Proxy is not accepted.
+    if (!harness.nativeDevices.has(options.device)) throw new TypeError("Invalid native GPUDevice");
     harness.createSurfaceCalls += 1;
     if (harness.failSurfaceCreates > 0) {
       harness.failSurfaceCreates -= 1;
@@ -160,6 +184,10 @@ vi.mock("./render/studio-engine-webgpu-presentation-surface", () => ({
 vi.mock("./render/studio-engine-webgpu-textured-brush-runtime", () => ({
   createStudioEngineWebGpuTexturedBrushRuntime() {
     harness.createRuntimeCalls += 1;
+    if (harness.failRuntimeCreates > 0) {
+      harness.failRuntimeCreates -= 1;
+      return { status: "rejected" as const, reason: "unavailable" as const };
+    }
     return {
       status: "ready" as const,
       runtime: {
@@ -224,6 +252,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   Reflect.deleteProperty(navigator, "gpu");
 });
 
@@ -565,5 +594,58 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
       expect(harness.disposedRuntimes).toBe(1);
       expect(harness.destroyedDevices).toBe(1);
     });
+  });
+});
+
+
+describe("Studio canonical canvas shared native GPU ownership", () => {
+  beforeEach(() => {
+    vi.stubEnv("MODE", "production");
+  });
+
+  it("passes the native device to presentation and releases its lease once on unmount", async () => {
+    const onAuthorityChange = vi.fn();
+    const view = render(<StudioCanonicalVNextDryMediaCanvas {...baseProps} onAuthorityChange={onAuthorityChange} />);
+    await waitFor(() => expect(onAuthorityChange).toHaveBeenLastCalledWith(expect.objectContaining({ status: "authorized" })));
+    expect(harness.releasedLeases).toBe(0);
+    view.unmount();
+    await waitFor(() => expect(harness.releasedLeases).toBe(1));
+    expect(harness.disposedSurfaces).toBe(1);
+    expect(harness.disposedRuntimes).toBe(1);
+    expect(harness.destroyedDevices).toBe(0);
+  });
+
+  it.each(["context", "surface", "runtime"] as const)("releases the shared lease when %s setup fails", async (failure) => {
+    if (failure === "context") vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(null);
+    if (failure === "surface") harness.failSurfaceCreates = 1;
+    if (failure === "runtime") harness.failRuntimeCreates = 1;
+    const onAuthorityChange = vi.fn();
+    const view = render(<StudioCanonicalVNextDryMediaCanvas {...baseProps} onAuthorityChange={onAuthorityChange} />);
+    await waitFor(() => expect(onAuthorityChange).toHaveBeenLastCalledWith(expect.objectContaining({ status: "unavailable" })));
+    view.unmount();
+    expect(harness.releasedLeases).toBe(1);
+    expect(harness.disposedSurfaces).toBe(failure === "runtime" ? 1 : 0);
+    expect(harness.destroyedDevices).toBe(0);
+  });
+
+  it("releases a shared acquisition that resolves after unmount without destroying peers' device", async () => {
+    harness.deferDeviceCreation = true;
+    const view = render(<StudioCanonicalVNextDryMediaCanvas {...baseProps} onAuthorityChange={vi.fn()} />);
+    await waitFor(() => expect(harness.pendingDeviceResolvers).toHaveLength(1));
+    view.unmount();
+    harness.releaseDevices();
+    await waitFor(() => expect(harness.releasedLeases).toBe(1));
+    expect(harness.destroyedDevices).toBe(0);
+  });
+
+  it("releases the shared lease on device loss and does not release it again at unmount", async () => {
+    const onAuthorityChange = vi.fn();
+    const view = render(<StudioCanonicalVNextDryMediaCanvas {...baseProps} onAuthorityChange={onAuthorityChange} />);
+    await waitFor(() => expect(onAuthorityChange).toHaveBeenLastCalledWith(expect.objectContaining({ status: "authorized" })));
+    harness.onDeviceLost?.({ reason: "unknown", message: "lost" } as GPUDeviceLostInfo);
+    await waitFor(() => expect(harness.releasedLeases).toBe(1));
+    view.unmount();
+    expect(harness.releasedLeases).toBe(1);
+    expect(harness.destroyedDevices).toBe(0);
   });
 });

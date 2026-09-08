@@ -97,9 +97,10 @@ describe("StudioLiveDynamicBrushOverlayRenderer cold start", () => {
       markedBeforeAppend = activeCanvas.recordedMarks.length;
     }
 
-    // The loop shape is fully determined, so it is pinned rather than bounded: the cold append
-    // deposits exactly 320 marks on every machine, and a chunk append is reached at index 7.
-    expect(markDeltas[0], "cold first append marks").toBe(320);
+    // The current catalogue selects causal V4, whose cold append deposits exactly 345 marks.
+    // The sibling replay suite separately retains persisted V3's 320-mark contract. Keep this
+    // process-cold gate on the catalogue path without changing either timing limit below.
+    expect(markDeltas[0], "catalogue V4 cold first append marks").toBe(345);
     expect(markDeltas.findIndex((delta) => delta > 1_000), "first ribbon chunk").toBe(7);
 
     // Both are BLOW-UP bounds, not budgets, and the reason is measured: a single cold reading is

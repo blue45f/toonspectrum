@@ -10,7 +10,7 @@ import {
   COMMUNITY_SCOPE_DIRECTORIES,
   COMMUNITY_SCOPE_LABEL,
 } from "@/shared/lib/community-ui";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 
 const SCOPES = ["title", "author", "pencafe"] as const;

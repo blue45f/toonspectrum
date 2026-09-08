@@ -7,7 +7,7 @@ import {
   STUDIO_BRUSH_CATALOG_COUNTS,
 } from "./studio-brush-catalog";
 import {
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
   planNormalizedStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsSelectionPresetId,
   resolveStudioBrushDynamicsPresetId,
@@ -43,7 +43,7 @@ describe("studio brush catalogue selection", () => {
         .toBeNull();
       expect(selection.brushDynamics, `${brushId}: authored snapshot missing`).not.toBeNull();
       expect(selection.brushDynamics?.depositPipeline, `${brushId}: causal pipeline`)
-        .toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3);
+        .toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4);
       expect(selection.brushDynamics?.opacity.base, `${brushId}: outer opacity duplicated`).toBe(1);
       expect(
         resolveStudioBrushDynamicsSelectionPresetId(brushId, selection.brushDynamics),

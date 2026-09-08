@@ -46,7 +46,7 @@ import {
 } from "@/shared/lib/creator-marketplace-semver";
 import {
   createCreatorMarketplacePortableDelivery,
-} from "@/src/infrastructure/creator-marketplace-client";
+} from "@/infrastructure/creator-marketplace-client";
 
 const LICENSE_METADATA: Readonly<
   Record<CreatorMarketplaceResourceLicense, Omit<StudioMarketplaceLicense, "sourceVerifiedAt">>

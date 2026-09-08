@@ -13,7 +13,7 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { GenreSpectrum } from "@/shared/components/ui/spectrum-bar";
 import { genreColor, genreTextColor } from "@/shared/lib/genre-color";
 import { GENRES } from "@/shared/lib/taxonomy";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 interface HomeDeferredSectionsProps {
   todayReleases: Title[];

@@ -1,4 +1,5 @@
 import {
+  parseStudioAutosave,
   readStudioAutosave,
   serializeStudioAutosave,
   studioAutosaveHasContent,
@@ -344,12 +345,7 @@ function decodeStudioAutosaveOpfsEnvelope(
     ) {
       throw new Error("OPFS 자동저장 payload 무결성 검증에 실패했습니다.");
     }
-    const parsed = JSON.parse(value.payload) as unknown;
-    if (
-      typeof parsed !== "object"
-      || parsed === null
-      || !Array.isArray((parsed as { readonly pagesList?: unknown }).pagesList)
-    ) {
+    if (!parseStudioAutosave(value.payload)) {
       throw new Error("OPFS 자동저장 payload가 Studio 문서가 아닙니다.");
     }
   }
@@ -468,12 +464,10 @@ export class StudioAutosaveOpfsSession {
         revision: entry.revision,
       });
     }
-    const payload = JSON.parse(envelope.payload as string) as unknown;
-    const serializedPayload = serializeStudioAutosave(payload as StudioAutosavePayload);
     const normalized = readStudioAutosave(
       {
         getItem: (candidate) =>
-          candidate === this.#autosaveKey ? serializedPayload : null,
+          candidate === this.#autosaveKey ? envelope.payload : null,
       },
       this.#autosaveKey,
     )?.payload ?? null;

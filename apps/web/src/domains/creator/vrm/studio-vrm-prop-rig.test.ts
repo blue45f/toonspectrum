@@ -214,7 +214,7 @@ describe("머리 소품의 face/bone socket 의미 계약", () => {
     "goggles",
     "blender_cyber_visor",
     "blender_cyber_glasses",
-    "blender_fox_mask",
+    "blender_fox_mask_v8",
   ] as const;
   const BONE_WEAR_IDS = [
     "cap",
@@ -243,7 +243,7 @@ describe("머리 소품의 face/bone socket 의미 계약", () => {
       .map((definition) => definition.id)
       .sort();
     expect(headIds).toEqual([...FACE_WEAR_IDS, ...BONE_WEAR_IDS].sort());
-    for (const id of FACE_WEAR_IDS) {
+    for (const id of [...FACE_WEAR_IDS, "blender_fox_mask"]) {
       const definition = propDefById(id)!;
       expect(definition.wearSocket, id).toBe("face");
       expect(usesVrmPropFaceSocket(definition, "head"), id).toBe(true);

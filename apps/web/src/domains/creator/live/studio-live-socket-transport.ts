@@ -15,6 +15,10 @@ import {
   type StudioLiveTransportFactory,
 } from "./studio-live-collaboration-transport";
 import {
+  createStudioLiveUnsupportedJamTransport,
+  isStudioLiveInstantJamTransportContext,
+} from "./studio-live-admission-support";
+import {
   createStudioLiveLockRevisionLedger,
 } from "./studio-live-lock-revision-ledger";
 import { applyStudioLiveP2pOverlay } from "./studio-live-p2p-overlay-transport";
@@ -499,7 +503,7 @@ export function createStudioServerLiveTransportFactory(
         ? createStudioLiveSignalingServerTransportFactory
         : localTransportFactory;
 
-  return applyStudioLiveP2pOverlay(
+  const configuredFactory = applyStudioLiveP2pOverlay(
     applyStudioRealtimePurposeRouting(primaryFactory, {
       realtimeOrigin: import.meta.env.VITE_STUDIO_REALTIME_ORIGIN,
       providerId: import.meta.env.VITE_STUDIO_REALTIME_PROVIDER_ID,
@@ -508,4 +512,24 @@ export function createStudioServerLiveTransportFactory(
       enabled: import.meta.env.VITE_STUDIO_LIVE_P2P_ENABLED !== "false",
     },
   );
+  return (context) => {
+    if (hasLocalTransportOverride || !isStudioLiveInstantJamTransportContext(context)) {
+      return configuredFactory(context);
+    }
+    // Nest's durable authority requires a persisted CreatorWork. Unsaved jams use the existing
+    // separately ticketed Cloudflare signaling/mesh contract, never a saved-work ACL exception.
+    const jamFactory = applyStudioRealtimePurposeRouting(
+      createStudioLiveSignalingServerTransportFactory,
+      {
+        realtimeOrigin: import.meta.env.VITE_STUDIO_REALTIME_ORIGIN,
+        providerId: import.meta.env.VITE_STUDIO_REALTIME_PROVIDER_ID,
+      },
+    );
+    if (jamFactory === createStudioLiveSignalingServerTransportFactory) {
+      return createStudioLiveUnsupportedJamTransport();
+    }
+    return applyStudioLiveP2pOverlay(jamFactory, {
+      enabled: import.meta.env.VITE_STUDIO_LIVE_P2P_ENABLED !== "false",
+    })(context);
+  };
 }
