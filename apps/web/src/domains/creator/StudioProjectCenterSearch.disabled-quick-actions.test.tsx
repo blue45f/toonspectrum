@@ -95,7 +95,9 @@ describe("StudioProjectCenterSearch quick access", () => {
       return buttons;
     });
 
-    for (const button of disabledQuickActions) fireEvent.click(button);
+    for (const button of disabledQuickActions) {
+      fireEvent.click(button);
+    }
     expect(onBackup).toHaveBeenCalledTimes(1);
   });
 });
