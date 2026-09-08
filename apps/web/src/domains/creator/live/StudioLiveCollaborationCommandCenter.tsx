@@ -102,6 +102,8 @@ const SYNC_PHASE_LABEL: Readonly<Record<StudioLiveSyncPhase, string>> = {
   repairing: "원고 복구 중",
   "durability-risk": "저장 보호 확인 필요",
   "read-only-follower": "다른 탭이 저장 담당",
+  "unsupported-jam": "저장 전 공동 작업 미지원",
+  "admission-denied": "작업실 참여 권한 없음",
   revoked: "작품 권한 회수됨",
   "recovery-required": "로컬 변경 복구 필요",
 };
