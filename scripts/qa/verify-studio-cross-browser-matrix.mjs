@@ -14,6 +14,8 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 import { chromium, firefox, webkit } from "playwright";
 
+import { isOptionalStudioPreviewApiError } from "../lib/studio-verify-preview-errors.mts";
+
 const OUTPUT_DIR = resolve(process.env.TOONSPECTRUM_VERIFY_DIR ?? "artifacts/studio-cross-browser");
 const LOCALE = process.env.TOONSPECTRUM_VERIFY_LOCALE ?? "ko-KR";
 const COLOR_SCHEME = process.env.TOONSPECTRUM_VERIFY_COLOR_SCHEME === "dark" ? "dark" : "light";
@@ -81,10 +83,6 @@ export const ROUTES = Object.freeze([
 ]);
 
 const IGNORED_CONSOLE = [
-  "/api/auth/session",
-  "/api/studio-ai/status",
-  "/api/kmas/merge-on-access",
-  "/socket.io/",
   "fonts.googleapis.com",
   "fonts.gstatic.com",
   "cdn.jsdelivr.net",
@@ -277,8 +275,10 @@ async function main() { // NOSONAR javascript:S3776
               page.on("console", (message) => {
                 if (message.type() !== "error") return;
                 const text = message.text();
-                consoleDetails.push({ text, location: message.location() });
-                if (!IGNORED_CONSOLE.some((ignored) => text.includes(ignored))) consoleErrors.push(text);
+                const location = message.location();
+                const optionalPreviewApi = isOptionalStudioPreviewApiError(`${text} ${location.url}`, baseUrl);
+                consoleDetails.push({ text, location, optionalPreviewApi });
+                if (!optionalPreviewApi && !IGNORED_CONSOLE.some((ignored) => text.includes(ignored))) consoleErrors.push(text);
               });
               await installGuestBoundary(page);
               try {
