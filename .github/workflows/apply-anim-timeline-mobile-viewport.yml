@@ -1,0 +1,62 @@
+name: Apply animation timeline mobile viewport fix
+
+on:
+  push:
+    branches:
+      - fix/anim-timeline-mobile-viewport-20260908
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the issue branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/anim-timeline-mobile-viewport-20260908
+
+      - name: Apply bounded panel and regression-test changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          panel_path = Path("apps/web/src/domains/creator/StudioAnimTimelinePanel.tsx")
+          panel = panel_path.read_text(encoding="utf-8")
+          old = 'className="absolute right-3 top-3 z-40 flex max-h-[calc(100%-5rem)] w-[min(46rem,calc(100%-1.5rem))] flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur"'
+          new = 'className="fixed inset-x-2 top-16 z-40 flex max-h-[calc(100svh-5rem)] w-auto flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur sm:absolute sm:inset-x-auto sm:right-3 sm:top-3 sm:max-h-[calc(100%-5rem)] sm:w-[min(46rem,calc(100%-1.5rem))]"'
+          if panel.count(old) != 1:
+              raise SystemExit(f"expected one timeline panel root class, found {panel.count(old)}")
+          panel_path.write_text(panel.replace(old, new, 1), encoding="utf-8")
+
+          test_path = Path("apps/web/src/domains/creator/StudioAnimTimelinePanel.test.tsx")
+          test_source = test_path.read_text(encoding="utf-8")
+          test_block = '''
+
+  it("pins the mobile timeline to the viewport while preserving desktop canvas placement", () => {
+    expect(source).toContain('className="fixed inset-x-2 top-16 z-40');
+    expect(source).toContain("max-h-[calc(100svh-5rem)]");
+    expect(source).toContain("sm:absolute sm:inset-x-auto sm:right-3 sm:top-3");
+    expect(source).toContain("sm:w-[min(46rem,calc(100%-1.5rem))]");
+    expect(source).not.toContain('className="absolute right-3 top-3 z-40');
+  });'''
+          if test_block.strip() in test_source:
+              raise SystemExit("mobile timeline viewport regression test already exists")
+          head, separator, tail = test_source.rpartition("\n});")
+          if not separator or tail.strip():
+              raise SystemExit("could not locate final StudioAnimTimelinePanel describe boundary")
+          test_path.write_text(head + test_block + separator + tail, encoding="utf-8")
+          PY
+
+          rm .github/workflows/apply-anim-timeline-mobile-viewport.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/domains/creator/StudioAnimTimelinePanel.tsx \
+            apps/web/src/domains/creator/StudioAnimTimelinePanel.test.tsx \
+            .github/workflows/apply-anim-timeline-mobile-viewport.yml
+          git commit -m "fix(studio): keep animation timeline inside mobile viewport"
+          git push origin HEAD:fix/anim-timeline-mobile-viewport-20260908
