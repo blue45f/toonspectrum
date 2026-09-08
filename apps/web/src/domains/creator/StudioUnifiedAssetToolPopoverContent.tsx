@@ -33,6 +33,9 @@ import {
 import type { StudioMenu } from "./studio-editor-tool-model";
 import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
 
+const INSERT_REVIEW_LOCKED_MESSAGE =
+  "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 항목을 삽입해 주세요.";
+
 const ASSET_MENU_ITEMS = [
   {
     id: "asset",
@@ -93,6 +96,14 @@ interface InsertSelectionBounds {
   readonly y: number;
   readonly width: number;
   readonly height: number;
+}
+
+function assertInsertMutationAllowed(
+  toolBelt: StudioToolBeltContentProps,
+): void {
+  if (toolBelt.activeSurfaceReviewLocked) {
+    throw new Error(INSERT_REVIEW_LOCKED_MESSAGE);
+  }
 }
 
 function resolveSelectionBounds(
@@ -193,6 +204,7 @@ function routeInsertAction(
   const handlers = toolBelt.stableHandlers;
   switch (actionId) {
     case "text":
+      assertInsertMutationAllowed(toolBelt);
       handlers.addText(undefined, true);
       toolBelt.setMenu(null);
       return true;
@@ -200,7 +212,7 @@ function routeInsertAction(
       toolBelt.setMenu("bubble");
       return true;
     case "upload":
-      // The workspace owns the hidden input so file-picker cancellation is a no-op.
+      // The workspace owns the hidden file input so cancellation is a no-op.
       return true;
     case "stock":
       toolBelt.setMenu("stockImage");
@@ -302,7 +314,10 @@ export function StudioUnifiedAssetToolPopoverContent({
           )
         }
         onUseAction={(actionId) => routeInsertAction(actionId, toolBelt)}
-        onUploadImage={toolBelt.stableHandlers.onPickImage}
+        onUploadImage={async (event) => {
+          assertInsertMutationAllowed(toolBelt);
+          await toolBelt.stableHandlers.onPickImage(event);
+        }}
         onOpenAi={(prompt) => {
           if (prompt) {
             toolBelt.stableHandlers.applyAiAssistPresetPrompt(
