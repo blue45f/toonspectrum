@@ -591,6 +591,51 @@ describe("two-tab autosave persistence", () => {
       ]);
     });
 
+  it("resumes after browser lock handover without waiting for React cleanup or disk lease expiry", async () => {
+    const store = new SharedJournalStore();
+    const locks = new FakeLockManager();
+    const leaderLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    const nextLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY, locks, registry: createStudioAutosaveDocumentLeadershipRegistry(),
+    });
+    const makeSession = (ownerId: string, documentLease: typeof leaderLease) =>
+      new StudioAutosaveOpfsSession({
+        autosaveKey: AUTOSAVE_KEY, journal: new TabJournal(store), ownerId,
+        now: () => store.now, documentLease,
+      });
+    const leader = makeSession("before-reload", leaderLease);
+    const follower = makeSession("follower", nextLease);
+    const storage = memoryStorage();
+    const sqlite = memorySqliteStore();
+    const persist = (target: StudioAutosaveOpfsSession, ids: string[]) =>
+      persistStudioAutosaveWithOpfsPrimary({
+        session: target, sqlite, storage, key: AUTOSAVE_KEY,
+        payload: payload("2026-08-13T00:00:00.000Z", ids),
+      });
+    await persist(leader, ["corrected-ellipse"]);
+    expect(store.lease).toBeNull();
+    await expect(persist(follower, ["wrong-tab"])).rejects.toBeInstanceOf(StudioAutosaveDocumentBusyError);
+    const mirrored = sqlite.values.get(AUTOSAVE_KEY);
+    expect(strokeIdsOf(mirrored?.state === "snapshot" ? mirrored.payload : null))
+      .toEqual(["corrected-ellipse"]);
+    // On navigation the browser releases Web Locks, while no React session.dispose runs.
+    await leaderLease.release();
+    expect(await nextLease.waitForLeadership({ timeoutMs: 1_000 })).toBe(true);
+    const reloaded = makeSession("after-reload", nextLease);
+    expect((await persist(reloaded, ["restored-freehand"])).authority).toBe("opfs-journal");
+    expect(store.now).toBe(1_000);
+    const recovered = await reconcileStudioAutosaveWithOpfsPrimary({
+      session: reloaded, sqlite, storage, key: AUTOSAVE_KEY,
+    });
+    expect(strokeIdsOf(recovered.candidate?.payload)).toEqual(["restored-freehand"]);
+    await leader.dispose();
+    await follower.dispose();
+    await reloaded.dispose();
+    await nextLease.release();
+  });
+
   it("lets the next tab take over once the leading tab releases its writer", async () => {
     const store = new SharedJournalStore();
     const storage = memoryStorage();
