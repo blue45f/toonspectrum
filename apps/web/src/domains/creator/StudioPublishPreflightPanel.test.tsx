@@ -80,4 +80,21 @@ describe("StudioPublishPreflightPanel keyboard ownership", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(options.onClose).not.toHaveBeenCalled();
   });
+
+  it("returns to the mobile project launcher when its action popover has disappeared", () => {
+    const trigger = document.createElement("button");
+    trigger.setAttribute("aria-controls", "studio-project-actions-menu");
+    const popover = document.createElement("div");
+    popover.id = "studio-project-actions-menu";
+    const action = document.createElement("button");
+    popover.append(action);
+    document.body.append(trigger, popover);
+    action.focus();
+    const options = props();
+    const view = render(<StudioPublishPreflightPanel {...options} />);
+    // Project Center closes after dispatching an action into a separate portal.
+    popover.remove();
+    view.rerender(<StudioPublishPreflightPanel {...options} open={false} />);
+    expect(document.activeElement).toBe(trigger);
+  });
 });

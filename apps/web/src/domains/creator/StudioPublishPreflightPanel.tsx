@@ -73,6 +73,14 @@ export function StudioPublishPreflightPanel({
     activeKey: open ? "publish-preflight" : null,
     dialogRef,
     onDismiss: onClose,
+    resolveReturnFocus: () => {
+      const ownerDocument = portalRootRef.current?.ownerDocument;
+      // Project Center removes its action popover after opening this portal. Its
+      // persistent launcher is the return target on mobile, where the menubar is hidden.
+      return ownerDocument?.activeElement?.closest("#studio-project-actions-menu")
+        ? ownerDocument.querySelector<HTMLElement>('[aria-controls="studio-project-actions-menu"]')
+        : null;
+    },
     rootRef: portalRootRef,
   });
 
