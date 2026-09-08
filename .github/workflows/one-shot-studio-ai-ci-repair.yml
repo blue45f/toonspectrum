@@ -1,0 +1,372 @@
+name: One-shot Studio AI CI repair
+
+on:
+  push:
+    branches:
+      - fix/studio-ai-ci-ratchets-20260909
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-shot-studio-ai-ci-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-ai-ci-ratchets-20260909
+          fetch-depth: 1
+
+      - name: Apply architecture-safe repair
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(source: str, old: str, new: str, label: str) -> str:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, found {count}")
+              return source.replace(old, new, 1)
+
+          host_path = Path("apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx")
+          host = host_path.read_text(encoding="utf-8")
+          host_lines_before = host.count("\n") + 1
+          host = replace_once(
+              host,
+              '''    if (
+                collaborationAccessRef.current.locked
+                || scenarioBusy
+                || scenarioRegeneratingIndex !== null
+              ) return;''',
+              '''    if (collaborationAccessRef.current.locked || scenarioBusy
+                || scenarioRegeneratingIndex !== null) return;''',
+              "compact comic composer mutation gate",
+          )
+          host = replace_once(
+              host,
+              '''    const existingFrames =
+                scenarioApplyTarget === "current-page"
+                  ? elements.filter((element): element is FrameEl => element.type === "frame")
+                  : [];''',
+              '''    const existingFrames = scenarioApplyTarget === "current-page"
+                ? elements.filter((element): element is FrameEl => element.type === "frame")
+                : [];''',
+              "compact comic composer frame selection",
+          )
+          host = replace_once(
+              host,
+              '''    setScenarioSceneCountHint(
+                handoff.totalCuts >= 2 && handoff.totalCuts <= 10 ? handoff.totalCuts : undefined
+              );''',
+              '''    setScenarioSceneCountHint(handoff.totalCuts >= 2 && handoff.totalCuts <= 10
+                ? handoff.totalCuts : undefined);''',
+              "compact comic composer cut hint",
+          )
+          host = replace_once(
+              host,
+              '''      // The handoff is a deterministic local transform of an existing plan, not a new model call.
+          textAiProvenance: null,''',
+              '''      textAiProvenance: null,''',
+              "remove redundant comic composer comment",
+          )
+          host_lines_after = host.count("\n") + 1
+          if host_lines_before - host_lines_after != 6:
+              raise SystemExit(
+                  f"host compaction changed {host_lines_before - host_lines_after} lines instead of 6"
+              )
+          if host_lines_after > 29_482:
+              raise SystemExit(f"host remains above ratchet: {host_lines_after} > 29482")
+          host_path.write_text(host, encoding="utf-8")
+
+          helper_path = Path("apps/web/src/domains/creator/studio-browser-storage-health.ts")
+          if helper_path.exists():
+              raise SystemExit(f"refusing to overwrite existing {helper_path}")
+          helper_path.write_text('''export interface StudioBrowserStorageHealth {
+            readonly status: "error" | "loading" | "ready" | "unsupported";
+            readonly persisted: boolean | null;
+            readonly usage: number | null;
+            readonly quota: number | null;
+          }
+
+          export const STUDIO_BROWSER_STORAGE_HEALTH_LOADING: StudioBrowserStorageHealth =
+            Object.freeze({
+              status: "loading",
+              persisted: null,
+              usage: null,
+              quota: null,
+            });
+
+          type StudioBrowserStorageManager = Partial<
+            Pick<StorageManager, "estimate" | "persist" | "persisted">
+          >;
+
+          function currentStudioBrowserStorageManager(): StudioBrowserStorageManager | null {
+            if (typeof navigator === "undefined" || typeof navigator.storage === "undefined") {
+              return null;
+            }
+            return navigator.storage;
+          }
+
+          export async function readStudioBrowserStorageHealth(
+            manager: StudioBrowserStorageManager | null = currentStudioBrowserStorageManager(),
+          ): Promise<StudioBrowserStorageHealth> {
+            if (!manager) {
+              return {
+                status: "unsupported",
+                persisted: null,
+                usage: null,
+                quota: null,
+              };
+            }
+            try {
+              const [persisted, estimate] = await Promise.all([
+                typeof manager.persisted === "function"
+                  ? manager.persisted().catch(() => null)
+                  : Promise.resolve(null),
+                typeof manager.estimate === "function"
+                  ? manager.estimate().catch(() => null)
+                  : Promise.resolve(null),
+              ]);
+              return {
+                status: "ready",
+                persisted,
+                usage: typeof estimate?.usage === "number" ? estimate.usage : null,
+                quota: typeof estimate?.quota === "number" ? estimate.quota : null,
+              };
+            } catch {
+              return {
+                status: "error",
+                persisted: null,
+                usage: null,
+                quota: null,
+              };
+            }
+          }
+
+          export async function requestStudioBrowserStoragePersistence(
+            manager: StudioBrowserStorageManager | null = currentStudioBrowserStorageManager(),
+          ): Promise<boolean | null> {
+            if (!manager || typeof manager.persist !== "function") return null;
+            return manager.persist();
+          }
+          ''', encoding="utf-8")
+
+          helper_test_path = Path("apps/web/src/domains/creator/studio-browser-storage-health.test.ts")
+          if helper_test_path.exists():
+              raise SystemExit(f"refusing to overwrite existing {helper_test_path}")
+          helper_test_path.write_text('''import { describe, expect, it, vi } from "vitest";
+
+          import {
+            readStudioBrowserStorageHealth,
+            requestStudioBrowserStoragePersistence,
+          } from "./studio-browser-storage-health";
+
+          describe("studio browser storage health adapter", () => {
+            it("reports unsupported without a StorageManager", async () => {
+              await expect(readStudioBrowserStorageHealth(null)).resolves.toEqual({
+                status: "unsupported",
+                persisted: null,
+                usage: null,
+                quota: null,
+              });
+              await expect(requestStudioBrowserStoragePersistence(null)).resolves.toBeNull();
+            });
+
+            it("reads persistence and quota without exposing browser APIs to the component", async () => {
+              await expect(readStudioBrowserStorageHealth({
+                persisted: vi.fn().mockResolvedValue(true),
+                estimate: vi.fn().mockResolvedValue({ usage: 1_024, quota: 8_192 }),
+              })).resolves.toEqual({
+                status: "ready",
+                persisted: true,
+                usage: 1_024,
+                quota: 8_192,
+              });
+            });
+
+            it("keeps partial capability failures non-fatal", async () => {
+              await expect(readStudioBrowserStorageHealth({
+                persisted: vi.fn().mockRejectedValue(new Error("blocked")),
+                estimate: vi.fn().mockRejectedValue(new Error("blocked")),
+              })).resolves.toEqual({
+                status: "ready",
+                persisted: null,
+                usage: null,
+                quota: null,
+              });
+            });
+
+            it("preserves granted, declined, and rejected persistence outcomes", async () => {
+              await expect(requestStudioBrowserStoragePersistence({
+                persist: vi.fn().mockResolvedValue(true),
+              })).resolves.toBe(true);
+              await expect(requestStudioBrowserStoragePersistence({
+                persist: vi.fn().mockResolvedValue(false),
+              })).resolves.toBe(false);
+              await expect(requestStudioBrowserStoragePersistence({
+                persist: vi.fn().mockRejectedValue(new Error("denied")),
+              })).rejects.toThrow("denied");
+            });
+          });
+          ''', encoding="utf-8")
+
+          component_path = Path("apps/web/src/domains/creator/StudioFileControlCenter.tsx")
+          component = component_path.read_text(encoding="utf-8")
+          component = replace_once(
+              component,
+              '''} from "./studio-file-control-center-model";
+          import {
+            scanStudioRecoveryStorage,''',
+              '''} from "./studio-file-control-center-model";
+          import {
+            STUDIO_BROWSER_STORAGE_HEALTH_LOADING,
+            readStudioBrowserStorageHealth,
+            requestStudioBrowserStoragePersistence,
+            type StudioBrowserStorageHealth,
+          } from "./studio-browser-storage-health";
+          import {
+            scanStudioRecoveryStorage,''',
+              "add browser storage adapter import",
+          )
+          component = replace_once(
+              component,
+              '''interface BrowserStorageHealth {
+            readonly status: "error" | "loading" | "ready" | "unsupported";
+            readonly persisted: boolean | null;
+            readonly usage: number | null;
+            readonly quota: number | null;
+          }
+
+          const LOADING_STORAGE_HEALTH: BrowserStorageHealth = Object.freeze({
+            status: "loading",
+            persisted: null,
+            usage: null,
+            quota: null,
+          });
+
+          ''',
+              "",
+              "remove component-owned storage health model",
+          )
+          component = replace_once(
+              component,
+              '''async function readBrowserStorageHealth(): Promise<BrowserStorageHealth> {
+            if (typeof navigator === "undefined" || !navigator.storage) {
+              return {
+                status: "unsupported",
+                persisted: null,
+                usage: null,
+                quota: null,
+              };
+            }
+            try {
+              const manager = navigator.storage;
+              const [persisted, estimate] = await Promise.all([
+                typeof manager.persisted === "function"
+                  ? manager.persisted().catch(() => null)
+                  : Promise.resolve(null),
+                typeof manager.estimate === "function"
+                  ? manager.estimate().catch(() => null)
+                  : Promise.resolve(null),
+              ]);
+              return {
+                status: "ready",
+                persisted,
+                usage: typeof estimate?.usage === "number" ? estimate.usage : null,
+                quota: typeof estimate?.quota === "number" ? estimate.quota : null,
+              };
+            } catch {
+              return {
+                status: "error",
+                persisted: null,
+                usage: null,
+                quota: null,
+              };
+            }
+          }
+
+          ''',
+              "",
+              "extract browser storage health reader",
+          )
+          component = component.replace("BrowserStorageHealth", "StudioBrowserStorageHealth")
+          component = component.replace(
+              "LOADING_STORAGE_HEALTH",
+              "STUDIO_BROWSER_STORAGE_HEALTH_LOADING",
+          )
+          component = component.replace(
+              "readBrowserStorageHealth",
+              "readStudioBrowserStorageHealth",
+          )
+          component = replace_once(
+              component,
+              '''  const requestPersistence = useCallback(async () => {
+            if (
+              typeof navigator === "undefined"
+              || !navigator.storage
+              || typeof navigator.storage.persist !== "function"
+            ) {
+              setAnnouncement("이 브라우저는 영구 저장소 요청을 지원하지 않습니다.");
+              return;
+            }
+            setStorageBusy(true);
+            try {
+              const granted = await navigator.storage.persist();
+              setAnnouncement(
+                granted
+                  ? "브라우저가 복구 저장소의 영구 보관을 허용했습니다."
+                  : "브라우저가 영구 보관을 허용하지 않았습니다. 아카이브 사본을 별도로 저장하세요.",
+              );
+              setStorageHealth(await readStudioBrowserStorageHealth());
+            } catch {
+              setAnnouncement("브라우저 저장소 보호 요청을 완료하지 못했습니다.");
+            } finally {
+              setStorageBusy(false);
+            }
+          }, []);''',
+              '''  const requestPersistence = useCallback(async () => {
+            setStorageBusy(true);
+            try {
+              const granted = await requestStudioBrowserStoragePersistence();
+              if (granted === null) {
+                setAnnouncement("이 브라우저는 영구 저장소 요청을 지원하지 않습니다.");
+                return;
+              }
+              setAnnouncement(
+                granted
+                  ? "브라우저가 복구 저장소의 영구 보관을 허용했습니다."
+                  : "브라우저가 영구 보관을 허용하지 않았습니다. 아카이브 사본을 별도로 저장하세요.",
+              );
+              setStorageHealth(await readStudioBrowserStorageHealth());
+            } catch {
+              setAnnouncement("브라우저 저장소 보호 요청을 완료하지 못했습니다.");
+            } finally {
+              setStorageBusy(false);
+            }
+          }, []);''',
+              "route persistence request through adapter",
+          )
+          if "navigator.storage" in component:
+              raise SystemExit("StudioFileControlCenter still owns navigator.storage directly")
+          component_path.write_text(component, encoding="utf-8")
+
+          workflow_path = Path(".github/workflows/one-shot-studio-ai-ci-repair.yml")
+          workflow_path.unlink()
+          PY
+
+      - name: Commit repaired source
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(studio): restore AI composer architecture gates"
+          git push origin HEAD:fix/studio-ai-ci-ratchets-20260909
