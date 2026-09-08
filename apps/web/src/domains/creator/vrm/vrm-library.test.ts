@@ -111,7 +111,11 @@ describe("VRM library helpers", () => {
     const names = SAMPLE_VRM_ENTRIES.map((entry) => entry.name);
 
     // 대표 엔트리 스팟 체크(기존 + 2026-07 신규).
-    expect(names.slice(0, 4)).toEqual(["루미", "하린", "세라", "유나"]);
+    expect(
+      ["sample-vrm", "avatar-a", "avatar-b", "avatar-c"].map(
+        (id) => SAMPLE_VRM_ENTRIES.find((entry) => entry.id === id)?.name,
+      ),
+    ).toEqual(["루미", "하린", "세라", "유나"]);
     expect(names).toContain("데빌 (악마)");
     expect(names).toContain("쿨에일리언 (외계인)");
     expect(names).toContain("스포츠메카 (메카)");
@@ -132,7 +136,9 @@ describe("VRM library helpers", () => {
     expect(new Set(ids).size).toBe(ids.length);
 
     for (const sample of SAMPLE_VRMS) {
-      expect(sample.url, `${sample.id} url`).toMatch(/^\/vrm\/[A-Za-z0-9_.-]+\.vrm$/);
+      expect(sample.url, `${sample.id} url`).toMatch(
+        /^\/vrm\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.vrm$/,
+      );
       expect(sample.id, `${sample.id} id format`).toMatch(/^[a-z0-9]+([_.-][a-z0-9]+)*$/);
     }
 
