@@ -202,11 +202,11 @@ ToonSpectrum에는 이미 다음 전문 기능이 존재한다.
 
 ## 8. 공식 참고 자료
 
-- Toon Boom Storyboard Pro 25 Timeline View: https://docs.toonboom.com/help/storyboard-pro-25/storyboard/reference/views/timeline-view.html
-- Toon Boom Storyboard Pro 3D camera: https://docs.toonboom.com/help/storyboard-pro-25/storyboard/3d-space/about-3d-camera.html
+- Toon Boom Storyboard Pro 27 animatic workflow: https://docs.toonboom.com/fr/help/storyboard-pro-27/storyboard/getting-started/animatic.html
+- Toon Boom Storyboard Pro 27 3D camera animation: https://docs.toonboom.com/help/storyboard-pro-27/storyboard/camera/animate-3d-camera.html
 - Toon Boom Storyboard Pro 27 release: https://www.toonboom.com/products/storyboard-pro
-- Boords features: https://boords.com/features
-- Boords collaboration: https://boords.com/storyboard-collaboration
+- Boords storyboard views: https://boords.com/docs/storyboard-views
+- Boords feedback and approvals: https://boords.com/collaborate
 - Boords animatic: https://boords.com/animatic
 - Boords shot list: https://boords.com/shot-list
 - Adobe Firefly Boards storyboard: https://www.adobe.com/products/firefly/features/storyboard.html
