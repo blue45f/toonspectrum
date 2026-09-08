@@ -609,6 +609,7 @@ function StudioLeftToolRailConnected() {
                 <button
                   key={id}
                   type="button"
+                  data-studio-hidden-tool-id={id}
                   className="flex min-h-11 w-full items-center rounded-lg px-2 py-2 text-left text-xs text-fg hover:bg-raised sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
                   onClick={() => {
                     commitAppSettings({
