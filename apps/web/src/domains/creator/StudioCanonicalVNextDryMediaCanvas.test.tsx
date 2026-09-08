@@ -10,6 +10,7 @@ import {
 } from "./StudioCanonicalVNextDryMediaCanvas";
 
 import type { DrawEl } from "./studio-element-model";
+import type { StudioEngineWebGpuPresentationLayout } from "./render/studio-engine-webgpu-presentation-surface";
 
 const harness = vi.hoisted(() => {
   let releasePresentation: (() => void) | null = null;
@@ -29,8 +30,10 @@ const harness = vi.hoisted(() => {
     deferDeviceCreation: false,
     failSurfaceCreates: 0,
     failPresentations: 0,
+    compileRejection: null as string | null,
     configurationFailure: null as string | null,
     snapshotDraws: 0,
+    documentParityStatus: "matched" as "matched" | "mismatch" | "unavailable",
     pendingDeviceResolvers: [] as Array<() => void>,
     createDevice() {
       const device = {
@@ -79,8 +82,10 @@ const harness = vi.hoisted(() => {
       this.deferDeviceCreation = false;
       this.failSurfaceCreates = 0;
       this.failPresentations = 0;
+      this.compileRejection = null;
       this.configurationFailure = null;
       this.snapshotDraws = 0;
+      this.documentParityStatus = "matched";
       this.pendingDeviceResolvers.length = 0;
       releasePresentation = null;
     },
@@ -100,12 +105,31 @@ vi.mock("./render/studio-gpu-fabric", () => ({
   },
 }));
 
+vi.mock("./studio-canonical-dry-media-document-parity", () => ({
+  measureStudioDryMediaDocumentParity(input: { element: DrawEl; layoutKey: string }) {
+    return harness.documentParityStatus === "unavailable"
+      ? { status: "unavailable", reason: "readback-unavailable" }
+      : {
+          status: harness.documentParityStatus, element: input.element, layoutKey: input.layoutKey,
+          width: 2, height: 1, comparedPixels: 2,
+          mismatchedPixels: harness.documentParityStatus === "matched" ? 0 : 1,
+          maxChannelDelta: harness.documentParityStatus === "matched" ? 0 : 149,
+          colorSpace: "srgb", alphaEncoding: "straight-rgba8", channelTolerance: 0,
+        };
+  },
+}));
+
 vi.mock("./studio-canonical-vnext-dry-media-product-adapter", () => ({
   async compileStudioCanonicalVNextDryMediaProductFrame(request: {
     element: DrawEl;
     signal?: AbortSignal;
   }) {
     harness.compileCalls.push(request);
+    if (harness.compileRejection) return {
+      status: "unavailable" as const,
+      reason: "quality-gate-rejected" as const,
+      detail: harness.compileRejection,
+    };
     return {
       status: "ready" as const,
       dynamicPlanDigest: "sha256:dynamic-plan",
@@ -151,6 +175,7 @@ vi.mock("./render/studio-engine-webgpu-presentation-surface", () => ({
   createStudioEngineWebGpuPresentationSurface(options: {
     onDeviceLost: (info: GPUDeviceLostInfo) => void;
     device: GPUDevice;
+    canvas: HTMLCanvasElement;
   }) {
     // Match the native boundary's identity requirement; a GPUDevice Proxy is not accepted.
     if (!harness.nativeDevices.has(options.device)) throw new TypeError("Invalid native GPUDevice");
@@ -166,12 +191,18 @@ vi.mock("./render/studio-engine-webgpu-presentation-surface", () => ({
     return {
       status: "ready" as const,
       surface: {
-        configure(layout: unknown) {
+        configure(layout: StudioEngineWebGpuPresentationLayout) {
           harness.configureCalls.push(layout);
           if (harness.configurationFailure) {
             return { status: "rejected" as const, reason: harness.configurationFailure };
           }
-          return { status: "ready" as const };
+          options.canvas.width = Math.round(layout.cssWidth * layout.dpr);
+          options.canvas.height = Math.round(layout.cssHeight * layout.dpr);
+          return { status: "ready" as const, configuration: {
+            ...layout,
+            physicalWidth: options.canvas.width, physicalHeight: options.canvas.height,
+            documentToSurface: { m11: 1, m12: 0, m21: 0, m22: 1, dx: 0, dy: 0 },
+          } };
         },
         dispose() {
           harness.disposedSurfaces += 1;
@@ -257,6 +288,68 @@ afterEach(() => {
 });
 
 describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
+  it("keeps ordinary document selection quiet when candidate tip geometry is unsupported", async () => {
+    harness.compileRejection = "tangent-alignment-required";
+    const onAuthorityChange = vi.fn();
+    const view = render(<StudioCanonicalVNextDryMediaCanvas {...baseProps} onAuthorityChange={onAuthorityChange} />);
+    await waitFor(() => expect(onAuthorityChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: "unavailable", reason: "compile:quality-gate-rejected:tangent-alignment-required",
+      retainsLastGoodFrame: false, lastPresented: null,
+    })));
+    expect(onAuthorityChange.mock.calls.some(([authority]) => authority?.status === "authorized")).toBe(false);
+    expect(onAuthorityChange.mock.calls.at(-1)![0].documentParity).toBeUndefined();
+    expect(view.queryByRole("alert")).toBeNull();
+    const canvas = view.container.querySelector<HTMLCanvasElement>("[data-studio-canonical-vnext-dry-media]");
+    expect(canvas?.style.visibility).toBe("hidden");
+    expect(canvas?.dataset.studioCanonicalVnextDryMediaDocumentParity).toBeUndefined();
+    await waitFor(() => expect(harness.disposedSurfaces).toBe(1));
+    expect(harness.disposedRuntimes).toBe(1);
+  });
+
+  it.each(["element", "layout", "paper"] as const)("does not attach old comparison metrics to a changed %s while explicit reselection is required", async (changed) => {
+    harness.documentParityStatus = "mismatch";
+    const onAuthorityChange = vi.fn();
+    const view = render(<StudioCanonicalVNextDryMediaCanvas {...baseProps} onAuthorityChange={onAuthorityChange} />);
+    await waitFor(() => expect(onAuthorityChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: "unavailable", documentParity: expect.objectContaining({ status: "mismatch" }),
+    })));
+    view.rerender(<StudioCanonicalVNextDryMediaCanvas
+      {...baseProps}
+      element={changed === "element" ? { ...element, strokeWidth: 22 } : element}
+      layoutKey={changed === "element" ? baseProps.layoutKey : `changed:${changed}`}
+      paperSurface={changed === "paper" ? { kind: "rough", seed: 77 } : undefined}
+      onAuthorityChange={onAuthorityChange}
+    />);
+    await waitFor(() => expect(onAuthorityChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: "unavailable", reason: "document-parity:reselection-required",
+      retainsLastGoodFrame: false, lastPresented: null,
+    })));
+    expect(onAuthorityChange.mock.calls.at(-1)![0].documentParity).toBeUndefined();
+    expect(view.queryByRole("alert")).toBeNull();
+    expect(view.container.querySelector("[data-studio-canonical-vnext-dry-media-document-parity]"))
+      .toBeNull();
+    expect(harness.compileCalls).toHaveLength(1);
+  });
+
+  it.each(["mismatch", "unavailable"] as const)("retains ordinary pixels silently after document parity %s despite successful GPU lineage", async (status) => {
+    harness.documentParityStatus = status;
+    const onAuthorityChange = vi.fn();
+    const view = render(<StudioCanonicalVNextDryMediaCanvas {...baseProps} onAuthorityChange={onAuthorityChange} />);
+    await waitFor(() => expect(onAuthorityChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: "unavailable", retainsLastGoodFrame: false, lastPresented: null,
+      documentParity: expect.objectContaining({ status }),
+    })));
+    expect(onAuthorityChange.mock.calls.some(([authority]) => authority?.status === "authorized")).toBe(false);
+    expect(view.queryByRole("alert")).toBeNull();
+    const snapshot = view.container.querySelector<HTMLCanvasElement>("[data-studio-canonical-vnext-dry-media-last-good]");
+    expect(snapshot?.width).toBe(0);
+    const canvas = view.container.querySelector<HTMLCanvasElement>("[data-studio-canonical-vnext-dry-media]");
+    expect(canvas?.style.visibility).toBe("hidden");
+    expect(JSON.parse(canvas!.dataset.studioCanonicalVnextDryMediaDocumentParity!)).toMatchObject({ status });
+    await waitFor(() => expect(harness.disposedSurfaces).toBe(1));
+    expect(harness.disposedRuntimes).toBe(1);
+  });
+
   it("keeps the canvas hidden until exact parity authorizes the same DrawEl", async () => {
     const authorities: Array<StudioCanonicalVNextDryMediaCanvasAuthority | null> = [];
     const onAuthorityChange = (
@@ -284,6 +377,7 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
       sourceDabCount: 32,
       texturedDabCount: 160,
       laneCount: 5,
+      documentParity: { status: "matched", mismatchedPixels: 0, channelTolerance: 0 },
     });
     expect(authority?.status).toBe("authorized");
     if (authority?.status !== "authorized") throw new Error("authority missing");

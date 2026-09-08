@@ -431,6 +431,7 @@ export function StudioCanvasViewportStageHost({
     canonicalDryMediaCanvasVisible: live.canonicalDryMediaCanvasVisible,
     canonicalDryMediaCandidate: live.canonicalDryMediaCandidate,
     canonicalDryMediaLayoutKey: live.canonicalDryMediaLayoutKey,
+    paperSurfaceForPreview: live.paperSurfaceForPreview,
     canvasFlipH: viewport.canvasFlipH,
     canvasH: viewport.canvasH,
     velloHubAuthority: live.velloHubAuthority,

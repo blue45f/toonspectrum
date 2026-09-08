@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 import {
   createStudioEngineWebGpuPresentationSurface,
+  type StudioEngineWebGpuPresentationConfiguration,
   type StudioEngineWebGpuPresentationLayout,
   type StudioEngineWebGpuPresentationSurface,
 } from "./render/studio-engine-webgpu-presentation-surface";
@@ -11,6 +12,11 @@ import {
 } from "./render/studio-engine-webgpu-textured-brush-runtime";
 import { acquireStudioGpuPresentationDevice } from "./render/studio-gpu-presentation-device";
 import {
+  measureStudioDryMediaDocumentParity,
+  type StudioDryMediaDocumentParityReceipt,
+  type StudioDryMediaDocumentParityResult,
+} from "./studio-canonical-dry-media-document-parity";
+import {
   StudioCanonicalVNextDryMediaPresentationController,
   type StudioCanonicalVNextDryMediaFinalParityResult,
 } from "./studio-canonical-vnext-dry-media-presentation-controller";
@@ -18,6 +24,7 @@ import { compileStudioCanonicalVNextDryMediaProductFrame } from "./studio-canoni
 import { resolveStudioLiveSurfaceDevicePixelRatio } from "./studio-low-latency-canvas";
 
 import type { StudioWebGpuSurfaceBounds } from "./render/studio-webgpu-viewport";
+import type { StudioPaperSurfaceSettings } from "./brush/studio-paper-granulation-runtime";
 import type { DrawEl } from "./studio-element-model";
 
 import { cn } from "@/shared/lib/utils";
@@ -35,6 +42,8 @@ export interface StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority {
   readonly sourceDabCount: number;
   readonly texturedDabCount: number;
   readonly laneCount: 3 | 5;
+  /** Measured ordinary-document equivalence, separate from GPU-internal phase lineage. */
+  readonly documentParity: StudioDryMediaDocumentParityReceipt;
   readonly parityReceipt: Extract<
     StudioCanonicalVNextDryMediaFinalParityResult,
     { readonly status: "completed" }
@@ -48,6 +57,7 @@ export interface StudioCanonicalVNextDryMediaCanvasUnavailableAuthority {
   readonly element: DrawEl;
   readonly layoutKey: string;
   readonly reason: string;
+  readonly documentParity?: StudioDryMediaDocumentParityResult;
   readonly retainsLastGoodFrame: boolean;
   readonly lastPresented: StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority | null;
   readonly retryPolicy: "explicit-next-selection-only";
@@ -67,6 +77,7 @@ export interface StudioCanonicalVNextDryMediaCanvasProps {
   readonly documentHeight: number;
   readonly documentScale: number;
   readonly flipX: boolean;
+  readonly paperSurface?: StudioPaperSurfaceSettings;
   readonly onAuthorityChange: (
     authority: StudioCanonicalVNextDryMediaCanvasAuthority | null,
   ) => void;
@@ -88,6 +99,7 @@ interface DryMediaGpuResources {
   readonly runtime: StudioEngineWebGpuTexturedBrushRuntime;
   readonly controller: StudioCanonicalVNextDryMediaPresentationController;
   readonly epochs: LayoutEpochs;
+  configuration: StudioEngineWebGpuPresentationConfiguration | null;
   tail: Promise<void>;
 }
 
@@ -95,6 +107,7 @@ type DryMediaCanvasDisplayState =
   | "awaiting-receipt"
   | "authorized"
   | "last-good-unavailable"
+  | "document-retained"
   | "unavailable";
 
 function surfaceDevicePixelRatio(width: number, height: number): number {
@@ -166,6 +179,7 @@ async function createResources(
         flipSignature: null,
       },
       tail: Promise.resolve(),
+      configuration: null,
     };
   } catch {
     runtime?.dispose();
@@ -247,9 +261,11 @@ function configureSurface(
     },
   };
   const configured = resources.surface.configure(layout);
-  return configured.status === "ready" || configured.status === "unchanged"
-    ? null
-    : configured.reason;
+  if (configured.status === "ready" || configured.status === "unchanged") {
+    resources.configuration = configured.configuration;
+    return null;
+  }
+  return configured.reason;
 }
 
 function disposeResources(resources: DryMediaGpuResources | null): void {
@@ -272,7 +288,7 @@ function snapshotPresentedCanvas(
   // executes brush commands, or grants Canvas2D provider authority; it only survives WebGPU
   // unconfigure/device-loss clearing the browser's current presentation texture.
   try {
-    const context = target.getContext("2d");
+    const context = target.getContext("2d", { colorSpace: "srgb", willReadFrequently: true });
     if (!context || source.width <= 0 || source.height <= 0) return false;
     target.width = source.width;
     target.height = source.height;
@@ -300,6 +316,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
   documentHeight,
   documentScale,
   flipX,
+  paperSurface,
   onAuthorityChange,
 }: StudioCanonicalVNextDryMediaCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -315,6 +332,11 @@ export function StudioCanonicalVNextDryMediaCanvas({
   const mountedRef = useRef(true);
   const blockedElementIdRef = useRef<string | null>(null);
   const unavailableReasonRef = useRef<string | null>(null);
+  const documentParityRef = useRef<Readonly<{
+    element: DrawEl;
+    layoutKey: string;
+    result: StudioDryMediaDocumentParityResult;
+  }> | null>(null);
   const lastAuthorizedRef =
     useRef<StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority | null>(null);
   const [display, setDisplay] = useState<Readonly<{
@@ -331,6 +353,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
   }, [onAuthorityChange]);
 
   useLayoutEffect(() => {
+    const snapshotCanvas = snapshotCanvasRef.current;
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
@@ -340,6 +363,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
       const resources = resourcesRef.current;
       resourcesRef.current = null;
       resourcesPromiseRef.current = null;
+      clearPresentedSnapshot(snapshotCanvas);
       disposeResourcesAfterTail(resources);
     };
   }, []);
@@ -358,8 +382,18 @@ export function StudioCanonicalVNextDryMediaCanvas({
       disposeResourcesAfterTail(resources);
     };
 
-    const publishUnavailable = (reason: string) => {
+    const publishUnavailable = (requestedReason: string) => {
       if (!element) return;
+      const comparison = documentParityRef.current;
+      const documentParity = comparison?.element === element && comparison.layoutKey === layoutKey
+        ? comparison.result : null;
+      const documentRetained = requestedReason.startsWith("document-parity:");
+      const reason = documentRetained && !documentParity
+        ? "document-parity:reselection-required" : requestedReason;
+      if (comparison && !documentParity) {
+        documentParityRef.current = null;
+        if (canvas) delete canvas.dataset.studioCanonicalVnextDryMediaDocumentParity;
+      }
       blockedElementIdRef.current = element.id;
       unavailableReasonRef.current = reason;
       // Only a frame receipted for this exact DrawEl in this exact layout may stand in for the
@@ -370,6 +404,15 @@ export function StudioCanonicalVNextDryMediaCanvas({
         ? lastAuthorizedRef.current
         : null;
       const retainsLastGoodFrame = lastPresented !== null;
+      // Candidate admission is automatic when selecting an ordinary stroke. Rejecting its
+      // unsupported tip geometry is not a document failure: the ordinary pixels still own it.
+      // Keep the diagnostic reason, and preserve alerts for failures of an authorized frame.
+      const rejectedCandidate = !retainsLastGoodFrame
+        && reason.startsWith("compile:quality-gate-rejected:");
+      if (!lastPresented) {
+        lastAuthorizedRef.current = null;
+        clearPresentedSnapshot(snapshotCanvas);
+      }
       canvas?.setAttribute(
         "data-studio-canonical-vnext-dry-media-state",
         "unavailable",
@@ -378,7 +421,8 @@ export function StudioCanonicalVNextDryMediaCanvas({
         canvas.dataset.studioCanonicalVnextDryMediaReason = reason;
       }
       setDisplay({
-        state: retainsLastGoodFrame ? "last-good-unavailable" : "unavailable",
+        state: documentRetained || rejectedCandidate ? "document-retained"
+          : retainsLastGoodFrame ? "last-good-unavailable" : "unavailable",
         reason,
       });
       callbackRef.current(Object.freeze({
@@ -389,6 +433,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
         layoutKey,
         reason,
         retainsLastGoodFrame,
+        ...(documentParity ? { documentParity } : {}),
         lastPresented,
         retryPolicy: "explicit-next-selection-only",
       }));
@@ -400,6 +445,8 @@ export function StudioCanonicalVNextDryMediaCanvas({
     };
 
     if (!canvas || !snapshotCanvas || !element) {
+      documentParityRef.current = null;
+      if (canvas) delete canvas.dataset.studioCanonicalVnextDryMediaDocumentParity;
       blockedElementIdRef.current = null;
       unavailableReasonRef.current = null;
       lastAuthorizedRef.current = null;
@@ -424,12 +471,14 @@ export function StudioCanonicalVNextDryMediaCanvas({
       lastAuthorizedRef.current = null;
       callbackRef.current(null);
       clearPresentedSnapshot(snapshotCanvas);
+      documentParityRef.current = null;
     }
     if (blockedElementIdRef.current === element.id) {
       publishUnavailable(unavailableReasonRef.current ?? "provider-unavailable");
       return () => controller.abort();
     }
     canvas.dataset.studioCanonicalVnextDryMediaState = "awaiting-receipt";
+    delete canvas.dataset.studioCanonicalVnextDryMediaDocumentParity;
     delete canvas.dataset.studioCanonicalVnextDryMediaReason;
     setDisplay((current) => current.state === "authorized"
       ? current
@@ -572,6 +621,34 @@ export function StudioCanonicalVNextDryMediaCanvas({
           rejectAndRelease("last-good-snapshot-unavailable");
           return;
         }
+        const documentParity = resources.configuration
+          ? measureStudioDryMediaDocumentParity({
+              element, layoutKey, snapshot: snapshotCanvas,
+              configuration: resources.configuration, paperSurface,
+            })
+          : { status: "unavailable" as const, reason: "invalid-pixels" as const };
+        canvas.dataset.studioCanonicalVnextDryMediaDocumentParity = JSON.stringify(
+          documentParity.status === "unavailable" ? documentParity : {
+            status: documentParity.status,
+            width: documentParity.width, height: documentParity.height,
+            comparedPixels: documentParity.comparedPixels,
+            mismatchedPixels: documentParity.mismatchedPixels,
+            maxChannelDelta: documentParity.maxChannelDelta,
+            colorSpace: documentParity.colorSpace,
+            alphaEncoding: documentParity.alphaEncoding,
+            channelTolerance: documentParity.channelTolerance,
+          },
+        );
+        if (documentParity.status !== "matched") {
+          // A self-consistent GPU frame is not necessarily the authored document. Do not retain
+          // this unverified snapshot, or resurrect an earlier frame after a measured mismatch.
+          lastAuthorizedRef.current = null;
+          clearPresentedSnapshot(snapshotCanvas);
+          documentParityRef.current = { element, layoutKey, result: documentParity };
+          rejectAndRelease(`document-parity:${documentParity.status === "unavailable"
+            ? documentParity.reason : "mismatch"}`);
+          return;
+        }
         canvas.dataset.studioCanonicalVnextDryMediaState = "authorized";
         delete canvas.dataset.studioCanonicalVnextDryMediaReason;
         const authority = Object.freeze({
@@ -585,6 +662,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
           sourceDabCount: compiled.sourceDabCount,
           texturedDabCount: compiled.texturedDabCount,
           laneCount: compiled.laneCount,
+          documentParity: { ...documentParity, status: "matched" as const },
           parityReceipt: parity.receipt,
         }) satisfies StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority;
         lastAuthorizedRef.current = authority;
@@ -608,6 +686,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
     element,
     flipX,
     layoutKey,
+    paperSurface,
     surfaceHeight,
     surfaceLeft,
     surfaceTop,
@@ -648,7 +727,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
           visibility: showWebGpuCanvas ? "visible" : "hidden",
         }}
       />
-      {display.reason ? (
+      {display.reason && display.state !== "document-retained" ? (
         <div
           role="alert"
           aria-live="assertive"
