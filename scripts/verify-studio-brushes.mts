@@ -3828,6 +3828,20 @@ async function enableSmartShape(page: Page): Promise<void> {
   throw new Error("visible Smart Shape toggle was not found");
 }
 
+async function revealStudioViewTool(page: Page, mode: "zoom" | "rotate"): Promise<void> {
+  const trigger = page.locator(`[data-studio-view-tool-trigger="${mode}"]`);
+  const more = page.locator('[data-studio-tool-rail-settings="true"] button[aria-haspopup="dialog"]');
+  const picker = page.getByRole("dialog", { name: "숨긴 도구", exact: true });
+  if (!(await trigger.isVisible())) {
+    if (await more.getAttribute("aria-expanded") !== "true") await more.click();
+    const toolId = mode === "zoom" ? "zoom" : "rotate-view";
+    await page.locator(`[data-studio-hidden-tool-id="${toolId}"]`).click();
+  }
+  if (await more.getAttribute("aria-expanded") === "true") await more.click();
+  await picker.waitFor({ state: "hidden" });
+  await trigger.waitFor({ state: "visible" });
+}
+
 async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: number) => ScreenPoint): Promise<void> {
   const before = (await persistedDrawElements(page)).at(-1);
   invariant(before?.id, "current-stroke correction has no persisted source");
@@ -3936,6 +3950,9 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   await page.setViewportSize({ width: 1440, height: 1100 });
   await dialog.getByRole("button", { name: "원래 자유선 복원", exact: true }).click();
   await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(before), "explicit original restore was not exact");
+  // Fresh profiles keep these tools in More; reveal them through the shipped toolbar controls.
+  await revealStudioViewTool(page, "zoom");
+  await revealStudioViewTool(page, "rotate");
   const viewEvidence: Array<{ zoom: string; rotation: string; bounds: unknown }> = [];
   for (const zoomAction of ["캔버스 축소", "캔버스 확대"] as const) {
     await page.locator('[data-studio-view-tool-trigger="zoom"]').click();
