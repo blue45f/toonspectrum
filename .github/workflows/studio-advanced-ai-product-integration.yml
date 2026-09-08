@@ -1,0 +1,199 @@
+name: Integrate Studio advanced AI tools
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-advanced-ai-product-integration.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Patch typed product integration points
+        run: |
+          cat > /tmp/integrate-advanced-ai.mjs <<'NODE'
+          import fs from 'node:fs';
+          import ts from 'typescript';
+
+          function addImport(source, statement) {
+            if (source.includes(statement)) return source;
+            const sf = ts.createSourceFile('source.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+            const imports = sf.statements.filter(ts.isImportDeclaration);
+            if (imports.length === 0) throw new Error('No import insertion point');
+            const position = imports.at(-1).end;
+            return `${source.slice(0, position)}\n${statement}${source.slice(position)}`;
+          }
+
+          function declaredNames(node) {
+            const names = new Set();
+            function addName(name) {
+              if (ts.isIdentifier(name)) names.add(name.text);
+              else if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+                for (const element of name.elements) if (ts.isBindingElement(element)) addName(element.name);
+              }
+            }
+            function visit(child) {
+              if (ts.isVariableDeclaration(child)) addName(child.name);
+              if (ts.isFunctionDeclaration(child) && child.name) names.add(child.name.text);
+              if (ts.isParameter(child)) addName(child.name);
+              ts.forEachChild(child, visit);
+            }
+            visit(node);
+            return names;
+          }
+
+          function findFunctionLike(sf, name) {
+            for (const statement of sf.statements) {
+              if (ts.isFunctionDeclaration(statement) && statement.name?.text === name && statement.body) return statement;
+              if (ts.isVariableStatement(statement)) {
+                for (const declaration of statement.declarationList.declarations) {
+                  if (ts.isIdentifier(declaration.name) && declaration.name.text === name && declaration.initializer) {
+                    const init = declaration.initializer;
+                    if ((ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && init.body && ts.isBlock(init.body)) return init;
+                  }
+                }
+              }
+            }
+            throw new Error(`Function ${name} not found`);
+          }
+
+          function insertBeforeTopLevelReturn(source, functionName, snippet) {
+            if (source.includes(snippet.trim())) return source;
+            const sf = ts.createSourceFile('source.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+            const fn = findFunctionLike(sf, functionName);
+            const body = fn.body;
+            const returns = body.statements.filter(ts.isReturnStatement);
+            const target = returns.at(-1);
+            if (!target) throw new Error(`${functionName} has no top-level return`);
+            return `${source.slice(0, target.getStart(sf))}${snippet}\n${source.slice(target.getStart(sf))}`;
+          }
+
+          function choose(names, candidates) {
+            return candidates.find((candidate) => names.has(candidate));
+          }
+
+          // Current document bridge in the actual editor host.
+          const hostPath = 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx';
+          let host = fs.readFileSync(hostPath, 'utf8');
+          host = addImport(
+            host,
+            'import { useStudioAiCanvasBridge } from "./ai/studio-stroke-proposal-bridge";',
+          );
+          const hostAst = ts.createSourceFile(hostPath, host, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+          const hostFn = findFunctionLike(hostAst, 'StudioCuttoonEditorHost');
+          const hostNames = declaredNames(hostFn);
+          const elements = choose(hostNames, ['elements', 'currentElements', 'pageElements']);
+          const appendElement = choose(hostNames, ['addEl', 'addElement', 'appendElement']);
+          const documentId = choose(hostNames, ['workId', 'currentWorkId', 'savedWorkId', 'currentPageId', 'pageId']);
+          if (!elements || !appendElement) {
+            throw new Error(`Unable to resolve Studio host bridge names: elements=${elements} append=${appendElement}`);
+          }
+          const documentExpression = documentId
+            ? `String(${documentId} ?? globalThis.location?.pathname ?? "studio")`
+            : 'String(globalThis.location?.pathname ?? "studio")';
+          host = insertBeforeTopLevelReturn(
+            host,
+            'StudioCuttoonEditorHost',
+            `  useStudioAiCanvasBridge({\n    ownerId: "StudioCuttoonEditorHost",\n    documentId: ${documentExpression},\n    elements: ${elements},\n    appendElement: ${appendElement},\n  });`,
+          );
+          fs.writeFileSync(hostPath, host);
+
+          // Advanced tools slot in the AI shell.
+          const hubPath = 'apps/web/src/domains/creator/ai/StudioAiAssistHub.tsx';
+          let hub = fs.readFileSync(hubPath, 'utf8');
+          hub = addImport(hub, 'import { StudioAdvancedAiTools } from "./StudioAdvancedAiTools";');
+          if (!hub.includes('advancedAiUserId?: string;')) {
+            hub = hub.replace(
+              /(^\s*toolPanel:\s*ReactNode;)/m,
+              '  advancedAiUserId?: string;\n$1',
+            );
+          }
+          if (!/\badvancedAiUserId\b[\s\S]*toolPanel,/u.test(hub)) {
+            hub = hub.replace(/(^\s*toolPanel,)/m, '  advancedAiUserId,\n$1');
+          }
+          if (!hub.includes('<StudioAdvancedAiTools userId={advancedAiUserId} />')) {
+            const anchor = '{providerSlot ? <div className="shrink-0">{providerSlot}</div> : null}';
+            if (!hub.includes(anchor)) throw new Error('StudioAiAssistHub provider slot anchor not found');
+            hub = hub.replace(
+              anchor,
+              `${anchor}\n\n      <StudioAdvancedAiTools userId={advancedAiUserId} />`,
+            );
+          }
+          fs.writeFileSync(hubPath, hub);
+
+          // Pass an available authenticated identity from the tool body when present.
+          const toolPath = 'apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.tsx';
+          let tool = fs.readFileSync(toolPath, 'utf8');
+          const toolAst = ts.createSourceFile(toolPath, tool, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+          let toolFunction;
+          for (const name of ['StudioAiToolPopoverBody', 'StudioAiToolPopoverContent']) {
+            try { toolFunction = findFunctionLike(toolAst, name); break; } catch {}
+          }
+          if (!toolFunction) throw new Error('Studio AI tool body function not found');
+          const toolNames = declaredNames(toolFunction);
+          const userId = choose(toolNames, ['userId', 'currentUserId', 'authUserId', 'viewerId', 'studioAiUserId']);
+          const expression = userId ? `{${userId}}` : '{undefined}';
+          if (!tool.includes('advancedAiUserId=')) {
+            const opening = /<StudioAiAssistHub\b/u.exec(tool);
+            if (!opening) throw new Error('StudioAiAssistHub usage not found');
+            const insertAt = opening.index + opening[0].length;
+            tool = `${tool.slice(0, insertAt)}\n        advancedAiUserId=${expression}${tool.slice(insertAt)}`;
+          }
+          fs.writeFileSync(toolPath, tool);
+          NODE
+          node /tmp/integrate-advanced-ai.mjs
+
+      - name: Verify integrated product surfaces
+        run: |
+          pnpm exec eslint --fix --max-warnings=0 \
+            apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx \
+            apps/web/src/domains/creator/ai/StudioAiAssistHub.tsx \
+            apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.tsx \
+            apps/web/src/domains/creator/ai/StudioAdvancedAiTools.tsx \
+            apps/web/src/domains/creator/ai/StudioConnectedStrokeProposalPanel.tsx \
+            apps/web/src/domains/creator/ai/studio-stroke-proposal-bridge.ts \
+            apps/web/src/domains/creator/ai/StudioAi3dGenerationPanel.tsx \
+            apps/web/src/domains/creator/ai/studio-3d-generation-client.ts
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/ai/studio-stroke-proposal.test.ts \
+            apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.test.tsx \
+            apps/web/src/domains/creator/ai/StudioAiAssistHub.test.tsx \
+            apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          grep -q 'useStudioAiCanvasBridge' apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx
+          grep -q 'StudioAdvancedAiTools' apps/web/src/domains/creator/ai/StudioAiAssistHub.tsx
+
+      - name: Commit verified product wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/domains/creator
+          if ! git diff --cached --quiet; then
+            git commit -m "feat(studio): connect stroke proposals and AI 3D to product surfaces"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
