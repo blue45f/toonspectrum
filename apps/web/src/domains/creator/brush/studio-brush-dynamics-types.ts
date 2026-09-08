@@ -6,6 +6,7 @@ import {
 
 import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
   isStudioDynamicBrushCausalDepositPipeline,
   STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION,
   type StudioDryMediaUnionProgramPin,
@@ -34,8 +35,10 @@ import type {
 
 export function studioDynamicBrushDepositPipelineUsesContinuation(
   value: unknown,
-): value is typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3 {
-  return value === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3;
+): value is typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
+  | typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4 {
+  return value === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
+    || value === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4;
 }
 
 export const STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS = {

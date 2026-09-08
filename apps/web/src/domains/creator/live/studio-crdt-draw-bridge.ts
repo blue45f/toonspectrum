@@ -1,6 +1,7 @@
 import {
   isStudioDynamicBrushMinimumDiameterRatio,
   studioDynamicBrushDepositPipelineUsesContinuation,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
 } from "../brush/studio-brush-dynamics";
 import { normalizeStudioBrushR8TextureGrainSource } from "../brush/studio-brush-r8-grain-asset-contract";
 import {
@@ -34,6 +35,7 @@ import {
   STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
 
 import type {
@@ -379,20 +381,22 @@ export function studioDrawElementToCrdtStroke(
   ) {
     throw new Error("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다.");
   }
-  // Keep ordinary strokes on v1 so long-open v1 collaborators continue to render them. Only
-  // renderer-significant layered paint requires v2; material/dynamic geometry snapshots require
-  // v3, while segmented causal continuation and immutable R8 grain require v4.
-  const payloadVersion = usesSegmentedCausalDeposit
-    || usesR8TextureGrain
-    || extensions?.outlineStroke !== undefined
-    ? STUDIO_CRDT_STROKE_PAYLOAD_VERSION
-    : extensions?.materialPressureModel !== undefined
-      || dynamicMinimumDiameterRatio !== undefined
-      || brushDynamics !== undefined
-      ? STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-      : extensions?.paintModel !== undefined
-        ? STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
-        : STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION;
+  // Preserve legacy payload versions. Only newly authored taper-aware spacing requires v5;
+  // existing segmented continuation and immutable R8 grain keep their v4 snapshots.
+  const usesTaperSpacing = brushDynamics?.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4;
+  const payloadVersion = usesTaperSpacing
+    ? STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+    : usesSegmentedCausalDeposit
+      || usesR8TextureGrain
+      || extensions?.outlineStroke !== undefined
+      ? STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      : extensions?.materialPressureModel !== undefined
+        || dynamicMinimumDiameterRatio !== undefined
+        || brushDynamics !== undefined
+        ? STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
+        : extensions?.paintModel !== undefined
+          ? STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
+          : STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION;
   const payload: StudioCrdtDrawStrokePayload = {
     version: payloadVersion,
     type: "draw",

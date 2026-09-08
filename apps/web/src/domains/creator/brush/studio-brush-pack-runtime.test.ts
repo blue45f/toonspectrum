@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   planNormalizedStudioDynamicBrushDabs,
   resolveStudioBrushDynamics,
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
 } from "./studio-brush-dynamics";
 import {
   STUDIO_BRUSH_PACK_CARRIER_TUNING_IDS,
@@ -72,7 +72,7 @@ describe("procedural brush pack runtime", () => {
     );
     expect(selections.every(
       ({ brushDynamics }) => brushDynamics.depositPipeline
-        === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
+        === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
     )).toBe(true);
     const dryMediaSelections = selections.filter(
       ({ runtimeBrushId }) => runtimeBrushId === "dry-media"
@@ -80,7 +80,7 @@ describe("procedural brush pack runtime", () => {
     expect(dryMediaSelections).toHaveLength(61);
     expect(dryMediaSelections.every(
       ({ brushDynamics }) => brushDynamics.depositPipeline
-        === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
+        === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
     )).toBe(true);
 
     for (const [index, selection] of selections.entries()) {

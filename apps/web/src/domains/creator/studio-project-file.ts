@@ -21,6 +21,7 @@ import {
 import { normalizePageReviewState } from "./studio-page-review";
 import { parseStudioLayerComps } from "./layer/studio-layer-comps-document";
 import { studioPageToCrdtPage } from "./live/studio-crdt-page-payload";
+import { minimumStudioProjectFileVersion } from "./studio-project-version";
 import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
 import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
 import {
@@ -83,8 +84,8 @@ const CommonProjectSchema = z.object({
   publishPack: z.unknown().optional(),
 });
 
-const ProjectV2Schema = CommonProjectSchema.extend({
-  version: z.literal(2),
+const CurrentProjectSchema = CommonProjectSchema.extend({
+  version: z.union([z.literal(2), z.literal(3)]),
   savedAt: z.string().optional(),
   pagesList: z.array(ProjectPageSchema).min(1).max(STUDIO_PROJECT_MAX_PAGES),
 }).passthrough();
@@ -100,7 +101,7 @@ const LegacyProjectSchema = z
   })
   .passthrough();
 
-export type StudioProjectFile = z.infer<typeof ProjectV2Schema>;
+export type StudioProjectFile = z.infer<typeof CurrentProjectSchema>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -241,6 +242,9 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
   }
   return {
     ...project,
+    // Old readers accept arbitrary V2 elements and would discard the unknown V4 brush program.
+    // Upgrade only documents carrying that program; keep historical V2/V3 stroke files intact.
+    version: project.version === 3 ? 3 : minimumStudioProjectFileVersion(pagesList, master),
     pagesList,
     master,
     ...(referenceBoard ? { referenceBoard } : {}),
@@ -248,7 +252,7 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
 }
 
 export function parseStudioProjectFile(value: unknown): StudioProjectFile {
-  const current = ProjectV2Schema.safeParse(value);
+  const current = CurrentProjectSchema.safeParse(value);
   if (current.success) return canonicalizeProjectBg3dScenes(current.data);
   const legacy = LegacyProjectSchema.safeParse(value);
   if (!legacy.success) throw new Error("올바르지 않은 ToonSpectrum 프로젝트 파일입니다.");

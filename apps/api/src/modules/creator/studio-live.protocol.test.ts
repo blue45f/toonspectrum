@@ -83,8 +83,8 @@ function gesturePreviewInput() {
 }
 
 describe("studio live protocol module", () => {
-  it("pins segmented causal stroke rooms to CRDT protocol v6", () => {
-    expect(protocol.STUDIO_CRDT_PROTOCOL_VERSION).toBe(6);
+  it("pins taper-aware stroke rooms to CRDT protocol v7", () => {
+    expect(protocol.STUDIO_CRDT_PROTOCOL_VERSION).toBe(7);
     expect(protocol.STUDIO_CRDT_BINARY_WIRE_VERSION).toBe(1);
     expect(protocol.STUDIO_CRDT_BINARY_WIRE_FORMAT).toBe("binary-v1");
     expect(protocol.STUDIO_CRDT_LEGACY_WIRE_FORMAT).toBe("base64-v4");
@@ -114,9 +114,9 @@ describe("studio live protocol module", () => {
     >();
   });
 
-  it("negotiates binary-v1 with a strict selection epoch without changing document v6", () => {
+  it("negotiates binary-v1 with a strict selection epoch without changing document v7", () => {
     const selection = {
-      protocolVersion: 6,
+      protocolVersion: 7,
       wireVersion: 1,
       workId: "work-1",
       format: "binary-v1",
@@ -133,7 +133,7 @@ describe("studio live protocol module", () => {
     expect(
       protocol.StudioLiveCrdtBinarySelectSchema.safeParse({
         ...selection,
-        protocolVersion: 5,
+        protocolVersion: 6,
       }).success
     ).toBe(false);
     expect(
@@ -164,13 +164,13 @@ describe("studio live protocol module", () => {
 
   it("preserves the legacy base64-v4 schemas and inferred input types unchanged", () => {
     const legacySync = {
-      protocolVersion: 6,
+      protocolVersion: 7,
       workId: "work-1",
       requestId: "request-legacy",
       stateVector: Buffer.from([1, 2, 3]).toString("base64"),
     } as const satisfies StudioLiveCrdtSyncInput;
     const legacyUpdate = {
-      protocolVersion: 6,
+      protocolVersion: 7,
       workId: "work-1",
       updateId: "00000000-0000-4000-8000-000000000106",
       clientSequence: 1,
@@ -232,7 +232,7 @@ describe("studio live protocol module", () => {
     );
     const offsetStateVector = nonzeroOffsetView(stateVectorEnvelope);
     const sync = protocol.StudioLiveCrdtBinarySyncSchema.parse({
-      protocolVersion: 6,
+      protocolVersion: 7,
       wireVersion: 1,
       workId: "work-1",
       requestId: "request-1",
@@ -244,7 +244,7 @@ describe("studio live protocol module", () => {
     const updateBytes = Uint8Array.of(9, 8, 7, 6, 5);
     const updateEnvelope = encodeStudioCrdtBinaryEnvelope("update", updateBytes);
     const update = protocol.StudioLiveCrdtBinaryUpdateSchema.parse({
-      protocolVersion: 6,
+      protocolVersion: 7,
       wireVersion: 1,
       workId: "work-1",
       updateId: "00000000-0000-4000-8000-000000000102",
@@ -254,7 +254,7 @@ describe("studio live protocol module", () => {
     expect(update.update).toEqual(updateBytes);
     expect(
       protocol.StudioLiveCrdtBinaryRemoteUpdateSchema.parse({
-        protocolVersion: 6,
+        protocolVersion: 7,
         wireVersion: 1,
         workId: "work-1",
         updateId: "00000000-0000-4000-8000-000000000102",
@@ -278,7 +278,7 @@ describe("studio live protocol module", () => {
     );
     oversizedUpdate[5] = 1;
     const baseUpdate = {
-      protocolVersion: 6,
+      protocolVersion: 7,
       wireVersion: 1,
       workId: "work-1",
       updateId: "00000000-0000-4000-8000-000000000103",
@@ -325,7 +325,7 @@ describe("studio live protocol module", () => {
       stateVectorBytes
     );
     const response = {
-      protocolVersion: 6,
+      protocolVersion: 7,
       wireVersion: 1,
       workId: "work-1",
       requestId: "request-1",
@@ -392,7 +392,7 @@ describe("studio live protocol module", () => {
 
   it("owns strict binary update ACK and remote metadata contracts", () => {
     const ack = {
-      protocolVersion: 6,
+      protocolVersion: 7,
       wireVersion: 1,
       workId: "work-1",
       updateId: "00000000-0000-4000-8000-000000000105",
@@ -419,7 +419,7 @@ describe("studio live protocol module", () => {
     );
     expect(
       protocol.StudioLiveCrdtBinaryRemoteUpdateSchema.safeParse({
-        protocolVersion: 6,
+        protocolVersion: 7,
         wireVersion: 1,
         workId: "work-1",
         updateId: ack.updateId,
@@ -429,7 +429,7 @@ describe("studio live protocol module", () => {
     ).toBe(true);
     expect(
       protocol.StudioLiveCrdtBinaryRemoteUpdateSchema.safeParse({
-        protocolVersion: 6,
+        protocolVersion: 7,
         wireVersion: 1,
         workId: "work-1",
         updateId: ack.updateId,

@@ -89,13 +89,19 @@ export const STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2 =
 export const STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3 =
   "causal-deposit-v3-segmented" as const;
 
+/** New authored snapshots size ratio spacing after taper; V2/V3 replay remains unchanged. */
+export const STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4 =
+  "causal-deposit-v4-taper-spacing" as const;
+
 export type StudioDynamicBrushDepositPipeline =
   | typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
-  | typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3;
+  | typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
+  | typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4;
 
 export function isStudioDynamicBrushCausalDepositPipeline(
   value: unknown,
 ): value is StudioDynamicBrushDepositPipeline {
   return value === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
-    || value === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3;
+    || value === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
+    || value === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4;
 }

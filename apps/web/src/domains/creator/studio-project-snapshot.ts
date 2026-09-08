@@ -5,6 +5,7 @@ import {
 } from "./ai/studio-ai-image-reference-roles";
 import { studioDrawingAssistHasContent } from "./brush/studio-drawing-assist-document";
 import { parseStudioLayerComps } from "./layer/studio-layer-comps-document";
+import { minimumStudioProjectFileVersion, type StudioProjectFileVersion } from "./studio-project-version";
 import {
   serializeDocumentMaster,
   type DocumentMaster,
@@ -89,9 +90,9 @@ export interface StudioProjectPublishPackSnapshot {
   packageCredits: string;
 }
 
-/** Canonical, fully typed v2 snapshot used by export, archive, checkpoints, and recovery. */
+/** Canonical snapshot used by export, archive, checkpoints, and recovery. */
 export type StudioProjectSnapshot = {
-  version: 2;
+  version: StudioProjectFileVersion;
   savedAt: string;
   title: string;
   description: string;
@@ -149,7 +150,7 @@ export function buildStudioProjectFileSnapshot(
   input: BuildStudioProjectFileSnapshotInput
 ): StudioProjectSnapshot {
   return {
-    version: 2,
+    version: minimumStudioProjectFileVersion(input.pagesList, input.master),
     savedAt: input.savedAt,
     title: input.title,
     description: input.description,

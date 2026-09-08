@@ -19,6 +19,7 @@ import {
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PROTOCOL_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_SYNC_CHUNK_MAX_BYTES,
   STUDIO_CRDT_UPDATE_MAX_BYTES,
 } from "./studio-crdt-protocol";
@@ -52,13 +53,14 @@ function syncResponse(bytes = new Uint8Array([1, 2, 3])) {
 }
 
 describe("studio CRDT protocol", () => {
-  it("pins segmented causal v4 strokes to the v6 network and local-wire contract", () => {
-    expect(STUDIO_CRDT_PROTOCOL_VERSION).toBe(6);
-    expect(STUDIO_CRDT_LOCAL_WIRE_BRAND).toBe("toonspectrum:studio-crdt:v6");
+  it("pins taper-aware v5 strokes to the v7 network and local-wire contract", () => {
+    expect(STUDIO_CRDT_PROTOCOL_VERSION).toBe(7);
+    expect(STUDIO_CRDT_LOCAL_WIRE_BRAND).toBe("toonspectrum:studio-crdt:v7");
     expect(STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION).toBe(1);
     expect(STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION).toBe(2);
     expect(STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION).toBe(3);
     expect(STUDIO_CRDT_STROKE_PAYLOAD_VERSION).toBe(4);
+    expect(STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION).toBe(5);
   });
 
   it("accepts only canonical bounded base64 for incremental updates", () => {
@@ -95,7 +97,7 @@ describe("studio CRDT protocol", () => {
     expect(parseStudioCrdtSyncRequest(syncRequest(), { expectedWorkId: workId })).toEqual(
       syncRequest()
     );
-    for (const legacyVersion of [1, 2, 3, 4, 5]) {
+    for (const legacyVersion of [1, 2, 3, 4, 5, 6]) {
       expect(parseStudioCrdtSyncRequest({
         ...syncRequest(),
         protocolVersion: legacyVersion,
@@ -112,7 +114,7 @@ describe("studio CRDT protocol", () => {
       update,
     } as const;
     expect(parseStudioCrdtUpdateRequest(publish, { expectedWorkId: workId })).toEqual(publish);
-    for (const legacyVersion of [1, 2, 3, 4, 5]) {
+    for (const legacyVersion of [1, 2, 3, 4, 5, 6]) {
       expect(parseStudioCrdtUpdateRequest({
         ...publish,
         protocolVersion: legacyVersion,
@@ -136,6 +138,10 @@ describe("studio CRDT protocol", () => {
     )).toEqual(publish);
     expect(parsePersistedStudioCrdtUpdateRequest(
       { ...publish, protocolVersion: 5 },
+      { expectedWorkId: workId }
+    )).toEqual(publish);
+    expect(parsePersistedStudioCrdtUpdateRequest(
+      { ...publish, protocolVersion: 6 },
       { expectedWorkId: workId }
     )).toEqual(publish);
     expect(parseStudioCrdtUpdateRequest({ ...publish, updateId: "bad id" })).toBeNull();
@@ -185,9 +191,9 @@ describe("studio CRDT protocol", () => {
       parseStudioCrdtLocalWireMessage(
         {
           ...requestWire,
-          brand: "toonspectrum:studio-crdt:v4",
-          protocolVersion: 4,
-          payload: { ...requestWire.payload, protocolVersion: 4 },
+          brand: "toonspectrum:studio-crdt:v6",
+          protocolVersion: 6,
+          payload: { ...requestWire.payload, protocolVersion: 6 },
         },
         {
           expectedWorkId: workId,
@@ -195,6 +201,16 @@ describe("studio CRDT protocol", () => {
         }
       )
     ).toBeNull();
+
+    // Brand and nested protocol are independent boundaries; neither can smuggle an old peer.
+    expect(parseStudioCrdtLocalWireMessage({
+      ...requestWire,
+      brand: "toonspectrum:studio-crdt:v6",
+    })).toBeNull();
+    expect(parseStudioCrdtLocalWireMessage({
+      ...requestWire,
+      payload: { ...requestWire.payload, protocolVersion: 6 },
+    })).toBeNull();
 
     const responseWire = createStudioCrdtLocalWireMessage({
       workId,

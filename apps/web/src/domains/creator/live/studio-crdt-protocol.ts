@@ -1,26 +1,43 @@
 import { fromUint8Array, toUint8Array } from "js-base64";
 
-// v6 gates rooms that can persist segmented causal-deposit v4 stroke snapshots.
-// Keeping this at v5 would let a long-open tab join the same room and silently truncate a
-// renderer-significant dynamic stroke after the v2 dab ceiling. The local wire brand changes with
-// the room protocol so stale BroadcastChannel peers are isolated before payload parsing.
-export const STUDIO_CRDT_PROTOCOL_VERSION = 6 as const;
-export const STUDIO_CRDT_LOCAL_WIRE_BRAND = "toonspectrum:studio-crdt:v6" as const;
+// v7 gates rooms that can persist taper-aware spacing in stroke payload v5.
+// The local wire brand changes with the room protocol so older peers cannot join and
+// silently reinterpret the new station geometry with their legacy brush normalizer.
+export const STUDIO_CRDT_PROTOCOL_VERSION = 7 as const;
+export const STUDIO_CRDT_LOCAL_WIRE_BRAND = "toonspectrum:studio-crdt:v7" as const;
 /**
  * v2 adds renderer-significant `paintModel` semantics. v3 adds the paired material-pressure
  * model/geometry-floor snapshot and the dynamic-brush minimum-diameter geometry floor. v4 adds the
- * segmented causal-deposit continuation pipeline. New clients still read v1-v3, while older
- * clients reject v4 instead of silently rendering a truncated stroke in the same room.
+ * segmented causal-deposit continuation pipeline. v5 adds taper-aware station spacing.
+ * New clients preserve and read v1-v4; older clients reject v5 rather than reinterpret it.
  */
 export const STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION = 1 as const;
 export const STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION = 2 as const;
 export const STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION = 3 as const;
 export const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 4 as const;
+/** Taper-aware spacing changes station identity; only newly authored V4 dynamics use wire v5. */
+export const STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION = 5 as const;
 export type StudioCrdtStrokePayloadVersion =
   | typeof STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION
   | typeof STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
   | typeof STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-  | typeof STUDIO_CRDT_STROKE_PAYLOAD_VERSION;
+  | typeof STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+  | typeof STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION;
+
+export function isStudioCrdtStrokePayloadVersion(value: unknown): value is StudioCrdtStrokePayloadVersion {
+  return value === STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION
+    || value === STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
+    || value === STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
+    || studioCrdtStrokePayloadSupportsContinuation(value);
+}
+
+/** Wire v5 retains the segmented-deposit, grain and geometry features introduced by wire v4. */
+export function studioCrdtStrokePayloadSupportsContinuation(
+  value: unknown,
+): value is typeof STUDIO_CRDT_STROKE_PAYLOAD_VERSION | typeof STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION {
+  return value === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    || value === STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION;
+}
 export const STUDIO_CRDT_ORIGIN_LOCAL = Symbol("studio-crdt-local");
 export const STUDIO_CRDT_ORIGIN_REMOTE = Symbol("studio-crdt-remote");
 export const STUDIO_CRDT_ORIGIN_SYNC = Symbol("studio-crdt-sync");
@@ -381,8 +398,8 @@ export function parseStudioCrdtUpdateRequest(
 }
 
 /**
- * Protocol v2-v6 changed the room capability gate, not the encoded Yjs update shape. Pending
- * v1-v5 outbox and recovery rows can therefore be upgraded locally before resend/export, while
+ * Protocol v2-v7 changed the room capability gate, not the encoded Yjs update shape. Pending
+ * v1-v6 outbox and recovery rows can therefore be upgraded locally before resend/export, while
  * network parsers continue to reject live legacy peers and prevent mixed-capability rooms.
  */
 export function parsePersistedStudioCrdtUpdateRequest(
@@ -394,7 +411,8 @@ export function parsePersistedStudioCrdtUpdateRequest(
     value.protocolVersion === 2 ||
     value.protocolVersion === 3 ||
     value.protocolVersion === 4 ||
-    value.protocolVersion === 5
+    value.protocolVersion === 5 ||
+    value.protocolVersion === 6
   )
     ? { ...value, protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION }
     : value;

@@ -49,6 +49,7 @@ function preWaveSettings(
 ): NormalizedStudioBrushDynamicsSettings {
   return normalizeStudioBrushDynamicsSettings({
     ...authoredSettings(brushId),
+    depositPipeline: "causal-deposit-v3-segmented",
     presetId: undefined,
     dryMediaKernelProgram: undefined,
   });
