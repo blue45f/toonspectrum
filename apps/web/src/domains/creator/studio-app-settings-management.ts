@@ -1,4 +1,5 @@
 import {
+  STUDIO_APP_SETTINGS_TABS,
   defaultStudioAppSettings,
   normalizeStudioAppSettings,
   type StudioAppSettings,
