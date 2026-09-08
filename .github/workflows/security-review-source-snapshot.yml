@@ -1,0 +1,46 @@
+name: Temporary security review source snapshot
+
+on:
+  push:
+    branches:
+      - security/code-scanning-audit-20260908
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: security/code-scanning-remediation-20260908
+          fetch-depth: 1
+      - name: Package remaining review sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p snapshot
+          targets=(
+            apps/web/src/domains/creator/character-platform/presets/character-part-preset.ts
+            apps/web/src/domains/creator/character-platform/presets/character-part-preset-store.ts
+            apps/web/src/domains/creator/character-platform/presets/character-part-preset.test.ts
+            apps/web/src/domains/creator/character-platform/presets/character-part-preset-application.test.ts
+            apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.ts
+            apps/web/src/domains/creator/character-platform/ui/use-character-platform-workbench.test.ts
+            apps/web/src/shared/lib/creator-asset-platform-contract.ts
+            apps/api/src/db/migrations/0039_creator_asset_platform_foundation.sql
+            apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql
+            apps/api/src/modules/creator/creator-asset-platform-integrity.integration.test.ts
+          )
+          for target in "${targets[@]}"; do
+            if [[ -f "$target" ]]; then install -D "$target" "snapshot/$target"; fi
+          done
+          tar -czf security-review-source-snapshot.tar.gz -C snapshot .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: security-review-source-snapshot
+          path: security-review-source-snapshot.tar.gz
+          if-no-files-found: error
+          retention-days: 1
