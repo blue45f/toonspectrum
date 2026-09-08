@@ -33,6 +33,7 @@ import { NowFlowArchive } from "./now-page/NowFlowArchive";
 import { NowFocusResearch } from "./now-page/NowFocusResearch";
 import { NowPlanning } from "./now-page/NowPlanning";
 import { NowSceneHero } from "./now-page/NowSceneHero";
+import { NowVariationLab } from "./now-page/NowVariationLab";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 
 function readStoredState(): NowState {
@@ -183,7 +184,7 @@ export function NowPage() {
   return (
     <ResourceLayout
       title="오늘의 영감"
-      intro="매일 한 장면을 발견하고, 연출 모드와 제작 시간을 직접 고른 뒤 5컷으로 실행하는 데일리 창작 데스크입니다. 저장·완주 기록은 이 브라우저에만 남습니다."
+      intro="매일 한 장면을 발견하고, 연출 모드·제작 시간·명시적 변주 규칙을 고른 뒤 5컷으로 실행하는 데일리 창작 데스크입니다. 저장·완주·개인 메모는 이 브라우저에만 남습니다."
       width="wide"
     >
       <NowSceneHero
@@ -222,6 +223,8 @@ export function NowPage() {
         onSessionPresetChange={setSessionPresetId}
         onModeChange={setMode}
       />
+
+      <NowVariationLab day={selected.day} theme={theme} mode={mode} sessionPreset={sessionPreset} />
 
       <NowCreationBoard
         day={selected.day}

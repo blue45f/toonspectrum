@@ -77,7 +77,7 @@ beforeEach(() => {
   Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
     configurable: true,
     get() {
-      return this.dataset?.studioPixelSelectionHud === "true" ? 720 : 0;
+      return this.dataset?.studioPixelSelectionHud === "true" ? 480 : 0;
     },
   });
   Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
