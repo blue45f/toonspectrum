@@ -121,7 +121,7 @@ describe("CatalogController cover SSRF boundary", () => {
     await createController().proxyCover("https://image-comic.pstatic.net/cover.png", res as unknown as Response);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
-      "https://image-comic.pstatic.net/cover.png",
+      new URL("https://image-comic.pstatic.net/cover.png"),
       expect.objectContaining({ redirect: "manual", signal: expect.any(AbortSignal) }),
     );
   });
@@ -136,7 +136,7 @@ describe("CatalogController cover SSRF boundary", () => {
     const res = { status: vi.fn().mockReturnThis(), send: vi.fn(), setHeader: vi.fn() };
     await createController().proxyCover("https://image-comic.pstatic.net/cover.png", res as unknown as Response);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://image-comic.pstatic.net/actual.png");
+    expect(fetchMock.mock.calls[1]?.[0]).toEqual(new URL("https://image-comic.pstatic.net/actual.png"));
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send).toHaveBeenCalledWith(Buffer.from(png));
   });

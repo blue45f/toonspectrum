@@ -4,6 +4,17 @@ import { resolveAffiliateDestination, resolveCoverFetchUrl } from "./catalog-url
 
 describe("catalog destination security", () => {
   it.each([
+    ["https://image-comic.pstatic.net/cover.png"],
+    { length: 1, toString: () => "https://image-comic.pstatic.net/cover.png" },
+    null,
+    123,
+    true,
+  ])("rejects non-string query parameters before URL coercion: %j", (value) => {
+    expect(resolveCoverFetchUrl(value)).toBeNull();
+    expect(resolveAffiliateDestination("ridi", value)).toBeNull();
+  });
+
+  it.each([
     "http://image-comic.pstatic.net/a.png",
     "https://image-comic.pstatic.net:8443/a.png",
     "https://user:pass@image-comic.pstatic.net/a.png",
@@ -19,8 +30,16 @@ describe("catalog destination security", () => {
 
   it("preserves a trusted CDN path without allowing it to replace the authority", () => {
     const result = resolveCoverFetchUrl("https://image-comic.pstatic.net//evil.test/a.png?size=200#ignored");
-    expect(result).toBe("https://image-comic.pstatic.net//evil.test/a.png?size=200");
-    expect(new URL(result!).origin).toBe("https://image-comic.pstatic.net");
+    expect(result?.href).toBe("https://image-comic.pstatic.net//evil.test/a.png?size=200");
+    expect(result?.origin).toBe("https://image-comic.pstatic.net");
+  });
+
+  it("retains encoded path/query bytes without interpreting them as another authority", () => {
+    const result = resolveCoverFetchUrl("https://image-comic.pstatic.net/%2F%2Fevil.test/a%3Fb.png?next=https%3A%2F%2Fevil.test%2F#ignored");
+    expect(result?.href).toBe("https://image-comic.pstatic.net/%2F%2Fevil.test/a%3Fb.png?next=https%3A%2F%2Fevil.test%2F");
+    expect(result?.hostname).toBe("image-comic.pstatic.net");
+    expect(result?.username).toBe("");
+    expect(result?.port).toBe("");
   });
 
   it.each([

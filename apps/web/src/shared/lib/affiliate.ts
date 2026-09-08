@@ -35,7 +35,7 @@ export const AFFILIATE_REGISTRY: Record<string, AffiliateConfig> = {
 
 export function isAffiliateSupported(platformId: string): boolean {
   return typeof platformId === "string"
-    && Object.prototype.hasOwnProperty.call(AFFILIATE_REGISTRY, platformId);
+    && Object.hasOwn(AFFILIATE_REGISTRY, platformId);
 }
 
 export function buildAffiliateUrl(platformId: string, originalUrl: string): string {

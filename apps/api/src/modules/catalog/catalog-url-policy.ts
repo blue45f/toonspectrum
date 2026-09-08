@@ -59,8 +59,10 @@ const PLATFORM_ORIGINS: Readonly<Record<string, readonly string[]>> = {
   kmas: ["https://www.kmas.or.kr"],
 };
 
-function parseUrl(value: string): URL | null {
-  if (value.length > 8192) return null;
+function parseUrl(value: unknown): URL | null {
+  // Express query parameters may be arrays or objects despite controller types.
+  // Check the runtime type before reading length or allowing URL coercion.
+  if (typeof value !== "string" || value.length > 8192) return null;
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.username || url.password || url.port) return null;
@@ -70,17 +72,21 @@ function parseUrl(value: string): URL | null {
   }
 }
 
-export function resolveCoverFetchUrl(value: string): string | null {
+export function resolveCoverFetchUrl(value: unknown): URL | null {
   const url = parseUrl(value);
   if (!url) return null;
   const origin = COVER_ORIGINS.find((allowed) => allowed === url.origin);
   if (!origin) return null;
-  // The slash is part of the trusted prefix, so a path beginning with // or a
-  // percent-encoded authority cannot replace the chosen server.
-  return `${origin}/${url.pathname.slice(1)}${url.search}`;
+  // Construct the network authority exclusively from the fixed allowlist.
+  // URL setters treat even //, backslashes and encoded separators as path or
+  // query data, so user input is never parsed as part of the fetch authority.
+  const destination = new URL(origin);
+  destination.pathname = url.pathname;
+  destination.search = url.search;
+  return destination;
 }
 
-export function resolveAffiliateDestination(platformId: string, value: string): string | null {
+export function resolveAffiliateDestination(platformId: string, value: unknown): string | null {
   const url = parseUrl(value);
   if (!url || !Object.hasOwn(PLATFORM_ORIGINS, platformId)) return null;
   const origin = PLATFORM_ORIGINS[platformId]?.find((allowed) => allowed === url.origin);

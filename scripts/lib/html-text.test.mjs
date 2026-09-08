@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decodeHtmlEntities } from "../crawl-helpers.mjs";
+import { decodeHtmlEntities, normalizeRemoteImageUrl } from "../crawl-helpers.mjs";
 import { decodeEntities, stripTags } from "../crawlers/_shared.mjs";
 import { decodeEntities as relatedInfoText } from "../related-info-parse.mjs";
 import { normalizeCompetitorBody } from "../studio-competitor-watch.mjs";
@@ -22,6 +22,15 @@ describe("untrusted feed text", () => {
     expect(stripTags(hostile)).toBe("beforeafter");
     expect(relatedInfoText(hostile)).toBe("beforeafter");
     expect(normalizeCompetitorBody(hostile)).toBe("before after");
+  });
+
+  it("preserves URL query parameters that resemble semicolon-less HTML entities", () => {
+    for (const parameter of ["copy", "not"]) {
+      const url = `https://image-comic.pstatic.net/cover.png?a=1&${parameter}=2`;
+      expect(decodeHtmlEntities(url)).toBe(url);
+      expect(normalizeRemoteImageUrl(url)).toBe(url);
+      expect(decodeHtmlEntities(`https://image-comic.pstatic.net/cover.png?a=1&amp;${parameter}=2`)).toBe(url);
+    }
   });
 
   it("handles tag delimiters in quoted attributes and malformed closing tags", () => {
