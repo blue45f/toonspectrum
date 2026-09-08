@@ -8,8 +8,6 @@ import type { CreatorMarketplaceResourceManifest } from "@/shared/lib/creator-ma
 
 import { createCreatorMarketplacePortableDelivery } from "@/infrastructure/creator-marketplace-client";
 
-
-
 async function manifest(): Promise<CreatorMarketplaceResourceManifest> {
   const delivery = await createCreatorMarketplacePortableDelivery("palette", {
     colors: ["#1a1a2e", "#e94560"],
@@ -39,7 +37,7 @@ async function manifest(): Promise<CreatorMarketplaceResourceManifest> {
 }
 
 describe("MarketResourceCard", () => {
-  it("종류·배급자·라이선스·태그와 상세 링크를 렌더링한다", async () => {
+  it("종류·배급자·라이선스·태그·제작 사전점검과 상세 링크를 렌더링한다", async () => {
     const input = await manifest();
     const record = {
       ...input,
@@ -65,6 +63,8 @@ describe("MarketResourceCard", () => {
     expect(html).toContain("CC BY 4.0");
     expect(html).toContain("#야경");
     expect(html).toContain(`href="/market/resource/${record.id}"`);
+    expect(html).toContain("적용 전 확인");
+    expect(html).toContain("6/7");
     expect(html).toContain("bg-canvas");
     expect(html).toContain("bg-accent");
     expect(html).toContain("text-on-accent");

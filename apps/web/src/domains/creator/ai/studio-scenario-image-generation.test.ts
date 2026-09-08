@@ -141,12 +141,19 @@ describe("reviewed scenario image replacement integrity", () => {
     expect(current.preview()?.items[0]).toMatchObject({
       imageDataUrl: REPLACEMENT_IMAGE,
       imageProvenance: { provider: "replacement.example.test", model: "replacement-model" },
-      imageCandidates: [{
-        qualityProfile: "balanced",
-        variationStrategy: "directorial",
-        variationLabel: "기본 연출",
-      }],
     });
+    expect(current.preview()?.items[0]?.imageCandidates).toHaveLength(2);
+    expect(current.preview()?.items[0]?.imageCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ imageDataUrl: ORIGINAL_IMAGE }),
+        expect.objectContaining({
+          imageDataUrl: REPLACEMENT_IMAGE,
+          qualityProfile: "balanced",
+          variationStrategy: "directorial",
+          variationLabel: "기본 연출",
+        }),
+      ]),
+    );
     expect(current.preview()?.items[0]?.imageError).toBeUndefined();
     expect(current.preview()?.items[1]).toEqual(current.original.items[1]);
     expect(current.ledger().operations.map((operation) => operation.status).sort()).toEqual(["failed", "succeeded"]);

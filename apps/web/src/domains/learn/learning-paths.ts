@@ -134,6 +134,17 @@ export function getLessonState(progress: LearningProgress, lessonId: string): Le
   return "not-started";
 }
 
+/** Requirement progress is derived from valid unique checks and the correct answer, never from raw array length. */
+export function getLessonRequirementProgress(lesson: Lesson, progress: LearningProgress): number {
+  const saved = progress.lessons[lesson.id];
+  if (!saved) return 0;
+  if (saved.completed) return 100;
+  const checked = new Set(saved.checks.filter((index) => Number.isInteger(index) && index >= 0 && index < lesson.checks.length)).size;
+  const correct = saved.answer === lesson.quiz.answer ? 1 : 0;
+  const total = Math.max(1, lesson.checks.length + 1);
+  return Math.min(100, Math.round(((checked + correct) / total) * 100));
+}
+
 export function getPathLessons(path: LearningPath, lessons: readonly Lesson[] = LESSONS): Lesson[] {
   const byId = new Map(lessons.map((lesson) => [lesson.id, lesson]));
   return path.lessonIds.map((id) => byId.get(id)).filter((lesson): lesson is Lesson => Boolean(lesson));
@@ -168,10 +179,12 @@ export function recommendLearningPath(goal: LearningGoal, level: LearningLevel):
   return ranked[0].path;
 }
 
+/** Resume active work first, then continue untouched lessons in curriculum order within the time budget. */
 export function buildSessionPlan(path: LearningPath, progress: LearningProgress, budgetMinutes: number): Lesson[] {
   const lessons = getPathLessons(path);
-  const incomplete = lessons.filter((lesson) => getLessonState(progress, lesson.id) !== "completed");
-  const candidates = incomplete.length ? incomplete : lessons;
+  const inProgress = lessons.filter((lesson) => getLessonState(progress, lesson.id) === "in-progress");
+  const untouched = lessons.filter((lesson) => getLessonState(progress, lesson.id) === "not-started");
+  const candidates = inProgress.length || untouched.length ? [...inProgress, ...untouched] : lessons;
   const budget = Number.isFinite(budgetMinutes) ? Math.max(5, Math.min(120, Math.round(budgetMinutes))) : 30;
   const selected: Lesson[] = [];
   let total = 0;
