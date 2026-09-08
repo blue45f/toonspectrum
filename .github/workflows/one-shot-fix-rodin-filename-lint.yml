@@ -10,14 +10,10 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: one-shot-fix-rodin-filename-lint
-  cancel-in-progress: true
-
 jobs:
   fix:
     if: github.event.pull_request.head.ref == 'release/main-final-924176-immutable-20260908' && github.actor != 'github-actions[bot]'
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
