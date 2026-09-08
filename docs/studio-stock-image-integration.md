@@ -83,7 +83,7 @@ import type { StudioStockImageCredit, StudioStockPhoto } from "./studio-stock-im
 ```
 
 **(b)** 앵커: `import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";`(478행)
-다음, `import type { GeneratedAssetQuality, ...} from "@/src/infrastructure/creator-client";`(479행
+다음, `import type { GeneratedAssetQuality, ...} from "@/infrastructure/creator-client";`(479행
 시작 블록) 앞. 새 줄 삽입:
 
 ```ts

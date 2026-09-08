@@ -5,7 +5,7 @@ import { shouldAppRouterOwnDocumentTitle } from "./app-route-title-ownership";
 import { CREATOR_RESOURCE_TITLES } from "./creator-resource-titles";
 
 import { useT } from "@/shared/lib/i18n";
-import { isStudioRoutePathname } from "@/src/domains/creator/studio-workspace-route";
+import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
 
 
 // 정적 라우트의 브라우저 탭 제목. 동적 라우트(작가·펜카페)는 URL에서 유도하고,

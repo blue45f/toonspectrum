@@ -10,7 +10,7 @@ import type {
   StudioCompanionReferenceSourceRuntime,
   StudioCompanionReferenceSourceSnapshot,
 } from "./studio-companion-reference-source-runtime";
-import type { StudioCompanionReferencePreviewFrame } from "@/src/domains/creator/studio-companion-reference-projection";
+import type { StudioCompanionReferencePreviewFrame } from "@/domains/creator/studio-companion-reference-projection";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

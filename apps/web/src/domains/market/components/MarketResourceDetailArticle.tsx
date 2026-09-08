@@ -66,7 +66,7 @@ import {
 } from "@/shared/lib/creator-marketplace-install-receipt";
 import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 const ENGINE_LABELS: Record<string, string> = {
   canvas2d: "Canvas 2D",

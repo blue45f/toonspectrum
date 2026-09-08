@@ -56,14 +56,14 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
     return connection;
   }
 
-  async function fixture(connection: PoolClient, state: "building" | "sealed" | "rejected" = "building", runState = "succeeded", lineage: { publisherId?: string; packageId?: string; entryId?: string } = {}) {
-    const draft = randomUUID();
+  async function fixture(connection: PoolClient, state: "building" | "sealed" | "rejected" = "building", runState = "succeeded", lineage: { publisherId?: string; packageId?: string; entryId?: string; draftId?: string } = {}) {
+    const draft = lineage.draftId ?? randomUUID();
     const run = randomUUID();
     const set = randomUUID();
     const source = digest();
     const toolchain = digest();
     const qa = randomUUID();
-    await connection.query(`INSERT INTO creator_marketplace_draft
+    if (!lineage.draftId) await connection.query(`INSERT INTO creator_marketplace_draft
       (id, "publisherId", "packageId", kind, name) VALUES ($1, $2, $3, 'asset', 'Fixture')`, [draft, lineage.publisherId ?? owner, lineage.packageId ?? draft]);
     await connection.query(`INSERT INTO creator_asset_processing_run
       (id, "draftId", "entryId", "sourceDigest", "pipelineProfile", "pipelineVersion",
@@ -206,7 +206,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
     return id;
   }
 
-  async function release(connection: PoolClient, ordinal = 1, bind = true) {
+  async function release(connection: PoolClient, ordinal = 1, bind = true, entryIds = ["entry"]) {
     const source = await fixture(connection, "sealed");
     const id = randomUUID();
     const license = randomUUID();
@@ -215,7 +215,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
        license, "provenanceOrigin", manifest, "manifestHash", "manifestByteSize", "releaseOrdinal")
       VALUES ($1, $2, $6, 'Fixture', 'asset', '1.0.0', '0.1.0', 'cc0-1.0', 'original', $3, $4, 100, $5)`,
     [id, owner, { schemaVersion: 1, packageId: source.draft, kind: "asset", resourceVersion: "1.0.0",
-      minimumStudioVersion: "0.1.0", license: "cc0-1.0", provenance: { origin: "original" }, entries: [{ id: "entry" }] }, digest().slice(7), ordinal, source.draft]);
+      minimumStudioVersion: "0.1.0", license: "cc0-1.0", provenance: { origin: "original" }, entries: entryIds.map((entryId) => ({ id: entryId })) }, digest().slice(7), ordinal, source.draft]);
     await connection.query(`INSERT INTO creator_asset_license_snapshot
       (id, "licenseCode", "policyVersion", capabilities, "legalTextDigest", "capturedAt", "reviewState", "reviewedBy")
       VALUES ($1, 'cc0-1.0', 1, '{}', $2, statement_timestamp(), 'pending', NULL)`, [license, digest()]);
@@ -335,6 +335,72 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
       const future = await grant(connection, null, null, "package-head", { packageId: selected.packageId, validFrom: "2999-01-01T00:00:00Z" });
       await rejects(connection, 'UPDATE creator_work_catalog_asset_binding SET "entitlementGrantId"=$2 WHERE "workId"=$1', [accepted.work, future],
         "creator_work_catalog_asset_binding_entitlement_authorization");
+    });
+  });
+
+  it.each((["valid", "revoked", "expired", "other-owner"] as const).flatMap((status) =>
+    ["entry, artifact set and license", "selected artifact and digest", "use receipt", "asset type"].map((change) => ({ status, change })),
+  ))("reauthorizes $change replacement with a $status grant", async ({ status, change: requestedChange }) => {
+    await transaction(async (connection) => {
+      const selected = await release(connection, 1, true, ["entry", "other-entry"]);
+      const alternate = await fixture(connection, "sealed", "succeeded", {
+        packageId: selected.packageId, entryId: "other-entry", draftId: selected.draft,
+      });
+      const license = randomUUID();
+      await connection.query(`INSERT INTO creator_asset_license_snapshot
+        (id, "licenseCode", "policyVersion", capabilities, "legalTextDigest", "capturedAt", "reviewState")
+        VALUES ($1, 'cc0-1.0', 1, '{}', $2, statement_timestamp(), 'pending')`, [license, digest()]);
+      await connection.query('UPDATE creator_asset_license_snapshot SET "reviewState"=\'approved\', "reviewedBy"=$2 WHERE id=$1', [license, owner]);
+      await connection.query(`INSERT INTO creator_marketplace_release_artifact_binding
+        ("releaseId", "entryId", "artifactSetId", "licenseSnapshotId", "publicPreviewArtifactId", "bindingHash")
+        VALUES ($1, 'other-entry', $2, $3, 'thumb', $4)`, [selected.id, alternate.set, license, digest()]);
+      const artifact = (await connection.query<{ objectDigest: string }>(
+        'SELECT "objectDigest" FROM creator_asset_artifact WHERE "artifactSetId"=$1 AND "artifactId"=\'runtime\'', [selected.set],
+      )).rows[0]!;
+      const changes: Array<{ name: string; sql: string; values: unknown[] }> = [
+        { name: "entry, artifact set and license", sql: '"entryId"=\'other-entry\', "artifactSetId"=$2, "licenseSnapshotId"=$3, "expectedContentDigest"=$4', values: [alternate.set, license, alternate.source] },
+        { name: "selected artifact and digest", sql: '"selectedArtifactId"=\'runtime\', "expectedContentDigest"=$2', values: [artifact.objectDigest] },
+        { name: "use receipt", sql: '"useReceiptId"=$2', values: [randomUUID()] },
+        { name: "asset type", sql: '"assetType"=\'vector\'', values: [] },
+      ];
+      for (const change of changes.filter((candidate) => candidate.name === requestedChange)) {
+        const expiry = status === "expired"
+          ? (await connection.query<{ until: Date }>("SELECT clock_timestamp() + interval '1 second' AS until")).rows[0]!.until
+          : null;
+        const expiringGrant = expiry ? await grant(connection, null, null, "package-head", {
+          packageId: selected.packageId, validFrom: "2000-01-01T00:00:00Z", validUntil: expiry.toISOString(), existingWorkSurvives: true,
+        }) : undefined;
+        const accepted = await workBinding(connection, selected, { entitlement: expiringGrant });
+        if (status === "revoked") {
+          await connection.query('UPDATE creator_marketplace_entitlement_grant SET "revokedAt"=statement_timestamp() WHERE id=$1', [accepted.entitlement]);
+        } else if (status === "expired") {
+          // Cross the real database clock boundary; entitlement facts remain immutable.
+          await connection.query("SELECT pg_sleep(GREATEST(0, EXTRACT(EPOCH FROM $1::timestamptz - clock_timestamp())) + 0.005)", [expiry]);
+          expect((await connection.query<{ expired: boolean }>(
+            'SELECT "validUntil" < statement_timestamp() AS expired FROM creator_marketplace_entitlement_grant WHERE id=$1', [accepted.entitlement],
+          )).rows[0]?.expired).toBe(true);
+        } else if (status === "other-owner") {
+          const nextOwner = randomUUID();
+          await connection.query('INSERT INTO "user" (id,name) VALUES ($1,\'New owner\')', [nextOwner]);
+          await connection.query('UPDATE creator_work SET "userId"=$2 WHERE id=$1', [accepted.work, nextOwner]);
+        }
+        const snapshot = async () => (await connection.query('SELECT * FROM creator_work_catalog_asset_binding WHERE "workId"=$1', [accepted.work])).rows[0];
+        const before = await snapshot();
+        const sql = `UPDATE creator_work_catalog_asset_binding SET ${change.sql} WHERE "workId"=$1 RETURNING *`;
+        if (status === "valid") {
+          const updated = (await connection.query(sql, [accepted.work, ...change.values])).rows[0];
+          expect(updated, change.name).toMatchObject({ workId: before.workId, attachmentId: before.attachmentId, releaseId: before.releaseId,
+            entitlementGrantId: before.entitlementGrantId, insertedAt: before.insertedAt });
+          expect(updated, change.name).not.toEqual(before);
+        } else {
+          await rejects(connection, sql, [accepted.work, ...change.values], "creator_work_catalog_asset_binding_entitlement_authorization");
+          expect(await snapshot(), change.name).toEqual(before);
+          // Revoked/expired historical references still accept resolution and warning metadata.
+          await connection.query(`UPDATE creator_work_catalog_asset_binding
+            SET state='revoked-warning', "qualityProfile"='mobile', "lastResolvedAt"=statement_timestamp() WHERE "workId"=$1`, [accepted.work]);
+          expect(await snapshot()).toMatchObject({ ...before, state: "revoked-warning", qualityProfile: "mobile", lastResolvedAt: expect.any(Date) });
+        }
+      }
     });
   });
 

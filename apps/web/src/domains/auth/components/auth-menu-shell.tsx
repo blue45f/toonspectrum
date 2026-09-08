@@ -3,7 +3,7 @@ import { lazy, Suspense, useState, type ComponentType } from "react";
 
 import { useT } from "@/shared/lib/i18n";
 import { keepInlineText } from "@/shared/lib/text";
-import { useSession } from "@/src/compat/auth-session-store";
+import { useSession } from "@/compat/auth-session-store";
 
 type AuthMenuProps = {
   defaultOpen?: boolean;

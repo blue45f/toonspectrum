@@ -20,13 +20,13 @@ import { MARKET_CURATED_THEMES } from "../models/market-theme";
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 import {
   useDocumentTitle,
   useJsonLd,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/src/hooks/use-document-title";
+} from "@/hooks/use-document-title";
 
 const MARKET_HOME_DESCRIPTION =
   "브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋, 3D 에셋과 소품을 살펴보고 ToonSpectrum Studio에서 바로 활용하세요.";

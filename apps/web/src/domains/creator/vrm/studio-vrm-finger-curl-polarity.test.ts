@@ -69,7 +69,6 @@ describe("VRM finger curl polarity", () => {
   it("curls middle fingertips into the palm for core humanoids (including Lumi axis flip)", async () => {
     const failures: string[] = [];
     for (const character of CORE) {
-      if (!fs.existsSync(path.resolve(character.file))) continue;
       const vrm = await load(character.file);
       const pose = pickNaturalIdlePose(character.id);
       const bones = stripFingerBones(pose.bones as PoseBoneMap);
@@ -101,7 +100,6 @@ describe("VRM finger curl polarity", () => {
 
   it("keeps the untouched hand's finger pose when only one side is overridden", async () => {
     for (const character of CORE) {
-      if (!fs.existsSync(path.resolve(character.file))) continue;
       const vrm = await load(character.file);
       const pose = pickNaturalIdlePose(character.id);
       const bones = stripFingerBones(pose.bones as PoseBoneMap);
@@ -128,7 +126,6 @@ describe("VRM finger curl polarity", () => {
 
   it("caches polarity so repeated applies do not flip between curl and hyperextension", async () => {
     for (const character of CORE) {
-      if (!fs.existsSync(path.resolve(character.file))) continue;
       const vrm = await load(character.file);
       const pose = pickNaturalIdlePose(character.id);
       const bones = stripFingerBones(pose.bones as PoseBoneMap);

@@ -66,13 +66,13 @@ describe("Studio router bundle boundaries", () => {
     expect(appRouterSource).toContain('import { appRoutes } from "./groups/app-routes"');
     expect(appRouterSource).toContain("appRoutes.map");
     expect(creatorRoutesSource).toContain(
-      'import("@/src/domains/creator/studio-router/StudioRouter")',
+      'import("@/domains/creator/studio-router/StudioRouter")',
     );
     expect(creatorRoutesSource).toContain(
       '{ id: "creator-studio", path: "/studio/*", element: <StudioRouter /> }',
     );
     expect(creatorRoutesSource).not.toContain('path: "/studio/tools-companion"');
-    expect(creatorRoutesSource).not.toContain('import("@/src/domains/creator/StudioPage")');
+    expect(creatorRoutesSource).not.toContain('import("@/domains/creator/StudioPage")');
   });
 
   it("keeps URL and editor-key ownership outside the legacy adapter", () => {

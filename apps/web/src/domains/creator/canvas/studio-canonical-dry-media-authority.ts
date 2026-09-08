@@ -1,4 +1,5 @@
 import { classifyStudioDryMediaCatalogIdV1 } from "../brush/studio-dry-media-anisotropic-grain-v1";
+import { studioCanonicalDryMediaEligibilityFailure } from "../studio-canonical-vnext-dry-media-eligibility";
 
 import type { NormalizedStudioBrushDynamicsSettings } from "../brush/studio-brush-dynamics-types";
 import type { StudioDryMediaAnisotropicPresetIdV1 } from "../brush/studio-dry-media-anisotropic-grain-v1";
@@ -101,32 +102,17 @@ export function studioCanonicalDryMediaDynamicsIneligibilityReason(
 export function classifyStudioCanonicalDryMediaElement(
   element: DrawEl | null | undefined,
 ): StudioCanonicalDryMediaElementEligibility {
-  if (!element || element.type !== "draw"
-    || (element.kind !== undefined && element.kind !== "freehand")
-    || element.mode === "eraser" || element.brush !== "dry-media") {
-    return { status: "ineligible", reason: "invalid-input" };
+  const failure = studioCanonicalDryMediaEligibilityFailure(element);
+  if (failure) {
+    return { status: "ineligible", reason: failure.reason, detail: failure.detail };
   }
-  const classification = classifyStudioDryMediaCatalogIdV1(element.brushCatalogId);
-  if (classification?.kind !== "anisotropic-continuous") {
+  const classified = element && classifyStudioDryMediaCatalogIdV1(element.brushCatalogId);
+  if (!element || classified?.kind !== "anisotropic-continuous") {
     return { status: "ineligible", reason: "ineligible-material" };
-  }
-  if (element.brushCatalogId === "paint-roller") {
-    return { status: "ineligible", reason: "unsupported-paint-roller" };
-  }
-  if ((element.symmetry?.type ?? "none") !== "none") {
-    return { status: "ineligible", reason: "unsupported-symmetry" };
-  }
-  if (element.blendMode !== undefined && element.blendMode !== "normal"
-    && element.blendMode !== "source-over") {
-    return { status: "ineligible", reason: "unsupported-composite" };
-  }
-  if (element.paintModel !== undefined
-    && (element.paintModel !== "bounded-flow-v2" || (element.opacity ?? 1) !== 1)) {
-    return { status: "ineligible", reason: "unsupported-paint-model", detail: `${element.paintModel}:${element.opacity ?? 1}` };
   }
   const reason = studioCanonicalDryMediaDynamicsIneligibilityReason(element.brushDynamics);
   return reason ? { status: "ineligible", reason }
-    : { status: "eligible", presetId: classification.presetId };
+    : { status: "eligible", presetId: classified.presetId };
 }
 
 /** Resolve the selected topmost eligible stroke before applying viewport presentation gates. */

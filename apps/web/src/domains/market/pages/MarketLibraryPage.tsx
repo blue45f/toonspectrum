@@ -16,11 +16,11 @@ import { MARKET_KINDS, marketKindMeta, marketLicenseMeta } from "../models/marke
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
-} from "@/src/hooks/use-document-title";
+} from "@/hooks/use-document-title";
 
 export function MarketLibraryPage() {
   useDocumentTitle("내 보관함 · 창작 마켓");

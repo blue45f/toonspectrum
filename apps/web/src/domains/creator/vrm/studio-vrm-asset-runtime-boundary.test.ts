@@ -90,7 +90,7 @@ describe("Studio VRM asset runtime ownership boundary", () => {
       "./studio-vrm-license-product-gate",
       "./studio-vrm-texture-paint-binding",
       "./vrm-library",
-      "@/src/shared/catalog/catalog-static",
+      "@/shared/catalog/catalog-static",
     ]);
     expect(runtime.typeImports).toEqual(["@pixiv/three-vrm"]);
     expect(binding.allImports).toEqual(["./studio-vrm-texture-paint-channel"]);

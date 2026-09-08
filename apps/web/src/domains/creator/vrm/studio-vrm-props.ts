@@ -906,20 +906,11 @@ function isValidPropUid(value: unknown): value is string {
 
 function secureRandomUuid(): string | null {
   try {
-    if (typeof globalThis.crypto?.randomUUID === "function") {
-      return globalThis.crypto.randomUUID();
-    }
+    return typeof globalThis.crypto?.randomUUID === "function"
+      ? globalThis.crypto.randomUUID()
+      : null;
   } catch {
-    // Some embedded WebViews expose randomUUID but reject calls to it.
-  }
-  try {
-    if (typeof globalThis.crypto?.getRandomValues !== "function") return null;
-    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-  } catch {
+    // 일부 임베디드 WebView는 crypto를 노출해도 호출 시 예외를 던질 수 있다.
     return null;
   }
 }
@@ -931,11 +922,16 @@ function propUidCandidate(seed?: string): string {
   const uuid = secureRandomUuid();
   if (uuid) return `${prefix}-${uuid}-${counter}`;
 
-  const timestamp = Date.now().toString(36);
-  // These are document-local object identifiers, never authorization tokens.
-  // Keep offline WebViews usable without pretending a weak PRNG is secure.
-  // The issued-ID registry also reserves saved IDs before allocating new ones.
-  return `${prefix}-${timestamp}-${counter}`;
+  // WebViews may omit randomUUID while still exposing Web Crypto's random-byte source.
+  // A saved instance must never silently fall back to predictable Math.random entropy.
+  const bytes = new Uint8Array(16);
+  try {
+    globalThis.crypto.getRandomValues(bytes);
+  } catch (cause) {
+    throw new Error("안전한 소품 식별자를 생성할 수 없습니다.", { cause });
+  }
+  const entropy = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${prefix}-${entropy}-${counter}`;
 }
 
 /** 저장·재실행 뒤에도 충돌하기 어려운 UI 인스턴스 키(테스트에서는 uid를 직접 주입할 수 있다). */

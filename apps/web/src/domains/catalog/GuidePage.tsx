@@ -5,7 +5,7 @@ import type { PlatformId } from "@/shared/lib/types";
 import { Container } from "@/shared/components/section";
 import { PLATFORMS } from "@/shared/lib/platforms";
 import { RANK_AXES, PLATFORM_REACH_WEIGHT } from "@/shared/lib/ranking";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 
 

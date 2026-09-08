@@ -10,7 +10,7 @@ const fetchMock = vi.hoisted(() => vi.fn());
 const signIn = vi.hoisted(() => vi.fn());
 const signInWithGoogleIdToken = vi.hoisted(() => vi.fn());
 
-vi.mock("@/src/compat/auth-session-store", () => ({
+vi.mock("@/compat/auth-session-store", () => ({
   signIn,
   signInWithGoogleIdToken,
 }));

@@ -681,7 +681,9 @@ export function describeStudioBrushEngineStack(
   if (settings.depositPipeline) {
     entries.push({
       id: "deposit-pipeline",
-      label: settings.depositPipeline === "causal-deposit-v3-segmented"
+      label: settings.depositPipeline === "causal-deposit-v4-taper-spacing"
+        ? "인과 도포 v4 (펜촉 간격)"
+        : settings.depositPipeline === "causal-deposit-v3-segmented"
         ? "인과 도포 v3 (세그먼트)"
         : "인과 도포 v2",
       active: true,

@@ -13,6 +13,7 @@ import {
   resolveStudioBrushDynamicsForNormalizedSettings,
   studioBrushTaperFactors,
   STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
 } from "./brush/studio-brush-dynamics";
 import {
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET,
@@ -52,6 +53,9 @@ const MAX_COORDINATE_ABS = 1_000_000_000;
 const MAX_POINTER_SPEED = 64;
 const ACTIVE_START_TAPER_REFERENCE_MIN_PX = 96;
 const ACTIVE_START_TAPER_WIDTH_FACTOR = 12;
+// V4 scales the historical 0.25px station floor with the final tip width too. The existing
+// 0.05..4096 diameter bounds keep every step positive without changing any dab/mark budget.
+const V4_MINIMUM_STATION_SPACING = 0.25 * 0.05 / 4_096;
 
 export interface StudioCausalDynamicBrushSampleV2 {
   readonly x: number;
@@ -297,6 +301,7 @@ function stateFieldsAreValid(
     | StudioCausalDynamicBrushDepositStateV2
     | StudioCausalDynamicBrushDepositStateV3,
   maximumAllowedDabs: number,
+  minimumSpacing: number,
 ): boolean {
   return state?.kind === "studio-causal-dynamic-brush-deposit-state"
     && sampleIsValid(state.previousSample)
@@ -308,7 +313,7 @@ function stateFieldsAreValid(
     && Number.isSafeInteger(state.nextDabIndex)
     && state.nextDabIndex >= 1
     && Number.isFinite(state.lastSpacing)
-    && state.lastSpacing >= 0.25
+    && state.lastSpacing >= minimumSpacing
     && typeof state.transitionedFromTap === "boolean"
     && Number.isSafeInteger(state.maximumDabs)
     && state.maximumDabs >= STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.min
@@ -317,16 +322,24 @@ function stateFieldsAreValid(
 
 function stateIsValidV2(
   state: StudioCausalDynamicBrushDepositStateV2,
+  minimumSpacing: number,
 ): boolean {
   return state?.version === STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION
-    && stateFieldsAreValid(state, STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS);
+    && stateFieldsAreValid(state, STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS, minimumSpacing);
 }
 
 function stateIsValidV3(
   state: StudioCausalDynamicBrushDepositStateV3,
+  minimumSpacing: number,
 ): boolean {
   return state?.version === STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V3_VERSION
-    && stateFieldsAreValid(state, STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_TOTAL_DABS);
+    && stateFieldsAreValid(state, STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_TOTAL_DABS, minimumSpacing);
+}
+
+function minimumStationSpacing(settings: NormalizedStudioBrushDynamicsSettings): number {
+  return settings.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
+    ? V4_MINIMUM_STATION_SPACING
+    : 0.25;
 }
 
 function frozenSample(
@@ -460,7 +473,13 @@ function dabAt(
     4_096,
   );
   const opacity = clamp01(recipe.opacity * taper.opacity);
-  const spacing = Math.max(0.25, recipe.spacing);
+  // Only V4 snapshots opt into spacing relative to the final tapered diameter. V2/V3 keep their
+  // original station positions, dab indices and seeded material pixels on every replay surface.
+  const spacingScale = settings.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
+    && settings.spacingRatio !== null && size < recipe.size
+    ? size / recipe.size
+    : 1;
+  const spacing = Math.max(0.25, recipe.spacing) * spacingScale;
   const contactFactor = studioDynamicBrushContactFactor(
     size,
     opacity,
@@ -509,7 +528,9 @@ function dabAt(
       size,
       opacity,
       flow: recipe.flow,
-      spacing: recipe.spacing,
+      spacing: settings.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
+        ? spacing
+        : recipe.spacing,
       scatter: recipe.scatter,
       angle: recipe.angle,
       roundness: recipe.roundness,
@@ -711,7 +732,7 @@ export function appendStudioCausalDynamicBrushDepositsV2(
   samples: readonly StudioCausalDynamicBrushSampleV2[],
   settings: NormalizedStudioBrushDynamicsSettings
 ): StudioCausalDynamicBrushDepositAppendResultV2 {
-  if (!stateIsValidV2(state)) return failure("invalid-state");
+  if (!stateIsValidV2(state, minimumStationSpacing(settings))) return failure("invalid-state");
   const appended = appendStudioCausalDynamicBrushDepositsCore(
     state,
     samples,
@@ -730,7 +751,7 @@ export function appendStudioCausalDynamicBrushDepositsV3(
   settings: NormalizedStudioBrushDynamicsSettings,
 ): StudioCausalDynamicBrushDepositAppendResultV3 {
   if (
-    !stateIsValidV3(state)
+    !stateIsValidV3(state, minimumStationSpacing(settings))
     || !studioDynamicBrushDepositPipelineUsesContinuation(settings.depositPipeline)
   ) {
     return failure("invalid-state");

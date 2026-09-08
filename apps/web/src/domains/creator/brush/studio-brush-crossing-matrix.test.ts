@@ -12,7 +12,7 @@ import {
 import {
   planNormalizedStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
 } from "./studio-brush-dynamics";
 import {
   STUDIO_BRUSH_PACK_DESCRIPTORS,
@@ -124,7 +124,7 @@ describe("full catalogue crossing and long-stroke matrix", () => {
 
       expect(resolveStudioBrushDynamicsPresetId(brushId)).toBe("dry-media");
       expect(dynamics?.depositPipeline).toBe(
-        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
       );
       expect(dynamics).not.toBeNull();
       if (!dynamics) return;

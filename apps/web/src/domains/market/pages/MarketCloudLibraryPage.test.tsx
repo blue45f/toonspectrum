@@ -9,8 +9,8 @@ import { MarketLibraryPage } from "./MarketCloudLibraryPage";
 import type { CreatorMarketplaceCloudLibraryItem, CreatorMarketplaceCloudLibraryPage } from "@/shared/lib/creator-marketplace-cloud-library-contract";
 
 const api = vi.hoisted(() => ({ session: vi.fn(), list: vi.fn(), archive: vi.fn() }));
-vi.mock("@/src/compat/auth-session-store", () => ({ useSession: api.session }));
-vi.mock("@/src/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/compat/auth-session-store", () => ({ useSession: api.session }));
+vi.mock("@/infrastructure/creator-marketplace-client", () => ({
   listCreatorMarketplaceCloudLibrary: api.list,
   setCreatorMarketplaceCloudLibraryArchived: api.archive,
 }));

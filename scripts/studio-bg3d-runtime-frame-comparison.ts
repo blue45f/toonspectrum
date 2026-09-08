@@ -37,3 +37,71 @@ export async function compareBg3dOriginalFrames<T extends Bg3dComparableFrame>(
   }
   return { sampled, reference, peakDelta };
 }
+
+/** Trim editor rails and overlays from the scene analysis copy; retain full-frame metrics too. */
+export const BG3D_FRAME_CROP_INSET = 0.25;
+
+/**
+ * Largest inter-session framing offset treated as framing rather than a defect, in capture pixels.
+ */
+export const BG3D_FRAME_MAX_ALIGNMENT_PX = 16;
+
+/** Candidate vertical offsets, in capture pixels. Zero is always offered, so the aligned figure
+ * can never exceed the unaligned one. */
+export const BG3D_FRAME_ALIGNMENT_OFFSETS_PX: readonly number[] = Array.from(
+  { length: BG3D_FRAME_MAX_ALIGNMENT_PX + 1 },
+  (_value, index) => index - BG3D_FRAME_MAX_ALIGNMENT_PX / 2,
+).map((step) => step * 2);
+
+export interface Bg3dFrameAlignmentCandidate<T extends Bg3dComparableFrame> {
+  readonly shiftPx: number;
+  readonly frame: T;
+}
+
+/**
+ * Compare equal-size captures after a bounded vertical translation. The selected offset and
+ * unaligned full-frame delta remain in the runtime report so framing changes stay visible.
+ */
+export function resolveBg3dAlignedComparison<T extends Bg3dComparableFrame>(
+  base: T,
+  candidates: readonly Bg3dFrameAlignmentCandidate<T>[],
+): { readonly alignmentPx: number; readonly peakDelta: number } {
+  if (!Number.isInteger(base.width) || !Number.isInteger(base.height)
+    || base.width <= 0 || base.height <= 0) {
+    throw new Error("Invalid base frame dimensions");
+  }
+  if (candidates.length === 0) throw new Error("No frame alignment candidates");
+  if (base.tiles.length === 0) throw new Error("Empty base frame tile counts");
+  if (!candidates.some((candidate) => candidate.shiftPx === 0)) {
+    throw new Error("Frame alignment must offer the unaligned comparison");
+  }
+  let best: { alignmentPx: number; peakDelta: number } | null = null;
+  for (const { shiftPx, frame } of candidates) {
+    if (!Number.isInteger(shiftPx) || Math.abs(shiftPx) > BG3D_FRAME_MAX_ALIGNMENT_PX) {
+      throw new Error(`Frame alignment offset out of range: ${shiftPx}`);
+    }
+    if (frame.width !== base.width || frame.height !== base.height) {
+      throw new Error("Different frame dimensions");
+    }
+    if (frame.tiles.length !== base.tiles.length) {
+      throw new Error("Different frame tile counts");
+    }
+    let peakDelta = 0;
+    for (let index = 0; index < base.tiles.length; index += 1) {
+      const here = base.tiles[index];
+      const there = frame.tiles[index];
+      if (here === undefined || there === undefined
+        || !Number.isFinite(here) || !Number.isFinite(there)) {
+        throw new Error("Non-finite frame tile");
+      }
+      peakDelta = Math.max(peakDelta, Math.abs(here - there));
+    }
+    // Ties keep the smaller offset, so an already-aligned pair reports no drift at all.
+    if (best === null || peakDelta < best.peakDelta
+      || (peakDelta === best.peakDelta && Math.abs(shiftPx) < Math.abs(best.alignmentPx))) {
+      best = { alignmentPx: shiftPx, peakDelta };
+    }
+  }
+  if (best === null) throw new Error("No frame alignment candidates");
+  return best;
+}

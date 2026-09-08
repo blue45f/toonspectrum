@@ -2,6 +2,7 @@
 import {
   isStudioDynamicBrushMinimumDiameterRatio,
   studioDynamicBrushDepositPipelineUsesContinuation,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
 } from "../brush/studio-brush-dynamics";
 import { serializeStudioBrushR8TextureGrainSourceCanonical } from "../brush/studio-brush-r8-grain-asset-contract";
 import {
@@ -53,7 +54,9 @@ import {
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
-  STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+  studioCrdtStrokePayloadSupportsContinuation,
+  isStudioCrdtStrokePayloadVersion,
+  STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
 
 import type { StudioCrdtJsonObject } from "./studio-crdt-scene-schema";
@@ -288,10 +291,7 @@ export function hasCanonicalRendererSignificantR8Grain(
 
 export function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boolean): void {
   if (
-    (payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
-      && payload.version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-      && payload.version !== STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
-      && payload.version !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION)
+    !isStudioCrdtStrokePayloadVersion(payload.version)
     || payload.type !== "draw"
   ) {
     throw new Error("지원하지 않는 획 페이로드 버전입니다.");
@@ -333,6 +333,12 @@ export function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty
     const value = payload[key];
     if (value !== undefined) cloneJsonObject(value);
   }
+  if (
+    payload.brushDynamics?.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
+    && payload.version !== STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+  ) {
+    throw new Error("테이퍼 간격 브러시는 획 페이로드 v5가 필요합니다.");
+  }
   const dynamicMinimumDiameterRatio =
     payload.brushDynamics?.minimumDiameterRatio;
   if (
@@ -340,7 +346,7 @@ export function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty
     && (
       (
         payload.version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-        && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+        && !studioCrdtStrokePayloadSupportsContinuation(payload.version)
       )
       || !isStudioDynamicBrushMinimumDiameterRatio(
         dynamicMinimumDiameterRatio,
@@ -353,19 +359,19 @@ export function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty
     studioDynamicBrushDepositPipelineUsesContinuation(
       payload.brushDynamics?.depositPipeline,
     )
-    && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !studioCrdtStrokePayloadSupportsContinuation(payload.version)
   ) {
     throw new Error("분할 연속 브러시 파이프라인과 페이로드 버전이 호환되지 않습니다.");
   }
   if (
     usesR8TextureGrain
-    && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !studioCrdtStrokePayloadSupportsContinuation(payload.version)
   ) {
     throw new Error("R8 브러시 그레인과 페이로드 버전이 호환되지 않습니다.");
   }
   const outlineStroke = payload.extensions?.outlineStroke;
   if (outlineStroke !== undefined) {
-    if (payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION) {
+    if (!studioCrdtStrokePayloadSupportsContinuation(payload.version)) {
       throw new Error("외곽선 획 계약과 페이로드 버전이 호환되지 않습니다.");
     }
     const normalizedOutlineStroke = normalizeStudioOutlineStrokeContract(outlineStroke);
@@ -390,7 +396,7 @@ export function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty
       (
         payload.version !== STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
         && payload.version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-        && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+        && !studioCrdtStrokePayloadSupportsContinuation(payload.version)
       )
       || !isStudioStrokePaintModelCompatible({
         ...payload,
@@ -412,7 +418,7 @@ export function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty
   if (
     hasMaterialPressureSnapshot
     && payload.version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-    && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !studioCrdtStrokePayloadSupportsContinuation(payload.version)
   ) {
     throw new Error("획 재질 필압 모델과 페이로드 버전이 호환되지 않습니다.");
   }
@@ -527,10 +533,7 @@ export function readPayload(record: Y.Map<unknown>): StudioCrdtDrawStrokePayload
   const pointsLength = sharedArrays.points?.length ?? -1;
   const count = pointsLength / 2;
   if (
-    (version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
-      && version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-      && version !== STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
-      && version !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION) ||
+    !isStudioCrdtStrokePayloadVersion(version) ||
     type !== "draw" ||
     !kind ||
     (mode !== "pen" && mode !== "eraser") ||

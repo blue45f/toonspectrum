@@ -33,8 +33,8 @@ import { PLATFORM_LIST } from "@/shared/lib/platforms";
 import { normalizeQuery } from "@/shared/lib/recent-searches";
 import { useApp, useSavedTitleIds } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
-import { useDebouncedValue } from "@/src/hooks/use-debounced-value";
-import { fetchSearchResponse, isSearchAbortError, type SearchCatalogMeta } from "@/src/infrastructure/search-client";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { fetchSearchResponse, isSearchAbortError, type SearchCatalogMeta } from "@/infrastructure/search-client";
 
 
 type FilterToken = { key: string; label: string; category: string };

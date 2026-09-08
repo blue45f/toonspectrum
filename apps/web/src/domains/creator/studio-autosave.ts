@@ -11,6 +11,7 @@ import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 import { parseStudioLayerComps } from "./layer/studio-layer-comps-document";
 import { normalizeStudioPublishPackageSettings } from "./studio-publish-package";
 import { normalizeStudioPublishPackSettings } from "./studio-publish-preflight";
+import { minimumStudioProjectFileVersion, type StudioProjectFileVersion } from "./studio-project-version";
 import {
   normalizeStudioReferenceBoardDocument,
   studioReferenceBoardHasContent,
@@ -20,6 +21,7 @@ import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d
 
 export const LEGACY_STUDIO_AUTOSAVE_KEY = "toonspectrum-studio-autosave";
 const STUDIO_AUTOSAVE_PREFIX = "toonspectrum-studio-autosave:v12";
+const TAPER_SPACING_AUTOSAVE_KIND = "studio-taper-spacing-autosave";
 
 export interface StudioAutosaveStorage {
   getItem(key: string): string | null;
@@ -59,7 +61,7 @@ export type StudioLifecycleDurabilityMarker = {
 };
 
 export type StudioAutosavePayload = {
-  version: 2;
+  version: StudioProjectFileVersion;
   savedAt: string;
   pagesList: Array<{
     id?: unknown;
@@ -236,7 +238,14 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
   try {
     const value: unknown = JSON.parse(raw);
     if (!value || typeof value !== "object") return null;
-    const record = value as Record<string, unknown>;
+    let record = value as Record<string, unknown>;
+    if (record.kind === TAPER_SPACING_AUTOSAVE_KIND) {
+      const payload = record.payload;
+      if (record.version !== 3 || !payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+      record = payload as Record<string, unknown>;
+      if (record.version !== 3) return null;
+    }
+    if (typeof record.version === "number" && record.version > 3) return null;
     if (!Array.isArray(record.pagesList) || record.pagesList.length === 0) return null;
     const pagesList = record.pagesList.map((page) => {
       if (!page || typeof page !== "object" || Array.isArray(page)) return page;
@@ -249,7 +258,7 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
       return shared3dStage ? { ...rest, shared3dStage } : rest;
     }) as StudioAutosavePayload["pagesList"];
     return {
-      version: 2,
+      version: record.version === 3 ? 3 : minimumStudioProjectFileVersion(pagesList, record.master),
       savedAt: typeof record.savedAt === "string" ? record.savedAt : new Date(0).toISOString(),
       pagesList,
       master: record.master,
@@ -319,7 +328,7 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
  * a caller passes an explicitly raw-retaining provenance document, browser storage receives only
  * its canonical hash-only representation.
  */
-export function serializeStudioAutosave(payload: StudioAutosavePayload): string {
+function normalizedStudioAutosavePayload(payload: StudioAutosavePayload) {
   const pagesList = payload.pagesList.map((page) => {
     if (!page || typeof page !== "object" || Array.isArray(page)) return page;
     const pageRecord = page as Record<string, unknown>;
@@ -328,8 +337,9 @@ export function serializeStudioAutosave(payload: StudioAutosavePayload): string 
     const shared3dStage = migrateStudioShared3dStageCollectionDocument(rawSharedStage);
     return shared3dStage ? { ...rest, shared3dStage } : rest;
   });
-  return JSON.stringify({
+  return {
     ...payload,
+    version: payload.version === 3 ? 3 : minimumStudioProjectFileVersion(pagesList, payload.master),
     pagesList,
     ...(payload.referenceBoard === undefined
       ? {}
@@ -340,7 +350,21 @@ export function serializeStudioAutosave(payload: StudioAutosavePayload): string 
     ...(payload.aiImageReferences === undefined
       ? {}
       : { aiImageReferences: hydrateStudioAiImageReferenceDocument(payload.aiImageReferences) }),
-  });
+  };
+}
+
+export function serializeStudioAutosave(payload: StudioAutosavePayload): string {
+  const safePayload = normalizedStudioAutosavePayload(payload);
+  // Historical recovery readers ignore a top-level version, but require pagesList. Keep new
+  // brush snapshots behind an envelope they cannot silently interpret as an old drawing.
+  return JSON.stringify(safePayload.version === 3
+    ? { kind: TAPER_SPACING_AUTOSAVE_KIND, version: 3, payload: safePayload }
+    : safePayload);
+}
+
+/** Downloaded recovery files use the public project reader, which enforces its V3 file version. */
+export function serializeStudioAutosaveBackup(payload: StudioAutosavePayload): string {
+  return JSON.stringify(normalizedStudioAutosavePayload(payload));
 }
 
 function studioWriterRoomHasContent(value: unknown): boolean {

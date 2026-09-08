@@ -26,11 +26,11 @@ import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
-import { NotFoundPage } from "@/src/components/NotFoundPage";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
-import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/src/infrastructure/creator-client";
+import Link from "@/compat/router-link";
+import { ErrorState } from "@/components/error-state";
+import { NotFoundPage } from "@/components/NotFoundPage";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/infrastructure/creator-client";
 
 
 // 회차 행 — 목록형(웹툰 회차 리스트 스타일).

@@ -4,7 +4,7 @@ import { recoverInterruptedStudioAiOperations } from "./ai/studio-ai-provenance-
 import { requireStudioDrawingPointerTransport } from "./brush/studio-drawing-pointer-transport";
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
-  serializeStudioAutosave,
+  serializeStudioAutosaveBackup,
   studioLifecycleAutosaveSidecarKey,
   studioSharedAutosaveCompatibility,
 } from "./studio-autosave";
@@ -520,7 +520,7 @@ export function downloadStudioAutosaveBackup(ctx: StudioAutosaveBackupContext): 
         setError("내려받을 임시저장 데이터를 찾지 못했어요.");
         return;
       }
-      const blob = new Blob([serializeStudioAutosave(saved.payload)], {
+      const blob = new Blob([serializeStudioAutosaveBackup(saved.payload)], {
         type: "application/json",
       });
       const url = URL.createObjectURL(blob);

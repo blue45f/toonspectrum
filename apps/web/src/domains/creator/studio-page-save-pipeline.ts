@@ -38,7 +38,7 @@ import type {
   StudioPublishPreflightInput,
 } from "./studio-publish-preflight";
 import type { StudioSharedDocument } from "./studio-shared-document-client";
-import type { WorkDetail } from "@/src/infrastructure/creator-client";
+import type { WorkDetail } from "@/infrastructure/creator-client";
 import type Konva from "konva";
 import type { Location, NavigateFunction } from "react-router-dom";
 
@@ -549,7 +549,7 @@ export async function runStudioPageSavePipeline(
           ] = await Promise.all([
             import("./studio-linked-3d-new-work-cloud-save"),
             import("./creator-draft-collaboration-client"),
-            import("@/src/infrastructure/creator-client"),
+            import("@/infrastructure/creator-client"),
             import("./studio-draft-collaboration"),
           ]);
           const directSavePlan = buildStudioDirectWorkSavePlan({
@@ -718,7 +718,7 @@ export async function runStudioPageSavePipeline(
           : `공동 문서 revision ${saved.revision}로 저장했습니다.`
       );
     } else {
-      const { createWork, updateWork } = await import("@/src/infrastructure/creator-client");
+      const { createWork, updateWork } = await import("@/infrastructure/creator-client");
       if (
         !saveScopeStillCurrent() ||
         !canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })

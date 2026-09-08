@@ -6,7 +6,7 @@ import type { FeedbackComment } from "@toonspectrum/core/feedback";
 import { useApp } from "@/shared/lib/store";
 import { feedbackTimeLabel } from "@toonspectrum/core/feedback";
 import { assertFeedbackComments, isFeedbackComment } from "@toonspectrum/core/feedback-response";
-import { api, getApiErrorMessage } from "@/src/infrastructure/api";
+import { api, getApiErrorMessage } from "@/infrastructure/api";
 
 function Reply({ reply, depth = 0 }: { reply: FeedbackComment; depth?: number }) {
   return <li className="fb-reply" data-official={reply.isOfficial || undefined}>

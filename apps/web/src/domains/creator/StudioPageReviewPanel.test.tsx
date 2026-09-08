@@ -7,7 +7,7 @@ import { StudioPageReviewPanel } from "./StudioPageReviewPanel";
 
 const viewportState = vi.hoisted(() => ({ mobile: false }));
 
-vi.mock("@/src/hooks/use-media-query", () => ({
+vi.mock("@/hooks/use-media-query", () => ({
   useIsMobile: () => viewportState.mobile,
 }));
 

@@ -38,9 +38,11 @@ import {
   type Page,
 } from "playwright";
 
+import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
 import { STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED } from "../apps/web/src/domains/creator/studio-living-ink-brush-admission";
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
+import { readDurableStudioAutosaveDocument } from "./lib/studio-verify-durable-autosave.mjs";
 import {
   findFreePort,
   stopChildProcess,
@@ -1196,64 +1198,33 @@ async function readMonitor(page: Page): Promise<BrowserMonitorSnapshot> {
   });
 }
 
-async function readStoredDocument(
+export async function readStoredDocument(
   page: Page,
   expectedKey?: string | null,
 ): Promise<StoredDocumentSnapshot> {
-  return page.evaluate((input) => {
-    type StoredDocument = {
-      savedAt?: string;
-      currentPageId?: string;
-      pagesList?: Array<{ id?: string; elements?: unknown[] }>;
-    };
-    let newest: { key: string; raw: string; value: StoredDocument } | null = null;
-    const keys = input.expectedKey
-      ? [input.expectedKey]
-      : Array.from({ length: window.localStorage.length }, (_, index) => (
-          window.localStorage.key(index)
-        ));
-    for (const key of keys) {
-      if (!key?.startsWith(input.prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as StoredDocument;
-        if (!Array.isArray(value.pagesList)) continue;
-        if (!newest || String(value.savedAt ?? "") >= String(newest.value.savedAt ?? "")) {
-          newest = { key, raw, value };
-        }
-      } catch {
-        // Keep looking for the newest valid Studio autosave.
-      }
-    }
-    if (!newest) return { key: null, raw: null, savedAt: null, elements: [] };
-    const pageRecord = newest.value.pagesList?.find(
-      (candidate) => candidate.id === newest?.value.currentPageId,
-    ) ?? newest.value.pagesList?.[0];
-    const elements = (pageRecord?.elements ?? []).flatMap((element) => {
-      if (!element || typeof element !== "object" || Array.isArray(element)) return [];
-      const value = element as Record<string, unknown>;
-      const points = Array.isArray(value.points)
-        ? value.points.filter((point): point is number => (
-            typeof point === "number" && Number.isFinite(point)
-          ))
-        : [];
-      return [{
-        id: typeof value.id === "string" ? value.id : "",
-        type: typeof value.type === "string" ? value.type : "",
-        hidden: value.hidden === true,
-        pointCount: Math.floor(points.length / 2),
-        src: typeof value.src === "string" ? value.src : null,
-        livingInkReceipt: value.livingInkReceipt ?? null,
-      }];
-    });
-    return {
-      key: newest.key,
-      raw: newest.raw,
-      savedAt: typeof newest.value.savedAt === "string" ? newest.value.savedAt : null,
-      elements,
-    };
-  }, { expectedKey: expectedKey ?? null, prefix: AUTOSAVE_PREFIX });
+  const newest = await readDurableStudioAutosaveDocument(page, expectedKey ?? studioAutosaveKey({}));
+  if (!newest) return { key: null, raw: null, savedAt: null, elements: [] };
+  const pageRecord = newest.pagesList.find(
+    (candidate) => candidate.id === newest.currentPageId,
+  ) ?? newest.pagesList[0];
+  const elements = (pageRecord?.elements ?? []).flatMap((element) => {
+    if (!element || typeof element !== "object" || Array.isArray(element)) return [];
+    const value = element as Record<string, unknown>;
+    const points = Array.isArray(value.points)
+      ? value.points.filter((point): point is number => (
+          typeof point === "number" && Number.isFinite(point)
+        ))
+      : [];
+    return [{
+      id: typeof value.id === "string" ? value.id : "",
+      type: typeof value.type === "string" ? value.type : "",
+      hidden: value.hidden === true,
+      pointCount: Math.floor(points.length / 2),
+      src: typeof value.src === "string" ? value.src : null,
+      livingInkReceipt: value.livingInkReceipt ?? null,
+    }];
+  });
+  return { key: newest.key, raw: newest.raw, savedAt: newest.savedAt, elements };
 }
 
 async function waitForStoredDocument(

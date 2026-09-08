@@ -13,7 +13,7 @@ import { computeCompareVerdict } from "@/shared/lib/compare-verdict";
 import { statsAreEstimated } from "@/shared/lib/estimate";
 import { STATUS_LABEL } from "@/shared/lib/taxonomy";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 // 정적 모드의 목록 응답(/api/titles)은 경량 카드(보러가기 URL·시놉시스 원문·평점분포 생략)라,
 // 비교 대상으로 확정된 작품은 상세 엔드포인트로 풀 데이터를 보강한다(요금 매트릭스의 '이동' 링크,

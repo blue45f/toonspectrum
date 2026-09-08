@@ -40,7 +40,7 @@ import {
 } from "@/shared/lib/image-attach";
 import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
-import { useCelebrate } from "@/src/hooks/use-celebrate";
+import { useCelebrate } from "@/hooks/use-celebrate";
 
 export { FanPostImages } from "./fan-cafe-images";
 export { FanPostReplySection } from "./fan-cafe-reply-section";

@@ -10,7 +10,7 @@ import {
   type StudioDraftCollaborationTemporaryRoom,
 } from "./studio-draft-collaboration";
 
-import { api, apiPath } from "@/src/infrastructure/api";
+import { api, apiPath } from "@/infrastructure/api";
 
 const DRAFT_COLLABORATION_ROOMS_PATH = "/creator/draft-collaboration/rooms";
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;

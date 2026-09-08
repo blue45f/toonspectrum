@@ -12,7 +12,7 @@ import { MarketCompareToggle } from "./MarketCompareToggle";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 interface MarketResourceCardProps {
   readonly record: CreatorMarketplaceResourceRecord;

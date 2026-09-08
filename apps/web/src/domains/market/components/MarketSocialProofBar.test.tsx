@@ -13,7 +13,7 @@ vi.mock("../hooks/use-market-social", () => ({
   useMarketSocial: mocks.useMarketSocial,
 }));
 
-vi.mock("@/src/compat/auth-session-store", () => ({
+vi.mock("@/compat/auth-session-store", () => ({
   useSession: () => ({
     ready: true,
     status: "authenticated",

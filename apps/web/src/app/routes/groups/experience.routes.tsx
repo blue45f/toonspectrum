@@ -3,13 +3,13 @@ import { defineAppRoutes } from "../app-route-definition";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const FortunePage = lazyRetry(
-  () => import("@/src/domains/fortune/FortunePage").then((module) => ({
+  () => import("@/domains/fortune/FortunePage").then((module) => ({
     default: module.FortunePage,
   })),
   "FortunePage",
 );
 const PlayPage = lazyRetry(
-  () => import("@/src/domains/play/PlayPage").then((module) => ({
+  () => import("@/domains/play/PlayPage").then((module) => ({
     default: module.PlayPage,
   })),
   "PlayPage",

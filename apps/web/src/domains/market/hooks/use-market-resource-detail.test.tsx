@@ -12,14 +12,14 @@ import {
   removeAuthoritativeCachedMarketResource,
   removeCachedMarketResource,
   writeAuthoritativeCachedMarketResource,
-} from "@/src/domains/market/models/market-resource-cache";
-import { getCreatorMarketplaceResource } from "@/src/domains/market/remotes/market-resource-remote";
-import { NotFoundError } from "@/src/infrastructure/use-api-resource";
+} from "@/domains/market/models/market-resource-cache";
+import { getCreatorMarketplaceResource } from "@/domains/market/remotes/market-resource-remote";
+import { NotFoundError } from "@/infrastructure/use-api-resource";
 
-vi.mock("@/src/domains/market/remotes/market-resource-remote", () => ({
+vi.mock("@/domains/market/remotes/market-resource-remote", () => ({
   getCreatorMarketplaceResource: vi.fn(),
 }));
-vi.mock("@/src/domains/market/models/market-resource-cache", () => ({
+vi.mock("@/domains/market/models/market-resource-cache", () => ({
   readAuthoritativeCachedMarketResource: vi.fn(() => null),
   removeAuthoritativeCachedMarketResource: vi.fn(),
   removeCachedMarketResource: vi.fn(),

@@ -165,36 +165,43 @@ async function main() {
   let otherPublisherBrushId: string | null = null;
 
   try {
-    await dbPool.query(`
-      CREATE TABLE IF NOT EXISTS "user" (
-        "id" text PRIMARY KEY,
-        "name" text,
-        "avatar" text,
-        "status" text NOT NULL DEFAULT 'active'
+    if (process.env.TOONSPECTRUM_MARKETPLACE_DB_RUNNER_VALIDATED === "1") {
+      // The integration runner has already required the complete migrated schema
+      // and checked it as the runtime role. Never replay forward-only DDL here.
+      console.log("Using the prepared schema validated by the PostgreSQL integration runner.");
+    } else {
+      // The standalone marketplace CI job supplies an empty disposable database.
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS "user" (
+          "id" text PRIMARY KEY,
+          "name" text,
+          "avatar" text,
+          "status" text NOT NULL DEFAULT 'active'
+        );
+        CREATE TABLE IF NOT EXISTS "toonspectrum_schema_migration" (
+          "id" text PRIMARY KEY,
+          "appliedAt" timestamptz DEFAULT now() NOT NULL,
+          CONSTRAINT "toonspectrum_schema_migration_id_check"
+            CHECK (length("id") BETWEEN 1 AND 160)
+        );
+      `);
+      const migrations = await Promise.all(
+        [
+          "0021_creator_marketplace_resource.sql",
+          "0022_creator_marketplace_distributed_gate_search.sql",
+          "0030_creator_marketplace_immutable_releases.sql",
+          "0031_creator_marketplace_moderation.sql",
+          "0032_creator_marketplace_release_lifecycle.sql",
+          "0033_creator_marketplace_cloud_library.sql",
+          "0034_creator_marketplace_package_moderation.sql",
+          "0035_creator_marketplace_3d_asset_kind.sql",
+          "0037_creator_marketplace_3d_asset_parity.sql",
+        ].map((name) =>
+          readFile(new URL(`../apps/api/src/db/migrations/${name}`, import.meta.url), "utf8")
+        )
       );
-      CREATE TABLE IF NOT EXISTS "toonspectrum_schema_migration" (
-        "id" text PRIMARY KEY,
-        "appliedAt" timestamptz DEFAULT now() NOT NULL,
-        CONSTRAINT "toonspectrum_schema_migration_id_check"
-          CHECK (length("id") BETWEEN 1 AND 160)
-      );
-    `);
-    const migrations = await Promise.all(
-      [
-        "0021_creator_marketplace_resource.sql",
-        "0022_creator_marketplace_distributed_gate_search.sql",
-        "0030_creator_marketplace_immutable_releases.sql",
-        "0031_creator_marketplace_moderation.sql",
-        "0032_creator_marketplace_release_lifecycle.sql",
-        "0033_creator_marketplace_cloud_library.sql",
-        "0034_creator_marketplace_package_moderation.sql",
-        "0035_creator_marketplace_3d_asset_kind.sql",
-        "0037_creator_marketplace_3d_asset_parity.sql",
-      ].map((name) =>
-        readFile(new URL(`../apps/api/src/db/migrations/${name}`, import.meta.url), "utf8")
-      )
-    );
-    for (const migration of migrations) await dbPool.query(migration);
+      for (const migration of migrations) await dbPool.query(migration);
+    }
     await dbPool.query(
       `INSERT INTO "user" ("id", "name", "avatar") VALUES
         ($1, $2, $3),

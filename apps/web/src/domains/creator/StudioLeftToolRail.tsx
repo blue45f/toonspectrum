@@ -82,6 +82,7 @@ import {
   studioRetouchToolHelp,
 } from "./studio-retouch-help";
 import { isSelectionUsable } from "./studio-selection-tools";
+import { suppressNextStudioToolHintFocus } from "./studio-tool-hint-focus-suppression";
 import { studioUiDensityAllows } from "./studio-ui-density";
 import { StudioLeftToolRailViewToolsCluster } from "./StudioLeftToolRailViewToolsCluster";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -552,7 +553,12 @@ function StudioLeftToolRailConnected() {
 
   function closeRailMoreAndRestoreFocus(): void {
     setRailMoreOpen(false);
-    requestAnimationFrame(() => document.getElementById(railMoreTriggerId)?.focus());
+    requestAnimationFrame(() => {
+      const trigger = document.getElementById(railMoreTriggerId);
+      // Selecting a tool keeps keyboard focus available without covering the new tool with its coach.
+      suppressNextStudioToolHintFocus(trigger);
+      trigger?.focus({ preventScroll: true });
+    });
   }
 
   const railMoreFooter = (

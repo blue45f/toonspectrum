@@ -11,7 +11,7 @@ import { useLocation } from "react-router-dom";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 interface MarketNavHeaderProps {
   className?: string;

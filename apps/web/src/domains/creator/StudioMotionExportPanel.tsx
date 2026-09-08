@@ -23,7 +23,7 @@ import {
 import { findBgmMood } from "./studio-bgm";
 import { REVEAL_PRESETS, findAmbientPreset, readWorkFx } from "./studio-motion-fx";
 
-import type { WorkDetail } from "@/src/infrastructure/creator-client";
+import type { WorkDetail } from "@/infrastructure/creator-client";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 

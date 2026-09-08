@@ -4,6 +4,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics-normalize";
 import {
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   studioSoftFalloffLinearAccumulationProgramPin,
 } from "./studio-brush-dynamics-program-pins";
@@ -32,7 +33,7 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     name: "잉크 입자",
     description: "필압과 속도에 반응하는 미세 잉크 입자와 방향성 펜촉",
     settings: {
-      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
       seed: 101,
       taper: {
         enabled: true,
@@ -73,7 +74,7 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     name: "소프트 에어브러시",
     description: "짧은 입력도 보이면서 여러 번 부드럽게 쌓이는 제어된 분사",
     settings: {
-      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
       // Fresh-authoring linear-accumulation opt-in for the analytic soft skirt. The whole
       // airbrush family (toolbar aliases, variants, pack expansions) derives from this preset, so
       // one mint covers every freshly authored soft/spray/marker snapshot, while persisted
@@ -122,7 +123,7 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     name: "드라이 미디어",
     description: "크레용·목탄처럼 압력과 속도에 따라 끊기고 거칠어지는 마른 획",
     settings: {
-      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4,
       seed: 303,
       taper: {
         enabled: true,
@@ -266,12 +267,17 @@ export function studioReplaySafeBrushDynamicsSettingsForBrushId(
     !settings
     || (settings.dryMediaKernelProgram === undefined
       && settings.softFalloffLinearProgram === undefined
-      && settings.causalStampGridRule === undefined)
+      && settings.causalStampGridRule === undefined
+      && settings.depositPipeline !== STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4)
   ) {
     return settings;
   }
   return normalizeStudioBrushDynamicsSettings({
     ...settings,
+    // Snapshot-less historical strokes must not acquire the new authoring spacing contract.
+    depositPipeline: settings.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
+      ? STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
+      : settings.depositPipeline,
     dryMediaKernelProgram: undefined,
     softFalloffLinearProgram: undefined,
     causalStampGridRule: undefined,

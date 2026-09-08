@@ -7,8 +7,8 @@ import { RouteStage } from "./route-stage";
 import { useRouteTitle } from "./route-titles";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
-import { ErrorBoundary } from "@/src/components/error-boundary";
-import { isStudioRoutePathname } from "@/src/domains/creator/studio-workspace-route";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
 
 function readInitialDocumentPathname(): string | null {
   try {
@@ -25,7 +25,7 @@ function readInitialDocumentPathname(): string | null {
 const INITIAL_DOCUMENT_PATHNAME = readInitialDocumentPathname();
 
 const StudioCrossOriginIsolationGate = lazyRetry(
-  () => import("@/src/app/StudioCrossOriginIsolationGate").then((module) => ({
+  () => import("@/app/StudioCrossOriginIsolationGate").then((module) => ({
     default: module.StudioCrossOriginIsolationGate,
   })),
   "StudioCrossOriginIsolationGate",

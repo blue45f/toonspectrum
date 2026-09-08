@@ -8,8 +8,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 
-// Plain Node runs inside the downloaded Lambda: no workspace, tsx, Vitest aliases,
-// inherited credentials or local env file. The only DB address is a closed loopback port.
+// Executed by plain Node in the downloaded Lambda, with no source tree, tsx or Vitest resolver.
+// The database address is deliberately unavailable: these anonymous, file-backed reads must
+// bootstrap without connecting to a database or submitting requests to an external service.
 function probeArtifact() {
   const assert = require("node:assert/strict");
   const fs = require("node:fs");
@@ -216,7 +217,7 @@ export async function verifyApiServerlessBuild() {
       assert.equal(child.status, 0, `Lambda bootstrap failed; see ${output}/${prefix}bootstrap.log`);
     }
   }
-  console.log(`Vercel HTTP/native Lambda packaging, 12 API probes and fail-closed gateway probes passed: ${output}`);
+  console.log(`Vercel HTTP/native Lambda packaging, 12 isolated API reads and fail-closed gateway probes passed: ${output}`);
   return output;
 }
 

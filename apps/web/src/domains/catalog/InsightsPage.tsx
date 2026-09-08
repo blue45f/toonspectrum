@@ -15,8 +15,8 @@ import { DistributionBars, GenreSpectrum, MeterBar } from "@/shared/components/u
 import { genreColor } from "@/shared/lib/genre-color";
 import { TYPE_LABEL } from "@/shared/lib/taxonomy";
 import { formatCount, formatFull } from "@/shared/lib/utils";
-import { ErrorState } from "@/src/components/error-state";
-import { useApiResource } from "@/src/infrastructure/use-api-resource";
+import { ErrorState } from "@/components/error-state";
+import { useApiResource } from "@/infrastructure/use-api-resource";
 
 
 type InsightsData = Awaited<ReturnType<typeof getInsightsData>>;

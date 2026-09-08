@@ -1,4 +1,4 @@
-import { isStudioRoutePathname } from "@/src/domains/creator/studio-workspace-route";
+import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
 
 export interface StudioDocumentNavigationIntent {
   readonly currentHref: string;

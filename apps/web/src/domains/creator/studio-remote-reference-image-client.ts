@@ -5,7 +5,7 @@ import {
   StudioRemoteReferenceImageResponseSchema,
   type StudioRemoteReferenceImageResponse,
 } from "@/shared/lib/studio-remote-reference-image-contract";
-import { api, apiPath, isHttpError, toApiError } from "@/src/infrastructure/api";
+import { api, apiPath, isHttpError, toApiError } from "@/infrastructure/api";
 
 export interface ImportedStudioRemoteReferenceImage
 extends StudioRemoteReferenceImageResponse {

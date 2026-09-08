@@ -1,1 +1,1 @@
-export * from "@/src/domains/community/components/fan-cafe-tree-utils";
+export * from "@/domains/community/components/fan-cafe-tree-utils";

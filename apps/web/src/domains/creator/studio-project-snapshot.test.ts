@@ -109,6 +109,22 @@ function snapshot(
   return buildStudioProjectFileSnapshot(input);
 }
 
+it("marks V4 strokes in raw autosave snapshots without upgrading historical stroke snapshots", () => {
+  for (const [pipeline, expectedVersion] of [
+    ["causal-deposit-v3-segmented", 2],
+    ["causal-deposit-v4-taper-spacing", 3],
+  ] as const) {
+    const stroke = testElement("stroke", {
+      type: "draw", brushDynamics: { version: 1, depositPipeline: pipeline },
+    });
+    const saved = snapshot((input) => { input.pagesList[0].elements = [stroke]; });
+    expect(saved.version).toBe(expectedVersion);
+    expect(saved.pagesList[0].elements[0]).toBe(stroke);
+    expect(JSON.parse(serializeStudioProjectFile(saved)).version).toBe(expectedVersion);
+    expect(snapshot((input) => { input.master = { elements: [stroke] }; }).version).toBe(expectedVersion);
+  }
+});
+
 describe("resolveStudioDurableProjectPages", () => {
   it("uses ref-backed history over a stale render and overlays the deferred stroke once", () => {
     const staleRender = [{ id: "page-1", elements: [{ id: "render-old" }] }];

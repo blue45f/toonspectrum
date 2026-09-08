@@ -9,7 +9,7 @@ import {
 } from "./auth-session-state";
 import { normalizeClientSession } from "./auth-session-storage";
 
-import { api, apiPath } from "@/src/infrastructure/api";
+import { api, apiPath } from "@/infrastructure/api";
 
 export {
   SESSION_KEY,

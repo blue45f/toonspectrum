@@ -6,7 +6,7 @@ import type { Availability } from "@/shared/lib/types";
 
 import { comparePlatformCosts, formatWon, type PlatformCost } from "@/shared/lib/pricing";
 import { cn } from "@/shared/lib/utils";
-import { useAppConfig } from "@/src/hooks/use-app-config";
+import { useAppConfig } from "@/hooks/use-app-config";
 
 
 // 플랫폼간 가격 비교 — 같은 작품의 보기/소장 비용을 플랫폼별로 비교(추정·예시).

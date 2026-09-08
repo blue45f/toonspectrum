@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, Download, ShieldCheck, X, XCircle } from "lucide-react";
-import { useEffect } from "react";
+import { useRef } from "react";
 import { createPortal } from "react-dom";
 
 import type {
@@ -12,6 +12,7 @@ import type {
   StudioPublishPreflightResult,
   StudioPublishProfile,
 } from "./studio-publish-preflight";
+import { useStudioModalSheet } from "./useStudioModalSheet";
 
 const PROFILE_LABELS: Record<StudioPublishProfile, string> = {
   generic: "일반 / ToonSpectrum",
@@ -64,14 +65,24 @@ export function StudioPublishPreflightPanel({
   result,
   onDownloadReport,
 }: StudioPublishPreflightPanelProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    globalThis.addEventListener("keydown", onKeyDown);
-    return () => globalThis.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const portalRootRef = useRef<HTMLElement | null>(
+    typeof document === "undefined" ? null : document.body,
+  );
+  useStudioModalSheet({
+    activeKey: open ? "publish-preflight" : null,
+    dialogRef,
+    onDismiss: onClose,
+    resolveReturnFocus: () => {
+      const ownerDocument = portalRootRef.current?.ownerDocument;
+      // Project Center removes its action popover after opening this portal. Its
+      // persistent launcher is the return target on mobile, where the menubar is hidden.
+      return ownerDocument?.activeElement?.closest("#studio-project-actions-menu")
+        ? ownerDocument.querySelector<HTMLElement>('[aria-controls="studio-project-actions-menu"]')
+        : null;
+    },
+    rootRef: portalRootRef,
+  });
 
   if (!open || typeof document === "undefined") return null;
 
@@ -85,9 +96,11 @@ export function StudioPublishPreflightPanel({
 
   const modal = (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="Publish Pack 사전검사"
+      tabIndex={-1}
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
     >
       <div className="mx-auto flex h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">

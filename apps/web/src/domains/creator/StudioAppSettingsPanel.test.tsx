@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 
-// @ts-expect-error -- jsdom is a test-only runtime fixture and does not bundle TypeScript types.
 import { JSDOM } from "jsdom";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -60,24 +59,22 @@ function openingButtonTagByAriaLabel(html: string, label: string): string {
 }
 
 function openingButtonTagByText(html: string, text: string): string {
-  const fragment = JSDOM.fragment(html) as DocumentFragment;
-  const button = Array.from(fragment.querySelectorAll("button")).find((element) =>
-    element.textContent?.trim() === text
+  const button = [...JSDOM.fragment(html).querySelectorAll("button")].find((element) =>
+    (element.textContent ?? "").trim() === text
   );
-  return button?.outerHTML.match(/^<button\b[^>]*>/u)?.[0] ?? "";
+  // Inspect only the button's own attributes; nested controls must not satisfy its assertions.
+  return (button?.cloneNode(false) as HTMLButtonElement | undefined)?.outerHTML ?? "";
 }
 
-describe("settings button text lookup", () => {
-  it("uses parsed text for nested markup and encoded literal tags", () => {
-    expect(openingButtonTagByText(
-      '<button data-target="nested"><span>High</span> quality</button>',
-      "High quality",
-    )).toContain('data-target="nested"');
-    expect(openingButtonTagByText(
-      '<button data-target="literal">&lt;script&gt; &amp; quality</button>',
-      "<script> & quality",
-    )).toContain('data-target="literal"');
-    expect(openingButtonTagByText("<button>Other</button>", "Missing")).toBe("");
+describe("settings button markup lookup", () => {
+  it("reads nested rendered text and HTML entities without treating markup as sanitized text", () => {
+    const html = renderToStaticMarkup(
+      <button className="min-h-11" aria-pressed="true"><span>{"도구 < & >"}</span></button>,
+    );
+    const tag = openingButtonTagByText(html, "도구 < & >");
+    expect(tag).toContain('aria-pressed="true"');
+    expect(tag).toContain('class="min-h-11"');
+    expect(openingButtonTagByText(html, "없는 버튼")).toBe("");
   });
 });
 

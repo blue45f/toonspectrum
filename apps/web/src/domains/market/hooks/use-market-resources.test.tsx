@@ -13,9 +13,9 @@ import {
   type CreatorMarketplaceResourceListPage,
   type CreatorMarketplaceResourceRecord,
 } from "@/shared/lib/creator-marketplace-resource-contract";
-import { listCreatorMarketplaceResources } from "@/src/domains/market/remotes/market-resource-remote";
+import { listCreatorMarketplaceResources } from "@/domains/market/remotes/market-resource-remote";
 
-vi.mock("@/src/domains/market/remotes/market-resource-remote", () => ({
+vi.mock("@/domains/market/remotes/market-resource-remote", () => ({
   listCreatorMarketplaceResources: vi.fn(),
 }));
 

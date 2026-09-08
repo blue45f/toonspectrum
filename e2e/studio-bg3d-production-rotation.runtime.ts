@@ -1,6 +1,12 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
-import { compareBg3dOriginalFrames } from "../scripts/studio-bg3d-runtime-frame-comparison";
+import {
+  BG3D_FRAME_ALIGNMENT_OFFSETS_PX,
+  BG3D_FRAME_CROP_INSET,
+  BG3D_FRAME_MAX_ALIGNMENT_PX,
+  compareBg3dOriginalFrames,
+  resolveBg3dAlignedComparison,
+} from "../scripts/studio-bg3d-runtime-frame-comparison";
 
 import { createBg3dCompositorSampler } from "./studio-bg3d-compositor-sampler";
 import { test } from "./studio-bg3d-runtime-diagnostics";
@@ -19,46 +25,76 @@ interface Frame {
   readonly distinctColors: number;
   readonly dominantShare: number;
 }
-async function decodeFrame(page: Page, png: Buffer, readbackOptimized = true): Promise<Frame> {
-  return page.evaluate(async ({ base64, readbackOptimized }) => {
+/**
+ * Measure the rendered scene, not the editor chrome drawn over it. The capture rectangle is the
+ * viewport canvas, and the rails, toasts and turntable bar sit on top of it as DOM: they never move
+ * with the camera, so leaving them in both dilutes the metric and makes a rigid alignment invalid.
+ * Each shift slides the cropped window by that many capture pixels, so a caller can weigh several
+ * framings; they are decoded together because one PNG upload and one bitmap decode cost the
+ * SwiftShader runner roughly 300ms, and the alignment needs seventeen of them.
+ */
+async function decodeFrames(
+  page: Page, png: Buffer, readbackOptimized: boolean, shifts: readonly number[],
+  inset = BG3D_FRAME_CROP_INSET,
+): Promise<Frame[]> {
+  if (shifts.length === 0) throw new Error("No BG3D frame shifts requested");
+  return page.evaluate(async ({ base64, readbackOptimized, shifts, inset }) => {
     const response = await fetch(`data:image/png;base64,${base64}`);
     const bitmap = await createImageBitmap(await response.blob());
     try {
-      const width = Math.min(bitmap.width, 320);
-      const height = Math.min(bitmap.height, 240);
+      const sourceX = Math.round(bitmap.width * inset);
+      const sourceY = Math.round(bitmap.height * inset);
+      const sourceWidth = bitmap.width - sourceX * 2;
+      const sourceHeight = bitmap.height - sourceY * 2;
+      if (sourceWidth <= 0 || sourceHeight <= 0) throw new Error("Empty BG3D analysis crop");
+      const width = Math.min(sourceWidth, 320);
+      const height = Math.min(sourceHeight, 240);
       // This is an analysis-only copy of a PNG, not the editor's canvas. Prefer CPU backing for
       // readback so measuring the GPU does not enqueue another GPU upload/draw/download cycle.
       const ctx = new OffscreenCanvas(width, height).getContext("2d", {
         willReadFrequently: readbackOptimized,
       });
       if (!ctx) throw new Error("Cannot decode composited WebGPU frame");
-      ctx.drawImage(bitmap, 0, 0, width, height);
-      const { data } = ctx.getImageData(0, 0, width, height);
-      const sums = new Float64Array(16 * 12);
-      const counts = new Float64Array(16 * 12);
-      const histogram = new Map<string, number>();
-      for (let y = 0; y < height; y += 1) {
-        for (let x = 0; x < width; x += 1) {
-          const offset = (y * width + x) * 4;
-          const tile = Math.min(11, Math.floor(y / height * 12)) * 16
-            + Math.min(15, Math.floor(x / width * 16));
-          sums[tile] += (data[offset] + data[offset + 1] + data[offset + 2]) / 3;
-          counts[tile] += 1;
-          const color = `${data[offset] >> 3},${data[offset + 1] >> 3},${data[offset + 2] >> 3}`;
-          histogram.set(color, (histogram.get(color) ?? 0) + 1);
+      return shifts.map((shiftY) => {
+        // Refuse to read outside the capture rather than sampling an implicitly clamped edge.
+        const offsetY = Math.max(-sourceY, Math.min(sourceY, Math.trunc(shiftY)));
+        ctx.drawImage(
+          bitmap, sourceX, sourceY + offsetY, sourceWidth, sourceHeight, 0, 0, width, height,
+        );
+        const { data } = ctx.getImageData(0, 0, width, height);
+        const sums = new Float64Array(16 * 12);
+        const counts = new Float64Array(16 * 12);
+        const histogram = new Map<string, number>();
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const offset = (y * width + x) * 4;
+            const luminance = (data[offset] + data[offset + 1] + data[offset + 2]) / 3;
+            const tile = Math.min(11, Math.floor(y / height * 12)) * 16
+              + Math.min(15, Math.floor(x / width * 16));
+            sums[tile] += luminance;
+            counts[tile] += 1;
+            const color = `${data[offset] >> 3},${data[offset + 1] >> 3},${data[offset + 2] >> 3}`;
+            histogram.set(color, (histogram.get(color) ?? 0) + 1);
+          }
         }
-      }
-      return {
-        width: bitmap.width,
-        height: bitmap.height,
-        tiles: Array.from(sums, (sum, index) => sum / Math.max(1, counts[index])),
-        distinctColors: histogram.size,
-        dominantShare: Math.max(...histogram.values()) / (width * height),
-      };
+        return {
+          width: bitmap.width,
+          height: bitmap.height,
+          tiles: Array.from(sums, (sum, index) => sum / Math.max(1, counts[index])),
+          distinctColors: histogram.size,
+          dominantShare: Math.max(...histogram.values()) / (width * height),
+        };
+      });
     } finally {
       bitmap.close();
     }
-  }, { base64: png.toString("base64"), readbackOptimized });
+  }, { base64: png.toString("base64"), readbackOptimized, shifts, inset });
+}
+
+async function decodeFrame(page: Page, png: Buffer, readbackOptimized = true): Promise<Frame> {
+  const [frame] = await decodeFrames(page, png, readbackOptimized, [0], 0);
+  if (!frame) throw new Error("Cannot decode composited WebGPU frame");
+  return frame;
 }
 
 function peakDelta(left: Frame, right: Frame): number {
@@ -124,7 +160,7 @@ async function stableFrame(page: Page, info: TestInfo, label: string) {
       .toBeLessThan(2);
     expect(reference.distinctColors).toBeGreaterThan(4);
     expect(reference.dominantShare).toBeLessThan(0.99);
-    return { frame: reference, ...metrics, referenceDelta };
+    return { frame: reference, referencePng, ...metrics, referenceDelta };
   } finally {
     await sampler.dispose();
   }
@@ -203,7 +239,10 @@ async function dragRing(page: Page, info: TestInfo, label: "continuous" | "direc
       }
       values = await readValues();
       if (values.every((value, index) => value === initial[index])) continue;
-      return { values, capture: await stableFrame(page, info, label) };
+      // The original PNG is an input to the aligned comparison, never published evidence: a Buffer
+      // serialises to a quarter of a megabyte of JSON in the attached metrics.
+      const { referencePng, ...capture } = await stableFrame(page, info, label);
+      return { values, capture, referencePng };
     } finally {
       await page.mouse.up();
     }
@@ -256,8 +295,40 @@ test("WebGPU 기즈모 연속 회전은 이전 실루엣을 누적하지 않는�
     expect(peakDelta(continuousBaseline.frame, directBaseline.frame),
       "Both gestures must start from the same settled scene and camera").toBeLessThan(2);
     const direct = await dragRing(page, testInfo, "direct", 1);
-    const finalPeakTileDelta = peakDelta(continuous.capture.frame, direct.capture.frame);
-    const metrics = { threshold: 8, finalPeakTileDelta, continuous, direct };
+    // Keep the original full-frame metric as the release oracle. Cropped alignment is
+    // diagnostic until independent image fixtures establish its coverage of edge defects.
+    const rawContinuous = continuous.capture.frame;
+    const rawDirect = direct.capture.frame;
+    const rawFullFramePeakTileDelta = peakDelta(rawContinuous, rawDirect);
+    const [croppedContinuous] = await decodeFrames(page, continuous.referencePng, false, [0]);
+    if (!croppedContinuous) throw new Error("Missing cropped continuous frame");
+    const shiftedDirectFrames = await decodeFrames(
+      page, direct.referencePng, false, BG3D_FRAME_ALIGNMENT_OFFSETS_PX,
+    );
+    const aligned = resolveBg3dAlignedComparison(
+      croppedContinuous,
+      BG3D_FRAME_ALIGNMENT_OFFSETS_PX.map((shiftPx, index) => {
+        const frame = shiftedDirectFrames[index];
+        if (!frame) throw new Error("Missing BG3D alignment candidate");
+        return { shiftPx, frame };
+      }),
+    );
+    const finalAlignmentPx = aligned.alignmentPx;
+    const finalPeakTileDelta = rawFullFramePeakTileDelta;
+    const croppedDirect = shiftedDirectFrames[BG3D_FRAME_ALIGNMENT_OFFSETS_PX.indexOf(0)];
+    if (!croppedDirect) throw new Error("Missing unaligned cropped direct frame");
+    const unalignedPeakTileDelta = peakDelta(croppedContinuous, croppedDirect);
+    const metrics = {
+      threshold: 8, finalPeakTileDelta, unalignedPeakTileDelta, finalAlignmentPx,
+      rawFullFramePeakTileDelta,
+      croppedAlignedPeakTileDelta: aligned.peakDelta,
+      alignmentWithinBand: Math.abs(finalAlignmentPx) < BG3D_FRAME_MAX_ALIGNMENT_PX,
+      rawFullFrames: { continuous: rawContinuous, direct: rawDirect },
+      cropInset: BG3D_FRAME_CROP_INSET,
+      maxAlignmentPx: BG3D_FRAME_MAX_ALIGNMENT_PX,
+      continuous: { values: continuous.values, capture: continuous.capture },
+      direct: { values: direct.values, capture: direct.capture },
+    };
     await testInfo.attach("bg3d-webgpu-rotation-metrics.json", {
       body: Buffer.from(JSON.stringify(metrics, null, 2)), contentType: "application/json",
     });

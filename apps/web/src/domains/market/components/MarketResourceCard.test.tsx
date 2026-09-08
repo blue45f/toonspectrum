@@ -6,7 +6,7 @@ import { MarketResourceCard } from "./MarketResourceCard";
 
 import type { CreatorMarketplaceResourceManifest } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { createCreatorMarketplacePortableDelivery } from "@/src/infrastructure/creator-marketplace-client";
+import { createCreatorMarketplacePortableDelivery } from "@/infrastructure/creator-marketplace-client";
 
 
 

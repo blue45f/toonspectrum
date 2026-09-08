@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
   upsertReview: vi.fn(),
 }));
 
-vi.mock("@/src/infrastructure/creator-marketplace-social-client", () => ({
+vi.mock("@/infrastructure/creator-marketplace-social-client", () => ({
   createCreatorMarketplaceComment: mocks.createComment,
   deleteCreatorMarketplaceComment: mocks.deleteComment,
   deleteCreatorMarketplaceReview: mocks.deleteReview,

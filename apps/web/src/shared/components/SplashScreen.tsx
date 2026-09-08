@@ -2,7 +2,7 @@ import { triggerParticleBurst } from "@toonspectrum/core/fx";
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/shared/lib/utils";
-import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
+import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 
 /**
  * SplashScreen — 웹 앱의 동적 인트로/스플래시.

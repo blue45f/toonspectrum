@@ -164,23 +164,29 @@ export async function loadStudioI18nLocale(
     throw new Error("Studio translation assets require the Fetch API.");
   }
   const job = (async () => {
-    const merged: Record<string, string> = {};
-    for (const namespace of STUDIO_I18N_NAMESPACES) {
-      const response = await fetchImpl(
-        studioI18nAssetUrl(assetLocale, options.baseUrl, namespace),
-        { cache: "force-cache", credentials: "same-origin" },
-      );
-      if (!response.ok) {
-        throw new Error(
-          `Studio translation asset failed to load (${assetLocale}/${namespace}, ${response.status}).`,
+    // All namespace requests in flight together. Awaiting inside the loop made the Studio
+    // route block on 23 sequential round-trips before it could commit.
+    const dictionaries = await Promise.all(
+      STUDIO_I18N_NAMESPACES.map(async (namespace) => {
+        const response = await fetchImpl(
+          studioI18nAssetUrl(assetLocale, options.baseUrl, namespace),
+          { cache: "force-cache", credentials: "same-origin" },
         );
-      }
-      const dictionary = parseStudioI18nDictionary(await response.text());
-      if (!dictionary) {
-        throw new Error(`Studio translation asset is invalid (${assetLocale}/${namespace}).`);
-      }
-      Object.assign(merged, dictionary);
-    }
+        if (!response.ok) {
+          throw new Error(
+            `Studio translation asset failed to load (${assetLocale}/${namespace}, ${response.status}).`,
+          );
+        }
+        const dictionary = parseStudioI18nDictionary(await response.text());
+        if (!dictionary) {
+          throw new Error(`Studio translation asset is invalid (${assetLocale}/${namespace}).`);
+        }
+        return dictionary;
+      }),
+    );
+    // Merged in manifest order so the result never depends on response arrival order.
+    const merged: Record<string, string> = {};
+    for (const dictionary of dictionaries) Object.assign(merged, dictionary);
     registerI18nLocaleEntries(assetLocale, merged);
     if (locale !== assetLocale) {
       registerI18nLocaleEntries(locale, merged);

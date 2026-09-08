@@ -6,7 +6,7 @@ import { useT } from "@/shared/lib/i18n";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { toast } from "@/shared/lib/toast-store";
 import { cn } from "@/shared/lib/utils";
-import { useCelebrate } from "@/src/hooks/use-celebrate";
+import { useCelebrate } from "@/hooks/use-celebrate";
 
 export function BookmarkButton({
   titleId,

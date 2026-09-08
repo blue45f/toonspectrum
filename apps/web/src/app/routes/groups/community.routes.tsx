@@ -3,31 +3,31 @@ import { defineAppRoutes } from "../app-route-definition";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const ReviewsPage = lazyRetry(
-  () => import("@/src/domains/community/ReviewsPage").then((module) => ({ default: module.ReviewsPage })),
+  () => import("@/domains/community/ReviewsPage").then((module) => ({ default: module.ReviewsPage })),
   "ReviewsPage",
 );
 const CommunityPage = lazyRetry(
-  () => import("@/src/domains/community/CommunityPage").then((module) => ({ default: module.CommunityPage })),
+  () => import("@/domains/community/CommunityPage").then((module) => ({ default: module.CommunityPage })),
   "CommunityPage",
 );
 const CommunityScopePage = lazyRetry(
-  () => import("@/src/domains/community/CommunityPage").then((module) => ({ default: module.CommunityScopePage })),
+  () => import("@/domains/community/CommunityPage").then((module) => ({ default: module.CommunityScopePage })),
   "CommunityScopePage",
 );
 const CafesPage = lazyRetry(
-  () => import("@/src/domains/community/CafesPage").then((module) => ({ default: module.CafesPage })),
+  () => import("@/domains/community/CafesPage").then((module) => ({ default: module.CafesPage })),
   "CafesPage",
 );
 const CafeDetailPage = lazyRetry(
-  () => import("@/src/domains/community/CafeDetailPage").then((module) => ({ default: module.CafeDetailPage })),
+  () => import("@/domains/community/CafeDetailPage").then((module) => ({ default: module.CafeDetailPage })),
   "CafeDetailPage",
 );
 const CommunityPostPage = lazyRetry(
-  () => import("@/src/domains/community/CommunityPostPage").then((module) => ({ default: module.CommunityPostPage })),
+  () => import("@/domains/community/CommunityPostPage").then((module) => ({ default: module.CommunityPostPage })),
   "CommunityPostPage",
 );
 const PencafePage = lazyRetry(
-  () => import("@/src/domains/community/PencafePage").then((module) => ({ default: module.PencafePage })),
+  () => import("@/domains/community/PencafePage").then((module) => ({ default: module.PencafePage })),
   "PencafePage",
 );
 

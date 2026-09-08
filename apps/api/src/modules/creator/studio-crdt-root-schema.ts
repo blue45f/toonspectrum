@@ -97,11 +97,18 @@ const STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION = 1;
 const STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION = 2;
 const STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION = 3;
 const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 4;
+const STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION = 5;
+function strokePayloadSupportsContinuation(version: unknown): boolean {
+  return version === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    || version === STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION;
+}
 const STUDIO_CRDT_LAYERED_FLOW_PAINT_MODEL = "layered-flow-v1";
 const STUDIO_CRDT_BOUNDED_FLOW_PAINT_MODEL = "bounded-flow-v2";
 const STUDIO_CRDT_MATERIAL_PRESSURE_MODEL = "canonical-material-v1";
-const STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE =
-  "causal-deposit-v3-segmented";
+const STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINES = new Set<unknown>([
+  "causal-deposit-v3-segmented",
+  "causal-deposit-v4-taper-spacing",
+]);
 // Fresh-authoring dry-media routing marker (`brushDynamics.dryMediaKernelProgram`, browser
 // `studioDryMediaKernelDabProgramPin`). It travels inside the bounded brushDynamics JSON and is
 // intentionally admitted by the bounded-JSON rules without a key whitelist — tightening
@@ -2647,24 +2654,28 @@ export function hasValidStudioCrdtStrokePaintContract(
   if (
     input.payloadVersion !== STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION
     && input.payloadVersion !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-    && input.payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !strokePayloadSupportsContinuation(input.payloadVersion)
   ) return false;
   const brushDynamics = input.brushDynamics !== null
     && typeof input.brushDynamics === "object"
     && !Array.isArray(input.brushDynamics)
     ? input.brushDynamics as Record<string, unknown>
     : undefined;
+  if (
+    brushDynamics?.depositPipeline === "causal-deposit-v4-taper-spacing"
+    && input.payloadVersion !== STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+  ) return false;
   const r8GrainAdmission = rendererSignificantR8GrainAdmission(input.brushDynamics);
   if (
     r8GrainAdmission === "invalid"
     || (
       r8GrainAdmission === "valid"
-      && input.payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      && !strokePayloadSupportsContinuation(input.payloadVersion)
     )
   ) return false;
   if (
-    brushDynamics?.depositPipeline === STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE
-    && input.payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINES.has(brushDynamics?.depositPipeline)
+    && !strokePayloadSupportsContinuation(input.payloadVersion)
   ) return false;
   if ((input.kind ?? "freehand") !== "freehand" || (input.mode ?? "pen") !== "pen") {
     return false;
@@ -2706,7 +2717,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     (payloadVersion !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION &&
       payloadVersion !== STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION &&
       payloadVersion !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION &&
-      payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION) ||
+      !strokePayloadSupportsContinuation(payloadVersion)) ||
     record.get("type") !== "draw" ||
     (record.get("mode") !== "pen" && record.get("mode") !== "eraser") ||
     !boundedExactText(record.get("kind"), 80) ||
@@ -2757,12 +2768,16 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     && Object.prototype.hasOwnProperty.call(extensions, "materialMinimumDiameterRatio");
   const hasDynamicMinimumDiameterRatio = brushDynamics !== undefined
     && Object.prototype.hasOwnProperty.call(brushDynamics, "minimumDiameterRatio");
+  if (
+    brushDynamics?.depositPipeline === "causal-deposit-v4-taper-spacing"
+    && payloadVersion !== STUDIO_CRDT_TAPER_SPACING_STROKE_PAYLOAD_VERSION
+  ) return false;
   const hasSegmentedCausalDeposit =
-    brushDynamics?.depositPipeline === STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE;
+    STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINES.has(brushDynamics?.depositPipeline);
   const r8GrainAdmission = rendererSignificantR8GrainAdmission(brushDynamicsValue);
   if (
     payloadVersion !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-    && payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !strokePayloadSupportsContinuation(payloadVersion)
     && (
       hasMaterialPressureModel
       || hasMaterialMinimumDiameterRatio
@@ -2772,7 +2787,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   if (
     (
       payloadVersion === STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
-      || payloadVersion === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      || strokePayloadSupportsContinuation(payloadVersion)
     )
     && (
       hasMaterialPressureModel !== hasMaterialMinimumDiameterRatio
@@ -2786,13 +2801,13 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   ) return false;
   if (
     hasSegmentedCausalDeposit
-    && payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && !strokePayloadSupportsContinuation(payloadVersion)
   ) return false;
   if (
     r8GrainAdmission === "invalid"
     || (
       r8GrainAdmission === "valid"
-      && payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      && !strokePayloadSupportsContinuation(payloadVersion)
     )
   ) return false;
   const paintModel = extensions?.paintModel;

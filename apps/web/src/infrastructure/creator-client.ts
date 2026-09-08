@@ -16,12 +16,12 @@ import {
 } from "@/shared/lib/creator-asset-contract";
 import { ensureArray } from "@/shared/lib/http-safe";
 import { projectRevisionComparisonValue } from "@/shared/lib/revision-comparison-projection";
-import { getAuthUserId } from "@/src/compat/auth-session-store";
-import { api, isHttpError, toApiError } from "@/src/infrastructure/api";
+import { getAuthUserId } from "@/compat/auth-session-store";
+import { api, isHttpError, toApiError } from "@/infrastructure/api";
 import {
   validateSharedAssetCatalogItem,
   validateSharedAssetContentResponse,
-} from "@/src/infrastructure/creator-asset-response-validation";
+} from "@/infrastructure/creator-asset-response-validation";
 
 
 export type WorkFormat = "cuttoon" | "upload";
@@ -762,7 +762,7 @@ export async function listSharedAssetCatalog(
 }
 
 export async function publishAsset(input: PublishAssetInput, signal?: AbortSignal): Promise<SharedAsset> {
-  const { createStudioSharedAssetPreview } = await import("@/src/domains/creator/studio-shared-asset-preview"
+  const { createStudioSharedAssetPreview } = await import("@/domains/creator/studio-shared-asset-preview"
   );
   const preview = await createStudioSharedAssetPreview(input.dataUrl);
   return callOrThrow(

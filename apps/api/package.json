@@ -18,7 +18,7 @@
     "@nestjs/websockets": "^11.1.28",
     "@socket.io/postgres-adapter": "^0.5.0",
     "@toonspectrum/core": "workspace:*",
-    "drizzle-orm": ">=0.45.2",
+    "drizzle-orm": "^0.45.2",
     "express": "^4.22.2",
     "image-js": "^1.7.0",
     "js-base64": "^3.9.0",

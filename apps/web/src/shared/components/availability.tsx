@@ -8,7 +8,7 @@ import type { Availability } from "@/shared/lib/types";
 
 import { cx } from "@/shared/lib/cx";
 import { PLATFORMS, PRICING_FULL } from "@/shared/lib/platforms";
-import { useAppConfig } from "@/src/hooks/use-app-config";
+import { useAppConfig } from "@/hooks/use-app-config";
 
 const PRICING_ICON = {
   free: Gift,

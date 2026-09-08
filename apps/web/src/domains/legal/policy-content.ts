@@ -2,7 +2,7 @@
 // 브라우저는 같은 출처 API 프록시(/api/legal/policies/:slug)를 호출하고,
 // 서버가 TermsDesk 공개 JSON을 대신 가져온다(CORS/프리플라이트 배포 차이 회피).
 // 본문은 마크다운/플레인텍스트가 섞일 수 있어 의존성 없이 최소 블록 파서로 렌더한다.
-import { api, apiPath, httpStatus } from "@/src/infrastructure/api";
+import { api, apiPath, httpStatus } from "@/infrastructure/api";
 
 export const TERMSDESK_BASE = "https://termsdesk.vercel.app";
 export const TERMSDESK_ORG_SLUG = "toonspectrum";

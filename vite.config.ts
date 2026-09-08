@@ -8,6 +8,7 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { build as viteBuild, defineConfig, type Plugin } from "vite";
 
 import { createStudioManualChunks } from "./apps/web/config/vite-manual-chunks";
+import { STUDIO_I18N_NAMESPACES } from "./apps/web/src/shared/lib/i18n-asset-manifest";
 import {
   planStudioServiceWorkerPrecache,
   studioServiceWorkerBuildId,
@@ -260,12 +261,7 @@ function studioCrossOriginIsolationPlugin(): Plugin {
  * module graph: `AppRouter` `Promise.all`s these two dictionaries with the route
  * chunk, so the route cannot commit until they resolve.
  */
-const STUDIO_I18N_NAMESPACES = [
-  "aiNotice", "aiToolPopover", "assetMenu", "background", "bubble", "bubbleTail", "canvas",
-  "commandBar", "commandSearch", "community", "creativeModes", "customFonts", "hub",
-  "imageAdjustments", "mainMenu", "mobileDock", "quickShape", "quickStart", "settings",
-  "shortcuts", "toolsCompanion", "tutorial", "tutorialTry",
-];
+
 const STUDIO_SERVICE_WORKER_WARM_URLS = STUDIO_I18N_NAMESPACES.flatMap((namespace) =>
   ["ko", "en"].map((locale) => `/i18n/studio/${namespace}/${locale}.json`),
 );
@@ -387,14 +383,9 @@ export default defineConfig(({ mode }) => ({
   root: webRoot,
   publicDir: path.resolve(webRoot, "public"),
   resolve: {
-    // Array form keeps longer `@/shared` / `@/domains` / `@/src` matches ahead of bare `@`
-    // for rolldown resolvers that do not sort by find length.
-    alias: [
-      { find: "@/shared", replacement: path.resolve(webRoot, "src/shared") },
-      { find: "@/domains", replacement: path.resolve(webRoot, "src/domains") },
-      { find: "@/src", replacement: path.resolve(webRoot, "src") },
-      { find: "@", replacement: webRoot },
-    ],
+    alias: { "@": path.resolve(webRoot, "src") },
+    // Workspace hooks and their auto-installed peers must share the app renderer's dispatcher.
+    dedupe: ["react", "react-dom"],
   },
   // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.
   assetsInclude: ["**/*.wasm"],
