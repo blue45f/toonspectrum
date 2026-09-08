@@ -147,6 +147,11 @@ const UNSUPPORTED_BRIDGES: Readonly<Record<string, readonly string[]>> = Object.
 });
 
 const MULTI_PART_EXTENSIONS = Object.freeze([".toonproject.zip"] as const);
+const LOW_INFORMATION_MIME_TYPES = Object.freeze([
+  "application/octet-stream",
+  "application/zip",
+  "binary/octet-stream",
+] as const);
 
 function normalizeText(value: string): string {
   return value.normalize("NFKC").trim().toLocaleLowerCase();
@@ -167,11 +172,26 @@ function capabilityFor(
   extension: string,
   mime: string | undefined,
 ): StudioInterchangeCapability | null {
+  if (extension.length > 0) {
+    const extensionMatch = STUDIO_INTERCHANGE_CAPABILITIES.find((capability) =>
+      capability.extensions.some((candidate) => normalizeText(candidate) === extension),
+    );
+    if (extensionMatch) return extensionMatch;
+
+    // A concrete but unknown extension is stronger evidence than a browser's
+    // generic or spoofable MIME value. Fail closed instead of reclassifying a
+    // proprietary document as the first registry entry sharing that MIME.
+    return null;
+  }
+
   const normalizedMime = normalizeText(mime ?? "");
+  const lowInformationMime = LOW_INFORMATION_MIME_TYPES.some(
+    (candidate) => candidate === normalizedMime,
+  );
+  if (normalizedMime.length === 0 || lowInformationMime) return null;
+
   return STUDIO_INTERCHANGE_CAPABILITIES.find((capability) =>
-    capability.extensions.some((candidate) => normalizeText(candidate) === extension)
-    || (normalizedMime.length > 0
-      && capability.mime.some((candidate) => normalizeText(candidate) === normalizedMime)),
+    capability.mime.some((candidate) => normalizeText(candidate) === normalizedMime),
   ) ?? null;
 }
 
