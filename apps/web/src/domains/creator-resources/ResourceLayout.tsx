@@ -4,9 +4,19 @@ import { RESOURCE_BUTTON, RESOURCE_PAGES } from "./navigation";
 
 import type { ReactNode } from "react";
 
-export function ResourceLayout({ title, intro, children }: { title: string; intro: string; children: ReactNode }) {
+export function ResourceLayout({
+  title,
+  intro,
+  children,
+  width = "default",
+}: {
+  title: string;
+  intro: string;
+  children: ReactNode;
+  width?: "default" | "wide";
+}) {
   const { pathname } = useLocation();
-  return <section className="mx-auto max-w-6xl space-y-8 px-4 py-8 text-fg sm:px-6 sm:py-12">
+  return <section className={`mx-auto space-y-8 px-4 py-8 text-fg sm:px-6 sm:py-12 ${width === "wide" ? "max-w-[90rem]" : "max-w-6xl"}`}>
     <header className="space-y-4">
       <Link to="/research" className="text-sm font-semibold text-accent">TOONSTUDIO / 리서치 데스크</Link>
       <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
@@ -25,6 +35,7 @@ export function ResourceLayout({ title, intro, children }: { title: string; intr
     </footer>
   </section>;
 }
+
 export function LocalSaveNotice({ error, saving = false, writable = true }: { error?: string; saving?: boolean; writable?: boolean }) {
   return <div className="rounded-xl border border-line bg-panel p-4 text-sm leading-6 text-fg-2">
     <p>자료와 기획서는 이 브라우저에만 저장됩니다. 계정·다른 기기로 동기화되지 않습니다. 공용 기기에서는 개인 작업 정보를 저장하지 마세요.</p>
