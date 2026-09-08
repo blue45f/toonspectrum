@@ -116,7 +116,7 @@ test("personal plan persists, opens its guided path, and combines library filter
   await expect(page.getByLabel("지금 가장 중요한 목표", { exact: true })).toHaveValue("publish");
   await expect(page.getByLabel("현재 경험", { exact: true })).toHaveValue("advanced");
   await expect(page.getByLabel("한 번에 집중할 시간", { exact: true })).toHaveValue("45");
-  await page.getByRole("link", { name: "추천 경로 자세히 보기", exact: true }).click();
+  await page.getByRole("link", { name: /추천 경로 자세히 보기/u }).click();
   await expect(page).toHaveURL(/\/learn\/paths\/publish-ready$/u);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("첫 회차 게시 준비");
   await expect(page.locator(".learn-path-course-list li")).toHaveCount(4);
