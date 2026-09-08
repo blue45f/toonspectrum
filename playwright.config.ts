@@ -12,11 +12,20 @@ const SOFTWARE_GPU_ARGS = [
 
 const BG3D_WEBGPU_GIZMO_GATE = process.env.STUDIO_BG3D_WEBGPU_GIZMO === "1";
 const STUDIO_E2E_PORT = BG3D_WEBGPU_GIZMO_GATE ? 5_207 : 5_199;
+// The BG3D compositor sampler crops the canvas with CDP device pixels and refuses dpr !== 1, so
+// the backing scale must be pinned rather than inherited. Xvfb already reports 1; a Retina Mac
+// reports 2 and made every local run of this gate die in its first capture.
 const BG3D_WEBGPU_GIZMO_ARGS = process.platform === "darwin"
-  ? ["--no-sandbox", "--enable-unsafe-webgpu", "--use-gpu-in-tests"]
+  ? [
+      "--no-sandbox",
+      "--enable-unsafe-webgpu",
+      "--use-gpu-in-tests",
+      "--force-device-scale-factor=1",
+    ]
   : [
       "--no-sandbox",
       "--enable-unsafe-webgpu",
+      "--force-device-scale-factor=1",
       "--enable-features=CDPScreenshotNewSurface,Vulkan",
       "--use-vulkan=swiftshader",
       "--use-webgpu-adapter=swiftshader",
