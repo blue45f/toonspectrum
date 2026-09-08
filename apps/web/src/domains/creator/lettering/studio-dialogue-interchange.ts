@@ -1167,7 +1167,11 @@ function parseTimedText(text: string, vtt: boolean): StudioDialogueInterchangeRe
     if (startMs == null || endMs == null || endMs <= startMs) {
       fail("INVALID_CUE", "자막 시간 범위가 올바르지 않습니다.");
     }
-    const payload = lines.slice(timingIndex + 1).join("\n").replace(/<[^>]*>/gu, "").trim();
+    // Strip only the presentation syntax supported by SRT/WebVTT. Unknown
+    // markup stays literal dialogue text; this codec never produces trusted HTML.
+    const payload = lines.slice(timingIndex + 1).join("\n")
+      .replace(/<\/?(?:b|i|u|ruby|rt|c|v|lang|font)(?:\.[\w-]+)*(?:[ \t][^<>]*)?>|<(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}>/giu, "")
+      .trim();
     if (!payload) continue;
     const firstLineEnd = payload.indexOf("\n");
     const firstLine = firstLineEnd >= 0 ? payload.slice(0, firstLineEnd) : payload;

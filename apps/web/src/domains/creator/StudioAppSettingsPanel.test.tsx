@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { htmlToText } from "../../../../../scripts/lib/html-text.mjs";
+
 import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import {
   defaultStudioAppSettings,
@@ -62,7 +64,7 @@ function openingButtonTagByAriaLabel(html: string, label: string): string {
 
 function openingButtonTagByText(html: string, text: string): string {
   const button = (html.match(/<button\b[^>]*>[\s\S]*?<\/button>/gu) ?? []).find((markup) =>
-    markup.replace(/<[^>]+>/gu, "").trim() === text
+    htmlToText(markup).trim() === text
   );
   return button?.match(/^<button\b[^>]*>/u)?.[0] ?? "";
 }

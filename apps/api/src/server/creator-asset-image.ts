@@ -86,6 +86,10 @@ export function inspectCreatorAssetDataUrl(
   if (typeof value !== "string") invalid("이미지 데이터가 올바르지 않습니다.");
   const fragmentIndex = value.indexOf("#");
   const imageDataUrl = fragmentIndex === -1 ? value : value.slice(0, fragmentIndex);
+  // Reject oversized data before regexp parsing, decoding, or allocating a Buffer.
+  if (imageDataUrl.length > Math.ceil(CREATOR_ASSET_MAX_ENCODED_BYTES / 3) * 4 + 32) {
+    invalid("이미지는 2.25MB 이하의 유효한 파일이어야 합니다.");
+  }
   const fragment = fragmentIndex === -1 ? null : value.slice(fragmentIndex + 1);
   if (fragment !== null) {
     if (
@@ -121,7 +125,13 @@ export function inspectCreatorAssetDataUrl(
   const mimeType = match[1] as CreatorAssetImageMime;
   const encoded = match[2]!;
   const bytes = Buffer.from(encoded, "base64");
-  if (bytes.toString("base64").replace(/=+$/u, "") !== encoded.replace(/=+$/u, "")) {
+  const canonical = bytes.toString("base64");
+  // The accepted encoding has at most two padding characters; a reverse regexp
+  // search here can repeatedly rescan a long attacker-controlled suffix.
+  const unpadded = (input: string) => input.endsWith("==")
+    ? input.slice(0, -2)
+    : input.endsWith("=") ? input.slice(0, -1) : input;
+  if (unpadded(canonical) !== unpadded(encoded) || (encoded.includes("=") && encoded !== canonical)) {
     invalid("이미지 base64 데이터가 손상되었습니다.");
   }
   if (bytes.length < 24 || bytes.length > CREATOR_ASSET_MAX_ENCODED_BYTES) {

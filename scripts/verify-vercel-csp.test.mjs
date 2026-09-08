@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
 import { verifyVercelCspContract } from "./verify-vercel-csp.mjs";
@@ -260,6 +262,89 @@ describe("Vercel CSP build contract", () => {
       vercelConfig: broadened,
       bootstrapCompatSource: current.bootstrapCompatSource,
     })).toThrow("unrestricted network scheme");
+  });
+
+  it.each([
+    '<SCRIPT>globalThis.compromised = true</SCRIPT>',
+    '<ScRiPt>globalThis.compromised = true</sCrIpT>',
+    '<script>globalThis.compromised = true</script >',
+    '<script data-src="/not-a-source.js">globalThis.compromised = true</script>',
+    '<script data-note="src=not-a-source">globalThis.compromised = true</script>',
+  ])("rejects executable inline HTML regardless of tag spelling or unrelated attributes: %s", (script) => {
+    const parsed = JSDOM.fragment(script).querySelector("script");
+    expect(parsed).not.toBeNull();
+    expect(parsed.hasAttribute("src")).toBe(false);
+    expect(parsed.textContent).toBe("globalThis.compromised = true");
+    const current = fixture();
+    expect(() => verifyVercelCspContract({
+      ...current,
+      html: current.html.replace("</body>", `${script}</body>`),
+    })).toThrow("Executable inline script");
+  });
+
+  it("accepts case-insensitive HTML tag and attribute names while retaining the exact JSON-LD hash", () => {
+    const current = fixture();
+    const html = current.html
+      .replaceAll("<script", "<SCRIPT")
+      .replaceAll("</script>", "</SCRIPT >")
+      .replaceAll(" src=", " SRC = ")
+      .replaceAll(" type=", " TYPE = ");
+    expect(verifyVercelCspContract({ ...current, html })).toMatchObject({
+      inlineScriptCount: 1,
+    });
+    expect(() => verifyVercelCspContract({
+      ...current,
+      html: html.replace('"@context": "https://schema.org"', '"@context": "https://example.invalid"'),
+    })).toThrow("Inline JSON-LD hash is absent");
+  });
+
+  it("distinguishes external src from src-like attributes without treating commented scripts as executable", () => {
+    const current = fixture();
+    const html = current.html.replace("</body>", [
+      '<script SRC = "/external.js" data-note="> in a quoted value"></script>',
+      '<!-- <script>not executable</script> -->',
+      "</body>",
+    ].join("\n"));
+    expect(verifyVercelCspContract({ ...current, html })).toMatchObject({
+      inlineScriptCount: 1,
+    });
+  });
+
+  it("hashes original JSON-LD bytes even when a data string contains HTML comment syntax", () => {
+    const current = fixture();
+    const content = '{"name":"<!-- literal data -->"}';
+    const script = `<script type="application/ld+json">${content}</script>`;
+    expect(JSDOM.fragment(script).querySelector("script").textContent).toBe(content);
+    const cspHeader = current.vercelConfig.headers[0].headers.find(
+      (header) => header.key === "Content-Security-Policy",
+    );
+    const hash = createHash("sha256").update(content).digest("base64");
+    cspHeader.value = cspHeader.value.replace("script-src ", `script-src 'sha256-${hash}' `);
+    expect(verifyVercelCspContract({
+      ...current,
+      html: current.html.replace("</head>", `${script}</head>`),
+    })).toMatchObject({ inlineScriptCount: 2 });
+  });
+
+  it.each(["https", "wss"].flatMap((scheme) => [
+    `${scheme}://not-realtime.toonstudio.cloud`,
+    `${scheme}://realtime.toonstudio.cloud.attacker.invalid`,
+    `${scheme}://realtime.toonstudio.cloud@attacker.invalid`,
+    `${scheme}://attacker.invalid/realtime.toonstudio.cloud`,
+    `${scheme}://attacker.invalid/?origin=${scheme}://realtime.toonstudio.cloud`,
+    `${scheme}://realtime.toonstudio.cloud/path`,
+    `${scheme}://*.toonstudio.cloud`,
+  ]))("requires each complete realtime origin token and rejects %s", (replacement) => {
+    const current = fixture();
+    const scheme = new URL(replacement).protocol;
+    const cspHeader = current.vercelConfig.headers[0].headers.find(
+      (header) => header.key === "Content-Security-Policy",
+    );
+    cspHeader.value = cspHeader.value.replace(
+      `${scheme}//realtime.toonstudio.cloud`,
+      replacement,
+    );
+    expect(() => verifyVercelCspContract(current)).toThrow("exact production realtime origins are missing");
   });
 
   it("requires the Blob fetch boundary used by verified Studio 3D asset textures", () => {

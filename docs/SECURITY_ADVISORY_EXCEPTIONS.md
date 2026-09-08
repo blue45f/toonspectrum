@@ -1,42 +1,37 @@
-# Security advisory exceptions
+# Security advisory coverage
 
-ToonSpectrum fixes high and critical dependency advisories instead of broadly
-silencing them. Any unavoidable exception must be exact, time-bounded and
-machine-verifiable.
+`pnpm run audit:security` checks production and development dependencies at every
+severity level. It is part of the required CI `core` gate through the lint job.
+`scripts/verify-security-advisory-exceptions.mjs` rejects nonempty or malformed
+advisory exclusion lists before running the registry audit. There are no active
+dependency advisory exceptions.
 
-## GHSA-qwww-vcr4-c8h2 — React Router unstable RSC mode
+## Retired React Router exception
 
-- Reviewed: 2026-07-31
-- Review deadline: 2026-10-31
-- Pinned packages: `react-router-dom@7.18.2` and its
-  `react-router@7.18.2` dependency
-- Upstream scope: only applications using React Router's unstable React Server
-  Components APIs
-- ToonSpectrum scope: Vite SPA using the declarative `<BrowserRouter>` API
+The former `GHSA-qwww-vcr4-c8h2` exclusion was removed on 2026-09-08. The
+[GitHub advisory](https://github.com/advisories/GHSA-qwww-vcr4-c8h2) now correctly
+identifies React Router 7.18.2 as the first fixed v7 release. The installed
+`react-router-dom@7.18.2` / `react-router@7.18.2` pair therefore passes the audit
+without an exception. The old RSC-only configuration restrictions and review
+deadline existed solely to justify that metadata exclusion and are retired with it.
 
-React Router 8.3.0 contains the original upstream fix, and React Router 7.18.2
-contains the official v7 backport that hardens the same RSC CSRF code paths.
-The GitHub Advisory Database range has not yet incorporated that backport:
+## Reviewed code-scanning false positives
 
-- [React Router v7 changelog](https://raw.githubusercontent.com/remix-run/react-router/v7/CHANGELOG.md)
-- [official v7 backport PR #15353](https://github.com/remix-run/react-router/pull/15353)
-- [pending advisory-range correction #8868](https://github.com/github/advisory-database/pull/8868)
+The following alerts were reviewed against their actual data flows on 2026-09-08.
+Their GitHub dismissal records contain the rationale; the scanning rules remain
+enabled for other occurrences.
 
-`react-router-dom` also has no 8.x release, so ToonSpectrum stays on the fixed,
-latest reviewed 7.x DOM package instead of partially migrating 38 runtime/test
-imports to React Router 8's new package entry points during release hardening.
+| Alert | Evidence |
+| --- | --- |
+| [12](https://github.com/blue45f/toonspectrum/security/code-scanning/12) | The cookie contains an HS256-signed session JWT with an opaque user id, session version, issuer/audience and timestamps. It does not contain OAuth provider passwords or access tokens. HttpOnly, production Secure, SameSite=Lax and expiry are enforced. |
+| [24](https://github.com/blue45f/toonspectrum/security/code-scanning/24) | The SHA-256 HMAC authenticates JWT messages with a server key; it does not hash user passwords. The OAuth callback passes only user id and session version to `signSession`. |
+| [18](https://github.com/blue45f/toonspectrum/security/code-scanning/18), [19](https://github.com/blue45f/toonspectrum/security/code-scanning/19) | The coturn TURN REST protocol requires HMAC-SHA1 for expiring relay credentials. This is a keyed MAC, not an unkeyed SHA-1 digest. Private user/work identity is independently protected with HMAC-SHA256. The test intentionally verifies protocol compatibility. |
+| [59](https://github.com/blue45f/toonspectrum/security/code-scanning/59) | The private preview component receives only a browser-generated `URL.createObjectURL(file)` value or an empty string. No filename or DOM text becomes HTML. A regression test checks a markup-like filename and URL revocation. |
 
-`scripts/verify-security-advisory-exceptions.mjs` runs before `pnpm audit` and
-fails closed if:
+Protocol references: [coturn TURN REST documentation](https://github.com/coturn/coturn/blob/master/README.turnserver#turn-rest-api),
+[SVG image processing modes](https://www.w3.org/TR/SVG/conform.html#processing-modes).
 
-- the allowlist contains anything other than this advisory;
-- the reviewed package pair or exact version changes;
-- a React Router Framework/RSC package, config file, entry point or API enters
-  runtime source;
-- the application stops using the reviewed client `createRoot`,
-  `BrowserRouter`, `Routes`/`Route`, and Vite React boundaries; or
-- the review deadline passes.
-
-At the deadline, prefer removing the exception by moving to a supported patched
-DOM/declarative release. Renew it only after re-checking the upstream advisory
-scope and the complete runtime source boundary.
+The two secret-scanning findings were also reviewed as synthetic test data:
+a hand-written diagnostic-redaction token and an example UUID used as a test
+publisher id. They were resolved as `used_in_tests`; their literal fixtures were
+replaced with a provider-neutral redaction string and a generated test UUID.

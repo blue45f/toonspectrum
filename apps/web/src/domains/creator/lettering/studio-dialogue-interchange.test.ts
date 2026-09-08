@@ -232,6 +232,14 @@ describe("studio dialogue interchange", () => {
     expect(file.warnings.join(" ")).toContain("자동 배정");
   });
 
+  it("imports supported subtitle formatting and retains unknown markup as literal text", () => {
+    const parsed = parseStudioDialogueInterchange("vtt", [
+      "WEBVTT", "", "00:00:00.000 --> 00:00:03.000",
+      '<v Hana><b>Hello</b> <c.green>world</c></v> <00:00:01.000><script>alert(1)</script>',
+    ].join("\n"));
+    expect(parsed.document.cues[0]?.text).toBe("Hello world <script>alert(1)</script>");
+  });
+
   it("UTF-8 BOM을 제거하고 잘못된 UTF-8은 거부한다", () => {
     expect(decodeStudioDialogueInterchangeText(new TextEncoder().encode("\uFEFF안녕"))).toBe("안녕");
     expect(() => decodeStudioDialogueInterchangeText(new Uint8Array([0xc3, 0x28]))).toThrowError(
