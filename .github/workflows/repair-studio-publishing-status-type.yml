@@ -1,0 +1,61 @@
+name: Repair Studio publishing status type
+
+on:
+  push:
+    branches:
+      - fix/studio-publishing-status-type-20260909
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-studio-publishing-status-type
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: ${{ !contains(github.event.head_commit.message, '[publication-status-type-fixed]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-publishing-status-type-20260909
+          fetch-depth: 0
+      - name: Apply exact type repair
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('apps/web/src/domains/creator/StudioPublishingCommandCenter.tsx')
+          source = path.read_text(encoding='utf-8')
+          import_old = '  type CreatorPublicationDirective,\n} from "@/shared/lib/creator-publication-contract";'
+          import_new = '  type CreatorPublicationDirective,\n  type CreatorPublicationWorkStatus,\n} from "@/shared/lib/creator-publication-contract";'
+          status_old = '    const requestedStatus = intent === "draft" ? "draft" : "published";\n    let effectiveStatus = requestedStatus;'
+          status_new = '    const requestedStatus: CreatorPublicationWorkStatus =\n      intent === "draft" ? "draft" : "published";\n    let effectiveStatus: CreatorPublicationWorkStatus = requestedStatus;'
+          if source.count(import_old) != 1:
+              raise SystemExit(f'expected one import target, found {source.count(import_old)}')
+          if source.count(status_old) != 1:
+              raise SystemExit(f'expected one status target, found {source.count(status_old)}')
+          path.write_text(
+              source.replace(import_old, import_new, 1).replace(status_old, status_new, 1),
+              encoding='utf-8',
+          )
+      - name: Commit exact repair and remove one-shot workflow
+        shell: bash
+        run: |
+          rm .github/workflows/repair-studio-publishing-status-type.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add apps/web/src/domains/creator/StudioPublishingCommandCenter.tsx .github/workflows/repair-studio-publishing-status-type.yml
+          git commit -m "fix(studio): preserve publication status union [publication-status-type-fixed]"
+          git push origin HEAD:fix/studio-publishing-status-type-20260909
+      - name: Install locked workspace dependencies
+        uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck complete workspace
+        run: pnpm exec tsc -p tsconfig.json --noEmit
