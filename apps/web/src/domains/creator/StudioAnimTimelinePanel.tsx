@@ -166,7 +166,7 @@ export function StudioAnimTimelinePanel({
           type="button"
           onClick={onClose}
           aria-label="다중 레이어 타임라인 패널 닫기"
-          className="grid size-6 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
+          className="grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
         >
           <X size={13} />
         </button>
@@ -223,7 +223,7 @@ export function StudioAnimTimelinePanel({
                 type="button"
                 onClick={onTogglePlay}
                 disabled={Boolean(playbackDisabledReason)}
-                className={cn(buttonClass({ size: "sm", variant: "outline" }), "gap-1.5")}
+                className={cn(buttonClass({ size: "sm", variant: "outline", className: "min-h-11 min-w-11" }), "gap-1.5")}
               >
                 {playing ? <Pause size={13} /> : <Play size={13} />}
                 {playing ? "정지" : "재생"}
@@ -263,7 +263,7 @@ export function StudioAnimTimelinePanel({
                     ),
                   );
                 }}
-                className={cn(buttonClass({ size: "sm", variant: "outline" }), "gap-1 text-[0.7rem]")}
+                className={cn(buttonClass({ size: "sm", variant: "outline", className: "min-h-11 min-w-11" }), "gap-1 text-[0.7rem]")}
               >
                 <Plus size={12} />
                 클립 추가
@@ -535,7 +535,7 @@ export function StudioAnimTimelinePanel({
                 type="button"
                 onClick={() => onAddKeyframe(focusedRow.id)}
                 disabled={Boolean(addKeyframeDisabledReason)}
-                className={cn(buttonClass({ size: "sm", variant: "solid" }), "w-full gap-1.5")}
+                className={cn(buttonClass({ size: "sm", variant: "solid", className: "min-h-11 min-w-11" }), "w-full gap-1.5")}
               >
                 <GanttChartSquare size={13} />
                 현재 프레임({playhead + 1}) 키프레임 {replacingKeyframe ? "갱신" : "추가"}
@@ -595,7 +595,7 @@ export function StudioAnimTimelinePanel({
               }}
               disabled={!hasTrack(doc, focusedRow.id)}
               title={hasTrack(doc, focusedRow.id) ? undefined : "삭제할 키프레임이 없어요"}
-              className={cn(buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5 text-bad hover:text-bad" }), "w-full")}
+              className={cn(buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 gap-1.5 text-bad hover:text-bad" }), "w-full")}
             >
               <Trash2 size={13} />
               이 레이어 트랙 삭제
