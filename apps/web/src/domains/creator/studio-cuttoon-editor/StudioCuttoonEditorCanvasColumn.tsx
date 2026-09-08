@@ -13,6 +13,14 @@ import { CANVAS_W } from "../studio-assets";
 import { StudioCommentThreadPopover, StudioPointCommentComposer, StudioCanvasRulerBars } from "../studio-page-lazy-ui";
 import { STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED } from "../studio-page-shell-runtime";
 import { StudioScrollViewportSubscriber } from "../StudioScrollViewportSubscriber";
+import { StudioPixelSelectionHud } from "../StudioPixelSelectionHud";
+import { smoothPixelSelection } from "../studio-selection-refinement";
+import {
+  SELECTION_EXPAND_DEFAULT,
+  expandContractSelection,
+  setSelectionFeather,
+  toggleSelectionInvert,
+} from "../studio-selection-tools";
 import { StudioSelectionContextBar } from "../StudioSelectionContextBar";
 import { cn } from "@/shared/lib/utils";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
@@ -720,6 +728,57 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
           canvasHostRef={wrapRef}
           stableHandlers={studioOnCanvasSurfaceHandlers}
         />
+        <StudioPixelSelectionHud
+          visible={
+            !!pixelOverlaySel
+            && selected?.type === "image"
+            && !canvasOnlyMode
+            && !canvasInteractionBlocked
+            && !isExporting
+            && !quickMaskArmed
+          }
+          selection={pixelOverlaySel}
+          operation={s.pixelCombine}
+          busy={s.pixelBusy}
+          readOnly={activeSurfaceReviewLocked || pageEditLocked}
+          stableHandlers={studioOnCanvasSurfaceHandlers}
+          onOperationChange={s.setPixelCombine}
+          onExpand={() => {
+            s.commitPixelSelectionState(
+              (selection) => expandContractSelection(selection, SELECTION_EXPAND_DEFAULT),
+              "transform",
+            );
+          }}
+          onContract={() => {
+            s.commitPixelSelectionState(
+              (selection) => expandContractSelection(selection, -SELECTION_EXPAND_DEFAULT),
+              "transform",
+            );
+          }}
+          onSmooth={() => {
+            s.commitPixelSelectionState(
+              (selection) => smoothPixelSelection(selection, { passes: 2, strength: 0.26 }),
+              "transform",
+            );
+          }}
+          onFeatherChange={(featherPx) => {
+            s.commitPixelSelectionState(
+              (selection) => selection ? setSelectionFeather(selection, featherPx) : selection,
+              "feather",
+              "hud-feather",
+            );
+          }}
+          onInvert={() => {
+            s.commitPixelSelectionState(
+              (selection) => selection ? toggleSelectionInvert(selection) : selection,
+              "invert",
+            );
+          }}
+          onClear={() => {
+            s.clearPolyLassoDraft();
+            s.commitPixelSelectionState(null, "clear");
+          }}
+        />
         <StudioSelectionContextBar
           visible={
             tool === "select"
@@ -727,6 +786,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
             && !canvasOnlyMode
             && !canvasInteractionBlocked
             && !isExporting
+            && !pixelOverlaySel
           }
           selectionCount={currentCanvasSelectionCount}
           readOnly={activeSurfaceReviewLocked || pageEditLocked}
