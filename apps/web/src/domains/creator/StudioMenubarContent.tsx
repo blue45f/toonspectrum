@@ -435,7 +435,7 @@ function StudioMenubarCommandBar({
         // 세로 스택의 stretch 로 행 전체를 채운다. 음수 마진이 호스트 셸의 좌우 패딩까지
         // 덮어 구분선이 메뉴바 전폭을 가로지르고, 같은 크기의 패딩을 되돌려 슬롯은 위 행의
         // 컨트롤과 같은 세로선에서 시작한다.
-        "hidden min-h-9 items-center gap-0.5 border-t border-line/60 md:flex",
+        "hidden min-h-11 items-center gap-0.5 border-t border-line/60 md:flex",
         "-mx-2.5 px-2.5 sm:-mx-3 sm:px-3",
         hidden && "!hidden"
       )}
@@ -468,7 +468,7 @@ function StudioMenubarCommandBar({
                   className={buttonClass({
                     size: "sm",
                     variant: "quiet",
-                    className: "min-h-9 min-w-9 px-0 disabled:opacity-35",
+                    className: "min-h-11 min-w-11 px-0 disabled:opacity-35",
                   })}
                 >
                   <binding.icon size={14} aria-hidden />
@@ -488,7 +488,7 @@ function StudioMenubarCommandBar({
           className={buttonClass({
             size: "sm",
             variant: historyPanelOpen ? "solid" : "quiet",
-            className: "min-h-9 min-w-9 px-0",
+            className: "min-h-11 min-w-11 px-0",
           })}
         >
           <HistoryIcon size={14} aria-hidden />
@@ -508,7 +508,7 @@ function StudioMenubarCommandBar({
           className={buttonClass({
             size: "sm",
             variant: settingsOpen ? "solid" : "quiet",
-            className: "min-h-9 min-w-9 px-0",
+            className: "min-h-11 min-w-11 px-0",
           })}
         >
           <Settings2 size={14} aria-hidden />
@@ -813,7 +813,7 @@ function StudioMenubarOverflowMenu({
           }}
           className={cn(
             buttonClass({ size: "sm", variant: open ? "solid" : "quiet" }),
-            "min-h-9 shrink-0 gap-0.5 px-1.5 text-[0.72rem] font-semibold tabular-nums"
+            "min-h-11 min-w-11 shrink-0 gap-0.5 px-1.5 text-[0.72rem] font-semibold tabular-nums"
           )}
         >
           <ChevronsRight size={14} aria-hidden />
@@ -1462,7 +1462,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               aria-expanded={activeToolbarGroup === "assetGroup"}
               className={cn(
                 buttonClass({ size: "sm", variant: activeToolbarGroup === "assetGroup" ? "solid" : "quiet" }),
-                "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
+                "min-h-11 min-w-11 gap-1.5 px-2.5 text-[0.72rem]"
               )}
             >
               <Folder size={14} aria-hidden />
@@ -1478,7 +1478,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               aria-expanded={menu === "bubble"}
               className={cn(
                 buttonClass({ size: "sm", variant: menu === "bubble" ? "solid" : "quiet" }),
-                "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
+                "min-h-11 min-w-11 gap-1.5 px-2.5 text-[0.72rem]"
               )}
             >
               <MessageCircle size={14} aria-hidden />
@@ -1579,7 +1579,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 aria-pressed={pageSequenceOpen}
                 aria-label={pageSequenceOpen ? "페이지 목록 닫기" : "페이지 목록 열기"}
                 className={cn(
-                  buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 gap-1.5" }),
+                  buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 shrink-0 gap-1.5" }),
                   // 모바일에서는 하단 도크의 드로잉 행이 같은 '페이지' 버튼을 이미 갖는다. 메뉴바 사본까지
                   // 두면 320~430px 액션 클러스터가 44px 버튼 7개(332px)로 레인을 넘친다.
                   isMobile && "hidden",
@@ -1602,7 +1602,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 data-studio-primary-action="export"
                 aria-label={`다운로드 ${exportScale}× ${exportFormat.toUpperCase()}${exportTransparent && exportFormat === "png" ? " · 투명" : ""} · 현재 페이지`}
                 className={cn(
-                  buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
+                  buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
                   // 모바일 도크의 '내보내기' 가 같은 핸들러다. 메뉴바에는 배율·포맷을 고르는
                   // 내보내기 옵션만 남겨 44px 클러스터가 320px 안에 들어오게 한다.
                   isMobile && "hidden"
@@ -1630,7 +1630,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 aria-expanded={exportMenuOpen}
                 aria-label="내보내기 옵션"
                 className={cn(
-                  buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" }),
+                  buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 px-1.5" }),
                   isMobile && "min-h-11 min-w-11"
                 )}
               >
@@ -1826,7 +1826,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             className={buttonClass({
               size: "sm",
               variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+              className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
             })}
             title={collaborationDocumentLocked ? collaborationLockMessage() : "한 줄 기획부터 시놉시스·비트·장면·컷·대사까지 한 흐름으로 설계하고 AI 초안을 검토"}
           >
@@ -1885,7 +1885,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             className={buttonClass({
               size: "sm",
               variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+              className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
             })}
             title={collaborationDocumentLocked ? collaborationLockMessage() : "캐릭터 외형·의상·말투·관계와 AI 고정 제약을 문서에 저장"}
           >
@@ -1977,7 +1977,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             data-project-keep-open
             onClick={() => projectImportInputRef.current?.click()}
             disabled={collaborationDocumentLocked}
-            className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" })}
+            className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" })}
             title={collaborationDocumentLocked ? collaborationLockMessage() : "빠른 .json 백업을 복구합니다. 포함되지 않은 로컬 3D 모델은 원래 기기의 검증 라이브러리에 있어야 합니다."}
           >
             <Upload size={14} /> 복구 (.json)
@@ -2127,7 +2127,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             className={buttonClass({
               size: "sm",
               variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+              className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
             })}
             title={collaborationDocumentLocked ? collaborationLockMessage() : "외부 자동 게시 없이 릴리스 일정과 직접 가져온 성과 기록을 관리"}
           >
@@ -2204,7 +2204,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 buttonClass({
                   size: "sm",
                   variant: "quiet",
-                  className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+                  className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
                 }),
                 isMobile &&
                   "min-h-11 max-[429px]:size-11 max-[429px]:justify-center max-[429px]:px-0",
@@ -2247,7 +2247,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   buttonClass({
                     size: "sm",
                     variant: "solid",
-                    className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+                    className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
                   }),
                   isMobile &&
                     "min-h-11 max-[429px]:size-11 max-[429px]:justify-center max-[429px]:px-0",

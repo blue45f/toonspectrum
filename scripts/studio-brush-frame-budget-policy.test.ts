@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { filterStudioBrushCatalogItems } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
+
 import {
   STUDIO_BRUSH_COMPETITIVE_DESKTOP_VIEWPORT,
   STUDIO_BRUSH_COMPETITIVE_EXECUTION_CASES,
@@ -182,22 +184,28 @@ describe("Studio competitive continuous brush frame-budget policy", () => {
     expect(STUDIO_BRUSH_FRAME_BUDGET_IDS).toEqual([
       "pen",
       "g-pen-flex",
-      "pencil-4b-rough",
+      "precision-pencil",
       "pencil",
       "crayon",
       "calligraphy",
       "oil-filbert",
       "paint-tube",
-      "airbrush-grand-soft",
+      "mist-soft",
       "airbrush-fine",
       "standard-eraser",
-      "watercolor-wet-wash",
-      "ink-wash",
-      "inkwash-bleed-wash",
-      "sumi-wash-fray",
+      "watercolor",
+      "ink-wash--sumi-core",
+      "watercolor--edge-bloom",
+      "rough-ink",
       "oil",
       "highlighter",
     ]);
+  });
+
+  it("can select every performance representative from the shipped picker", () => {
+    for (const id of STUDIO_BRUSH_FRAME_BUDGET_IDS) {
+      expect(filterStudioBrushCatalogItems({ query: id }).some((brush) => brush.id === id), id).toBe(true);
+    }
   });
 
   it("materializes 1k, 8k, 50k, and 30s at 120/240Hz and DPR1/2", () => {

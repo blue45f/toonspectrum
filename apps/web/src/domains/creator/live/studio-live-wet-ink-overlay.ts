@@ -88,11 +88,11 @@ const LIVE_SIMULATION_STEPS_MAX = 8;
 const LIVE_SIMULATION_CATCH_UP_CAP = 4;
 const POINT_EPSILON = 1e-6;
 /**
- * InkWash live preview is intentionally lower resolution than the 4× committed wash. It still
- * uses the real Gaussian deposition and Beer-Lambert optical model, but bins into bounded sparse
- * tiles and never runs Stam on pointer frames.
+ * InkWash live preview shares the committed wash lattice so subpixel Gaussian edges retain
+ * their sampling phase on pointer-up. Sparse tiles bound the working set, and pointer frames
+ * still never run Stam or allocate the full wash.
  */
-const INKWASH_PREVIEW_FIELD_SCALE = 2;
+const INKWASH_PREVIEW_FIELD_SCALE = STUDIO_WET_INK_BRUSH_FIELD_SCALE;
 const INKWASH_PREVIEW_TILE_SIZE = 64;
 const INKWASH_PREVIEW_MAX_TILES = 512;
 
@@ -372,10 +372,15 @@ function inkwashStrokeFieldGeometry(
     scale * 2,
     radiusCells + STUDIO_WET_INK_BRUSH_SIMULATION_STEPS + 2,
   );
-  const originX = minX - marginCells / scale;
-  const originY = minY - marginCells / scale;
-  const width = Math.ceil((maxX - minX) * scale) + marginCells * 2 + 1;
-  const height = Math.ceil((maxY - minY) * scale) + marginCells * 2 + 1;
+  // The shared committed wash uses integer field-cell origins. A fractional origin here makes
+  // the subsequent canonical replay grow/copy the already deposited field by a rounded offset,
+  // moving the accepted prefix at pointer-up even though its document points have not changed.
+  const originCellX = Math.floor(minX * scale) - marginCells;
+  const originCellY = Math.floor(minY * scale) - marginCells;
+  const originX = originCellX / scale;
+  const originY = originCellY / scale;
+  const width = Math.ceil(maxX * scale) + marginCells - originCellX + 1;
+  const height = Math.ceil(maxY * scale) + marginCells - originCellY + 1;
   if (width <= 0 || height <= 0 || !Number.isSafeInteger(width * height)) return null;
   return { originX, originY, width, height };
 }

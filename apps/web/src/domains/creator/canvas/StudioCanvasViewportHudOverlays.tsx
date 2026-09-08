@@ -239,7 +239,7 @@ export function StudioCanvasViewportHudOverlays({
             type="button"
             onClick={() => setQuickStartOpen(true)}
             className={cn(
-              "absolute bottom-3 right-3 z-30 hidden size-9 place-items-center rounded-lg border border-line bg-panel/90 text-xs font-bold text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
+              "absolute bottom-3 right-3 z-30 hidden size-11 place-items-center rounded-lg border border-line bg-panel/90 text-xs font-bold text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
               canvasOnlyMode && "!hidden"
             )}
             style={

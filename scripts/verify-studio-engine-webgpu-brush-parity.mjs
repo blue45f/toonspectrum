@@ -23,14 +23,14 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 
-import { WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
+import { REPO_ROOT, WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 
 const SCRATCH =
   process.env.TOONSPECTRUM_ENGINE_WEBGPU_BRUSH_PARITY_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
   ?? join(tmpdir(), "toonspectrum-studio-engine-webgpu-brush-parity");
 const HARNESS_PATH = "/__studio_engine_webgpu_brush_parity__";
-const HARNESS_ENTRY = "/scripts/studio-engine-webgpu-brush-parity-browser.ts";
+const HARNESS_ENTRY = `/@fs/${join(REPO_ROOT, "scripts/studio-engine-webgpu-brush-parity-browser.ts")}`;
 const RESULT_TIMEOUT_MS = 60_000;
 const MAX_GOLDEN_SAMPLE_CHANNEL_DELTA = 2;
 const MAX_OUTSIDE_EDGE_CHANGED_PIXELS_TOLERANCE_2 = 0;

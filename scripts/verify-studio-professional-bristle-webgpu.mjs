@@ -18,14 +18,14 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 
-import { WEB_ROOT } from "./lib/repo-paths.mjs";
+import { REPO_ROOT, WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 
 const SCRATCH =
   process.env.TOONSPECTRUM_BRISTLE_WEBGPU_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
   ?? join(tmpdir(), `toonspectrum-professional-bristle-webgpu-${Date.now()}`);
 const HARNESS_PATH = "/__studio_professional_bristle_webgpu__";
-const HARNESS_ENTRY = "/scripts/studio-professional-bristle-webgpu-browser.ts";
+const HARNESS_ENTRY = `/@fs/${join(REPO_ROOT, "scripts/studio-professional-bristle-webgpu-browser.ts")}`;
 const RESULT_TIMEOUT_MS = 120_000;
 const EXPECTED_CASE_IDS = [
   "straight-rake",
@@ -325,6 +325,7 @@ async function main() { // NOSONAR javascript:S3776
   const origin = `http://127.0.0.1:${port}/`;
   const viteServer = await createViteServer({
     root: WEB_ROOT,
+    configFile: WEB_VITE_CONFIG,
     appType: "custom",
     logLevel: "error",
     server: {
