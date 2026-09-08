@@ -129,9 +129,8 @@ async getDashboard(userId: string, periodDays: number): Promise<DashboardRespons
 
 async getAdminMe(userId: string) {
     try {
-      // 권한 판정만 한다. ensureAdminSchema(DDL) 는 runtime role 에 CREATE 가 없으면
-      // permission denied 로 떨어지는데, 그걸 403 "관리자 아님"으로 오인하면
-      // role=admin 계정도 콘솔에 못 들어온다. 스키마 보정은 쓰기 엔드포인트에서만.
+      // 권한만 판정한다. 관리자 기능의 스키마 준비 실패를 403으로 바꾸면
+      // 유효한 관리자도 콘솔에 들어오지 못한다. 각 기능이 준비 상태를 별도로 검사한다.
       const admin = await requireAdminUser(userId);
       return {
         id: admin.id,

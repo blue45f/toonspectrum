@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { buildAdminCapabilitySql } from "./admin-database-contract.mjs";
 import { buildFeedbackCapabilitySql } from "./feedback-database-contract.mjs";
 import {
   buildAuthRuntimeAclViolationSql,
@@ -33,6 +34,7 @@ const ADOPTION_MARKER_ID = "__managed_history_through_0019__";
 const ADOPTION_BASELINE_SEQUENCE = 19;
 
 const EXPECTED_SPECIAL_CAPABILITIES = Object.freeze([
+  "adminColumnsReady",
   "authAccountColumnsReady",
   "authAccountConstraintsReady",
   "authAccountUserIndexReady",
@@ -373,6 +375,7 @@ export function buildProductionCapabilityVerificationSql(
 
   return `
 ${buildFeedbackCapabilitySql(runtimeDatabaseRole)}
+${buildAdminCapabilitySql(runtimeDatabaseRole)}
 DO $toonspectrum_readiness$
 DECLARE
   missing_relations text[];

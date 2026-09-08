@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { and, desc, eq, lt, notInArray } from "drizzle-orm";
 
 import { getCatalogState, loadCatalogSnapshot, replaceCatalogData, resetCatalogToEmpty } from "../../../../packages/core/src/server/catalog-store";
-import { catalogIngestRuns, catalogSnapshots, db, dbClient } from "../db";
+import { catalogIngestRuns, catalogSnapshots, db } from "../db";
 
 import {
   loadCatalogTitlesFromFile,
@@ -16,6 +16,7 @@ import {
   writeCatalogTitlesToFile,
 } from "./catalog-file";
 import { buildCatalogSourcePlan, parseCatalogSourceIds } from "./catalog-sources";
+import { createSchemaReadinessCheck } from "./schema-readiness";
 
 import type { Title } from "../../../web/src/shared/lib/types";
 
@@ -78,8 +79,6 @@ export interface CatalogIngestRunOptions {
 type EnvLike = Partial<Record<string, string | undefined>>;
 
 const execSource = "crawl.mjs";
-let runSchemaReady = false;
-let snapshotSchemaReady = false;
 // 레거시 FORCE_DB 모드: 현재 메모리에 로드된 current 스냅샷 id — DB 폴링 핫 리로드의 변경 감지 기준.
 let loadedSnapshotId: string | null = null;
 // 파일 모드: 메모리에 로드된 카탈로그 파일의 (경로, mtime, size) — 스탯 폴링의 변경 감지 기준.
@@ -221,60 +220,22 @@ export function parseCrawlerJsonPayload(stdout: string): CatalogCrawlerPayload {
   throw new Error("crawler stdout did not contain a valid catalog JSON payload");
 }
 
-// 실행 이력(catalog_ingest_run, 행당 수 KB)은 파일 전용 모드에서도 계속 DB에 기록한다 —
-// 수동 크롤 UI(status/recentRuns)가 소비. 대형 catalog_snapshot DDL 은 레거시 경로에서만 보장.
-async function ensureIngestRunSchema() {
-  if (runSchemaReady) return;
+// History is used by the manual ingest UI even in file mode. Runtime validates the
+// migrated columns without DDL; installation and upgrades own tables and indexes.
+const ensureIngestRunSchema = createSchemaReadinessCheck([
+  `SELECT "id", "source", "status", "runHash", "triggeredBy", "requestedBy", "startedAt",
+          "finishedAt", "durationMs", "titleCount", "message", "error", "metadata", "createdAt"
+   FROM "catalog_ingest_run" WHERE FALSE`,
+]);
 
-  await dbClient.execute(`
-    CREATE TABLE IF NOT EXISTS catalog_ingest_run (
-      id TEXT PRIMARY KEY,
-      source TEXT NOT NULL,
-      status TEXT NOT NULL,
-      "runHash" TEXT,
-      "triggeredBy" TEXT,
-      "requestedBy" TEXT,
-      "startedAt" TIMESTAMPTZ NOT NULL,
-      "finishedAt" TIMESTAMPTZ,
-      "durationMs" INTEGER,
-      "titleCount" INTEGER NOT NULL DEFAULT 0,
-      message TEXT,
-      error TEXT,
-      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_ingest_run_created ON catalog_ingest_run("createdAt")`);
-  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_ingest_run_status ON catalog_ingest_run(status, "createdAt")`);
-
-  runSchemaReady = true;
-}
-
-// 레거시 전용: catalog_snapshot DDL. DB 스냅샷을 실제로 읽고 쓰는 함수들만 호출한다.
-async function ensureLegacySnapshotSchema() {
-  if (snapshotSchemaReady) return;
-
-  await dbClient.execute(`
-    CREATE TABLE IF NOT EXISTS catalog_snapshot (
-      id TEXT PRIMARY KEY,
-      source TEXT NOT NULL,
-      "sourceVersion" TEXT,
-      "titleCount" INTEGER NOT NULL DEFAULT 0,
-      "isCurrent" BOOLEAN NOT NULL DEFAULT false,
-      snapshot TEXT NOT NULL,
-      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_current ON catalog_snapshot("isCurrent", "createdAt")`);
-  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_created ON catalog_snapshot("createdAt")`);
-
-  snapshotSchemaReady = true;
-}
+const ensureLegacySnapshotSchema = createSchemaReadinessCheck([
+  `SELECT "id", "source", "sourceVersion", "titleCount", "isCurrent", "snapshot", "metadata", "createdAt"
+   FROM "catalog_snapshot" WHERE FALSE`,
+]);
 
 export async function ensureCatalogIngestSchema() {
   await ensureIngestRunSchema();
-  // 파일 전용 모드에서는 스냅샷 테이블 DDL 자체를 건너뛴다(불필요한 DB 왕복/객체 생성 방지).
+  // File mode does not query the legacy snapshot table.
   if (isCatalogForceDb()) await ensureLegacySnapshotSchema();
 }
 

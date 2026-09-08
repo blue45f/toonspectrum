@@ -6,6 +6,7 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { buildAdminCapabilitySql, buildAdminRuntimeAclSql } from "./admin-database-contract.mjs";
 import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";
 import {
   createPsqlEnvironment,
@@ -90,6 +91,12 @@ const HISTORICAL_BASELINE_RELATIONS = Object.freeze([
   "verificationToken",
 ]);
 export const POST_BASELINE_RELATIONS = Object.freeze([
+  "admin_announcements",
+  "admin_audit_logs",
+  "admin_banned_words",
+  "admin_content_reports",
+  "admin_promos",
+  "admin_security_policies",
   "creator_asset_storage_object",
   "creator_draft_collaboration_room",
   "creator_marketplace_library_item",
@@ -2366,6 +2373,8 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildAdminRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildAdminCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildFeedbackCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole));

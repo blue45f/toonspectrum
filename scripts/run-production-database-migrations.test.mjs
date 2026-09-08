@@ -25,12 +25,12 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(42);
+  expect(manifest).toHaveLength(43);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe(
-    "0042_creator_asset_publication_retention",
+    "0043_admin_runtime_schema",
   );
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(42);
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(43);
 });
 
 test("creator marketplace release migration backfills immutable SemVer order", () => {
@@ -560,6 +560,12 @@ test("historical adoption requires structural evidence through 0019", () => {
 
 test("post-baseline relation classification stays synchronized with the CI fixture reset", () => {
   expect(POST_BASELINE_RELATIONS).toEqual([
+    "admin_announcements",
+    "admin_audit_logs",
+    "admin_banned_words",
+    "admin_content_reports",
+    "admin_promos",
+    "admin_security_policies",
     "creator_asset_storage_object",
     "creator_draft_collaboration_room",
     "creator_marketplace_library_item",

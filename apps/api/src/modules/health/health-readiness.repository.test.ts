@@ -12,6 +12,7 @@ import {
 function completeSchemaCatalog() {
   return {
     relationNames: [...REQUIRED_DATABASE_RELATIONS],
+    adminColumnsReady: true,
     authUserColumnsReady: true,
     authUserConstraintsReady: true,
     authUserStatusIndexReady: true,
@@ -40,6 +41,13 @@ function completeSchemaCatalog() {
 }
 
 describe("PostgresHealthReadinessRepository", () => {
+  it("rejects otherwise complete infrastructure when administrator columns are missing", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ ...completeSchemaCatalog(), adminColumnsReady: false }] });
+    const repository = new PostgresHealthReadinessRepository({ query } as never);
+    await expect(repository.isSchemaReady()).resolves.toBe(false);
+    expect(query).toHaveBeenCalledOnce();
+  });
+
   it("uses a bounded SELECT 1 database probe", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: 1 }] });
     const repository = new PostgresHealthReadinessRepository({ query } as never);
