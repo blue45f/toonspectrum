@@ -1,8 +1,15 @@
 /* Extracted session contract from StudioCuttoonEditor.
  * Matches the original closure bag from StudioPage/StudioCuttoonEditor. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { StudioAnimaticWorkspaceDocument } from "../animatic/studio-animatic-workspace";
 
 export type StudioCuttoonEditorViewSessionRest = {
+  animaticWorkspace: StudioAnimaticWorkspaceDocument | null;
+  animaticPersistenceBusy: boolean;
+  animaticPersistenceError: string | null;
+  hydrateAnimaticWorkspace: (document: StudioAnimaticWorkspaceDocument) => void;
+  commitAnimaticWorkspace: (before: StudioAnimaticWorkspaceDocument, after: StudioAnimaticWorkspaceDocument) => boolean;
+  handleCapturePagesForIndices: (indices: number[]) => Promise<HTMLCanvasElement[]>;
   quickShapeActive: any;
   railMoreOpen: any;
   rasterFavoriteOnly: any;

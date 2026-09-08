@@ -76,6 +76,7 @@ describe("Studio VRM asset runtime ownership boundary", () => {
     const poser = moduleEdges("./useStudioVrmPoserInstall.ts");
     const runtime = moduleEdges("./studio-vrm-asset-runtime.ts");
     const binding = moduleEdges("./studio-vrm-texture-paint-binding.ts");
+    const channel = moduleEdges("./studio-vrm-texture-paint-channel.ts");
 
     expect(
       poser.valueImports.filter((specifier) => specifier === "./studio-vrm-asset-runtime"),
@@ -92,7 +93,9 @@ describe("Studio VRM asset runtime ownership boundary", () => {
       "@/shared/catalog/catalog-static",
     ]);
     expect(runtime.typeImports).toEqual(["@pixiv/three-vrm"]);
-    expect(binding.allImports).toEqual([]);
+    expect(binding.allImports).toEqual(["./studio-vrm-texture-paint-channel"]);
+    expect(channel.allImports).toEqual([]);
+    expect(channel.source).not.toContain("./StudioVrmPoser");
     // MToon 의 WebGPU 노드 재질은 이 리프가 아니라 BG3D 쪽에서 주입한다. 여기서 승인된 WebGPU
     // 지연 entry 를 직접 import 하면 포저의 청크까지 Three 의 WebGPU 그래프에 묶인다.
     expect(runtime.dynamicImports).toEqual([

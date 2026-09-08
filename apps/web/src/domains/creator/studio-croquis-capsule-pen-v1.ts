@@ -515,6 +515,20 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Avoids repeated fractional-double formatting on the common two-decimal canvas grid. */
+function formatRoundedCoordinate(value: number): string {
+  // Outside ordinary canvas coordinates, retain JavaScript's exact exponent/large-number form.
+  if (Math.abs(value) >= 1_000_000_000) return String(value);
+  const cents = Math.round(Math.abs(value) * 100);
+  const whole = Math.floor(cents / 100);
+  const fraction = cents - whole * 100;
+  const sign = value < 0 ? "-" : "";
+  if (fraction === 0) return sign + whole;
+  const decimal = fraction % 10 === 0 ? String(fraction / 10)
+    : fraction < 10 ? `0${fraction}` : String(fraction);
+  return `${sign}${whole}.${decimal}`;
+}
+
 /**
  * Serializes ONE hull ring into its `M … L … Z` subpath, or `null` when the ring is invisible at
  * serialization precision (fewer than 3 distinct 0.01px-grid vertices) or malformed. Extracted so
@@ -541,14 +555,14 @@ export function studioCroquisCapsuleLoopToPathPart(
     const x = round2(rawX);
     const y = round2(rawY);
     if (x === previousX && y === previousY) continue;
-    commands.push(commands.length === 0 ? `M${x} ${y}` : `L${x} ${y}`);
+    commands.push(`${commands.length === 0 ? "M" : "L"}${formatRoundedCoordinate(x)} ${formatRoundedCoordinate(y)}`);
     previousX = x;
     previousY = y;
   }
   if (commands.length < 3) return null;
   // Drop a closing vertex that landed back on the start of the ring.
   const first = commands[0]!;
-  if (`M${previousX} ${previousY}` === first) commands.pop();
+  if (`M${formatRoundedCoordinate(previousX)} ${formatRoundedCoordinate(previousY)}` === first) commands.pop();
   if (commands.length < 3) return null;
   commands.push("Z");
   return commands.join(" ");
@@ -576,5 +590,26 @@ export function studioCroquisCapsuleLoopsToPathData(
 export function buildStudioCroquisCapsuleStrokePathData(
   input: StudioCroquisCapsuleStrokeInput,
 ): string {
-  return studioCroquisCapsuleLoopsToPathData(buildStudioCroquisCapsuleStrokeLoops(input));
+  const stroke = normalizeStroke(input);
+  if (!stroke) return "";
+  const { xs, ys, rs } = stroke;
+  const tolerance = safeArcTolerance(input.arcTolerancePx);
+  if (xs.length === 1) {
+    if (rs[0]! <= 0) return "";
+    return studioCroquisCapsuleLoopToPathPart(
+      circleLoop({ x: xs[0]!, y: ys[0]!, r: rs[0]! }, tolerance),
+    ) ?? "";
+  }
+  // Serialize each ring before constructing the next one. Keeping every temporary vertex
+  // array until the final join unnecessarily makes long strokes pay a large GC peak.
+  const parts: string[] = [];
+  for (let index = 1; index < xs.length; index += 1) {
+    const solution = solveStudioCroquisCapsule(
+      { x: xs[index - 1]!, y: ys[index - 1]!, r: rs[index - 1]! },
+      { x: xs[index]!, y: ys[index]!, r: rs[index]! },
+    );
+    const part = studioCroquisCapsuleLoopToPathPart(studioCroquisCapsuleLoop(solution, tolerance));
+    if (part !== null) parts.push(part);
+  }
+  return parts.join(" ");
 }

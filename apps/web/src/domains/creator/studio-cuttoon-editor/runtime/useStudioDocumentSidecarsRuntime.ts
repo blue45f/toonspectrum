@@ -68,6 +68,11 @@ export function useStudioDocumentSidecarsRuntime({
   });
 
   const {
+    animaticWorkspace,
+    animaticPersistenceBusy,
+    animaticPersistenceError,
+    hydrateAnimaticWorkspace,
+    commitAnimaticWorkspace,
     characterBible,
     hydrateStudioSidecarDocuments,
     hydrateStudioSidecarSource,
@@ -151,6 +156,11 @@ export function useStudioDocumentSidecarsRuntime({
   masterRenderElsRef.current = masterRenderEls;
 
   return {
+    animaticWorkspace,
+    animaticPersistenceBusy,
+    animaticPersistenceError,
+    hydrateAnimaticWorkspace,
+    commitAnimaticWorkspace,
     aiProvenance,
     characterBible,
     hydrateStudioSidecarDocuments,

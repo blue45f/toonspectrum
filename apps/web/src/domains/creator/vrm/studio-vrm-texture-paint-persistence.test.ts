@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { Group } from "three";
+import { createStudioVrmTexturePaintRuntime } from "./studio-vrm-texture-paint-runtime";
 
 import {
   STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES,
@@ -73,6 +75,20 @@ function dependencies(
 }
 
 describe("studio VRM texture-paint persistence", () => {
+  it("preserves scalar slot identity through persistence and cold rehydration", async () => {
+    const binding = { bindingKey: "gltf-material-2-roughness", materialLocator: "gltf-material:2", textureSlot: "roughness" as const };
+    const stored = artifact(binding.bindingKey);
+    const deps = dependencies({ createArtifact: vi.fn(async () => stored), getArtifact: vi.fn(async () => stored) });
+    const runtime = { exportPaintedTargets: () => ({ ok: true as const, value: [{ id: "roughness", width: 2, height: 1, pixels: new Uint8ClampedArray(8), bindings: [binding] }] }) };
+    const settings = await persistStudioVrmTexturePaintRuntime(runtime, { dependencies: deps });
+    expect(settings).toMatchObject({ version: 2, textures: [{ textureSlot: "roughness", colorSpace: "linear", channelPacking: "grayscale" }] });
+    const emptyRuntime = createStudioVrmTexturePaintRuntime(new Group());
+    const snapshot = emptyRuntime.getSnapshot();
+    emptyRuntime.dispose();
+    const rehydrateTarget = vi.fn(async () => ({ ok: true as const, value: snapshot }));
+    await rehydrateStudioVrmTexturePaintRuntime({ rehydrateTarget }, settings, { dependencies: deps });
+    expect(rehydrateTarget).toHaveBeenCalledWith(expect.objectContaining({ binding }));
+  });
   it("encodes each changed target once while preserving every material binding", async () => {
     const deps = dependencies();
     const runtime = {
