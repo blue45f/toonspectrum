@@ -155,6 +155,22 @@ describe("WGSL shader sandbox and device budget", () => {
     })).toContain("storage-write-policy-violation");
   });
 
+  it("ignores nested comments while keeping following executable tokens visible", () => {
+    expect(codes({ ...simple, wgsl: simple.wgsl + "\n/* outer /* loop */ while */" })).toEqual([]);
+    expect(codes({ ...simple, wgsl: simple.wgsl + "\n// /* line comment\nloop;" }))
+      .toContain("control-flow-policy-violation");
+    expect(codes({ ...simple, wgsl: simple.wgsl + "\n/* for */ loop;" }))
+      .toContain("control-flow-policy-violation");
+  });
+
+  it("rejects unterminated nested comments and oversized shader input", () => {
+    expect(codes({ ...simple, wgsl: simple.wgsl + "\n/*" + "a/*".repeat(16_000) }))
+      .toContain("shader-source-invalid");
+    expect(codes({ ...simple, wgsl: " ".repeat(262_145) })).toContain("shader-source-invalid");
+    expect(codes({ ...simple, wgsl: { length: Number.MAX_SAFE_INTEGER } as unknown as string }))
+      .toContain("shader-source-invalid");
+  });
+
   it("fails closed with all structured reasons", () => {
     expect(() => assertWgslVariantAdmitted(simple, {
       ...baseline(),
