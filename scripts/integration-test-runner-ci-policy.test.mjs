@@ -38,6 +38,18 @@ const HEADED_PARITY_COMMAND =
   'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console';
 
 describe("database integration runner CI policy", () => {
+  it.each(["ci.yml", "bg3d-runtime-regression.yml", "studio-ink-live-commit.yml"])(
+    "runs %s for both main and the active integration branch",
+    (filename) => {
+      const workflow = readYaml(`.github/workflows/${filename}`);
+      for (const event of ["pull_request", "push"]) {
+        expect(workflow.on[event].branches).toEqual([
+          "main", "release/salvage-integration-20260908",
+        ]);
+      }
+    },
+  );
+
   it("keeps the package entrypoints bound to the reviewed integration runners", () => {
     const packageManifest = readJson("package.json");
 

@@ -2,7 +2,7 @@ name: BG3D production runtime regression
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, release/salvage-integration-20260908]
     paths:
       - "apps/web/src/domains/creator/bg3d/**"
       - "e2e/studio-3d-visual-verification.spec.ts"
@@ -15,7 +15,7 @@ on:
       - "pnpm-lock.yaml"
       - ".github/workflows/bg3d-runtime-regression.yml"
   push:
-    branches: [main]
+    branches: [main, release/salvage-integration-20260908]
     paths:
       - "apps/web/src/domains/creator/bg3d/**"
       - "e2e/studio-3d-visual-verification.spec.ts"
