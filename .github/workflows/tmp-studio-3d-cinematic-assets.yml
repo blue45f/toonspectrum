@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   integrate-and-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     env:
       CI: true
@@ -93,4 +93,4 @@ jobs:
           git commit -m "feat(studio): add cinematic procedural 3d asset pack"
           git push origin HEAD:feat/studio-3d-cinematic-assets-20260909
 
-# Triggered by the CI repair pass; this file deletes itself after validated integration.
+# ARM runner trigger for the validated integration pass; this file deletes itself after success.
