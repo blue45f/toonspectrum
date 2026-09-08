@@ -58,6 +58,7 @@ import {
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
+import { StudioSelectionWorkbenchPanel } from "./StudioSelectionWorkbenchPanel";
 import {
   StudioRasterToolRecoveryPanel,
   StudioInspectorFilterLauncher,
@@ -608,6 +609,27 @@ export function StudioInspectorSelectedImageTools({
                           onColorRangeRemoveSample={(i) => setColorRangeSamples((prev) => prev.filter((_, idx) => idx !== i))}
                           onColorRangeClearSamples={() => setColorRangeSamples([])}
                           onColorRangeApply={() => void runColorRangeApply()}
+                        />
+                        <StudioSelectionWorkbenchPanel
+                          selection={pixelSel}
+                          operation={pixelCombine}
+                          imageSource={selectedReadableImageSource ?? null}
+                          scopeKey={selected.id}
+                          aspect={selected.width > 0 ? selected.height / selected.width : 1}
+                          flipX={selected.flipped === true}
+                          flipY={selected.flippedY === true}
+                          busy={pixelBusy}
+                          onCommitSelection={(next, intent) => {
+                            clearPolyLassoDraft();
+                            commitPixelSelectionState(
+                              next,
+                              intent === "smooth"
+                                ? "transform"
+                                : intent === "restore-saved"
+                                  ? "other"
+                                  : "magic-wand",
+                            );
+                          }}
                         />
                         <StudioMagicWandPanel
                           active={pixelTool === "wand"}
