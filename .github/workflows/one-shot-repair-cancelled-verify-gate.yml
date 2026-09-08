@@ -65,7 +65,6 @@ jobs:
           )
           PY
           git diff --check
-          grep -F 'if: ${{ always() && !cancelled() }}' .github/workflows/ci.yml
       - name: Commit the repair and retire this temporary workflow
         shell: bash
         run: |
