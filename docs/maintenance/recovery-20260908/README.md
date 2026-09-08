@@ -23,7 +23,7 @@
 - 화면·검증: 협업 표시와 view HUD를 공통 sticky 영역에 배치하고 상태 안내가 전체 높이를 따라가게 했습니다. Smart Shape cold recovery/extreme view 검사, fractional touch target 검증, 탐색 시간 측정을 복구했습니다.
 - 동시 작업에서 확정된 `a4a7dd1b68a4c4fe499c4b5f3af1010aaeb7022a`까지 원본 14개 커밋도 합쳤습니다. 필터별 불투명도, ICC 곡선 검증, 자산 revision 정리 경합, Rodin 응답 body 취소, 오디오 준비 중 내보내기 취소, 이미지 재생성 실패 시 기존 결과 보존이 포함됩니다. 이후 새로 시작한 기능 작업은 이 snapshot 범위에 포함하지 않습니다.
 - 정리 자동화: 다른 열린 PR의 base인 브랜치를 보호하는 `f3557f3d` 수정(통합 내 `52e76936`)을 포함했습니다. 대상 SHA와 열린 base PR을 삭제 직전에 다시 검사하고 API 오류에는 삭제를 중단합니다.
-- CI: `7f4bd6ba182e86d4d273bf007a0ba852b3ec45d0`의 3개 workflow 대상/경로 수정과 정책 테스트를 합쳤습니다. 통합 브랜치 및 번들 검사 관련 파일 변경을 감지하며 기존 job/permissions/concurrency는 유지합니다.
+- CI: `7f4bd6ba182e86d4d273bf007a0ba852b3ec45d0` 및 최종 후속 `3fedb55c33488add4931ab4ffe9c8c7672ffc209`의 workflow 대상/경로 수정과 정책 테스트를 합쳤습니다. 통합 브랜치 및 번들 검사 관련 파일 변경을 감지하며 기존 job/permissions/concurrency는 유지합니다.
 
 ## 원본을 보관한 제안과 실험
 
@@ -37,6 +37,10 @@
 
 ## 검증과 정리
 
-현재 합본 관련 회귀 테스트 777개, CI 정책 테스트 23개, 웹/API TypeScript, 수정 파일 ESLint, Vite production build를 통과했습니다. 별도 opt-in CPU 실험 27개 및 scoped TypeScript/ESLint도 통과했습니다. 정적 번들/CSP 검사의 최종 결과는 verification.json에 기록합니다. 전체 브라우저/GPU 제품 인수 검증은 다른 작업에서 진행 중이며 이 MR의 합본 전체 통과로 주장하지 않습니다.
+현재 합본 관련 회귀 테스트 777개, CI 정책 테스트 29개, 웹/API TypeScript, 수정 파일 ESLint, Vite production build를 통과했습니다. 별도 opt-in CPU 실험 27개 및 scoped TypeScript/ESLint도 통과했습니다. 정적 번들/CSP 검사의 최종 결과는 verification.json에 기록합니다. 전체 브라우저/GPU 제품 인수 검증은 다른 작업에서 진행 중이며 이 MR의 합본 전체 통과로 주장하지 않습니다.
 
 이미 main에 반영된 PR919 계열 clean worktree 1개와 로컬 브랜치 3개, 원격 CRDT 번들 브랜치 1개를 정리했습니다. worktree의 고유·무시 파일 179개는 압축 후 개별 SHA-256을 재검증했습니다. 원본 SHA는 `refs/cleanup-archive/all-unmerged-integration-20260908/`에 남아 있습니다. 활성 main checkout과 다른 작업의 독립 소스/서비스는 유지합니다. 미반영 소스는 이 통합 MR에 수집한 뒤에도 실제 대상 브랜치 반영 전까지 무조건 병합 완료로 취급하지 않습니다.
+
+## 감사 중 도착한 main 변경
+
+MR #959가 감사 도중 main `dce667137fca4849ecd5536fb4e8e9e3e54f4fa3`에 병합됐습니다. 이 변경의 Smart Shape 연결, AI 용도별 권한 및 자산 검사 의도는 이 통합 코드에 이미 포함돼 있습니다. 대체 Host 구현을 다시 설치하면 copy/snapshot 처리와 최신 원본·ID·진행 중 입력 검사가 약해지므로 현재 `useStudioSmartShapeEditing`을 유지했습니다. 고유한 메뉴 미연결 안내와 Quick Shape 버튼 호출·터치 크기 회귀만 좁게 복구했습니다. 새 main과의 source 비교는 [late-main-comparison.json](late-main-comparison.json)에 보관합니다. 최초 55 ref 감사 시점과 이후 변경 시점을 구분합니다.

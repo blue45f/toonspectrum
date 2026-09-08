@@ -100,6 +100,9 @@ export function buildStudioBrushMenuItems({
       label: "현재 스트로크 교정…",
       icon: Shapes,
       disabled: !ui.correctCurrentStroke,
+      unavailableReason: ui.correctCurrentStroke
+        ? undefined
+        : "현재 스트로크를 교정할 편집기가 연결되어 있지 않아요.",
       onSelect: () => { ui.correctCurrentStroke?.(); },
     },
     {

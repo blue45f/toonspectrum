@@ -9,7 +9,7 @@
     "numFailedTests": 0,
     "success": true
   },
-  "ciPolicyTests": 23,
+  "ciPolicyTests": 29,
   "cpuExperiments": 27,
   "webTypecheck": {
     "result": "pass",
@@ -62,5 +62,7 @@
       "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/ci-policy-vitest.log",
       "sha256": "200a622ff8fe697d9b52c4e0d010bbbca6dfa38cca48e5e95715b53b698b0478"
     }
-  }
+  },
+  "finalCiSource": "3fedb55c33488add4931ab4ffe9c8c7672ffc209",
+  "latestMainCompared": "dce667137fca4849ecd5536fb4e8e9e3e54f4fa3"
 }

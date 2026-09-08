@@ -162,6 +162,7 @@ export interface StudioMainMenuUiActions extends StudioMainMenuSurfaceActions {
   openShortcuts: () => unknown;
   selectDrawMode: (mode: Extract<DrawMode, "pen" | "eraser">) => unknown;
   enableSmartShape: () => unknown;
+  /** Opens the current-stroke Smart Shape editor. Absent when the host has not wired it. */
   correctCurrentStroke?: () => unknown;
   /** Free-transform / pixel-selection transform, whatever the selection turns out to be. */
   activateTransformTool: () => unknown;
