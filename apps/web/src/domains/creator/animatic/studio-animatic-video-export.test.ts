@@ -77,6 +77,51 @@ describe("storyboard video completion and resource cleanup", () => {
     expect(h.track.stop).toHaveBeenCalledOnce();
     expect(h.frames.size).toBe(0);
   });
+  it.each(["cancel", "hidden", "resume-race"] as const)("interrupts audio preparation on %s without recording after interruption", async (reason) => {
+    const h = harness(), controller = new AbortController();
+    let resume: () => void = () => undefined;
+    const audio = {
+      resume: vi.fn(() => new Promise<void>((resolve) => { resume = resolve; })),
+      close: vi.fn(async () => undefined),
+      createMediaStreamDestination: vi.fn(() => { throw new Error("resumed after export was interrupted"); }),
+    };
+    vi.stubGlobal("AudioContext", class { constructor() { return audio; } });
+    const visibility = new EventTarget() as EventTarget & { visibilityState: string };
+    visibility.visibilityState = "visible";
+    vi.stubGlobal("document", visibility);
+    const track = {
+      id: "voice", name: "voice", asset: { hash: `sha256:${"b".repeat(64)}` as const, bytes: 20, mime: "audio/wav" },
+      startMs: 0, durationMs: 1000, trimStartMs: 0, trimEndMs: 1000,
+      volume: 1, muted: false, waveform: [],
+    };
+    let settlement: { error: unknown } | { blob: Blob } | undefined;
+    const done = exportStudioAnimaticVideo({ ...h.request, signal: controller.signal,
+      snapshot: { ...h.request.snapshot, audio: [track] },
+    }).then((blob) => { settlement = { blob }; }, (error: unknown) => { settlement = { error }; });
+    expect(audio.resume).toHaveBeenCalledOnce();
+    if (reason === "resume-race") { resume(); await Promise.resolve(); }
+    if (reason !== "hidden") controller.abort();
+    else { visibility.visibilityState = "hidden"; visibility.dispatchEvent(new Event("visibilitychange")); }
+    try {
+      // Let promise/finally microtasks finish while the browser resume promise remains pending.
+      for (let index = 0; index < 12; index++) await Promise.resolve();
+      expect(settlement).toMatchObject({ error: reason !== "hidden"
+        ? expect.objectContaining({ name: "AbortError" })
+        : expect.objectContaining({ message: expect.stringContaining("화면이 숨겨져") }) });
+      expect(audio.close).toHaveBeenCalledOnce();
+      expect(h.track.stop).toHaveBeenCalledOnce();
+      expect(h.canvas.width).toBe(1);
+      expect(h.canvas.height).toBe(1);
+      expect(h.frames.size).toBe(0);
+      expect(h.deps.createRecorder).not.toHaveBeenCalled();
+    } finally {
+      // Release the fake browser operation even on failure; its late resolution must do nothing.
+      resume(); await done;
+    }
+    expect(audio.createMediaStreamDestination).not.toHaveBeenCalled();
+    expect(h.recorder.start).not.toHaveBeenCalled();
+    expect(audio.close).toHaveBeenCalledOnce();
+  });
   it("rejects an encoder error emitted synchronously from start", async () => {
     const h = harness();
     vi.mocked(h.recorder.start).mockImplementation(() => h.recorder.onerror?.(new Error("encoder unavailable")));
