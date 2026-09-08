@@ -73,7 +73,7 @@ function normalizedTag(value: string): string {
 }
 
 export function parseStudioPublicationTags(value: string | readonly string[]): string[] {
-  const source = Array.isArray(value) ? value : value.split(/[,\s]+/u);
+  const source = typeof value === "string" ? value.split(/[,\s]+/u) : value;
   return source.map(normalizedTag).filter(Boolean).slice(0, 8);
 }
 
