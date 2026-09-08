@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import { LearnPage as LearnContent } from "./LearnContent";
 import { LearningRecordsPage } from "./LearningRecordsPage";
@@ -11,12 +11,5 @@ export function LearnPage() {
   if (pathname === "/learn/records" || pathname === "/learn/records/") {
     return <LearningRecordsPage />;
   }
-  return (
-    <>
-      <aside className="learn-record-shortcut" lang="ko" aria-label="학습 기록 관리">
-        <Link to="/learn/records">내 학습 기록 · 백업 / 복원 →</Link>
-      </aside>
-      <LearnContent />
-    </>
-  );
+  return <LearnContent />;
 }
