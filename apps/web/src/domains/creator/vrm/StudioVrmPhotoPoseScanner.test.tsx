@@ -183,6 +183,29 @@ describe("StudioVrmPhotoPoseScanner", () => {
     ]);
   });
 
+  it("uses only a generated blob URL for a preview even when a filename contains markup", async () => {
+    const createObjectURL = vi.fn(() => "blob:https://toonstudio.cloud/generated-preview");
+    const revokeObjectURL = vi.fn();
+    class PreviewURL extends URL {
+      static createObjectURL = createObjectURL;
+      static revokeObjectURL = revokeObjectURL;
+    }
+    vi.stubGlobal("URL", PreviewURL);
+    const file = new File([new Uint8Array([1, 2, 3])], '<svg onload="alert(1)">.png', { type: "image/png" });
+    const { container, unmount } = render(
+      <StudioVrmPhotoPoseScanner includeHandDetection={false} onApply={() => true} />,
+    );
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(container.querySelector("svg image")).not.toBeNull());
+    expect(createObjectURL).toHaveBeenCalledWith(file);
+    expect(container.querySelector("svg image")?.getAttribute("href"))
+      .toBe("blob:https://toonstudio.cloud/generated-preview");
+    expect(container.querySelector("[onload], script")).toBeNull();
+    unmount();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:https://toonstudio.cloud/generated-preview");
+  });
+
   it("scans an image handed over by the surrounding surface without a second file pick", async () => {
     const file = new File([new Uint8Array([9, 9, 9])], "handed.png", { type: "image/png" });
     const { rerender } = render(

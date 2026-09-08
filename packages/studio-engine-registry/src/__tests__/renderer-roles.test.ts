@@ -288,6 +288,13 @@ describe("renderer role ledger markdown", () => {
     );
   });
 
+  it("escapes existing backslashes before table delimiters and folds all line endings", () => {
+    const note = String.raw`left\|middle\\|right` + "\rnext\r\nlast\nend";
+    const markdown = renderRendererRoleLedgerMarkdown([{ ...STUDIO_RENDERER_ROLE_LEDGER[0], note }]);
+    expect(markdown).toContain(String.raw`left\\\|middle\\\\\|right` + " next last end");
+    expect(markdown).not.toContain("\r");
+  });
+
   it("groups primary rows before lab rows", () => {
     const markdown = renderRendererRoleLedgerMarkdown(STUDIO_RENDERER_ROLE_LEDGER);
     expect(markdown.indexOf("`konva`")).toBeLessThan(markdown.indexOf("`wesl`"));

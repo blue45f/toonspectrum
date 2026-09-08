@@ -31,6 +31,12 @@ describe("studio music contract", () => {
   it("rejects non-object requests", () => {
     for (const value of [null, [], "hello", 42]) expect(() => parseMusicBrief(value)).toThrow();
   });
+  it("strips long period runs and preserves filename control-character safety", () => {
+    expect(musicFilename(".".repeat(50_000) + "track" + ".".repeat(50_000))).toBe("track.mp3");
+    expect(musicFilename(".".repeat(50_000))).toBe("toonstudio-music.mp3");
+    expect(musicFilename("track" + String.fromCharCode(0, 31) + "name")).toBe("track__name.mp3");
+    expect(musicFilename("가".repeat(100))).toBe("가".repeat(80) + ".mp3");
+  });
   it("sanitizes download names and identifies MP3 instead of HTML", () => {
     expect(musicFilename("../../evil:track?")).toBe("_.._evil_track_.mp3");
     expect(musicFilename("...")).toBe("toonstudio-music.mp3");

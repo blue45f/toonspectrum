@@ -390,6 +390,24 @@ describe("VRM 소품 카탈로그", () => {
 });
 
 describe("부착 인스턴스 생성·직렬화", () => {
+  it("crypto가 없는 WebView에서도 약한 난수 없이 고유한 로컬 키를 만든다", () => {
+    vi.stubGlobal("crypto", undefined);
+    const now = vi.spyOn(Date, "now").mockReturnValue(123456789);
+    const random = vi.spyOn(Math, "random").mockImplementation(() => {
+      throw new Error("UI identifiers must not depend on weak randomness");
+    });
+    try {
+      const first = createPropInstance("mug")!;
+      const second = createPropInstance("mug")!;
+      expect(first.uid).not.toBe(second.uid);
+      expect(random).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+      now.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it.each(["missing", "throwing"])("uses secure random bytes when randomUUID is %s", (mode) => {
     const getRandomValues = vi.fn((bytes: Uint8Array) => bytes.fill(0xab));
     const random = vi.spyOn(Math, "random");

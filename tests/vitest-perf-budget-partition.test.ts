@@ -38,6 +38,7 @@ describe("execution-time budget partition", () => {
   it("lists only files that measure execution time", () => {
     // The clock can be owned by a shared helper. Both calibrated budgets and the catalogue
     // matrix are live measurements even though the test does not call performance.now itself.
+    // CPU-time ratios also measure execution cost and must avoid coverage instrumentation.
     const notTimed = PERF_BUDGET_TEST_FILES.filter((file) =>
       !measuresExecutionTime(readFileSync(path.join(root, file), "utf8")));
     expect(

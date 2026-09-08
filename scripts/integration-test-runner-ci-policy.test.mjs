@@ -33,7 +33,7 @@ function usesActions(job) {
 
 const PLAYWRIGHT_INSTALL = "pnpm exec playwright install --with-deps chromium";
 const ROOT_SHARD_COMMAND =
-  "pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }}";
+  "pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }} --testTimeout=120000";
 const HEADED_PARITY_COMMAND =
   'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console';
 
@@ -323,6 +323,7 @@ describe("database integration runner CI policy", () => {
     // The checks that used to live inside the single core job each keep their own runner.
     expect(runCommands(workflow.jobs?.lint)).toEqual([
       "pnpm install --frozen-lockfile",
+      "pnpm run audit:security",
       "pnpm run validate:architecture",
       "pnpm run verify:csp",
       "pnpm run verify:toolchain-coverage",

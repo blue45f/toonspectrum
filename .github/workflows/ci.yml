@@ -64,6 +64,7 @@ jobs:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+      - run: pnpm run audit:security
       - run: pnpm run validate:architecture
       - run: pnpm run verify:csp
       - run: pnpm run verify:toolchain-coverage
@@ -105,8 +106,8 @@ jobs:
       - run: pnpm run build
       - run: pnpm run check:studio-bundle
       - run: pnpm run build:all
-      - name: Verify the isolated Vercel API artifact starts and serves its read routes
-        run: node scripts/verify-api-serverless-build.mjs
+      - name: Verify isolated Vercel API artifact
+        run: pnpm run verify:api-serverless-build
       - name: Verify Cloudflare realtime Worker packaging
         run: |
           pnpm exec wrangler deploy \
@@ -322,12 +323,17 @@ jobs:
       # 않아 각 러너가 전체 스위트를 중복 실행한다. shard 옵션을 스크립트에 직접 전달한다.
       - name: Run this shard of the root Vitest suite with per-file progress
         timeout-minutes: 20
-        run: pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }}
+        # V8 coverage makes synchronous fluid/replay correctness cases take up to 60s
+        # on the four-worker runner (run 34195132851). Keep their full numerical inputs
+        # and assertions, with a bounded 120s coverage-only test timeout. The normal
+        # 30s suite and uninstrumented serial performance budgets stay unchanged.
+        run: pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }} --testTimeout=120000
       - name: Preserve this shard's coverage for SonarQube
         uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
         with:
           name: sonar-coverage-${{ matrix.shard }}
           path: coverage/shard-${{ matrix.shard }}/lcov.info
+          overwrite: true
           if-no-files-found: error
           retention-days: 7
 

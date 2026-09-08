@@ -330,6 +330,8 @@ export function StudioVrmPhotoPoseScanner({
     if (previewUrlRef.current && typeof URL.revokeObjectURL === "function") {
       URL.revokeObjectURL(previewUrlRef.current);
     }
+    // Preview hrefs come only from the browser's blob URL registry, never file
+    // names, imported text or HTML. Keep this provenance when changing previews.
     const next = file && typeof URL.createObjectURL === "function"
       ? URL.createObjectURL(file)
       : "";
