@@ -1,0 +1,85 @@
+name: Studio GPU soak reproductions
+
+on:
+  push:
+    branches: [release/salvage-integration-20260908]
+    paths:
+      - '.github/workflows/studio-gpu-soak-repro.yml'
+      - 'scripts/qa/studio-webgpu-soak-command.mjs'
+      - 'scripts/qa/studio-soak-config.mjs'
+      - 'scripts/qa/studio-soak-runner.mjs'
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact 40-character commit SHA to verify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  linux-webgpu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      QA_SUITE: brush-raster
+      QA_CASE: webgpu-brush-parity,professional-bristle
+      QA_RESULTS_DIR: artifacts/studio-gpu-soak-repro/logs
+      QA_EVIDENCE_DIR: artifacts/studio-gpu-soak-repro/evidence
+      JIRA_BASE_URL: ''
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Bind evidence to the exact requested source
+        id: source
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { mkdirSync, writeFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          const event = process.env.GITHUB_EVENT_NAME;
+          const expected = event === 'push' ? process.env.GITHUB_SHA : process.env.EXPECTED_SHA;
+          const actual = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const receipt = {
+            event, expected, actual, eventSha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF,
+            suite: process.env.QA_SUITE, cases: process.env.QA_CASE,
+            platform: process.platform, architecture: process.arch, node: process.version,
+            runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            rendererLane: 'Linux Chromium headed under Xvfb; forced SwiftShader',
+          };
+          mkdirSync(process.env.QA_EVIDENCE_DIR, { recursive: true });
+          writeFileSync(join(process.env.QA_EVIDENCE_DIR, 'source.json'), JSON.stringify(receipt, null, 2) + '\n');
+          console.log(JSON.stringify(receipt));
+          if (!['push', 'workflow_dispatch'].includes(event) || !/^[0-9a-f]{40}$/.test(expected ?? '')
+            || expected !== actual || expected !== process.env.GITHUB_SHA) throw new Error('Source SHA mismatch');
+          NODE
+      - run: pnpm install --frozen-lockfile
+      - name: Verify actual soak command and workflow contracts
+        run: >-
+          pnpm exec vitest run --maxWorkers=1
+          scripts/qa/studio-webgpu-soak-command.test.ts
+          scripts/qa/studio-gpu-soak-workflow.test.mjs
+      - name: Install Chromium and Linux compositor dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run only the two original Linux WebGPU reproductions
+        run: node scripts/qa/studio-chromium-inapp-suite-runner.mjs
+      - name: Upload source, browser, renderer, queue and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
+        with:
+          name: studio-gpu-soak-repro-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/studio-gpu-soak-repro
+          if-no-files-found: warn
+          retention-days: 14
