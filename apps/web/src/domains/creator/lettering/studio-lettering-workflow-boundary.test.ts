@@ -13,7 +13,7 @@ describe("Studio lettering workflow boundary", () => {
     const dispatcher = read("../studio-page-shortcut-dispatcher.ts");
     const help = read("../StudioShortcutsHelp.tsx");
 
-    expect(settings).toContain('{ id: "tool-lettering", label: "레터링(텍스트·말풍선)", labelKey: "studio.settings.shortcut.toolLettering", defaultKeys: "T" }');
+    expect(settings).toContain('{ id: "tool-lettering", label: "글자·말풍선", labelKey: "studio.settings.shortcut.toolLettering", defaultKeys: "T" }');
     expect(dispatcher).toContain('matchStudioShortcut(sc["tool-lettering"], e)');
     expect(dispatcher).toContain("void startEditText(selected.id)");
     expect(dispatcher).toContain("addBubble(lastLettering.variant, undefined, true)");

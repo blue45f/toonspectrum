@@ -47,7 +47,7 @@ beforeEach(() => {
 });
 
 describe("acquireStudioGpuPresentationDevice", () => {
-  it("borrows the Studio GPU fabric and maps destroy to an idempotent lease release", async () => {
+  it("borrows the Studio GPU fabric and keeps the native device and releases only its own lease", async () => {
     const createBuffer = vi.fn(function createBuffer(this: GPUDevice) {
       return this;
     });
@@ -70,14 +70,16 @@ describe("acquireStudioGpuPresentationDevice", () => {
       canvasFormat: "bgra8unorm",
       ownership: "fabric-lease",
     });
+    // GPUCanvasContext.configure accepts the native object, not a Proxy of GPUDevice.
+    expect(acquired?.device).toBe(physicalDevice);
     expect(fabricHarness.acquireStudioGpuDevice).toHaveBeenCalledWith({ gpu });
     expect(requestAdapter).not.toHaveBeenCalled();
     expect(acquired?.device.createBuffer({} as GPUBufferDescriptor)).toBe(
       physicalDevice,
     );
 
-    acquired?.device.destroy();
-    acquired?.device.destroy();
+    acquired?.release();
+    acquired?.release();
     expect(lease.release).toHaveBeenCalledTimes(1);
     expect(physicalDestroy).not.toHaveBeenCalled();
   });
@@ -100,6 +102,7 @@ describe("acquireStudioGpuPresentationDevice", () => {
       deviceEpoch: 1,
       canvasFormat: "rgba8unorm",
       ownership: "dedicated",
+      release: expect.any(Function),
     });
     expect(requestAdapter).toHaveBeenCalledWith({
       powerPreference: "high-performance",
@@ -107,7 +110,8 @@ describe("acquireStudioGpuPresentationDevice", () => {
     expect(requestDevice).toHaveBeenCalledTimes(1);
     expect(fabricHarness.acquireStudioGpuDevice).not.toHaveBeenCalled();
 
-    acquired?.device.destroy();
+    acquired?.release();
+    acquired?.release();
     expect(destroy).toHaveBeenCalledTimes(1);
   });
 

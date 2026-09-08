@@ -65,11 +65,13 @@ function add(document: StudioCrdtDocument, id: string, x: number): void {
 class FakeRoom {
   ready = true;
   readonly mode: "local" | "server";
+  crdtFanout?: "authoritative" | "mesh" | "none";
   readonly workId = "work-a";
   readonly participant = { sessionId: "self", displayName: "Me", role: "editor" as const };
   readonly crdtListeners = new Set<(event: StudioLiveCrdtRoomEvent) => void>();
   readonly roomListeners = new Set<(event: StudioLiveRoomEvent) => void>();
   readonly publications: StudioCrdtUpdateRequest[] = [];
+  readonly syncResponses: Array<{ response: StudioCrdtSyncResponse; sessionId: string }> = [];
   server: StudioCrdtDocument;
   failuresRemaining = 0;
   nextPublishError: Error | null = null;
@@ -153,7 +155,8 @@ class FakeRoom {
     };
   }
 
-  respondCrdtSync(): boolean {
+  respondCrdtSync(response: StudioCrdtSyncResponse, sessionId: string): boolean {
+    this.syncResponses.push({ response, sessionId });
     return true;
   }
 
@@ -373,6 +376,173 @@ describe("StudioCrdtRoomBinding", () => {
     source.destroy();
     client.destroy();
     server.destroy();
+  });
+
+  it("holds a local delivery fence until the final sub-frame batch is sent without inventing a server ACK", async () => {
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(peer, "local");
+    const statuses: StudioCrdtBindingStatus[] = [];
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake), onStatus: (status) => statuses.push(status) });
+    await binding.start();
+    let release!: () => void;
+    fake.publishBarrier = new Promise<void>((resolve) => { release = resolve; });
+    add(client, "sub-frame-delivery", 20);
+    let delivered = false;
+    const delivery = binding.flushAndWaitForDelivery().then(() => { delivered = true; });
+    await vi.waitFor(() => expect(fake.publications).toHaveLength(1));
+    expect(delivered).toBe(false);
+    expect(peer.getStroke("sub-frame-delivery")).toBeNull();
+    release();
+    await delivery;
+    expect(peer.getStroke("sub-frame-delivery")).not.toBeNull();
+    expect(statuses.at(-1)).toMatchObject({ pendingCount: 0, lastAckAt: null, lastAckServerSequence: null });
+    await expect(binding.flushAndWaitForAuthoritativeAck()).rejects.toThrow("서버 승인 전");
+    binding.close();
+    client.destroy();
+    peer.destroy();
+  });
+
+  it("retries the same local update inside the delivery fence and repairs the latest peer frontier", async () => {
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(peer, "local");
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    await binding.start();
+    add(peer, "peer-before-lease", 21);
+    fake.failuresRemaining = 1;
+    add(client, "retry-delivery", 22);
+    await binding.flushAndWaitForDelivery();
+    expect(client.getStroke("peer-before-lease")).not.toBeNull();
+    expect(peer.getStroke("retry-delivery")).not.toBeNull();
+    expect(fake.publications).toHaveLength(2);
+    expect(fake.publications[0]).toEqual(fake.publications[1]);
+    binding.close();
+    client.destroy();
+    peer.destroy();
+  });
+
+  it("requests a fresh local frontier after joining a sync that began before the delivery fence", async () => {
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(peer, "local");
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    await binding.start();
+    let release!: () => void;
+    fake.nextSyncBarrier = new Promise<void>((resolve) => { release = resolve; });
+    const earlierSync = binding.syncNow();
+    const delivery = binding.flushAndWaitForDelivery();
+    expect(fake.syncRequests).toBe(2);
+    release();
+    await earlierSync;
+    await delivery;
+    expect(fake.syncRequests).toBe(3);
+    expect(fake.publications).toHaveLength(0);
+    binding.close();
+    client.destroy();
+    peer.destroy();
+  });
+
+  it("times out a blocked local delivery while keeping its pending request available to retry", async () => {
+    vi.useFakeTimers();
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(peer, "local");
+    const statuses: StudioCrdtBindingStatus[] = [];
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake), onStatus: (status) => statuses.push(status) });
+    await binding.start();
+    let release!: () => void;
+    fake.publishBarrier = new Promise<void>((resolve) => { release = resolve; });
+    add(client, "slow-local-delivery", 23);
+    const timeout = expect(binding.flushAndWaitForDelivery(100)).rejects.toThrow("전송을 기다리는 시간이 초과");
+    await vi.advanceTimersByTimeAsync(100);
+    await timeout;
+    expect(statuses.at(-1)).toMatchObject({ pendingCount: 1 });
+    expect(client.getStroke("slow-local-delivery")).not.toBeNull();
+    release();
+    await binding.flushAndWaitForDelivery();
+    expect(peer.getStroke("slow-local-delivery")).not.toBeNull();
+    expect(fake.publications).toHaveLength(1);
+    expect(statuses.at(-1)).toMatchObject({ pendingCount: 0 });
+    binding.close();
+    client.destroy();
+    peer.destroy();
+  });
+
+  it("rejects a local delivery that completes after the binding closes", async () => {
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(peer, "local");
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    await expect(binding.flushAndWaitForDelivery()).rejects.toThrow("시작되지 않았습니다");
+    await binding.start();
+    let release!: () => void;
+    fake.publishBarrier = new Promise<void>((resolve) => { release = resolve; });
+    add(client, "closing-local-delivery", 24);
+    const rejected = expect(binding.flushAndWaitForDelivery()).rejects.toThrow("이미 닫힌");
+    await vi.waitFor(() => expect(fake.publications).toHaveLength(1));
+    binding.close();
+    release();
+    await rejected;
+    await expect(binding.flushAndWaitForDelivery()).rejects.toThrow("이미 닫힌");
+    client.destroy();
+    peer.destroy();
+  });
+
+  it("rejects local delivery on a disconnected channel or terminal recovery", async () => {
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(peer, "local");
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    await binding.start();
+    fake.ready = false;
+    await expect(binding.flushAndWaitForDelivery()).rejects.toThrow("연결이 끊겼습니다");
+    fake.ready = true;
+    fake.nextSyncError = createStudioCrdtServerAckError("storage_corruption", "corrupt delivery frontier");
+    await expect(binding.flushAndWaitForDelivery()).rejects.toThrow("corrupt delivery frontier");
+    expect(binding.recoveryRequired).toBe(true);
+    await expect(binding.flushAndWaitForDelivery()).rejects.toThrow("corrupt delivery frontier");
+    binding.close();
+    client.destroy();
+    peer.destroy();
+  });
+
+  it("uses the actual authoritative ACK fence for server delivery", async () => {
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server);
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    await binding.start();
+    const ack = vi.spyOn(binding, "flushAndWaitForAuthoritativeAck");
+    add(client, "server-delivery", 25);
+    await binding.flushAndWaitForDelivery(700);
+    expect(ack).toHaveBeenCalledExactlyOnceWith(700);
+    expect(server.getStroke("server-delivery")).not.toBeNull();
+    binding.close();
+    client.destroy();
+    server.destroy();
+  });
+
+  it.each(["scoped-local", "mesh", "none"] as const)("does not release unacknowledged %s data through a delivery fence", async (kind) => {
+    vi.useFakeTimers();
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(peer, kind === "scoped-local" ? "local" : "server");
+    if (kind !== "scoped-local") fake.crdtFanout = kind;
+    const outbox = new DurableMemoryOutbox();
+    const statuses: StudioCrdtBindingStatus[] = [];
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake), outbox,
+      outboxScope: kind === "scoped-local" ? "authenticated-fallback" : null,
+      recoveryVault: new MemoryRecoveryVault(), onStatus: (status) => statuses.push(status) });
+    await binding.start();
+    add(client, "requires-server-delivery", 26);
+    await expect(binding.flushAndWaitForDelivery()).rejects.toThrow("서버 승인 전");
+    await vi.advanceTimersByTimeAsync(40);
+    expect(statuses.at(-1)).toMatchObject({ pendingCount: 1, lastAckAt: null });
+    expect(outbox.requests.size).toBe(kind === "scoped-local" ? 1 : 0);
+    binding.close();
+    client.destroy();
+    peer.destroy();
   });
 
   it("flushes a sub-frame edit, waits for its authoritative ACK, then reconciles the final server frontier", async () => {
@@ -1049,6 +1219,248 @@ describe("StudioCrdtRoomBinding", () => {
     binding.close();
     client.destroy();
     server.destroy();
+  });
+
+  it.each([undefined, " \t "])("releases every delivered local-only batch without accumulating a backlog (scope %j)", async (outboxScope) => {
+    vi.useFakeTimers();
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const localRoom = new FakeRoom(peer, "local");
+    const outbox = new DurableMemoryOutbox();
+    const list = vi.spyOn(outbox, "list");
+    const put = vi.spyOn(outbox, "put");
+    const remove = vi.spyOn(outbox, "remove");
+    const statuses: StudioCrdtBindingStatus[] = [];
+    const binding = new StudioCrdtRoomBinding({
+      document: client,
+      room: room(localRoom),
+      outbox,
+      outboxScope,
+      onStatus: (status) => statuses.push(status),
+    });
+    await binding.start();
+
+    for (let index = 0; index < 256; index += 1) {
+      add(client, `local-batch-${index}`, index);
+      binding.flush();
+      await vi.advanceTimersByTimeAsync(40);
+      // Each subsequent drain has no already-delivered requests to retain or scan.
+      expect(statuses.at(-1)).toMatchObject({
+        state: "ready",
+        pendingCount: 0,
+        lastAckAt: null,
+        lastAckServerSequence: null,
+      });
+    }
+
+    expect(localRoom.publications).toHaveLength(256);
+    expect(new Set(localRoom.publications.map((request) => request.updateId)).size).toBe(256);
+    expect(peer.getStrokes()).toHaveLength(256);
+    expect(statuses.every((status) => status.pendingCount <= 1)).toBe(true);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(localRoom.publications).toHaveLength(256);
+    expect(list).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    await expect(binding.flushAndWaitForAuthoritativeAck()).rejects.toThrow("서버 승인 전");
+
+    binding.close();
+    client.destroy();
+    peer.destroy();
+  });
+
+  it("retains a failed local-only broadcast and retries the same request before releasing it", async () => {
+    vi.useFakeTimers();
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const localRoom = new FakeRoom(peer, "local");
+    localRoom.failuresRemaining = 1;
+    const statuses: StudioCrdtBindingStatus[] = [];
+    const binding = new StudioCrdtRoomBinding({
+      document: client,
+      room: room(localRoom),
+      onStatus: (status) => statuses.push(status),
+    });
+    await binding.start();
+
+    add(client, "retry-local-stroke", 51);
+    await vi.advanceTimersByTimeAsync(40);
+    expect(statuses.at(-1)).toMatchObject({ state: "retrying", pendingCount: 1 });
+    expect(peer.getStrokes()).toHaveLength(0);
+    const failedRequest = localRoom.publications[0];
+    await vi.advanceTimersByTimeAsync(300);
+    expect(localRoom.publications).toEqual([failedRequest, failedRequest]);
+    expect(peer.getStrokes().map((stroke) => stroke.id)).toEqual(["retry-local-stroke"]);
+    expect(statuses.at(-1)).toMatchObject({ state: "ready", pendingCount: 0, lastAckAt: null });
+
+    binding.close();
+    client.destroy();
+    peer.destroy();
+  });
+
+  it("serves a late peer from the document after local delivery and accepts duplicate incoming updates without echoing", async () => {
+    vi.useFakeTimers();
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const latePeer = new StudioCrdtDocument();
+    const localRoom = new FakeRoom(peer, "local");
+    const statuses: StudioCrdtBindingStatus[] = [];
+    const binding = new StudioCrdtRoomBinding({
+      document: client,
+      room: room(localRoom),
+      onStatus: (status) => statuses.push(status),
+    });
+    await binding.start();
+    add(client, "already-delivered", 51);
+    add(client, "deleted-before-peer-sync", 50);
+    await vi.advanceTimersByTimeAsync(40);
+    latePeer.applyUpdate(client.encodeStateAsUpdate());
+    expect(client.deleteStroke("deleted-before-peer-sync")).toBe(true);
+    await vi.advanceTimersByTimeAsync(40);
+    expect(statuses.at(-1)).toMatchObject({ pendingCount: 0 });
+
+    for (const listener of localRoom.crdtListeners) {
+      listener({
+        type: "sync-request",
+        senderSessionId: "late-peer",
+        request: {
+          protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+          workId: localRoom.workId,
+          requestId: "00000000-0000-4000-8000-000000000051",
+          stateVector: latePeer.getStateVectorBase64(),
+        },
+      });
+    }
+    expect(localRoom.syncResponses).toHaveLength(1);
+    expect(localRoom.syncResponses[0]?.sessionId).toBe("late-peer");
+    latePeer.applySyncResponse(localRoom.syncResponses[0]!.response);
+    expect(latePeer.getStroke("already-delivered")).not.toBeNull();
+    expect(latePeer.getStroke("deleted-before-peer-sync")).toBeNull();
+
+    add(latePeer, "incoming-from-late-peer", 52);
+    const update: StudioCrdtRemoteUpdate = {
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: localRoom.workId,
+      updateId: "00000000-0000-4000-8000-000000000052",
+      serverSequence: "0",
+      update: encodeStudioCrdtUpdate(latePeer.encodeStateAsUpdate(client.encodeStateVector())),
+    };
+    localRoom.emitRemote(update);
+    localRoom.emitRemote(update);
+    await vi.advanceTimersByTimeAsync(40);
+    expect(client.getStrokes().map((stroke) => stroke.id).sort()).toEqual([
+      "already-delivered",
+      "incoming-from-late-peer",
+    ]);
+    expect(localRoom.publications).toHaveLength(2);
+    expect(statuses.at(-1)).toMatchObject({ pendingCount: 0, lastAckAt: null });
+
+    binding.close();
+    client.destroy();
+    peer.destroy();
+    latePeer.destroy();
+  });
+
+  it("publishes the full local document to a later authoritative binding after releasing peer receipts", async () => {
+    vi.useFakeTimers();
+    const peer = new StudioCrdtDocument();
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const localRoom = new FakeRoom(peer, "local");
+    const localStatuses: StudioCrdtBindingStatus[] = [];
+    const localBinding = new StudioCrdtRoomBinding({
+      document: client,
+      room: room(localRoom),
+      onStatus: (status) => localStatuses.push(status),
+    });
+    await localBinding.start();
+    add(client, "local-before-cloud", 53);
+    add(client, "deleted-before-cloud", 52);
+    await vi.advanceTimersByTimeAsync(40);
+    const staleFrontier = client.encodeStateAsUpdate();
+    expect(client.deleteStroke("deleted-before-cloud")).toBe(true);
+    await vi.advanceTimersByTimeAsync(40);
+    expect(localStatuses.at(-1)).toMatchObject({ pendingCount: 0, lastAckAt: null });
+    localBinding.close();
+
+    const serverRoom = new FakeRoom(server);
+    const outbox = new DurableMemoryOutbox();
+    const serverStatuses: StudioCrdtBindingStatus[] = [];
+    const serverBinding = new StudioCrdtRoomBinding({
+      document: client,
+      room: room(serverRoom),
+      outbox,
+      outboxScope: "signed-in-after-local-edit",
+      recoveryVault: new MemoryRecoveryVault(),
+      onStatus: (status) => serverStatuses.push(status),
+    });
+    await serverBinding.start();
+    await serverBinding.flushAndWaitForAuthoritativeAck();
+    expect(server.getStroke("local-before-cloud")).not.toBeNull();
+    server.applyUpdate(staleFrontier);
+    expect(server.getStroke("deleted-before-cloud")).toBeNull();
+    expect(serverRoom.publications).toHaveLength(1);
+    expect(serverRoom.publications[0]?.updateId).not.toBe(localRoom.publications[0]?.updateId);
+    expect(outbox.requests.size).toBe(0);
+    expect(serverStatuses.at(-1)).toMatchObject({ pendingCount: 0, lastAckAt: expect.any(Number) });
+
+    serverBinding.close();
+    client.destroy();
+    peer.destroy();
+    server.destroy();
+  });
+
+  it("repairs an application deletion when the reconnecting server already has the original stroke", async () => {
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    add(client, "keep-after-reconnect", 53);
+    add(client, "delete-while-disconnected", 54);
+    server.applyUpdate(client.encodeStateAsUpdate());
+    expect(client.getStateVectorBase64()).toBe(server.getStateVectorBase64());
+
+    expect(client.deleteStroke("delete-while-disconnected")).toBe(true);
+    // Application deletion records an operation, so its frontier advances beyond the server.
+    expect(client.getStateVectorBase64()).not.toBe(server.getStateVectorBase64());
+    const serverRoom = new FakeRoom(server);
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(serverRoom) });
+    await binding.start();
+    await binding.flushAndWaitForAuthoritativeAck();
+    expect(server.getStroke("delete-while-disconnected")).toBeNull();
+    expect(server.getStroke("keep-after-reconnect")).not.toBeNull();
+    expect(serverRoom.publications).toHaveLength(1);
+    expect(client.getStateVectorBase64()).toBe(server.getStateVectorBase64());
+
+    await binding.syncNow();
+    expect(serverRoom.publications).toHaveLength(1);
+
+    binding.close();
+    client.destroy();
+    server.destroy();
+  });
+
+  it.each(["mesh", "none"] as const)("preserves server %s requests without treating peer receipts as authoritative", async (crdtFanout) => {
+    vi.useFakeTimers();
+    const peer = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const serverRoom = new FakeRoom(peer);
+    serverRoom.crdtFanout = crdtFanout;
+    const statuses: StudioCrdtBindingStatus[] = [];
+    const binding = new StudioCrdtRoomBinding({
+      document: client,
+      room: room(serverRoom),
+      onStatus: (status) => statuses.push(status),
+    });
+    await binding.start();
+    add(client, "unacknowledged-server-peer", 54);
+    await vi.advanceTimersByTimeAsync(40);
+    expect(statuses.at(-1)).toMatchObject({ state: "retrying", pendingCount: 1, lastAckAt: null });
+    await expect(binding.flushAndWaitForAuthoritativeAck()).rejects.toThrow("서버 승인 전");
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(serverRoom.publications).toHaveLength(1);
+
+    binding.close();
+    client.destroy();
+    peer.destroy();
   });
 
   it("keeps a local BroadcastChannel delivery in the durable outbox until a server ACK arrives", async () => {

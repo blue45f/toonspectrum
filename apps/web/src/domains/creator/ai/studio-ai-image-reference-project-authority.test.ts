@@ -295,7 +295,7 @@ describe("AI image reference project authority", () => {
       "aiImageReferences: scenarioImageReferenceDocument",
     );
     expect(restoreBoundary).toMatch(
-      /setScenarioImageReferenceDocument\(\s*hydrateStudioAiImageReferenceDocument\(projectData\.aiImageReferences\)/u,
+      /setScenarioImageReferenceDocumentState\(\s*hydrateStudioAiImageReferenceDocument\(projectData\.aiImageReferences\)/u,
     );
     expect(studioPageSource).not.toMatch(
       /\b(?:load|save|clear)StudioAiImageReferenceDocument\b/u,

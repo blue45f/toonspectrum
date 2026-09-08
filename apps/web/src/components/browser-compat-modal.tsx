@@ -81,7 +81,7 @@ export const BrowserCompatModal: React.FC<BrowserCompatModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="absolute top-4 right-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-fg-3 hover:bg-white/10 hover:text-fg transition-colors"
+            className="absolute top-4 right-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-fg-3 hover:bg-white/10 hover:text-fg transition-colors"
           >
             <X size={18} />
           </button>
@@ -184,7 +184,7 @@ export const BrowserCompatModal: React.FC<BrowserCompatModalProps> = ({
           <button
             type="button"
             onClick={handleCopyLink}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 text-xs font-medium text-fg hover:bg-white/10 transition-colors"
+            className="inline-flex min-h-11 max-w-full items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-center text-xs font-medium leading-tight text-fg hover:bg-white/10 transition-colors"
           >
             {copyState === "copied"
               ? "주소 복사됨!"
@@ -196,7 +196,7 @@ export const BrowserCompatModal: React.FC<BrowserCompatModalProps> = ({
           <button
             type="button"
             onClick={handleRefresh}
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent/20 px-4 text-xs font-medium text-accent-light hover:bg-accent/30 transition-colors"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent/20 px-4 py-2.5 text-xs font-medium text-accent-light hover:bg-accent/30 transition-colors"
           >
             <RefreshCw size={14} />
             새로고침
@@ -206,7 +206,7 @@ export const BrowserCompatModal: React.FC<BrowserCompatModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-10 items-center justify-center rounded-xl bg-accent px-4 text-xs font-semibold text-on-accent hover:bg-accent-2 transition-colors shadow-lg"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-on-accent hover:bg-accent-2 transition-colors shadow-lg"
             >
               호환 모드로 계속하기
             </button>

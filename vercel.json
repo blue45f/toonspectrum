@@ -1,11 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "git": {
+    "deploymentEnabled": {
+      "*": false,
+      "main": true
+    }
+  },
   "buildCommand": "pnpm --filter @webtoon-nest/api build && pnpm run build",
   "installCommand": "pnpm install --frozen-lockfile",
   "outputDirectory": "dist",
   "functions": {
     "api/index.js": {
+      "maxDuration": 60,
+      "includeFiles": "{apps/api/dist/**,apps/api/data/catalog.json.gz}"
+    },
+    "api/studio-live.js": {
       "maxDuration": 60,
       "includeFiles": "{apps/api/dist/**,apps/api/data/catalog.json.gz}"
     },
@@ -29,6 +39,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/socket.io", "destination": "/api/studio-live" },
+    { "source": "/socket.io/:path*", "destination": "/api/studio-live" },
     { "source": "/api/cover", "destination": "/api/index" },
     { "source": "/title/:slug", "destination": "/api/og?slug=:slug" },
     { "source": "/market", "destination": "/api/og?marketPage=home" },

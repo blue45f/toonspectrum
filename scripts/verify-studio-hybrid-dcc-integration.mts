@@ -1006,43 +1006,92 @@ async function readWorkerMonitor(page: Page): Promise<MutableWorkerMonitor> {
 }
 
 async function readHybridDccOpfsFiles(page: Page): Promise<readonly StudioHybridDccOpfsFileEvidence[]> {
-  const files = await page.evaluate(async (rootName) => {
+  const files = await page.evaluate(async ({ rootName, maxAttempts, retryDelayMs }) => {
     type DirectoryWithEntries = FileSystemDirectoryHandle & {
       entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
     };
-    const storage = navigator.storage;
-    if (typeof storage?.getDirectory !== "function") return [];
-    const root = await storage.getDirectory();
-    const output: Array<{ path: string; byteLength: number; sha256: `sha256:${string}` }> = [];
-    const pending: Array<{ directory: FileSystemDirectoryHandle; prefix: string }> = [{
-      directory: root,
-      prefix: "",
-    }];
-    while (pending.length > 0) {
-      const current = pending.pop();
-      if (!current) break;
-      for await (const [name, handle] of (current.directory as DirectoryWithEntries).entries()) {
-        const path = current.prefix ? `${current.prefix}/${name}` : name;
-        if (handle.kind === "directory") {
-          pending.push({ directory: handle as FileSystemDirectoryHandle, prefix: path });
-          continue;
+    interface OpfsSnapshot {
+      files: Array<{ path: string; byteLength: number; sha256: `sha256:${string}` }>;
+      transientNotFound: boolean;
+    }
+
+    const isTransientNotFound = (error: unknown): boolean => (
+      error instanceof DOMException && error.name === "NotFoundError"
+    );
+
+    const readSnapshot = async (): Promise<OpfsSnapshot> => {
+      const storage = navigator.storage;
+      if (typeof storage?.getDirectory !== "function") {
+        return { files: [], transientNotFound: false };
+      }
+      const root = await storage.getDirectory();
+      const output: Array<{ path: string; byteLength: number; sha256: `sha256:${string}` }> = [];
+      const pending: Array<{ directory: FileSystemDirectoryHandle; prefix: string }> = [{
+        directory: root,
+        prefix: "",
+      }];
+      let transientNotFound = false;
+
+      while (pending.length > 0) {
+        const current = pending.pop();
+        if (!current) break;
+        try {
+          for await (const [name, handle] of (current.directory as DirectoryWithEntries).entries()) {
+            const path = current.prefix ? `${current.prefix}/${name}` : name;
+            if (handle.kind === "directory") {
+              pending.push({ directory: handle as FileSystemDirectoryHandle, prefix: path });
+              continue;
+            }
+            try {
+              const file = await (handle as FileSystemFileHandle).getFile();
+              const bytes = await file.arrayBuffer();
+              const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+              let digestHex = "";
+              for (const value of digest) digestHex += value.toString(16).padStart(2, "0");
+              output.push({
+                path,
+                byteLength: file.size,
+                sha256: `sha256:${digestHex}`,
+              });
+            } catch (error) {
+              if (!isTransientNotFound(error)) throw error;
+              // OPFS writers replace files atomically. A handle yielded just before the
+              // replacement can disappear before getFile()/arrayBuffer(); discard the
+              // whole partial snapshot and retry rather than reporting incomplete proof.
+              transientNotFound = true;
+            }
+          }
+        } catch (error) {
+          if (!isTransientNotFound(error)) throw error;
+          // A directory can likewise be replaced while its async iterator is active.
+          transientNotFound = true;
         }
-        const file = await (handle as FileSystemFileHandle).getFile();
-        const bytes = await file.arrayBuffer();
-        const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-        let digestHex = "";
-        for (const value of digest) digestHex += value.toString(16).padStart(2, "0");
-        output.push({
-          path,
-          byteLength: file.size,
-          sha256: `sha256:${digestHex}`,
+      }
+
+      return {
+        files: output
+          .filter(({ path }) => path.startsWith(`${rootName}/`))
+          .sort((left, right) => left.path.localeCompare(right.path)),
+        transientNotFound,
+      };
+    };
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const snapshot = await readSnapshot();
+      if (!snapshot.transientNotFound) return snapshot.files;
+      if (attempt < maxAttempts) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, retryDelayMs * attempt);
         });
       }
     }
-    return output
-      .filter(({ path }) => path.startsWith(`${rootName}/`))
-      .sort((left, right) => left.path.localeCompare(right.path));
-  }, HYBRID_DCC_OPFS_ROOT);
+
+    throw new Error(`Hybrid DCC OPFS snapshot did not stabilize after ${maxAttempts} attempts`);
+  }, {
+    rootName: HYBRID_DCC_OPFS_ROOT,
+    maxAttempts: 5,
+    retryDelayMs: 25,
+  });
   return files;
 }
 

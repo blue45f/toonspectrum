@@ -437,8 +437,12 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
   KAKAO_REST_API_KEY: z.string().min(1).max(4_096).optional(),
   KAKAO_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
+  KAKAO_OAUTH_CLIENT_ID: z.string().min(1).max(4_096).optional(),
+  KAKAO_OAUTH_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
   NAVER_OAUTH_CLIENT_ID: z.string().min(1).max(4_096).optional(),
   NAVER_OAUTH_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
+  NAVER_CLIENT_ID: z.string().min(1).max(4_096).optional(),
+  NAVER_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
   // 만화규장각 서버 보강. 인증키는 URL query에 들어가므로 반드시 서버 secret으로만 보관한다.
   KMAS_PRV_KEY: z.string().min(1).max(4_096).optional(),
   KMAS_BASE_URL: z.url({ protocol: /^https$/u }).optional(),
@@ -512,8 +516,12 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "GOOGLE_OAUTH_CLIENT_SECRET",
   "KAKAO_REST_API_KEY",
   "KAKAO_CLIENT_SECRET",
+  "KAKAO_OAUTH_CLIENT_ID",
+  "KAKAO_OAUTH_CLIENT_SECRET",
   "NAVER_OAUTH_CLIENT_ID",
   "NAVER_OAUTH_CLIENT_SECRET",
+  "NAVER_CLIENT_ID",
+  "NAVER_CLIENT_SECRET",
   "KMAS_PRV_KEY",
 ];
 
@@ -568,8 +576,12 @@ function assertProductionAuthSecrets(source: NodeJS.ProcessEnv): void {
     source.GOOGLE_OAUTH_CLIENT_SECRET,
     source.KAKAO_REST_API_KEY,
     source.KAKAO_CLIENT_SECRET,
+    source.KAKAO_OAUTH_CLIENT_ID,
+    source.KAKAO_OAUTH_CLIENT_SECRET,
     source.NAVER_OAUTH_CLIENT_ID,
     source.NAVER_OAUTH_CLIENT_SECRET,
+    source.NAVER_CLIENT_ID,
+    source.NAVER_CLIENT_SECRET,
   ].some((value) => Boolean(value?.trim()));
   if (stateSecret !== null || authorizationCodeFlowConfigured) {
     assertStrongProductionHmacSecret(

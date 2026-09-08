@@ -15,6 +15,20 @@ const starterPanelSource = readFileSync(
 );
 
 describe("BG3D procedural starter UI integration boundary", () => {
+  it("keeps both blockout selectors closed by default without removing primitive insertion", () => {
+    expect(shapesPanelSource).toContain("[showProceduralBlockouts, setShowProceduralBlockouts] = useState(false)");
+    expect(shapesPanelSource).toContain("[showCompositeBlockouts, setShowCompositeBlockouts] = useState(false)");
+    expect(shapesPanelSource).toContain("aria-expanded={showProceduralBlockouts}");
+    expect(shapesPanelSource).toContain('aria-controls="bg3d-procedural-blockouts"');
+    expect(shapesPanelSource).toContain("hidden={!showProceduralBlockouts}");
+    expect(shapesPanelSource).toContain("aria-expanded={showCompositeBlockouts}");
+    expect(shapesPanelSource).toContain('aria-controls="bg3d-composite-blockout-categories bg3d-composite-blockout-presets"');
+    expect(shapesPanelSource.match(/hidden=\{!showCompositeBlockouts\}/gu)).toHaveLength(2);
+    expect(shapesPanelSource).toContain("onClick={() => addPrimitive(btn.kind)}");
+    expect(shapesPanelSource).toContain("onClick={() => addComposite(preset.id)}");
+    expect(shapesPanelSource).toContain("onInsert={addProceduralStarterAsset}");
+  });
+
   it("routes insertion through the fail-closed planner and live scene authority", () => {
     expect(backgroundSource).toContain(
       'from "./studio-bg3d-procedural-scene-usage"',
@@ -48,7 +62,7 @@ describe("BG3D procedural starter UI integration boundary", () => {
 
   it("keeps rights, search, budget, and mobile touch affordances visible in the leaf", () => {
     expect(starterPanelSource).toContain("오리지널 · CC0");
-    expect(starterPanelSource).toContain('aria-label="절차형 3D 에셋 검색"');
+    expect(starterPanelSource).toContain('aria-label="블록아웃 프리셋 검색"');
     expect(starterPanelSource).toContain("asset.budget.triangles");
     expect(starterPanelSource).toContain("disabled={Boolean(disabledReason)}");
     expect(starterPanelSource).toContain("min-h-11");

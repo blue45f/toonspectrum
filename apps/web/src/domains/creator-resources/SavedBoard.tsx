@@ -9,6 +9,12 @@ import type { CreatorResource, ResourceProvider } from "@/shared/lib/creator-res
 import { selectBoardResources } from "@/shared/lib/creator-resource-workflow";
 import { attributionMarkdown, deadlineLabel, isProvider, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
 
+function licenseLabel(item: CreatorResource): string {
+  if (item.license === "CC0") return "CC0";
+  if (item.license === "book-promotion") return "도서 소개 목적";
+  return "메타데이터";
+}
+
 export function SavedBoard({ items, onRemove, disabled = false }: { items: readonly CreatorResource[]; onRemove: (id: string) => void; disabled?: boolean }) {
   const [query, setQuery] = useState("");
   const [provider, setProvider] = useState<ResourceProvider | "all">("all");
@@ -43,7 +49,7 @@ export function SavedBoard({ items, onRemove, disabled = false }: { items: reado
       <button className={RESOURCE_BUTTON} disabled={!visible.length} onClick={() => downloadText("selected-creator-sources.md", attributionMarkdown(visible))}>표시된 자료 출처 내보내기</button>
     </div>
     <div className="grid gap-4 md:grid-cols-2">{visible.map((item) => <article key={item.id} className="min-w-0 rounded-xl border border-line bg-canvas p-4">
-      <p className="text-xs text-accent">{RESOURCE_LABELS[item.provider]} · {item.license === "CC0" ? "CC0" : "메타데이터"}</p>
+      <p className="text-xs text-accent">{RESOURCE_LABELS[item.provider]} · {licenseLabel(item)}</p>
       <h3 className="mt-2 break-words font-bold">{item.title}</h3>
       <p className="mt-2 text-sm text-fg-2">{item.creator || "저작자·기관 원문 확인"}</p>
       {item.provider === "bizinfo" && <p className="mt-2 text-sm">{deadlineLabel(item.deadline)}</p>}
@@ -51,6 +57,6 @@ export function SavedBoard({ items, onRemove, disabled = false }: { items: reado
         <button className={RESOURCE_BUTTON} disabled={disabled} aria-label={`${item.title} 저장 해제`} onClick={() => onRemove(item.id)}>저장 해제</button>
       </div>
     </article>)}</div>
-    {!visible.length && <p className="rounded-xl border border-dashed border-line p-5 text-sm text-fg-2">{items.length ? "조건에 맞는 저장 자료가 없습니다. 검색어나 필터를 바꿔보세요." : "아직 저장한 자료가 없습니다. 기회센터·레퍼런스·도서 검색에서 보드에 저장을 선택하세요."}</p>}
+    {!visible.length && <p className="rounded-xl border border-dashed border-line p-5 text-sm text-fg-2">{items.length ? "조건에 맞는 저장 자료가 없습니다. 검색어나 필터를 바꿔보세요." : "아직 저장한 자료가 없습니다. 기회센터·레퍼런스·글로벌 판본 탐색에서 보드에 저장을 선택하세요."}</p>}
   </section>;
 }

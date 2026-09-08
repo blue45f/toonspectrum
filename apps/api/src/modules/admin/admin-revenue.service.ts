@@ -7,24 +7,45 @@ import {
   revenueLedger,
 } from "../../db";
 
-import { 
-  RevenueStatus, toNumber, parsePositiveInt, toPlainObject, parsePlanPayload, 
-  parseRevenueQuery, 
-  parseRevenueStatusPayload, parseRevenueSettlePayload, 
-  parseRevenueStatus, statusLabel, 
-  normalizeRevenueEvent, canTransitionRevenueStatus, 
-  requireAdminUser, ensureAdminSchema, 
+import {
+  DAY_MS,
+  type PlanPayload,
+  type RevenueQuery,
+  type RevenueSettlePayload,
+  type RevenueStatus,
+  type RevenueStatusPayload,
+  canTransitionRevenueStatus,
+  ensureAdminSchema,
   logAuditAction,
-  PlanPayload, RevenueQuery, DAY_MS, RevenueStatusPayload, RevenueSettlePayload
+  normalizeRevenueEvent,
+  parsePlanPayload,
+  parsePositiveInt,
+  parseRevenueQuery,
+  parseRevenueSettlePayload,
+  parseRevenueStatus,
+  parseRevenueStatusPayload,
+  requireAdminUser,
+  statusLabel,
+  toNumber,
+  toPlainObject,
 } from "./admin-types";
+
+function spreadsheetSafeCsvCell(value: unknown): string {
+  let text = String(value ?? "");
+  if (/^[\s\uFEFF]*[=+\-@]|^[\t\r\n]/u.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
 
 @Injectable()
 export class AdminRevenueService {
-async getPlans(userId: string) {
+  async getPlans(userId: string) {
     await ensureAdminSchema();
     await requireAdminUser(userId);
 
-    const rows = await db.select().from(monetizationPlans).orderBy(desc(monetizationPlans.updatedAt));
+    const rows = await db
+      .select()
+      .from(monetizationPlans)
+      .orderBy(desc(monetizationPlans.updatedAt));
     return {
       items: rows.map((row) => ({
         ...row,
@@ -34,7 +55,7 @@ async getPlans(userId: string) {
     };
   }
 
-async upsertPlan(userId: string, payload: PlanPayload) {
+  async upsertPlan(userId: string, payload: PlanPayload) {
     await ensureAdminSchema();
     await requireAdminUser(userId);
     const parsed = parsePlanPayload(payload);
@@ -45,12 +66,19 @@ async upsertPlan(userId: string, payload: PlanPayload) {
         .from(monetizationPlans)
         .where(eq(monetizationPlans.id, parsed.id))
         .limit(1);
-      if (!existing) throw new BadRequestException("수정 대상 플랜을 찾을 수 없습니다.");
+      if (!existing) {
+        throw new BadRequestException("수정 대상 플랜을 찾을 수 없습니다.");
+      }
 
       const [duplicate] = await db
         .select({ id: monetizationPlans.id })
         .from(monetizationPlans)
-        .where(and(eq(monetizationPlans.code, parsed.code), ne(monetizationPlans.id, parsed.id)))
+        .where(
+          and(
+            eq(monetizationPlans.code, parsed.code),
+            ne(monetizationPlans.id, parsed.id),
+          ),
+        )
         .limit(1);
       if (duplicate) {
         throw new BadRequestException("동일한 플랜 코드가 이미 존재합니다.");
@@ -72,6 +100,14 @@ async upsertPlan(userId: string, payload: PlanPayload) {
         .where(eq(monetizationPlans.id, parsed.id))
         .returning();
 
+      void logAuditAction(userId, "PLAN_UPDATE", "plan", parsed.id, {
+        code: parsed.code,
+        name: parsed.name,
+        intervalDays: parsed.intervalDays,
+        currency: parsed.currency,
+        priceCents: parsed.priceCents,
+        isActive: parsed.isActive,
+      });
       return {
         ok: true,
         item: updated ?? null,
@@ -85,7 +121,7 @@ async upsertPlan(userId: string, payload: PlanPayload) {
       .limit(1);
     if (duplicate) throw new BadRequestException("중복된 플랜 코드입니다.");
 
-    const inserted = await db
+    const [inserted] = await db
       .insert(monetizationPlans)
       .values({
         code: parsed.code,
@@ -99,13 +135,23 @@ async upsertPlan(userId: string, payload: PlanPayload) {
       })
       .returning();
 
+    if (inserted) {
+      void logAuditAction(userId, "PLAN_CREATE", "plan", inserted.id, {
+        code: parsed.code,
+        name: parsed.name,
+        intervalDays: parsed.intervalDays,
+        currency: parsed.currency,
+        priceCents: parsed.priceCents,
+        isActive: parsed.isActive,
+      });
+    }
     return {
       ok: true,
-      item: inserted[0] ?? null,
+      item: inserted ?? null,
     };
   }
 
-async getRevenue(userId: string, days: number, query: RevenueQuery = {}) {
+  async getRevenue(userId: string, days: number, query: RevenueQuery = {}) {
     await ensureAdminSchema();
     await requireAdminUser(userId);
     const normalizedDays = parsePositiveInt(days, 30, 1, 365);
@@ -113,65 +159,74 @@ async getRevenue(userId: string, days: number, query: RevenueQuery = {}) {
 
     const now = Date.now();
     const from = now - normalizedDays * DAY_MS;
-    // timestamp 컬럼은 epoch-ms 숫자와 비교 불가 — Date로 바인딩(대시보드와 동일 수정).
-    const where: SQL[] = [sql`${revenueLedger.createdAt} >= ${new Date(from)}`];
-    if (parsedQuery.status !== "all") where.push(eq(revenueLedger.status, parsedQuery.status));
-    const whereClause = where.length === 1 ? where[0] : and(...where);
+    const periodWhereClause: SQL = sql`${revenueLedger.createdAt} >= ${new Date(from)}`;
+    const eventWhereClause: SQL =
+      parsedQuery.status === "all"
+        ? periodWhereClause
+        : (and(
+            periodWhereClause,
+            eq(revenueLedger.status, parsedQuery.status),
+          ) ?? periodWhereClause);
 
     const [[periodSummary], plans, events] = await Promise.all([
       db
-      .select({
-        pendingAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'pending' then ${revenueLedger.amountCents} else 0 end), 0)`.as("pendingAmount"),
-        approvedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'approved' then ${revenueLedger.amountCents} else 0 end), 0)`.as("approvedAmount"),
-        paidAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'paid' then ${revenueLedger.amountCents} else 0 end), 0)`.as("paidAmount"),
-        rejectedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'rejected' then ${revenueLedger.amountCents} else 0 end), 0)`.as("rejectedAmount"),
-        revokedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'revoked' then ${revenueLedger.amountCents} else 0 end), 0)`.as("revokedAmount"),
-        pendingEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'pending' then 1 else 0 end), 0)`.as("pendingEvents"),
-        approvedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'approved' then 1 else 0 end), 0)`.as("approvedEvents"),
-        paidEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'paid' then 1 else 0 end), 0)`.as("paidEvents"),
-        rejectedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'rejected' then 1 else 0 end), 0)`.as("rejectedEvents"),
-        revokedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'revoked' then 1 else 0 end), 0)`.as("revokedEvents"),
-      })
-      .from(revenueLedger)
-      .where(whereClause),
+        .select({
+          pendingAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'pending' then ${revenueLedger.amountCents} else 0 end), 0)`.as("pendingAmount"),
+          approvedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'approved' then ${revenueLedger.amountCents} else 0 end), 0)`.as("approvedAmount"),
+          paidAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'paid' then ${revenueLedger.amountCents} else 0 end), 0)`.as("paidAmount"),
+          rejectedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'rejected' then ${revenueLedger.amountCents} else 0 end), 0)`.as("rejectedAmount"),
+          revokedAmount: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'revoked' then ${revenueLedger.amountCents} else 0 end), 0)`.as("revokedAmount"),
+          pendingEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'pending' then 1 else 0 end), 0)`.as("pendingEvents"),
+          approvedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'approved' then 1 else 0 end), 0)`.as("approvedEvents"),
+          paidEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'paid' then 1 else 0 end), 0)`.as("paidEvents"),
+          rejectedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'rejected' then 1 else 0 end), 0)`.as("rejectedEvents"),
+          revokedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'revoked' then 1 else 0 end), 0)`.as("revokedEvents"),
+        })
+        .from(revenueLedger)
+        .where(periodWhereClause),
 
       db
-      .select({
-        planId: revenueLedger.planId,
-        planName: sql<string>`max(${monetizationPlans.name})`.as("planName"),
-        events: sql<number>`count(*)`.as("events"),
-        amountCents: sql<number>`coalesce(sum(${revenueLedger.amountCents}), 0)`.as("amountCents"),
-      })
-      .from(revenueLedger)
-      .leftJoin(monetizationPlans, eq(monetizationPlans.id, revenueLedger.planId))
-        .where(whereClause)
+        .select({
+          planId: revenueLedger.planId,
+          planName: sql<string>`max(${monetizationPlans.name})`.as("planName"),
+          events: sql<number>`count(*)`.as("events"),
+          amountCents: sql<number>`coalesce(sum(${revenueLedger.amountCents}), 0)`.as("amountCents"),
+        })
+        .from(revenueLedger)
+        .leftJoin(
+          monetizationPlans,
+          eq(monetizationPlans.id, revenueLedger.planId),
+        )
+        .where(periodWhereClause)
         .groupBy(revenueLedger.planId)
-        .orderBy(desc(sql<number>`coalesce(sum(${revenueLedger.amountCents}), 0)`))
+        .orderBy(
+          desc(sql<number>`coalesce(sum(${revenueLedger.amountCents}), 0)`),
+        )
         .limit(10),
 
       db
-      .select({
-        id: revenueLedger.id,
-        status: revenueLedger.status,
-        kind: revenueLedger.kind,
-        amountCents: revenueLedger.amountCents,
-        currency: revenueLedger.currency,
-        planId: revenueLedger.planId,
-        campaignId: revenueLedger.campaignId,
-        payerId: revenueLedger.payerId,
-        recipientId: revenueLedger.recipientId,
-        reviewedBy: revenueLedger.reviewedBy,
-        reviewedAt: revenueLedger.reviewedAt,
-        reviewNote: revenueLedger.reviewNote,
-        settledAt: revenueLedger.settledAt,
-        createdAt: revenueLedger.createdAt,
-        updatedAt: revenueLedger.createdAt,
-        metadata: revenueLedger.metadata,
-      })
-      .from(revenueLedger)
-      .orderBy(desc(revenueLedger.createdAt))
-      .where(whereClause)
-      .limit(24),
+        .select({
+          id: revenueLedger.id,
+          status: revenueLedger.status,
+          kind: revenueLedger.kind,
+          amountCents: revenueLedger.amountCents,
+          currency: revenueLedger.currency,
+          planId: revenueLedger.planId,
+          campaignId: revenueLedger.campaignId,
+          payerId: revenueLedger.payerId,
+          recipientId: revenueLedger.recipientId,
+          reviewedBy: revenueLedger.reviewedBy,
+          reviewedAt: revenueLedger.reviewedAt,
+          reviewNote: revenueLedger.reviewNote,
+          settledAt: revenueLedger.settledAt,
+          createdAt: revenueLedger.createdAt,
+          updatedAt: revenueLedger.createdAt,
+          metadata: revenueLedger.metadata,
+        })
+        .from(revenueLedger)
+        .where(eventWhereClause)
+        .orderBy(desc(revenueLedger.createdAt))
+        .limit(24),
     ]);
 
     const summary = periodSummary ?? {};
@@ -211,34 +266,47 @@ async getRevenue(userId: string, days: number, query: RevenueQuery = {}) {
         metadata: toPlainObject(event.metadata),
         status: parseRevenueStatus(event.status) ?? "pending",
         reviewedBy: event.reviewedBy ? String(event.reviewedBy) : null,
-        reviewedAt: event.reviewedAt ? new Date(event.reviewedAt).toISOString() : null,
+        reviewedAt: event.reviewedAt
+          ? new Date(event.reviewedAt).toISOString()
+          : null,
         reviewNote: event.reviewNote ?? null,
-        settledAt: event.settledAt ? new Date(event.settledAt).toISOString() : null,
-        createdAt: event.createdAt ? new Date(event.createdAt).toISOString() : new Date().toISOString(),
+        settledAt: event.settledAt
+          ? new Date(event.settledAt).toISOString()
+          : null,
+        createdAt: event.createdAt
+          ? new Date(event.createdAt).toISOString()
+          : new Date().toISOString(),
       })),
       generatedAt: new Date().toISOString(),
     };
   }
 
-async setRevenueStatus(userId: string, eventId: string, payload: RevenueStatusPayload) {
+  async setRevenueStatus(
+    userId: string,
+    eventId: string,
+    payload: RevenueStatusPayload,
+  ) {
     await ensureAdminSchema();
     await requireAdminUser(userId);
     const parsed = parseRevenueStatusPayload(payload, eventId);
 
     const [row] = await db
-      .select({
-        id: revenueLedger.id,
-        status: revenueLedger.status,
-      })
+      .select({ id: revenueLedger.id, status: revenueLedger.status })
       .from(revenueLedger)
       .where(eq(revenueLedger.id, parsed.id))
       .limit(1);
 
-    if (!row?.id) throw new BadRequestException("수익 이벤트를 찾을 수 없습니다.");
+    if (!row?.id) {
+      throw new BadRequestException("수익 이벤트를 찾을 수 없습니다.");
+    }
     const currentStatus = parseRevenueStatus(row.status);
-    if (!currentStatus) throw new BadRequestException("수익 이벤트 상태가 손상되어 있습니다.");
+    if (!currentStatus) {
+      throw new BadRequestException("수익 이벤트 상태가 손상되어 있습니다.");
+    }
     if (!canTransitionRevenueStatus(currentStatus, parsed.status)) {
-      throw new BadRequestException(`${statusLabel(currentStatus)} 상태는 ${statusLabel(parsed.status)}로 바로 변경할 수 없습니다.`);
+      throw new BadRequestException(
+        `${statusLabel(currentStatus)} 상태는 ${statusLabel(parsed.status)}로 바로 변경할 수 없습니다.`,
+      );
     }
 
     const updates: Record<string, unknown> = {
@@ -249,30 +317,44 @@ async setRevenueStatus(userId: string, eventId: string, payload: RevenueStatusPa
     };
     if (parsed.status !== "paid") updates.settledAt = null;
 
-    const updatedRows = await db
+    const [updated] = await db
       .update(revenueLedger)
       .set(updates)
       .where(eq(revenueLedger.id, parsed.id))
       .returning();
-    if (!updatedRows[0]) throw new BadRequestException("상태 변경에 실패했습니다.");
+    if (!updated) throw new BadRequestException("상태 변경에 실패했습니다.");
 
     const [full] = await db
       .select()
       .from(revenueLedger)
       .where(eq(revenueLedger.id, parsed.id))
       .limit(1);
-
     if (!full) {
       throw new BadRequestException("상태 반영 후 이벤트를 읽어오지 못했습니다.");
     }
 
+    void logAuditAction(
+      userId,
+      "REVENUE_STATUS_CHANGE",
+      "revenue",
+      parsed.id,
+      {
+        previousStatus: currentStatus,
+        nextStatus: parsed.status,
+        note: parsed.note ?? null,
+      },
+    );
     return {
       ok: true,
       event: normalizeRevenueEvent(full),
     };
   }
 
-async settleRevenueEvent(userId: string, eventId: string, payload: RevenueSettlePayload) {
+  async settleRevenueEvent(
+    userId: string,
+    eventId: string,
+    payload: RevenueSettlePayload,
+  ) {
     await ensureAdminSchema();
     await requireAdminUser(userId);
     const parsed = parseRevenueSettlePayload(payload, eventId);
@@ -283,15 +365,21 @@ async settleRevenueEvent(userId: string, eventId: string, payload: RevenueSettle
       .where(eq(revenueLedger.id, parsed.id))
       .limit(1);
 
-    if (!row?.id) throw new BadRequestException("수익 이벤트를 찾을 수 없습니다.");
+    if (!row?.id) {
+      throw new BadRequestException("수익 이벤트를 찾을 수 없습니다.");
+    }
     const currentStatus = parseRevenueStatus(row.status);
-    if (!currentStatus) throw new BadRequestException("수익 이벤트 상태가 손상되어 있습니다.");
+    if (!currentStatus) {
+      throw new BadRequestException("수익 이벤트 상태가 손상되어 있습니다.");
+    }
     if (currentStatus !== "paid") {
-      throw new BadRequestException("정산은 지급 완료 상태에서만 처리할 수 있습니다.");
+      throw new BadRequestException(
+        "정산은 지급 완료 상태에서만 처리할 수 있습니다.",
+      );
     }
 
-    const updatedRows = await db
-    .update(revenueLedger)
+    const [updated] = await db
+      .update(revenueLedger)
       .set({
         settledAt: parsed.settledAt,
         reviewedBy: userId,
@@ -300,22 +388,36 @@ async settleRevenueEvent(userId: string, eventId: string, payload: RevenueSettle
       })
       .where(eq(revenueLedger.id, parsed.id))
       .returning();
-    const updated = updatedRows[0];
     if (!updated) throw new BadRequestException("정산 처리에 실패했습니다.");
+
     const [full] = await db
       .select()
       .from(revenueLedger)
       .where(eq(revenueLedger.id, parsed.id))
       .limit(1);
-    if (!full) throw new BadRequestException("정산 처리 후 이벤트를 읽어오지 못했습니다.");
+    if (!full) {
+      throw new BadRequestException(
+        "정산 처리 후 이벤트를 읽어오지 못했습니다.",
+      );
+    }
 
+    void logAuditAction(
+      userId,
+      "REVENUE_SETTLEMENT_CHANGE",
+      "revenue",
+      parsed.id,
+      {
+        settledAt: parsed.settledAt?.toISOString() ?? null,
+        note: parsed.note ?? null,
+      },
+    );
     return {
       ok: true,
       event: normalizeRevenueEvent(full),
     };
   }
 
-async exportRevenueCsv(userId: string) {
+  async exportRevenueCsv(userId: string) {
     await requireAdminUser(userId);
     await ensureAdminSchema();
     const rows = await db
@@ -334,24 +436,74 @@ async exportRevenueCsv(userId: string) {
       .orderBy(desc(revenueLedger.createdAt))
       .limit(5000);
 
-    const header = "ID,PayerID,RecipientID,Kind,Status,AmountCents,Currency,SettledAt,CreatedAt\n";
+    const header = [
+      "ID",
+      "PayerID",
+      "RecipientID",
+      "Kind",
+      "Status",
+      "AmountCents",
+      "Currency",
+      "SettledAt",
+      "CreatedAt",
+    ]
+      .map(spreadsheetSafeCsvCell)
+      .join(",");
     const body = rows
-      .map(
-        (r) =>
-          `"${r.id}","${r.payerId}","${r.recipientId}","${r.kind}","${r.status}",${r.amountCents},"${r.currency}","${r.settledAt ? new Date(r.settledAt).toISOString() : ""}","${r.createdAt ? new Date(r.createdAt).toISOString() : ""}"`
+      .map((row) =>
+        [
+          row.id,
+          row.payerId,
+          row.recipientId,
+          row.kind,
+          row.status,
+          row.amountCents,
+          row.currency,
+          row.settledAt ? new Date(row.settledAt).toISOString() : "",
+          row.createdAt ? new Date(row.createdAt).toISOString() : "",
+        ]
+          .map(spreadsheetSafeCsvCell)
+          .join(","),
       )
       .join("\n");
 
-    return header + body;
+    void logAuditAction(userId, "REVENUE_EXPORT_CSV", "revenue", null, {
+      exportedCount: rows.length,
+    });
+    return `${header}\n${body}`;
   }
 
-async bulkSetRevenueStatus(userId: string, eventIds: string[], status: RevenueStatus, note?: string) {
+  async bulkSetRevenueStatus(
+    userId: string,
+    eventIds: string[],
+    status: RevenueStatus,
+    note?: string,
+  ) {
     await requireAdminUser(userId);
     if (!Array.isArray(eventIds) || !eventIds.length) {
       throw new BadRequestException("대상 정산건을 선택해 주세요.");
     }
-    await Promise.all(eventIds.map((id) => this.setRevenueStatus(userId, id, { status, note })));
-    void logAuditAction(userId, "REVENUE_BULK_STATUS_CHANGE", "revenue", null, { eventIds, status, note });
-    return { ok: true, count: eventIds.length };
+    if (
+      eventIds.length > 200 ||
+      eventIds.some((id) => typeof id !== "string" || !id.trim())
+    ) {
+      throw new BadRequestException(
+        "유효한 정산 이벤트 ID를 최대 200개까지 전달해 주세요.",
+      );
+    }
+    const uniqueIds = Array.from(new Set(eventIds.map((id) => id.trim())));
+    await Promise.all(
+      uniqueIds.map((id) =>
+        this.setRevenueStatus(userId, id, { status, note }),
+      ),
+    );
+    void logAuditAction(
+      userId,
+      "REVENUE_BULK_STATUS_CHANGE",
+      "revenue",
+      null,
+      { eventIds: uniqueIds, status, note },
+    );
+    return { ok: true, count: uniqueIds.length };
   }
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { normalizeStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
 import { materializeAllStudioBrushPackSelections } from "./brush/studio-brush-pack-runtime";
+import { resolveStudioCanonicalDryMediaSelectedElement } from "./canvas/studio-canonical-dry-media-authority";
 import { validateStudioCanonicalVNextDryMediaCompiledFrame } from "./studio-canonical-vnext-dry-media-presentation-controller";
 import {
   compileStudioCanonicalVNextDryMediaProductFrame,
@@ -82,6 +83,7 @@ async function ready(
     throw new Error(`compile failed with status=${result.status} reason=${result.reason} detail=${result.detail ?? ""}`);
   }
   expect(result.status).toBe("ready");
+  expect(resolveStudioCanonicalDryMediaSelectedElement(element, element.id)).toBe(element);
   return result;
 }
 
@@ -174,6 +176,10 @@ describe("canonical vNext dry-media product adapter", () => {
       DrawEl,
       Exclude<StudioCanonicalVNextDryMediaProductCompileResult, { status: "ready" }>["reason"],
     ]> = [
+      [{ ...base, kind: "rect" }, "invalid-input"],
+      [{ ...base, brush: "pen" }, "invalid-input"],
+      [{ ...base, symmetry: { type: "vertical", centerX: 0, centerY: 0 } }, "unsupported-symmetry"],
+      [{ ...base, blendMode: "multiply" }, "unsupported-composite"],
       [{
         ...base,
         id: "dual-tip",
@@ -207,6 +213,7 @@ describe("canonical vNext dry-media product adapter", () => {
     ];
 
     for (const [element, reason] of candidates) {
+      expect(resolveStudioCanonicalDryMediaSelectedElement(element, element.id)).toBeNull();
       await expect(compileStudioCanonicalVNextDryMediaProductFrame({
         element,
         sessionEpoch: 1,

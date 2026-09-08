@@ -92,7 +92,7 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
     return await new Promise<Blob>((resolve, reject) => {
       const chunks: Blob[] = [];
       let raf = 0;
-      let audioStopTimer: ReturnType<typeof setTimeout> | undefined;
+      let finishTimer: ReturnType<typeof setTimeout> | undefined;
       let bytes = 0;
       let settled = false;
       let finished = false;
@@ -101,7 +101,7 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
       const cleanup = () => {
         cancelAnimationFrame(raf);
         clearTimeout(watchdog);
-        if (audioStopTimer !== undefined) clearTimeout(audioStopTimer);
+        if (finishTimer !== undefined) clearTimeout(finishTimer);
         signal.removeEventListener("abort", abort);
         document.removeEventListener("visibilitychange", visibility);
         activeRecorder.ondataavailable = null;
@@ -151,18 +151,16 @@ export async function recordPromoVideo(project: PromoProject, { signal, onProgre
             // Canvas capture happens when the canvas is painted, after this callback.
             // Let the ending frame reach the track before stopping the recorder.
             videoTrack.requestFrame?.();
-            // End audio slightly before the visual flush completes so the native
-            // muxer cannot extend the audio track beyond the final video frame.
-            audioStopTimer = setTimeout(() => {
-              stream?.getAudioTracks?.().forEach((track) => track.stop());
-            }, 250);
+            // Stop audio at the timeline boundary. Only video needs this extra
+            // paint/encoder flush; keeping audio alive would append a silent tail.
+            stream?.getAudioTracks?.().forEach((track) => track.stop());
             if (typeof window === "undefined") {
               raf = requestAnimationFrame(() => {
                 if (finished) return;
                 raf = requestAnimationFrame(() => finish());
               });
             } else {
-              setTimeout(() => {
+              finishTimer = setTimeout(() => {
                 if (!finished) finish();
               }, 250);
             }

@@ -1,0 +1,534 @@
+{
+  "generator": "scripts/blender/generate_studio_refined_props_v8.py",
+  "license": "CC0-1.0",
+  "assets": {
+    "fox_mask": {
+      "url": "/assets/3d/refined-v8/fox_mask.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/fox_mask.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/fox_mask.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/fox_mask-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/fox_mask-after.png",
+      "additionalPreviews": [
+        "artifacts/studio-asset-quality-v8/previews/fox_mask-three-quarter.png",
+        "artifacts/studio-asset-quality-v8/previews/fox_mask-inside.png"
+      ],
+      "before": {
+        "bytes": 187336,
+        "triangles": 6728,
+        "meshCount": 19,
+        "materialCount": 5,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 841088,
+        "triangles": 35723,
+        "meshCount": 21,
+        "materialCount": 4,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 1.4901161193847656e-8,
+      "boundsBlender": [
+        [
+          -0.10195283591747284,
+          -0.08900000154972076,
+          -0.11875718832015991
+        ],
+        [
+          0.10195283591747284,
+          0.05583769455552101,
+          0.1889699101448059
+        ]
+      ],
+      "newGeometryScale": [
+        0.9593429565429688,
+        1.3164938688278198,
+        0.9740541577339172
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed front, three-quarter and inside: actual almond eye apertures, thin hollow shell, tapered jaw and integrated muzzle, projected enamel markings, connected ear junctions."
+    },
+    "ice_cream_cone": {
+      "url": "/assets/3d/refined-v8/ice_cream_cone.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/ice_cream_cone.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/ice_cream_cone.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/ice_cream_cone-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/ice_cream_cone-after.png",
+      "additionalPreviews": [],
+      "before": {
+        "bytes": 324608,
+        "triangles": 11956,
+        "meshCount": 40,
+        "materialCount": 7,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 2224876,
+        "triangles": 49384,
+        "meshCount": 32,
+        "materialCount": 6,
+        "embeddedImages": 4,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 3.725290298461914e-9,
+      "boundsBlender": [
+        [
+          -0.03270000219345093,
+          -0.03270000219345093,
+          0.0015000030398368835
+        ],
+        [
+          0.03270000219345093,
+          0.03270000219345093,
+          0.2483692765235901
+        ]
+      ],
+      "newGeometryScale": [
+        0.9407187700271606,
+        0.9557689428329468,
+        1.0220345258712769
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed native and exported-GLB roundtrip: corrected cone direction, conformal waffle lattice, shaped scoops without floating rods.",
+      "glbRoundtripPreview": "artifacts/studio-asset-quality-v8/previews/ice_cream_cone-glb-roundtrip.png"
+    },
+    "bubble_tea": {
+      "url": "/assets/3d/refined-v8/bubble_tea.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/bubble_tea.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/bubble_tea.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/bubble_tea-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/bubble_tea-after.png",
+      "additionalPreviews": [],
+      "before": {
+        "bytes": 199852,
+        "triangles": 8076,
+        "meshCount": 18,
+        "materialCount": 6,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 689108,
+        "triangles": 18056,
+        "meshCount": 35,
+        "materialCount": 7,
+        "embeddedImages": 1,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 0,
+      "boundsBlender": [
+        [
+          -0.03700000047683716,
+          -0.03700000047683716,
+          0.002499997615814209
+        ],
+        [
+          0.03700000047683716,
+          0.03700000047683716,
+          0.21772104501724243
+        ]
+      ],
+      "newGeometryScale": [
+        1.121212124824524,
+        1.121212124824524,
+        1.0009615421295166
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed native and exported-GLB roundtrip: wider cup rim, hollow straw and lid opening, visible tapioca in the lower syrup layer.",
+      "glbRoundtripPreview": "artifacts/studio-asset-quality-v8/previews/bubble_tea-glb-roundtrip.png"
+    },
+    "robot_pet": {
+      "url": "/assets/3d/refined-v8/robot_pet.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/robot_pet.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/robot_pet.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/robot_pet-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/robot_pet-after.png",
+      "additionalPreviews": [],
+      "before": {
+        "bytes": 323972,
+        "triangles": 12260,
+        "meshCount": 44,
+        "materialCount": 5,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 452044,
+        "triangles": 19444,
+        "meshCount": 51,
+        "materialCount": 5,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 1.4901161193847656e-8,
+      "boundsBlender": [
+        [
+          -0.09800000488758087,
+          -0.21000000834465027,
+          0
+        ],
+        [
+          0.09800000488758087,
+          0.1939999908208847,
+          0.44199997186660767
+        ]
+      ],
+      "newGeometryScale": [
+        0.8711111545562744,
+        1.0520833730697632,
+        1.0416959524154663
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed articulated leg continuity, capped tube ends, continuous tail and readable paired optic lenses."
+    },
+    "hanging_sign": {
+      "url": "/assets/3d/refined-v8/hanging_sign.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/hanging_sign.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/hanging_sign.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/hanging_sign-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/hanging_sign-after.png",
+      "additionalPreviews": [],
+      "before": {
+        "bytes": 331028,
+        "triangles": 13324,
+        "meshCount": 37,
+        "materialCount": 5,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 1496384,
+        "triangles": 46232,
+        "meshCount": 26,
+        "materialCount": 5,
+        "embeddedImages": 2,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 2.2351741790771484e-8,
+      "boundsBlender": [
+        [
+          0,
+          -0.02500000037252903,
+          -0.4350000023841858
+        ],
+        [
+          0.49500003457069397,
+          0.02500000037252903,
+          0.03400000184774399
+        ]
+      ],
+      "newGeometryScale": [
+        1.0185185670852661,
+        0.7692307829856873,
+        1.2025641202926636
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed legible lettering, thin inset border and complete bracket-chain-board suspension."
+    },
+    "chair": {
+      "url": "/assets/3d/refined-v8/chair.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/chair.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/chair.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/chair-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/chair-after.png",
+      "additionalPreviews": [],
+      "before": {
+        "bytes": 253940,
+        "triangles": 9464,
+        "meshCount": 27,
+        "materialCount": 5,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 893008,
+        "triangles": 9144,
+        "meshCount": 21,
+        "materialCount": 6,
+        "embeddedImages": 3,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 5.960464477539063e-8,
+      "boundsBlender": [
+        [
+          -0.20900000631809235,
+          -0.1985500007867813,
+          0
+        ],
+        [
+          0.20900000631809235,
+          0.22181501984596252,
+          0.9657800793647766
+        ]
+      ],
+      "newGeometryScale": [
+        1.0340392589569092,
+        0.9843473434448242,
+        1.0463429689407349
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed curved backrest, supported cushion, four grounded legs and restrained material grain."
+    },
+    "desk": {
+      "url": "/assets/3d/refined-v8/desk.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/desk.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/desk.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/desk-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/desk-after.png",
+      "additionalPreviews": [],
+      "before": {
+        "bytes": 189712,
+        "triangles": 6300,
+        "meshCount": 34,
+        "materialCount": 7,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 575508,
+        "triangles": 7220,
+        "meshCount": 27,
+        "materialCount": 5,
+        "embeddedImages": 2,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 0,
+      "boundsBlender": [
+        [
+          -0.6000000238418579,
+          -0.30000001192092896,
+          0
+        ],
+        [
+          0.6000000238418579,
+          0.30000001192092896,
+          0.7536084651947021
+        ]
+      ],
+      "newGeometryScale": [
+        0.9836065769195557,
+        0.9375000596046448,
+        0.9669665694236755
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed rounded oak desktop, cable opening, supported drawers and distinct pulls."
+    },
+    "sofa": {
+      "url": "/assets/3d/refined-v8/sofa.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/sofa.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/sofa.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/sofa-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/sofa-after.png",
+      "additionalPreviews": [],
+      "before": {
+        "bytes": 702512,
+        "triangles": 26800,
+        "meshCount": 54,
+        "materialCount": 5,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 1147256,
+        "triangles": 19268,
+        "meshCount": 27,
+        "materialCount": 5,
+        "embeddedImages": 3,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 5.960464477539063e-8,
+      "boundsBlender": [
+        [
+          -0.9259999990463257,
+          -0.4000000059604645,
+          0
+        ],
+        [
+          0.9259999990463257,
+          0.4000000059604645,
+          0.8995658159255981
+        ]
+      ],
+      "newGeometryScale": [
+        1.0570775270462036,
+        1.0373444557189941,
+        1.1024090051651
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed native and exported-GLB roundtrip: rounded upholstery, cushion seams, four legs and accent pillow.",
+      "glbRoundtripPreview": "artifacts/studio-asset-quality-v8/previews/sofa-glb-roundtrip.png"
+    },
+    "blackboard": {
+      "url": "/assets/3d/refined-v8/blackboard.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/blackboard.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/blackboard.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/blackboard-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/blackboard-after.png",
+      "additionalPreviews": [],
+      "before": {
+        "bytes": 264324,
+        "triangles": 7740,
+        "meshCount": 37,
+        "materialCount": 7,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 2305120,
+        "triangles": 69264,
+        "meshCount": 29,
+        "materialCount": 7,
+        "embeddedImages": 3,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 0,
+      "boundsBlender": [
+        [
+          -0.9500000476837158,
+          -0.10900000482797623,
+          0.0009999952744692564
+        ],
+        [
+          0.9500000476837158,
+          0.10400000214576721,
+          2.06000018119812
+        ]
+      ],
+      "newGeometryScale": [
+        1,
+        0.9102564454078674,
+        1.0039005279541016
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed readable writing surface, chalk tray, eraser and wheeled stand."
+    },
+    "mailbox": {
+      "url": "/assets/3d/refined-v8/mailbox.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/mailbox.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/mailbox.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/mailbox-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/mailbox-after.png",
+      "additionalPreviews": [],
+      "before": {
+        "bytes": 151660,
+        "triangles": 5612,
+        "meshCount": 19,
+        "materialCount": 5,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 683028,
+        "triangles": 11152,
+        "meshCount": 14,
+        "materialCount": 6,
+        "embeddedImages": 2,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 0,
+      "boundsBlender": [
+        [
+          -0.16500000655651093,
+          -0.09749999642372131,
+          0
+        ],
+        [
+          0.17170633375644684,
+          0.08999999612569809,
+          1.0399999618530273
+        ]
+      ],
+      "newGeometryScale": [
+        0.9958152174949646,
+        1.0445681810379028,
+        1.014634132385254
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed arched roof with flat floor, shaped front door, hinge, pull, address and signal flag."
+    },
+    "traffic_light": {
+      "url": "/assets/3d/refined-v8/traffic_light.glb",
+      "thumbnailUrl": "/assets/3d/refined-v8/thumbnails/traffic_light.png",
+      "source": "artifacts/studio-asset-quality-v8/sources/traffic_light.blend",
+      "beforePreview": "artifacts/studio-asset-quality-v8/previews/traffic_light-before.png",
+      "afterPreview": "artifacts/studio-asset-quality-v8/previews/traffic_light-after.png",
+      "additionalPreviews": [],
+      "before": {
+        "bytes": 297892,
+        "triangles": 11324,
+        "meshCount": 32,
+        "materialCount": 8,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "after": {
+        "bytes": 587072,
+        "triangles": 29352,
+        "meshCount": 28,
+        "materialCount": 5,
+        "embeddedImages": 0,
+        "externalUris": 0
+      },
+      "boundsErrorMetres": 1.4901161193847656e-8,
+      "boundsBlender": [
+        [
+          -0.12999999523162842,
+          -0.21675530076026917,
+          0
+        ],
+        [
+          0.5300000309944153,
+          0.12999999523162842,
+          2.759999990463257
+        ]
+      ],
+      "newGeometryScale": [
+        1.0585405826568604,
+        1.1369025707244873,
+        1.0147058963775635
+      ],
+      "originPreserved": true,
+      "visualReview": "reviewed",
+      "gripSocketReview": "bounds and origin preserved; per-character runtime review required",
+      "visualReviewNotes": "Reviewed three visible lenses under genuinely open hoods, mounting arm and bolted base."
+    }
+  },
+  "reviewScope": "Blender 5.2 Cycles asset-level review. Runtime character grip, face attachment, scene layout and browser material behavior are reviewed separately.",
+  "qualityClaim": "Refined stylized replacements with corrected construction; not a claim of universal photoreal or highest-tier production quality.",
+  "render": {
+    "engine": "Cycles",
+    "device": "CPU",
+    "finalSamples": 64,
+    "finalResolution": [
+      800,
+      800
+    ],
+    "roundtripSamples": 48,
+    "roundtripResolution": [
+      720,
+      720
+    ]
+  }
+}

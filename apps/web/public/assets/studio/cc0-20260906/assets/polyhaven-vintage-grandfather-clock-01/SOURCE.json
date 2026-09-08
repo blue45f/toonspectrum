@@ -1,0 +1,98 @@
+{
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provider": "Poly Haven",
+    "sourceUrl": "https://polyhaven.com/a/vintage_grandfather_clock_01",
+    "commercialUse": true,
+    "redistributionAllowed": true,
+    "checkedOn": "2026-09-08"
+  },
+  "metadata": {
+    "type": 2,
+    "tags": [
+      "vintage",
+      "antique",
+      "fancy",
+      "time",
+      "clock",
+      "old",
+      "wooden",
+      "ornate"
+    ],
+    "name": "Vintage Grandfather Clock 01",
+    "date_published": 1627430400,
+    "sponsors": [
+      "26820710"
+    ],
+    "categories": [
+      "decorative",
+      "appliances",
+      "rigged"
+    ],
+    "authors": {
+      "Yann Kervran": "Rigging",
+      "James Ray Cock": "Modeling & Texturing"
+    },
+    "max_resolution": [
+      8192,
+      8192
+    ],
+    "polycount": 12604,
+    "texel_density": 3056.3588473921463,
+    "dimensions": [
+      996.6365396976471,
+      795.2136099338531,
+      2190.5919313430786
+    ],
+    "files_hash": "c706b0b10ddcc119feb8ecba2b00174576896a16",
+    "description": "Free 8K model - ornate vintage wooden grandfather clock with antique brass dial and moonphase, fully rigged for animation; ideal for decorative or period sets.",
+    "category_id": "78e2cdf4-5d1e-5e5a-9396-933299fbe72b",
+    "category": "Electronics & Appliances/Clocks & Timepieces/Grandfather Clocks",
+    "attributes": {
+      "condition": [
+        "worn"
+      ],
+      "material": [
+        "wood",
+        "brass",
+        "glass"
+      ],
+      "rigged": true
+    },
+    "download_count": 28970,
+    "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/vintage_grandfather_clock_01.png?width=256&height=256"
+  },
+  "files": [
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/vintage_grandfather_clock_01/vintage_grandfather_clock_01_2k.gltf",
+      "bytes": 8727,
+      "sha256": "686d1f3f3c644dfcabadcc105c006a4d9c626fa428386005f7b7b4807b1d4300",
+      "sourceMd5": "c8ec5677888133a546c50e82b784a783"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_grandfather_clock_01/vintage_grandfather_clock_01_nor_gl_2k.jpg",
+      "bytes": 2034505,
+      "sha256": "43cc4929ef2e20387231698bcb65046b14568438f3264fd6ea0a998858fcb0df",
+      "sourceMd5": "1519e8b32f7c094de8e6aae3de68f856"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_grandfather_clock_01/vintage_grandfather_clock_01_arm_2k.jpg",
+      "bytes": 2581760,
+      "sha256": "0e4b5d684f25afa3d9d4805d0b1ce023a685d78205451cc74731d6a96c83218a",
+      "sourceMd5": "9763544cdd5b87abcefa6dd2471c6bc8"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/vintage_grandfather_clock_01/vintage_grandfather_clock_01.bin",
+      "bytes": 337096,
+      "sha256": "c08ac0f81f4e4f00e0440c8645caf7b86604655e3b3cfbafa09465dda2829c3c",
+      "sourceMd5": "acaa3b0b8a422c99da9211f6ac4bbf2b"
+    },
+    {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/vintage_grandfather_clock_01/vintage_grandfather_clock_01_diff_2k.jpg",
+      "bytes": 2187674,
+      "sha256": "dfda5e02239d1fd30005f45860789b6304fbf9fe8c00a937780a6cd2104fdc4f",
+      "sourceMd5": "7448374986003ef45729f9a32ac060ea"
+    }
+  ]
+}

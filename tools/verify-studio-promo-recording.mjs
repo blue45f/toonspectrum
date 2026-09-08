@@ -17,11 +17,12 @@ const { outputText, diagnostics } = ts.transpileModule(source, {
 });
 assert.equal(diagnostics?.filter((item) => item.category === ts.DiagnosticCategory.Error).length, 0);
 
-async function recording({ preAborted = false, stopThrows = false, failFinalProgress = false, manualCapture = true, supportedMimes } = {}) { // NOSONAR javascript:S3776
+async function recording({ preAborted = false, stopThrows = false, failFinalProgress = false, manualCapture = true, supportedMimes, withAudio = false, browserWindow = false } = {}) { // NOSONAR javascript:S3776
   let clock = 0;
   let nextId = 0;
   let trackStops = 0;
   let frameRequests = 0;
+  let audioStoppedAt = null;
   const contextOptions = [];
   const frames = new Map();
   const timers = new Map();
@@ -32,7 +33,23 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
   const controller = new AbortController();
   if (preAborted) controller.abort();
   const track = { stop: () => { trackStops += 1; }, ...(manualCapture ? { requestFrame: () => { frameRequests += 1; } } : {}) };
-  const stream = { getTracks: () => [track], getVideoTracks: () => [track] };
+  const audioTrack = { stop: () => { audioStoppedAt ??= clock; } };
+  const stream = {
+    getTracks: () => withAudio ? [track, audioTrack] : [track],
+    getVideoTracks: () => [track],
+    getAudioTracks: () => withAudio ? [audioTrack] : [],
+    addTrack: (added) => { assert.equal(added, audioTrack); },
+  };
+  class AudioContext {
+    state = "running";
+    get currentTime() { return clock / 1000; }
+    async resume() {}
+    async decodeAudioData() { return { duration: 1 }; }
+    createBufferSource() { return { connect() {}, disconnect() {}, start() {}, stop() {} }; }
+    createGain() { return { gain: { value: 0, setValueAtTime() {} }, connect() {}, disconnect() {} }; }
+    createMediaStreamDestination() { return { stream: { getAudioTracks: () => [audioTrack] } }; }
+    async close() { this.state = "closed"; }
+  }
   class Canvas {
     width = 0;
     height = 0;
@@ -64,6 +81,7 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
     "./promo-canvas": { drawPromoFrame: () => {}, loadPromoImages: async () => new Map() },
     "./promo-model": {
       PROMO_FPS: 30,
+      promoAudioGain: () => 0,
       promoFrameCount: (project) => project.seconds * 30,
       promoSize: () => ({ width: 720, height: 1280 }),
     },
@@ -71,14 +89,16 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
   const exports = {};
   runInNewContext(outputText, {
     exports, require: (id) => { assert.ok(Object.hasOwn(mocks, id), `Unexpected import: ${id}`); return mocks[id]; },
-    document, HTMLCanvasElement: Canvas, MediaRecorder: Recorder, Blob, DOMException,
+    document, HTMLCanvasElement: Canvas, MediaRecorder: Recorder, Blob, DOMException, AudioContext,
+    ...(browserWindow ? { window: {} } : {}),
+    fetch: async () => ({ arrayBuffer: async () => new ArrayBuffer(0) }),
     performance: { now: () => clock },
     requestAnimationFrame: (callback) => { const id = ++nextId; frames.set(id, callback); return id; },
     cancelAnimationFrame: (id) => frames.delete(id),
-    setTimeout: (callback) => { const id = ++nextId; timers.set(id, callback); return id; },
+    setTimeout: (callback, delay = 0) => { const id = ++nextId; timers.set(id, { callback, at: clock + delay }); return id; },
     clearTimeout: (id) => timers.delete(id),
   });
-  const outcome = exports.recordPromoVideo({ seconds: 15, ratio: "9:16", panels: [{}], audio: null }, {
+  const outcome = exports.recordPromoVideo({ seconds: 15, ratio: "9:16", panels: [{}], audio: withAudio ? { src: "data:audio/wav;base64,", volume: 0.5 } : null }, {
     signal: controller.signal,
     onProgress: (value) => {
       if (value === 1 && failFinalProgress) throw new Error("UI callback failed");
@@ -96,6 +116,13 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
   return {
     recorder, document, canvases, controller, progress, data, tick, contextOptions,
     frameRequests: () => frameRequests,
+    audioStoppedAt: () => audioStoppedAt,
+    runTimers(now) {
+      clock = now;
+      for (const [id, timer] of [...timers]) {
+        if (timer.at <= now) { timers.delete(id); timer.callback(); }
+      }
+    },
     end() {
       data();
       tick(15_000);
@@ -104,7 +131,7 @@ async function recording({ preAborted = false, stopThrows = false, failFinalProg
     },
     stopEvent() { recorder.onstop?.(); },
     hide() { document.hidden = true; listeners.get("visibilitychange")?.(); },
-    timeout() { for (const callback of [...timers.values()]) callback(); },
+    timeout() { for (const { callback } of [...timers.values()]) callback(); },
     async result() {
       let timer;
       try {
@@ -209,4 +236,28 @@ test("VP9-only environments retain their correctly labeled supported fallback", 
   context.end(); context.stopEvent();
   assert.equal((await context.result()).blob.type, "video/webm;codecs=vp9,opus");
   context.cleaned();
+});
+
+
+test("audio ends at the timeline boundary while the browser flushes the final video frame", async () => {
+  const context = await recording({ withAudio: true, browserWindow: true });
+  context.data();
+  context.tick(15_000);
+  assert.equal(context.audioStoppedAt(), 15_000, "video flushing must not append an extra quarter-second of audio");
+  assert.equal(context.recorder.state, "recording", "preserve the final video paint/encoder opportunity");
+  context.runTimers(15_249);
+  assert.equal(context.recorder.state, "recording");
+  context.runTimers(15_250);
+  assert.equal(context.recorder.state, "inactive");
+  context.stopEvent();
+  assert.ok((await context.result()).blob.size > 0);
+  context.cleaned();
+});
+
+test("cancellation during the browser final-frame timer releases audio and clears pending work", async () => {
+  const context = await recording({ withAudio: true, browserWindow: true });
+  context.data(); context.tick(15_000);
+  context.controller.abort(); context.stopEvent();
+  await rejectsRecording(context, /취소/u);
+  assert.equal(context.audioStoppedAt(), 15_000);
 });

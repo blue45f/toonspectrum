@@ -379,12 +379,7 @@ export function bindStudioCuttoonStagePointersDownDraw(
         flushSync(() => settleZoomGestureRef.current());
         stageRef.current?.setPointersPositions(pointerSample);
       }
-      const pendingBatch = pendingStrokeCommitsRef.current;
-      if (
-        pendingBatch
-        && pendingBatch.pageId !== activePage.id
-        && !flushPendingStrokeCommitsRef.current()
-      ) {
+      if (!h.prepareStrokeCommitPage()) {
         setError(
           "이전 페이지의 마지막 획을 확정하지 못해 새 획을 시작하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요."
         );
