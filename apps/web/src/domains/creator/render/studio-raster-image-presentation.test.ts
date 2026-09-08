@@ -89,6 +89,30 @@ describe("studio raster image presentation probe", () => {
     acknowledgeStudioRasterImagePresentationDraw({ elementId: "line-1", src: "locator-a" });
   });
 
+  it("does not accept an older filter program for the same imported image", async () => {
+    const source = { elementId: "import-1", src: "data:image/png;base64,import" };
+    const first = { ...source, requestKey: "invert:1" };
+    const latest = { ...source, requestKey: "invert:0.25" };
+    let completed = false;
+    const pending = waitForStudioRasterImagePresentations([latest], () => undefined)
+      .then(() => { completed = true; });
+    acknowledgeStudioRasterImagePresentationDraw(first);
+    acknowledgeStudioRasterImagePresentationDraw(source);
+    await Promise.resolve();
+    const acceptedStale = completed;
+    acknowledgeStudioRasterImagePresentationDraw(latest);
+    await pending;
+    expect(acceptedStale).toBe(false);
+    expect(completed).toBe(true);
+  });
+
+  it("preserves source-only OPFS capture callers when the node acknowledges its filter request", async () => {
+    const source = { elementId: "linked-1", src: `studio-opfs-cas:sha256:${"a".repeat(64)}` };
+    await expect(waitForStudioRasterImagePresentations([source], () => {
+      acknowledgeStudioRasterImagePresentationDraw({ ...source, requestKey: "current" });
+    })).resolves.toBeUndefined();
+  });
+
   it("snapshots only currently mounted canonical identities and reference-counts duplicate mounts", () => {
     const releaseFirst = registerStudioMountedRasterImagePresentation({
       elementId: "line-1",

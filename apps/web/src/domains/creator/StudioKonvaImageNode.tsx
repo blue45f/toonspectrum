@@ -36,7 +36,6 @@ import {
   acknowledgeStudioRasterImagePresentationDraw,
   expectedStudioRasterImagePresentation,
   registerStudioMountedRasterImagePresentation,
-  type StudioRasterImagePresentationExpectation,
 } from "./render/studio-raster-image-presentation";
 import {
   evaluateStudioAnimatedImageFilterCapability,
@@ -507,20 +506,10 @@ export function StudioKonvaImageNode({
   const animatedFilterNoticeRef = useRef<string | null>(null);
   const hokusaiPresentationReceiptRef = useRef<string | null>(null);
   const livingInkPresentationReceiptRef = useRef<string | null>(null);
-  const rasterImagePresentationReceiptRef =
-    useRef<StudioRasterImagePresentationExpectation | null>(null);
   // 최신 el을 담아두는 ref — 아래 Worker 필터 effect가 좌표 드래그 등 필터와 무관한 el 변경마다
   // 재실행되지 않도록(의존성은 filterCacheKey/width/height만) 최신 값만 읽어들이는 용도.
   const elRef = useRef(el);
   elRef.current = el;
-
-  useLayoutEffect(() => {
-    if (
-      !rasterPresentationEligible
-      || !el.src.startsWith("studio-opfs-cas:sha256:")
-    ) return;
-    return registerStudioMountedRasterImagePresentation({ elementId: el.id, src: el.src });
-  }, [el.id, el.src, rasterPresentationEligible]);
 
   useEffect(() => {
     const src = el.src;
@@ -1001,6 +990,19 @@ export function StudioKonvaImageNode({
     // 요청으로 취급하면 안 된다(fail-closed 폴백 키와 결과 상태 매칭이 함께 이 키를 쓴다).
     filterMaskWantedSrc ?? null,
   ]);
+  const rasterPresentationRequestKey = JSON.stringify([
+    workerRequestKey, flipped, flippedY, isAnimatedGif,
+  ]);
+  const rasterPresentationRequestKeyRef = useRef(rasterPresentationRequestKey);
+  rasterPresentationRequestKeyRef.current = rasterPresentationRequestKey;
+  useLayoutEffect(() => {
+    if (!rasterPresentationEligible) return;
+    // Ordinary file imports need the same fence as CAS images. Register while computation is
+    // pending, before there is a final canvas; otherwise an immediate export skips the image.
+    return registerStudioMountedRasterImagePresentation({
+      elementId: el.id, src: el.src, requestKey: rasterPresentationRequestKey,
+    });
+  }, [el.id, el.src, rasterPresentationEligible, rasterPresentationRequestKey]);
   // Once this operation enters the GPU/Worker filter boundary, failure keeps that boundary active
   // so Konva's synchronous filter cache cannot become an automatic replacement renderer.
   const filterPipelineActive = workerPipelineRequested;
@@ -1738,6 +1740,9 @@ export function StudioKonvaImageNode({
         node.cache(cachePad > 0 ? { offset: cachePad } : { pixelRatio: filterDensity });
         ready = { requestKey: workerRequestKey, source: displayImg };
       }
+      // A filter removal must first clear the previous Konva cache before a raw-source draw can
+      // acknowledge the new request. It needs no Worker result or filter-module download.
+      if (!hasFilters) ready = { requestKey: workerRequestKey, source: displayImg };
       setKonvaFilterPresentationReady((current) => (
         current?.requestKey === ready?.requestKey && current?.source === ready?.source
           ? current
@@ -1893,10 +1898,9 @@ export function StudioKonvaImageNode({
       // parameter revision. `readbackFinal()` commits the exact result into
       // currentWorkerFilteredCanvas, and only that full-resolution Worker result closes the fence.
       ? (currentWorkerFilteredCanvas === imageSource ? imageSource : undefined)
-      : hasFilters
-        // Konva's synchronous filter path is exact only after node.cache() completed for this
-        // concrete source and filter request. A module-ready flag alone can race the passive cache
-        // effect and acknowledge an old/unfiltered layer draw.
+      : hasFilters || !isAnimatedGif
+        // The synchronous source is exact only after its cache is rebuilt (filtered) or cleared
+        // (unfiltered) for this request. Module readiness alone can race the passive cache effect.
         ? (
             konvaFilterPresentationReady?.requestKey === workerRequestKey
             && konvaFilterPresentationReady.source === imageSource
@@ -1910,15 +1914,8 @@ export function StudioKonvaImageNode({
     const identity = {
       elementId: el.id,
       src: el.src,
+      requestKey: rasterPresentationRequestKey,
     } as const;
-    const expected = expectedStudioRasterImagePresentation(identity);
-    const linkedPassPresentation = el.src.startsWith("studio-opfs-cas:sha256:");
-    // The verifier installs a fresh probe for each cold/warm operation, so its numeric epoch may
-    // restart at 1. Dedupe by the expectation object owned by that probe, not by epoch alone.
-    if (
-      !linkedPassPresentation
-      && (!expected || rasterImagePresentationReceiptRef.current === expected)
-    ) return;
     const node = imageRef.current;
     const layer = node?.getLayer();
     if (!node || !layer) return;
@@ -1936,15 +1933,11 @@ export function StudioKonvaImageNode({
         || node.image() !== rasterPresentationSource
         || elRef.current.id !== identity.elementId
         || elRef.current.src !== identity.src
+        || rasterPresentationRequestKeyRef.current !== identity.requestKey
       ) return;
-      if (linkedPassPresentation) acknowledgeStudioRasterImagePresentationDraw(identity);
+      acknowledgeStudioRasterImagePresentationDraw(identity);
       const currentExpected = expectedStudioRasterImagePresentation(identity);
-      const receipt = currentExpected
-        ? acknowledgeStudioRasterImagePresentation(currentExpected)
-        : null;
-      if (receipt) {
-        rasterImagePresentationReceiptRef.current = currentExpected;
-      }
+      if (currentExpected) acknowledgeStudioRasterImagePresentation(currentExpected);
     };
     layer.on("draw.studioRasterPresentation", acknowledgeAfterDraw);
     // Coalesce with React-Konva's pending draw instead of forcing another synchronous full Stage
@@ -1955,7 +1948,7 @@ export function StudioKonvaImageNode({
       active = false;
       layer.off("draw.studioRasterPresentation", acknowledgeAfterDraw);
     };
-  }, [el.id, el.src, rasterPresentationEligible, rasterPresentationSource]);
+  }, [el.id, el.src, rasterPresentationEligible, rasterPresentationRequestKey, rasterPresentationSource]);
 
   if (!displayImg || !imageSource) return null;
 
