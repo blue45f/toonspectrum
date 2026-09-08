@@ -7,16 +7,22 @@ on:
     paths:
       - "scripts/patch-studio-ai-comic-director-apply.mjs"
       - ".github/workflows/patch-studio-ai-comic-director-apply.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/patch-studio-ai-comic-director-apply.mjs"
+      - ".github/workflows/patch-studio-ai-comic-director-apply.yml"
 
 permissions:
   contents: write
 
 concurrency:
-  group: patch-studio-ai-comic-director-apply
+  group: patch-studio-ai-comic-director-apply-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
   patch:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
