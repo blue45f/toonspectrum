@@ -24,7 +24,7 @@ export function pickObjectIdsAtPoint<T extends { id: string }>(
 ): string[] {
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return [];
   const include = opts?.include ?? (() => true);
-  const hitSlop = Math.max(0, Number.isFinite(opts?.hitSlop) ? opts!.hitSlop! : 0);
+  const hitSlop = opts?.hitSlop ?? 0;
   const maxResults = normalizedLimit(opts?.maxResults);
   if (maxResults === 0) return [];
 
