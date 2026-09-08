@@ -2,6 +2,25 @@
 export type ResourceProvider = "met" | "openlibrary" | "openbd" | "kakao" | "bizinfo";
 export type ResourceStatus = "ready" | "partial" | "not_configured" | "unavailable";
 export type ResourceLicense = "CC0" | "metadata-only" | "book-promotion";
+
+export interface CreatorAssetMetadata {
+  objectName: string;
+  department: string;
+  culture: string;
+  period: string;
+  dynasty: string;
+  medium: string;
+  dimensions: string;
+  classification: string;
+  country: string;
+  objectBeginDate?: number;
+  objectEndDate?: number;
+  isHighlight: boolean;
+  tags: string[];
+  originalImageUrl?: string;
+  additionalImageUrls: string[];
+}
+
 export interface CreatorResource {
   id: string;
   provider: ResourceProvider;
@@ -18,7 +37,9 @@ export interface CreatorResource {
   deadline?: string;
   eligibility?: string;
   isbn?: string;
+  asset?: CreatorAssetMetadata;
 }
+
 export interface ResourceSearchResult {
   provider: ResourceProvider;
   status: ResourceStatus;
@@ -27,7 +48,9 @@ export interface ResourceSearchResult {
   hasMore: boolean;
   fetchedAt: string | null;
   message: string;
+  total?: number;
 }
+
 export const RESOURCE_LABELS: Record<ResourceProvider, string> = {
   met: "The Met · 공개 미술 자료",
   openlibrary: "Open Library · 글로벌 도서",
@@ -35,13 +58,16 @@ export const RESOURCE_LABELS: Record<ResourceProvider, string> = {
   kakao: "카카오 · 도서 검색",
   bizinfo: "기업마당 · 지원사업",
 };
+
 export function recordOf(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown> : {};
 }
+
 export function textOf(value: unknown, max = 500): string {
   return typeof value === "string" ? value.slice(0, max).trim() : "";
 }
+
 export function httpsUrl(value: unknown, hosts?: readonly string[]): string {
   if (typeof value !== "string" || value.length > 2048 || /[\r\n\t]/u.test(value)) return "";
   try {
@@ -51,6 +77,7 @@ export function httpsUrl(value: unknown, hosts?: readonly string[]): string {
     return url.href;
   } catch { return ""; }
 }
+
 const SOURCE_HOSTS: Record<ResourceProvider, readonly string[]> = {
   met: ["www.metmuseum.org", "metmuseum.org"],
   openlibrary: ["openlibrary.org", "www.openlibrary.org"],
@@ -58,6 +85,9 @@ const SOURCE_HOSTS: Record<ResourceProvider, readonly string[]> = {
   kakao: ["search.daum.net", "book.daum.net", "m.search.daum.net"],
   bizinfo: ["www.bizinfo.go.kr", "bizinfo.go.kr"],
 };
+
+const MET_IMAGE_HOSTS = ["images.metmuseum.org"] as const;
+
 export function isProvider(value: unknown): value is ResourceProvider {
   return value === "met"
     || value === "openlibrary"
@@ -65,12 +95,14 @@ export function isProvider(value: unknown): value is ResourceProvider {
     || value === "kakao"
     || value === "bizinfo";
 }
+
 export function dateOnly(value: unknown): string | undefined {
   const raw = textOf(value, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(raw)) return undefined;
   const date = new Date(`${raw}T00:00:00Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === raw ? raw : undefined;
 }
+
 /** Ambiguous/open-ended periods remain unknown, never fabricated as an active deadline. */
 export function parseDeadline(period: unknown): string | undefined {
   const match = textOf(period, 100).match(/^\s*(\d{4})-?(\d{2})-?(\d{2})\s*~\s*(\d{4})-?(\d{2})-?(\d{2})\s*$/u);
@@ -79,6 +111,7 @@ export function parseDeadline(period: unknown): string | undefined {
   const end = dateOnly(`${match[4]}-${match[5]}-${match[6]}`);
   return start && end && start <= end ? end : undefined;
 }
+
 export function deadlineLabel(deadline: string | undefined, now = new Date()): string {
   const day = dateOnly(deadline);
   if (!day) return "마감일 원문 확인";
@@ -86,6 +119,76 @@ export function deadlineLabel(deadline: string | undefined, now = new Date()): s
   const days = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${todayKst}T00:00:00Z`)) / 86400000);
   return days < 0 ? "마감일 경과" : days === 0 ? "오늘 마감 · 시간 확인" : `D-${days}`;
 }
+
+function safeYear(value: unknown): number | undefined {
+  return typeof value === "number"
+    && Number.isInteger(value)
+    && value >= -10000
+    && value <= 3000
+    ? value
+    : undefined;
+}
+
+function safeTextList(value: unknown, maximumItems: number, maximumLength: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .map((item) => textOf(item, maximumLength))
+    .filter(Boolean))]
+    .slice(0, maximumItems);
+}
+
+function safeMetImages(value: unknown, maximumItems: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .map((item) => httpsUrl(item, MET_IMAGE_HOSTS))
+    .filter(Boolean))]
+    .slice(0, maximumItems);
+}
+
+export function parseCreatorAssetMetadata(value: unknown): CreatorAssetMetadata | undefined {
+  const v = recordOf(value);
+  const objectBeginDate = safeYear(v.objectBeginDate);
+  const objectEndDate = safeYear(v.objectEndDate);
+  const originalImageUrl = httpsUrl(v.originalImageUrl, MET_IMAGE_HOSTS);
+  const tags = safeTextList(v.tags, 24, 80);
+  const additionalImageUrls = safeMetImages(v.additionalImageUrls, 8);
+  const metadata: CreatorAssetMetadata = {
+    objectName: textOf(v.objectName, 200),
+    department: textOf(v.department, 240),
+    culture: textOf(v.culture, 240),
+    period: textOf(v.period, 240),
+    dynasty: textOf(v.dynasty, 240),
+    medium: textOf(v.medium, 800),
+    dimensions: textOf(v.dimensions, 1200),
+    classification: textOf(v.classification, 240),
+    country: textOf(v.country, 240),
+    isHighlight: v.isHighlight === true,
+    tags,
+    additionalImageUrls,
+    ...(objectBeginDate !== undefined ? { objectBeginDate } : {}),
+    ...(objectEndDate !== undefined ? { objectEndDate } : {}),
+    ...(originalImageUrl ? { originalImageUrl } : {}),
+  };
+  const hasContent = metadata.isHighlight
+    || metadata.tags.length > 0
+    || metadata.additionalImageUrls.length > 0
+    || metadata.originalImageUrl
+    || objectBeginDate !== undefined
+    || objectEndDate !== undefined
+    || [
+      metadata.objectName,
+      metadata.department,
+      metadata.culture,
+      metadata.period,
+      metadata.dynasty,
+      metadata.medium,
+      metadata.dimensions,
+      metadata.classification,
+      metadata.country,
+    ].some(Boolean);
+  return hasContent ? metadata : undefined;
+}
+
 export function parseResource(value: unknown): CreatorResource | null {
   const v = recordOf(value);
   if (!isProvider(v.provider)) return null;
@@ -100,20 +203,23 @@ export function parseResource(value: unknown): CreatorResource | null {
     : provider === "openbd" && v.license === "book-promotion"
       ? "book-promotion"
       : "metadata-only";
-  const imageUrl = license === "CC0" ? httpsUrl(v.imageUrl, ["images.metmuseum.org"]) : "";
+  const imageUrl = license === "CC0" ? httpsUrl(v.imageUrl, MET_IMAGE_HOSTS) : "";
   const licenseUrl = license === "CC0"
     ? "https://creativecommons.org/publicdomain/zero/1.0/"
     : license === "book-promotion"
       ? "https://openbd.jp/terms/"
       : "";
+  const asset = provider === "met" && license === "CC0" ? parseCreatorAssetMetadata(v.asset) : undefined;
   return {
     id, provider, title, sourceUrl, fetchedAt, license, licenseUrl,
     creator: textOf(v.creator, 300), description: textOf(v.description, 1200), credit: textOf(v.credit, 500),
     ...(imageUrl ? { imageUrl } : {}),
     dateLabel: textOf(v.dateLabel, 100), deadline: dateOnly(v.deadline),
     eligibility: textOf(v.eligibility, 300), isbn: textOf(v.isbn, 100),
+    ...(asset ? { asset } : {}),
   };
 }
+
 export function parseSearchResult(value: unknown): ResourceSearchResult | null {
   const v = recordOf(value);
   if (!isProvider(v.provider) || !["ready", "partial", "not_configured", "unavailable"].includes(String(v.status)) || !Array.isArray(v.items) || v.items.length > 100) return null;
@@ -121,26 +227,37 @@ export function parseSearchResult(value: unknown): ResourceSearchResult | null {
   if (items.length !== v.items.length || new Set(items.map((item) => item.id)).size !== items.length) return null;
   if ((v.status === "not_configured" || v.status === "unavailable") && items.length > 0) return null;
   if (v.status === "not_configured" && v.hasMore === true) return null;
+  const total = v.total === undefined
+    ? undefined
+    : typeof v.total === "number" && Number.isSafeInteger(v.total) && v.total >= 0
+      ? v.total
+      : null;
+  if (total === null) return null;
   return {
     provider: v.provider, status: v.status as ResourceStatus, items,
     page: typeof v.page === "number" && Number.isInteger(v.page) && v.page > 0 ? v.page : 1,
     hasMore: v.hasMore === true, fetchedAt: typeof v.fetchedAt === "string" ? v.fetchedAt : null,
     message: textOf(v.message, 500),
+    ...(total !== undefined ? { total } : {}),
   };
 }
+
 export interface CreatorWorkspace {
   version: 1;
   saved: CreatorResource[];
   story: Record<string, string>;
   checks: string[];
 }
+
 export const STORY_FIELDS = ["title", "protagonist", "desire", "obstacle", "stakes", "world", "turn", "ending"] as const;
 export type StoryField = typeof STORY_FIELDS[number];
 export const STORY_LABELS: Record<StoryField, string> = {
   title: "작품 가제", protagonist: "주인공은 누구인가요?", desire: "주인공이 원하는 것", obstacle: "가로막는 인물·상황",
   stakes: "실패하면 잃는 것", world: "세계관의 규칙", turn: "첫 화의 전환점", ending: "마지막에 달라지는 것",
 };
+
 export function emptyWorkspace(): CreatorWorkspace { return { version: 1, saved: [], story: {}, checks: [] }; }
+
 export function parseWorkspace(raw: string | null): CreatorWorkspace {
   if (!raw) return emptyWorkspace();
   if (new TextEncoder().encode(raw).length > 1000000) throw new Error("저장 파일이 너무 큽니다. 1 MB 이하 파일을 사용하세요.");
@@ -155,20 +272,38 @@ export function parseWorkspace(raw: string | null): CreatorWorkspace {
     checks: [...new Set(v.checks.filter((item): item is string => typeof item === "string" && /^[\w-]{1,100}$/u.test(item)))],
   };
 }
+
 const markdownText = (value: string) => value.replace(/[\\[\]<>`*_]/gu, "\\$&");
+
+function assetAttributionLines(item: CreatorResource): string {
+  if (!item.asset) return "";
+  const values = [
+    ["부서", item.asset.department],
+    ["유형", item.asset.objectName || item.asset.classification],
+    ["문화권", item.asset.culture],
+    ["시대", item.asset.period || item.dateLabel || ""],
+    ["재료·기법", item.asset.medium],
+    ["크기", item.asset.dimensions],
+  ].filter((entry) => entry[1]);
+  return values.map(([label, value]) => `- ${label}: ${markdownText(value)}\n`).join("");
+}
+
 export function attributionMarkdown(items: readonly CreatorResource[]): string {
   return "# 창작 자료 출처 기록\n\n검색·열람 권한은 이미지 재배포 허가와 다릅니다. 제작에 사용하기 전 원문 조건을 다시 확인하세요.\n\n" + items.map((item) =>
-    `## ${markdownText(item.title)}\n- 제공처: ${RESOURCE_LABELS[item.provider]}\n- 저작자: ${markdownText(item.creator || "원문 확인")}\n- 원문: ${item.sourceUrl}\n- 이용조건: ${item.license}\n- 크레딧: ${markdownText(item.credit)}\n- 조회일: ${item.fetchedAt}\n`,
+    `## ${markdownText(item.title)}\n- 제공처: ${RESOURCE_LABELS[item.provider]}\n- 저작자: ${markdownText(item.creator || "원문 확인")}\n- 원문: ${item.sourceUrl}\n- 이용조건: ${item.license}\n- 크레딧: ${markdownText(item.credit)}\n${assetAttributionLines(item)}- 조회일: ${item.fetchedAt}\n`,
   ).join("\n");
 }
+
 export function storyMarkdown(story: Record<string, string>): string {
   return "# 웹툰 기획 워크시트\n\n직접 작성하는 기획 도구입니다. AI 생성 결과가 아닙니다.\n\n" + STORY_FIELDS.map((field) =>
     `## ${STORY_LABELS[field]}\n${markdownText(story[field] || "아직 작성하지 않음")}\n`,
   ).join("\n");
 }
+
 function icsText(value: string): string {
   return value.replaceAll("\\", "\\\\").replace(/\r\n|\r|\n/gu, "\\n").replaceAll(",", "\\,").replaceAll(";", "\\;");
 }
+
 function foldIcs(line: string): string {
   const encoder = new TextEncoder();
   let output = ""; let width = 0;
@@ -179,6 +314,7 @@ function foldIcs(line: string): string {
   }
   return output;
 }
+
 export function deadlineCalendar(item: CreatorResource, now = new Date()): string {
   const day = dateOnly(item.deadline);
   if (item.provider !== "bizinfo" || !day) throw new Error("확인된 마감일이 없습니다.");
