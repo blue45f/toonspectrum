@@ -9,13 +9,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: apply-studio-pixel-pencil-pro-core-v2
+  group: apply-studio-pixel-pencil-pro-core-macos-v3
   cancel-in-progress: false
 
 jobs:
   apply:
     if: ${{ !contains(github.event.head_commit.message, '[pixel-pencil-pro-core-applied]') }}
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 60
     steps:
       - name: Checkout feature branch
