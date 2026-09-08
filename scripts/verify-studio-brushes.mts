@@ -1,3 +1,4 @@
+import { meetsStudioMinimumTouchTarget } from "./lib/studio-touch-target-measurement.mjs";
 /**
  * Reproducible browser gate for Studio's unified brush catalogue and stroke durability.
  *
@@ -3929,13 +3930,18 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   await page.setViewportSize({ width: 320, height: 720 });
   const layout = await dialog.evaluate((element) => {
     const box = element.getBoundingClientRect();
-    const small = Array.from(element.querySelectorAll("button,input:not([type=checkbox]),select")).filter((node) => {
+    const controls = Array.from(element.querySelectorAll("button,input:not([type=checkbox]),select")).map((node) => {
       const bounds = node.getBoundingClientRect();
-      return bounds.width > 0 && (bounds.width < 44 || bounds.height < 44);
-    });
-    return { left: box.left, right: box.right, width: innerWidth, small: small.length };
+      const style = getComputedStyle(node);
+      return { tag: node.tagName, label: node.getAttribute("aria-label") || node.textContent?.trim(),
+        width: bounds.width, height: bounds.height, minWidth: style.minWidth, minHeight: style.minHeight,
+        transform: style.transform, zoom: style.zoom };
+    }).filter((bounds) => bounds.width > 0);
+    return { left: box.left, right: box.right, width: innerWidth, controls };
   });
-  invariant(layout.left >= 0 && layout.right <= layout.width && layout.small === 0, `mobile correction controls overflow or miss 44px: ${JSON.stringify(layout)}`);
+  const smallControls = layout.controls.filter((bounds) => !meetsStudioMinimumTouchTarget(bounds));
+  invariant(layout.left >= 0 && layout.right <= layout.width && smallControls.length === 0,
+    `mobile correction controls overflow or miss 44px: ${JSON.stringify({ ...layout, smallControls })}`);
   await page.screenshot({ path: join(SCRATCH, "studio-current-stroke-correction-mobile.png"), animations: "disabled" });
   await page.setViewportSize({ width: 1440, height: 1100 });
   await dialog.getByRole("button", { name: "원래 자유선 복원", exact: true }).click();
