@@ -182,7 +182,13 @@ function blobFor(binary: Studio3dGenerationBinary): Blob {
 
 function validateFilename(filename: string, field: string): string {
   const trimmed = filename.trim();
-  if (!trimmed || trimmed.length > 180 || /[\\/\u0000]/u.test(trimmed)) {
+  if (
+    !trimmed ||
+    trimmed.length > 180 ||
+    trimmed.includes("/") ||
+    trimmed.includes("\\") ||
+    trimmed.includes("\0")
+  ) {
     throw new Studio3dGenerationProviderError({
       code: "invalid-request",
       message: `${field} has an invalid filename.`,

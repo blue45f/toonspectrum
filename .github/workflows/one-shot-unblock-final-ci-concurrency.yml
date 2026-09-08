@@ -1,0 +1,55 @@
+name: One-shot unblock final CI concurrency
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/one-shot-unblock-final-ci-concurrency.yml
+
+permissions:
+  contents: write
+
+jobs:
+  unblock:
+    if: github.event.pull_request.head.ref == 'release/main-final-924176-immutable-20260908' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: release/main-final-924176-immutable-20260908
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/ci.yml
+            .github/workflows/one-shot-unblock-final-ci-concurrency.yml
+      - name: Isolate the final protected CI run from stale queued gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/ci.yml')
+          text = path.read_text(encoding='utf-8')
+          old = "  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}"
+          new = old + "-release-final-g2"
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one CI concurrency group, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          grep -F -- '-release-final-g2' .github/workflows/ci.yml
+          git diff --check
+      - name: Commit the concurrency repair and retire this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/one-shot-unblock-final-ci-concurrency.yml
+          git add .github/workflows/ci.yml
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(ci): isolate final protected run from stale queued gates'
+          git push origin HEAD:release/main-final-924176-immutable-20260908

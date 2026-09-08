@@ -283,6 +283,45 @@ describe("Hyper3dRodinProvider", () => {
     expect(sleeps).toEqual([]);
   });
 
+  it.each(["", "   ", "../reference.png", "..\\reference.png", "bad\0name.png", "a".repeat(181)])(
+    "rejects invalid image filename %j before contacting the provider",
+    async (filename) => {
+      const requests: Array<{ input: string; init: RequestInit }> = [];
+      const provider = createHyper3dRodinProvider({
+        apiKey: "secret-key",
+        fetchImpl: responseSequence([], requests),
+      });
+
+      await expect(provider.submit(generationRequest({
+        mode: "image-to-3d",
+        images: [image(filename)],
+      }), new AbortController().signal)).rejects.toMatchObject({
+        code: "invalid-request",
+      });
+      expect(requests).toHaveLength(0);
+    },
+  );
+
+  it.each(["reference.png", `${"a".repeat(176)}.png`])(
+    "trims a valid filename without changing its multipart name: %s",
+    async (filename) => {
+      const requests: Array<{ input: string; init: RequestInit }> = [];
+      const provider = createHyper3dRodinProvider({
+        apiKey: "secret-key",
+        fetchImpl: responseSequence([acceptedSubmission()], requests),
+      });
+
+      await provider.submit(generationRequest({
+        mode: "image-to-3d",
+        images: [image(`  ${filename}  `)],
+      }), new AbortController().signal);
+
+      expect(requests).toHaveLength(1);
+      const form = requests[0]?.init.body as FormData;
+      expect((form.get("images") as File).name).toBe(filename);
+    },
+  );
+
   it("rejects more than five images before contacting the provider", async () => {
     const requests: Array<{ input: string; init: RequestInit }> = [];
     const provider = createHyper3dRodinProvider({
