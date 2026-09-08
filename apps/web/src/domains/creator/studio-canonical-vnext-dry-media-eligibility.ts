@@ -12,7 +12,7 @@ export type StudioCanonicalDryMediaEligibilityFailure = {
 export function studioCanonicalDryMediaEligibilityFailure(
   element: DrawEl | null | undefined,
 ): StudioCanonicalDryMediaEligibilityFailure | null {
-  if (!element || element.type !== "draw" || (element.kind && element.kind !== "freehand")
+  if (!element || element.type !== "draw" || (element.kind !== undefined && element.kind !== "freehand")
     || element.mode === "eraser" || element.brush !== "dry-media") return { reason: "invalid-input" };
   if (classifyStudioDryMediaCatalogIdV1(element.brushCatalogId)?.kind !== "anisotropic-continuous") {
     return { reason: "ineligible-material" };

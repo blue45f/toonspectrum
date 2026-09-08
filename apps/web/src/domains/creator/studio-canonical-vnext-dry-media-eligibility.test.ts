@@ -25,6 +25,7 @@ describe("canonical dry-media viewport admission", () => {
   it.each([
     ["eraser", { mode: "eraser" }, "invalid-input"],
     ["geometric shape", { kind: "rect" }, "invalid-input"],
+    ["empty geometry kind", { kind: "" }, "invalid-input"],
     ["unknown material", { brushCatalogId: "not-a-dry-material" }, "ineligible-material"],
     ["roller", { brushCatalogId: "paint-roller" }, "unsupported-paint-roller"],
     ["multiply composite", { blendMode: "multiply" }, "unsupported-composite"],
