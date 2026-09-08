@@ -148,7 +148,7 @@ export function renderStudioCanvasStageHud({
             <button
               type="button"
               className={cn(
-                "grid size-7 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg",
+                "grid size-11 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg",
                 (viewTransformSuppressed || zoomLocked || zoomOutAtLimit) && "cursor-not-allowed opacity-40"
               )}
               aria-label="축소"
@@ -173,7 +173,7 @@ export function renderStudioCanvasStageHud({
             <button
               type="button"
               className={cn(
-                "grid size-7 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg",
+                "grid size-11 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg",
                 (viewTransformSuppressed || zoomLocked || zoomInAtLimit) && "cursor-not-allowed opacity-40"
               )}
               aria-label="확대"
@@ -194,7 +194,7 @@ export function renderStudioCanvasStageHud({
             aria-expanded={pageSequenceOpen}
             aria-label={`페이지 시퀀스 ${pageSequenceOpen ? "닫기" : "열기"} · ${pageDisplayName(activePage, activePageIndex)}`}
             onClick={() => setPageSequenceOpen((current) => !current)}
-            className="inline-flex min-h-6 min-w-0 items-center gap-1 rounded-full px-1.5 text-fg transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="inline-flex min-h-11 min-w-11 items-center gap-1 rounded-full px-1.5 text-fg transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <Clapperboard size={11} aria-hidden />
             <span className="truncate">{pageDisplayName(activePage, activePageIndex)}</span>
@@ -309,7 +309,7 @@ export function renderStudioCanvasStageHud({
               aria-label={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
               onClick={() => setStudioUiDensity(mode)}
               className={cn(
-                "grid size-6 place-items-center rounded-full transition-colors",
+                "grid size-11 place-items-center rounded-full transition-colors",
                 uiDensityMode === mode
                   ? "bg-accent text-on-accent"
                   : "text-fg-3 hover:bg-raised hover:text-fg-2"
@@ -331,7 +331,7 @@ export function renderStudioCanvasStageHud({
             }}
             aria-disabled={viewTransformSuppressed ? true : undefined}
             className={cn(
-              "min-h-7 rounded-full px-2 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg",
+              "min-h-11 min-w-11 rounded-full px-2 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg",
               viewTransformSuppressed && "cursor-not-allowed opacity-40"
             )}
           >
@@ -347,7 +347,7 @@ export function renderStudioCanvasStageHud({
           aria-label={canvasOnlyMode
             ? localizeText(t, "도구 보기", "studio.canvas.canvasOnlyModeShowTools")
             : localizeText(t, "` · 캔버스만 보기", "studio.canvas.canvasOnlyModeShowCanvasOnly")}
-          className="min-h-6 min-w-6 rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+          className="min-h-11 min-w-11 rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
           title={localizeText(t, "` — 캔버스만 / 도구 토글", "studio.canvas.canvasOnlyModeTitle")}
         >
           {canvasOnlyMode ? localizeText(t, "도구", "studio.canvas.canvasOnlyModeTool") : "`"}

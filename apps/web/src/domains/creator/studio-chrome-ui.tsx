@@ -975,7 +975,7 @@ export function StudioRailToolButton({
       ) : null}
       {launcher ? (
         <ArrowUpRight
-          size={9}
+          size={10}
           strokeWidth={2.5}
           aria-hidden
           className="absolute right-0.5 top-0.5 opacity-60"

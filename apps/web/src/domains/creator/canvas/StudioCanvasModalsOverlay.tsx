@@ -307,7 +307,7 @@ export const StudioCanvasModalsOverlay = memo(function StudioCanvasModalsOverlay
         type="button"
         onClick={() => setShortcutsOpen(true)}
         className={cn(
-          "absolute bottom-3 right-14 z-30 hidden size-9 place-items-center rounded-lg border border-line bg-panel/90 text-sm text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
+          "absolute bottom-3 right-16 z-30 hidden size-11 place-items-center rounded-lg border border-line bg-panel/90 text-sm text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
           canvasOnlyMode && "!hidden"
         )}
         style={
@@ -325,7 +325,7 @@ export const StudioCanvasModalsOverlay = memo(function StudioCanvasModalsOverlay
         type="button"
         onClick={() => openFeatureTutorial(null)}
         className={cn(
-          "absolute bottom-3 right-[6.5rem] z-30 hidden size-9 place-items-center rounded-lg border border-line bg-panel/90 text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
+          "absolute bottom-3 right-[7.25rem] z-30 hidden size-11 place-items-center rounded-lg border border-line bg-panel/90 text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
           canvasOnlyMode && "!hidden"
         )}
         style={
