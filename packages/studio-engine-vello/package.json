@@ -24,10 +24,10 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@toonspectrum/studio-project-model": "workspace:*",
-    "@toonspectrum/studio-engine-registry": "workspace:*"
+    "@toonspectrum/studio-engine-registry": "workspace:*",
+    "@toonspectrum/studio-project-model": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24"
+    "@types/node": "^24.13.2"
   }
 }
