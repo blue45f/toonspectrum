@@ -124,4 +124,12 @@ describe("StudioAnimTimelinePanel motion coach", () => {
     expect(html).toContain("가속 (ease-in)");
     expect(html).toContain("클립 추가");
   });
+
+  it("pins the mobile timeline to the viewport while preserving desktop canvas placement", () => {
+    expect(source).toContain('className="fixed inset-x-2 top-16 z-40');
+    expect(source).toContain("max-h-[calc(100svh-5rem)]");
+    expect(source).toContain("sm:absolute sm:inset-x-auto sm:right-3 sm:top-3");
+    expect(source).toContain("sm:w-[min(46rem,calc(100%-1.5rem))]");
+    expect(source).not.toContain('className="absolute right-3 top-3 z-40');
+  });
 });
