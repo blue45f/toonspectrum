@@ -1,0 +1,73 @@
+name: Studio Selection Contract Validation
+
+on:
+  push:
+    branches:
+      - ci/studio-selection-contract-validation-20260909
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-selection-contract-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  selection-contracts:
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      HUSKY: "0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ci/studio-selection-contract-validation-20260909
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Selection regression suite
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/studio-selection-tools.test.ts
+          apps/web/src/domains/creator/studio-pixel-selection-history.test.ts
+          apps/web/src/domains/creator/studio-selection-refinement.test.ts
+          apps/web/src/domains/creator/studio-selection-source.test.ts
+          apps/web/src/domains/creator/studio-saved-selections.test.ts
+          apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.test.tsx
+          apps/web/src/domains/creator/StudioPixelSelectionHud.test.tsx
+          apps/web/src/domains/creator/StudioSelectionContextBar.test.tsx
+          apps/web/src/domains/creator/studio-selection-workbench-integration.test.ts
+          apps/web/src/domains/creator/studio-main-menu-group-spec.test.ts
+      - name: Selection implementation lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/studio-selection-refinement.ts
+          apps/web/src/domains/creator/studio-selection-refinement.test.ts
+          apps/web/src/domains/creator/studio-selection-source.ts
+          apps/web/src/domains/creator/studio-selection-source-browser.ts
+          apps/web/src/domains/creator/studio-selection-source.test.ts
+          apps/web/src/domains/creator/studio-saved-selections.ts
+          apps/web/src/domains/creator/studio-saved-selections.test.ts
+          apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.tsx
+          apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.test.tsx
+          apps/web/src/domains/creator/StudioPixelSelectionHud.tsx
+          apps/web/src/domains/creator/StudioPixelSelectionHud.test.tsx
+          apps/web/src/domains/creator/studio-selection-workbench-integration.test.ts
+          apps/web/src/domains/creator/StudioInspectorImageToolsSection.tsx
+          apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx
+          apps/web/src/domains/creator/studio-main-menu-group-spec-model.ts
+          apps/web/src/domains/creator/studio-main-menu-group-spec.ts
+          apps/web/src/domains/creator/studio-main-menu-items-selection.ts
+      - name: Workspace typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+      - name: Studio architecture contracts
+        run: |
+          pnpm run validate:architecture
+          pnpm run verify:studio-menus
+          pnpm run verify:studio-canvas-surfaces
