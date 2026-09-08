@@ -38,10 +38,10 @@
     "apiSurface": "imk_generate(pre-modeled points stride-4 f64, BrushTip params, pressure->size behavior) -> positions f32 + surface-UV texCoords f32 + triangle indices u32; noise_seed pinned 0 (deterministic replay)"
   },
   "measuredRuntime": {
-    "generatedAtUtc": "2026-08-08T05:03:49.494Z",
+    "generatedAtUtc": "2026-09-08T06:36:14.489Z",
     "harness": "packages/studio-brush-platform/src/__tests__/ink-mesh.test.ts (INK_MESH_POC=1)",
     "upstreamCommit": "1d0daba661f3035f42f3649b8e6a0061b47aa759",
-    "wasmBytes": 538378,
+    "wasmBytes": 541737,
     "stroke": {
       "points": 240,
       "spanPx": 180,
@@ -52,8 +52,8 @@
       "triangleCount": 34
     },
     "generationMs": {
-      "p50": 0.47887500000001637,
-      "p95": 0.538791999999944,
+      "p50": 0.4912919999999872,
+      "p95": 0.5951249999999959,
       "runs": 50
     }
   },
