@@ -19,6 +19,7 @@ import type {
   StudioHokusaiLiveOverlaySurfaceBinding,
   StudioLivingInkOverlaySurfaceBinding,
 } from "./StudioCanvasViewportTypes";
+import { StudioViewInspectorHud } from "./StudioViewInspectorHud";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -398,6 +399,21 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
       <StudioCanvasViewportHudOverlays
         viewport={props}
         interaction={interaction}
+      />
+      <StudioViewInspectorHud
+        viewportRef={wrapRef}
+        zoom={zoom}
+        canvasRotation={canvasRotation}
+        canvasFlipH={canvasFlipH}
+        selectionCount={canvasSelectionEls.length}
+        viewDisabledReason={viewBusyReason}
+        onZoomToSelection={zoomToSelection}
+        onFitCanvasToWidth={fitCanvasToWidth}
+        onActualPixels={setActualPixelView}
+        onResetView={resetView}
+        onRotateLeft={() => rotateCanvasView("left")}
+        onRotateRight={() => rotateCanvasView("right")}
+        onToggleFlip={toggleHorizontalCanvasView}
       />
     </div>
   );

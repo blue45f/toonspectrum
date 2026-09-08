@@ -30,6 +30,7 @@ import {
 
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
+import { openStudioViewInspectionPanel } from "./studio-view-inspection-store";
 
 /** View ▸ Navigator and View ▸ Reference Overlay (밑그림 underlay). */
 export function buildStudioViewSurfaceMenuItems({
@@ -42,6 +43,7 @@ export function buildStudioViewSurfaceMenuItems({
       label: "미니맵 · 탐색",
       icon: Compass,
       onSelect: () => {
+        openStudioViewInspectionPanel();
         ui.openCanvasNavigator();
       },
     },
