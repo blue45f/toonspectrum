@@ -173,6 +173,11 @@ async function openReadyWebGpu(page: Page, info: TestInfo, label: string): Promi
   await expect(page.getByRole("spinbutton", { name: "회전 Y", exact: true }).first())
     .toBeVisible({ timeout: READINESS_TIMEOUT_MS });
   await page.getByRole("button", { name: "회전", exact: true }).first().click();
+  // Reopening a viewport is not a camera reset: controls can retain a different settled
+  // presentation. Establish the same real user-selected camera before both pixel oracles.
+  await page.locator(DIALOG).getByRole("button", { name: "시점 초기화", exact: true }).click();
+  // Keep viewport tool hints and hovered gizmos out of both baseline captures.
+  await page.mouse.move(0, 0);
   await page.waitForTimeout(1_000);
 }
 

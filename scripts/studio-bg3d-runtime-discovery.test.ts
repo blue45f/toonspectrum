@@ -34,6 +34,9 @@ describe("BG3D hardware gate discovery", () => {
     expect(source).toContain("expect(finalPeakTileDelta).toBeLessThan(8)");
     expect(source).toContain("internalDelta < 2");
     expect(source).toContain("expect(fatal).toEqual([])");
+    expect(source).toContain('await page.locator(DIALOG).getByRole("button", { name: "시점 초기화", exact: true }).click()');
+    expect(source).toContain("await page.mouse.move(0, 0)");
+    expect(source).toContain('"Both gestures must start from the same settled scene and camera").toBeLessThan(2)');
     expect(source).toContain("const SETTLE_TIMEOUT_MS = 15_000");
     expect(source).toContain("stableIntervals < 2 || settleMs > SETTLE_TIMEOUT_MS");
     expect(source).toContain("page.locator(CANVAS).screenshot()");
