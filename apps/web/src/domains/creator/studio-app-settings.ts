@@ -100,6 +100,7 @@ export const DEFAULT_STUDIO_RAIL_VISIBLE_IDS = [
 
 /** Customizable shortcut action ids (subset wired in StudioPage). */
 export const STUDIO_SHORTCUT_ACTIONS = [
+  { id: "correct-current-stroke", label: "현재 스트로크 교정", labelKey: "studio.settings.shortcut.correctCurrentStroke", defaultKeys: "Alt+Shift+Q" },
   { id: "tool-select", label: "선택", labelKey: "studio.settings.shortcut.toolSelect", defaultKeys: "V" },
   { id: "tool-hand", label: "화면 이동", labelKey: "studio.settings.shortcut.toolHand", defaultKeys: "Space" },
   { id: "tool-pen", label: "펜", labelKey: "studio.settings.shortcut.toolPen", defaultKeys: "B" },

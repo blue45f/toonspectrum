@@ -121,6 +121,7 @@ export function StudioInspectorDrawingSection({
     previewPerspectiveEyeLevelY,
     previewVanishingPointById,
     queueBrushDelete,
+    onCorrectCurrentStroke,
     quickShapeActive,
     recentBrushSizes,
     rememberRecentBrushSize,
@@ -426,6 +427,7 @@ export function StudioInspectorDrawingSection({
                           ? (QUICKSHAPE_KIND_LABELS[liveDraftShapeKind] ?? null)
                           : null
                       }
+                      onCorrectCurrentStroke={onCorrectCurrentStroke}
                       onOpenTutorial={() => openFeatureTutorial("smart-shape")}
                       onToggleActive={() => {
                         const next = !quickShapeActive;
