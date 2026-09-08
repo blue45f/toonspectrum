@@ -7,6 +7,7 @@ import { useStudioCanvasViewportInteraction } from "./studio-canvas-viewport-int
 import { useStudioCanvasViewportLiveSurfaces } from "./studio-canvas-viewport-live-surfaces";
 import { localizeText } from "./studio-canvas-viewport-primitives";
 import { useStudioHandNavigation } from "./useStudioHandNavigation";
+import { useStudioHandShortcutController } from "./useStudioHandShortcutController";
 import { renderStudioCanvasStageHud } from "./StudioCanvasStageHud";
 import { StudioCanvasStatusRail } from "./StudioCanvasStatusRail";
 import { renderStudioCanvasStickyBanners } from "./StudioCanvasStickyBanners";
@@ -69,6 +70,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     advancedFillBusy,
     advancedFillPreview,
     appSettings,
+    appSettingsPersistenceState,
     autosaveDocumentLeadership,
     autosaveLiveJam,
     autosaveRestoreBlockedReason,
@@ -130,6 +132,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     clearAutosave,
     dismissQuickStart,
     clearCanvasSelection,
+    commitAppSettings,
     commitPages,
     downloadAutosaveBackup,
     duplicateSelected,
@@ -176,7 +179,16 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     zoomOutAtLimit,
     zoomOutUnavailableReason,
   } = interaction;
+  const togglePersistentHandTool = useCallback(() => {
+    setTool((currentTool) => (currentTool === "hand" ? "select" : "hand"));
+  }, [setTool]);
 
+  useStudioHandShortcutController({
+    appSettings,
+    settingsReady: appSettingsPersistenceState !== "loading",
+    commitAppSettings,
+    onToggleHandTool: togglePersistentHandTool,
+  });
   useStudioHandNavigation({
     viewportRef: wrapRef,
     handToolActive: tool === "hand",
@@ -185,6 +197,17 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     rightButtonAction: appSettings.mouse.rightButton,
     touchOneFingerMode: appSettings.touch.oneFingerDrag,
   });
+
+  const handAriaShortcuts = [
+    appSettings.shortcuts["tool-hand"],
+    "Space",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
@@ -285,7 +308,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
       <div
         ref={wrapRef}
         data-studio-canvas-viewport
-        data-studio-hand-navigation="pointer-capture-v1"
+        data-studio-hand-navigation="pointer-capture-v2"
+        data-studio-hand-shortcut={
+          appSettings.shortcuts["tool-hand"] || undefined
+        }
         data-studio-viewport-cursor={viewportCursorClassName.replace(
           "cursor-",
           ""
@@ -298,10 +324,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
         role="group"
-        aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight"
+        aria-keyshortcuts={handAriaShortcuts}
         aria-label={localizeText(
           t,
-          "작업 캔버스 — 스페이스·드래그, 설정된 보조 버튼·드래그 또는 방향키로 이동",
+          "작업 캔버스 — H로 핸드 전환, 스페이스·드래그, 설정된 보조 버튼·드래그 또는 방향키로 이동",
           "studio.canvas.canvasAriaLabel"
         )}
         onDragLeave={onWrapDragLeave}
