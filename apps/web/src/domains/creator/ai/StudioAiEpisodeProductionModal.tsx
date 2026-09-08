@@ -35,6 +35,7 @@ import {
   type StudioAiContinuityLockId,
   type StudioAiEpisodeContinuityLocks,
   type StudioAiEpisodeIssueSeverity,
+  type StudioAiEpisodeProductionPlan,
   type StudioAiProductionMode,
   type StudioAiVariantCount,
 } from "./studio-ai-episode-production-director";
@@ -207,12 +208,15 @@ function StepCard({
 export interface StudioAiEpisodeProductionModalProps {
   readonly open: boolean;
   readonly onClose: () => void;
+  readonly onApplyPlan?: (plan: StudioAiEpisodeProductionPlan) => void;
+  /** Legacy prompt handoff retained for callers that only own a single image tool. */
   readonly onApplyPrompt?: (prompt: string) => void;
 }
 
 export function StudioAiEpisodeProductionModal({
   open,
   onClose,
+  onApplyPlan,
   onApplyPrompt,
 }: StudioAiEpisodeProductionModalProps): ReactElement | null {
   const rawId = useId();
@@ -256,7 +260,7 @@ export function StudioAiEpisodeProductionModal({
   const clipboard = useStudioCopyFeedback(2400);
   const firstBatchPrompt = plan.batches[0]?.positivePrompt ?? "";
   const hasBlocker = plan.issues.some((issue) => issue.severity === "blocker");
-  const canApply = Boolean(onApplyPrompt && firstBatchPrompt && !hasBlocker);
+  const canApply = Boolean((onApplyPlan || onApplyPrompt) && firstBatchPrompt && !hasBlocker);
   const copyStatusMessage =
     clipboard.current === null
       ? ""
@@ -667,13 +671,14 @@ export function StudioAiEpisodeProductionModal({
                 statusFor={clipboard.statusFor}
                 onCopy={clipboard.copy}
               />
-              {onApplyPrompt ? (
+              {onApplyPlan || onApplyPrompt ? (
                 <button
                   type="button"
                   disabled={!canApply}
                   onClick={() => {
                     if (!canApply) return;
-                    onApplyPrompt(firstBatchPrompt);
+                    if (onApplyPlan) onApplyPlan(plan);
+                    else onApplyPrompt?.(firstBatchPrompt);
                     onClose();
                   }}
                   className={cn(
@@ -684,7 +689,7 @@ export function StudioAiEpisodeProductionModal({
                   )}
                 >
                   <WandSparkles size={14} aria-hidden />
-                  첫 배치를 구도 도구에 적용
+                  {onApplyPlan ? "편집 가능한 컷 제작으로 넘기기" : "첫 배치를 구도 도구에 적용"}
                 </button>
               ) : null}
             </div>

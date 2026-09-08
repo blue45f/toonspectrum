@@ -37,17 +37,17 @@ describe("StudioAiToolPopoverBody webtoon AI production wiring", () => {
     expect(popover).toContain("requestStudioAiSuperSuiteOpen()");
     expect(popover).toContain("onPreloadSuperSuite={preloadStudioAiSuperSuiteModal}");
     expect(popover).toContain(
-      "<StudioAiEpisodeProductionGateway onApplyPrompt={applyEpisodeBatchPrompt} />"
+      "<StudioAiEpisodeProductionGateway onApplyPlan={applyEpisodeProductionPlan} />"
     );
     expect(popover).toContain(
       "<StudioAiSuperSuiteGateway onApplyPrompt={applySuperSuitePrompt} />"
     );
   });
 
-  it("hands approved prompts back to the existing non-destructive AI tool flow", () => {
-    expect(popover).toContain('setAiAssistTool("composition")');
-    expect(popover).toContain("setAiCompositionDraft(trimmed)");
-    expect(popover).toContain("pushStudioAiRecentPrompt");
-    expect(popover).toContain('setMenu("aiAssist")');
+  it("hands the complete approved episode into the editable scenario production flow", () => {
+    expect(popover).toContain("createStudioAiComicComposerHandoff(plan)");
+    expect(popover).toContain("requestStudioAiComicComposerOpen(handoff)");
+    expect(popover).toContain("handoff.totalCuts");
+    expect(popover).not.toContain("applyEpisodeBatchPrompt");
   });
 });
