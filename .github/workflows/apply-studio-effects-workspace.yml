@@ -1,0 +1,125 @@
+name: Apply Studio effects workspace
+
+on:
+  push:
+    branches:
+      - feat/studio-effects-workspace-20260909
+    paths:
+      - .github/workflows/apply-studio-effects-workspace.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-studio-effects-workspace-20260909
+  cancel-in-progress: false
+
+jobs:
+  apply-validate-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+      BRANCH_NAME: feat/studio-effects-workspace-20260909
+    steps:
+      - name: Check out isolated feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/studio-effects-workspace-20260909
+          fetch-depth: 1
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.20.0
+          cache: pnpm
+
+      - name: Verify and apply implementation payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/studio-effects-payload.part* | base64 --decode > /tmp/studio-effects-payload.tar.xz
+          printf '%s  %s\n' \
+            'd26c240ae2dd5bb5d31ffbc9ad21a4abe9c64494b76871ebe8034d3aba28abe6' \
+            '/tmp/studio-effects-payload.tar.xz' | sha256sum --check --strict
+          xz --test /tmp/studio-effects-payload.tar.xz
+          mkdir -p /tmp/studio-effects-payload
+          tar --extract --xz --file /tmp/studio-effects-payload.tar.xz --directory /tmp/studio-effects-payload
+          printf '%s  %s\n' \
+            'fb9077931ae82f4eb39c9516ec1d238dd3d6c3272b034d77af380673f0c42521' \
+            '/tmp/studio-effects-payload/toonstudio-effects-workspace.patch' | sha256sum --check --strict
+          printf '%s  %s\n' \
+            '40666f3aca7514b0cb98d0dba8dade0951a9ed10ade945fb7e500be45057eee5' \
+            '/tmp/studio-effects-payload/enhance-effects-workspace.mjs' | sha256sum --check --strict
+          node --check /tmp/studio-effects-payload/enhance-effects-workspace.mjs
+          git apply --check /tmp/studio-effects-payload/toonstudio-effects-workspace.patch
+          git apply /tmp/studio-effects-payload/toonstudio-effects-workspace.patch
+          node /tmp/studio-effects-payload/enhance-effects-workspace.mjs
+          rm -rf \
+            .bootstrap \
+            .github/workflows/apply-studio-effects-workspace.yml \
+            .github/workflows/recover-studio-effects-payload.yml
+          git status --short
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Format changed sources
+        run: |
+          pnpm exec prettier --write \
+            apps/web/src/domains/creator/studio-effects-workspace.ts \
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.tsx \
+            apps/web/src/domains/creator/studio-effects-workspace.test.ts \
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx \
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.tsx \
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx \
+            docs/rewrite/studio-effects-workspace-benchmark-2026-09-09.md
+
+      - name: Validate architecture and changed-file lint
+        run: |
+          set -euo pipefail
+          pnpm run validate:architecture
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/studio-effects-workspace.ts \
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.tsx \
+            apps/web/src/domains/creator/studio-effects-workspace.test.ts \
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx \
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.tsx \
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx
+
+      - name: Typecheck repository contracts
+        run: pnpm run typecheck
+
+      - name: Run effects regression suite
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-effects-workspace.test.ts \
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx \
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx \
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.opacity.test.tsx
+          pnpm run verify:studio-filter-dialog
+
+      - name: Build production web bundle
+        run: pnpm run build:bundle
+
+      - name: Commit validated product changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No product changes were produced." >&2
+            exit 1
+          fi
+          git commit -m "feat(studio): add non-destructive effects workspace"
+          git push origin "HEAD:refs/heads/${BRANCH_NAME}"
