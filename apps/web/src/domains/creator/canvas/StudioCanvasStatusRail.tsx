@@ -385,7 +385,7 @@ export function StudioCanvasStatusRail({
     const rail = noticeRailRef.current;
     const host = rail?.parentElement;
     if (!rail || !host) return;
-    const controls = host.querySelector("[data-studio-presence-controls]");
+    const controls = host.querySelector("[data-studio-floating-controls]");
     if (!controls) return;
     const placeBelowControls = () => {
       const hostTop = host.getBoundingClientRect().top;
