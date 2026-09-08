@@ -1,5 +1,13 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import * as studioHelpCenterChannel from "./studio-help-center-channel";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
+
+import { installStudioDialogFocusReturn } from "./studio-dialog-focus-return";
+import { installStudioErrorJournal } from "./studio-error-journal";
+import {
+  requestStudioCommandSearch,
+  subscribeStudioHelpCenter,
+} from "./studio-help-center-channel";
+import { resolveStudioHelpSurface } from "./studio-help-surface-routing";
+
 import type { StudioHelpCenterSection } from "./studio-help-center-channel";
 
 const StudioHelpCenterDialog = lazy(() =>
@@ -14,78 +22,117 @@ const StudioContextHelpDialog = lazy(() =>
   })),
 );
 
+const StudioGuidedHelpDialog = lazy(() =>
+  import("./StudioGuidedHelpDialog").then((module) => ({
+    default: module.StudioGuidedHelpDialog,
+  })),
+);
+
+type StudioHelpSurface = "center" | "context" | "guided";
+
 interface StudioHelpCenterState {
   readonly open: boolean;
+  readonly surface: StudioHelpSurface;
   readonly section: StudioHelpCenterSection;
   readonly toolCommandId: string | null;
 }
 
-interface StudioHelpCenterRequestLike {
-  readonly section: StudioHelpCenterSection;
-  readonly toolCommandId?: string | null;
-}
-
-type StudioHelpCenterSubscriber = (
-  listener: (request: StudioHelpCenterRequestLike) => void,
-) => (() => void) | void;
-
 const CLOSED_STATE: StudioHelpCenterState = {
   open: false,
+  surface: "center",
   section: "diagnostics",
   toolCommandId: null,
 };
 
-function resolveHelpCenterSubscriber(): StudioHelpCenterSubscriber | null {
-  const channel = studioHelpCenterChannel as unknown as Record<string, unknown>;
-  const candidates = [
-    "subscribeStudioHelpCenter",
-    "subscribeStudioHelpCenterRequest",
-    "subscribeStudioHelpCenterRequests",
-    "onStudioHelpCenterRequest",
-  ] as const;
-
-  for (const candidate of candidates) {
-    const value = channel[candidate];
-    if (typeof value === "function") return value as StudioHelpCenterSubscriber;
-  }
-  return null;
+function currentToolSurface(toolCommandId: string | null): StudioHelpSurface {
+  return toolCommandId ? "guided" : "context";
 }
 
 export function StudioHelpCenterHost() {
   const [state, setState] = useState<StudioHelpCenterState>(CLOSED_STATE);
   const openerRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    const subscribe = resolveHelpCenterSubscriber();
-    if (!subscribe) {
-      console.error("[studio-help] Help center request subscriber is unavailable.");
-      return undefined;
-    }
+  useEffect(() => installStudioErrorJournal(), []);
+  useEffect(() => installStudioDialogFocusReturn(), []);
 
-    return subscribe((request) => {
-      openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      setState({
+  useEffect(
+    () =>
+      subscribeStudioHelpCenter((request) => {
+        openerRef.current =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+        const route = resolveStudioHelpSurface(request);
+        if (route.surface === "guided") {
+          setState({
+            open: true,
+            surface: currentToolSurface(route.toolCommandId),
+            section: "current-tool",
+            toolCommandId: route.toolCommandId,
+          });
+          return;
+        }
+        setState({
+          open: true,
+          surface: "center",
+          section: route.section,
+          toolCommandId: route.toolCommandId,
+        });
+      }),
+    [],
+  );
+
+  const close = useCallback(() => {
+    setState(CLOSED_STATE);
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() =>
+      openerRef.current?.focus({ preventScroll: true }),
+    );
+  }, []);
+
+  const changeSection = useCallback((section: StudioHelpCenterSection) => {
+    setState((current) => {
+      if (section === "current-tool") {
+        return {
+          ...current,
+          open: true,
+          surface: currentToolSurface(current.toolCommandId),
+          section,
+        };
+      }
+      return {
+        ...current,
         open: true,
-        section: request.section,
-        toolCommandId: request.toolCommandId ?? null,
-      });
+        surface: "center",
+        section,
+      };
     });
+  }, []);
+
+  const openCommandSearch = useCallback(() => {
+    setState(CLOSED_STATE);
+    requestStudioCommandSearch();
+  }, []);
+
+  const openManual = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.open("/studio/manual", "_blank", "noopener,noreferrer");
   }, []);
 
   if (!state.open) return null;
 
-  const close = () => {
-    setState(CLOSED_STATE);
-    window.requestAnimationFrame(() => openerRef.current?.focus());
-  };
-
-  const changeSection = (section: StudioHelpCenterSection) => {
-    setState((current) => ({ ...current, section }));
-  };
-
   return (
     <Suspense fallback={null}>
-      {state.section === "current-tool" ? (
+      {state.surface === "guided" ? (
+        <StudioGuidedHelpDialog
+          open
+          initialToolCommandId={state.toolCommandId}
+          onOpenSupport={changeSection}
+          onOpenCommandSearch={openCommandSearch}
+          onOpenManual={openManual}
+          onClose={close}
+        />
+      ) : state.surface === "context" ? (
         <StudioContextHelpDialog
           key={state.toolCommandId ?? "studio-help-home"}
           open

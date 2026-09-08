@@ -3,8 +3,8 @@
  *
  * 이 그룹이 감사에서 심각 미흡을 받은 이유는 기능이 없어서가 아니라 **알 수 없어서**
  * 였다. 그러니 여기서 지키는 것은 모양이 아니라 정직성이다: 측정하지 않은 값은
- * 측정했다고 표시되지 않고, 도움말 문서가 없으면 없다고 말하고, 사전과 라이선스
- * 표는 손으로 적은 목록이 아니라 실제 카탈로그·정책에서 나온다.
+ * 측정했다고 표시되지 않고, 작성형 도움말 존재 여부는 실제 그래프에서 나오며,
+ * 사전과 라이선스 표는 손으로 적은 목록이 아니라 실제 카탈로그·정책에서 나온다.
  */
 
 import { describe, expect, it } from "vitest";
@@ -128,10 +128,10 @@ describe("현재 도구 도움말", () => {
     ).toBeNull();
   });
 
-  it("산문 도움말이 없다는 사실을 감추지 않는다", () => {
+  it("출하된 작성형 도움말을 실제 그래프에서 확인한다", () => {
     const help = buildStudioToolHelp("tool.pen");
     expect(help).not.toBeNull();
-    expect(help?.authoredHelp, "HelpGraph 가 출하되기 전에는 언제나 false").toBe(false);
+    expect(help?.authoredHelp).toBe(true);
     expect(help?.helpNodeId).toMatch(/^help\//u);
   });
 
