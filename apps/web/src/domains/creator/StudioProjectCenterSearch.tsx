@@ -611,7 +611,7 @@ export function StudioProjectCenterSearch(): ReactElement {
       }
       return;
     }
-    if (event.altKey && event.key.toLocaleLowerCase() === "p") {
+    if (event.altKey && event.code === "KeyP") {
       event.preventDefault();
       const active = visibleResults[Math.max(0, activeIndex)];
       if (active) toggleFavorite(active);
@@ -665,9 +665,6 @@ export function StudioProjectCenterSearch(): ReactElement {
             ? `${actions.length}개 도구`
             : `${sectionCounts.get(scope) ?? 0}개 도구`;
   const activeResult = visibleResults[Math.max(0, activeIndex)];
-  const activeResultId = activeResult
-    ? `${resultListId}-${activeResult.key}`
-    : undefined;
   const emptyTitle = queryActive
     ? "일치하는 프로젝트 도구가 없습니다"
     : scope === "favorites"
@@ -701,7 +698,6 @@ export function StudioProjectCenterSearch(): ReactElement {
             placeholder="도구·목적 검색 · /"
             aria-label="프로젝트 센터 도구 검색"
             aria-controls={resultMode ? resultListId : undefined}
-            aria-activedescendant={resultMode ? activeResultId : undefined}
             className="min-w-0 flex-1 bg-transparent text-[0.75rem] text-fg outline-none placeholder:text-fg-3"
           />
           <span
@@ -892,10 +888,14 @@ export function StudioProjectCenterSearch(): ReactElement {
         ) : null}
 
         {resultMode ? (
-          <div className="mt-2 rounded-xl border border-line bg-canvas/75 shadow-lg">
+          <div
+            id={resultListId}
+            role="region"
+            aria-label="프로젝트 센터 결과"
+            className="mt-2 rounded-xl border border-line bg-canvas/75 shadow-lg"
+          >
             {visibleResults.length > 0 ? (
               <div
-                id={resultListId}
                 role="list"
                 aria-label="프로젝트 센터 검색 결과"
                 data-project-center-search-results="true"
@@ -999,6 +999,16 @@ export function StudioProjectCenterSearch(): ReactElement {
             ) : null}
           </div>
         ) : null}
+        <span
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {resultMode && activeResult
+            ? `${Math.max(0, activeIndex) + 1}/${visibleResults.length} ${activeResult.label}, ${activeResult.sectionLabel}`
+            : ""}
+        </span>
         <span className="sr-only" role="status" aria-live="polite">
           {announcement}
         </span>
