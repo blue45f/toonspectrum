@@ -3,6 +3,8 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { BlendIsolationGroup } from "./BlendIsolationGroup";
+import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   STUDIO_HOKUSAI_LIVE_DOCUMENT_RECEIPT_VERSION,
 } from "./render/studio-hokusai-live-brush-document-receipt";
@@ -67,6 +69,16 @@ class TestImage {
   width = 64;
 }
 
+type TestCachedParent = {
+  cache: ReturnType<typeof vi.fn>;
+  cachedImage?: CanvasImageSource;
+  clearCache: ReturnType<typeof vi.fn>;
+  getClientRect: () => { width: number; height: number };
+  getLayer: () => { batchDraw: () => void };
+  getParent: () => null;
+  isCached: () => boolean;
+};
+
 const konvaCapture = vi.hoisted(() => {
   const drawListeners = new Set<() => void>();
   const layer = {
@@ -81,18 +93,24 @@ const konvaCapture = vi.hoisted(() => {
   };
   const capture = {
     appliedImage: undefined as CanvasImageSource | undefined,
+    drawnImage: undefined as CanvasImageSource | undefined,
+    parent: null as TestCachedParent | null,
     drawListeners,
     layer,
     node: {
       cache: vi.fn(),
       clearCache: vi.fn(),
       getLayer: vi.fn(() => layer),
+      getParent: vi.fn(() => capture.parent),
       image: vi.fn(() => capture.appliedImage),
       isVisible: vi.fn(() => true),
       visible: vi.fn(),
     },
     currentProps: null as Record<string, unknown> | null,
     fireLayerDraw: () => {
+      capture.drawnImage = capture.parent?.isCached()
+        ? capture.parent.cachedImage
+        : capture.appliedImage;
       const listeners = [...drawListeners];
       listeners.forEach((listener) => listener());
     },
@@ -115,7 +133,7 @@ const tournamentCapture = vi.hoisted(() => ({
 }));
 
 vi.mock("react-konva/lib/ReactKonvaCore", async () => {
-  const { forwardRef, useEffect, useImperativeHandle } = await import("react");
+  const { forwardRef, useEffect, useImperativeHandle, useState } = await import("react");
   const Image = forwardRef<unknown, Record<string, unknown>>((props, ref) => {
     useImperativeHandle(ref, () => {
       konvaCapture.appliedImage = props.image as CanvasImageSource | undefined;
@@ -131,7 +149,27 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
     return null;
   });
   Image.displayName = "TestKonvaImage";
-  return { Image };
+  const Group = forwardRef<unknown, { children: import("react").ReactNode }>((props, ref) => {
+    const [node] = useState(() => {
+      let cached = false;
+      const parent: TestCachedParent = {
+        cache: vi.fn(() => { cached = true; parent.cachedImage = konvaCapture.appliedImage; }),
+        clearCache: vi.fn(() => { cached = false; }),
+        getClientRect: () => ({ width: 200, height: 200 }),
+        getLayer: () => konvaCapture.layer,
+        getParent: () => null,
+        isCached: () => cached,
+      };
+      return parent;
+    });
+    useImperativeHandle(ref, () => {
+      konvaCapture.parent = node;
+      return node;
+    }, [node]);
+    return props.children;
+  });
+  Group.displayName = "TestKonvaCachedGroup";
+  return { Group, Image };
 });
 
 vi.mock("./render/studio-konva-runtime", () => ({
@@ -338,6 +376,8 @@ beforeEach(() => {
   konvaCapture.props.length = 0;
   konvaCapture.currentProps = null;
   konvaCapture.appliedImage = undefined;
+  konvaCapture.drawnImage = undefined;
+  konvaCapture.parent = null;
   konvaCapture.drawListeners.clear();
   delete window.__studioRasterImagePresentationProbe;
   imageCapture.instances.length = 0;
@@ -401,6 +441,7 @@ afterEach(() => {
   delete window.__studioRasterImagePresentationProbe;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("StudioKonvaImageNode image lifecycle", () => {
@@ -1280,6 +1321,75 @@ describe("StudioKonvaImageNode product capture readiness", () => {
     await capture.pending;
     expect(capture.completed).toHaveBeenCalledWith(capture.stage);
     expect(window.__studioRasterImagePresentationProbe).toBeUndefined();
+  });
+
+  it.each([
+    ["multiply", BlendIsolationGroup],
+    ["alpha-mask", ClipMaskGroup],
+  ] as const)("refreshes a %s cache when its Worker finishes after all delayed recaches", async (_name, CacheGroup) => {
+    vi.useFakeTimers();
+    render(<CacheGroup cacheKey="unchanged-image" composite="multiply">
+      {renderNode(filtered(1))}
+    </CacheGroup>);
+    const source = await resolveLatestImage();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_300); });
+    expect(runs).toHaveLength(1);
+    const parent = konvaCapture.parent!;
+    expect(parent.cachedImage).toBe(source);
+    const cacheCount = parent.cache.mock.calls.length;
+    const capture = startCapture();
+    await act(async () => undefined);
+    expect(konvaCapture.drawnImage).toBe(source);
+    expect(capture.completed).not.toHaveBeenCalled();
+
+    await finishWorker(0);
+    const finalImage = latestImageProps().image;
+    expect(finalImage).toBeInstanceOf(HTMLCanvasElement);
+    expect(parent.cache).toHaveBeenCalledTimes(cacheCount + 1);
+    expect(parent.cachedImage).toBe(finalImage);
+    expect(capture.completed).not.toHaveBeenCalled();
+    act(() => konvaCapture.fireLayerDraw());
+    await capture.pending;
+    expect(konvaCapture.drawnImage).toBe(finalImage);
+    expect(capture.completed).toHaveBeenCalledWith(capture.stage);
+    act(() => konvaCapture.fireLayerDraw());
+    expect(parent.cache).toHaveBeenCalledTimes(cacheCount + 1);
+  });
+
+  it("does not acknowledge a filtered source when its ancestor cache fails", async () => {
+    vi.useFakeTimers();
+    render(<BlendIsolationGroup cacheKey="unchanged-image" composite="multiply">
+      {renderNode(filtered(1))}
+    </BlendIsolationGroup>);
+    await resolveLatestImage();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_300); });
+    const parent = konvaCapture.parent!;
+    parent.cache.mockImplementation(() => { throw new Error("cache allocation failed"); });
+    const capture = startCapture(250);
+    await act(async () => undefined);
+    await finishWorker(0);
+    act(() => konvaCapture.fireLayerDraw());
+    expect(capture.completed).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(await capture.pending).toMatchObject({ code: "render-timeout" });
+  });
+
+  it("can capture when a parent cache and a same-source presentation change in one commit", async () => {
+    vi.useFakeTimers();
+    const view = render(<BlendIsolationGroup cacheKey="before" composite="multiply">
+      {renderNode(imageEl({ isAnimatedGif: true }))}
+    </BlendIsolationGroup>);
+    const source = await resolveLatestImage();
+    view.rerender(<BlendIsolationGroup cacheKey="after" composite="multiply">
+      {renderNode(imageEl({ flipped: true, isAnimatedGif: true }))}
+    </BlendIsolationGroup>);
+    expect(latestImageProps().image).toBe(source);
+    const capture = startCapture(250);
+    await act(async () => undefined);
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    await capture.pending;
+    expect(capture.completed).toHaveBeenCalledWith(capture.stage);
+    expect(konvaCapture.drawnImage).toBe(source);
   });
 
   it("rejects the previous same-source program's draw while a changed opacity is pending", async () => {

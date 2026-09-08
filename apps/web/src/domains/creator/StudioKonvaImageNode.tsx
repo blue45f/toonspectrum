@@ -37,6 +37,7 @@ import {
   expectedStudioRasterImagePresentation,
   registerStudioMountedRasterImagePresentation,
 } from "./render/studio-raster-image-presentation";
+import { refreshStudioRasterPresentationCaches } from "./render/studio-raster-presentation-cache";
 import {
   evaluateStudioAnimatedImageFilterCapability,
   startStudioAnimatedImageFilterFrameLoop,
@@ -1909,7 +1910,9 @@ export function StudioKonvaImageNode({
           )
         : imageSource;
 
-  useLayoutEffect(() => {
+  // Parent cache owners finish their layout registration before this passive effect. A child
+  // layout effect can otherwise run between the parent's old cleanup and its new registration.
+  useEffect(() => {
     if (!rasterPresentationSource || !rasterPresentationEligible) return;
     const identity = {
       elementId: el.id,
@@ -1919,6 +1922,10 @@ export function StudioKonvaImageNode({
     const node = imageRef.current;
     const layer = node?.getLayer();
     if (!node || !layer) return;
+
+    // A cached blend/mask ancestor can still contain the previous image despite this node's new
+    // image prop. Rebuild those owners once per exact presentation, preserving their cache policy.
+    if (!refreshStudioRasterPresentationCaches(node)) return;
 
     let active = true;
     const acknowledgeAfterDraw = () => {

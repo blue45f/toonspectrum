@@ -20,8 +20,10 @@
  * cacheKey: 요소의 렌더 결과가 바뀌면 달라지는 키. 바뀔 때마다 다시 캐시한다
  * (마운트 시에도 1회 실행되므로 첫 캐시도 이 effect가 담당한다).
  */
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { Group } from "react-konva/lib/ReactKonvaCore";
+
+import { registerStudioRasterPresentationCache } from "./render/studio-raster-presentation-cache";
 
 import type Konva from "konva";
 import type { ReactNode } from "react";
@@ -39,11 +41,11 @@ export function BlendIsolationGroup({
 }): React.ReactElement {
   const ref = useRef<Konva.Group>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
     const recache = () => {
       const node = ref.current;
-      if (cancelled || !node) return;
+      if (cancelled || !node) return false;
       node.clearCache();
       // 자식 이미지가 아직 로드 전이면 그룹 크기가 0 — 이때 cache()는 Konva 경고를 낸다.
       // 크기가 생긴 뒤(지연 재캐시)에만 캐시한다. 캐시 실패 시에는 캐시 없이 그리는데,
@@ -58,11 +60,14 @@ export function BlendIsolationGroup({
         }
       }
       node.getLayer()?.batchDraw();
+      return node.isCached();
     };
+    const unregister = registerStudioRasterPresentationCache(ref.current, recache);
     recache();
     const timers = [120, 350, 700, 1200].map((ms) => globalThis.setTimeout(recache, ms));
     return () => {
       cancelled = true;
+      unregister();
       timers.forEach((t) => globalThis.clearTimeout(t));
     };
   }, [cacheKey]);
