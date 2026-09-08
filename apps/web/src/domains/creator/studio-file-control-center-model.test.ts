@@ -54,7 +54,12 @@ describe("studio file control center model", () => {
   });
 
   it("fails closed for proprietary or ambiguous containers", () => {
-    const clip = inspectStudioFileCandidate({ name: "source.clip", size: 100 });
+    const clip = inspectStudioFileCandidate({
+      name: "source.clip",
+      size: 100,
+      type: "application/octet-stream",
+    });
+    expect(clip.capabilityId).toBeNull();
     expect(clip.tier).toBe("unsupported");
     expect(clip.actionId).toBeNull();
     expect(clip.recommendations.join(" ")).toContain("PSD");
@@ -64,6 +69,7 @@ describe("studio file control center model", () => {
       size: 100,
       type: "application/zip",
     });
+    expect(zip.capabilityId).toBeNull();
     expect(zip.tier).toBe("unsupported");
     expect(zip.actionId).toBeNull();
     expect(zip.summary).toContain(".toonproject.zip");
