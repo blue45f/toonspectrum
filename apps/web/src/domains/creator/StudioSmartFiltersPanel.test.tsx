@@ -259,7 +259,8 @@ describe("StudioSmartFiltersPanel", () => {
       />,
     );
     expect(html).toContain("3 × 3 커널");
-    expect(html.match(/type="number"/g)?.length).toBe(9);
+    const kernel = html.match(/<fieldset><legend[^>]*>3 × 3 커널<\/legend>([\s\S]*?)<\/fieldset>/)?.[1];
+    expect(kernel?.match(/type="number"/g)?.length).toBe(9);
     expect(html).toContain(">엠보스</button>");
     expect(html).toContain(">박스 블러</button>");
     expect(html).toContain(">하이패스</button>");

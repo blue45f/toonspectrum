@@ -331,6 +331,8 @@ export interface StudioAdjustmentEntry {
   id: string;
   engine: StudioAdjustmentEngineId;
   enabled: boolean;
+  /** Effect strength in 0..1. Omitted is legacy full strength; source pixels stay immutable. */
+  opacity?: number;
   /** Engine-specific params; normalized loosely (finite numbers only). */
   params: Record<string, number | string | boolean>;
 }
@@ -432,10 +434,12 @@ function normalizeEntry(value: unknown, index: number): StudioAdjustmentEntry | 
   const id = typeof source.id === "string" && source.id.trim().length > 0
     ? source.id.trim().slice(0, 80)
     : `adj-${index + 1}`;
+  const opacity = Math.max(0, Math.min(1, finiteNumber(source.opacity, 1)));
   return {
     id,
     engine,
     enabled: source.enabled !== false,
+    ...(opacity < 1 ? { opacity } : {}),
     params: normalizeParams(source.params),
   };
 }
@@ -448,7 +452,8 @@ function serializeCanonicalParams(params: Readonly<Record<string, number | strin
 }
 
 function serializeCanonicalEntry(entry: StudioAdjustmentEntry): string {
-  return `{"enabled":${entry.enabled},"engine":${JSON.stringify(entry.engine)},"id":${JSON.stringify(entry.id)},"params":${serializeCanonicalParams(entry.params)}}`;
+  const opacity = entry.opacity === undefined ? "" : `,"opacity":${entry.opacity}`;
+  return `{"enabled":${entry.enabled},"engine":${JSON.stringify(entry.engine)},"id":${JSON.stringify(entry.id)}${opacity},"params":${serializeCanonicalParams(entry.params)}}`;
 }
 
 /** Stable-key-order JSON used by byte admission and equality checks. */
@@ -556,6 +561,7 @@ export function appendStudioAdjustmentEntry(
       id: entry.id,
       engine: entry.engine,
       enabled: entry.enabled,
+      opacity: entry.opacity,
       params: entry.params,
     },
     current.entries.length
@@ -621,7 +627,7 @@ export function listEnabledStudioAdjustmentOperations(
   stack: unknown
 ): readonly StudioAdjustmentFilterOperation[] {
   return normalizeStudioAdjustmentStack(stack).entries
-    .filter((entry) => entry.enabled)
+    .filter((entry) => entry.enabled && entry.opacity !== 0)
     .map((entry) => ({ ...entry, params: { ...entry.params } }));
 }
 
@@ -1328,5 +1334,5 @@ export function studioAdjustmentStackToFilterFields(
 
 /** True when the stack has at least one enabled entry that maps to live filter fields. */
 export function studioAdjustmentStackHasLivePreview(stack: unknown): boolean {
-  return listEnabledStudioAdjustmentEngines(stack).some(studioAdjustmentEngineHasLivePreview);
+  return listEnabledStudioAdjustmentOperations(stack).some((entry) => studioAdjustmentEngineHasLivePreview(entry.engine));
 }

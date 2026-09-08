@@ -801,6 +801,27 @@ export function StudioSmartFiltersPanel({
                     <Trash2 className="size-3.5" aria-hidden />
                   </button>
                 </div>
+                <label className="flex min-h-11 items-center justify-between gap-2 text-xs text-fg-2">
+                  불투명도
+                  <span className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={Number(((entry.opacity ?? 1) * 100).toFixed(2))}
+                      aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 필터 ${index + 1} 불투명도`}
+                      className="min-h-11 w-20 rounded border border-line bg-card px-2 text-right tabular-nums text-fg"
+                      onChange={(event) => patch({
+                        ...current,
+                        entries: current.entries.map((candidate) => candidate.id === entry.id
+                          ? { ...candidate, opacity: Number(event.target.value) / 100 }
+                          : candidate),
+                      })}
+                    />
+                    %
+                  </span>
+                </label>
                 {entry.enabled ? (
                   <StudioSmartFilterControls
                     entry={entry}

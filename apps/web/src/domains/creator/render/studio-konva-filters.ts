@@ -1230,10 +1230,40 @@ export function buildImageFilters(
       execution,
     );
     const operationAttrs = operationBuild.attrs;
-    for (const operationFilter of operationBuild.filters) {
-      filters.push(function orderedStudioSmartFilter(imageData: StudioImageDataLike): void {
-        operationFilter.call({ attrs: operationAttrs }, imageData);
+    const opacity = operation.opacity ?? 1;
+    if (opacity < 1 && operationBuild.filters.length > 0) {
+      filters.push(function translucentStudioSmartFilter(imageData: StudioImageDataLike): void {
+        // Run all kernels in the entry before mixing. The private copy also keeps the accepted
+        // input intact when a kernel fails, and at most one extra RGBA buffer is live per entry.
+        const filtered: StudioImageDataLike = {
+          width: imageData.width,
+          height: imageData.height,
+          data: new Uint8ClampedArray(imageData.data),
+        };
+        for (const operationFilter of operationBuild.filters) {
+          operationFilter.call({ attrs: operationAttrs }, filtered);
+        }
+        for (let index = 0; index < imageData.data.length; index += 4) {
+          // Canvas ImageData is straight RGBA. Mix premultiplied color contributions, then
+          // unpremultiply once; transparent filtered RGB must never darken the retained color.
+          const originalWeight = imageData.data[index + 3]! * (1 - opacity);
+          const filteredWeight = filtered.data[index + 3]! * opacity;
+          const alpha = originalWeight + filteredWeight;
+          for (let channel = 0; channel < 3; channel += 1) {
+            imageData.data[index + channel] = alpha > 0
+              ? (imageData.data[index + channel]! * originalWeight
+                + filtered.data[index + channel]! * filteredWeight) / alpha
+              : 0;
+          }
+          imageData.data[index + 3] = alpha;
+        }
       });
+    } else {
+      for (const operationFilter of operationBuild.filters) {
+        filters.push(function orderedStudioSmartFilter(imageData: StudioImageDataLike): void {
+          operationFilter.call({ attrs: operationAttrs }, imageData);
+        });
+      }
     }
     cachePad = Math.max(cachePad, operationBuild.cachePad);
   }

@@ -679,6 +679,19 @@ describe("runStudioImageFilterWorker", () => {
     });
   });
 
+  it("does not strip opacity at the clone-safe Worker projection boundary", async () => {
+    const worker = new CapturingApplyingWorker();
+    const el: ImageFilterFields = { smartFilters: { version: 1, entries: [
+      { id: "partial", engine: "invert", enabled: true, opacity: 0.25, params: {} },
+      { id: "zero", engine: "invert", enabled: true, opacity: 0, params: {} },
+    ] } };
+    const output = await runStudioImageFilterWorker(requestFixture(el), { workerFactory: () => worker });
+    const direct = await runStudioImageFilterWorker(requestFixture(el), { executionMode: "direct" });
+    expect(worker.postedEl?.smartFilterOperations).toEqual([el.smartFilters!.entries[0]]);
+    expect(Array.from(output.imageData.data)).toEqual(Array.from(direct.imageData.data));
+    expect(el.smartFilters!.entries).toHaveLength(2);
+  });
+
   it("normalizes new smart-filter engines into one ordered Worker program", async () => {
     const worker = new CapturingApplyingWorker();
     const el: ImageFilterFields = {
