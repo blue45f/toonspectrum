@@ -12638,6 +12638,7 @@ export function StudioCuttoonEditor({
   const captureCommitRef = useRef({
     pageId: activePage.id,
     historyIndex: pagesHi,
+    page: activePage,
     exporting: false,
     timelapse: false,
     masterEditMode,
@@ -12646,11 +12647,12 @@ export function StudioCuttoonEditor({
     captureCommitRef.current = {
       pageId: activePage.id,
       historyIndex: pagesHi,
+      page: activePage,
       exporting: isExporting,
       timelapse: timelapseCapturing,
       masterEditMode,
     };
-  }, [activePage.id, activePage.elements, isExporting, master, masterEditMode, pagesHi, timelapseCapturing]);
+  }, [activePage, isExporting, master, masterEditMode, pagesHi, timelapseCapturing]);
   // 스테이지를 문서 전체로 되돌릴 때 필요한 기하. 동반 창(navigator) 캡처처럼 의존성 없는
   // useCallback 안에서 캡처하는 경로가 현재 문서 크기·표시 배율을 읽어야 하므로 ref 로 보관한다.
   const stageDocumentGeometryRef = useRef({
@@ -24047,12 +24049,11 @@ const puppetWarpArmed =
     endLiveResourceEdit();
   }
 
-  async function captureReadyStageForPage(page: PageState): Promise<Konva.Stage> {
+  async function captureReadyStageForPage(page: PageState, onReady?: (page: PageState) => void): Promise<Konva.Stage> {
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 캡처할 수 있어요.");
     }
     const {
-      collectStudioCaptureAssetSources,
       waitForStudioCaptureReady,
     } = await loadStudioCaptureReadinessRuntime();
     return waitForStudioCaptureReady({
@@ -24062,7 +24063,11 @@ const puppetWarpArmed =
         return committed.exporting && !committed.masterEditMode ? committed.pageId : null;
       },
       getStage: () => stageRef.current,
-      assetSources: collectStudioCaptureAssetSources(page, master),
+      document: {
+        drawingRef, drawingPointerTransportRef, pendingStrokeCommitsRef,
+        flushPendingStrokes: () => flushSync(() => flushPendingStrokeCommitsRef.current()),
+        pagesHistoryRef, pagesHiRef, captureCommitRef, master, onReady,
+      },
     });
   }
 
@@ -26144,23 +26149,22 @@ function clearSelectionForEdit() {
     hideStrokeGuide();
     setIsExporting(true);
     try {
-      const [stage, { exportPagePsd }] = await Promise.all([
-        captureReadyStageForPage(activePage),
-        loadStudioPsdExportModule(),
-      ]);
-      const pageGroups = activePage.groups ?? EMPTY_LAYER_GROUPS;
-      const visible = activePage.elements.filter(
+      const { exportPagePsd } = await loadStudioPsdExportModule();
+      let capturedPage = activePage;
+      const stage = await captureReadyStageForPage(activePage, (page) => { capturedPage = page; });
+      const pageGroups = capturedPage.groups ?? EMPTY_LAYER_GROUPS;
+      const visible = capturedPage.elements.filter(
         (element) => !isEffectivelyHidden(element, pageGroups)
       );
-      return exportPagePsd(
+      return await exportPagePsd(
         stage,
         visible as unknown as PsdExportEl[],
         CANVAS_W,
-        canvasH,
+        capturedPage.canvasH,
         effScale,
         {
           scale: exportScale,
-          background: { color: bg, gradient: bgGrad },
+          background: { color: capturedPage.bg, gradient: capturedPage.bgGrad },
         }
       );
     } finally {
