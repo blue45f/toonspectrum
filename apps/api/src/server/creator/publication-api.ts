@@ -107,7 +107,8 @@ export function assertCreatorPublicationRelationMutationAllowed(
   if (requestedStatus !== "published") return;
 
   const inputDoc = isRecord(input.doc) ? input.doc : null;
-  const publicationProvided = inputDoc !== null && hasOwn(inputDoc, "publication");
+  const publicationProvided =
+    inputDoc !== null && hasOwn(inputDoc, "publication");
   const directive = publicationProvided
     ? normalizeCreatorPublicationDirective(inputDoc.publication)
     : readCreatorPublicationDirective(existing.doc);
@@ -126,7 +127,8 @@ async function assertCreatorPublicationRemixAllowed(
   if (
     !parent ||
     parent.hidden ||
-    (parent.ownerId !== userId && !isCreatorPublicationPolicyRowReadable(parent))
+    (parent.ownerId !== userId &&
+      !isCreatorPublicationPolicyRowReadable(parent))
   ) {
     throw new Error("원작을 찾을 수 없거나 이어서 편집할 수 없습니다.");
   }
@@ -135,11 +137,18 @@ async function assertCreatorPublicationRemixAllowed(
   }
 }
 
-async function assertReadablePublication(workId: string): Promise<CreatorPublicationPolicyRow> {
+async function readablePublicationPolicy(
+  workId: string,
+): Promise<CreatorPublicationPolicyRow | null> {
   const row = await publicationPolicyRow(workId);
-  if (!row || !isCreatorPublicationPolicyRowReadable(row)) {
-    throw new Error("작품을 찾을 수 없습니다.");
-  }
+  return row && isCreatorPublicationPolicyRowReadable(row) ? row : null;
+}
+
+async function assertReadablePublication(
+  workId: string,
+): Promise<CreatorPublicationPolicyRow> {
+  const row = await readablePublicationPolicy(workId);
+  if (!row) throw new Error("공개된 작품을 찾을 수 없습니다.");
   return row;
 }
 
@@ -172,7 +181,11 @@ export async function updateWork(
   return updatePublicationWork(userId, id, input);
 }
 
-export async function addComment(userId: string, workId: string, text: unknown) {
+export async function addComment(
+  userId: string,
+  workId: string,
+  text: unknown,
+) {
   const policy = await assertReadablePublication(workId);
   if (!creatorPublicationCommentsAllowed(policy.doc)) {
     throw new Error("이 작품은 새 댓글을 받지 않습니다.");
@@ -180,8 +193,11 @@ export async function addComment(userId: string, workId: string, text: unknown) 
   return addPublicationComment(userId, workId, text);
 }
 
-export async function listComments(workId: string, includeHidden = false) {
-  await assertReadablePublication(workId);
+export async function listComments(
+  workId: string,
+  includeHidden = false,
+) {
+  if (!(await readablePublicationPolicy(workId))) return [];
   return listPublicationComments(workId, includeHidden);
 }
 
