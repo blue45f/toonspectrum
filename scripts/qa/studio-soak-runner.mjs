@@ -254,7 +254,7 @@ async function summarize(records, executions, infra) {
   const findings = [...records.values()].sort((a, b) => b.count - a.count);
   const data = { phase, configuredDurationMinutes: durationMinutes, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(), wallClockMinutes: Number(((Date.now() - startedAt.getTime()) / 60000).toFixed(2)), executionCount: executions.length, executions, findings, infrastructureErrors: infra };
   await writeFile(join(root, "summary.json"), `${JSON.stringify(data, null, 2)}\n`, "utf8");
-  const rows = findings.map((x) => `| ${x.severity} | ${x.count} | ${x.knownJira ?? x.tracker?.key ?? "pending"} | ${x.title.replace(/\|/g, "\\|")} | \`${x.fingerprint.slice(0, 12)}\` |`);
+  const rows = findings.map((x) => `| ${x.severity} | ${x.count} | ${x.knownJira ?? x.tracker?.key ?? "pending"} | ${x.title.replace(/[\\|]/gu, "\\$&")} | \`${x.fingerprint.slice(0, 12)}\` |`);
   const md = [`# Studio soak QA — ${phase}`, "", `- Configured: ${durationMinutes} minutes`, `- Actual: ${data.wallClockMinutes} minutes`, `- Executions: ${executions.length}`, `- Unique findings: ${findings.length}`, "", "| Severity | Count | Tracker | Finding | Fingerprint |", "|---|---:|---|---|---|", ...(rows.length ? rows : ["| - | 0 | - | No findings | - |"]), ""].join("\n");
   await writeFile(join(root, "summary.md"), md, "utf8");
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, md, "utf8");

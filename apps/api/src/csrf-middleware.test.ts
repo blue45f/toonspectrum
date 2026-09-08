@@ -65,6 +65,14 @@ describe("CSRF Origin policy", () => {
 });
 
 describe("auth mutation path recognition", () => {
+  it("classifies long trailing separators without regexp backtracking", () => {
+    const path = `/api/auth/login${"/".repeat(100_000)}`;
+    expect(isAuthMutationRequest({ path, originalUrl: path, query: {} } as never)).toBe(true);
+    const ticketPath = `/api/studio-realtime/tickets${"/".repeat(100_000)}`;
+    expect(isStudioRealtimeTicketMutationRequest({
+      path: ticketPath, originalUrl: ticketPath, query: {},
+    } as never)).toBe(true);
+  });
   it("recognizes direct, trailing-slash, and Vercel query-path auth requests", () => {
     expect(
       isAuthMutationRequest({
