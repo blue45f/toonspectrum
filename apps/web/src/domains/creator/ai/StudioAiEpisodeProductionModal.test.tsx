@@ -101,6 +101,31 @@ describe("StudioAiEpisodeProductionModal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("hands the complete deterministic plan to the editable comic composer", () => {
+    const onApplyPlan = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <StudioAiEpisodeProductionModal
+        open
+        onClose={onClose}
+        onApplyPlan={onApplyPlan}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "편집 가능한 컷 제작으로 넘기기" }));
+
+    expect(onApplyPlan).toHaveBeenCalledTimes(1);
+    expect(onApplyPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        version: 1,
+        totalCuts: expect.any(Number),
+        scenes: expect.any(Array),
+        batches: expect.any(Array),
+      })
+    );
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("copies the deterministic production manifest with truthful feedback", async () => {
     render(<StudioAiEpisodeProductionModal open onClose={() => {}} />);
 
