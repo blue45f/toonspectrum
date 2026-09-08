@@ -16,7 +16,7 @@
  * tsx/tsc resolve from an `.mts` consumer, and plain `.mjs`/`.js` scripts
  * import this file directly.
  */
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Absolute path of the repository root (this file lives in `<root>/scripts/lib`). */
@@ -46,11 +46,15 @@ export const DIST_DIR = join(REPO_ROOT, "dist");
 /**
  * Product Vite resolve.alias entries for harnesses that set `configFile: false`
  * while still loading app modules that import `@/…` (same order as root vite.config.ts).
- * Longer `@/shared` / `@/domains` / `@/src` finds must stay ahead of bare `@`.
+ * Every frontend alias resolves from the source root.
  */
 export const WEB_VITE_ALIASES = Object.freeze([
-  Object.freeze({ find: "@/shared", replacement: join(WEB_SRC, "shared") }),
-  Object.freeze({ find: "@/domains", replacement: join(WEB_SRC, "domains") }),
-  Object.freeze({ find: "@/src", replacement: WEB_SRC }),
-  Object.freeze({ find: "@", replacement: WEB_ROOT }),
+  Object.freeze({ find: "@", replacement: WEB_SRC }),
 ]);
+
+/** Convert a repository-relative source path into Vite's web-root-relative manifest key. */
+export function viteManifestKey(repositoryRelativePath) {
+  return relative(WEB_ROOT, join(REPO_ROOT, repositoryRelativePath))
+    .split(sep)
+    .join("/");
+}

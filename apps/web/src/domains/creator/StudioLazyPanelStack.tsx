@@ -111,7 +111,7 @@ import type { StudioCommentsPanelSharedReplyController } from "./StudioCommentsP
 import type {
   WorkDetail,
   WorkRevisionSummary,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 interface StudioLazyContinuityScene {
   id: string;

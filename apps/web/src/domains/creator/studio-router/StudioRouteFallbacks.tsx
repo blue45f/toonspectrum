@@ -1,7 +1,7 @@
 import type { StudioWorkspaceRouteErrorCode } from "../studio-workspace-route";
 import type { StudioPlaceholderRouteId } from "./studio-route-manifest";
 
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 const ROUTE_ERROR_DETAILS: Readonly<Record<StudioWorkspaceRouteErrorCode, string>> = {
   "identity-conflict": "작품과 리믹스 원본 ID가 한 주소에 함께 들어 있어 문서를 열지 않았습니다.",

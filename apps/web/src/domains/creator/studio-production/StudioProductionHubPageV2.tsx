@@ -55,7 +55,7 @@ import { StudioServerVersionsCard } from "./StudioServerVersionsCard";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 const STUDIO_PRODUCTION_SURFACES = [
   "projects",

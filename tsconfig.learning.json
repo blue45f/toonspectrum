@@ -4,6 +4,6 @@
     "incremental": false,
     "types": ["node", "vite/client"]
   },
-  "include": ["src/domains/learn/**/*.ts", "src/domains/learn/**/*.tsx", "e2e/learn*.spec.ts"],
+  "include": ["apps/web/src/domains/learn/**/*.ts", "apps/web/src/domains/learn/**/*.tsx", "e2e/learn*.spec.ts"],
   "exclude": ["node_modules", "dist"]
 }

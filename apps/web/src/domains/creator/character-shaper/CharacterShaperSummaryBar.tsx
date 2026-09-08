@@ -17,7 +17,7 @@ import type { VrmLibraryEntry } from "../vrm/vrm-library";
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
-import { useMediaQuery } from "@/src/hooks/use-media-query";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 type SummaryPopover = "reset" | "save" | "more";
 

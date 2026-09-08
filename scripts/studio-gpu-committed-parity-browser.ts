@@ -12,14 +12,14 @@
  * Settles window.__studioGpuCommittedParityResult to either a success payload or a structured
  * error so the Node orchestrator never has to guess from a bare timeout.
  */
-import type { StudioWebGpuCommittedHandoffElement } from "@/src/domains/creator/render/studio-webgpu-committed-handoff";
-import type { StudioGpuFrameReceipt } from "@/src/domains/creator/render/studio-webgpu-engine";
+import type { StudioWebGpuCommittedHandoffElement } from "@/domains/creator/render/studio-webgpu-committed-handoff";
+import type { StudioGpuFrameReceipt } from "@/domains/creator/render/studio-webgpu-engine";
 
-import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "@/src/domains/creator/brush/studio-ink-pressure-model";
-import { createStudioWebGpuCommittedHandoff } from "@/src/domains/creator/render/studio-webgpu-committed-handoff";
-import { planStudioGpuDabs, StudioWebGpuEngine } from "@/src/domains/creator/render/studio-webgpu-engine";
-import { planStudioCausalInk } from "@/src/domains/creator/studio-causal-ink";
-import { fillStudioCausalInkDabs } from "@/src/domains/creator/studio-causal-ink-canvas";
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "@/domains/creator/brush/studio-ink-pressure-model";
+import { createStudioWebGpuCommittedHandoff } from "@/domains/creator/render/studio-webgpu-committed-handoff";
+import { planStudioGpuDabs, StudioWebGpuEngine } from "@/domains/creator/render/studio-webgpu-engine";
+import { planStudioCausalInk } from "@/domains/creator/studio-causal-ink";
+import { fillStudioCausalInkDabs } from "@/domains/creator/studio-causal-ink-canvas";
 
 const WIDTH = 128;
 const HEIGHT = 96;

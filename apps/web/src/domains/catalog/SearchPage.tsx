@@ -8,7 +8,7 @@ import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useT } from "@/shared/lib/i18n";
 import { PLATFORM_LIST } from "@/shared/lib/platforms";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 export function SearchPage() {
   const [searchParams] = useSearchParams();

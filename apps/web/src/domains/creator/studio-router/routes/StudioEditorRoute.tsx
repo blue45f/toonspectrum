@@ -11,7 +11,7 @@ import { useStudioDraftScope } from "../useStudioDraftScope";
 import type { StudioEditorRouteResolution } from "../studio-route-manifest";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
-import { useSession } from "@/src/compat/auth-session-store";
+import { useSession } from "@/compat/auth-session-store";
 
 const LegacyStudioEditorAdapter = lazyRetry(
   () => import("../../studio-legacy-editor-adapter").then((module) => ({

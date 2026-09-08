@@ -22,9 +22,9 @@ import {
 } from "@/shared/lib/title-filters";
 import { useRememberedFilters } from "@/shared/lib/use-remembered-filters";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
-import { useApiResource } from "@/src/infrastructure/use-api-resource";
+import Link from "@/compat/router-link";
+import { ErrorState } from "@/components/error-state";
+import { useApiResource } from "@/infrastructure/use-api-resource";
 
 
 

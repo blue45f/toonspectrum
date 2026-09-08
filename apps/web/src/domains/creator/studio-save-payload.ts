@@ -7,7 +7,7 @@ import type { StudioTeamRole } from "./studio-team-client";
 import type {
   CreateWorkInput,
   UpdateWorkInput,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 export type StudioSaveStatus = "published" | "draft";
 export type StudioSavePayload = Omit<CreateWorkInput, "status"> & {

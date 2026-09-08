@@ -47,8 +47,6 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: kmas-reference-browser-evidence
-          path: |
-            reference-test-results
-            reference-playwright-report
+          path: test-results/references
           if-no-files-found: ignore
           retention-days: 7

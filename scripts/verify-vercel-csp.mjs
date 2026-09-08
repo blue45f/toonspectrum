@@ -351,7 +351,9 @@ export function verifyVercelCspContract({ html, vercelConfig, bootstrapCompatSou
 }
 
 function main() {
-  const htmlPath = resolve(repositoryRoot, process.argv[2] ?? "index.html");
+  // Default to the source entry; the 2026-09 apps/web move relocated it from the
+  // repository root. `postbuild` still passes `dist/index.html` explicitly.
+  const htmlPath = resolve(repositoryRoot, process.argv[2] ?? "apps/web/index.html");
   const vercelPath = resolve(repositoryRoot, "vercel.json");
   const builtBootstrapPath = resolve(dirname(htmlPath), "bootstrap-compat.js");
   const sourceBootstrapPath = resolve(repositoryRoot, "apps/web/public/bootstrap-compat.js");

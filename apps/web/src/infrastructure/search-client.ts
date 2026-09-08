@@ -1,6 +1,6 @@
 import type { PlatformId, Title } from "@/shared/lib/types";
 
-import { apiPath } from "@/src/infrastructure/api";
+import { apiPath } from "@/infrastructure/api";
 
 export type SearchCatalogMeta = {
   source: string;

@@ -13,7 +13,7 @@
 import {
   diagnoseStudioInAppBrowserFromGlobals,
   type StudioInAppBrowserDiagnosis,
-} from "@/src/compat/in-app-browser";
+} from "@/compat/in-app-browser";
 
 export interface StudioCompanionPopupGuidance {
   /** 인앱 브라우저를 벗어나는 링크. 눌러서 바로 나갈 수 있을 때만 존재한다. */

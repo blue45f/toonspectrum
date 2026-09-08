@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { signInWithGoogleIdToken } from "@/src/compat/auth-session-store";
+import { signInWithGoogleIdToken } from "@/compat/auth-session-store";
 
 declare global {
   interface Window {

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 import { Container } from "@/shared/components/section";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 const COLLECTION_CHANNELS = [
   {

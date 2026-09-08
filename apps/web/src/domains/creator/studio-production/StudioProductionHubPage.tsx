@@ -7,7 +7,7 @@ import {
   type StudioProductionSurface,
 } from "./StudioProductionHubPageV2";
 
-import { PreserveLinkQueryParams } from "@/src/compat/router-link";
+import { PreserveLinkQueryParams } from "@/compat/router-link";
 
 const DEMO_SURFACES = [
   "projects",

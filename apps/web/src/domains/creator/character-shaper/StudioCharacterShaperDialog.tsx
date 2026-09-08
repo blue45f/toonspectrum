@@ -40,7 +40,7 @@ import type { LoadStatus } from "../vrm/StudioVrmPoserTypes";
 import type { ChangeEvent, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
-import { useMediaQuery } from "@/src/hooks/use-media-query";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 type MobileSheetTab = "shelf" | "inspector";
 

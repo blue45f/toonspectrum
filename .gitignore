@@ -105,7 +105,7 @@ test-accounts.local.*
 /*.jpg
 
 # cargo build artifacts
-crates/*/target/
+crates/**/target/
 
 # Local AI assistant sessions & configs
 /.continue/
@@ -128,3 +128,6 @@ crates/*/target/
 
 # isolated feedback UI review build output
 /dist-feedback-review/
+
+# default HTML report from Playwright CLI --reporter=html
+/playwright-report/

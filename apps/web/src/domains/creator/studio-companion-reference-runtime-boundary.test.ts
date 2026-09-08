@@ -228,7 +228,7 @@ function propertyInitializers(sourceFile: ts.SourceFile, name: string): ts.Expre
 
 const CAPTURE_RUNTIME = "@/domains/creator/studio/components/runtime/studio-companion-reference-capture-runtime";
 const SOURCE_RUNTIME = "./studio-companion-reference-source-runtime";
-const PREVIEW_RUNTIME = "@/src/domains/creator/studio-companion-reference-preview";
+const PREVIEW_RUNTIME = "@/domains/creator/studio-companion-reference-preview";
 const REFERENCE_DISPLAY = "./StudioCompanionReferenceDisplay";
 
 describe("Studio companion Reference runtime boundaries", () => {

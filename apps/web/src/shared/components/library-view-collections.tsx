@@ -11,7 +11,7 @@ import type { Title } from "@/shared/lib/types";
 import { MAX_COLLECTION_NAME_LENGTH } from "@/shared/lib/collection-contract";
 import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 export function CollectionsTab({
   collections,

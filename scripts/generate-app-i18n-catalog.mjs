@@ -21,14 +21,31 @@ const BUILT_IN_LOCALES = ["ko", "en"];
 const REFERENCE_LOCALE = "en";
 const TRANSLATED_LOCALE_THRESHOLD = 0.5;
 
+/** Read the same namespace assets used by the browser; flat legacy files are not authoritative. */
 export function readAppLocaleDictionaries(directory = assetDirectory) {
-  const dictionaries = new Map();
-  for (const fileName of readdirSync(directory).sort()) {
-    if (!fileName.endsWith(".json")) continue;
-    const locale = fileName.slice(0, -".json".length);
-    dictionaries.set(locale, JSON.parse(readFileSync(path.join(directory, fileName), "utf8")));
+  const namespaces = readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  if (namespaces.length === 0) {
+    throw new Error(
+      `No locale namespace directories under ${directory}. `
+      + "The app dictionaries are published as <namespace>/<locale>.json.",
+    );
   }
-  return dictionaries;
+
+  const dictionaries = new Map();
+  for (const namespace of namespaces) {
+    for (const fileName of readdirSync(path.join(directory, namespace)).sort()) {
+      if (!fileName.endsWith(".json")) continue;
+      const locale = fileName.slice(0, -".json".length);
+      const part = JSON.parse(readFileSync(path.join(directory, namespace, fileName), "utf8"));
+      const existing = dictionaries.get(locale);
+      if (existing) Object.assign(existing, part);
+      else dictionaries.set(locale, part);
+    }
+  }
+  return new Map([...dictionaries].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
 }
 
 /**

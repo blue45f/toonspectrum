@@ -80,8 +80,8 @@ import {
   CreatorMarketplaceResourceReportReceiptSchema,
   CreatorMarketplaceResourceReportStatusSchema,
 } from "@/shared/lib/creator-marketplace-resource-contract";
-import { api, getApiErrorMessage, toApiError } from "@/src/infrastructure/api";
-import { NotFoundError } from "@/src/infrastructure/use-api-resource";
+import { api, getApiErrorMessage, toApiError } from "@/infrastructure/api";
+import { NotFoundError } from "@/infrastructure/use-api-resource";
 
 const BASE = "/creator/marketplace/resources";
 const LIBRARY_BASE = "/creator/marketplace/library";

@@ -13,19 +13,32 @@ import {
   studioI18nAssetUrl,
 } from "./studio-i18n-loader";
 
+const assetCache = new Map<string, string>();
 function readAsset(locale: string): string {
+  const cached = assetCache.get(locale);
+  if (cached !== undefined) return cached;
   const merged: Record<string, string> = {};
   for (const namespace of STUDIO_I18N_NAMESPACES) {
     const file = path.resolve(process.cwd(), "apps/web/public/i18n/studio", namespace, `${locale}.json`);
     Object.assign(merged, JSON.parse(readFileSync(file, "utf8")));
   }
-  return JSON.stringify(merged);
+  const serialized = JSON.stringify(merged);
+  assetCache.set(locale, serialized);
+  return serialized;
+}
+
+const dictionaryCache = new Map<string, Record<string, string> | null>();
+function assetDictionary(locale: string): Record<string, string> | null {
+  if (dictionaryCache.has(locale)) return dictionaryCache.get(locale) ?? null;
+  const parsed = parseStudioI18nDictionary(readAsset(locale));
+  dictionaryCache.set(locale, parsed);
+  return parsed;
 }
 
 describe("Studio lazy i18n assets", () => {
   it("keeps complete, validated Korean and English dictionaries", () => {
     for (const locale of STUDIO_I18N_ASSET_LOCALES) {
-      const dictionary = parseStudioI18nDictionary(readAsset(locale));
+      const dictionary = assetDictionary(locale);
       expect(dictionary).not.toBeNull();
       // 1_323 → 1_325: 컴패니언 창의 막다른 상태에 붙인 탈출구 두 줄
       // (studio.toolsCompanion.exit.disconnected / .editor).
@@ -60,7 +73,7 @@ describe("Studio lazy i18n assets", () => {
       "studio.creativeModes.title",
     ]) {
       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
-        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toBeTruthy();
+        expect(assetDictionary(locale)?.[key]).toBeTruthy();
       }
       expect(resolveI18nValue("ko", key)).not.toBe(key);
     }
@@ -80,7 +93,7 @@ describe("Studio lazy i18n assets", () => {
       "studio.mainMenu.item.filter.wave-warp",
     ]) {
       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
-        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toBeTruthy();
+        expect(assetDictionary(locale)?.[key]).toBeTruthy();
       }
     }
     expect(resolveI18nValue("en", "studio.mainMenu.item.filter.lens-blur")).toBe("Lens blur");
@@ -129,13 +142,13 @@ describe("Studio lazy i18n assets", () => {
       ]
     ) {
       const values = STUDIO_I18N_ASSET_LOCALES.map(
-        (locale) => parseStudioI18nDictionary(readAsset(locale))?.[key],
+        (locale) => assetDictionary(locale)?.[key],
       );
       for (const value of values) expect(value).toBeTruthy();
       // A key left untranslated shows up as ~75 copies of the English value. The
       // ceiling is loose rather than 1 because loanwords legitimately collide —
       // "Slot {index}" is the same string in Dutch, German, Czech, Malay and more.
-      const english = parseStudioI18nDictionary(readAsset("en"))?.[key];
+      const english = assetDictionary("en")?.[key];
       expect(values.filter((value) => value === english).length).toBeLessThan(20);
     }
     // Korean stays the authored source of truth for the literals these replaced.
@@ -155,7 +168,7 @@ describe("Studio lazy i18n assets", () => {
     // Both slot rows interpolate the same placeholder the rest of the packs use.
     for (const key of ["studio.commandBar.slot", "studio.commandBar.slotAria"]) {
       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
-        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toContain("{index}");
+        expect(assetDictionary(locale)?.[key]).toContain("{index}");
       }
     }
   });

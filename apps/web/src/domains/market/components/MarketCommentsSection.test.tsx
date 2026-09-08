@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MarketCommentsSection } from "./MarketCommentsSection";
 
-import { SessionContext } from "@/src/compat/auth-session-store";
+import { SessionContext } from "@/compat/auth-session-store";
 
 
 const mocks = vi.hoisted(() => ({

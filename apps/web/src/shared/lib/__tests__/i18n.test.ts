@@ -351,6 +351,7 @@ describe("runtime translation bundles", () => {
 describe("translation dictionary completeness", () => {
   it("keeps every t() key covered by its shell or lazy route dictionaries", () => {
     const usedKeys = collectSourceI18nKeys();
+    expect(usedKeys.size).toBeGreaterThan(200);
     const shellKeys = new Set([...Object.keys(i18nDict.ko), ...Object.keys(i18nDict.en)]);
     const adminEn = readRouteDictionary("apps/web/public/i18n/admin/en.json");
     const adminKo = readRouteDictionary("apps/web/public/i18n/admin/ko.json");

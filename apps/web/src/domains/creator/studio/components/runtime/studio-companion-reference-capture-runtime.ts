@@ -14,18 +14,18 @@ import type {
   StudioCompanionReferencePreviewDependencies,
   StudioCompanionReferencePreviewFrameInput,
   StudioCompanionReferencePreviewItem,
-} from "@/src/domains/creator/studio-companion-reference-preview";
+} from "@/domains/creator/studio-companion-reference-preview";
 import type {
   StudioCompanionReferenceCaptureCursor,
   StudioCompanionReferencePoint,
   StudioCompanionReferencePreviewFrame,
   StudioCompanionReferenceProjection,
-} from "@/src/domains/creator/studio-companion-reference-projection";
+} from "@/domains/creator/studio-companion-reference-projection";
 
 import {
   STUDIO_COMPANION_REFERENCE_FAILURE_BACKOFF_MS,
   STUDIO_COMPANION_REFERENCE_MAX_ITEMS,
-} from "@/src/domains/creator/studio-companion-reference-projection";
+} from "@/domains/creator/studio-companion-reference-projection";
 
 export interface StudioCompanionReferenceCaptureSnapshot {
   readonly document: unknown;
@@ -139,7 +139,7 @@ async function loadDefaultSourceRuntime(): Promise<StudioCompanionReferenceSourc
 }
 
 async function loadDefaultPreviewRuntime(): Promise<StudioCompanionReferencePreviewRuntimeModule> {
-  return import("@/src/domains/creator/studio-companion-reference-preview");
+  return import("@/domains/creator/studio-companion-reference-preview");
 }
 
 function positiveSafeInteger(value: unknown): value is number {

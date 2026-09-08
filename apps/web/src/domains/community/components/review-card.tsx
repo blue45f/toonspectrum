@@ -11,7 +11,7 @@ import { Stars } from "@/shared/components/ui/stars";
 import { useT } from "@/shared/lib/i18n";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { cn, relativeDate } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 const PROGRESS_TONE: Record<string, "good" | "accent" | "neutral" | "bad"> = {
   완독: "good",

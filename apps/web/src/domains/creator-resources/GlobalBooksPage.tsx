@@ -14,7 +14,7 @@ import {
   parseSearchResult,
   RESOURCE_LABELS,
 } from "@/shared/lib/creator-resources";
-import { apiPath } from "@/src/infrastructure/api";
+import { apiPath } from "@/infrastructure/api";
 
 const EXAMPLES = ["webtoon drawing", "manga art", "graphic novel", "9784088820118"] as const;
 const SEARCH_PROVIDERS: ResourceProvider[] = ["openlibrary", "openbd"];

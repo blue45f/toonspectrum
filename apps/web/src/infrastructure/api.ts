@@ -9,8 +9,8 @@ import {
   isCsrfProtectedMethod,
 } from "@/shared/lib/csrf";
 import { resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
-import { handleUnauthorizedSession } from "@/src/compat/auth-session-state";
-import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
+import { handleUnauthorizedSession } from "@/compat/auth-session-state";
+import { getRuntimeApiBase } from "@/infrastructure/runtime-api-base";
 
 function apiBase() {
   const env = import.meta.env.VITE_API_BASE?.trim().replace(/\/+$/, "");

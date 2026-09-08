@@ -13,16 +13,16 @@ import { Container } from "@/shared/components/section";
 import { ShimmerTitle } from "@/shared/components/shimmer-title";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn, formatCount } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import Link from "@/compat/router-link";
+import { ErrorState } from "@/components/error-state";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   challengeDday,
   getChallenge,
   listChallenges,
   type ChallengeSummary,
   type WorkSummary,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 
 // 마감 D-day 칩 — 마감 임박(3일 이내)은 경고 톤.

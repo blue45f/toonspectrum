@@ -17,8 +17,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("./studio-music-client", () => ({ generateMusic: mocks.generate, getMusicStatus: mocks.status }));
 vi.mock("./studio-music-library", () => ({ loadMusicTracks: mocks.load, saveMusicTrack: mocks.save, deleteMusicTrack: mocks.remove }));
-vi.mock("@/src/compat/auth-session-store", () => ({ useSession: () => ({ data: mocks.ownerId ? { user: { id: mocks.ownerId } } : null }) }));
-vi.mock("@/src/infrastructure/api", () => ({ getApiErrorMessage: mocks.error }));
+vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: mocks.ownerId ? { user: { id: mocks.ownerId } } : null }) }));
+vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: mocks.error }));
 
 function output(index = 1, ownerId = "owner-a", workId = "work-a"): LocalMusicTrack {
   return {

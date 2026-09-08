@@ -9,7 +9,7 @@ import { pingVisit } from "@/shared/lib/visits-api";
 import {
   isStudioRoutePathname,
   shouldPreserveStudioRouteLifecycle,
-} from "@/src/domains/creator/studio-workspace-route";
+} from "@/domains/creator/studio-workspace-route";
 
 import "@toonspectrum/core/fx/fx.css";
 

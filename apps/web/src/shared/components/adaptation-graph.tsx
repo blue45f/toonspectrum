@@ -8,8 +8,8 @@ import type { Title } from "@/shared/lib/types";
 import { TYPE_LABEL } from "@/shared/lib/taxonomy";
 import { type MediaAdaptation, MEDIA_KIND_LABEL, mediaThumb, mediaLink } from "@/shared/lib/title-universe";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { useInView } from "@/src/hooks/use-in-view";
+import Link from "@/compat/router-link";
+import { useInView } from "@/hooks/use-in-view";
 
 
 

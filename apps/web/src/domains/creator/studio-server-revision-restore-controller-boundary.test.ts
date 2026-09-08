@@ -129,7 +129,7 @@ describe("Studio server-revision restore controller boundary", () => {
     expect(controller.valueImports).not.toContain("./StudioPage");
     expect(controller.valueImports).not.toContain("react");
     expect(controller.dynamicImports).toEqual([
-      "@/src/infrastructure/creator-client",
+      "@/infrastructure/creator-client",
       "./studio-shared-document-client",
       "./studio-linked-3d-pass-cloud-project",
       "./studio-shared-document-client",

@@ -23,7 +23,7 @@ import type { StudioProjectFile } from "./studio-project-file";
 import type { StudioRevisionChange } from "./studio-revision-diff";
 import type { StudioServerRevisionComparison } from "./studio-server-revision-comparison";
 
-import { getWorkRevisionComparison } from "@/src/infrastructure/creator-client";
+import { getWorkRevisionComparison } from "@/infrastructure/creator-client";
 
 export interface StudioServerRevisionSummary {
   revision: number;

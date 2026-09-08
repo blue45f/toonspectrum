@@ -10,11 +10,11 @@ import { TitleCard } from "@/shared/components/title-card";
 import { GenreChip } from "@/shared/components/ui/chip";
 import { Stars } from "@/shared/components/ui/stars";
 import { formatCount } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
-import { NotFoundPage } from "@/src/components/NotFoundPage";
-import { useMetaDescription } from "@/src/hooks/use-document-title";
-import { useApiResource } from "@/src/infrastructure/use-api-resource";
+import Link from "@/compat/router-link";
+import { ErrorState } from "@/components/error-state";
+import { NotFoundPage } from "@/components/NotFoundPage";
+import { useMetaDescription } from "@/hooks/use-document-title";
+import { useApiResource } from "@/infrastructure/use-api-resource";
 
 interface AuthorResponse {
   author: string;

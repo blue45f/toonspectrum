@@ -58,7 +58,7 @@ import {
 } from "@/shared/lib/creator-marketplace-resource-contract";
 import {
   createCreatorMarketplacePortableDelivery,
-} from "@/src/infrastructure/creator-marketplace-client";
+} from "@/infrastructure/creator-marketplace-client";
 
 export const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY =
   "toonspectrum.studio-creator-filter-presets.v1" as const;

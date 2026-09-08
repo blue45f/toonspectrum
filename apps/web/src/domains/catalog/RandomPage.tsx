@@ -2,8 +2,8 @@ import { Shuffle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Container } from "@/shared/components/section";
-import { useRouter, useSearchParams } from "@/src/compat/navigation";
-import { api } from "@/src/infrastructure/api";
+import { useRouter, useSearchParams } from "@/compat/navigation";
+import { api } from "@/infrastructure/api";
 
 // /random — 품질 풀에서 무작위 작품을 골라 상세로 보낸다(replace로 뒤로가기 오염 방지).
 // type·genre 쿼리를 그대로 /api/random에 전달해 맥락 있는 랜덤도 지원한다.

@@ -17,7 +17,7 @@ const session = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/src/compat/auth-session-store", () => ({
+vi.mock("@/compat/auth-session-store", () => ({
   useSession: () => session.value,
 }));
 

@@ -8,8 +8,8 @@ import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-import { pickNaturalIdlePose } from "@/src/domains/creator/studio-pose-presets";
-import { resolveStudioVrmFingerAuthority } from "@/src/domains/creator/vrm/studio-vrm-auto-grip-authority";
+import { pickNaturalIdlePose } from "@/domains/creator/studio-pose-presets";
+import { resolveStudioVrmFingerAuthority } from "@/domains/creator/vrm/studio-vrm-auto-grip-authority";
 import {
   applyFingerRotations,
   applyPoseToVrm,
@@ -18,21 +18,21 @@ import {
   stripFingerBones,
   type FingerRotationMap,
   type PoseBoneMap,
-} from "@/src/domains/creator/vrm/studio-vrm-poser-utils";
-import { acquireStudioVrmPropAsset } from "@/src/domains/creator/vrm/studio-vrm-prop-asset-runtime";
+} from "@/domains/creator/vrm/studio-vrm-poser-utils";
+import { acquireStudioVrmPropAsset } from "@/domains/creator/vrm/studio-vrm-prop-asset-runtime";
 import {
   createAutoGripFingerOverrides,
   measureVrmPropRigMetrics,
   resolvePropAttachment,
   resolveSecondaryPropTarget,
   type VrmPropRigMetrics,
-} from "@/src/domains/creator/vrm/studio-vrm-prop-rig";
+} from "@/domains/creator/vrm/studio-vrm-prop-rig";
 import {
   buildPropObject,
   propDefById,
   type PropInstance,
   type PropRigV2,
-} from "@/src/domains/creator/vrm/studio-vrm-props";
+} from "@/domains/creator/vrm/studio-vrm-props";
 
 const statusEl = document.getElementById("status")!;
 

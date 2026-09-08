@@ -3,7 +3,7 @@ import { Sigma, ArrowUpRight } from "lucide-react";
 import type { Title } from "@/shared/lib/types";
 
 import { explainScore, axisMeta, type RankAxis } from "@/shared/lib/ranking";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 
 // "왜 이 점수인가" 투명성 카드 — 한 축의 점수 기여 요인을 사람이 읽게 분해.

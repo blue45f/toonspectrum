@@ -111,8 +111,8 @@ import {
 import { filterStarterMarketplaceResources } from "@/shared/lib/creator-marketplace-starter-catalog";
 import { cx } from "@/shared/lib/cx";
 import { useT } from "@/shared/lib/i18n";
-import { useSession } from "@/src/compat/auth-session-store";
-import { CreatorMarketplaceReportAction } from "@/src/domains/market/components/CreatorMarketplaceReportAction";
+import { useSession } from "@/compat/auth-session-store";
+import { CreatorMarketplaceReportAction } from "@/domains/market/components/CreatorMarketplaceReportAction";
 import {
   deleteCreatorMarketplaceResource,
   getCreatorMarketplaceResource,
@@ -122,8 +122,8 @@ import {
   listCreatorMarketplaceResources,
   publishCreatorMarketplaceResource,
   setCreatorMarketplaceCloudLibraryArchived,
-} from "@/src/infrastructure/creator-marketplace-client";
-import { NotFoundError } from "@/src/infrastructure/use-api-resource";
+} from "@/infrastructure/creator-marketplace-client";
+import { NotFoundError } from "@/infrastructure/use-api-resource";
 
 
 const FOCUS =

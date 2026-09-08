@@ -10,7 +10,7 @@ import {
   FEEDBACK_AREA_LABELS, FEEDBACK_KIND_LABELS, FEEDBACK_PROGRESS, FEEDBACK_PROGRESS_LABELS, feedbackTimeLabel,
 } from "@toonspectrum/core/feedback";
 import { isFeedbackEntry, isFeedbackVote } from "@toonspectrum/core/feedback-response";
-import { api, getApiErrorMessage } from "@/src/infrastructure/api";
+import { api, getApiErrorMessage } from "@/infrastructure/api";
 
 function ProgressEditor({ post, readOnly, onUpdated }: { post: FeedbackEntry; readOnly: boolean; onUpdated: (patch: Partial<FeedbackEntry>) => void }) {
   const id = useId();

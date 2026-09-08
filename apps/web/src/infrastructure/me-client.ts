@@ -1,7 +1,7 @@
 // 내 정보(/api/me) 프로필 갱신 전용 ky 헬퍼.
 // 공유 클라이언트가 HttpOnly 세션 쿠키와 CSRF 헤더를 처리한다.
-import { mergeCurrentSessionProfile } from "@/src/compat/auth-session-state";
-import { api, toApiError } from "@/src/infrastructure/api";
+import { mergeCurrentSessionProfile } from "@/compat/auth-session-state";
+import { api, toApiError } from "@/infrastructure/api";
 
 export interface MeProfile {
   id: string;

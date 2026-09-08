@@ -21,7 +21,7 @@ const BackToTop = lazy(() =>
   })),
 );
 const DeskCloudMounts = lazy(() =>
-  import("@/src/components/deskcloud-native/DeskCloudMounts").then((mod) => ({
+  import("@/components/deskcloud-native/DeskCloudMounts").then((mod) => ({
     default: mod.DeskCloudMounts,
   })),
 );

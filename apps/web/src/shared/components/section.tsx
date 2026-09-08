@@ -4,7 +4,7 @@ import { buttonClass } from "./ui/button-utils";
 import { Carousel } from "./ui/carousel";
 
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 export { Container } from "./container";
 

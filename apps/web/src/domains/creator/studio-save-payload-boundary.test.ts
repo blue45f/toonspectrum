@@ -84,10 +84,10 @@ describe("studio save payload ownership boundary", () => {
     ]);
 
     const directTransport = save.slice(
-      save.indexOf('await import("@/src/infrastructure/creator-client")'),
+      save.indexOf('await import("@/infrastructure/creator-client")'),
     );
     expectTokenOrder(directTransport, [
-      'await import("@/src/infrastructure/creator-client")',
+      'await import("@/infrastructure/creator-client")',
       "!saveScopeStillCurrent()",
       "buildStudioDirectWorkSavePlan({",
       'if (directSavePlan.kind === "update")',
