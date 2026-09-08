@@ -7,6 +7,7 @@
  * out, not to raise the number. What is left in the spec file is the table.
  *
  * Pure declarations only — no React, no browser, no page state.
+ * Validation note: this branch-only comment deliberately triggers an independent preview build.
  */
 
 export type StudioMenuSpecCoverage = "present" | "partial" | "absent";
