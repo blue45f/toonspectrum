@@ -54,6 +54,8 @@ export interface StudioVrmPhotoPoseScannerProps {
 export interface StudioVrmPhotoPoseApplyPayload {
   readonly sourceName: string;
   readonly bones: BoneEulerMap;
+  /** Absolute poser root height, supplied only by explicit grounding operations. */
+  readonly yOffset?: number;
   readonly landmarks: readonly StudioVrmPhotoPoseLandmark[];
   readonly worldLandmarks: readonly StudioVrmPhotoPoseLandmark[];
   readonly confidence: StudioVrmPhotoPoseConfidenceSummary;

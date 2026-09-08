@@ -32,6 +32,7 @@ export interface CharacterPartPresetStore {
   refresh(): Promise<void>;
   list(query?: CharacterPartPresetQuery): readonly CharacterPartPresetV1[];
   save(preset: CharacterPartPresetV1): Promise<CharacterPartPresetStoreSnapshot>;
+  saveMany(presets: readonly unknown[]): Promise<CharacterPartPresetStoreSnapshot>;
   remove(presetId: string): Promise<CharacterPartPresetStoreSnapshot>;
   clear(): Promise<CharacterPartPresetStoreSnapshot>;
 }
@@ -135,6 +136,24 @@ export function createCharacterPartPresetStore(
     }
   });
 
+  const saveMany = (inputs: readonly unknown[]) => {
+    if (inputs.length > MAX_PRESETS) throw new Error("프리셋 목록 형식이 올바르지 않습니다.");
+    // Validate every entry before touching storage, then persist the complete import once.
+    const incoming = inputs.map(parseCharacterPartPresetV1);
+    return mutate((presets) => {
+      let next = [...presets];
+      for (const preset of incoming) {
+        const existing = next.find((item) => item.presetId === preset.presetId);
+        const replacement = existing
+          ? Object.freeze({ ...preset, version: existing.version + 1,
+              createdAt: existing.createdAt, updatedAt: new Date().toISOString() })
+          : preset;
+        next = [replacement, ...next.filter((item) => item.presetId !== preset.presetId)].slice(0, MAX_PRESETS);
+      }
+      return next;
+    });
+  };
+
   return Object.freeze({
     getSnapshot: () => snapshot,
     subscribe(listener: () => void) {
@@ -153,20 +172,9 @@ export function createCharacterPartPresetStore(
       return queryPresets(snapshot.presets, query);
     },
     save(presetInput: CharacterPartPresetV1) {
-      const preset = parseCharacterPartPresetV1(presetInput);
-      return mutate((presets) => {
-        const existing = presets.find((item) => item.presetId === preset.presetId);
-        const nextPreset: CharacterPartPresetV1 = existing
-          ? Object.freeze({
-              ...preset,
-              version: existing.version + 1,
-              createdAt: existing.createdAt,
-              updatedAt: new Date().toISOString(),
-            })
-          : preset;
-        return [nextPreset, ...presets.filter((item) => item.presetId !== preset.presetId)].slice(0, MAX_PRESETS);
-      });
+      return saveMany([presetInput]);
     },
+    saveMany,
     remove: (presetId: string) => mutate((presets) => presets.filter((item) => item.presetId !== presetId)),
     clear: () => enqueue(async () => {
       try {

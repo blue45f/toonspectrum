@@ -380,6 +380,72 @@ describe("Studio mutation coordinator", () => {
     expect(store.commit).not.toHaveBeenCalled();
   });
 
+  it.each(["page-state", "identity-index"] as const)(
+    "restores a domain that mutates before its commit rejects: %s",
+    async (failingDomain) => {
+      let pageState = { count: 0 };
+      let identityState = { count: 0 };
+      let failCommit = true;
+      const events: string[] = [];
+      const failure = new Error(`${failingDomain} persistence failed`);
+      const pagePort = createStudioExistingReducerDomainPort({
+        domain: "page-state",
+        getSnapshot: () => pageState,
+        reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
+        replaceSnapshot: async (snapshot) => {
+          pageState = snapshot;
+          events.push(`page-state:${snapshot.count}`);
+          if (failCommit && snapshot.count === 1 && failingDomain === "page-state") {
+            throw failure;
+          }
+        },
+      });
+      const identityPort = createStudioExistingReducerDomainPort({
+        domain: "identity-index",
+        getSnapshot: () => identityState,
+        reduce: (snapshot) => ({ state: { count: snapshot.count + 1 } }),
+        replaceSnapshot: async (snapshot) => {
+          identityState = snapshot;
+          events.push(`identity-index:${snapshot.count}`);
+          if (failCommit && snapshot.count === 1 && failingDomain === "identity-index") {
+            throw failure;
+          }
+        },
+      });
+      const store = durability();
+      const coordinator = createStudioMutationCoordinator({
+        domains: [pagePort, identityPort],
+        durability: store,
+        getCurrentCoordinates: () => coordinates(),
+      });
+      const request = envelope([
+        command("command-page", "page-state", "page-state/add-frame"),
+        command("command-identity", "identity-index", "identity/link-panel"),
+      ]);
+
+      await expect(coordinator.execute(request)).rejects.toBe(failure);
+
+      expect(pageState).toEqual({ count: 0 });
+      expect(identityState).toEqual({ count: 0 });
+      expect(events).toEqual(failingDomain === "page-state"
+        ? ["page-state:1", "page-state:0"]
+        : ["page-state:1", "identity-index:1", "identity-index:0", "page-state:0"]);
+      expect(store.abort).toHaveBeenCalledExactlyOnceWith(expect.any(Object), failure);
+      expect(store.commit).not.toHaveBeenCalled();
+      expect(await store.findCommittedReceipt(request.idempotencyKey)).toBeNull();
+      expect(store.syncEnvelopeByKey.size).toBe(0);
+
+      failCommit = false;
+      await expect(coordinator.execute(request)).resolves.toMatchObject({
+        status: "committed",
+        localSequence: 1,
+      });
+      expect(pageState).toEqual({ count: 1 });
+      expect(identityState).toEqual({ count: 1 });
+      expect(store.commit).toHaveBeenCalledOnce();
+    },
+  );
+
   it("rolls back in-memory owners when the atomic durable commit fails", async () => {
     let pageState = { count: 0 };
     const port = createStudioExistingReducerDomainPort({

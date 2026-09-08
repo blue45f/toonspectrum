@@ -55,6 +55,7 @@ export type StudioAssetIssueCode =
   | "commercial-use-prohibited"
   | "commercial-use-unknown"
   | "modification-prohibited"
+  | "modification-unknown"
   | "ai-input-prohibited"
   | "ai-input-unknown"
   | "attribution-missing";
@@ -280,6 +281,15 @@ export function decideStudioAssetPublishUse(
         blocking: true,
       });
     }
+    if (input.modified) {
+      issues.push({
+        code: "modification-unknown",
+        assetId: reference.assetId,
+        revisionId: reference.revisionId,
+        message: "Modification permission is not established.",
+        blocking: true,
+      });
+    }
     return { allowed: issues.every((issue) => !issue.blocking), issues };
   }
   if (input.commercial && license.commercialUse === "prohibited") {
@@ -305,6 +315,14 @@ export function decideStudioAssetPublishUse(
       assetId: reference.assetId,
       revisionId: reference.revisionId,
       message: "The pinned license prohibits modification.",
+      blocking: true,
+    });
+  } else if (input.modified && license.modification !== "allowed") {
+    issues.push({
+      code: "modification-unknown",
+      assetId: reference.assetId,
+      revisionId: reference.revisionId,
+      message: "The pinned license does not establish modification permission.",
       blocking: true,
     });
   }

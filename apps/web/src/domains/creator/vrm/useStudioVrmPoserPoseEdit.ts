@@ -293,6 +293,7 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
       || jointIkTransactionRef.current
       || !persistentIkCaptureIsReady()
     ) return false;
+    if (payload.yOffset !== undefined && !Number.isFinite(payload.yOffset)) return false;
 
     const before = captureFullState();
     const plan = createStudioVrmPhotoPoseApplyPlan({
@@ -316,11 +317,13 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
     }
 
     const poseId = "photo-scan";
+    const nextYOffset = payload.yOffset ?? before.yOffset;
     const after = serializeFullVrmState({
       ...before,
       poseId,
       bones: plan.bones,
       fingerOverrides: plan.fingerEdits,
+      yOffset: nextYOffset,
     });
     const candidateSignature = buildStudioVrmPersistentIkSignature({
       modelId: activeModelId,
@@ -364,6 +367,7 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
     setActivePoseId(poseId);
     setCustomBones(plan.bones);
     setFingerEdits(plan.fingerEdits);
+    setCustomYOffset(nextYOffset);
     const nextEffectiveFingers = resolveStudioVrmFingerAuthority(
       plan.fingerEdits,
       createAutoGripFingerOverrides(
@@ -374,7 +378,7 @@ export function useStudioVrmPoserPoseEdit(h: StudioVrmPoserHost): void {
     );
     applyPoserVisualState(currentVrm, {
       bones: plan.bones,
-      yOffset: customYOffset,
+      yOffset: nextYOffset,
       poseTranslations,
       fingerEdits: nextEffectiveFingers,
       bodyScale,

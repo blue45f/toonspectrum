@@ -5,6 +5,7 @@ import {
   validateStudioAssetReferenceV2,
   type StudioAssetReferenceV2,
 } from "./studio-asset-reference-v2";
+import { digestStudioCanonicalJsonValue } from "./studio-canonical-json";
 
 export const STUDIO_GENERATION_REFERENCE_ROLES = [
   "character-identity",
@@ -131,6 +132,7 @@ export type StudioGenerationCandidateIssueCode =
   | "duplicate-reference-role-revision"
   | "missing-document-digest"
   | "missing-snapshot-digest"
+  | "snapshot-digest-mismatch"
   | "missing-input-snapshot-digest"
   | "candidate-cycle"
   | "parent-missing";
@@ -185,6 +187,15 @@ function characterPinMap(
   return new Map(pins.map((pin) => [pin.characterId, pin]));
 }
 
+/** Hash every persisted input field except the digest that records this very preimage. */
+export function computeStudioGenerationInputSnapshotDigest(
+  snapshot: Omit<StudioGenerationInputSnapshotV1, "snapshotDigest">,
+): string {
+  const input: Record<string, unknown> = { ...snapshot };
+  delete input.snapshotDigest;
+  return digestStudioCanonicalJsonValue(input);
+}
+
 export function validateStudioGenerationInputSnapshot(
   snapshot: StudioGenerationInputSnapshotV1,
 ): readonly StudioGenerationCandidateIssue[] {
@@ -193,6 +204,11 @@ export function validateStudioGenerationInputSnapshot(
     issues.push({
       code: "missing-snapshot-digest",
       message: "A generation input snapshot must have its own canonical digest.",
+    });
+  } else if (snapshot.snapshotDigest !== computeStudioGenerationInputSnapshotDigest(snapshot)) {
+    issues.push({
+      code: "snapshot-digest-mismatch",
+      message: "Generation input snapshot digest does not match its canonical contents.",
     });
   }
   if (!snapshot.localDocumentDigest.trim()) {

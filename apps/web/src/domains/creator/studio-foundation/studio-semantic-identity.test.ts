@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { evaluateStudioWorkflowIntegrity } from "../studio-workflow/studio-workflow-integrity";
+import { createEmptyStudioVersionCoordinates } from "./studio-version-coordinates";
 import {
   addStudioIdentityReference,
   buildStudioSemanticIdentityShadowIndex,
@@ -9,6 +11,7 @@ import {
   deriveStudioIdentityLinkState,
   removeStudioIdentityReference,
   resolveStudioSemanticId,
+  STUDIO_SEMANTIC_ENTITY_KINDS,
   upsertStudioIdentityLink,
   validateStudioIdentityIndex,
   type StudioDomainReference,
@@ -29,6 +32,90 @@ const comicPanel: StudioDomainReference = {
 };
 
 describe("studio semantic identity", () => {
+  it.each([
+    "future-kind",
+    "__proto__",
+    "constructor",
+    "toString",
+    "",
+    null,
+    17,
+    undefined,
+  ])("reports imported kind %j without throwing and blocks review", (kind) => {
+    const valid: StudioIdentityIndexV1 = {
+      ...createEmptyStudioIdentityIndex("work:chapter-1"),
+      links: [createStudioIdentityLink({
+        semanticId: "panel:unknown-kind",
+        kind: "panel",
+        references: [writerPanel],
+        source: "imported",
+        createdAt: NOW,
+      })],
+    };
+    const invalid = {
+      ...valid,
+      links: [{ ...valid.links[0], kind }],
+    } as unknown as StudioIdentityIndexV1;
+
+    expect(validateStudioIdentityIndex(invalid)).toEqual([
+      expect.objectContaining({
+        code: "invalid-kind",
+        semanticId: "panel:unknown-kind",
+      }),
+    ]);
+    const versionCoordinates = createEmptyStudioVersionCoordinates();
+    expect(evaluateStudioWorkflowIntegrity({
+      versionCoordinates,
+      identityIndex: valid,
+    }).canRequestReview).toBe(true);
+    const integrity = evaluateStudioWorkflowIntegrity({
+      versionCoordinates,
+      identityIndex: invalid,
+    });
+    expect(integrity.canRequestReview).toBe(false);
+    expect(integrity.blockingIssueIds.review).toContain(
+      "identity:invalid-kind:panel:unknown-kind",
+    );
+  });
+
+  it.each(["orphaned", "deleted"] as const)(
+    "rejects unknown kinds even for %s links without references",
+    (state) => {
+      const invalid = {
+        ...createEmptyStudioIdentityIndex("work:chapter-1"),
+        links: [{
+          ...createStudioIdentityLink({
+            semanticId: "panel:unknown-kind",
+            kind: "panel",
+            source: "imported",
+            createdAt: NOW,
+          }),
+          kind: "future-kind",
+          state,
+        }],
+      } as unknown as StudioIdentityIndexV1;
+
+      expect(validateStudioIdentityIndex(invalid)).toEqual([
+        expect.objectContaining({ code: "invalid-kind" }),
+      ]);
+    },
+  );
+
+  it.each(STUDIO_SEMANTIC_ENTITY_KINDS)("continues accepting known kind %s", (kind) => {
+    const index: StudioIdentityIndexV1 = {
+      ...createEmptyStudioIdentityIndex("work:chapter-1"),
+      links: [createStudioIdentityLink({
+        semanticId: `entity:${kind}`,
+        kind,
+        references: [writerPanel],
+        source: "native",
+        createdAt: NOW,
+      })],
+    };
+
+    expect(validateStudioIdentityIndex(index)).toEqual([]);
+  });
+
   it("uses a collision-safe canonical reference key", () => {
     expect(canonicalStudioDomainReferenceKey(writerPanel)).toBe(
       '["writer-room","panel",null,"writer-panel-1"]',
