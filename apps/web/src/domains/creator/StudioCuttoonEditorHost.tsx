@@ -1,5 +1,6 @@
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
 import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
+import { copyStudioSmartShapeSnapshot } from "./studio-smart-shape-copy";
 /** Editor host extracted from the /studio page entry.
  * StudioPage.tsx stays the route-facing re-export so the lazy Studio chunk
  * still starts at that path; this file owns remaining editor session logic.
@@ -19995,9 +19996,10 @@ const puppetWarpArmed =
 
   // 요소 평행이동(draw는 points, 그 외는 x/y) — 클립 정규화·삽입용.
   function shiftEl(el: El, dx: number, dy: number): El {
-    return el.type === "draw"
+    const shifted = el.type === "draw"
       ? ({ ...el, points: el.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as El)
       : ({ ...el, x: (el as { x: number }).x + dx, y: (el as { y: number }).y + dy } as El);
+    return copyStudioSmartShapeSnapshot(el, shifted, { mapPoint: (x, y) => [x + dx, y + dy] });
   }
   // 선택 요소(그룹이면 그룹 전체)를 원점 기준으로 정규화해 재사용 클립으로 저장.
   async function saveSelectionAsClip() {
@@ -20038,7 +20040,8 @@ const puppetWarpArmed =
         if (!groupMap.has(groupId)) groupMap.set(groupId, uid());
         groupId = groupMap.get(groupId);
       }
-      return { ...shiftEl(e, dx, dy), id: uid(), groupId, hidden: false, locked: false };
+      const shifted = shiftEl(e, dx, dy);
+      return copyStudioSmartShapeSnapshot(shifted, { ...shifted, id: uid(), groupId, hidden: false, locked: false });
     });
     const insertedElements = remapStudioBg3dLtCopiedBundles(newEls, masterEditMode);
     const clipGroups = masterEditMode
