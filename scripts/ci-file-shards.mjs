@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { statSync } from "node:fs";
+import { resolve } from "node:path";
 import process from "node:process";
 
 const MAX_SHARDS = 64;
@@ -11,6 +12,12 @@ function parseInteger(value, label) {
     throw new Error(`${label} must be an integer, received ${String(value)}`);
   }
   return parsed;
+}
+
+function compareText(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 export function parseCiShardArguments(
@@ -46,12 +53,12 @@ export function listCiVisibleFiles(cwd = process.cwd()) {
     ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
     { cwd, maxBuffer: GIT_FILE_LIST_MAX_BYTES },
   );
-  return [...new Set(output.toString("utf8").split("\0").filter(Boolean))].sort();
+  return [...new Set(output.toString("utf8").split("\0").filter(Boolean))].sort(compareText);
 }
 
 function fileWeight(cwd, file) {
   try {
-    const stat = statSync(file, { throwIfNoEntry: false });
+    const stat = statSync(resolve(cwd, file), { throwIfNoEntry: false });
     return stat?.isFile() ? Math.max(1, stat.size) : 0;
   } catch {
     return 0;
@@ -70,7 +77,7 @@ export function partitionCiFilesByWeight(files, shardCount, cwd = process.cwd())
   const weighted = files
     .map((file) => ({ file, bytes: fileWeight(cwd, file) }))
     .filter((entry) => entry.bytes > 0)
-    .sort((left, right) => right.bytes - left.bytes || left.file.localeCompare(right.file));
+    .sort((left, right) => right.bytes - left.bytes || compareText(left.file, right.file));
   const buckets = Array.from({ length: shardCount }, (_, index) => ({
     index,
     bytes: 0,
@@ -84,6 +91,7 @@ export function partitionCiFilesByWeight(files, shardCount, cwd = process.cwd())
         || left.index - right.index,
     );
     const bucket = buckets[0];
+    if (!bucket) throw new Error("Unable to allocate a CI shard bucket");
     bucket.files.push(entry.file);
     bucket.bytes += entry.bytes;
   }
@@ -91,7 +99,7 @@ export function partitionCiFilesByWeight(files, shardCount, cwd = process.cwd())
     .sort((left, right) => left.index - right.index)
     .map((bucket) => ({
       bytes: bucket.bytes,
-      files: bucket.files.sort(),
+      files: bucket.files.sort(compareText),
     }));
 }
 
