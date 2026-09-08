@@ -1,9 +1,11 @@
-import { decodeHTML, decodeXML } from "entities";
+import { decodeHTMLStrict, decodeXML } from "entities";
 import { parseFragment } from "parse5";
 
 /** Decode exactly one layer. The result is plain text, never trusted HTML. */
 export function decodeHtmlText(value) {
-  return decodeHTML(String(value ?? ""));
+  // Standalone values can be URLs: legacy semicolon-less names such as &copy=2
+  // are query parameters, not HTML text entities.
+  return decodeHTMLStrict(String(value ?? ""));
 }
 
 export function decodeXmlText(value) {

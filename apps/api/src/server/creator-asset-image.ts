@@ -128,9 +128,11 @@ export function inspectCreatorAssetDataUrl(
   const canonical = bytes.toString("base64");
   // The accepted encoding has at most two padding characters; a reverse regexp
   // search here can repeatedly rescan a long attacker-controlled suffix.
-  const unpadded = (input: string) => input.endsWith("==")
-    ? input.slice(0, -2)
-    : input.endsWith("=") ? input.slice(0, -1) : input;
+  const unpadded = (input: string) => {
+    if (input.endsWith("==")) return input.slice(0, -2);
+    if (input.endsWith("=")) return input.slice(0, -1);
+    return input;
+  };
   if (unpadded(canonical) !== unpadded(encoded) || (encoded.includes("=") && encoded !== canonical)) {
     invalid("이미지 base64 데이터가 손상되었습니다.");
   }
