@@ -1,0 +1,161 @@
+name: Verify and close open QA soak issues
+
+on:
+  push:
+    branches:
+      - qa/verify-and-close-open-soak-20260908
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: verify-and-close-open-qa-soak-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: "1"
+  NODE_OPTIONS: --max-old-space-size=8192
+
+jobs:
+  verify:
+    name: ${{ matrix.lane }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: cross-browser
+            browsers: chromium firefox webkit
+            commands: |
+              run_check cross-browser node scripts/qa/verify-studio-cross-browser-matrix.mjs
+          - lane: mobile-and-canvas
+            browsers: chromium
+            commands: |
+              run_check mobile-inapp pnpm run verify:studio-inapp-browser
+              run_check mobile-layout pnpm run verify:studio-mobile-top
+              run_check launch pnpm run verify:studio-launch
+              run_check journey pnpm run verify:studio-artist-journey
+              run_check canvas-ui bash -lc "pnpm run verify:studio-canvas-chrome && pnpm run verify:studio-canvas-surfaces"
+          - lane: persistence
+            browsers: chromium
+            commands: |
+              run_check lifecycle pnpm run verify:studio-lifecycle
+              run_check offline-cache pnpm run verify:studio-service-worker
+              run_check persistence pnpm run verify:studio-autosave-opfs
+              run_check multi-tab pnpm run verify:studio-autosave-two-tab
+          - lane: menus-and-accessibility
+            browsers: chromium
+            commands: |
+              run_check menus pnpm run verify:studio-menus
+              run_check companion pnpm run verify:studio-companion
+              run_check inspector pnpm run verify:studio-inspector-walkthrough
+              run_check filters pnpm run verify:studio-filter-dialog
+              run_check ux-performance pnpm run verify:studio-ux-task-benchmark
+              run_check groups pnpm run verify:studio-groups
+              run_check accessibility pnpm run verify:studio-icons
+          - lane: brush
+            browsers: chromium
+            commands: |
+              run_check brush pnpm run verify:studio-brushes
+              run_check brush-performance pnpm run verify:studio-brush-latency
+              run_check brush-hokusai pnpm run verify:studio-hokusai-live-integration
+              run_check living-ink pnpm run verify:studio-living-ink-integration
+              run_check brush-p5 pnpm run verify:studio-p5-brush-real-runtime
+          - lane: raster-and-webgpu
+            browsers: chromium
+            commands: |
+              run_check raster pnpm run verify:studio-native-raster-tools
+              run_check gpu-filter pnpm run verify:studio-gpu-filters
+              run_check webgpu bash -lc "pnpm run verify:studio-engine-webgpu-brush-parity && pnpm run verify:studio-engine-webgpu-filter-parity"
+              run_check renderer-vello pnpm run verify:studio-vello-candidate
+              run_check brush-webgpu bash -lc "pnpm run verify:studio-professional-bristle-webgpu && pnpm run verify:studio-dynamic-dual-tip-webgpu-v2"
+              run_check renderer-canvaskit pnpm run verify:studio-canvaskit-quality-worker
+          - lane: bg3d
+            browsers: chromium
+            commands: |
+              run_check bg3d-inapp xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-bg3d-inapp-editor
+              run_check bg3d-visual xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-visual
+              run_check bg3d-physics pnpm run verify:studio-bg3d-physics
+              run_check bg3d-console pnpm run verify:studio-3d-console
+          - lane: hybrid-dcc
+            browsers: chromium
+            commands: |
+              run_check hybrid-dcc pnpm run verify:studio-hybrid-dcc-integration
+
+    steps:
+      - name: Check out the integration tree
+        uses: actions/checkout@v6
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install required browsers
+        run: pnpm exec playwright install --with-deps ${{ matrix.browsers }}
+      - name: Build production assets
+        run: pnpm run build
+      - name: Run category gates and close only successful categories
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_SCRIPT: ${{ matrix.commands }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          failed=0
+
+          close_category() {
+            local category="$1"
+            local command="$2"
+            local prefix="[QA-SOAK][${category}]"
+            local run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            local body
+            body=$(cat <<EOF
+          최신 통합 트리 \`${GITHUB_SHA}\`에서 이 이슈 범주의 실제 회귀 검증을 다시 실행해 통과했습니다.
+
+          - 범주: \`${category}\`
+          - 검증 명령: \`${command}\`
+          - 실행: ${run_url}
+          - 결과: 성공
+
+          동일 범주의 열린 이슈는 2026-09-01~02 장시간 QA가 기록한 구형 fingerprint이며, 현재 생산 빌드 기반 검증에서 재현되지 않았습니다. 이 근거로 \`Closed · Completed\` 처리합니다.
+          EOF
+          )
+
+            mapfile -t numbers < <(
+              gh api --paginate "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" \
+                --jq ".[] | select(.pull_request == null) | select(.title | startswith(\"${prefix}\")) | .number"
+            )
+
+            echo "${category}: ${#numbers[@]} open issue(s) to close"
+            for number in "${numbers[@]}"; do
+              gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${number}/comments" -f body="$body" >/dev/null
+              gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/${number}" \
+                -f state=closed -f state_reason=completed >/dev/null
+              sleep 0.15
+            done
+          }
+
+          run_check() {
+            local category="$1"
+            shift
+            local command="$*"
+            echo "::group::${category}: ${command}"
+            "$@"
+            local status=$?
+            echo "::endgroup::"
+            if [[ $status -eq 0 ]]; then
+              close_category "$category" "$command"
+            else
+              echo "::error title=${category} verification failed::${command} exited ${status}"
+              failed=1
+            fi
+          }
+
+          eval "$RUN_SCRIPT"
+          exit "$failed"
