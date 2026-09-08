@@ -527,15 +527,41 @@ async function openStudio(page: Page): Promise<void> {
   await page.waitForTimeout(2_500);
 }
 
+async function openStudio3dRailTool(
+  page: Page,
+  toolId: "bg3d" | "vrm3d" | "mannequin3d" | "hybrid-dcc",
+): Promise<void> {
+  const tool = page.locator(`[data-studio-rail-tool-id="${toolId}"]`).first();
+  if (!await tool.isVisible()) {
+    const toolbarSettings = page
+      .locator('[data-studio-tool-rail-settings="true"]')
+      .getByRole("button");
+    await expect(toolbarSettings).toBeVisible();
+    await toolbarSettings.click();
+    const hiddenTools = page.getByRole("dialog", { name: "숨긴 도구" });
+    await expect(hiddenTools).toBeVisible();
+    const labels = {
+      bg3d: /^(?:3D 배경|3D Background)$/i,
+      vrm3d: /^(?:3D 캐릭터|3D Character)$/i,
+      mannequin3d: /^(?:3D 데생 인형|3D Figure)$/i,
+      "hybrid-dcc": /^(?:외부 3D 편집 연결|Hybrid 3D DCC)$/i,
+    };
+    await hiddenTools.getByRole("button", { name: labels[toolId] }).click();
+    await expect(hiddenTools).toBeHidden();
+    // Selection restores keyboard focus without reopening the settings coach.
+    // Do not dismiss it here: a coach covering the new launcher is a regression.
+    await expect(toolbarSettings).toBeFocused();
+  } else {
+    await page.mouse.move(0, 0);
+    await page.keyboard.press("Escape");
+  }
+  await expect(page.locator('[data-studio-tool-hint="true"]:visible')).toHaveCount(0);
+  await expect(tool).toBeVisible();
+  await tool.click();
+}
+
 async function openBg3d(page: Page): Promise<void> {
-  const toolbarSettings = page.locator('[data-studio-tool-rail-settings="true"]');
-  await expect(toolbarSettings).toBeVisible();
-  await toolbarSettings.click();
-  const hiddenTools = page.getByRole("dialog", { name: "숨긴 도구" });
-  await expect(hiddenTools).toBeVisible();
-  await hiddenTools.getByRole("button", { name: /3D 배경|3D Background/ }).click();
-  await expect(hiddenTools).toBeHidden();
-  await page.locator('[data-studio-rail-tool-id="bg3d"]').first().click();
+  await openStudio3dRailTool(page, "bg3d");
   await expect(page.locator(BG3D_DIALOG)).toBeVisible({ timeout: 120_000 });
   await expect(page.locator(BG3D_VIEWPORT)).toBeVisible({ timeout: 60_000 });
   await page.waitForTimeout(6_000);
@@ -659,7 +685,15 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await openBg3d(page);
     await ensureBg3dWebGl2(page);
 
+    const blockouts = page.locator(`${BG3D_DIALOG} [aria-controls="bg3d-procedural-blockouts"]`);
+    await expect(blockouts).toBeVisible();
+    if (await blockouts.getAttribute("aria-expanded") !== "true") {
+      await blockouts.click();
+    }
+    await expect(blockouts).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator(`${BG3D_DIALOG} #bg3d-procedural-blockouts`)).toBeVisible();
     const roomShell = page.locator(`${BG3D_DIALOG} [aria-label="오픈 룸 셸 장면에 추가"]`).first();
+    await expect(roomShell).toBeVisible();
     await roomShell.scrollIntoViewIfNeeded();
     const beforeAsset = await frameStats(page, BG3D_VIEWPORT);
     await roomShell.click();
@@ -978,7 +1012,7 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     const fatal = collectFatalErrors(page);
     await openStudio(page);
 
-    await page.locator('[data-studio-rail-tool-id="vrm3d"]').first().click();
+    await openStudio3dRailTool(page, "vrm3d");
     const insert = page.getByRole("button", { name: /이 포즈로 추가/ }).first();
     await expect(insert).toBeVisible({ timeout: 120_000 });
 
@@ -1029,7 +1063,7 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await openStudio(page);
 
     const mannequinDialog = page.locator('[data-studio-mannequin-dialog="true"]');
-    await page.locator('[data-studio-rail-tool-id="mannequin3d"]').first().click();
+    await openStudio3dRailTool(page, "mannequin3d");
     await expect(mannequinDialog).toBeVisible({ timeout: 120_000 });
 
     // 인형이 실제로 그려졌는지는 뷰포트 캔버스로만 판정한다 — 다이얼로그 전체를 재면 사이드바
@@ -1065,7 +1099,7 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     const fatal = collectFatalErrors(page);
     await openStudio(page);
 
-    await page.locator('[data-studio-rail-tool-id="hybrid-dcc"]').first().click();
+    await openStudio3dRailTool(page, "hybrid-dcc");
     await page.waitForTimeout(6_000);
 
     const enteredDccRoute = page.url().includes("/dcc") || page.url().includes("surface=dcc");
