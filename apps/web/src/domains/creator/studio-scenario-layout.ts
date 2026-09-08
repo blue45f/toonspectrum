@@ -44,6 +44,8 @@ export interface ScenarioSceneInput {
  *  (studio-ai-client.StudioAiImageSize로의 매핑은 호출부 책임 — 이 모듈은 AI 클라이언트를 모른다). */
 export type ScenarioPanelAspect = "square" | "portrait" | "landscape";
 export type ScenarioImageVariantCount = 1 | 2 | 4;
+export type ScenarioImageQualityProfile = "draft" | "balanced" | "final";
+export type ScenarioImageVariationStrategy = "subtle" | "directorial" | "coverage";
 
 export interface ScenarioImageCandidate {
   id: string;
@@ -51,6 +53,10 @@ export interface ScenarioImageCandidate {
   imageProvenance?: StudioPublishAiProvenance;
   inputFingerprint: string;
   createdAt: string;
+  /** Provider-neutral review metadata; it never claims a model-side seed or unsupported control. */
+  qualityProfile?: ScenarioImageQualityProfile;
+  variationStrategy?: ScenarioImageVariationStrategy;
+  variationLabel?: string;
 }
 
 export function scenarioPanelAspect(width: number, height: number): ScenarioPanelAspect {
