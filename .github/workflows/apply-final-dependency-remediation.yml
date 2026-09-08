@@ -1,4 +1,4 @@
-name: Apply final dependency remediation
+name: Retired final dependency remediation helper
 
 on:
   push:
@@ -7,136 +7,13 @@ on:
     paths:
       - .github/workflows/apply-final-dependency-remediation.yml
 
-permissions:
-  contents: write
-
 concurrency:
   group: apply-final-dependency-remediation
   cancel-in-progress: true
 
 jobs:
-  remediate:
-    if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
+  retired:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out the complete final integration dependency graph
-        uses: actions/checkout@v6
-        with:
-          ref: release/final-main-merge-4888b061-immutable-20260908
-          fetch-depth: 0
-          persist-credentials: true
-          filter: blob:none
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            .npmrc
-            package.json
-            pnpm-lock.yaml
-            pnpm-workspace.yaml
-            apps/*/package.json
-            packages/*/package.json
-            patches/**
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 11.4.0
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: false
-
-      - name: Remediate every available advisory
-        shell: bash
-        run: |
-          set -euo pipefail
-          target='release/final-main-merge-4888b061-immutable-20260908'
-          git pull --ff-only origin "$target"
-          mkdir -p "$RUNNER_TEMP/final-dependency-audit"
-
-          set +e
-          pnpm audit --json --audit-level low \
-            > "$RUNNER_TEMP/final-dependency-audit/before.json" \
-            2> "$RUNNER_TEMP/final-dependency-audit/before.err"
-          printf '%s\n' "$?" > "$RUNNER_TEMP/final-dependency-audit/before.exit"
-
-          pnpm audit --fix=update --audit-level low \
-            > "$RUNNER_TEMP/final-dependency-audit/fix.log" 2>&1
-          printf '%s\n' "$?" > "$RUNNER_TEMP/final-dependency-audit/fix.exit"
-          set -e
-
-          pnpm install --lockfile-only --ignore-scripts
-
-          set +e
-          pnpm audit --json --audit-level low \
-            > "$RUNNER_TEMP/final-dependency-audit/after.json" \
-            2> "$RUNNER_TEMP/final-dependency-audit/after.err"
-          printf '%s\n' "$?" > "$RUNNER_TEMP/final-dependency-audit/after.exit"
-          set -e
-
-      - name: Require a clean all-severity audit
-        shell: bash
-        run: |
-          node --input-type=module <<'NODE'
-          import { readFileSync } from "node:fs";
-          import { join } from "node:path";
-
-          const root = join(process.env.RUNNER_TEMP, "final-dependency-audit");
-          const readJson = (name) => JSON.parse(readFileSync(join(root, name), "utf8"));
-          const readExit = (name) => Number(readFileSync(join(root, name), "utf8").trim());
-          const count = (report) => {
-            const source = report?.metadata?.vulnerabilities ?? {};
-            const values = ["info", "low", "moderate", "high", "critical"]
-              .map((severity) => Number(source[severity] ?? 0));
-            return values.reduce((sum, value) => sum + value, 0);
-          };
-
-          const before = readJson("before.json");
-          const after = readJson("after.json");
-          const summary = {
-            before: count(before),
-            after: count(after),
-            fixExitCode: readExit("fix.exit"),
-            auditExitCode: readExit("after.exit"),
-          };
-          console.log(JSON.stringify(summary, null, 2));
-          if (summary.after !== 0 || summary.auditExitCode !== 0) {
-            console.error(readFileSync(join(root, "after.err"), "utf8"));
-            console.error(JSON.stringify(after, null, 2));
-            process.exit(1);
-          }
-          NODE
-
-      - name: Commit only dependency graph changes to the final integration branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          target='release/final-main-merge-4888b061-immutable-20260908'
-          unexpected="$({ git diff --name-only; git diff --cached --name-only; } | sort -u | grep -Ev '^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|apps/[^/]+/package\.json|packages/[^/]+/package\.json)$' || true)"
-          if [[ -n "$unexpected" ]]; then
-            echo "Unexpected tracked changes:" >&2
-            echo "$unexpected" >&2
-            exit 1
-          fi
-
-          git add -- \
-            package.json \
-            pnpm-lock.yaml \
-            pnpm-workspace.yaml \
-            ':(glob)apps/*/package.json' \
-            ':(glob)packages/*/package.json'
-          git diff --cached --check
-
-          if git diff --cached --quiet; then
-            echo "The final integration dependency graph is already audit-clean."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "fix(security): remediate dependencies on final integration tree"
-          git pull --rebase origin "$target"
-          git push origin HEAD:"$target"
+      - run: echo "Dependency remediation already completed on the final integration branch."
