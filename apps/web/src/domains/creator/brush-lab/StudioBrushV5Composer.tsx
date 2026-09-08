@@ -240,10 +240,16 @@ function Slider({ label, value, minimum, maximum, step, display, onChange }: {
   display?: string;
   onChange: (value: number) => void;
 }) {
+  const inputId = `brush-v5-slider-${label.replace(/[^a-z0-9가-힣]+/giu, "-").toLowerCase()}`;
   return (
-    <label className="block rounded-xl border border-line bg-bg-2/45 p-3 text-xs font-semibold text-fg-2">
-      <span className="flex items-center justify-between gap-3"><span>{label}</span><span className="tabular-nums text-fg-3">{display ?? value.toFixed(2)}</span></span>
+    <div className="block rounded-xl border border-line bg-bg-2/45 p-3 text-xs font-semibold text-fg-2">
+      <div className="flex items-center justify-between gap-3">
+        <label htmlFor={inputId}>{label}</label>
+        <span className="tabular-nums text-fg-3">{display ?? value.toFixed(2)}</span>
+      </div>
       <input
+        id={inputId}
+        aria-label={label}
         className="mt-2 min-h-8 w-full accent-accent"
         type="range"
         min={minimum}
@@ -252,7 +258,7 @@ function Slider({ label, value, minimum, maximum, step, display, onChange }: {
         value={value}
         onChange={(event) => onChange(event.currentTarget.valueAsNumber)}
       />
-    </label>
+    </div>
   );
 }
 
@@ -378,10 +384,23 @@ export function StudioBrushV5Composer({ scope }: { scope: string }) {
 
         <canvas ref={canvasRef} className="mt-4 h-[360px] w-full rounded-2xl border border-line bg-canvas" aria-label="현재 브러시 조합 미리보기" />
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <label className="rounded-xl border border-line bg-bg-2/45 p-3 text-xs font-semibold text-fg-2">
-            <span className="flex items-center justify-between"><span>물리 정착 시간</span><span className="tabular-nums text-fg-3">{Math.round(settleProgress * 100)}%</span></span>
-            <input className="mt-2 min-h-8 w-full accent-accent" type="range" min={0} max={1} step={0.01} value={settleProgress} onChange={(event) => setSettleProgress(event.currentTarget.valueAsNumber)} />
-          </label>
+          <div className="rounded-xl border border-line bg-bg-2/45 p-3 text-xs font-semibold text-fg-2">
+            <div className="flex items-center justify-between">
+              <label htmlFor="brush-v5-settle-progress">물리 정착 시간</label>
+              <span className="tabular-nums text-fg-3">{Math.round(settleProgress * 100)}%</span>
+            </div>
+            <input
+              id="brush-v5-settle-progress"
+              aria-label="물리 정착 시간"
+              className="mt-2 min-h-8 w-full accent-accent"
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={settleProgress}
+              onChange={(event) => setSettleProgress(event.currentTarget.valueAsNumber)}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-2 text-[0.65rem] font-semibold">
             <span className={`rounded-xl border px-3 py-2 ${capabilities.webgpu ? "border-good/40 bg-good/5 text-good" : "border-warn/35 bg-warn/5 text-warn"}`}>WebGPU {capabilities.webgpu ? "지원" : "미지원"}</span>
             <span className="rounded-xl border border-line bg-bg-2/45 px-3 py-2 text-fg-3">Raw {capabilities.pointerRawUpdate ? "지원" : "대체"}</span>
