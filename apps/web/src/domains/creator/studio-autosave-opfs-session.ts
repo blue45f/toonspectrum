@@ -530,7 +530,9 @@ export class StudioAutosaveOpfsSession {
         // transaction when a separate Web Lock already guards the whole document lifetime;
         // otherwise a completed checkpoint strands a 30-second disk lease after reload.
         // Callers without that document lock retain the existing expiry/fencing discipline.
-        if (this.#documentLease?.role === "leader"
+        // Admission may close while an already-started checkpoint drains. Its owned disk writer
+        // still needs release even though the document handle now reports a follower role.
+        if (this.#documentLease
           && this.#documentLease.basis !== "locks-unavailable") {
           try {
             await this.#journal.releaseWriter(writer);
