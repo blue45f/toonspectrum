@@ -1,0 +1,71 @@
+name: Fix OPFS regression test formatting
+
+on:
+  push:
+    branches:
+      - fix/hybrid-dcc-opfs-snapshot-race-20260908
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the issue branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/hybrid-dcc-opfs-snapshot-race-20260908
+
+      - name: Fix only the malformed regression-test block
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/verify-studio-hybrid-dcc-integration.test.ts")
+          source = path.read_text(encoding="utf-8")
+          old = '''  it("retries transient OPFS replacement races without accepting partial evidence", () => {
+  const source = readFileSync(
+    new URL("./verify-studio-hybrid-dcc-integration.mts", import.meta.url),
+    "utf8",
+  );
+  const readerStart = source.indexOf("async function readHybridDccOpfsFiles");
+  const readerEnd = source.indexOf("function studioHybridDccOpfsFileIdentity", readerStart);
+  const reader = source.slice(readerStart, readerEnd);
+
+  expect(reader).toContain('error instanceof DOMException && error.name === "NotFoundError"');
+  expect(reader).toContain("transientNotFound = true");
+  expect(reader).toContain("if (!snapshot.transientNotFound) return snapshot.files");
+  expect(reader).toContain("maxAttempts: 5");
+  expect(reader).toContain("Hybrid DCC OPFS snapshot did not stabilize");
+});'''
+          new = '''  it("retries transient OPFS replacement races without accepting partial evidence", () => {
+    const source = readFileSync(
+      new URL("./verify-studio-hybrid-dcc-integration.mts", import.meta.url),
+      "utf8",
+    );
+    const readerStart = source.indexOf("async function readHybridDccOpfsFiles");
+    const readerEnd = source.indexOf("function studioHybridDccOpfsFileIdentity", readerStart);
+    const reader = source.slice(readerStart, readerEnd);
+
+    expect(reader).toContain('error instanceof DOMException && error.name === "NotFoundError"');
+    expect(reader).toContain("transientNotFound = true");
+    expect(reader).toContain("if (!snapshot.transientNotFound) return snapshot.files");
+    expect(reader).toContain("maxAttempts: 5");
+    expect(reader).toContain("Hybrid DCC OPFS snapshot did not stabilize");
+  });'''
+          if source.count(old) != 1:
+              raise SystemExit(f"expected one malformed OPFS test block, found {source.count(old)}")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+
+          rm .github/workflows/fix-opfs-test-format.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/verify-studio-hybrid-dcc-integration.test.ts \
+            .github/workflows/fix-opfs-test-format.yml
+          git commit -m "test(verify): format OPFS race regression"
+          git push origin HEAD:fix/hybrid-dcc-opfs-snapshot-race-20260908
