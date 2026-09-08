@@ -493,23 +493,31 @@ describe("studio brush catalogue paint performance matrix", () => {
   });
 
   it.each([
-    ["crayon", 3_538, 11_231, "fe67ae85"],
-    ["chalk", 2_000, 10_000, "570a2a90"],
-    ["charcoal", 1_979, 9_895, "0ae7f47f"],
-    ["pastel", 1_658, 8_290, "31a8e83d"],
-    ["oil-pastel", 2_295, 11_475, "a1a51e33"],
-  ] as const)("preserves the persisted V3 work and geometry for %s", (catalogId, dabCount, markCount, digest) => {
+    ["crayon", 3_538, 11_231, "c00827e4"],
+    ["chalk", 2_000, 10_000, "903fcc0d"],
+    ["charcoal", 1_979, 9_895, "617bbbd3"],
+    ["pastel", 1_658, 8_290, "457ca324"],
+    ["oil-pastel", 2_295, 11_475, "6352efed"],
+  ] as const)("preserves the persisted V3 work and geometry for %s", (catalogId, dabCount, markCount, geometryFloat32Digest) => {
     // These are the pre-V4 work pins. A saved V3 revision must keep them even while new
     // authoring uses taper-aware V4 spacing, which deliberately emits a different plan.
-    const replay = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
+    const options = {
       sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
       depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
-    });
-    expect(replay.ok, replay.failure ?? catalogId).toBe(true);
-    expect(replay.path).toBe("causal-coverage");
-    expect(replay.dabCount).toBe(dabCount);
-    expect(replay.markCount).toBe(markCount);
-    expect(replay.digest).toBe(digest);
+    } as const;
+    const first = evaluateStudioBrushCataloguePaintPerfRow(catalogId, options);
+    const second = evaluateStudioBrushCataloguePaintPerfRow(catalogId, options);
+    for (const replay of [first, second]) {
+      expect(replay.ok, replay.failure ?? catalogId).toBe(true);
+      expect(replay.path).toBe("causal-coverage");
+      expect(replay.dabCount).toBe(dabCount);
+      expect(replay.markCount).toBe(markCount);
+      // Pinned across Node 22 and 24. Every mark's position, radii, angle and alpha participate;
+      // this is exact Float32 geometry, not a tolerance or a replacement for raw-byte identity.
+      expect(replay.geometryFloat32Digest).toBe(geometryFloat32Digest);
+    }
+    expect(first.digest).toMatch(/^[a-f0-9]{8}$/u);
+    expect(second.digest).toBe(first.digest);
   });
 
   it("replays identical same-seed digests and feeds honest bench receipts", () => {

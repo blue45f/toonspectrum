@@ -320,6 +320,8 @@ export interface StudioBrushCataloguePerfRow {
    * contract-only paths that plan no geometry — those rows are determinism-unmeasured, not failed.
    */
   readonly digest: string | null;
+  /** Coverage geometry at Float32 upload precision, for cross-runtime golden comparisons. */
+  readonly geometryFloat32Digest?: string;
 }
 
 /** Same-seed double-run comparison used by the quality-receipt bench stage. */
@@ -518,6 +520,12 @@ function evaluateCausalCoverage(
     failure: null,
     freeze: elapsedMs > budgetMs,
     digest: computeStudioBrushPlanDigest(coverageMarkDigestStream(coverage.marks)),
+    // Keep the raw Float64 digest above for same-runtime replay identity. V8 math versions can
+    // differ in trailing Float64 bits; the WebGPU brush instance buffer uses Float32Array.
+    // Golden geometry at that precision is checked separately, outside the measured plan window.
+    geometryFloat32Digest: computeStudioBrushPlanDigest(
+      Float32Array.from(coverageMarkDigestStream(coverage.marks)),
+    ),
   };
 }
 
