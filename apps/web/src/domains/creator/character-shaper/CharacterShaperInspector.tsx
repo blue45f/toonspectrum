@@ -264,7 +264,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
 
   const busyReason = binding.busyReason;
   const modelReady = h.status === "ready";
-  const locked = busyReason !== null || !modelReady;
+  const locked = busyReason !== null || binding.previewEntryId != null || !modelReady;
   const forgeState = (h.avatarForgeState ?? null) as AvatarForgeState | null;
   const proportionStatus: string = typeof h.proportionRigStatus === "string" ? h.proportionRigStatus : "idle";
   const proportionBusy = proportionStatus === "applying" || proportionStatus === "reload-required";

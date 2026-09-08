@@ -235,6 +235,54 @@ describe("useCharacterShaperBinding", () => {
     expect(result.current.history.recentLabels[0]).toBe("눈: 순정 반짝");
   });
 
+  it("previews a candidate on the real host without changing recipe or history, then restores exactly", () => {
+    const fake = createFakeHost();
+    const { result } = renderBinding(fake);
+    const before = fake.state.avatarForgeState;
+
+    act(() => {
+      result.current.preview?.(entryOf("eyes:romance-sparkle"));
+    });
+
+    expect(result.current.previewEntryId).toBe("eyes:romance-sparkle");
+    expect(Object.keys(fake.state.avatarForgeState.semanticFaceMorphs ?? {})).toContain("eyeSize");
+    expect(result.current.recipe.slots.eyes).toBe("eyes:original");
+    expect(result.current.history.length).toBe(0);
+
+    act(() => {
+      result.current.cancelPreview?.();
+    });
+
+    expect(result.current.previewEntryId).toBeNull();
+    expect(fake.state.avatarForgeState).toEqual(before);
+    expect(result.current.recipe.slots.eyes).toBe("eyes:original");
+    expect(result.current.history.length).toBe(0);
+  });
+
+  it("promotes the matching preview to one undoable commit without applying it twice", () => {
+    const fake = createFakeHost();
+    const { result } = renderBinding(fake);
+
+    act(() => {
+      result.current.preview?.(entryOf("eyes:romance-sparkle"));
+    });
+    const writesAfterPreview = fake.calls.forge.length;
+    act(() => {
+      result.current.commitPreview?.(entryOf("eyes:romance-sparkle"));
+    });
+
+    expect(fake.calls.forge).toHaveLength(writesAfterPreview);
+    expect(result.current.previewEntryId).toBeNull();
+    expect(result.current.recipe.slots.eyes).toBe("eyes:romance-sparkle");
+    expect(result.current.history.recentLabels[0]).toBe("눈: 순정 반짝");
+    expect(result.current.history.length).toBe(1);
+
+    act(() => {
+      result.current.undo();
+    });
+    expect(result.current.recipe.slots.eyes).toBe("eyes:original");
+  });
+
   it("merges every Avatar Forge write of one commit into a single handleAvatarForgeChange", () => {
     const fake = createFakeHost();
     const { result } = renderBinding(fake);

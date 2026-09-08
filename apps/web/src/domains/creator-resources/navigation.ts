@@ -1,5 +1,5 @@
 export const RESOURCE_PAGES = [
-  { path: "/research", title: "리서치 데스크", description: "작품·판본·창작 자료를 모아 다음 장면과 출판 준비로 연결하세요." },
+  { path: "/research", title: "리서치 데스크", description: "하나의 질문에서 자료 탐색, 출처 점검, 기획 진행도, 제작 전환까지 관리하세요." },
   { path: "/now", title: "오늘의 영감", description: "매일 하나의 사물·공간·빛·소리와 5컷 미션으로 창작을 시작하세요." },
   { path: "/opportunities", title: "작가 기회센터", description: "지원사업을 찾아 저장하고 접수 준비를 시작하세요." },
   { path: "/research/assets", title: "창작 레퍼런스", description: "복식·소품·미술 자료를 출처와 함께 모으세요." },
