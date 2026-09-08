@@ -92,3 +92,5 @@ jobs:
           git status --short
           git commit -m "feat(studio): add cinematic procedural 3d asset pack"
           git push origin HEAD:feat/studio-3d-cinematic-assets-20260909
+
+# Triggered by the CI repair pass; this file deletes itself after validated integration.
