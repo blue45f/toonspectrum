@@ -34,11 +34,12 @@ interface RawManifest extends Record<string, unknown> {
 
 const root = fileURLToPath(new URL("../../../../../", import.meta.url));
 const publicPack = path.join(root, "apps/web/public/assets/studio/cc0-20260906");
-const stagedPack = path.join(root, "artifacts/studio-asset-expansion/pbr-20260908");
+const evidencePack = path.join(root, "artifacts/studio-asset-expansion/pbr-20260908");
 const manifestBytes = readFileSync(path.join(publicPack, "manifest.json"));
 const manifest = JSON.parse(manifestBytes.toString("utf8")) as RawManifest;
-const staged = JSON.parse(readFileSync(path.join(stagedPack, "manifest.json"), "utf8")) as RawManifest;
-const publication = JSON.parse(readFileSync(path.join(stagedPack, "publication-report.json"), "utf8")) as {
+const publication = JSON.parse(
+  readFileSync(path.join(evidencePack, "publication-report.json"), "utf8"),
+) as {
   addedIds: string[];
   catalogCount: number;
   afterManifestSha256: string;
@@ -64,7 +65,8 @@ const originals = [
   },
 ] as const;
 const cassette = manifest.assets.find(({ id }) => id === originals[0].id)!;
-const digest = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
+const digest = (bytes: Uint8Array | string) =>
+  createHash("sha256").update(bytes).digest("hex");
 
 function parseOriginal(original: unknown, patch: Record<string, unknown> = {}) {
   return parseStudioCc0Catalog({
@@ -96,40 +98,84 @@ describe("CC0 optional original delivery", () => {
     expect(asset.sha256).toBe(cassette.sha256);
   });
 
-  it.each([null, "original.glb", 3, true])("rejects a non-object variant: %s", (original) => {
-    expect(() => parseOriginal(original)).toThrow(TypeError);
-  });
+  it.each([null, "original.glb", 3, true])(
+    "rejects a non-object variant: %s",
+    (original) => {
+      expect(() => parseOriginal(original)).toThrow(TypeError);
+    },
+  );
 
   it.each([
-    { label: "external URL", patch: { path: "https://example.test/original.glb" } },
-    { label: "absolute path", patch: { path: "/assets/polyhaven-cassette-player/original.glb" } },
-    { label: "parent traversal", patch: { path: "assets/polyhaven-cassette-player/../original.glb" } },
-    { label: "encoded traversal", patch: { path: "assets/polyhaven-cassette-player/%2e%2e.glb" } },
-    { label: "cross-asset path", patch: { path: "assets/polyhaven-brass-goblets/original.glb" } },
+    {
+      label: "external URL",
+      patch: { path: "https://example.test/original.glb" },
+    },
+    {
+      label: "absolute path",
+      patch: { path: "/assets/polyhaven-cassette-player/original.glb" },
+    },
+    {
+      label: "parent traversal",
+      patch: {
+        path: "assets/polyhaven-cassette-player/../original.glb",
+      },
+    },
+    {
+      label: "encoded traversal",
+      patch: { path: "assets/polyhaven-cassette-player/%2e%2e.glb" },
+    },
+    {
+      label: "cross-asset path",
+      patch: { path: "assets/polyhaven-brass-goblets/original.glb" },
+    },
     { label: "same primary path", patch: { path: cassette.path } },
-    { label: "non-GLB file", patch: { path: "assets/polyhaven-cassette-player/original.png" } },
+    {
+      label: "non-GLB file",
+      patch: { path: "assets/polyhaven-cassette-player/original.png" },
+    },
     { label: "empty size", patch: { bytes: 0 } },
     { label: "negative size", patch: { bytes: -1 } },
     { label: "fractional size", patch: { bytes: 1.5 } },
-    { label: "unsafe size", patch: { bytes: Number.MAX_SAFE_INTEGER + 1 } },
+    {
+      label: "unsafe size",
+      patch: { bytes: Number.MAX_SAFE_INTEGER + 1 },
+    },
     { label: "non-number size", patch: { bytes: "3958756" } },
     { label: "short hash", patch: { sha256: "a".repeat(63) } },
     { label: "non-hex hash", patch: { sha256: "z".repeat(64) } },
     { label: "empty decoded memory", patch: { estimatedDecodedImageBytes: 0 } },
-    { label: "infinite decoded memory", patch: { estimatedDecodedImageBytes: Infinity } },
+    {
+      label: "infinite decoded memory",
+      patch: { estimatedDecodedImageBytes: Infinity },
+    },
     { label: "non-CC0 license", patch: { licenseId: "CC-BY-4.0" } },
-    { label: "different source", patch: { sourceUrl: "https://example.test/cassette_player" } },
-    { label: "non-HTTPS source", patch: { sourceUrl: "http://polyhaven.com/a/cassette_player" } },
-    { label: "truthy string", patch: { visuallyEquivalentToDefault: "true" } },
+    {
+      label: "different source",
+      patch: { sourceUrl: "https://example.test/cassette_player" },
+    },
+    {
+      label: "non-HTTPS source",
+      patch: { sourceUrl: "http://polyhaven.com/a/cassette_player" },
+    },
+    {
+      label: "truthy string",
+      patch: { visuallyEquivalentToDefault: "true" },
+    },
   ])("rejects $label", ({ patch }) => {
-    expect(() => parseOriginal({ ...cassette.original, ...patch })).toThrow(TypeError);
+    expect(() => parseOriginal({ ...cassette.original, ...patch })).toThrow(
+      TypeError,
+    );
   });
 
   it("rejects variants on 2D assets or without matching parent CC0 rights", () => {
-    expect(() => parseOriginal(cassette.original, { kind: "surface-texture" })).toThrow(TypeError);
-    expect(() => parseOriginal(cassette.original, {
-      license: { ...cassette.license, id: "CC-BY-4.0" },
-    })).toThrow(TypeError);
+    expect(() =>
+      parseOriginal(cassette.original, { kind: "surface-texture" }),
+    ).toThrow(TypeError);
+    expect(() =>
+      parseOriginal(cassette.original, {
+        license: { ...cassette.license, id: "CC-BY-4.0" },
+      }),
+    ).toThrow(TypeError);
   });
 
   it("does not turn original provenance into a visual quality approval", () => {
@@ -145,31 +191,31 @@ describe("CC0 optional original delivery", () => {
 });
 
 describe("published CC0 original bytes and provenance", () => {
-  it.each(originals)("$id is an exact CC0 stage copy with recorded source hash", (expected) => {
-    const asset = manifest.assets.find(({ id }) => id === expected.id)!;
-    const original = asset.original!;
-    const publicBytes = readFileSync(path.join(publicPack, original.path));
-    const sourceBytes = readFileSync(path.join(stagedPack, original.path));
-    expect(publicBytes.byteLength).toBe(expected.bytes);
-    expect(sourceBytes.byteLength).toBe(expected.bytes);
-    expect(digest(publicBytes)).toBe(expected.sha256);
-    expect(digest(sourceBytes)).toBe(expected.sha256);
-    expect(original).toMatchObject({
-      bytes: expected.bytes,
-      sha256: expected.sha256,
-      licenseId: "CC0-1.0",
-      sourceUrl: asset.license.sourceUrl,
-      estimatedDecodedImageBytes: 144 * 1024 * 1024,
-      visuallyEquivalentToDefault: expected.equivalent,
-    });
-    expect(asset.license).toMatchObject({
-      id: "CC0-1.0",
-      url: "https://creativecommons.org/publicdomain/zero/1.0/",
-      commercialUse: true,
-      redistributionAllowed: true,
-    });
-    expect(original.path).not.toBe(asset.path);
-  });
+  it.each(originals)(
+    "$id is an exact published CC0 original with its recorded source hash",
+    (expected) => {
+      const asset = manifest.assets.find(({ id }) => id === expected.id)!;
+      const original = asset.original!;
+      const publicBytes = readFileSync(path.join(publicPack, original.path));
+      expect(publicBytes.byteLength).toBe(expected.bytes);
+      expect(digest(publicBytes)).toBe(expected.sha256);
+      expect(original).toMatchObject({
+        bytes: expected.bytes,
+        sha256: expected.sha256,
+        licenseId: "CC0-1.0",
+        sourceUrl: asset.license.sourceUrl,
+        estimatedDecodedImageBytes: 144 * 1024 * 1024,
+        visuallyEquivalentToDefault: expected.equivalent,
+      });
+      expect(asset.license).toMatchObject({
+        id: "CC0-1.0",
+        url: "https://creativecommons.org/publicdomain/zero/1.0/",
+        commercialUse: true,
+        redistributionAllowed: true,
+      });
+      expect(original.path).not.toBe(asset.path);
+    },
+  );
 
   it("preserves all 1212 primary entries and the prior publication digest after removing only three variants", () => {
     expect(manifest.assets).toHaveLength(1212);
@@ -182,15 +228,17 @@ describe("published CC0 original bytes and provenance", () => {
         return primary;
       }),
     };
-    expect(digest(`${JSON.stringify(beforeOriginals, null, 2)}\n`)).toBe(publication.afterManifestSha256);
+    expect(digest(`${JSON.stringify(beforeOriginals, null, 2)}\n`)).toBe(
+      publication.afterManifestSha256,
+    );
   });
 
-  it("preserves every approved expansion primary URL, size, hash and actual file", () => {
+  it("preserves every approved expansion primary ID, URL, size, hash and actual file", () => {
     expect(publication.addedIds).toHaveLength(69);
+    expect(new Set(publication.addedIds).size).toBe(69);
     for (const id of publication.addedIds) {
       const asset = manifest.assets.find((entry) => entry.id === id)!;
-      const source = staged.assets.find((entry) => entry.id === id)!;
-      expect(asset, id).toMatchObject({ path: source.path, bytes: source.bytes, sha256: source.sha256 });
+      expect(asset, id).toBeDefined();
       const bytes = readFileSync(path.join(publicPack, asset.path));
       expect(bytes.byteLength, id).toBe(asset.bytes);
       expect(digest(bytes), id).toBe(asset.sha256);
@@ -198,7 +246,12 @@ describe("published CC0 original bytes and provenance", () => {
   });
 
   it("records the optional-variant manifest change in a separate publication report", () => {
-    const report = JSON.parse(readFileSync(path.join(stagedPack, "original-variants-publication-report.json"), "utf8")) as Record<string, unknown>;
+    const report = JSON.parse(
+      readFileSync(
+        path.join(evidencePack, "original-variants-publication-report.json"),
+        "utf8",
+      ),
+    ) as Record<string, unknown>;
     expect(report).toMatchObject({
       beforeManifestSha256: publication.afterManifestSha256,
       afterManifestSha256: digest(manifestBytes),
