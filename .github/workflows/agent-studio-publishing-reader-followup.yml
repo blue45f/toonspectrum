@@ -40,6 +40,7 @@ jobs:
           (
             set -euo pipefail
             python3 scripts/apply-studio-publishing-reader-followup.py
+            python3 scripts/fix-studio-publishing-reader-followup.py
             pnpm install --frozen-lockfile
             pnpm exec eslint --max-warnings=0 \
               apps/web/src/domains/creator/creator-publication-reader.ts \
@@ -69,7 +70,8 @@ jobs:
           set -e
           rm -f \
             .github/workflows/agent-studio-publishing-reader-followup.yml \
-            scripts/apply-studio-publishing-reader-followup.py
+            scripts/apply-studio-publishing-reader-followup.py \
+            scripts/fix-studio-publishing-reader-followup.py
 
           if [ "${{ steps.verify.outputs.status }}" != "0" ]; then
             mkdir -p .agent
