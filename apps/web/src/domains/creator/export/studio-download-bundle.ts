@@ -58,12 +58,16 @@ export interface StudioDownloadBundleResult {
   manifest: StudioDownloadBundleManifest;
 }
 
-interface PlannedBundleFile extends StudioDownloadBundleSource {
+export interface PlannedStudioDownloadBundleFile extends StudioDownloadBundleSource {
   archivePath: string;
 }
 
 function normalizeGeneratedAt(value: Date | number | string | undefined): Date {
-  const generatedAt = value === undefined ? new Date() : new Date(value);
+  const generatedAt = value instanceof Date
+    ? new Date(value.getTime())
+    : value === undefined
+      ? new Date()
+      : new Date(value);
   const time = generatedAt.getTime();
   const year = generatedAt.getUTCFullYear();
   if (!Number.isFinite(time) || year < 1980 || year > 2107) {
@@ -74,7 +78,7 @@ function normalizeGeneratedAt(value: Date | number | string | undefined): Date {
 
 export function planStudioDownloadBundleFiles(
   files: readonly StudioDownloadBundleSource[],
-): PlannedBundleFile[] {
+): PlannedStudioDownloadBundleFile[] {
   if (files.length === 0) {
     throw new Error("다운로드 묶음에 포함할 파일이 없습니다.");
   }
