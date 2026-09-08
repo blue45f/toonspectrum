@@ -20,7 +20,7 @@ const entryName = "studio-discovery-qa.tsx";
 const html = join(WEB_ROOT, htmlName);
 const entry = join(WEB_ROOT, entryName);
 const runtimeErrors: string[] = [];
-const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[]; failure?: string } = { checks: [], runtimeErrors, screenshots: [] };
+const receipt: { checks: string[]; runtimeErrors: string[]; screenshots: string[]; devNavigationMs: number[]; failure?: string } = { checks: [], runtimeErrors, screenshots: [], devNavigationMs: [] };
 const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
 const devPort = await findFreePort();
 const previewPort = await findFreePort();
@@ -67,7 +67,9 @@ try {
     const page = await context.newPage();
     watch(page);
     // Cold Vite compilation can outlast interaction deadlines; wait for the actual component.
+    const navigationStartedAt = Date.now();
     await page.goto(`${devOrigin}/${htmlName}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
+    receipt.devNavigationMs.push(Date.now() - navigationStartedAt);
     const palette = page.locator('[data-studio-subtool-palette="true"]');
     await palette.waitFor({ state: "visible", timeout: 120_000 });
     assert.equal(await palette.getByRole("tab").count(), 6);
