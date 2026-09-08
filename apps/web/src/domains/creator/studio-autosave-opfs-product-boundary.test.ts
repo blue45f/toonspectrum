@@ -152,7 +152,9 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
     expect(restore).not.toContain("readStudioAutosave(");
     expect(restore).not.toContain("localStorage");
     expect(backup).toContain("const saved = autosaveRecoveryCandidateRef.current");
-    expect(backup).toContain("serializeStudioAutosave(saved.payload)");
+    // Downloads use the public versioned project format, not the private recovery envelope.
+    expect(backup).toContain("serializeStudioAutosaveBackup(saved.payload)");
+    expect(backup).not.toContain("serializeStudioAutosave(saved.payload)");
     expect(backup).not.toContain("readStudioAutosave(");
     expect(backup).not.toContain("localStorage");
   });
