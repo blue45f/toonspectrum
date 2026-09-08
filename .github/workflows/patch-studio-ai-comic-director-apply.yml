@@ -32,9 +32,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24.16.0
-      - name: Patch Studio apply compiler
+      - name: Patch Studio apply compiler and contract pins
         run: node scripts/patch-studio-ai-comic-director-apply.mjs
-      - name: Commit patched host
+      - name: Commit patched integration
         run: |
           if git diff --quiet; then
             echo "No patch required"
@@ -42,6 +42,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx
-          git commit -m "feat(studio-ai): apply decomposed comic layers"
+          git add -A
+          git commit -m "feat(studio-ai): connect durable director production path"
           git push origin HEAD:feat/studio-ai-comic-director-complete-20260909
