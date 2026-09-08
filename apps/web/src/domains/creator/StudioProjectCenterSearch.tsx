@@ -243,6 +243,7 @@ export function StudioProjectCenterSearch(): ReactElement {
   const inputRef = useRef<HTMLInputElement>(null);
   const authoredHiddenRef = useRef(new Map<HTMLElement, boolean>());
   const actionsRef = useRef<readonly IndexedProjectAction[]>([]);
+  const delegatedActionTargetRef = useRef<HTMLElement | null>(null);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<ProjectCenterScope>("all");
   const [actions, setActions] = useState<readonly IndexedProjectAction[]>([]);
@@ -254,6 +255,8 @@ export function StudioProjectCenterSearch(): ReactElement {
   const [recentKeys, setRecentKeys] = useState<readonly string[]>(() =>
     readStoredKeys(RECENT_STORAGE_KEY, RECENT_LIMIT),
   );
+  const favoriteKeysRef = useRef(favoriteKeys);
+  const recentKeysRef = useRef(recentKeys);
   const [activeIndex, setActiveIndex] = useState(0);
   const [announcement, setAnnouncement] = useState("");
 
@@ -381,11 +384,14 @@ export function StudioProjectCenterSearch(): ReactElement {
   }, [rememberAuthoredVisibility]);
 
   const rememberRecent = useCallback((key: string) => {
-    setRecentKeys((current) => {
-      const next = prependStudioProjectCenterKey(current, key, RECENT_LIMIT);
-      writeStoredKeys(RECENT_STORAGE_KEY, next);
-      return next;
-    });
+    const next = prependStudioProjectCenterKey(
+      recentKeysRef.current,
+      key,
+      RECENT_LIMIT,
+    );
+    recentKeysRef.current = next;
+    writeStoredKeys(RECENT_STORAGE_KEY, next);
+    setRecentKeys(next);
   }, []);
 
   useEffect(() => {
@@ -416,6 +422,7 @@ export function StudioProjectCenterSearch(): ReactElement {
         'button,a[href],[role="button"]',
       );
       if (!target || root.contains(target)) return;
+      if (delegatedActionTargetRef.current === target) return;
       const action = actionsRef.current.find(
         (candidate) => candidate.target === target,
       );
@@ -575,32 +582,39 @@ export function StudioProjectCenterSearch(): ReactElement {
       return;
     }
     setAnnouncement(`${action.label} 실행`);
-    action.target.click();
-  }, []);
+    rememberRecent(action.key);
+    delegatedActionTargetRef.current = action.target;
+    try {
+      action.target.click();
+    } finally {
+      delegatedActionTargetRef.current = null;
+    }
+  }, [rememberRecent]);
 
   const toggleFavorite = useCallback((action: IndexedProjectAction) => {
-    setFavoriteKeys((current) => {
-      const removing = current.includes(action.key);
-      const next = removing
-        ? current.filter((key) => key !== action.key)
-        : prependStudioProjectCenterKey(
-          current,
-          action.key,
-          FAVORITE_LIMIT,
-        );
-      writeStoredKeys(FAVORITE_STORAGE_KEY, next);
-      setAnnouncement(
-        removing
-          ? `${action.label}을 즐겨찾기에서 해제했습니다.`
-          : `${action.label}을 즐겨찾기에 추가했습니다.`,
+    const current = favoriteKeysRef.current;
+    const removing = current.includes(action.key);
+    const next = removing
+      ? current.filter((key) => key !== action.key)
+      : prependStudioProjectCenterKey(
+        current,
+        action.key,
+        FAVORITE_LIMIT,
       );
-      return next;
-    });
+    favoriteKeysRef.current = next;
+    writeStoredKeys(FAVORITE_STORAGE_KEY, next);
+    setFavoriteKeys(next);
+    setAnnouncement(
+      removing
+        ? `${action.label}을 즐겨찾기에서 해제했습니다.`
+        : `${action.label}을 즐겨찾기에 추가했습니다.`,
+    );
   }, []);
 
   const onSearchKeyDown = useCallback((
     event: ReactKeyboardEvent<HTMLInputElement>,
   ) => {
+    if (event.nativeEvent.isComposing) return;
     if (visibleResults.length === 0) {
       if (event.key === "ArrowDown" && !queryActive && scope === "all") {
         const firstAvailable = actions.find((action) => !action.disabled);
@@ -611,7 +625,14 @@ export function StudioProjectCenterSearch(): ReactElement {
       }
       return;
     }
-    if (event.altKey && event.code === "KeyP") {
+    if (
+      event.altKey
+      && !event.ctrlKey
+      && !event.metaKey
+      && !event.shiftKey
+      && !event.repeat
+      && event.code === "KeyP"
+    ) {
       event.preventDefault();
       const active = visibleResults[Math.max(0, activeIndex)];
       if (active) toggleFavorite(active);
@@ -729,7 +750,7 @@ export function StudioProjectCenterSearch(): ReactElement {
         </label>
 
         <div
-          role="toolbar"
+          role="group"
           aria-label="프로젝트 센터 보기 범위"
           className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]"
         >
