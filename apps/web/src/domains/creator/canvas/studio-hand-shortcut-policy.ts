@@ -20,7 +20,7 @@ export interface StudioHandShortcutBoundaryInput {
 }
 
 function normalizedShortcut(value: string) {
-  return value.trim().replaceAll(" ", "").toLocaleLowerCase();
+  return value.trim().replace(/\s+/g, "").toLowerCase();
 }
 
 /**
