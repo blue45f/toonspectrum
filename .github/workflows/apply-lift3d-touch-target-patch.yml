@@ -33,22 +33,22 @@ jobs:
           source_path.write_text(source.replace(old, new, 1), encoding="utf-8")
 
           test_path = Path("apps/web/src/domains/creator/lift3d/StudioLift3dPage.touch-target.test.ts")
-          test_path.write_text(
-              '''import { readFileSync } from "node:fs";
-
-import { describe, expect, it } from "vitest";
-
-const source = readFileSync(new URL("./StudioLift3dPage.tsx", import.meta.url), "utf8");
-
-describe("Studio Lift3D preview touch targets", () => {
-  it("keeps every preview tab at least 44px tall", () => {
-    expect(source).toContain('className={`min-h-11 flex-1 rounded-md');
-    expect(source).not.toContain('className={`min-h-9 flex-1 rounded-md');
-  });
-});
-''',
-              encoding="utf-8",
-          )
+          test_content = "\n".join([
+              'import { readFileSync } from "node:fs";',
+              '',
+              'import { describe, expect, it } from "vitest";',
+              '',
+              'const source = readFileSync(new URL("./StudioLift3dPage.tsx", import.meta.url), "utf8");',
+              '',
+              'describe("Studio Lift3D preview touch targets", () => {',
+              '  it("keeps every preview tab at least 44px tall", () => {',
+              '    expect(source).toContain(\'className={`min-h-11 flex-1 rounded-md\');',
+              '    expect(source).not.toContain(\'className={`min-h-9 flex-1 rounded-md\');',
+              '  });',
+              '});',
+              '',
+          ])
+          test_path.write_text(test_content, encoding="utf-8")
           PY
 
           rm .github/workflows/apply-lift3d-touch-target-patch.yml
