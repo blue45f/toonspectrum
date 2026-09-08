@@ -1,68 +1,145 @@
 {
-  "verifiedAt": "2026-09-08T14:04:08.826636+00:00",
+  "verifiedAt": "2026-09-08T14:45:16.458650+00:00",
   "frozenMain": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
-  "productSourceHeadAtBuild": "7b28f8596",
-  "productDiffAfterBuild": [],
+  "latestMainCompared": "dce667137fca4849ecd5536fb4e8e9e3e54f4fa3",
+  "testedProductHead": "7b215fb67a176056aae68a1d212c474f070a6038",
+  "testedProductTree": "eb0d3d51e7a7458ffcb878ec1a2b4c1e5d0de00c",
+  "postValidationChanges": "Audit documents and separately validated verifier fixes; application source must remain identical to tested product head.",
   "focusedTests": {
-    "numTotalTests": 777,
-    "numPassedTests": 777,
+    "files": 56,
+    "numTotalTests": 965,
+    "numPassedTests": 965,
     "numFailedTests": 0,
-    "success": true
+    "success": true,
+    "includesCiPolicyAndMenuTests": true
   },
-  "ciPolicyTests": 29,
-  "cpuExperiments": 27,
+  "cpuExperiments": {
+    "tests": 27,
+    "result": "pass",
+    "pixelEquivalence": "Inkwash direct/tile is not pixel equivalent; see experiment-verification.json."
+  },
   "webTypecheck": {
     "result": "pass",
-    "heapMB": 8192,
-    "initialDefaultHeapAttempt": "OOM; rerun with repository standard heap succeeded"
+    "heapMB": 8192
   },
-  "apiTypecheck": "pass (workspace dependency link restored before final run)",
+  "apiTypecheck": {
+    "result": "pass",
+    "verifiedSourcePrefix": "7270766ea",
+    "pathsUnchangedSinceVerification": [
+      "apps/api",
+      "packages/core"
+    ],
+    "changedPaths": []
+  },
   "eslint": {
-    "files": 76,
+    "files": 104,
     "result": "pass"
   },
+  "buildReceipt": {
+    "sourceHead": "7b215fb67a176056aae68a1d212c474f070a6038",
+    "sourceTree": "eb0d3d51e7a7458ffcb878ec1a2b4c1e5d0de00c",
+    "endHead": "7b215fb67a176056aae68a1d212c474f070a6038",
+    "sourceUnchanged": true,
+    "results": {
+      "final-build": 0,
+      "final-notices": 0,
+      "final-csp": 0,
+      "final-bundle": 0
+    }
+  },
   "build": "pass",
+  "licenseNotices": "pass",
   "csp": "pass",
   "staticStudioBundle": "pass",
-  "browserGpu": "No aggregate-wide runtime PASS claimed; owner is running separate native validation",
+  "dist": {
+    "path": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/dist",
+    "fileCount": 10615,
+    "totalBytes": 2222076269,
+    "manifestSha256": "8f645cb1a6123eea9bee47082f0128c6994869a5c824ef2b53f8a66472238575"
+  },
+  "browserGpu": "Final aggregate native account/save/restart acceptance pending in coordinated QA task; no final aggregate runtime PASS claimed.",
+  "remoteCi": "Final pushed MR head CI must be inspected separately. Earlier-head results are not final-head evidence.",
+  "exportRecoverySources": [
+    "3fdc520c23e161e0f7b7e19fefb27dd9b4373bee",
+    "2f6c0baa8",
+    "376a210a6bb59749a5fd68d6db6ad742efda5aef"
+  ],
+  "menuCoverageFix": "3efb99121",
+  "finalCiSource": "3fedb55c33488add4931ab4ffe9c8c7672ffc209",
   "logs": {
-    "tests.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/tests.log",
-      "sha256": "239e29a8adccec0cf3ef0f1c6377a4a6e52431f9f222dccd0a4c384552d45fb1"
+    "final-tests.json": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-tests.json",
+      "sha256": "6075c063d289718f7c607896e6875b6ddfc256b9ef9b23f1e6e5e446d4f5b514"
     },
-    "web-types-8gb.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/web-types-8gb.log",
+    "final-tests.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-tests.log",
+      "sha256": "4ee3014208aebaedc694772c6d542b10d43e160578a69de1c3e6c91681ea5d0c"
+    },
+    "final-web-types.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-web-types.log",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "api-types.log": {
       "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/api-types.log",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
-    "eslint-final.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/eslint-final.log",
+    "final-eslint-receipt.json": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-eslint-receipt.json",
+      "sha256": "c88dc6f0c6dd6cf09b8feca32bf890083db53c9c269475d849672fb9aa37c165"
+    },
+    "final-eslint.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-eslint.log",
       "sha256": "b77aa8c5ca50d43297909a3fee5369104844045f98da48b8d06af992e23c5257"
     },
-    "build.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/build.log",
-      "sha256": "6821b3da9cebedf7cc93d25125acfcd4ed641619190a566b6016f31aa2e66d59"
+    "final-build.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-build.log",
+      "sha256": "7f94a6831c2450d49a563f1af4483f04c8db01e4f6abc3230cefb5d377948803"
     },
-    "notices.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/notices.log",
+    "final-notices.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-notices.log",
       "sha256": "fa267be140584124b609f02316cd8d005bc4d14ea87fe49b66e0ea4db0119edc"
     },
-    "csp.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/csp.log",
+    "final-csp.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-csp.log",
       "sha256": "026e6f1d5ee14d96878c4142dc1f926f16c3f1c2408c577b5bf47ad3ba2219f1"
     },
-    "bundle.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/bundle.log",
-      "sha256": "39dec4e2e49523ba1a7ab3be333434cfaef2eea81d533d477c43db6716463c4b"
+    "final-bundle.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-bundle.log",
+      "sha256": "468c5ee7fcceb68ab198c189d6ad19ab7eaae1cccfced93cb0de7e2f426ccf1b"
     },
-    "ci-policy-vitest.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/ci-policy-vitest.log",
-      "sha256": "200a622ff8fe697d9b52c4e0d010bbbca6dfa38cca48e5e95715b53b698b0478"
+    "final-build-receipt.json": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-build-receipt.json",
+      "sha256": "e97ab1658168f7386ad2d84671eca3894aa60b9de615e6569af1df36074ab250"
+    },
+    "dist-manifest.json": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/dist-manifest.json",
+      "sha256": "8f645cb1a6123eea9bee47082f0128c6994869a5c824ef2b53f8a66472238575"
     }
   },
-  "finalCiSource": "3fedb55c33488add4931ab4ffe9c8c7672ffc209",
-  "latestMainCompared": "dce667137fca4849ecd5536fb4e8e9e3e54f4fa3"
+  "collectionPullRequest": {
+    "number": 960,
+    "headBranch": "codex/integrate-unmerged-20260908",
+    "baseBranch": "release/salvage-integration-20260908",
+    "draft": false,
+    "merged": true,
+    "mergeCommit": "557dd3fa419c615de70950d6d544c51b03bfb5fb",
+    "mergedAt": "2026-09-08T14:43:09Z",
+    "productTreeIdenticalToTestedHead": true
+  },
+  "mainPullRequest": {
+    "headBranch": "release/salvage-integration-20260908",
+    "baseBranch": "main",
+    "status": "Being prepared; current CI and native QA are separate from collection merge."
+  },
+  "verifierFollowup": {
+    "commit": "fd4277582c2112a20ff535811e4160397a69c26d",
+    "file": "scripts/verify-studio-brushes.mts",
+    "eslint": "pass",
+    "changedHelperTypecheck": "pass",
+    "cpuStatesPassed": 8,
+    "existingReactTestsPassed": 3,
+    "fullShapesBrowser": "pending",
+    "diagnosisLocalPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/mr960-shapes-diagnosis.json"
+  },
+  "applicationSourceUnchangedAtVerifierHead": "fd4277582c2112a20ff535811e4160397a69c26d"
 }

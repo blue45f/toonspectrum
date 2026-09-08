@@ -1,0 +1,78 @@
+{
+  "capturedAt": "2026-09-08T14:44:11.485268+00:00",
+  "initialScope": {
+    "refEntries": 55,
+    "localEntries": 14,
+    "remoteEntries": 41,
+    "uniqueCommitShas": 46
+  },
+  "retiredLocalSourceBranches": 13,
+  "retiredRemoteSourceBranches": 39,
+  "remainingOriginalSourceRefs": [],
+  "sourceRefAbsenceVerified": true,
+  "registeredOriginalRepositoryWorktrees": 1,
+  "originalSnapshotsPreserved": {
+    "archiveRefCount": 55,
+    "distinctCommitShas": 46,
+    "allCommitAndTreeObjectsReadable": true
+  },
+  "pr919WorktreeRemoved": true,
+  "pr919IgnoredAndUniqueFilesPreserved": {
+    "archiveSha256": "8af2e06a71726b34546b7129beff729f1506c8c2d1c7222b957c3ba7a48456c0",
+    "filesVerified": 179,
+    "hashMismatches": []
+  },
+  "additionalTemporaryLocalBranchesRetiredAfterCollectionMerge": [
+    "codex/fix-cleanup-active-pr-base-20260908",
+    "codex/integrate-unmerged-20260908"
+  ],
+  "collectionMergeVerification": {
+    "checkedAt": "2026-09-08T14:49:08.735853+00:00",
+    "pullRequest": {
+      "baseRefName": "release/salvage-integration-20260908",
+      "headRefName": "codex/integrate-unmerged-20260908",
+      "headRefOid": "7b215fb67a176056aae68a1d212c474f070a6038",
+      "isDraft": false,
+      "mergeCommit": {
+        "oid": "557dd3fa419c615de70950d6d544c51b03bfb5fb"
+      },
+      "mergedAt": "2026-09-08T14:43:09Z",
+      "number": 960,
+      "state": "MERGED",
+      "url": "https://github.com/blue45f/toonspectrum/pull/960"
+    },
+    "collectionMergeTreeMatchesTestedProduct": true,
+    "archiveRefCount": 55,
+    "originalDistinctShas": 46,
+    "unreachableOriginalShas": [],
+    "mainAtCheck": "dce667137fca4849ecd5536fb4e8e9e3e54f4fa3",
+    "mainMergePending": true
+  },
+  "protectedActiveSources": [
+    "original repository active checkout and duplicate untracked files",
+    "QA/source clones now coordinate on release/salvage-integration-20260908; old remote branch names retired"
+  ],
+  "fullReadOnlyReviewLocalPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/final-cleanup-review.json",
+  "scopeNote": "Initial-scope counts exclude later active source branches and temporary branches created for this audit; preserving sources in integration does not mean they are already in main.",
+  "finalTwoSourceBranches": {
+    "checkedAt": "2026-09-08T15:07:42.620927+00:00",
+    "integration": "2797e837b4a4707b74ecb4d6b0fd683d14cb47be",
+    "sources": {
+      "codex/ci-salvage-followup-20260908": "9cdd7b9605666442325124250e52261d5de1bc44",
+      "codex/issues-parallel-fixes-20260908": "a4a7dd1b68a4c4fe499c4b5f3af1010aaeb7022a"
+    },
+    "bothFullyIncluded": true,
+    "removedRemoteSourceRefs": [
+      "codex/ci-salvage-followup-20260908",
+      "codex/issues-parallel-fixes-20260908"
+    ],
+    "archiveNamespace": "refs/cleanup-archive/all-unmerged-integration-20260908/final-active-sources/",
+    "originalAndIsolatedCloneArchives": true,
+    "remoteHeadsAfter": {
+      "refs/heads/main": "dce667137fca4849ecd5536fb4e8e9e3e54f4fa3",
+      "refs/heads/release/salvage-integration-20260908": "2797e837b4a4707b74ecb4d6b0fd683d14cb47be"
+    },
+    "pr": 961,
+    "mainStillPending": true
+  }
+}
