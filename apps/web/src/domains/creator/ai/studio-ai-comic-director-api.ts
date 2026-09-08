@@ -7,6 +7,9 @@ import {
   type StudioAiVisualBibleDocument,
 } from "./studio-ai-comic-director-session";
 
+import { withCsrfProtection } from "@/shared/lib/csrf";
+import { useApp } from "@/shared/lib/store";
+
 export type StudioAiComicDirectorApiResult<T> =
   | { readonly ok: true; readonly data: T }
   | {
@@ -105,13 +108,17 @@ function serverMessage(value: unknown, fallback: string): string {
   const message = body.message;
   if (typeof message === "string" && message.trim()) return message;
   if (Array.isArray(message)) {
-    const text = message.filter((item): item is string => typeof item === "string").join(" ");
+    const text = message
+      .filter((item): item is string => typeof item === "string")
+      .join(" ");
     if (text) return text;
   }
   return fallback;
 }
 
-function sessionFromServer(bundle: ServerSessionBundle): StudioAiComicDirectorSessionDocument {
+function sessionFromServer(
+  bundle: ServerSessionBundle,
+): StudioAiComicDirectorSessionDocument {
   const sourcePayload = record(bundle.session.payload) ?? {};
   const local = hydrateStudioAiComicDirectorSession({
     version: 1,
@@ -147,34 +154,23 @@ function sessionPayload(session: StudioAiComicDirectorSessionDocument) {
   };
 }
 
-function userIdFromBrowser(): string | null {
-  if (typeof window === "undefined") return null;
-  const keys = [
-    "toonspectrum-user-id",
-    "toonspectrum:user-id",
-    "userId",
-  ];
-  for (const key of keys) {
-    const value = window.sessionStorage.getItem(key) ?? window.localStorage.getItem(key);
-    if (value?.trim()) return value.trim();
-  }
-  return null;
-}
-
 export function createStudioAiComicDirectorApiClient(input: {
-  readonly userId?: string | null;
+  /** Signed ToonSpectrum session token accepted through x-user-id. */
+  readonly sessionToken?: string | null;
   readonly baseUrl?: string;
   readonly fetchImpl?: typeof fetch;
 } = {}): StudioAiComicDirectorApiClient {
   const baseUrl = (input.baseUrl ?? "/api/studio-ai/comic-director").replace(/\/$/u, "");
   const fetchImpl = input.fetchImpl ?? globalThis.fetch.bind(globalThis);
-  const userId = input.userId?.trim() || userIdFromBrowser();
 
   async function request<T>(
     path: string,
     init: RequestInit = {},
   ): Promise<StudioAiComicDirectorApiResult<T>> {
-    if (!userId) {
+    const sessionToken = input.sessionToken?.trim()
+      || useApp.getState().sessionToken?.trim()
+      || null;
+    if (!sessionToken) {
       return {
         ok: false,
         code: "not_authenticated",
@@ -183,15 +179,18 @@ export function createStudioAiComicDirectorApiClient(input: {
     }
     let response: Response;
     try {
-      response = await fetchImpl(`${baseUrl}${path}`, {
-        credentials: "include",
-        ...init,
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": userId,
-          ...(init.headers ?? {}),
-        },
-      });
+      response = await fetchImpl(
+        `${baseUrl}${path}`,
+        withCsrfProtection({
+          credentials: "include",
+          ...init,
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": sessionToken,
+            ...(init.headers ?? {}),
+          },
+        }),
+      );
     } catch {
       return {
         ok: false,
@@ -220,7 +219,10 @@ export function createStudioAiComicDirectorApiClient(input: {
             : response.status === 404
               ? "not_found"
               : "http_error",
-        message: serverMessage(body, `요청이 실패했습니다 (HTTP ${response.status}).`),
+        message: serverMessage(
+          body,
+          `요청이 실패했습니다 (HTTP ${response.status}).`,
+        ),
         ...(typeof parsed?.currentRevision === "number"
           ? { currentRevision: parsed.currentRevision }
           : {}),
@@ -304,10 +306,7 @@ export function createStudioAiComicDirectorApiClient(input: {
     createJob(sessionId, job) {
       return request<StudioAiComicDirectorJob>(
         `/sessions/${encodeURIComponent(sessionId)}/jobs`,
-        {
-          method: "POST",
-          body: JSON.stringify(job),
-        },
+        { method: "POST", body: JSON.stringify(job) },
       );
     },
 
