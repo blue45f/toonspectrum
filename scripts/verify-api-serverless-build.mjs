@@ -16,6 +16,17 @@ function probeArtifact() {
   const fs = require("node:fs");
   const http = require("node:http");
   const root = fs.realpathSync(process.argv[1]);
+  const originalFetch = globalThis.fetch;
+  let origin;
+  let blockedFetches = 0;
+  globalThis.fetch = (input, options) => {
+    const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
+    if (url.origin !== origin) {
+      blockedFetches++;
+      throw new Error("Artifact verification forbids external fetches");
+    }
+    return originalFetch(input, options);
+  };
   const handler = require(root + "/api/index.js");
   const server = http.createServer((request, response) => {
     Promise.resolve(handler(request, response)).catch((error) => {
@@ -26,28 +37,54 @@ function probeArtifact() {
   });
   async function run() {
     await new Promise((resolvePromise) => server.listen(0, "127.0.0.1", resolvePromise));
-    const origin = "http://127.0.0.1:" + server.address().port;
+    origin = "http://127.0.0.1:" + server.address().port;
     const rows = [];
-    for (const path of [
-      "/api/auth/session", "/api/config", "/api/search?q=test",
-      "/api/ranking", "/api/studio-music/status",
-    ]) {
-      const response = await fetch(origin + path);
-      const body = await response.json();
-      assert.equal(response.status, 200, path);
+    const paths = [
+      ["/api/health/live", 200],
+      ["/api/health/ready", 503],
+      ["/api/auth/session", 200],
+      ["/api/config", 200],
+      ["/api/search?q=test", 200],
+      ["/api/ranking", 200],
+      ["/api/studio-music/status", 200],
+      ["/api/search?q=" + "x".repeat(513), 400],
+      ["/api/search?q=one&q=two", 400],
+      ["/api/titles?q=" + "x".repeat(513), 400],
+      ["/api/titles?q=one&q=two", 400],
+      ["/api/cover?u=https%3A%2F%2F127.0.0.1%2Fprivate", 403],
+    ];
+    for (const [path, expected] of paths) {
+      const response = await fetch(origin + path, { signal: AbortSignal.timeout(15_000) });
+      const text = await response.text();
+      assert.equal(response.status, expected, `${path}: ${text.slice(0, 200)}`);
+      const body = response.headers.get("content-type")?.includes("application/json")
+        ? JSON.parse(text)
+        : null;
+      if (path === "/api/health/live") assert.equal(body.status, "ok");
+      if (path === "/api/health/ready") {
+        // AllExceptionsFilter deliberately replaces all 5xx controller envelopes.
+        assert.equal(body.statusCode, 503);
+        assert.equal(body.message, "Request could not be completed");
+        assert.equal(body.path, path);
+        assert.equal(response.headers.get("cache-control"), "no-store");
+        assert(!text.includes("127.0.0.1"), "Readiness must not expose database details");
+      }
       if (path === "/api/auth/session") {
         assert.equal(body.authenticated, false);
         assert.equal(body.user, null);
       }
       if (path === "/api/studio-music/status") assert.equal(body.enabled, false);
-      rows.push({ path, status: response.status, bodyKeys: Object.keys(body) });
+      rows.push({ path, status: response.status, bodyKeys: body ? Object.keys(body) : [] });
     }
+    assert.equal(blockedFetches, 0, "A route attempted an external request");
     const loadedModules = Object.keys(require.cache);
     assert(loadedModules.every((path) => path.startsWith(root + "/")),
       "A module escaped the isolated Lambda artifact");
     assert(!loadedModules.some((path) => /packages\/core\/src\/.*\.ts$/u.test(path)),
       "The Lambda loaded an uncompiled workspace TypeScript export");
-    fs.writeFileSync(process.argv[2], JSON.stringify({ rows, loadedModules }, null, 2));
+    assert(loadedModules.some((path) => path.endsWith("/dist/packages/core/src/studio-music.js")),
+      "The real compiled Studio Music contract must be loaded");
+    fs.writeFileSync(process.argv[2], JSON.stringify({ rows, blockedFetches, loadedModules }, null, 2));
     await new Promise((resolvePromise) => server.close(resolvePromise));
     process.exit(0);
   }
@@ -160,7 +197,7 @@ export async function verifyApiServerlessBuild() {
         "-e", `(${probe.toString()})()`, lambdaRoot, resolve(output, `${prefix}bootstrap-report.json`),
       ], {
         cwd: lambdaRoot,
-        timeout: 45_000,
+        timeout: 60_000,
         encoding: "utf8",
         env: {
           NODE_ENV: "production",
@@ -170,6 +207,7 @@ export async function verifyApiServerlessBuild() {
           AUTH_SESSION_SECRET: "toonspectrum-artifact-verification-session-only",
           DATABASE_URL: "postgresql://test:test@127.0.0.1:9/toonspectrum_package_test",
           CATALOG_INGEST_MODE: "off",
+          COVER_IMAGE_POLICY: "proxy",
           KMAS_LIVE_SEARCH: "0",
           KMAS_MERGE_ON_ACCESS: "0",
           ...environment,
@@ -179,7 +217,7 @@ export async function verifyApiServerlessBuild() {
       assert.equal(child.status, 0, `Lambda bootstrap failed; see ${output}/${prefix}bootstrap.log`);
     }
   }
-  console.log(`Vercel HTTP/native Lambda packaging, five API reads and fail-closed gateway probes passed: ${output}`);
+  console.log(`Vercel HTTP/native Lambda packaging, 12 isolated API reads and fail-closed gateway probes passed: ${output}`);
   return output;
 }
 

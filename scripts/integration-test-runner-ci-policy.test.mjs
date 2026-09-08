@@ -323,6 +323,7 @@ describe("database integration runner CI policy", () => {
     // The checks that used to live inside the single core job each keep their own runner.
     expect(runCommands(workflow.jobs?.lint)).toEqual([
       "pnpm install --frozen-lockfile",
+      "pnpm run audit:security",
       "pnpm run validate:architecture",
       "pnpm run verify:csp",
       "pnpm run verify:toolchain-coverage",
