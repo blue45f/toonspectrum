@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CreatorMarketplaceCloudLibraryAction } from "./CreatorMarketplaceCloudLibraryAction";
 
+import type { CreatorMarketplaceAcquisitionTarget } from "@/shared/lib/creator-marketplace-cloud-library-contract";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 import type { SessionContextValue } from "@/compat/auth-session-store";
 
@@ -431,6 +432,43 @@ describe("CreatorMarketplaceCloudLibraryAction", () => {
       expect.any(AbortSignal),
     ));
     expect(await screen.findByText(/현재 v3\.0\.0을 이 계정/u)).toBeTruthy();
+  });
+
+  it("처음 활성화된 action을 바로 사용해도 실패 후 retry로 초점을 이동한다", async ({ onTestFinished }) => {
+    const current = record();
+    const target = deferred<CreatorMarketplaceAcquisitionTarget>();
+    mocks.resolveTarget.mockReturnValueOnce(target.promise);
+    mocks.acquire.mockRejectedValueOnce(new Error("현재 head가 변경되었습니다."));
+    renderAction();
+
+    // Interact with the newly enabled DOM before passive effects for that commit
+    // flush; findByRole alone can finish those effects before the click.
+    await new Promise<void>((resolve) => {
+      const observer = new MutationObserver(() => {
+        const action = screen.queryByRole<HTMLButtonElement>("button", {
+          name: "계정 라이브러리에 추가",
+        });
+        if (!action || action.disabled) return;
+        observer.disconnect();
+        action.focus();
+        fireEvent.click(action);
+        action.blur();
+        resolve();
+      });
+      onTestFinished(() => observer.disconnect());
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+      target.resolve({
+        state: "available",
+        requestReleaseId: current.id,
+        publisherId: current.publisher.id,
+        packageId: current.packageId,
+        kind: current.kind,
+        logicalPackId: creatorMarketplaceStudioPackId(current),
+        currentHead: { id: current.id, resourceVersion: current.resourceVersion },
+      });
+    });
+    const retry = await screen.findByRole("button", { name: "다시 확인" });
+    await waitFor(() => expect(document.activeElement).toBe(retry));
   });
 
   it("계정 보관과 로컬 제거를 분리하고 설치 확인 범위를 account-ever로 설명한다", async () => {
