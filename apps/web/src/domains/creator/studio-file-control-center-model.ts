@@ -154,7 +154,7 @@ const LOW_INFORMATION_MIME_TYPES = Object.freeze([
 ] as const);
 
 function normalizeText(value: string): string {
-  return value.normalize("NFKC").trim().toLocaleLowerCase();
+  return value.normalize("NFKC").trim().toLowerCase();
 }
 
 export function studioFileExtension(name: string): string {
@@ -214,7 +214,7 @@ function compatibilityTier(
   if (capability.import === "engine-ready" || capability.uiWiring.import === "not-wired") {
     return "bridge";
   }
-  if (capability.id === "toonproject-archive" || capability.roundTrip === "lossless") {
+  if (capability.id === "toonproject-archive") {
     return "native";
   }
   return "structured";
