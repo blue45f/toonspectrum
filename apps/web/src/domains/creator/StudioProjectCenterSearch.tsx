@@ -1,5 +1,7 @@
 import { Search, X } from "lucide-react";
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useId,
@@ -11,6 +13,11 @@ import {
 import { StudioSurfaceState } from "./StudioSurfaceState";
 
 import { cn } from "@/shared/lib/utils";
+
+const StudioFileControlCenter = lazy(async () => {
+  const module = await import("./StudioFileControlCenter");
+  return { default: module.StudioFileControlCenter };
+});
 
 function normalizeProjectQuery(value: string): string {
   return value.normalize("NFKC").trim().toLocaleLowerCase();
@@ -157,73 +164,87 @@ export function StudioProjectCenterSearch(): ReactElement {
 
   const active = normalizeProjectQuery(query).length > 0;
   return (
-    <div
-      ref={rootRef}
-      data-project-center-search="true"
-      className="mt-2"
-    >
-      <label
-        htmlFor={inputId}
-        className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-canvas/70 px-3 shadow-inner transition-colors focus-within:border-accent/60 focus-within:bg-card"
-      >
-        <Search size={15} aria-hidden className="shrink-0 text-fg-3" />
-        <input
-          ref={inputRef}
-          id={inputId}
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="도구 검색 · /"
-          aria-label="프로젝트 센터 도구 검색"
-          className="min-w-0 flex-1 bg-transparent text-[0.75rem] text-fg outline-none placeholder:text-fg-3"
-        />
-        <span
-          role="status"
-          aria-live="polite"
-          className="shrink-0 text-[0.62rem] font-semibold tabular-nums text-fg-3"
-        >
-          {active ? `${stats.matched}/${stats.total}개` : `${stats.total}개`}
-        </span>
-        {active ? (
-          <button
-            type="button"
-            data-project-keep-open
-            data-project-center-control="true"
-            onClick={() => {
-              setQuery("");
-              inputRef.current?.focus({ preventScroll: true });
-            }}
-            aria-label="프로젝트 센터 검색 초기화"
-            className="grid size-8 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    <>
+      <Suspense
+        fallback={(
+          <div
+            data-studio-file-control-center-loading="true"
+            className="col-span-full mt-2 rounded-2xl border border-line bg-canvas/55 px-4 py-5 text-center text-[0.66rem] text-fg-3"
           >
-            <X size={14} aria-hidden />
-          </button>
-        ) : (
-          <kbd className="hidden shrink-0 rounded border border-line/70 bg-card px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-3 sm:inline-flex">
-            /
-          </kbd>
+            파일 제어 센터를 불러오는 중…
+          </div>
         )}
-      </label>
-      {active && stats.total > 0 && stats.matched === 0 ? (
-        <StudioSurfaceState
-          state="empty"
-          compact
-          title="일치하는 프로젝트 도구가 없습니다"
-          description="백업, 검수, 게시, 버전처럼 작업 목적을 입력해 보세요."
-          className="mt-2"
-          action={(
+      >
+        <StudioFileControlCenter />
+      </Suspense>
+      <div
+        ref={rootRef}
+        data-project-center-search="true"
+        className="col-span-full mt-3"
+      >
+        <label
+          htmlFor={inputId}
+          className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-canvas/70 px-3 shadow-inner transition-colors focus-within:border-accent/60 focus-within:bg-card"
+        >
+          <Search size={15} aria-hidden className="shrink-0 text-fg-3" />
+          <input
+            ref={inputRef}
+            id={inputId}
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="도구 검색 · /"
+            aria-label="프로젝트 센터 도구 검색"
+            className="min-w-0 flex-1 bg-transparent text-[0.75rem] text-fg outline-none placeholder:text-fg-3"
+          />
+          <span
+            role="status"
+            aria-live="polite"
+            className="shrink-0 text-[0.62rem] font-semibold tabular-nums text-fg-3"
+          >
+            {active ? `${stats.matched}/${stats.total}개` : `${stats.total}개`}
+          </span>
+          {active ? (
             <button
               type="button"
               data-project-keep-open
               data-project-center-control="true"
-              onClick={() => setQuery("")}
-              className="min-h-9 rounded-lg border border-line bg-card px-3 text-[0.7rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              onClick={() => {
+                setQuery("");
+                inputRef.current?.focus({ preventScroll: true });
+              }}
+              aria-label="프로젝트 센터 검색 초기화"
+              className="grid size-8 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              전체 도구 보기
+              <X size={14} aria-hidden />
             </button>
+          ) : (
+            <kbd className="hidden shrink-0 rounded border border-line/70 bg-card px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-3 sm:inline-flex">
+              /
+            </kbd>
           )}
-        />
-      ) : null}
-    </div>
+        </label>
+        {active && stats.total > 0 && stats.matched === 0 ? (
+          <StudioSurfaceState
+            state="empty"
+            compact
+            title="일치하는 프로젝트 도구가 없습니다"
+            description="백업, 검수, 게시, 버전처럼 작업 목적을 입력해 보세요."
+            className="mt-2"
+            action={(
+              <button
+                type="button"
+                data-project-keep-open
+                data-project-center-control="true"
+                onClick={() => setQuery("")}
+                className="min-h-9 rounded-lg border border-line bg-card px-3 text-[0.7rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                전체 도구 보기
+              </button>
+            )}
+          />
+        ) : null}
+      </div>
+    </>
   );
 }
