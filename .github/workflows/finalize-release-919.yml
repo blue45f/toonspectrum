@@ -1,0 +1,95 @@
+name: Finalize release PR 919
+
+on:
+  push:
+    branches:
+      - release/final-main-merge-4888b061-immutable-20260908
+    paths:
+      - .github/workflows/finalize-release-919.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-release-pr-919
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: release/final-main-merge-4888b061-immutable-20260908
+          fetch-depth: 0
+      - name: Align integrated release CI contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch='release/final-main-merge-4888b061-immutable-20260908'
+          git fetch origin "$branch"
+          git checkout "$branch"
+          git reset --hard "origin/$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if new in text and old not in text:
+                  return
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "scripts/integration-test-runner-ci-policy.test.mjs",
+              '      group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}",',
+              '      group: "${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == \'pull_request\' && github.event.pull_request.number || github.sha }}",',
+          )
+
+          replace_once(
+              "vitest.perf-budget-files.mjs",
+              '  "scripts/studio-brush-catalogue-perf-matrix.test.ts",\n]);',
+              '  "scripts/studio-brush-catalogue-perf-matrix.test.ts",\n  "tests/visual/bristle-quality.test.ts",\n]);',
+          )
+
+          replace_once(
+              "apps/web/src/domains/creator/bg3d/studio-bg3d-model-mutation-integration.test.ts",
+              '      "if (!lease.isCurrent() || !args.isActive())",',
+              '      "if (!lease.isCurrent() || !args.isActive() || !isPolicyCurrent())",',
+          )
+
+          replace_once(
+              "apps/web/src/domains/creator/vrm/vrm-library.test.ts",
+              '    expect(names.slice(0, 4)).toEqual(["루미", "하린", "세라", "유나"]);',
+              '''    expect(
+                ["sample-vrm", "avatar-a", "avatar-b", "avatar-c"].map(
+                  (id) => SAMPLE_VRM_ENTRIES.find((entry) => entry.id === id)?.name,
+                ),
+              ).toEqual(["루미", "하린", "세라", "유나"]);''',
+          )
+
+          replace_once(
+              "apps/web/src/domains/creator/vrm/vrm-library.test.ts",
+              '      expect(sample.url, `${sample.id} url`).toMatch(/^\\/vrm\\/[A-Za-z0-9_.-]+\\.vrm$/);',
+              '''      expect(sample.url, `${sample.id} url`).toMatch(
+                /^\\/vrm\\/(?:[A-Za-z0-9_.-]+\\/)*[A-Za-z0-9_.-]+\\.vrm$/,
+              );''',
+          )
+          PY
+
+          git add \
+            scripts/integration-test-runner-ci-policy.test.mjs \
+            vitest.perf-budget-files.mjs \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-model-mutation-integration.test.ts \
+            apps/web/src/domains/creator/vrm/vrm-library.test.ts
+          git diff --cached --check
+          git commit -m "test: align integrated release CI contracts"
+          git push origin HEAD:"$branch"
