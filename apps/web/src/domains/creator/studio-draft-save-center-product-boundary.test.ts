@@ -13,8 +13,17 @@ describe("draft save center product boundary", () => {
     expect(view).toContain('import { StudioDraftSaveCenter } from "../StudioDraftSaveCenter"');
     expect(view.match(/<StudioDraftSaveCenter\b/gu)).toHaveLength(1);
     expect(view).toContain('s.studioMenubarContentHandlers.handleSave("draft")');
+    expect(view).toContain("s.onContinuePendingSave()");
     expect(view).toContain("s.setCheckpointPanelOpen(true)");
     expect(view).toContain("s.studioMenubarContentHandlers.handleExportProject()");
+  });
+
+  it("wires hydration, pending intent and local recovery receipts from the live session", () => {
+    expect(view).toContain("workHydrated={s.workHydrated}");
+    expect(view).toContain("workHydrationFailed={s.workHydrationFailed}");
+    expect(view).toContain("pendingSaveIntent={s.pendingSaveIntent}");
+    expect(view).toContain("localCheckpointCount={s.checkpoints?.length ?? 0}");
+    expect(view).toContain('key={s.effectiveWorkId ?? s.workId ?? "new-work"}');
   });
 
   it("does not introduce a second network or persistence authority", () => {
@@ -24,6 +33,7 @@ describe("draft save center product boundary", () => {
     expect(center).not.toContain("indexedDB");
     expect(center).not.toContain("navigator.locks");
     expect(center).toContain("onSaveDraft");
+    expect(center).toContain("onContinuePendingSave");
     expect(center).toContain("onExportBackup");
     expect(center).toContain("useStudioReliabilityStatus");
   });
@@ -31,6 +41,7 @@ describe("draft save center product boundary", () => {
   it("keeps device recovery, server revision and offline queue semantically distinct", () => {
     expect(center).toContain("이 기기");
     expect(center).toContain("서버 초안");
+    expect(center).toContain("기기 체크포인트");
     expect(center).toContain('window.addEventListener("online", onOnline)');
     expect(center).toContain("setDeferredSave(true)");
     expect(model).toContain('phase = "local-risk"');
@@ -40,10 +51,21 @@ describe("draft save center product boundary", () => {
     expect(model).toContain("서버 초안 revision");
   });
 
+  it("blocks pre-hydration overwrite and resumes the exact pending draft intent", () => {
+    expect(model).toContain('phase = "load-risk"');
+    expect(model).toContain('phase = "loading"');
+    expect(model).toContain('phase = "metadata-required"');
+    expect(model).toContain('primaryAction: StudioDraftSavePrimaryAction');
+    expect(model).toContain("빈 문서로 덮어쓰지 않고");
+    expect(center).toContain('pendingSaveIntent === "draft"');
+    expect(center).toContain('model.primaryAction === "metadata"');
+  });
+
   it("keeps conflict recovery non-destructive and exposes existing version history", () => {
     expect(model).toContain("저장 충돌을 검토해 주세요");
+    expect(model).toContain('activeServerConflict');
     expect(center).toContain("버전·체크포인트");
-    expect(center).toContain("자동 덮어쓰기 대신 기존 버전 비교·복원 흐름");
+    expect(center).toContain("자동 덮어쓰기 대신 버전 비교·복원 흐름");
     expect(center).toContain('aria-live="polite"');
     expect(center).toContain('event.key !== "Escape"');
   });
