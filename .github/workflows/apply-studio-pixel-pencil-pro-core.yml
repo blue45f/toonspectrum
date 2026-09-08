@@ -56,7 +56,7 @@ jobs:
 
       - name: Format changed sources
         run: |
-          pnpm exec prettier --write \
+          pnpm dlx prettier@3.6.2 --write \
             apps/web/src/domains/creator/studio-pixel-pencil.ts \
             apps/web/src/domains/creator/studio-pixel-pencil.test.ts \
             apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.ts \
@@ -104,9 +104,10 @@ jobs:
 
       - name: Commit verified implementation
         run: |
-          rm scripts/apply-studio-pixel-pencil-pro-core.py
-          rm scripts/prepare-studio-pixel-pencil-pro-core.py
-          rm .github/workflows/apply-studio-pixel-pencil-pro-core.yml
+          rm -f scripts/apply-studio-pixel-pencil-pro-core.py
+          rm -f scripts/prepare-studio-pixel-pencil-pro-core.py
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core.yml
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core-macos.yml
           git config user.name "OpenAI Codex"
           git config user.email "codex@openai.com"
           git add -A
