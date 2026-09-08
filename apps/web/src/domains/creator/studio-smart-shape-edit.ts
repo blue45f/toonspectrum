@@ -1,63 +1,26 @@
-import { STUDIO_CRDT_METADATA_MAX_BYTES } from "./live/studio-crdt-document-constants";
-import { payloadMetadataByteLength, validatePayload } from "./live/studio-crdt-document-payload";
+import { validatePayload } from "./live/studio-crdt-document-payload";
 import { studioDrawElementToCrdtStroke } from "./live/studio-crdt-draw-bridge";
 import { DEFAULT_SHAPE_PARAMS } from "./brush/studio-stroke-shapes";
 import { decimateStrokeHandles } from "./studio-node-edit";
 import { promoteFreehandQuickShapeOnRelease } from "./studio-quickshape";
 import {
   applyStudioSmartShapeBrushEffect,
-  resolveStudioSmartShapeBrushEffectAvailability,
 } from "./studio-smart-shape-brush-effect";
 
-import type { DrawEl, El } from "./studio-element-model";
+import {
+  readStudioSmartShapeSnapshot, studioSmartShapeEditReason, STUDIO_SMART_SHAPE_EDIT_MAX_COORDINATES,
+  type StudioSmartShapeEditKind,
+} from "./studio-smart-shape-snapshot";
 
-export const STUDIO_SMART_SHAPE_EDIT_KINDS = ["line", "curve", "polyline", "rect", "ellipse", "polygon"] as const;
-export type StudioSmartShapeEditKind = (typeof STUDIO_SMART_SHAPE_EDIT_KINDS)[number];
-export interface StudioSmartShapeEditSnapshot {
-  version: 1;
-  kind: StudioSmartShapeEditKind;
-  /** Exact authored stroke, without another nested correction snapshot. */
-  original: DrawEl;
-}
-export const STUDIO_SMART_SHAPE_EDIT_MAX_COORDINATES = 16_384;
-const MAX_SNAPSHOT_BYTES = 1_000_000;
+import type { DrawEl } from "./studio-element-model";
 
-export function studioSmartShapeEditReason(stroke: DrawEl | null | undefined): string | null {
-  if (!stroke) return "교정할 펜 스트로크를 먼저 그려 주세요.";
-  if (stroke.smartShape !== undefined && !readStudioSmartShapeSnapshot(stroke)) return "저장된 도형 원본이 손상되어 교정할 수 없어요.";
-  if ((stroke.kind ?? "freehand") !== "freehand") return "자유선 스트로크를 선택해 주세요.";
-  if (!Array.isArray(stroke.points) || stroke.points.length < 4 || stroke.points.length % 2 !== 0
-    || stroke.points.length > STUDIO_SMART_SHAPE_EDIT_MAX_COORDINATES
-    || stroke.points.some((point) => !Number.isFinite(point) || Math.abs(point) > 1_000_000)) {
-    return "이 스트로크의 좌표 또는 크기로는 도형을 편집할 수 없어요.";
-  }
-  if (resolveStudioSmartShapeBrushEffectAvailability(stroke).status !== "available") {
-    return "이 브러시는 원래 획을 보존해야 해서 도형 교정을 지원하지 않아요.";
-  }
-  try {
-    if (JSON.stringify(stroke).length > MAX_SNAPSHOT_BYTES) return "원본을 보존하기에 스트로크가 너무 커요.";
-    const withSnapshot = stroke.smartShape ? stroke : { ...stroke, smartShape: { version: 1, kind: "line", original: stroke } };
-    if (payloadMetadataByteLength(studioDrawElementToCrdtStroke("smart-shape-check", withSnapshot).payload) > STUDIO_CRDT_METADATA_MAX_BYTES) {
-      return "원본을 함께 저장하기에는 스트로크가 너무 커요. 더 짧은 스트로크를 그려 주세요.";
-    }
-  } catch { return "원본 스트로크를 읽을 수 없어요."; }
-  return null;
-}
-
-export function readStudioSmartShapeSnapshot(stroke: DrawEl): StudioSmartShapeEditSnapshot | null {
-  const value = stroke.smartShape;
-  if (!value || value.version !== 1 || !STUDIO_SMART_SHAPE_EDIT_KINDS.includes(value.kind)
-    || !value.original || value.original.type !== "draw" || value.original.id !== stroke.id
-    || value.original.smartShape !== undefined || studioSmartShapeEditReason(value.original)) return null;
-  return value;
-}
-
-/** A selected corrected stroke can be reopened; otherwise the most recent drawing is authoritative. */
-export function recentStudioSmartShapeStroke(elements: readonly El[], selectedId?: string | null): DrawEl | null {
-  const selected = elements.find((element) => element.id === selectedId);
-  if (selected?.type === "draw" && readStudioSmartShapeSnapshot(selected)) return selected;
-  return elements.findLast((element): element is DrawEl => element.type === "draw") ?? null;
-}
+// Retain the public API while keeping copy/eligibility paths independent of edit-time validation.
+export {
+  readStudioSmartShapeSnapshot, recentStudioSmartShapeStroke, studioSmartShapeEditReason,
+  STUDIO_SMART_SHAPE_EDIT_KINDS, STUDIO_SMART_SHAPE_EDIT_MAX_COORDINATES,
+  type StudioSmartShapeEditKind, type StudioSmartShapeEditSnapshot,
+} from "./studio-smart-shape-snapshot";
+export { moveStudioSmartShapePoint } from "./studio-smart-shape-geometry";
 
 export function initialStudioSmartShapeKind(stroke: DrawEl): StudioSmartShapeEditKind {
   const snapshot = readStudioSmartShapeSnapshot(stroke);
@@ -115,24 +78,6 @@ export function transformStudioSmartShapePath(points: readonly number[], scale: 
 }
 
 /** Existing point handles share page coordinates; Shift snaps a moved point relative to its neighbor. */
-export function moveStudioSmartShapePoint(points: readonly number[], index: number, x: number, y: number, snap = false): number[] {
-  if (!Number.isFinite(x) || !Number.isFinite(y) || index < 0 || index * 2 + 1 >= points.length) return [...points];
-  const next = [...points], neighbor = index === 0 ? 2 : (index - 1) * 2;
-  if (snap) {
-    const dx = x - points[neighbor]!, dy = y - points[neighbor + 1]!;
-    const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 12)) * Math.PI / 12;
-    const length = Math.hypot(dx, dy);
-    x = points[neighbor]! + Math.cos(angle) * length; y = points[neighbor + 1]! + Math.sin(angle) * length;
-  }
-  next[index * 2] = x; next[index * 2 + 1] = y;
-  // Keep explicit closure atomic when either copy of the endpoint moves.
-  if (points.length > 4 && points[0] === points.at(-2) && points[1] === points.at(-1)) {
-    if (index === 0) { next[next.length - 2] = x; next[next.length - 1] = y; }
-    if (index * 2 === points.length - 2) { next[0] = x; next[1] = y; }
-  }
-  return next;
-}
-
 export function commitStudioSmartShapeEdit(stroke: DrawEl, kind: StudioSmartShapeEditKind, points: number[]): DrawEl | null {
   if (studioSmartShapeEditReason(stroke) || points.length < 4 || points.length % 2 !== 0
     || points.length > STUDIO_SMART_SHAPE_EDIT_MAX_COORDINATES

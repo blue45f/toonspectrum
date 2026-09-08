@@ -1,4 +1,4 @@
-import { readStudioSmartShapeSnapshot } from "./studio-smart-shape-edit";
+import { readStudioSmartShapeSnapshot } from "./studio-smart-shape-snapshot";
 
 import type { DrawEl } from "./studio-element-model";
 

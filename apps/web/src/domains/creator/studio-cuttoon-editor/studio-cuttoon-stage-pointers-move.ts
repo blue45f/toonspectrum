@@ -8,7 +8,7 @@
 import { flushSync } from "react-dom";
 import { cancelStudioNodeEditPointer, ownsStudioNodeEditPointer, studioNodeEditSourceMatches } from "../vector/studio-node-edit-pointer-session";
 
-import { moveStudioSmartShapePoint } from "../studio-smart-shape-edit";
+import { moveStudioSmartShapePoint } from "../studio-smart-shape-geometry";
 
 import { resolveStudioCapturedBrushDynamicsPresetId } from "../brush/studio-brush-dynamics";
 import {

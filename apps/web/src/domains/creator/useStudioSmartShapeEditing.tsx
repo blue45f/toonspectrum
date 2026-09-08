@@ -1,7 +1,7 @@
 import { Suspense, useState } from "react";
 
 import { StudioSmartShapeEditDialog } from "./studio-page-lazy-ui";
-import { recentStudioSmartShapeStroke, studioSmartShapeEditReason } from "./studio-smart-shape-edit";
+import { recentStudioSmartShapeStroke, studioSmartShapeEditReason } from "./studio-smart-shape-snapshot";
 
 import type { StudioEditorMutationTicket } from "./studio-editor-scope";
 import type { DrawEl, El } from "./studio-element-model";
