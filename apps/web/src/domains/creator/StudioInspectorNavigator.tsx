@@ -130,6 +130,10 @@ const COPY = {
     "선택이 바뀌어도 이미지 전문 탭을 자동 초기화하지 않습니다",
   ],
   options: ["studio.inspector.panel.options", "작업 패널 구성"],
+  closeOptions: [
+    "studio.inspector.panel.options.close",
+    "작업 패널 구성 닫기",
+  ],
   optionsHint: [
     "studio.inspector.panel.optionsHint",
     "자주 쓰는 탭만 남기고 패널 높이를 줄일 수 있습니다",
@@ -258,6 +262,7 @@ export function StudioInspectorNavigator({
   const tabA11y = providedTabA11y ?? createStudioInspectorTabA11y(titleId);
   const propertiesTabRef = useRef<HTMLButtonElement>(null);
   const panelOptionsTriggerRef = useRef<HTMLButtonElement>(null);
+  const panelOptionsRef = useRef<HTMLDivElement>(null);
   const [panelOptionsOpen, setPanelOptionsOpen] = useState(false);
   const panelState = useSyncExternalStore(
     subscribeStudioInspectorPanelState,
@@ -288,15 +293,37 @@ export function StudioInspectorNavigator({
 
   useEffect(() => {
     if (!panelOptionsOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
+
+    const closeOptions = (restoreFocus: boolean) => {
       setPanelOptionsOpen(false);
+      if (!restoreFocus) return;
       globalThis.requestAnimationFrame?.(() => {
         panelOptionsTriggerRef.current?.focus({ preventScroll: true });
       });
     };
+    const closeOnPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        panelOptionsRef.current?.contains(target)
+        || panelOptionsTriggerRef.current?.contains(target)
+      ) {
+        return;
+      }
+      closeOptions(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeOptions(true);
+    };
+    document.addEventListener("pointerdown", closeOnPointerDown);
     window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
   }, [panelOptionsOpen]);
 
   function navigate(route: StudioInspectorRoute) {
@@ -397,6 +424,7 @@ export function StudioInspectorNavigator({
             onClick={() => setPanelOptionsOpen((open) => !open)}
             aria-label={copy("options")}
             aria-expanded={panelOptionsOpen}
+            aria-haspopup="dialog"
             aria-controls={panelOptionsId}
             title={copy("options")}
             data-inspector-priority="chrome"
@@ -433,11 +461,14 @@ export function StudioInspectorNavigator({
 
       {panelOptionsOpen ? (
         <div
+          ref={panelOptionsRef}
           id={panelOptionsId}
-          role="region"
+          role="dialog"
+          aria-modal="false"
           aria-label={copy("options")}
           data-testid="studio-inspector-panel-options"
-          className="mb-2 rounded-lg border border-line bg-card/85 p-2 shadow-sm"
+          data-studio-inspector-panel-options-surface="popover"
+          className="absolute inset-x-1 top-[calc(100%+0.375rem)] z-50 max-h-[65vh] overflow-y-auto overscroll-contain rounded-lg border border-line bg-card/95 p-2 shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-card/90"
         >
           <div className="mb-2 flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -446,9 +477,27 @@ export function StudioInspectorNavigator({
                 {copy("optionsHint")}
               </p>
             </div>
-            <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.6875rem] font-bold tabular-nums text-accent">
-              {panelState.visiblePrimaryTabs.length}/{STUDIO_INSPECTOR_PRIMARY_TABS.length}
-            </span>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.6875rem] font-bold tabular-nums text-accent">
+                {panelState.visiblePrimaryTabs.length}/{STUDIO_INSPECTOR_PRIMARY_TABS.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setPanelOptionsOpen(false);
+                  globalThis.requestAnimationFrame?.(() => {
+                    panelOptionsTriggerRef.current?.focus({ preventScroll: true });
+                  });
+                }}
+                aria-label={copy("closeOptions")}
+                className={cn(
+                  "grid size-11 shrink-0 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg",
+                  tabFocusClass,
+                )}
+              >
+                <X size={14} strokeWidth={1.75} aria-hidden />
+              </button>
+            </div>
           </div>
           <fieldset className="m-0 min-w-0 border-0 p-0">
             <legend className="mb-1 text-[0.6875rem] font-semibold text-fg-2">
