@@ -162,6 +162,10 @@ export function createStudioAiComicDirectorApiClient(input: {
 } = {}): StudioAiComicDirectorApiClient {
   const baseUrl = (input.baseUrl ?? "/api/studio-ai/comic-director").replace(/\/$/u, "");
   const fetchImpl = input.fetchImpl ?? globalThis.fetch.bind(globalThis);
+  // Local edits can advance the client session revision several times before one cloud save. Keep
+  // the last acknowledged server revision separately so optimistic locking never compares against
+  // a client-only revision.
+  const remoteRevisions = new Map<string, number>();
 
   async function request<T>(
     path: string,
@@ -247,6 +251,7 @@ export function createStudioAiComicDirectorApiClient(input: {
         }),
       });
       if (!result.ok) return result;
+      remoteRevisions.set(result.data.id, result.data.revision);
       return {
         ok: true,
         data: sessionFromServer({ session: result.data }),
@@ -257,18 +262,19 @@ export function createStudioAiComicDirectorApiClient(input: {
       const result = await request<ServerSessionBundle>(
         `/sessions/${encodeURIComponent(sessionId)}`,
       );
-      return result.ok
-        ? { ok: true, data: sessionFromServer(result.data) }
-        : result;
+      if (!result.ok) return result;
+      remoteRevisions.set(sessionId, result.data.session.revision);
+      return { ok: true, data: sessionFromServer(result.data) };
     },
 
     async updateSession(session, previousRevision) {
+      const expectedRevision = remoteRevisions.get(session.id) ?? previousRevision;
       const result = await request<ServerSessionRecord>(
         `/sessions/${encodeURIComponent(session.id)}`,
         {
           method: "PATCH",
           body: JSON.stringify({
-            expectedRevision: previousRevision,
+            expectedRevision,
             title: session.title,
             stage: session.stage,
             status: session.status,
@@ -277,9 +283,12 @@ export function createStudioAiComicDirectorApiClient(input: {
           }),
         },
       );
-      return result.ok
-        ? { ok: true, data: sessionFromServer({ session: result.data }) }
-        : result;
+      if (!result.ok) return result;
+      remoteRevisions.set(session.id, result.data.revision);
+      return {
+        ok: true,
+        data: sessionFromServer({ session: result.data }),
+      };
     },
 
     async appendVisualBibleRevision(sessionId, bible) {
@@ -347,7 +356,7 @@ export function createStudioAiComicDirectorApiClient(input: {
         {
           method: "POST",
           body: JSON.stringify({
-            expectedRevision,
+            expectedRevision: remoteRevisions.get(sessionId) ?? expectedRevision,
             candidateDigest,
             payload: { source: "studio-ai-comic-director" },
           }),
