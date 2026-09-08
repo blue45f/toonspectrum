@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
 const view = read("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
-const center = read("./StudioDraftSaveCenter.tsx");
+const adapter = read("./StudioDraftSaveCenter.tsx");
+const implementation = read("./StudioDraftSaveCenterImpl.tsx");
+const center = `${adapter}\n${implementation}`;
 const model = read("./studio-draft-save-center-model.ts");
 const outbox = read("./studio-draft-save-outbox.ts");
 
@@ -52,6 +54,17 @@ describe("draft save center product boundary", () => {
     expect(outbox).not.toContain("readonly assets");
   });
 
+  it("retains a cleared receipt until save acknowledgement and coalesces duplicate requests", () => {
+    expect(adapter).toContain("consumeRecentlyClearedStudioDraftSaveOutbox");
+    expect(adapter).toContain("saveInFlightRef");
+    expect(adapter).toContain("writeStudioDraftSaveOutbox");
+    expect(adapter).toContain("clearStudioDraftSaveOutbox");
+    expect(adapter).toContain("serverRevisionLoading");
+    expect(adapter).toContain("serverRevisionError");
+    expect(outbox).toContain("queueMicrotask");
+    expect(outbox).toContain("cancelledSentinel");
+  });
+
   it("keeps device recovery, server revision and offline queue semantically distinct", () => {
     expect(center).toContain("이 기기");
     expect(center).toContain("서버 초안");
@@ -80,7 +93,7 @@ describe("draft save center product boundary", () => {
 
   it("keeps conflict recovery non-destructive and exposes existing version history", () => {
     expect(model).toContain("저장 충돌을 검토해 주세요");
-    expect(model).toContain('actionableServerConflict');
+    expect(model).toContain("actionableServerConflict");
     expect(center).toContain("버전·체크포인트");
     expect(center).toContain("자동 덮어쓰기 대신 버전 비교·복원 흐름");
     expect(center).toContain('aria-live="polite"');

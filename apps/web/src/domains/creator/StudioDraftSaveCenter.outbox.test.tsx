@@ -44,9 +44,12 @@ afterEach(() => {
 });
 
 describe("StudioDraftSaveCenter reload-safe outbox", () => {
-  it("persists an offline save intent and clears it after one reconnect save", async () => {
+  it("keeps an offline receipt until one reconnect save acknowledges success", async () => {
     setOnline(false);
-    const onSaveDraft = vi.fn(() => Promise.resolve());
+    let resolveSave: (() => void) | null = null;
+    const onSaveDraft = vi.fn(() => new Promise<void>((resolve) => {
+      resolveSave = resolve;
+    }));
     render(<StudioDraftSaveCenter {...defaultProps} onSaveDraft={onSaveDraft} />);
 
     fireEvent.click(screen.getByRole("button", { name: "저장 상태: 오프라인 · 기기 저장" }));
@@ -64,10 +67,66 @@ describe("StudioDraftSaveCenter reload-safe outbox", () => {
     });
 
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
+    expect(readStudioDraftSaveOutbox({
+      storage: window.sessionStorage,
+      workId: "work-1",
+    })).not.toBeNull();
+
+    act(() => resolveSave?.());
     await waitFor(() => expect(readStudioDraftSaveOutbox({
       storage: window.sessionStorage,
       workId: "work-1",
     })).toBeNull());
+  });
+
+  it("coalesces repeated manual save clicks while the existing save promise is pending", async () => {
+    setOnline(true);
+    let resolveSave: (() => void) | null = null;
+    const onSaveDraft = vi.fn(() => new Promise<void>((resolve) => {
+      resolveSave = resolve;
+    }));
+    render(<StudioDraftSaveCenter {...defaultProps} onSaveDraft={onSaveDraft} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "저장 상태: 서버 r7 확인" }));
+    const saveButton = screen.getByRole("button", { name: "지금 서버에 저장" });
+    fireEvent.click(saveButton);
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
+    act(() => resolveSave?.());
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
+  });
+
+  it("waits for the current server revision before replaying a restored receipt", async () => {
+    const entry = createStudioDraftSaveOutboxEntry({
+      workId: "work-1",
+      serverRevision: 7,
+      hasServerDocument: true,
+      now: Date.now(),
+    })!;
+    expect(writeStudioDraftSaveOutbox({ storage: window.sessionStorage, entry })).toBe(true);
+    const onSaveDraft = vi.fn(() => Promise.resolve());
+    const view = render(
+      <StudioDraftSaveCenter
+        {...defaultProps}
+        onSaveDraft={onSaveDraft}
+        serverRevisionLoading
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", {
+      name: "저장 상태: 연결 후 저장 예약",
+    })).not.toBeNull());
+    expect(onSaveDraft).not.toHaveBeenCalled();
+
+    view.rerender(
+      <StudioDraftSaveCenter
+        {...defaultProps}
+        onSaveDraft={onSaveDraft}
+        serverRevisionLoading={false}
+      />,
+    );
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
   });
 
   it("restores after reload, waits in a follower tab, then replays after leadership handover", async () => {
@@ -103,7 +162,7 @@ describe("StudioDraftSaveCenter reload-safe outbox", () => {
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
   });
 
-  it("requeues a failed reconnect save and lets the user cancel the intent", async () => {
+  it("retains a failed reconnect receipt and lets the user cancel the intent", async () => {
     setOnline(false);
     const onSaveDraft = vi.fn(() => Promise.reject(new Error("서버 초안 저장에 실패했습니다.")));
     render(<StudioDraftSaveCenter {...defaultProps} onSaveDraft={onSaveDraft} />);
@@ -126,5 +185,23 @@ describe("StudioDraftSaveCenter reload-safe outbox", () => {
       storage: window.sessionStorage,
       workId: "work-1",
     })).toBeNull();
+  });
+
+  it("keeps the queue visible when neither receipt deletion nor invalidation is possible", () => {
+    setOnline(false);
+    render(<StudioDraftSaveCenter {...defaultProps} />);
+    fireEvent.click(screen.getByRole("button", { name: "저장 상태: 오프라인 · 기기 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "연결 후 저장 예약" }));
+
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("storage removal blocked");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage overwrite blocked");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "저장 예약 취소" }));
+
+    expect(screen.getByRole("button", { name: "저장 예약 취소" })).not.toBeNull();
+    expect(screen.getByText(/서버 저장 예약을 정리하지 못했습니다/)).not.toBeNull();
   });
 });

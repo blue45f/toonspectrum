@@ -28,6 +28,63 @@ export interface StudioDraftSaveOutboxStorage {
   removeItem(key: string): void;
 }
 
+type StudioDraftSaveOutboxListener = (input: {
+  readonly workId: string;
+  readonly entry: StudioDraftSaveOutboxEntry | null;
+}) => void;
+
+const outboxListeners = new Set<StudioDraftSaveOutboxListener>();
+const recentlyClearedEntries = new Map<string, StudioDraftSaveOutboxEntry>();
+
+function emitStudioDraftSaveOutboxChange(
+  workId: string,
+  entry: StudioDraftSaveOutboxEntry | null,
+): void {
+  for (const listener of outboxListeners) {
+    try {
+      listener({ workId, entry });
+    } catch {
+      // Observers must never be allowed to break save durability.
+    }
+  }
+}
+
+function rememberStudioDraftSaveOutboxClear(
+  entry: StudioDraftSaveOutboxEntry,
+): void {
+  recentlyClearedEntries.set(entry.workId, entry);
+  queueMicrotask(() => {
+    if (recentlyClearedEntries.get(entry.workId) === entry) {
+      recentlyClearedEntries.delete(entry.workId);
+    }
+  });
+}
+
+export function subscribeStudioDraftSaveOutbox(
+  listener: StudioDraftSaveOutboxListener,
+): () => void {
+  outboxListeners.add(listener);
+  return () => {
+    outboxListeners.delete(listener);
+  };
+}
+
+/**
+ * Returns a valid receipt only during the same synchronous turn that removed it.
+ * The save wrapper uses this narrow hand-off to keep the receipt durable until
+ * the existing server-save Promise acknowledges success. User cancellation does
+ * not call the save wrapper, so its hand-off expires in the next microtask.
+ */
+export function consumeRecentlyClearedStudioDraftSaveOutbox(
+  workId: string,
+): StudioDraftSaveOutboxEntry | null {
+  const normalized = normalizedWorkId(workId);
+  if (normalized === null) return null;
+  const entry = recentlyClearedEntries.get(normalized) ?? null;
+  recentlyClearedEntries.delete(normalized);
+  return entry;
+}
+
 function normalizedWorkId(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const workId = value.trim();
@@ -159,12 +216,14 @@ export function writeStudioDraftSaveOutbox(input: {
   try {
     input.storage.setItem(key, JSON.stringify(input.entry));
     const persisted = input.storage.getItem(key);
-    return persisted !== null
+    const verified = persisted !== null
       && parseStudioDraftSaveOutboxEntry(
         persisted,
         input.entry.workId,
         input.entry.queuedAt,
       ) !== null;
+    if (verified) emitStudioDraftSaveOutboxChange(input.entry.workId, input.entry);
+    return verified;
   } catch {
     return false;
   }
@@ -175,10 +234,31 @@ export function clearStudioDraftSaveOutbox(input: {
   readonly workId: string;
 }): boolean {
   const key = studioDraftSaveOutboxKey(input.workId);
-  if (!input.storage || key === null) return false;
+  const workId = normalizedWorkId(input.workId);
+  if (!input.storage || key === null || workId === null) return false;
+  const existing = readStudioDraftSaveOutbox({
+    storage: input.storage,
+    workId,
+  });
+  if (existing !== null) rememberStudioDraftSaveOutboxClear(existing);
   try {
     input.storage.removeItem(key);
-    return input.storage.getItem(key) === null;
+    if (input.storage.getItem(key) === null) {
+      emitStudioDraftSaveOutboxChange(workId, null);
+      return true;
+    }
+  } catch {
+    // Some constrained storage implementations can reject removal but still permit overwrite.
+  }
+  const cancelledSentinel = JSON.stringify({
+    schema: STUDIO_DRAFT_SAVE_OUTBOX_SCHEMA,
+    cancelled: true,
+  });
+  try {
+    input.storage.setItem(key, cancelledSentinel);
+    const invalidated = input.storage.getItem(key) === cancelledSentinel;
+    if (invalidated) emitStudioDraftSaveOutboxChange(workId, null);
+    return invalidated;
   } catch {
     return false;
   }
