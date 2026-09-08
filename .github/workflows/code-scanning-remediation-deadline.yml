@@ -1,0 +1,60 @@
+name: Bound earlier CodeQL remediation runtime
+
+on:
+  push:
+    branches:
+      - codex/code-scanning-remediation-20260908
+    paths:
+      - .github/workflows/code-scanning-remediation-deadline.yml
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  deadline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: codex/code-scanning-remediation-20260908
+    steps:
+      - name: Give deterministic remediation a bounded completion window
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            runs="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs?branch=${TARGET_BRANCH}&per_page=100")"
+            successes="$(jq '[.workflow_runs[] | select((.name == "Complete CodeQL remediation" or .name == "Collision-safe CodeQL remediation fallback" or .name == "AI-assisted residual CodeQL remediation") and .conclusion == "success")] | length' <<<"$runs")"
+            active="$(jq '[.workflow_runs[] | select((.name == "Complete CodeQL remediation" or .name == "Collision-safe CodeQL remediation fallback" or .name == "AI-assisted residual CodeQL remediation") and .status != "completed")] | length' <<<"$runs")"
+            echo "successes=${successes}; active=${active}; attempt=${attempt}/30"
+            [[ "$successes" != "0" || "$active" == "0" ]] && exit 0
+            sleep 30
+          done
+
+          runs="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs?branch=${TARGET_BRANCH}&per_page=100")"
+          jq -r '.workflow_runs[] | select((.name == "Complete CodeQL remediation" or .name == "Collision-safe CodeQL remediation fallback" or .name == "AI-assisted residual CodeQL remediation") and .status != "completed") | .id' <<<"$runs" | while read -r run_id; do
+            [[ -n "$run_id" ]] || continue
+            echo "Cancelling overdue remediation run ${run_id}"
+            gh api --method POST "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel" || true
+          done
+
+      - name: Remove the one-shot deadline controller
+        uses: actions/checkout@v4
+        with:
+          ref: codex/code-scanning-remediation-20260908
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Commit deadline-controller cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/code-scanning-remediation-deadline.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(security): remove remediation deadline controller"
+            git push origin HEAD:codex/code-scanning-remediation-20260908
+          fi
