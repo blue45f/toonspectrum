@@ -542,7 +542,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
               type="button"
               data-studio-status-error-dismiss
               aria-label="오류 메시지 닫기"
-              className="-mr-1 shrink-0 rounded p-0.5 transition hover:bg-bad/15"
+              className="-mr-1 grid size-11 shrink-0 place-items-center rounded transition hover:bg-bad/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               onClick={() => setError(null)}
             >
               <X size={12} strokeWidth={2.5} aria-hidden="true" />

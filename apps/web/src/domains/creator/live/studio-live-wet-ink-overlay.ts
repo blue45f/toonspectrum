@@ -88,11 +88,11 @@ const LIVE_SIMULATION_STEPS_MAX = 8;
 const LIVE_SIMULATION_CATCH_UP_CAP = 4;
 const POINT_EPSILON = 1e-6;
 /**
- * InkWash live preview is intentionally lower resolution than the 4× committed wash. It still
- * uses the real Gaussian deposition and Beer-Lambert optical model, but bins into bounded sparse
- * tiles and never runs Stam on pointer frames.
+ * InkWash live preview shares the committed wash lattice so subpixel Gaussian edges retain
+ * their sampling phase on pointer-up. Sparse tiles bound the working set, and pointer frames
+ * still never run Stam or allocate the full wash.
  */
-const INKWASH_PREVIEW_FIELD_SCALE = 2;
+const INKWASH_PREVIEW_FIELD_SCALE = STUDIO_WET_INK_BRUSH_FIELD_SCALE;
 const INKWASH_PREVIEW_TILE_SIZE = 64;
 const INKWASH_PREVIEW_MAX_TILES = 512;
 

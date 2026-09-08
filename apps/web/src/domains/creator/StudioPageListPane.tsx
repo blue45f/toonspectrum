@@ -358,12 +358,13 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                 />
               </Suspense>
             ) : null}
-            <div className="flex min-h-11 items-center justify-between gap-2 lg:min-h-6">
-              <span className="flex items-center gap-1 text-[0.7rem] font-bold text-fg-2">
+            <div className="flex min-h-11 flex-wrap items-center justify-between gap-2">
+              <span className="flex shrink-0 items-center gap-1 text-[0.7rem] font-bold text-fg-2">
                 <button
                   type="button"
                   onClick={() => setLeftPanelOpen(false)}
-                  className="hidden text-fg-3 transition-colors hover:text-fg lg:inline-flex"
+                  className="hidden size-11 shrink-0 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:inline-flex"
+                  aria-label="페이지 목록 접기"
                   title="페이지 목록 접기"
                 >
                   <ChevronLeft size={13} />
@@ -380,7 +381,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                       : "페이지 목록을 창으로 분리"}
                     aria-pressed={desktopDetached}
                     title={detached ? "왼쪽 패널에 붙이기" : "자유 배치 창으로 분리"}
-                    className="grid size-8 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    className="grid size-11 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
                     {detached ? <PanelLeft size={14} aria-hidden /> : <Move size={14} aria-hidden />}
                   </button>
@@ -400,7 +401,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                   aria-label="새 페이지 추가"
                   title="새 페이지 추가"
                   onClick={addPage}
-                  className="flex min-h-11 items-center gap-1 rounded-lg bg-accent px-3 text-[0.7rem] font-semibold text-on-accent hover:bg-accent-hover lg:min-h-6 lg:px-2 lg:text-[10px]"
+                  className="flex min-h-11 items-center gap-1 rounded-lg bg-accent px-3 text-[0.7rem] font-semibold text-on-accent hover:bg-accent-hover lg:px-2 lg:text-[10px]"
                 >
                   <Plus size={12} aria-hidden /> 페이지 추가
                 </button>
@@ -414,7 +415,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
               <button
                 type="button"
                 onClick={applyGradeToAll}
-                className="min-h-11 shrink-0 rounded-lg border border-line px-3 text-[0.7rem] text-fg-3 hover:bg-raised lg:min-h-6 lg:px-1.5 lg:text-[10px]"
+                className="min-h-11 min-w-11 shrink-0 rounded-lg border border-line px-3 text-[0.7rem] text-fg-3 hover:bg-raised lg:px-1.5 lg:text-[10px]"
                 title="현재 페이지의 색보정을 모든 페이지에 적용"
               >
                 그레이드 전체
@@ -422,7 +423,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
               <button
                 type="button"
                 onClick={applyBgToAll}
-                className="min-h-11 shrink-0 rounded-lg border border-line px-3 text-[0.7rem] text-fg-3 hover:bg-raised lg:min-h-6 lg:px-1.5 lg:text-[10px]"
+                className="min-h-11 min-w-11 shrink-0 rounded-lg border border-line px-3 text-[0.7rem] text-fg-3 hover:bg-raised lg:px-1.5 lg:text-[10px]"
                 title="현재 페이지의 배경을 모든 페이지에 적용"
               >
                 배경 전체
@@ -433,7 +434,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                 disabled={collaborationDocumentLocked}
                 aria-pressed={masterPanelOpen}
                 className={cn(
-                  "min-h-11 shrink-0 rounded-lg border px-3 text-[0.7rem] transition-colors disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-6 lg:px-1.5 lg:text-[10px]",
+                  "min-h-11 min-w-11 shrink-0 rounded-lg border px-3 text-[0.7rem] transition-colors disabled:cursor-not-allowed disabled:opacity-50 lg:px-1.5 lg:text-[10px]",
                   masterEditMode
                     ? "border-accent bg-accent-soft/50 text-accent"
                     : masterPanelOpen
@@ -447,7 +448,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
               <div
                 role="group"
                 aria-label="페이지 미리보기 크기"
-                className="ml-auto flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-line bg-card px-1.5 lg:min-h-6"
+                className="ml-auto flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-line bg-card px-1.5"
                 title={`페이지 미리보기 ${PAGE_PREVIEW_SIZE_LABEL[pagePreviewSize]}`}
               >
                 <Minimize2 size={12} className="shrink-0 text-fg-3" aria-hidden />
@@ -464,7 +465,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                   }}
                   aria-label="페이지 미리보기 크기 조절"
                   aria-valuetext={PAGE_PREVIEW_SIZE_LABEL[pagePreviewSize]}
-                  className="h-11 w-20 cursor-pointer accent-accent lg:h-6 lg:w-16"
+                  className="h-11 w-20 cursor-pointer accent-accent lg:w-16"
                 />
                 <Maximize2 size={12} className="shrink-0 text-fg-3" aria-hidden />
               </div>
@@ -488,7 +489,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                   type="button"
                   data-testid="studio-page-bulk-move-up"
                   onClick={() => movePagesBulk(liveSelectedPageIds, -1)}
-                  className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-2 hover:bg-raised lg:size-auto lg:min-h-6 lg:rounded-lg lg:px-1.5"
+                  className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-2 hover:bg-raised lg:rounded-lg lg:px-1.5"
                   title="선택한 페이지 위로 이동"
                   aria-label="선택한 페이지 위로 이동"
                 >
@@ -498,7 +499,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                   type="button"
                   data-testid="studio-page-bulk-move-down"
                   onClick={() => movePagesBulk(liveSelectedPageIds, 1)}
-                  className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-2 hover:bg-raised lg:size-auto lg:min-h-6 lg:rounded-lg lg:px-1.5"
+                  className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-2 hover:bg-raised lg:rounded-lg lg:px-1.5"
                   title="선택한 페이지 아래로 이동"
                   aria-label="선택한 페이지 아래로 이동"
                 >
@@ -519,7 +520,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                     })();
                   }}
                   disabled={pages.length <= 1}
-                  className="ml-auto grid size-11 shrink-0 place-items-center rounded-xl text-bad hover:bg-bad-soft/20 disabled:opacity-30 lg:size-auto lg:min-h-6 lg:rounded-lg lg:px-1.5"
+                  className="ml-auto grid size-11 shrink-0 place-items-center rounded-xl text-bad hover:bg-bad-soft/20 disabled:opacity-30 lg:rounded-lg lg:px-1.5"
                   title="선택한 페이지 삭제"
                   aria-label="선택한 페이지 삭제"
                 >
@@ -603,7 +604,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                           e.stopPropagation();
                           setMetaEditPageId((v) => (v === p.id ? null : p.id));
                         }}
-                        className={cn("grid size-11 shrink-0 place-items-center rounded-xl hover:bg-raised lg:size-6 lg:rounded", metaEditPageId === p.id ? "text-accent" : "text-fg-3")}
+                        className={cn("grid size-11 shrink-0 place-items-center rounded-xl hover:bg-raised lg:rounded", metaEditPageId === p.id ? "text-accent" : "text-fg-3")}
                         title="이름·콘티 메모 편집"
                         aria-label={`${pageDisplayName(p, idx)} 이름·콘티 메모 편집`}
                         aria-expanded={metaEditPageId === p.id}
@@ -617,7 +618,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                           movePageUp(p.id);
                         }}
                         disabled={idx === 0}
-                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:size-6 lg:rounded"
+                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:rounded"
                         title="위로 이동"
                         aria-label="위로 이동"
                       >
@@ -630,7 +631,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                           movePageDown(p.id);
                         }}
                         disabled={idx === pages.length - 1}
-                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:size-6 lg:rounded"
+                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:rounded"
                         title="아래로 이동"
                         aria-label="아래로 이동"
                       >
@@ -643,7 +644,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                           movePageToTop(p.id);
                         }}
                         disabled={idx === 0}
-                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:size-6 lg:rounded"
+                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:rounded"
                         title="맨 위로"
                         aria-label="맨 위로 이동"
                       >
@@ -656,7 +657,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                           movePageToBottom(p.id);
                         }}
                         disabled={idx === pages.length - 1}
-                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:size-6 lg:rounded"
+                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:rounded"
                         title="맨 아래로"
                         aria-label="맨 아래로 이동"
                       >
@@ -738,7 +739,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                         e.stopPropagation();
                         insertPageBefore(p.id);
                       }}
-                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:size-6 lg:rounded"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:rounded"
                       title="이 앞에 빈 페이지 삽입"
                       aria-label="이 앞에 빈 페이지 삽입"
                     >
@@ -750,7 +751,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                         e.stopPropagation();
                         insertPageAfter(p.id);
                       }}
-                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:size-6 lg:rounded"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:rounded"
                       title="이 뒤에 빈 페이지 삽입"
                       aria-label="이 뒤에 빈 페이지 삽입"
                     >
@@ -762,7 +763,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                         e.stopPropagation();
                         duplicatePage(p.id);
                       }}
-                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:size-6 lg:rounded"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:rounded"
                       title="페이지 복제"
                       aria-label="페이지 복제"
                     >
@@ -774,7 +775,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                         e.stopPropagation();
                         duplicatePageMirrored(p.id);
                       }}
-                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:size-6 lg:rounded"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:rounded"
                       title="미러 복제 (좌우 반전)"
                       aria-label="미러 복제 (좌우 반전)"
                     >
@@ -786,7 +787,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                         e.stopPropagation();
                         clearPageFor(p.id);
                       }}
-                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:size-6 lg:rounded"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:rounded"
                       title="이 페이지 내용 비우기"
                       aria-label="이 페이지 내용 비우기"
                     >
@@ -810,7 +811,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                         })();
                       }}
                       disabled={pages.length <= 1}
-                      className="grid size-11 shrink-0 place-items-center rounded-xl text-bad hover:bg-bad-soft/20 disabled:opacity-30 lg:size-6 lg:rounded"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-bad hover:bg-bad-soft/20 disabled:opacity-30 lg:rounded"
                       title="페이지 삭제"
                       aria-label="페이지 삭제"
                     >
