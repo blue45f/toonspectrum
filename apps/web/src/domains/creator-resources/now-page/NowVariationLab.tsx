@@ -240,10 +240,12 @@ export function NowVariationLab({
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-canvas/55 p-4">
           <div>
             <p className="text-xs font-bold tracking-[0.14em] text-accent">VARIATION SET</p>
-            <p className="mt-1 text-sm font-semibold text-fg">세트 {dayState.shuffle + 1} · 선택 규칙을 유지한 3개 경로</p>
+            <p className="mt-1 text-sm font-semibold text-fg">
+              세트 {dayState.shuffle + 1} · 선택 규칙을 기준으로 펼친 3개 경로
+            </p>
           </div>
           <button type="button" className={ACTION_BUTTON} onClick={shuffleCandidates}>
-            <Shuffle size={16} aria-hidden="true" /> 같은 규칙으로 다시 섞기
+            <Shuffle size={16} aria-hidden="true" /> 같은 기준으로 다시 섞기
           </button>
         </div>
 
