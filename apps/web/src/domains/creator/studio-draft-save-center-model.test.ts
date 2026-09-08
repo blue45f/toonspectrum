@@ -14,6 +14,9 @@ import {
 function input(overrides: Partial<StudioDraftSaveCenterInput> = {}): StudioDraftSaveCenterInput {
   return {
     isOnline: true,
+    hydrated: true,
+    hydrationFailed: false,
+    metadataRequired: false,
     saving: false,
     deferredSave: false,
     collaborationLocked: false,
@@ -24,6 +27,7 @@ function input(overrides: Partial<StudioDraftSaveCenterInput> = {}): StudioDraft
     storageSignal: null,
     hasServerDocument: true,
     serverRevision: 12,
+    checkpointCount: 2,
     versionCount: 4,
     lastServerSaveAt: null,
     serverSaveError: null,
@@ -41,6 +45,36 @@ describe("resolveStudioDraftSaveCenter", () => {
     expect(model.compactLabel).toBe("서버 r12 확인");
     expect(model.device.title).toBe("이 탭이 복구 저장 담당");
     expect(model.server.title).toBe("서버 초안 revision #12");
+  });
+
+  it("blocks save while the existing document is still hydrating", () => {
+    const model = resolveStudioDraftSaveCenter(input({ hydrated: false }));
+
+    expect(model.phase).toBe("loading");
+    expect(model.compactLabel).toBe("원고 불러오는 중");
+    expect(model.saveActionDisabled).toBe(true);
+    expect(model.server.title).toBe("원고 불러오는 중");
+  });
+
+  it("routes a hydration failure to preserved versions instead of saving an empty document", () => {
+    const model = resolveStudioDraftSaveCenter(input({
+      hydrated: false,
+      hydrationFailed: true,
+    }));
+
+    expect(model.phase).toBe("load-risk");
+    expect(model.primaryAction).toBe("versions");
+    expect(model.saveActionLabel).toBe("버전·복구 열기");
+    expect(model.saveActionDisabled).toBe(false);
+  });
+
+  it("continues the exact pending draft after required metadata is entered", () => {
+    const model = resolveStudioDraftSaveCenter(input({ metadataRequired: true }));
+
+    expect(model.phase).toBe("metadata-required");
+    expect(model.compactLabel).toBe("저장 정보 입력 필요");
+    expect(model.primaryAction).toBe("metadata");
+    expect(model.saveActionLabel).toBe("초안 저장 계속");
   });
 
   it("does not call an offline document cloud-saved", () => {
@@ -80,14 +114,16 @@ describe("resolveStudioDraftSaveCenter", () => {
     expect(model.device.detail).toContain("프로젝트 백업");
   });
 
-  it("uses conflict-specific recovery copy", () => {
+  it("routes a revision conflict to comparison instead of blind retry", () => {
     const model = resolveStudioDraftSaveCenter(input({
       serverSaveError: "다른 팀원이 먼저 저장했습니다. 최신 공동 문서를 다시 불러와 주세요.",
     }));
 
     expect(model.phase).toBe("server-risk");
+    expect(model.compactLabel).toBe("저장 충돌 확인");
     expect(model.server.title).toBe("저장 충돌을 검토해 주세요");
-    expect(model.saveActionLabel).toBe("서버 저장 다시 시도");
+    expect(model.primaryAction).toBe("versions");
+    expect(model.saveActionLabel).toBe("버전 비교·복원");
   });
 
   it("blocks save actions while the collaboration document is locked", () => {
@@ -98,16 +134,17 @@ describe("resolveStudioDraftSaveCenter", () => {
     expect(model.saveActionLabel).toBe("저장 권한 확인");
   });
 
-  it("describes a first server save without inventing a revision", () => {
+  it("keeps local checkpoints available before the first server revision", () => {
     const model = resolveStudioDraftSaveCenter(input({
       hasServerDocument: false,
       serverRevision: null,
+      checkpointCount: 0,
       versionCount: 0,
     }));
 
     expect(model.phase).toBe("local-only");
     expect(model.server.title).toBe("아직 서버 초안 없음");
-    expect(model.canOpenVersions).toBe(false);
+    expect(model.canOpenVersions).toBe(true);
   });
 });
 
@@ -151,6 +188,8 @@ describe("draft save helpers", () => {
     );
 
     expect(diagnostics).toContain("phase=queued");
+    expect(diagnostics).toContain("hydrated=true");
+    expect(diagnostics).toContain("checkpointCount=2");
     expect(diagnostics).toContain("serverRevision=12");
     expect(diagnostics).not.toContain("title=");
     expect(diagnostics).not.toContain("document=");
