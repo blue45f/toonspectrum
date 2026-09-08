@@ -16,7 +16,10 @@ import {
   type CreatorPublicationValidationIssue,
 } from "../../../../web/src/shared/lib/creator-publication-contract";
 import { creatorWorks, db } from "../../db";
-import { CREATOR_WORK_REVISION_MAX, CreatorWorkRevisionConflictError } from "../creator-work-revisions";
+import {
+  CREATOR_WORK_REVISION_MAX,
+  CreatorWorkRevisionConflictError,
+} from "../creator-work-revisions";
 
 import {
   getChallenge as rawGetChallenge,
@@ -136,10 +139,16 @@ export function prepareCreatorPublicationMutation({
       now,
       challengeLinked,
     });
-    if (!validation.valid) throw new CreatorPublicationValidationError(validation.errors);
+    if (!validation.valid) {
+      throw new CreatorPublicationValidationError(validation.errors);
+    }
   }
 
-  const effectiveStatus = resolveCreatorPublicationStatus(requestedStatus, directive, now);
+  const effectiveStatus = resolveCreatorPublicationStatus(
+    requestedStatus,
+    directive,
+    now,
+  );
   let effectiveDirective = directive;
   if (effectiveStatus === "published" && directive.publishedAt === null) {
     effectiveDirective = markCreatorPublicationPublished(directive, now);
@@ -157,7 +166,10 @@ export function prepareCreatorPublicationMutation({
   };
 }
 
-async function assertRemixPolicy(userId: string, remixFromId: unknown): Promise<void> {
+async function assertRemixPolicy(
+  userId: string,
+  remixFromId: unknown,
+): Promise<void> {
   const parentId = referenceId(remixFromId);
   if (!parentId) return;
   const parent = await rawGetWork(parentId, userId);
@@ -209,7 +221,9 @@ export interface CreatorPublicationListOptions {
   followedBy?: string;
 }
 
-async function documentsByWorkId(ids: readonly string[]): Promise<Map<string, unknown>> {
+async function documentsByWorkId(
+  ids: readonly string[],
+): Promise<Map<string, unknown>> {
   if (ids.length === 0) return new Map();
   const rows = await db
     .select({ id: creatorWorks.id, doc: creatorWorks.doc })
@@ -222,8 +236,10 @@ export function filterCreatorPublicationSummaries<Work extends { id: string }>(
   works: readonly Work[],
   documents: ReadonlyMap<string, unknown>,
 ): Work[] {
-  return works.filter((work) =>
-    documents.has(work.id) && isCreatorPublicationListable(documents.get(work.id)),
+  return works.filter(
+    (work) =>
+      documents.has(work.id) &&
+      isCreatorPublicationListable(documents.get(work.id)),
   );
 }
 
@@ -270,14 +286,19 @@ async function publicationAwareNeighbors(
     return { prevEpisode: null, nextEpisode: null };
   }
   const episodes = await rawListWorks({ seriesId: work.seriesId, viewerId });
-  const documents = await documentsByWorkId(episodes.map((episode) => episode.id));
+  const documents = await documentsByWorkId(
+    episodes.map((episode) => episode.id),
+  );
   const visible = episodes.filter(
     (episode) =>
       episode.id === work.id ||
-      (documents.has(episode.id) && isCreatorPublicationListable(documents.get(episode.id))),
+      (documents.has(episode.id) &&
+        isCreatorPublicationListable(documents.get(episode.id))),
   );
   const index = visible.findIndex((episode) => episode.id === work.id);
-  const project = (episode: CreatorWorkSummary | undefined): CreatorEpisodeRef | null =>
+  const project = (
+    episode: CreatorWorkSummary | undefined,
+  ): CreatorEpisodeRef | null =>
     episode
       ? { id: episode.id, title: episode.title, episodeNo: episode.episodeNo }
       : null;
@@ -289,7 +310,9 @@ async function publicationAwareNeighbors(
 
 async function publicationAwareRemixRelations(
   work: CreatorWorkDetail,
-): Promise<Pick<CreatorWorkDetail, "remixFromId" | "remixFromTitle" | "remixedChildren">> {
+): Promise<
+  Pick<CreatorWorkDetail, "remixFromId" | "remixFromTitle" | "remixedChildren">
+> {
   let remixFromId = work.remixFromId;
   let remixFromTitle = work.remixFromTitle;
   let remixedChildren = work.remixedChildren ?? [];
@@ -297,18 +320,22 @@ async function publicationAwareRemixRelations(
     ...(remixFromId ? [remixFromId] : []),
     ...remixedChildren.map((child) => child.id),
   ];
-  if (ids.length === 0) return { remixFromId, remixFromTitle, remixedChildren };
+  if (ids.length === 0) {
+    return { remixFromId, remixFromTitle, remixedChildren };
+  }
   const documents = await documentsByWorkId(ids);
   if (
     remixFromId &&
-    (!documents.has(remixFromId) || !isCreatorPublicationListable(documents.get(remixFromId)))
+    (!documents.has(remixFromId) ||
+      !isCreatorPublicationListable(documents.get(remixFromId)))
   ) {
     remixFromId = null;
     remixFromTitle = null;
   }
   remixedChildren = remixedChildren.filter(
     (child) =>
-      documents.has(child.id) && isCreatorPublicationListable(documents.get(child.id)),
+      documents.has(child.id) &&
+      isCreatorPublicationListable(documents.get(child.id)),
   );
   return { remixFromId, remixFromTitle, remixedChildren };
 }
@@ -346,11 +373,15 @@ function publicationAwareSeriesAggregate(
 ): CreatorSeriesDetail {
   const removedCovers = new Set(
     detail.episodeList
-      .filter((episode) => !episodeList.some((visible) => visible.id === episode.id))
+      .filter(
+        (episode) =>
+          !episodeList.some((visible) => visible.id === episode.id),
+      )
       .map((episode) => episode.cover)
       .filter(Boolean),
   );
-  const fallbackCover = episodeList.find((episode) => episode.cover)?.cover ?? "";
+  const fallbackCover =
+    episodeList.find((episode) => episode.cover)?.cover ?? "";
   const cover = removedCovers.has(detail.cover) ? fallbackCover : detail.cover;
   const latestEpisodeAt = episodeList.reduce<string | null>(
     (latest, episode) =>
@@ -373,12 +404,20 @@ async function getPublicSeries(
   viewerId?: string,
   forcePublicProjection = false,
 ): Promise<CreatorSeriesDetail | null> {
-  const detail = await rawGetSeries(id, forcePublicProjection ? undefined : viewerId);
+  const detail = await rawGetSeries(
+    id,
+    forcePublicProjection ? undefined : viewerId,
+  );
   if (!detail) return null;
   if (detail.isOwner && !forcePublicProjection) return detail;
   const episodeList = await listableWorkSummaries(detail.episodeList);
   const projected = publicationAwareSeriesAggregate(detail, episodeList);
-  return forcePublicProjection ? { ...projected, isOwner: Boolean(viewerId && detail.author.id === viewerId) } : projected;
+  return forcePublicProjection
+    ? {
+        ...projected,
+        isOwner: Boolean(viewerId && detail.author.id === viewerId),
+      }
+    : projected;
 }
 
 export async function getSeries(
@@ -393,11 +432,17 @@ export async function getSeries(
   }
 }
 
-export async function listSeries(options: {
-  userId?: string;
-  sort?: Parameters<typeof rawListSeries>[0] extends { sort?: infer Sort } ? Sort : never;
-  viewerId?: string;
-} = {}): Promise<CreatorSeriesSummary[]> {
+export async function listSeries(
+  options: {
+    userId?: string;
+    sort?: Parameters<typeof rawListSeries>[0] extends {
+      sort?: infer Sort;
+    }
+      ? Sort
+      : never;
+    viewerId?: string;
+  } = {},
+): Promise<CreatorSeriesSummary[]> {
   await promoteDueCreatorPublicationsSafely();
   const series = await rawListSeries(options);
   const ownerView =
@@ -407,13 +452,22 @@ export async function listSeries(options: {
   if (ownerView || series.length === 0) return series;
   const projected = await Promise.all(
     series.map(async (candidate) => {
-      const detail = await getPublicSeries(candidate.id, options.viewerId, true);
+      const detail = await getPublicSeries(
+        candidate.id,
+        options.viewerId,
+        true,
+      );
       if (!detail) return null;
       const { episodeList: _episodeList, ...summary } = detail;
-      return { ...summary, isOwner: candidate.isOwner } satisfies CreatorSeriesSummary;
+      return {
+        ...summary,
+        isOwner: candidate.isOwner,
+      } satisfies CreatorSeriesSummary;
     }),
   );
-  return projected.filter((candidate): candidate is CreatorSeriesSummary => candidate !== null);
+  return projected.filter(
+    (candidate): candidate is CreatorSeriesSummary => candidate !== null,
+  );
 }
 
 function publicationAwareChallengeAggregate(
@@ -451,10 +505,16 @@ export async function listChallenges(): Promise<CreatorChallengeSummary[]> {
       return summary;
     }),
   );
-  return projected.filter((challenge): challenge is CreatorChallengeSummary => challenge !== null);
+  return projected.filter(
+    (challenge): challenge is CreatorChallengeSummary => challenge !== null,
+  );
 }
 
-export async function addComment(userId: string, workId: string, text: unknown) {
+export async function addComment(
+  userId: string,
+  workId: string,
+  text: unknown,
+) {
   await promoteDueCreatorPublicationsSafely();
   const work = await rawGetWork(workId, userId);
   if (work && !creatorPublicationCommentsAllowed(work.doc)) {
@@ -463,7 +523,10 @@ export async function addComment(userId: string, workId: string, text: unknown) 
   return rawAddComment(userId, workId, text);
 }
 
-export async function listComments(workId: string, includeHidden = false) {
+export async function listComments(
+  workId: string,
+  includeHidden = false,
+) {
   await promoteDueCreatorPublicationsSafely();
   return rawListComments(workId, includeHidden);
 }
@@ -484,10 +547,12 @@ export interface PromoteDueCreatorPublicationsResult {
  * replicas can race safely: one revision wins, later replicas observe a conflict and retry from a
  * fresh snapshot on the next bounded sweep.
  */
-export async function promoteDueCreatorPublications(options: {
-  now?: Date;
-  limit?: number;
-} = {}): Promise<PromoteDueCreatorPublicationsResult> {
+export async function promoteDueCreatorPublications(
+  options: {
+    now?: Date;
+    limit?: number;
+  } = {},
+): Promise<PromoteDueCreatorPublicationsResult> {
   if (!(await ensureCreatorCommunitySchema())) {
     return { promoted: 0, workIds: [], skipped: 0 };
   }
@@ -509,6 +574,7 @@ export async function promoteDueCreatorPublications(options: {
         eq(creatorWorks.hidden, false),
         lt(creatorWorks.revision, CREATOR_WORK_REVISION_MAX),
         sql`${creatorWorks.doc} -> 'publication' ->> 'mode' = 'scheduled'`,
+        sql`${creatorWorks.doc} -> 'publication' ->> 'publishedAt' is null`,
         sql`${creatorWorks.doc} -> 'publication' ->> 'scheduledAt' <= ${nowIso}`,
       ),
     )
@@ -530,7 +596,10 @@ export async function promoteDueCreatorPublications(options: {
     try {
       await rawUpdateWork(candidate.ownerId, candidate.id, {
         baseRevision: candidate.revision,
-        doc: writeCreatorPublicationDirective(candidate.doc, publishedDirective),
+        doc: writeCreatorPublicationDirective(
+          candidate.doc,
+          publishedDirective,
+        ),
         status: "published",
       });
       workIds.push(candidate.id);
