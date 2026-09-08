@@ -37,6 +37,13 @@ function input(overrides: Partial<StudioDraftSaveCenterInput> = {}): StudioDraft
   };
 }
 
+const failedStorageSignal = {
+  level: "failed" as const,
+  title: "OPFS 쓰기 실패",
+  detail: "저장 공간을 확인하세요.",
+  at: 1,
+};
+
 describe("resolveStudioDraftSaveCenter", () => {
   it("keeps device recovery and server revision as separate saved authorities", () => {
     const model = resolveStudioDraftSaveCenter(input());
@@ -100,18 +107,35 @@ describe("resolveStudioDraftSaveCenter", () => {
 
   it("promotes local durability failure above online server state", () => {
     const model = resolveStudioDraftSaveCenter(input({
-      storageSignal: {
-        level: "failed",
-        title: "OPFS 쓰기 실패",
-        detail: "저장 공간을 확인하세요.",
-        at: 1,
-      },
+      storageSignal: failedStorageSignal,
     }));
 
     expect(model.phase).toBe("local-risk");
     expect(model.tone).toBe("danger");
     expect(model.shouldPromoteBackup).toBe(true);
     expect(model.device.detail).toContain("프로젝트 백업");
+  });
+
+  it("keeps a save action disabled when local risk overlaps a document lock", () => {
+    const model = resolveStudioDraftSaveCenter(input({
+      collaborationLocked: true,
+      storageSignal: failedStorageSignal,
+    }));
+
+    expect(model.phase).toBe("local-risk");
+    expect(model.saveActionLabel).toBe("저장 권한 확인");
+    expect(model.saveActionDisabled).toBe(true);
+  });
+
+  it("keeps a save action disabled when local risk overlaps hydration", () => {
+    const model = resolveStudioDraftSaveCenter(input({
+      hydrated: false,
+      storageSignal: failedStorageSignal,
+    }));
+
+    expect(model.phase).toBe("local-risk");
+    expect(model.saveActionLabel).toBe("원고 불러오는 중");
+    expect(model.saveActionDisabled).toBe(true);
   });
 
   it("routes a revision conflict to comparison instead of blind retry", () => {
@@ -122,6 +146,17 @@ describe("resolveStudioDraftSaveCenter", () => {
     expect(model.phase).toBe("server-risk");
     expect(model.compactLabel).toBe("저장 충돌 확인");
     expect(model.server.title).toBe("저장 충돌을 검토해 주세요");
+    expect(model.primaryAction).toBe("versions");
+    expect(model.saveActionLabel).toBe("버전 비교·복원");
+  });
+
+  it("keeps conflict recovery non-destructive even when local durability also fails", () => {
+    const model = resolveStudioDraftSaveCenter(input({
+      storageSignal: failedStorageSignal,
+      serverSaveError: "다른 팀원이 먼저 저장했습니다. 최신 공동 문서를 다시 불러와 주세요.",
+    }));
+
+    expect(model.phase).toBe("local-risk");
     expect(model.primaryAction).toBe("versions");
     expect(model.saveActionLabel).toBe("버전 비교·복원");
   });
