@@ -37,14 +37,14 @@ describe("StudioBg3dProceduralStarterPanel", () => {
     );
 
     expect(screen.getByText("오리지널 · CC0")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "구도용 블록아웃" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "3D 캐릭터·배경·소품" })).toBeTruthy();
     expect(screen.queryByText("절차형 무료 에셋")).toBeNull();
     expect(screen.getByText(/직접 제작 · CC0 1.0/)).toBeTruthy();
-    expect(screen.getByText("17개 블록아웃 · 파츠별 편집")).toBeTruthy();
+    expect(screen.getByText("41개 3D 에셋 · 파츠별 편집")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /장면에 추가$/ })).toHaveLength(6);
 
-    fireEvent.click(screen.getByRole("button", { name: "블록아웃 11개 더 보기" }));
-    expect(screen.getAllByRole("button", { name: /장면에 추가$/ })).toHaveLength(17);
+    fireEvent.click(screen.getByRole("button", { name: "3D 에셋 35개 더 보기" }));
+    expect(screen.getAllByRole("button", { name: /장면에 추가$/ })).toHaveLength(41);
     expect(screen.getByRole("button", { name: "처음 6개만 보기" })).toBeTruthy();
   });
 
@@ -53,14 +53,14 @@ describe("StudioBg3dProceduralStarterPanel", () => {
       <StudioBg3dProceduralStarterPanel onInsert={(assetId) => successPlan(assetId)} />,
     );
 
-    fireEvent.change(screen.getByRole("searchbox", { name: "블록아웃 프리셋 검색" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "3D 에셋 검색" }), {
       target: { value: "가구" },
     });
     expect(screen.getAllByRole("button", { name: /장면에 추가$/ })).toHaveLength(6);
 
     fireEvent.click(screen.getByRole("radio", { name: "문·창호" }));
-    expect(screen.getByText("0개 블록아웃 · 파츠별 편집")).toBeTruthy();
-    expect(screen.getByText("검색과 카테고리에 맞는 블록아웃이 없습니다.")).toBeTruthy();
+    expect(screen.getByText("0개 3D 에셋 · 파츠별 편집")).toBeTruthy();
+    expect(screen.getByText("검색과 카테고리에 맞는 3D 에셋이 없습니다.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "검색·필터 초기화" }));
     expect(screen.getByRole("radio", { name: "전체" }).getAttribute("aria-checked")).toBe(
