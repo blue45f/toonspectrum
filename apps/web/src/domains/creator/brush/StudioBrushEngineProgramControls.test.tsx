@@ -21,8 +21,8 @@ describe("StudioBrushEngineProgramControls", () => {
       <StudioBrushEngineProgramControls brushId="pen" programSet={null} onChange={onChange} />,
     );
     expect(screen.getByText("범용 BrushGraph 컴포저")).toBeTruthy();
-    expect(screen.getByLabelText("필기감 선택")).toHaveValue("adaptive-ema");
-    expect(screen.getByLabelText("물리 엔진 선택")).toHaveValue("no-physics");
+    expect((screen.getByLabelText("필기감 선택") as HTMLSelectElement).value).toBe("adaptive-ema");
+    expect((screen.getByLabelText("물리 엔진 선택") as HTMLSelectElement).value).toBe("no-physics");
     expect(screen.getByText("authority 충돌 없이 컴파일 가능한 조합입니다.")).toBeTruthy();
   });
 
