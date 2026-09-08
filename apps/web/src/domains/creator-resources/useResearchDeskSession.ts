@@ -52,16 +52,9 @@ export function useResearchDeskSession() {
   }, [apply]);
 
   const update = useCallback((updater: (current: ResearchDeskSession) => ResearchDeskSession) => {
-    let base = sessionRef.current;
-    if (typeof window !== "undefined") {
-      try {
-        const raw = window.localStorage.getItem(RESEARCH_DESK_SESSION_KEY);
-        if (raw !== null) base = parseResearchDeskSession(raw);
-      } catch {
-        // Keep the valid in-memory copy instead of trusting malformed external state.
-      }
-    }
-    const next = sanitizeResearchDeskSession(updater(base));
+    // The in-memory snapshot stays authoritative while this tab is editing. Reading an
+    // older persisted value here would roll back unsaved fields after quota/security failures.
+    const next = sanitizeResearchDeskSession(updater(sessionRef.current));
     apply(next);
     if (typeof window === "undefined") return;
     try {
