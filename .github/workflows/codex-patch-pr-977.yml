@@ -1,0 +1,40 @@
+name: Codex patch PR 977
+
+on:
+  push:
+    branches: [feat/studio-publishing-command-center]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[codex-patch-done-977]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/studio-publishing-command-center
+      - name: Apply focused publication status type fix
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('apps/web/src/domains/creator/StudioPublishingCommandCenter.tsx')
+          source = path.read_text()
+          import_old = '  type CreatorPublicationDirective,\n} from "@/shared/lib/creator-publication-contract";'
+          import_new = '  type CreatorPublicationDirective,\n  type CreatorPublicationWorkStatus,\n} from "@/shared/lib/creator-publication-contract";'
+          status_old = 'const requestedStatus = intent === "draft" ? "draft" : "published";\n    let effectiveStatus = requestedStatus;'
+          status_new = 'const requestedStatus: CreatorPublicationWorkStatus =\n      intent === "draft" ? "draft" : "published";\n    let effectiveStatus: CreatorPublicationWorkStatus = requestedStatus;'
+          if source.count(import_old) != 1:
+              raise SystemExit(f'expected one import target, found {source.count(import_old)}')
+          if source.count(status_old) != 1:
+              raise SystemExit(f'expected one status target, found {source.count(status_old)}')
+          path.write_text(source.replace(import_old, import_new, 1).replace(status_old, status_new, 1))
+      - name: Commit repair and remove patch workflow
+        run: |
+          rm .github/workflows/codex-patch-pr-977.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add apps/web/src/domains/creator/StudioPublishingCommandCenter.tsx .github/workflows/codex-patch-pr-977.yml
+          git commit -m "fix(studio): preserve publication status type [codex-patch-done-977]"
+          git push origin HEAD:feat/studio-publishing-command-center
