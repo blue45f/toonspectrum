@@ -18,10 +18,11 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
   let pool: Pool;
   let owner: string;
 
-  async function migrate(connection: Pool | PoolClient, targetSchema: string, lastMigration = 42) {
+  async function migrate(connection: Pool | PoolClient, targetSchema: string, lastMigration = 44) {
     const manifest = await readFile(new URL("../../../../../scripts/production-database-migrations.manifest", import.meta.url), "utf8");
     for (const path of manifest.trim().split("\n")) {
-      const number = /\/00(39|40|41|42)_/u.exec(path)?.[1];
+      // 0043 provisions unrelated administrator tables, absent from this asset-only fixture.
+      const number = /\/00(39|40|41|42|44)_/u.exec(path)?.[1];
       if (!number || Number(number) > lastMigration) continue;
       const migration = await readFile(new URL(`../../../../../${path}`, import.meta.url), "utf8");
       await connection.query(migration.replaceAll("public.", `"${targetSchema}".`));
@@ -193,13 +194,15 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
     });
   });
 
-  async function grant(connection: PoolClient, minimum: number | null = null, maximum: number | null = null, policy = "package-head", target: { packageId?: string; publisherId?: string; releaseId?: string } = {}) {
+  async function grant(connection: PoolClient, minimum: number | null = null, maximum: number | null = null, policy = "package-head", target: { packageId?: string; publisherId?: string; releaseId?: string; subjectType?: "user" | "organization"; subjectId?: string; validFrom?: string; validUntil?: string | null; existingWorkSurvives?: boolean; revokedAt?: string | null } = {}) {
     const id = randomUUID();
     await connection.query(`INSERT INTO creator_marketplace_entitlement_grant
       (id, "subjectType", "subjectId", "publisherId", "packageId", "releasePolicy", "minimumOrdinal", "maximumOrdinal", "releaseId",
-       "grantType", scope, "validFrom", "sourceEventId")
-      VALUES ($1, 'user', $2, $6, $7, $3, $4, $5, $8, 'purchase', 'personal', statement_timestamp(), $1)`,
-    [id, owner, policy, minimum, maximum, target.publisherId ?? owner, target.packageId ?? 'fixture', target.releaseId ?? null]);
+       "grantType", scope, "validFrom", "validUntil", "existingWorkSurvives", "revokedAt", "sourceEventId")
+      VALUES ($1, $9, $2, $6, $7, $3, $4, $5, $8, 'purchase', 'personal',
+        coalesce($10::timestamptz, statement_timestamp()), $11, $12, $13, $1)`,
+    [id, target.subjectId ?? owner, policy, minimum, maximum, target.publisherId ?? owner, target.packageId ?? 'fixture', target.releaseId ?? null,
+      target.subjectType ?? "user", target.validFrom ?? null, target.validUntil ?? null, target.existingWorkSurvives ?? false, target.revokedAt ?? null]);
     return id;
   }
 
@@ -223,7 +226,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
     return { ...source, id, license, packageId: source.draft };
   }
 
-  async function workBinding(connection: PoolClient, selected: Awaited<ReturnType<typeof release>>, overrides: { releaseId?: string; entryId?: string; license?: string; entitlement?: string | null; digest?: string } = {}) {
+  async function workBinding(connection: PoolClient, selected: Awaited<ReturnType<typeof release>>, overrides: { releaseId?: string; entryId?: string; license?: string; entitlement?: string | null; digest?: string; insertedAt?: string; workOwner?: string } = {}) {
     const work = randomUUID();
     const target = (await connection.query<{ publisherId: string; packageId: string }>(
       'SELECT "publisherId", "packageId" FROM creator_marketplace_resource WHERE id=$1',
@@ -231,15 +234,160 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
     )).rows[0]!;
     const entitlement = overrides.entitlement !== undefined ? overrides.entitlement
       : await grant(connection, null, null, "package-head", target);
-    await connection.query('INSERT INTO creator_work (id, "userId", title) VALUES ($1, $2, \'Fixture\')', [work, owner]);
+    await connection.query('INSERT INTO creator_work (id, "userId", title) VALUES ($1, $2, \'Fixture\')', [work, overrides.workOwner ?? owner]);
     await connection.query(`INSERT INTO creator_work_catalog_asset_binding
       ("workId", "attachmentId", "assetType", "releaseId", "entryId", "artifactSetId", "selectedArtifactId",
-       "expectedContentDigest", "licenseSnapshotId", "entitlementGrantId", "useReceiptId", "qualityProfile")
-      VALUES ($1, 'attachment', 'raster', $2, $3, $4, 'source', $5, $6, $7, $1, 'source')`,
+       "expectedContentDigest", "licenseSnapshotId", "entitlementGrantId", "useReceiptId", "qualityProfile", "insertedAt")
+      VALUES ($1, 'attachment', 'raster', $2, $3, $4, 'source', $5, $6, $7, $1, 'source', coalesce($8::timestamptz, statement_timestamp()))`,
     [work, overrides.releaseId ?? selected.id, overrides.entryId ?? "entry", selected.set, overrides.digest ?? selected.source,
-      overrides.license ?? selected.license, entitlement]);
+      overrides.license ?? selected.license, entitlement, overrides.insertedAt ?? null]);
     return { work, entitlement };
   }
+
+  it.each(["other-user", "organization", "revoked", "future", "expired", "expired-survivable"] as const)("rejects new work acquisition with a %s entitlement", async (kind) => {
+    await transaction(async (connection) => {
+      const selected = await release(connection);
+      const entitlement = await grant(connection, null, null, "package-head", {
+        packageId: selected.packageId,
+        subjectId: kind === "other-user" ? randomUUID() : owner,
+        subjectType: kind === "organization" ? "organization" : "user",
+        validFrom: kind === "future" ? "2999-01-01T00:00:00Z" : "2000-01-01T00:00:00Z",
+        validUntil: kind.startsWith("expired") ? "2001-01-01T00:00:00Z" : null,
+        revokedAt: kind === "revoked" ? "2000-01-01T00:00:00Z" : null,
+        existingWorkSurvives: kind === "expired-survivable",
+      });
+      await expect(workBinding(connection, selected, { entitlement, insertedAt: "2000-06-01T00:00:00Z" }))
+        .rejects.toMatchObject({ constraint: "creator_work_catalog_asset_binding_entitlement_authorization" });
+    });
+  });
+
+  it("uses server acquisition time for a valid owner grant and preserves publisher grant-free insertion", async () => {
+    await transaction(async (connection) => {
+      const selected = await release(connection);
+      const before = (await connection.query<{ now: Date }>('SELECT statement_timestamp() AS now')).rows[0]!.now;
+      const accepted = await workBinding(connection, selected, { insertedAt: "2000-06-01T00:00:00Z" });
+      const row = (await connection.query<{ insertedAt: Date }>('SELECT "insertedAt" FROM creator_work_catalog_asset_binding WHERE "workId"=$1', [accepted.work])).rows[0]!;
+      expect(row.insertedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect((await workBinding(connection, selected, { entitlement: null })).entitlement).toBeNull();
+    });
+  });
+
+  it("requires a verified grant for another user's CC0 release instead of trusting a free access claim", async () => {
+    await transaction(async (connection) => {
+      const selected = await release(connection);
+      const reader = randomUUID();
+      await connection.query('INSERT INTO "user" (id,name) VALUES ($1,\'Reader\')', [reader]);
+      await expect(workBinding(connection, selected, { entitlement: null, workOwner: reader }))
+        .rejects.toMatchObject({ constraint: "creator_work_catalog_asset_binding_entitlement_authorization" });
+    });
+  });
+
+  it.each(["insertedAt", "insertedBy", "entitlementGrantId"] as const)("preserves acquisition proof and nullable attribution: %s", async (field) => {
+    await transaction(async (connection) => {
+      const selected = await release(connection);
+      const accepted = await workBinding(connection, selected);
+      const value = field === "insertedAt" ? "2000-01-01T00:00:00Z" : field === "insertedBy" ? owner : null;
+      if (field === "insertedBy") {
+        await connection.query('UPDATE creator_work_catalog_asset_binding SET "insertedBy"=$2 WHERE "workId"=$1', [accepted.work, owner]);
+        expect((await connection.query('SELECT "insertedBy" FROM creator_work_catalog_asset_binding WHERE "workId"=$1', [accepted.work])).rows[0]?.insertedBy).toBe(owner);
+        await connection.query('UPDATE creator_work_catalog_asset_binding SET "insertedBy"=NULL WHERE "workId"=$1', [accepted.work]);
+        expect((await connection.query('SELECT "insertedBy" FROM creator_work_catalog_asset_binding WHERE "workId"=$1', [accepted.work])).rows[0]?.insertedBy).toBeNull();
+        return;
+      }
+      await rejects(connection, `UPDATE creator_work_catalog_asset_binding SET "${field}"=$2 WHERE "workId"=$1`,
+        [accepted.work, value], "creator_work_catalog_asset_binding_entitlement_evidence");
+    });
+  });
+
+  it("keeps another owner's binding when its attributed author is deleted", async () => {
+    await transaction(async (connection) => {
+      const selected = await release(connection);
+      const accepted = await workBinding(connection, selected);
+      const author = randomUUID();
+      await connection.query('INSERT INTO "user" (id,name) VALUES ($1,\'Departing contributor\')', [author]);
+      await connection.query('UPDATE creator_work_catalog_asset_binding SET "insertedBy"=$2 WHERE "workId"=$1', [accepted.work, author]);
+      const before = (await connection.query('SELECT * FROM creator_work_catalog_asset_binding WHERE "workId"=$1', [accepted.work])).rows[0];
+      await connection.query('DELETE FROM "user" WHERE id=$1', [author]);
+      const remaining = (await connection.query('SELECT * FROM creator_work_catalog_asset_binding WHERE "workId"=$1', [accepted.work])).rows;
+      expect(remaining).toEqual([{ ...before, insertedBy: null }]);
+      expect((await connection.query('SELECT "userId" FROM creator_work WHERE id=$1', [accepted.work])).rows[0]?.userId).toBe(owner);
+    });
+  });
+
+  it("preserves revoked reference metadata but reauthorizes work, attachment, release and grant changes", async () => {
+    await transaction(async (connection) => {
+      const selected = await release(connection);
+      const accepted = await workBinding(connection, selected);
+      await connection.query('UPDATE creator_marketplace_entitlement_grant SET "revokedAt"=statement_timestamp() WHERE id=$1', [accepted.entitlement]);
+      const evidence = async () => (await connection.query('SELECT "insertedAt","insertedBy","entitlementGrantId","releaseId" FROM creator_work_catalog_asset_binding WHERE "workId"=$1', [accepted.work])).rows[0];
+      const before = await evidence();
+      await connection.query('UPDATE creator_work_catalog_asset_binding SET state=\'revoked-warning\',"qualityProfile"=\'mobile\',"lastResolvedAt"=statement_timestamp() WHERE "workId"=$1', [accepted.work]);
+      expect(await evidence()).toEqual(before);
+      const work = randomUUID();
+      await connection.query('INSERT INTO creator_work (id,"userId",title) VALUES ($1,$2,\'Other work\')', [work, owner]);
+      for (const [field, value] of [["workId", work], ["attachmentId", "another-attachment"]]) {
+        await rejects(connection, `UPDATE creator_work_catalog_asset_binding SET "${field}"=$2 WHERE "workId"=$1`, [accepted.work, value],
+          "creator_work_catalog_asset_binding_entitlement_authorization");
+      }
+      const unrelated = await release(connection);
+      await rejects(connection, 'UPDATE creator_work_catalog_asset_binding SET "releaseId"=$2 WHERE "workId"=$1', [accepted.work, unrelated.id],
+        "creator_work_catalog_asset_binding_entitlement_release");
+      const future = await grant(connection, null, null, "package-head", { packageId: selected.packageId, validFrom: "2999-01-01T00:00:00Z" });
+      await rejects(connection, 'UPDATE creator_work_catalog_asset_binding SET "entitlementGrantId"=$2 WHERE "workId"=$1', [accepted.work, future],
+        "creator_work_catalog_asset_binding_entitlement_authorization");
+    });
+  });
+
+  it.each([true, false])("preserves expired historical receipts without granting new use (survival=%s)", async (survives) => {
+    const legacy = `asset_authorization_${randomUUID().replaceAll("-", "")}`;
+    const connection = await client();
+    try {
+      await connection.query(`CREATE SCHEMA "${legacy}"`);
+      for (const table of ["user", "creator_work", "creator_marketplace_resource", "creator_asset_storage_object"]) {
+        await connection.query(`CREATE TABLE "${legacy}"."${table}" (LIKE public."${table}" INCLUDING ALL)`);
+      }
+      await migrate(connection, legacy, 42);
+      await connection.query(`SET search_path TO "${legacy}", public`);
+      await connection.query('INSERT INTO "user" (id,name) VALUES ($1,\'Historical owner\')', [owner]);
+      const selected = await release(connection);
+      const entitlement = await grant(connection, null, null, "package-head", { packageId: selected.packageId,
+        validFrom: "2000-01-01T00:00:00Z", validUntil: "2001-01-01T00:00:00Z", existingWorkSurvives: survives });
+      const accepted = await workBinding(connection, selected, { entitlement, insertedAt: "2000-06-01T00:00:00Z" });
+      const snapshot = async () => (await connection.query('SELECT * FROM creator_work_catalog_asset_binding WHERE "workId"=$1', [accepted.work])).rows[0];
+      const before = await snapshot();
+      const migration = await readFile(new URL("../../../../../apps/api/src/db/migrations/0044_creator_work_entitlement_authorization.sql", import.meta.url), "utf8");
+      await connection.query(migration.replaceAll("public.", `"${legacy}".`));
+      expect(await snapshot()).toEqual(before);
+      await connection.query('UPDATE creator_work_catalog_asset_binding SET "qualityProfile"=\'mobile\',state=\'revoked-warning\' WHERE "workId"=$1', [accepted.work]);
+      expect(await snapshot()).toEqual({ ...before, qualityProfile: "mobile", state: "revoked-warning" });
+      await expect(workBinding(connection, selected, { entitlement, insertedAt: "2000-06-01T00:00:00Z" }))
+        .rejects.toMatchObject({ constraint: "creator_work_catalog_asset_binding_entitlement_authorization" });
+    } finally {
+      await connection.query("ROLLBACK");
+      await connection.query(`DROP SCHEMA IF EXISTS "${legacy}" CASCADE`);
+      connection.release();
+    }
+  });
+
+  it.each(["binding-first", "revocation-first"] as const)("serializes entitlement revocation and acquisition: %s", async (order) => {
+    const first = await client(); const second = await client();
+    try {
+      const selected = await release(first);
+      const entitlement = await grant(first, null, null, "package-head", { packageId: selected.packageId });
+      const reference = await workBinding(first, selected, { entitlement: null });
+      const bind = (connection: PoolClient) => connection.query('UPDATE creator_work_catalog_asset_binding SET "entitlementGrantId"=$2 WHERE "workId"=$1', [reference.work, entitlement]);
+      const revoke = (connection: PoolClient) => connection.query('UPDATE creator_marketplace_entitlement_grant SET "revokedAt"=statement_timestamp() WHERE id=$1', [entitlement]);
+      const backend = (await second.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!;
+      await first.query("BEGIN");
+      await (order === "binding-first" ? bind(first) : revoke(first));
+      const pending = (order === "binding-first" ? revoke(second) : bind(second))
+        .then(() => ({ accepted: true }), (error: { constraint?: string }) => ({ accepted: false, constraint: error.constraint }));
+      await expect.poll(async () => (await pool.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1', [backend.pid])).rows[0]?.wait_event_type).toBe("Lock");
+      await first.query("COMMIT");
+      expect(await pending).toEqual(order === "binding-first" ? { accepted: true }
+        : { accepted: false, constraint: "creator_work_catalog_asset_binding_entitlement_authorization" });
+    } finally { await first.query("ROLLBACK"); first.release(); second.release(); }
+  });
 
   it.each(["release", "entry", "license"] as const)("rejects a mismatched release-entry %s attachment", async (field) => {
     await transaction(async (connection) => {

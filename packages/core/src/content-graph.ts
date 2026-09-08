@@ -286,7 +286,11 @@ export function authorizeContentUsage(
   if (!rights.allowedMonetizationModels.includes(context.monetization)) {
     return { allowed: false, reason: "MONETIZATION_NOT_ALLOWED" };
   }
-  if (!rights.allowedSurfaces.includes(context.surface)) {
+  if (
+    !rights.allowedSurfaces.includes(context.surface)
+    || (context.surface === "studio-import" && rights.projectImport !== true)
+    || (context.surface === "marketplace-download" && rights.originalDownload !== true)
+  ) {
     return { allowed: false, reason: "SURFACE_NOT_ALLOWED" };
   }
   if (context.commercialProject && rights.commercialUse !== true) {

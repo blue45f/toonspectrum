@@ -12,6 +12,7 @@ import type {
   StudioProjectPublishPackSnapshot,
   StudioProjectSnapshot,
 } from "../studio-project-snapshot";
+import { createSha256Portable } from "../studio-sha256";
 
 import {
   migrateStudioCharacterBibleV1ToV2,
@@ -146,11 +147,14 @@ export interface StudioProjectArchiveMigrationBundleV3 {
 }
 
 export type StudioProjectArchiveIssueCode =
+  | "invalid-archive"
   | "invalid-version"
   | "invalid-id"
   | "invalid-timestamp"
   | "missing-content-digest"
   | "missing-section-digest"
+  | "content-digest-mismatch"
+  | "section-digest-mismatch"
   | "invalid-version-coordinates"
   | "invalid-character-bible"
   | "invalid-identity-index"
@@ -165,6 +169,88 @@ export interface StudioProjectArchiveIssue {
 }
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,239}$/u;
+const SECTION_PROPERTIES = {
+  metadata: "metadata",
+  content: "content",
+  story: "story",
+  bible: "bible",
+  identity: "identity",
+  provenance: "provenance",
+  assets: "assets",
+  "publish-draft": "publishDraft",
+  operations: "operations",
+  "local-drafts": "localDrafts",
+} as const satisfies Record<StudioProjectArchiveSectionKey, keyof StudioProjectArchiveV3>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Normalize once through JSON so Dates, toJSON, undefined and non-finite values match storage. */
+function normalizeArchive(archive: StudioProjectArchiveV3): StudioProjectArchiveV3 {
+  const serialized = JSON.stringify(archive);
+  if (serialized === undefined) throw new TypeError("Studio archive is not JSON serializable.");
+  const normalized: unknown = JSON.parse(serialized);
+  if (
+    !isRecord(normalized)
+    || !isRecord(normalized.manifest)
+    || !isRecord(normalized.manifest.sectionDigests)
+    || !isRecord(normalized.compatibility)
+    || "workspace" in normalized
+  ) throw new TypeError("Studio archive structure is invalid.");
+  for (const property of Object.values(SECTION_PROPERTIES)) {
+    if (!isRecord(normalized[property])) {
+      throw new TypeError(`Studio archive section is invalid: ${property}`);
+    }
+  }
+  const result = normalized as unknown as StudioProjectArchiveV3;
+  if (
+    !Array.isArray(result.content.pagesList)
+    || !Array.isArray(result.assets.revisions)
+    || result.assets.manifestVersion !== 1
+    || typeof result.metadata.title !== "string"
+    || typeof result.metadata.description !== "string"
+    || typeof result.metadata.tagsText !== "string"
+    || typeof result.content.panelGutter !== "number"
+    || !Number.isFinite(result.content.panelGutter)
+  ) throw new TypeError("Studio archive section fields are invalid.");
+  return result;
+}
+
+function canonicalJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJsonValue);
+  if (isRecord(value)) {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [
+      key,
+      canonicalJsonValue(value[key]),
+    ]));
+  }
+  return value;
+}
+
+function digestJsonValue(value: unknown): string {
+  const hasher = createSha256Portable();
+  hasher.update(new TextEncoder().encode(JSON.stringify(canonicalJsonValue(value))));
+  return `sha256:${hasher.finalizeHex()}`;
+}
+
+/** The root binds all persisted payload, including v2 compatibility, but never external workspace. */
+function computeArchiveDigests(archive: StudioProjectArchiveV3): Pick<
+  StudioProjectArchiveManifestV3, "contentDigest" | "sectionDigests"
+> {
+  const normalized = normalizeArchive(archive);
+  const sectionDigests = Object.fromEntries(STUDIO_PROJECT_ARCHIVE_SECTION_KEYS.map((key) => [
+    key,
+    digestJsonValue(normalized[SECTION_PROPERTIES[key]]),
+  ])) as Record<StudioProjectArchiveSectionKey, string>;
+  const manifest: Record<string, unknown> = { ...normalized.manifest };
+  delete manifest.contentDigest;
+  delete manifest.sectionDigests;
+  return {
+    sectionDigests,
+    contentDigest: digestJsonValue({ ...normalized, manifest }),
+  };
+}
 
 function validTimestamp(value: string): boolean {
   if (!Number.isFinite(Date.parse(value))) return false;
@@ -180,9 +266,8 @@ function nullableId(value: string | null | undefined): string | null {
   return normalized || null;
 }
 
-function validDigest(value: string): boolean {
-  const digest = value.trim();
-  return digest.length >= 8 && digest.length <= 512;
+function validDigest(value: unknown): value is string {
+  return typeof value === "string" && /^sha256:[0-9a-f]{64}$/u.test(value);
 }
 
 function validateWorkspaceState(
@@ -214,8 +299,8 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
   readonly workScope: string;
   readonly createdAt: string;
   readonly sourceCoordinates: StudioVersionCoordinates;
-  readonly contentDigest: string;
-  readonly sectionDigests: Readonly<Record<StudioProjectArchiveSectionKey, string>>;
+  readonly contentDigest?: string;
+  readonly sectionDigests?: Readonly<Record<StudioProjectArchiveSectionKey, string>>;
   readonly identityIndex?: StudioIdentityIndexV1;
   readonly assetRevisions?: readonly StudioAssetReferenceV2[];
   readonly selectedElementIds?: readonly string[];
@@ -231,7 +316,7 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
     || !SAFE_ID.test(input.archiveId)
     || !SAFE_ID.test(input.workScope)
     || !validTimestamp(input.createdAt)
-    || !validDigest(input.contentDigest)
+    || (input.contentDigest !== undefined && !validDigest(input.contentDigest))
   ) {
     throw new Error("Studio archive v3 migration requires valid, pinned source metadata.");
   }
@@ -240,9 +325,11 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
   if (identityIndex.workScope !== input.workScope) {
     throw new Error("Studio archive identity index belongs to another work scope.");
   }
-  const sectionDigests = { ...input.sectionDigests };
+  const sectionDigests = Object.fromEntries(
+    STUDIO_PROJECT_ARCHIVE_SECTION_KEYS.map((key) => [key, ""]),
+  ) as Record<StudioProjectArchiveSectionKey, string>;
   for (const key of STUDIO_PROJECT_ARCHIVE_SECTION_KEYS) {
-    if (!validDigest(sectionDigests[key])) {
+    if (input.sectionDigests !== undefined && !validDigest(input.sectionDigests[key])) {
       throw new Error(`Studio archive section digest is missing: ${key}`);
     }
   }
@@ -260,7 +347,7 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
     throw new Error("Primary selection must belong to the workspace selection set.");
   }
 
-  const archive: StudioProjectArchiveV3 = {
+  const unsealedArchive: StudioProjectArchiveV3 = {
     version: STUDIO_PROJECT_ARCHIVE_VERSION,
     manifest: {
       archiveId: input.archiveId,
@@ -270,7 +357,7 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
         ? input.snapshot.savedAt
         : null,
       sourceCoordinates: input.sourceCoordinates,
-      contentDigest: input.contentDigest,
+      contentDigest: "",
       sectionDigests,
       schemaVersions: {
         archive: STUDIO_PROJECT_ARCHIVE_VERSION,
@@ -325,6 +412,20 @@ export function migrateStudioProjectSnapshotV2ToArchiveV3(input: {
     compatibility: { characterBibleV1: input.snapshot.characterBible },
   };
 
+  const computedDigests = computeArchiveDigests(unsealedArchive);
+  if (input.contentDigest !== undefined && input.contentDigest !== computedDigests.contentDigest) {
+    throw new Error("Studio archive content digest does not match its payload.");
+  }
+  for (const key of STUDIO_PROJECT_ARCHIVE_SECTION_KEYS) {
+    if (input.sectionDigests !== undefined && input.sectionDigests[key] !== computedDigests.sectionDigests[key]) {
+      throw new Error(`Studio archive section digest does not match its payload: ${key}`);
+    }
+  }
+  const archive: StudioProjectArchiveV3 = {
+    ...unsealedArchive,
+    manifest: { ...unsealedArchive.manifest, ...computedDigests },
+  };
+
   const workspace: StudioProjectWorkspaceStateV1 = {
     version: 1,
     workScope: input.workScope,
@@ -354,49 +455,64 @@ export function projectStudioArchiveV3ToV2Snapshot(input: {
   readonly workspace: StudioProjectWorkspaceStateV1;
   readonly savedAt?: string;
 }): StudioProjectSnapshot {
+  const archive = normalizeArchive(input.archive);
   const issues = [
-    ...validateStudioProjectArchiveV3(input.archive),
+    ...validateStudioProjectArchiveV3(archive),
     ...validateWorkspaceState(input.workspace),
   ];
   if (issues.length > 0) {
     throw new Error(`Cannot project an invalid Studio archive: ${issues[0].message}`);
   }
-  if (input.workspace.workScope !== input.archive.manifest.workScope) {
+  if (input.workspace.workScope !== archive.manifest.workScope) {
     throw new Error("Studio archive and workspace scopes differ.");
   }
   const savedAt = input.savedAt
-    ?? input.archive.manifest.sourceV2SavedAt
-    ?? input.archive.manifest.createdAt;
+    ?? archive.manifest.sourceV2SavedAt
+    ?? archive.manifest.createdAt;
   if (!validTimestamp(savedAt)) {
     throw new Error("Studio v2 projection requires a canonical savedAt timestamp.");
   }
   return {
     version: 2,
     savedAt,
-    title: input.archive.metadata.title,
-    description: input.archive.metadata.description,
-    tagsText: input.archive.metadata.tagsText,
-    linkedTitleId: input.archive.metadata.linkedTitleId,
-    linkedSeriesId: input.archive.metadata.linkedSeriesId,
-    linkedChallengeId: input.archive.metadata.linkedChallengeId,
-    pagesList: [...input.archive.content.pagesList],
-    master: input.archive.content.master,
-    characterBible: input.archive.compatibility.characterBibleV1,
-    writerRoom: input.archive.story.writerRoom,
-    aiProvenance: input.archive.provenance.ai,
-    comments: input.archive.localDrafts.comments,
-    releaseSchedule: input.archive.operations.releaseSchedule,
-    publicationAnalytics: input.archive.operations.publicationAnalytics,
-    referenceBoard: input.archive.provenance.referenceBoard,
-    aiImageReferences: input.archive.provenance.imageReferences,
+    title: archive.metadata.title,
+    description: archive.metadata.description,
+    tagsText: archive.metadata.tagsText,
+    linkedTitleId: archive.metadata.linkedTitleId,
+    linkedSeriesId: archive.metadata.linkedSeriesId,
+    linkedChallengeId: archive.metadata.linkedChallengeId,
+    pagesList: [...archive.content.pagesList],
+    master: archive.content.master,
+    characterBible: archive.compatibility.characterBibleV1,
+    writerRoom: archive.story.writerRoom,
+    aiProvenance: archive.provenance.ai,
+    comments: archive.localDrafts.comments,
+    releaseSchedule: archive.operations.releaseSchedule,
+    publicationAnalytics: archive.operations.publicationAnalytics,
+    referenceBoard: archive.provenance.referenceBoard,
+    aiImageReferences: archive.provenance.imageReferences,
     currentPageId: input.workspace.currentPageId,
-    webtoonTheme: input.archive.content.webtoonTheme,
-    panelGutter: input.archive.content.panelGutter,
-    publishPack: input.archive.publishDraft.settings,
+    webtoonTheme: archive.content.webtoonTheme,
+    panelGutter: archive.content.panelGutter,
+    publishPack: archive.publishDraft.settings,
   };
 }
 
 export function validateStudioProjectArchiveV3(
+  archive: StudioProjectArchiveV3,
+): readonly StudioProjectArchiveIssue[] {
+  try {
+    return validateNormalizedArchive(normalizeArchive(archive));
+  } catch {
+    return [{
+      code: "invalid-archive",
+      path: "archive",
+      message: "Studio archive is malformed or cannot be serialized as JSON.",
+    }];
+  }
+}
+
+function validateNormalizedArchive(
   archive: StudioProjectArchiveV3,
 ): readonly StudioProjectArchiveIssue[] {
   const issues: StudioProjectArchiveIssue[] = [];
@@ -434,6 +550,26 @@ export function validateStudioProjectArchiveV3(
         code: "missing-section-digest",
         path: `manifest.sectionDigests.${key}`,
         message: `Studio archive section digest is missing: ${key}`,
+      });
+    }
+  }
+  const computedDigests = computeArchiveDigests(archive);
+  if (validDigest(archive.manifest.contentDigest) && archive.manifest.contentDigest !== computedDigests.contentDigest) {
+    issues.push({
+      code: "content-digest-mismatch",
+      path: "manifest.contentDigest",
+      message: "Studio archive content digest does not match its payload.",
+    });
+  }
+  for (const key of STUDIO_PROJECT_ARCHIVE_SECTION_KEYS) {
+    if (
+      validDigest(archive.manifest.sectionDigests[key])
+      && archive.manifest.sectionDigests[key] !== computedDigests.sectionDigests[key]
+    ) {
+      issues.push({
+        code: "section-digest-mismatch",
+        path: `manifest.sectionDigests.${key}`,
+        message: `Studio archive section digest does not match its payload: ${key}`,
       });
     }
   }
@@ -494,9 +630,10 @@ export function validateStudioProjectArchiveV3(
 export function serializeStudioProjectArchiveV3(
   archive: StudioProjectArchiveV3,
 ): string {
-  const issues = validateStudioProjectArchiveV3(archive);
+  const normalized = normalizeArchive(archive);
+  const issues = validateStudioProjectArchiveV3(normalized);
   if (issues.length > 0) {
     throw new Error(`Cannot serialize invalid Studio archive: ${issues[0].message}`);
   }
-  return JSON.stringify(archive);
+  return JSON.stringify(normalized);
 }

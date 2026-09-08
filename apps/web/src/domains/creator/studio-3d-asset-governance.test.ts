@@ -21,7 +21,9 @@ import {
   evaluateStudio3dAssetRelease,
   publishStudio3dAsset,
   transitionStudio3dAssetRefinery,
+  type Studio3dAssetRefineryDiagnostic,
   type Studio3dAssetRefineryReceipt,
+  type Studio3dAssetRefineryStage,
 } from "./studio-3d-asset-refinery";
 
 const ASSET_ID = "hero-character-001";
@@ -113,7 +115,12 @@ function supplyEvidence(
   };
 }
 
-function approvedRefinery(): Studio3dAssetRefineryReceipt {
+function approvedRefinery(
+  diagnosticsByStage: Partial<Record<
+    Studio3dAssetRefineryStage,
+    readonly Studio3dAssetRefineryDiagnostic[]
+  >> = {}
+): Studio3dAssetRefineryReceipt {
   const receipt = createStudio3dAssetRefineryReceipt({
     assetId: ASSET_ID,
     assetVersion: ASSET_VERSION,
@@ -127,6 +134,7 @@ function approvedRefinery(): Studio3dAssetRefineryReceipt {
     "rights_checked",
     "analyzed",
     "normalized",
+    ...(diagnosticsByStage.repaired ? ["repaired" as const] : []),
     "optimized",
     "technical_qa",
     "render_qa",
@@ -138,6 +146,7 @@ function approvedRefinery(): Studio3dAssetRefineryReceipt {
     at: REVIEWED_AT,
     actor: "asset-refinery",
     reason: "단계별 검사와 담당자 승인을 통과했습니다.",
+    diagnostics: diagnosticsByStage[stage],
   }), receipt);
 }
 
@@ -291,6 +300,58 @@ describe("studio 3D asset supply policy", () => {
 });
 
 describe("studio 3D asset refinery and release gate", () => {
+  it("allows explicitly repaired diagnostics while preserving the original error history", () => {
+    const failure = { code: "OPEN_MESH", severity: "error", message: "Mesh has open edges." } as const;
+    const repaired = { code: "OPEN_MESH", severity: "info", message: "Closed edges verified." } as const;
+    const refinery = approvedRefinery({ analyzed: [failure], repaired: [repaired] });
+    const gate = {
+      refinery,
+      quality: buildStudio3dAssetQualityPassport(qualityInput()),
+      supply: evaluateStudio3dAssetSupply(supplyEvidence()),
+      rights: rights(),
+    };
+
+    expect(refinery.diagnostics).toEqual([repaired]);
+    expect(refinery.history.find(event => event.to === "analyzed")?.diagnostics).toEqual([failure]);
+    expect(refinery.history.find(event => event.to === "repaired")?.diagnostics).toEqual([repaired]);
+    expect(Object.isFrozen(refinery.diagnostics)).toBe(true);
+    expect(evaluateStudio3dAssetRelease(gate).allowed).toBe(true);
+    expect(publishStudio3dAsset(gate, {
+      at: REVIEWED_AT,
+      actor: "catalog-publisher",
+      reason: "Repair and all release gates verified.",
+    }).stage).toBe("published");
+  });
+
+  it("does not clear unresolved or newly recurring errors merely by completing QA", () => {
+    const failure = { code: "OPEN_MESH", severity: "error", message: "Mesh has open edges." } as const;
+    const repaired = { code: "OPEN_MESH", severity: "info", message: "Closed edges verified." } as const;
+    const unrelated = { code: "QA_COMPLETE", severity: "info", message: "Other checks passed." } as const;
+    const anotherFailure = { code: "BAD_WEIGHTS", severity: "error", message: "Weights still invalid." } as const;
+    const receipts = [
+      approvedRefinery({ analyzed: [failure], technical_qa: [unrelated] }),
+      approvedRefinery({ analyzed: [failure, anotherFailure], repaired: [repaired] }),
+      approvedRefinery({ analyzed: [failure], repaired: [repaired], technical_qa: [failure] }),
+    ];
+
+    for (const refinery of receipts) {
+      const gate = {
+        refinery,
+        quality: buildStudio3dAssetQualityPassport(qualityInput()),
+        supply: evaluateStudio3dAssetSupply(supplyEvidence()),
+        rights: rights(),
+      };
+      expect(evaluateStudio3dAssetRelease(gate)).toMatchObject({ allowed: false });
+      expect(evaluateStudio3dAssetRelease(gate).diagnostics.map(entry => entry.code))
+        .toContain("REFINERY_ERRORS_PRESENT");
+      expect(() => publishStudio3dAsset(gate, {
+        at: REVIEWED_AT,
+        actor: "catalog-publisher",
+        reason: "Unresolved findings must remain blocked.",
+      })).toThrow("REFINERY_ERRORS_PRESENT");
+    }
+  });
+
   it("rejects skipped states and preserves an immutable approval history", () => {
     const received = createStudio3dAssetRefineryReceipt({
       assetId: ASSET_ID,

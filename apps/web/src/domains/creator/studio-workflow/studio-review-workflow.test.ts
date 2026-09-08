@@ -56,6 +56,81 @@ function thread(
 }
 
 describe("Studio review workflow", () => {
+  it.each(["foreign-cycle", "foreign-work", "unlisted-snapshot"])(
+    "rejects approval snapshots outside the explicit cycle membership: %s",
+    (kind) => {
+      const { cycle, snapshot } = review();
+      const approval = createStudioApproval({
+        approvalId: "approval-1",
+        cycle,
+        snapshot,
+        threads: [],
+        approvedBy: "user-producer",
+        approvedAt: LATER,
+        statementDigest: "statement-digest",
+      });
+      const supplied = {
+        ...snapshot,
+        id: "review-snapshot-extra",
+        cycleId: kind === "foreign-cycle" ? "review-cycle-other" : cycle.id,
+        workId: kind === "foreign-work" ? "work-other" : cycle.workId,
+      };
+      const claimedCycle = {
+        ...cycle,
+        currentSnapshotId: supplied.id,
+        snapshotIds: kind === "unlisted-snapshot" ? cycle.snapshotIds : [...cycle.snapshotIds, supplied.id],
+      };
+      expect(validateStudioReviewWorkflow({
+        cycle: claimedCycle,
+        snapshots: [snapshot, supplied],
+        threads: [],
+        approval: { ...approval, reviewSnapshotId: supplied.id },
+      })).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: "approval-snapshot-mismatch", entityId: approval.id }),
+      ]));
+      expect(evaluateStudioReviewApproval({
+        cycle: claimedCycle,
+        snapshot: supplied,
+        threads: [],
+      }).allowed).toBe(false);
+      expect(() => createStudioApproval({
+        approvalId: "approval-extra",
+        cycle: claimedCycle,
+        snapshot: supplied,
+        threads: [],
+        approvedBy: "user-producer",
+        approvedAt: LATER,
+        statementDigest: "statement-digest",
+      })).toThrow(/approval is blocked/u);
+    },
+  );
+
+  it("preserves an approval for a registered historical snapshot in the same cycle and work", () => {
+    const { cycle, snapshot } = review();
+    const approval = createStudioApproval({
+      approvalId: "approval-1",
+      cycle,
+      snapshot,
+      threads: [],
+      approvedBy: "user-producer",
+      approvedAt: LATER,
+      statementDigest: "statement-digest",
+    });
+    const current = {
+      ...snapshot,
+      id: "review-snapshot-2",
+      sourceServerRevision: 43,
+      sourceContentDigest: "digest-r43",
+    };
+    expect(validateStudioReviewWorkflow({
+      cycle: { ...cycle, currentSnapshotId: current.id, snapshotIds: [snapshot.id, current.id] },
+      snapshots: [snapshot, current],
+      threads: [],
+      approval,
+    })).toEqual([]);
+    expect(canPublishStudioApproval(approval, snapshot.sourceServerRevision, snapshot.sourceContentDigest)).toBe(true);
+  });
+
   it("creates a review snapshot pinned to an immutable server source", () => {
     const { cycle, snapshot } = review();
 

@@ -232,6 +232,55 @@ describe("Studio mutation coordinator", () => {
     expect(store.commit).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { mutationId: "mutation-2", transactionId: "transaction-1" },
+    { mutationId: "mutation-1", transactionId: "transaction-2" },
+    { mutationId: "mutation-2", transactionId: "transaction-2" },
+  ])("rejects an idempotency key collision for $mutationId/$transactionId", async (identity) => {
+    const existing: StudioMutationReceipt = {
+      mutationId: "mutation-1",
+      transactionId: "transaction-1",
+      status: "committed",
+      localSequence: 1,
+      serverSyncState: "queued",
+      affectedSemanticIds: ["panel-1"],
+      committedDomains: ["page-state"],
+    };
+    const port = {
+      domain: "page-state" as const,
+      getSnapshot: vi.fn(() => ({ count: 1 })),
+      prepare: vi.fn(),
+      commit: vi.fn(),
+      restore: vi.fn(),
+    };
+    const store = durability(existing);
+    const coordinator = createStudioMutationCoordinator({
+      domains: [port],
+      durability: store,
+      getCurrentCoordinates: () => coordinates(1),
+    });
+    const original = envelope([command("command-page", "page-state", "page-state/add-frame")]);
+
+    await expect(coordinator.execute({ ...original, ...identity })).rejects.toMatchObject({
+      name: "StudioMutationConflictError",
+      issues: [{ code: "idempotency-key-conflict" }],
+    });
+    // A rejected collision must not poison genuine retries, even after the local base advances.
+    await expect(coordinator.execute(original)).resolves.toEqual({
+      ...existing,
+      status: "idempotent-replay",
+    });
+    expect(port.getSnapshot).not.toHaveBeenCalled();
+    expect(port.prepare).not.toHaveBeenCalled();
+    expect(port.commit).not.toHaveBeenCalled();
+    expect(port.restore).not.toHaveBeenCalled();
+    expect(store.begin).not.toHaveBeenCalled();
+    expect(store.appendPrepared).not.toHaveBeenCalled();
+    expect(store.commit).not.toHaveBeenCalled();
+    expect(store.abort).not.toHaveBeenCalled();
+    expect(store.syncEnvelopeByKey.size).toBe(0);
+  });
+
   it("rejects stale local bases before touching any domain", async () => {
     const port = {
       domain: "page-state" as const,

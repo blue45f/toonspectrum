@@ -664,19 +664,38 @@ export class Hyper3dRodinProvider implements Studio3dGenerationProvider {
   }
 
   async #requestJsonWithRetry(
-    path: string,
+    path: "/status" | "/download",
     body: JsonRecord,
     signal: AbortSignal
   ): Promise<unknown> {
     for (let attempt = 1; attempt <= this.#retryAttempts; attempt += 1) {
-      const response = await this.#request(`${this.#baseUrl}${path}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.#apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      }, signal);
+      let response: Response;
+      try {
+        response = await this.#request(`${this.#baseUrl}${path}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.#apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }, signal);
+      } catch (error) {
+        if (signal.aborted) throw abortError("3D generation request was cancelled.");
+        if (
+          !(error instanceof Studio3dGenerationProviderError) ||
+          !error.retryable ||
+          (error.code !== "timeout" && error.code !== "provider-unavailable") ||
+          attempt === this.#retryAttempts
+        ) {
+          throw error;
+        }
+        // Only existing-job queries reach this helper. Paid submissions remain single-shot.
+        await this.#sleep(
+          Math.min(DEFAULT_MAX_POLL_DELAY_MS, DEFAULT_FIRST_POLL_DELAY_MS * attempt),
+          signal
+        );
+        continue;
+      }
       const payload = await jsonPayload(response);
       if (response.ok) return payload;
 

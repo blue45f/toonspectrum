@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_3D_GENERATION_PROVIDER_CONTRACT_VERSION,
@@ -262,19 +262,187 @@ describe("Hyper3dRodinProvider", () => {
     expect(requests).toHaveLength(2);
   });
 
-  it("never automatically resubmits an ambiguously failed paid request", async () => {
+  it.each(["poll", "download"] as const)("retries a transient transport failure in %s without changing the job query", async (operation) => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const sleeps: number[] = [];
+    const provider = createHyper3dRodinProvider({
+      apiKey: "secret-key",
+      retryAttempts: 2,
+      fetchImpl: responseSequence([
+        new TypeError("mock transient connection reset"),
+        jsonResponse(operation === "poll"
+          ? { jobs: [{ uuid: "job-1", status: "Done" }] }
+          : { list: [{ name: "model.glb", url: "https://download.example/model.glb" }] }),
+      ], requests),
+      sleep: async (delayMs) => { sleeps.push(delayMs); },
+    });
+
+    await expect(provider[operation](jobIdentity(), new AbortController().signal)).resolves.toMatchObject({
+      providerId: HYPER3D_RODIN_PROVIDER_ID,
+    });
+    expect(requests).toHaveLength(2);
+    expect(sleeps).toEqual([5_000]);
+    expect(requests.map((request) => request.input)).toEqual([
+      `https://api.hyper3d.com/api/v2/${operation === "poll" ? "status" : "download"}`,
+      `https://api.hyper3d.com/api/v2/${operation === "poll" ? "status" : "download"}`,
+    ]);
+    expect(requests[1]?.init.body).toBe(requests[0]?.init.body);
+  });
+
+  it.each(["poll", "download"] as const)("stops %s transport retries at the configured attempt budget", async (operation) => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const sleeps: number[] = [];
+    const provider = createHyper3dRodinProvider({
+      apiKey: "secret-key",
+      retryAttempts: 3,
+      fetchImpl: responseSequence(Array.from({ length: 3 }, () => new TypeError("mock network failure")), requests),
+      sleep: async (delayMs) => { sleeps.push(delayMs); },
+    });
+
+    await expect(provider[operation](jobIdentity(), new AbortController().signal)).rejects.toMatchObject({
+      code: "provider-unavailable", retryable: true,
+    });
+    expect(requests).toHaveLength(3);
+    expect(sleeps).toEqual([5_000, 10_000]);
+  });
+
+  it("shares one attempt budget across transport failures and HTTP Retry-After responses", async () => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const sleeps: number[] = [];
+    const provider = createHyper3dRodinProvider({
+      apiKey: "secret-key",
+      retryAttempts: 3,
+      fetchImpl: responseSequence([
+        new TypeError("mock connection reset"),
+        jsonResponse({ error: null }, 429, { "Retry-After": "7" }),
+        jsonResponse({ jobs: [{ uuid: "job-1", status: "Done" }] }),
+      ], requests),
+      sleep: async (delayMs) => { sleeps.push(delayMs); },
+    });
+
+    await expect(provider.poll(jobIdentity(), new AbortController().signal)).resolves.toMatchObject({ state: "succeeded" });
+    expect(requests).toHaveLength(3);
+    expect(sleeps).toEqual([5_000, 7_000]);
+  });
+
+  it.each(["poll", "download"] as const)("retries an internal %s request timeout within the same bounded query budget", async (operation) => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const sleeps: number[] = [];
+      const provider = createHyper3dRodinProvider({
+        apiKey: "secret-key",
+        timeoutMs: 5_000,
+        retryAttempts: 2,
+        fetchImpl: async (_input, init) => {
+          calls += 1;
+          if (calls === 1) {
+            return new Promise<Response>((_resolve, reject) => {
+              init?.signal?.addEventListener("abort", () => reject(new Error("mock request aborted")), { once: true });
+            });
+          }
+          return jsonResponse(operation === "poll"
+            ? { jobs: [{ uuid: "job-1", status: "Done" }] }
+            : { list: [{ name: "model.glb", url: "https://download.example/model.glb" }] });
+        },
+        sleep: async (delayMs) => { sleeps.push(delayMs); },
+      });
+      const outcome = provider[operation](jobIdentity(), new AbortController().signal)
+        .then(() => "success", (error: unknown) => error);
+
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      expect(await outcome).toBe("success");
+      expect(calls).toBe(2);
+      expect(sleeps).toEqual([5_000]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["poll", "download"] as const)("never classifies caller cancellation as a retryable %s timeout", async (operation) => {
+    let calls = 0;
+    const sleeps: number[] = [];
+    const controller = new AbortController();
+    const provider = createHyper3dRodinProvider({
+      apiKey: "secret-key",
+      retryAttempts: 3,
+      fetchImpl: async (_input, init) => {
+        calls += 1;
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new Error("mock transport abort")), { once: true });
+        });
+      },
+      sleep: async (delayMs) => { sleeps.push(delayMs); },
+    });
+    const pending = provider[operation](jobIdentity(), controller.signal);
+    controller.abort(new Error("timeout"));
+
+    await expect(pending).rejects.toMatchObject({ code: "cancelled", retryable: false });
+    expect(calls).toBe(1);
+    expect(sleeps).toEqual([]);
+  });
+
+  it("does not issue another request after cancellation during transport backoff", async () => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const sleeps: number[] = [];
+    const controller = new AbortController();
+    const provider = createHyper3dRodinProvider({
+      apiKey: "secret-key",
+      retryAttempts: 3,
+      fetchImpl: responseSequence([new TypeError("mock connection reset")], requests),
+      sleep: async (delayMs) => {
+        sleeps.push(delayMs);
+        controller.abort();
+      },
+    });
+
+    await expect(provider.poll(jobIdentity(), controller.signal)).rejects.toMatchObject({ code: "cancelled", retryable: false });
+    expect(requests).toHaveLength(1);
+    expect(sleeps).toEqual([5_000]);
+  });
+
+  it.each(["authentication", "invalid-response", "provider-rejected"] as const)("does not expand transport retries to %s failures", async (code) => {
+    const requests: Array<{ input: string; init: RequestInit }> = [];
+    const sleeps: number[] = [];
+    const response = code === "authentication" ? jsonResponse({ error: null }, 401)
+      : code === "invalid-response" ? new Response("not JSON", { status: 200 })
+        : jsonResponse({ error: "API_INVALID_JOB" }, 200);
+    const provider = createHyper3dRodinProvider({
+      apiKey: "secret-key",
+      retryAttempts: 3,
+      fetchImpl: responseSequence([response], requests),
+      sleep: async (delayMs) => { sleeps.push(delayMs); },
+    });
+
+    await expect(provider.poll(jobIdentity(), new AbortController().signal)).rejects.toMatchObject({ code, retryable: false });
+    expect(requests).toHaveLength(1);
+    expect(sleeps).toEqual([]);
+  });
+
+  it.each([
+    ["text-to-3d", "transport"],
+    ["texture-only", "transport"],
+    ["text-to-3d", "http"],
+    ["texture-only", "http"],
+  ] as const)("never automatically resubmits an ambiguously failed paid %s request after a %s error", async (mode, failure) => {
     const requests: Array<{ input: string; init: RequestInit }> = [];
     const sleeps: number[] = [];
     const provider = createHyper3dRodinProvider({
       apiKey: "secret-key",
       retryAttempts: 5,
-      fetchImpl: responseSequence([new Error("connection reset after upload")], requests),
+      fetchImpl: responseSequence([failure === "transport"
+        ? new Error("connection reset after upload")
+        : jsonResponse({ error: null }, 503)], requests),
       sleep: async (delayMs) => {
         sleeps.push(delayMs);
       },
     });
 
-    await expect(provider.submit(generationRequest(), new AbortController().signal))
+    const request = mode === "texture-only"
+      ? generationRequest({ mode, images: [image("reference.png")], model: model() })
+      : generationRequest();
+    await expect(provider.submit(request, new AbortController().signal))
       .rejects.toMatchObject<Partial<Studio3dGenerationProviderError>>({
         code: "provider-unavailable",
         retryable: true,

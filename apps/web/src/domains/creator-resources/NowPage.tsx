@@ -254,7 +254,7 @@ export function NowPage() {
             ))}
           </div>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-on-accent" to="/studio">
+            <Link className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-on-accent" to="/studio" reloadDocument>
               Studio에서 시작 <ArrowRight size={15} aria-hidden="true" />
             </Link>
             <Link className={RESOURCE_BUTTON} to="/research">연구 보드 열기</Link>

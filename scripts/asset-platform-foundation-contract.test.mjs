@@ -44,6 +44,7 @@ describe("asset platform production migration", () => {
       "apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql",
       "apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql",
     ]);
+    expect(manifest[43]).toBe("apps/api/src/db/migrations/0044_creator_work_entitlement_authorization.sql");
     expect(new Set(manifest).size).toBe(manifest.length);
   });
 
