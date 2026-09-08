@@ -80,6 +80,8 @@ jobs:
             --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE
       - name: Actual repository admin regression suite
         if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
+        env:
+          STUDIO_CAMPAIGN_TEST_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
         run: >-
           pnpm exec vitest run apps/web/src/domains/admin apps/api/src/modules/admin
           apps/web/src/shared/lib/__tests__/admin-emails.test.ts apps/web/src/shared/lib/__tests__/admin-security.test.ts
