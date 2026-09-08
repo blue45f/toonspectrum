@@ -1,0 +1,522 @@
+name: AI-assisted residual CodeQL remediation
+
+on:
+  push:
+    branches:
+      - codex/code-scanning-remediation-20260908
+    paths:
+      - .github/workflows/code-scanning-remediation-v4.yml
+
+permissions:
+  actions: read
+  contents: write
+  models: read
+  pull-requests: write
+  security-events: read
+
+concurrency:
+  group: ai-assisted-residual-codeql-remediation
+  cancel-in-progress: false
+
+env:
+  TARGET_BRANCH: codex/code-scanning-remediation-20260908
+
+jobs:
+  wait:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    outputs:
+      proceed: ${{ steps.state.outputs.proceed }}
+      branch_exists: ${{ steps.state.outputs.branch_exists }}
+    steps:
+      - name: Wait for deterministic remediation passes
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          runs='{"workflow_runs":[]}'
+          for attempt in $(seq 1 600); do
+            runs="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs?branch=${TARGET_BRANCH}&per_page=100")"
+            active="$(jq '[.workflow_runs[] | select((.name == "Complete CodeQL remediation" or .name == "Collision-safe CodeQL remediation fallback") and .status != "completed")] | length' <<<"$runs")"
+            if [[ "$active" == "0" ]]; then
+              break
+            fi
+            echo "Waiting for ${active} deterministic remediation run(s), attempt ${attempt}/600"
+            sleep 30
+          done
+
+          if gh api "/repos/${GITHUB_REPOSITORY}/branches/${TARGET_BRANCH//\//%2F}" >/dev/null 2>&1; then
+            branch_exists=true
+          else
+            branch_exists=false
+          fi
+          deterministic_success="$(jq '[.workflow_runs[] | select((.name == "Complete CodeQL remediation" or .name == "Collision-safe CodeQL remediation fallback") and .conclusion == "success")] | length' <<<"$runs")"
+          if [[ "$branch_exists" == "true" && "$deterministic_success" == "0" ]]; then
+            proceed=true
+          else
+            proceed=false
+          fi
+          echo "branch_exists=$branch_exists" >> "$GITHUB_OUTPUT"
+          echo "proceed=$proceed" >> "$GITHUB_OUTPUT"
+
+      - name: Remove unused AI fallback after deterministic success
+        if: steps.state.outputs.branch_exists == 'true' && steps.state.outputs.proceed != 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Commit unused fallback cleanup
+        if: steps.state.outputs.branch_exists == 'true' && steps.state.outputs.proceed != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/code-scanning-remediation-v4.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(security): remove unused residual remediation fallback"
+            git push origin "HEAD:${TARGET_BRANCH}"
+          fi
+
+  collect:
+    needs: wait
+    if: needs.wait.outputs.proceed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    outputs:
+      finding_count: ${{ steps.extract.outputs.finding_count }}
+    steps:
+      - name: Checkout residual remediation branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Integrate latest main before residual analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            git merge --no-edit origin/main
+            git push origin "HEAD:${TARGET_BRANCH}"
+          fi
+
+      - name: Initialize residual CodeQL analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - name: Analyze residual findings
+        uses: github/codeql-action/analyze@v3
+        with:
+          upload: false
+          output: /tmp/codeql-v4-initial
+          category: /language:javascript-typescript
+
+      - name: Extract security findings
+        id: extract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import json
+          import os
+
+          findings = []
+          seen = set()
+          paths = glob.glob("/tmp/codeql-v4-initial/**/*.sarif", recursive=True)
+          if not paths:
+              raise SystemExit("No initial SARIF output")
+          for path in paths:
+              with open(path, encoding="utf-8") as source:
+                  sarif = json.load(source)
+              for run in sarif.get("runs", []):
+                  rules = {rule.get("id"): rule for rule in ((((run.get("tool") or {}).get("driver") or {}).get("rules")) or [])}
+                  for result in run.get("results", []):
+                      rule_id = result.get("ruleId")
+                      rule = rules.get(rule_id) or {}
+                      props = rule.get("properties") or {}
+                      tags = [str(tag) for tag in (props.get("tags") or [])]
+                      security_severity = props.get("security-severity")
+                      if security_severity is None and not any(tag.startswith("security/") or tag.startswith("external/cwe/") for tag in tags):
+                          continue
+                      locations = result.get("locations") or []
+                      physical = ((locations[0].get("physicalLocation") if locations else None) or {})
+                      artifact = physical.get("artifactLocation") or {}
+                      region = physical.get("region") or {}
+                      file_path = artifact.get("uri")
+                      if not file_path:
+                          continue
+                      item = {
+                          "rule": rule_id,
+                          "name": rule.get("name"),
+                          "description": ((rule.get("shortDescription") or {}).get("text")),
+                          "securitySeverity": security_severity,
+                          "precision": props.get("precision"),
+                          "tags": tags,
+                          "path": file_path,
+                          "startLine": region.get("startLine"),
+                          "endLine": region.get("endLine") or region.get("startLine"),
+                          "message": ((result.get("message") or {}).get("text")),
+                      }
+                      key = (item["rule"], item["path"], item["startLine"], item["message"])
+                      if key not in seen:
+                          seen.add(key)
+                          findings.append(item)
+
+          with open("codeql-v4-findings.json", "w", encoding="utf-8") as output:
+              json.dump(findings, output, ensure_ascii=False, indent=2)
+          print(json.dumps(findings, ensure_ascii=False, indent=2))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"finding_count={len(findings)}\n")
+          PY
+
+      - name: Upload residual finding context
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-v4-findings
+          path: codeql-v4-findings.json
+          if-no-files-found: error
+          retention-days: 1
+
+  ai-fix:
+    needs: [wait, collect]
+    if: needs.wait.outputs.proceed == 'true' && needs.collect.outputs.finding_count != '0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout branch for residual fixes
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Download finding context
+        uses: actions/download-artifact@v4
+        with:
+          name: codeql-v4-findings
+          path: /tmp/codeql-v4-context
+
+      - name: Generate narrowly scoped source edits with GitHub Models
+        env:
+          GITHUB_MODELS_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import re
+          import time
+          import urllib.error
+          import urllib.request
+
+          token = os.environ["GITHUB_MODELS_TOKEN"]
+          repo_root = pathlib.Path.cwd().resolve()
+          with open("/tmp/codeql-v4-context/codeql-v4-findings.json", encoding="utf-8") as source:
+              findings = json.load(source)
+
+          by_file = {}
+          for finding in findings:
+              by_file.setdefault(finding["path"], []).append(finding)
+
+          endpoints = [
+              "https://models.github.ai/inference/chat/completions",
+              "https://models.inference.ai.azure.com/chat/completions",
+          ]
+          models = ["openai/gpt-5-mini", "openai/gpt-4.1", "openai/gpt-4o"]
+
+          def numbered_window(lines, centers, radius=100):
+              ranges = []
+              for center in centers:
+                  start = max(1, int(center or 1) - radius)
+                  end = min(len(lines), int(center or 1) + radius)
+                  ranges.append((start, end))
+              ranges.sort()
+              merged = []
+              for start, end in ranges:
+                  if merged and start <= merged[-1][1] + 1:
+                      merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+                  else:
+                      merged.append((start, end))
+              chunks = []
+              for start, end in merged:
+                  chunks.append(f"--- lines {start}-{end} ---")
+                  chunks.extend(f"{index}: {lines[index - 1]}" for index in range(start, end + 1))
+              return "\n".join(chunks)
+
+          def extract_json(text):
+              text = text.strip()
+              if text.startswith("```"):
+                  text = re.sub(r"^```(?:json)?\s*", "", text)
+                  text = re.sub(r"\s*```$", "", text)
+              start = text.find("{")
+              end = text.rfind("}")
+              if start < 0 or end < start:
+                  raise ValueError("Model response did not contain a JSON object")
+              return json.loads(text[start:end + 1])
+
+          def invoke(prompt):
+              failures = []
+              for endpoint in endpoints:
+                  for model in models:
+                      payloads = [
+                          {
+                              "model": model,
+                              "messages": [
+                                  {"role": "system", "content": "You are a senior application-security engineer. Produce minimal, compiling source edits that eliminate the supplied CodeQL findings without suppressions, query exclusions, or behavior-degrading shortcuts."},
+                                  {"role": "user", "content": prompt},
+                              ],
+                              "temperature": 0,
+                              "max_tokens": 12000,
+                              "response_format": {"type": "json_object"},
+                          },
+                          {
+                              "model": model,
+                              "messages": [
+                                  {"role": "system", "content": "You are a senior application-security engineer. Return only strict JSON containing minimal source edits."},
+                                  {"role": "user", "content": prompt},
+                              ],
+                              "temperature": 0,
+                              "max_tokens": 12000,
+                          },
+                      ]
+                      for payload in payloads:
+                          request = urllib.request.Request(
+                              endpoint,
+                              data=json.dumps(payload).encode("utf-8"),
+                              headers={
+                                  "Accept": "application/json",
+                                  "Authorization": f"Bearer {token}",
+                                  "Content-Type": "application/json",
+                                  "User-Agent": "toonspectrum-codeql-residual-remediation",
+                              },
+                              method="POST",
+                          )
+                          try:
+                              with urllib.request.urlopen(request, timeout=240) as response:
+                                  body = json.load(response)
+                              content = body["choices"][0]["message"]["content"]
+                              return extract_json(content), model, endpoint
+                          except Exception as error:
+                              failures.append(f"{endpoint} {model}: {error}")
+                              time.sleep(1)
+              raise RuntimeError("All GitHub Models requests failed: " + " | ".join(failures[-8:]))
+
+          changed = []
+          for relative_path, file_findings in sorted(by_file.items()):
+              target = (repo_root / relative_path).resolve()
+              if repo_root not in target.parents or not target.is_file():
+                  raise RuntimeError(f"Unsafe or missing finding path: {relative_path}")
+              original = target.read_text(encoding="utf-8")
+              lines = original.splitlines(keepends=True)
+              centers = [item.get("startLine") or 1 for item in file_findings]
+              if len(original) <= 70000:
+                  context = "".join(f"{index}: {line}" for index, line in enumerate(lines, 1))
+              else:
+                  context = numbered_window([line.rstrip("\n") for line in lines], centers)
+
+              prompt = f"""Fix every listed CodeQL security finding in this single file.
+
+Repository file: {relative_path}
+Findings:
+{json.dumps(file_findings, ensure_ascii=False, indent=2)}
+
+Exact source context with 1-based line numbers:
+{context}
+
+Return a strict JSON object with this schema:
+{{
+  "edits": [
+    {{"startLine": 1, "endLine": 1, "replacement": "complete replacement text for the inclusive line range"}}
+  ],
+  "summary": "brief explanation"
+}}
+
+Rules:
+- Line numbers are 1-based and inclusive.
+- Edits must not overlap.
+- Apply the smallest robust fix for all findings in this file.
+- Do not add CodeQL suppressions, comments claiming false positives, query exclusions, unsafe casts, or blanket try/catch blocks.
+- Preserve public interfaces unless a safe caller update is included in the same replacement range.
+- For security-sensitive randomness use a cryptographically secure API.
+- For URL handling parse once, enforce protocol and exact/suffix host allowlists, reject credentials and ambiguous values.
+- For escaping/sanitization prefer one-pass encoders or structured serializers rather than chained replacements.
+- For regular-expression denial of service replace vulnerable expressions with deterministic parsing or explicit bounded processing.
+- Return JSON only.
+"""
+
+              last_error = None
+              for attempt in range(1, 4):
+                  try:
+                      response, model, endpoint = invoke(prompt + (f"\nPrevious validation error: {last_error}" if last_error else ""))
+                      edits = response.get("edits")
+                      if not isinstance(edits, list) or not edits:
+                          raise ValueError("No edits returned")
+                      normalized = []
+                      for edit in edits:
+                          start = int(edit["startLine"])
+                          end = int(edit["endLine"])
+                          replacement = edit["replacement"]
+                          if not isinstance(replacement, str):
+                              raise ValueError("Replacement must be a string")
+                          if start < 1 or end < start or end > len(lines):
+                              raise ValueError(f"Invalid edit range {start}-{end} for {len(lines)} lines")
+                          normalized.append((start, end, replacement))
+                      normalized.sort()
+                      for previous, current in zip(normalized, normalized[1:]):
+                          if current[0] <= previous[1]:
+                              raise ValueError(f"Overlapping edits: {previous[:2]} and {current[:2]}")
+
+                      updated = list(lines)
+                      for start, end, replacement in reversed(normalized):
+                          replacement_lines = replacement.splitlines(keepends=True)
+                          if replacement and not replacement.endswith(("\n", "\r")) and end < len(lines):
+                              replacement_lines[-1:] = [replacement_lines[-1] + "\n"] if replacement_lines else []
+                          updated[start - 1:end] = replacement_lines
+                      candidate = "".join(updated)
+                      if candidate == original:
+                          raise ValueError("Edits did not change the file")
+                      target.write_text(candidate, encoding="utf-8")
+                      print(json.dumps({"path": relative_path, "model": model, "endpoint": endpoint, "summary": response.get("summary"), "edits": len(normalized)}, ensure_ascii=False))
+                      changed.append(relative_path)
+                      break
+                  except Exception as error:
+                      last_error = str(error)
+                      if attempt == 3:
+                          raise
+
+          if not changed:
+              raise SystemExit("No residual source files were changed")
+          pathlib.Path("/tmp/codeql-v4-changed-files.txt").write_text("\n".join(changed) + "\n", encoding="utf-8")
+          PY
+
+      - name: Validate and commit generated edits
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(security): remediate residual CodeQL findings"
+          git push origin "HEAD:${TARGET_BRANCH}"
+
+  verify:
+    needs: [wait, collect, ai-fix]
+    if: always() && needs.wait.outputs.proceed == 'true' && needs.collect.result == 'success' && (needs.ai-fix.result == 'success' || needs.ai-fix.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout final remediation tree
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Remove all temporary remediation workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            git merge --no-edit origin/main
+          fi
+          rm -f \
+            .github/workflows/code-scanning-inventory.yml \
+            .github/workflows/code-scanning-context.yml \
+            .github/workflows/code-scanning-autofix.yml \
+            .github/workflows/code-scanning-remediation-gate.yml \
+            .github/workflows/code-scanning-remediation-gate-trigger.yml \
+            .github/workflows/code-scanning-remediation-v2.yml \
+            .github/workflows/code-scanning-remediation-v3.yml \
+            .github/workflows/code-scanning-remediation-v4.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(security): remove temporary CodeQL remediation automation"
+          fi
+          git push origin "HEAD:${TARGET_BRANCH}"
+
+      - name: Initialize final residual CodeQL verification
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - name: Analyze final residual tree
+        uses: github/codeql-action/analyze@v3
+        with:
+          upload: false
+          output: /tmp/codeql-v4-final
+          category: /language:javascript-typescript
+
+      - name: Require zero final security findings
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import json
+
+          count = 0
+          seen = set()
+          paths = glob.glob("/tmp/codeql-v4-final/**/*.sarif", recursive=True)
+          if not paths:
+              raise SystemExit("No final SARIF output")
+          for path in paths:
+              with open(path, encoding="utf-8") as source:
+                  sarif = json.load(source)
+              for run in sarif.get("runs", []):
+                  rules = {rule.get("id"): rule for rule in ((((run.get("tool") or {}).get("driver") or {}).get("rules")) or [])}
+                  for result in run.get("results", []):
+                      rule_id = result.get("ruleId")
+                      props = (rules.get(rule_id) or {}).get("properties") or {}
+                      tags = [str(tag) for tag in (props.get("tags") or [])]
+                      if props.get("security-severity") is None and not any(tag.startswith("security/") or tag.startswith("external/cwe/") for tag in tags):
+                          continue
+                      locs = result.get("locations") or []
+                      physical = ((locs[0].get("physicalLocation") if locs else None) or {})
+                      key = (rule_id, ((physical.get("artifactLocation") or {}).get("uri")), ((physical.get("region") or {}).get("startLine")), ((result.get("message") or {}).get("text")))
+                      if key not in seen:
+                          seen.add(key)
+                          count += 1
+                          print(json.dumps({"rule": key[0], "path": key[1], "line": key[2], "message": key[3]}, ensure_ascii=False))
+          if count:
+              raise SystemExit(f"Final CodeQL security gate found {count} finding(s)")
+          print("CODEQL_SECURITY_FINDINGS=0")
+          PY
+
+      - name: Create or locate pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$TARGET_BRANCH" --base main --state open --json number --jq '.[0].number // empty')"
+          if [[ -z "$number" ]]; then
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$TARGET_BRANCH" --title "fix(security): resolve all open CodeQL findings" --body $'## Summary\n\n- resolves the complete open CodeQL inventory\n- applies deterministic Autofix passes first\n- applies narrowly scoped residual fixes only when needed\n- validates the final tree with CodeQL `security-extended`\n- removes all temporary remediation automation\n\n## Gate\n\nCodeQL security findings: **0**'
+            number="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$TARGET_BRANCH" --base main --state open --json number --jq '.[0].number')"
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Enable protected squash auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge "${{ steps.pr.outputs.number }}" --repo "$GITHUB_REPOSITORY" --squash --auto --delete-branch
