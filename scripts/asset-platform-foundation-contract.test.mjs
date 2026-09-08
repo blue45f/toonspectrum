@@ -34,15 +34,16 @@ const managedTables = [
 ];
 
 describe("asset platform production migration", () => {
-  it("is registered as the next forward-only managed migration", () => {
+  it("preserves the ordered foundation migrations when later migrations are appended", () => {
     const manifest = read("scripts/production-database-migrations.manifest")
       .trim()
       .split("\n");
-    expect(manifest[38]).toBe(migrationPath);
-    expect(manifest[39]).toBe("apps/api/src/db/migrations/0040_creator_asset_platform_integrity.sql");
-    expect(manifest[40]).toBe("apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql");
-    expect(manifest.at(-1)).toBe("apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql");
-    expect(manifest).toHaveLength(42);
+    expect(manifest.slice(38, 42)).toEqual([
+      migrationPath,
+      "apps/api/src/db/migrations/0040_creator_asset_platform_integrity.sql",
+      "apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql",
+      "apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql",
+    ]);
     expect(new Set(manifest).size).toBe(manifest.length);
   });
 
