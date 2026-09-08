@@ -24,7 +24,7 @@ jobs:
   document-convergence:
     name: two-tab-document-convergence
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
@@ -37,15 +37,24 @@ jobs:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Resolve collaboration evidence directory
+      - name: Resolve collaboration evidence directories
         run: |
-          echo "TOONSPECTRUM_VERIFY_DIR=$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync"
+          mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/production"
+          mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/branch"
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
+      - name: Reproduce the currently deployed Studio
+        id: production-baseline
+        continue-on-error: true
+        env:
+          TOONSPECTRUM_VERIFY_ORIGIN: https://www.toonstudio.cloud
+          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonspectrum-verification/studio-collaboration-sync/production
+        run: pnpm exec tsx scripts/verify-studio-collaboration-sync.mts
       - name: Build production Studio assets
         run: pnpm run build
-      - name: Verify bidirectional document convergence
+      - name: Verify the pull-request build
+        env:
+          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonspectrum-verification/studio-collaboration-sync/branch
         run: pnpm exec tsx scripts/verify-studio-collaboration-sync.mts
       - name: Upload collaboration evidence
         if: always()
