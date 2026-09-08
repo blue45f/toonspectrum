@@ -850,7 +850,7 @@ function buildBatches(
   return Object.freeze(batches);
 }
 
-export function planStudioWetRibbonCarrier(
+function buildStudioWetRibbonCarrier(
   dabs: readonly StudioWetRibbonSourceDab[],
   options?: StudioWetRibbonCarrierPlanOptions | null,
 ): StudioWetRibbonCarrierPlan {
@@ -870,6 +870,67 @@ export function planStudioWetRibbonCarrier(
     footprints,
     batches,
   });
+}
+
+interface CarrierReplayCacheEntry {
+  readonly sources: readonly StudioWetRibbonSourceDab[];
+  readonly plan: StudioWetRibbonCarrierPlan;
+  readonly coordinateCount: number;
+}
+
+const CARRIER_REPLAY_CACHE = new Map<string, CarrierReplayCacheEntry>();
+const CARRIER_REPLAY_MAX_ENTRIES = 8;
+const CARRIER_REPLAY_MAX_COORDINATES = 1_048_576;
+let cachedReplayCoordinates = 0;
+
+/** Retain exact immutable geometry across document/draft handoffs and unrelated redraws. */
+export function planStudioWetRibbonCarrier(
+  dabs: readonly StudioWetRibbonSourceDab[],
+  options?: StudioWetRibbonCarrierPlanOptions | null,
+): StudioWetRibbonCarrierPlan {
+  const normalized = normalizeOptions(options);
+  const key = `${normalized.seed}/${normalized.maxFootprints}`;
+  const cached = CARRIER_REPLAY_CACHE.get(key);
+  if (cached) {
+    CARRIER_REPLAY_CACHE.delete(key);
+    if (Array.isArray(dabs) && cached.sources.length === dabs.length
+      && cached.sources.every((source, index) => {
+        const next = dabs[index];
+        return next && source.x === next.x && source.y === next.y
+          && source.radius === next.radius && source.opacity === next.opacity
+          && source.role === next.role;
+      })) {
+      CARRIER_REPLAY_CACHE.set(key, cached);
+      return cached.plan;
+    }
+    cachedReplayCoordinates -= cached.coordinateCount;
+  }
+  const plan = buildStudioWetRibbonCarrier(dabs, normalized);
+  if (!Array.isArray(dabs) || !dabs.every((dab) => dab
+    && [dab.x, dab.y, dab.radius, dab.opacity].every(Number.isFinite)
+    && (dab.role === "core" || dab.role === "diffuse"))) return plan;
+  const polygons = new Set([
+    ...plan.footprints.flatMap((footprint) => footprint.layers.map((layer) => layer.polygon)),
+    ...plan.batches.flatMap((batch) => batch.polygons),
+  ]);
+  const coordinateCount = dabs.length * 4 + [...polygons].reduce((count, polygon) => count
+    + polygon.points.length + (polygon.strip?.startSection.length ?? 0)
+    + (polygon.strip?.endSection.length ?? 0), 0);
+  if (coordinateCount > CARRIER_REPLAY_MAX_COORDINATES) return plan;
+  CARRIER_REPLAY_CACHE.set(key, {
+    sources: dabs.map(({ x, y, radius, opacity, role }) => ({ x, y, radius, opacity, role })),
+    plan,
+    coordinateCount,
+  });
+  cachedReplayCoordinates += coordinateCount;
+  while (CARRIER_REPLAY_CACHE.size > CARRIER_REPLAY_MAX_ENTRIES
+    || cachedReplayCoordinates > CARRIER_REPLAY_MAX_COORDINATES) {
+    const oldest = CARRIER_REPLAY_CACHE.entries().next().value;
+    if (!oldest) break;
+    CARRIER_REPLAY_CACHE.delete(oldest[0]);
+    cachedReplayCoordinates -= oldest[1].coordinateCount;
+  }
+  return plan;
 }
 
 export interface StudioIncrementalWetRibbonCarrier {
@@ -1257,7 +1318,7 @@ export interface StudioWetRibbonPathSink {
  * pass removes only those internal edges. Disconnected superlevel intervals and directional tap
  * leaves remain separate contours, and the underlying footprint/batch arrays stay prefix-stable.
  */
-function continuousBatchContours(
+function buildContinuousBatchContours(
   polygons: readonly StudioWetRibbonPolygon[],
 ): readonly StudioWetRibbonPolygon[] {
   const contours: StudioWetRibbonPolygon[] = [];
@@ -1363,18 +1424,78 @@ function continuousBatchContours(
   return Object.freeze(contours);
 }
 
+interface ContourCacheEntry {
+  readonly sources: readonly StudioWetRibbonPolygon[];
+  readonly contours: readonly StudioWetRibbonPolygon[];
+  readonly coordinateCount: number;
+}
+
+// A layer redraw can replay the same committed wash hundreds of times while a different stroke
+// is active. Retain its joined contours, with a bounded LRU and an exact identity check for the
+// incremental planner's mutable rung arrays. Never reuse a same-length replaced preview tail.
+const CONTOUR_CACHE = new Map<readonly StudioWetRibbonPolygon[], ContourCacheEntry>();
+const CONTOUR_CACHE_MAX_ENTRIES = 512;
+const CONTOUR_CACHE_MAX_COORDINATES = 1_048_576;
+let cachedContourCoordinates = 0;
+
+function continuousBatchContours(
+  polygons: readonly StudioWetRibbonPolygon[],
+): readonly StudioWetRibbonPolygon[] {
+  const cached = CONTOUR_CACHE.get(polygons);
+  if (cached) {
+    CONTOUR_CACHE.delete(polygons);
+    if (
+      cached.sources.length === polygons.length
+      && cached.sources.every((source, index) => source === polygons[index])
+    ) {
+      CONTOUR_CACHE.set(polygons, cached);
+      return cached.contours;
+    }
+    cachedContourCoordinates -= cached.coordinateCount;
+  }
+  const contours = buildContinuousBatchContours(polygons);
+  // Caller-authored mutable geometry is legal at this boundary, but cannot be identity-cached.
+  if (!polygons.every((source) => (
+    Object.isFrozen(source)
+    && Object.isFrozen(source.points)
+    && (!source.strip || (
+      Object.isFrozen(source.strip)
+      && Object.isFrozen(source.strip.startSection)
+      && Object.isFrozen(source.strip.endSection)
+    ))
+  ))) return contours;
+  const coordinateCount = contours.reduce((count, contour) => count + contour.points.length, 0)
+    + polygons.reduce((count, polygon) => count + polygon.points.length
+      + (polygon.strip?.startSection.length ?? 0) + (polygon.strip?.endSection.length ?? 0), 0);
+  if (coordinateCount > CONTOUR_CACHE_MAX_COORDINATES) return contours;
+  CONTOUR_CACHE.set(polygons, { sources: [...polygons], contours, coordinateCount });
+  cachedContourCoordinates += coordinateCount;
+  while (
+    CONTOUR_CACHE.size > CONTOUR_CACHE_MAX_ENTRIES
+    || cachedContourCoordinates > CONTOUR_CACHE_MAX_COORDINATES
+  ) {
+    const oldest = CONTOUR_CACHE.entries().next().value;
+    if (!oldest) break;
+    CONTOUR_CACHE.delete(oldest[0]);
+    cachedContourCoordinates -= oldest[1].coordinateCount;
+  }
+  return contours;
+}
+
 /** Canvas and test adapters trace the exact continuous contours shared with SVG. */
 export function traceStudioWetRibbonCarrierBatch(
   sink: StudioWetRibbonPathSink,
   batch: StudioWetRibbonCarrierBatch,
 ): void {
   for (const plannedPolygon of continuousBatchContours(batch.polygons)) {
-    const [firstX, firstY, ...remaining] = plannedPolygon.points;
+    const points = plannedPolygon.points;
+    const firstX = points[0];
+    const firstY = points[1];
     if (firstX === undefined || firstY === undefined) continue;
     sink.moveTo(firstX, firstY);
-    for (let index = 0; index < remaining.length; index += 2) {
-      const x = remaining[index];
-      const y = remaining[index + 1];
+    for (let index = 2; index < points.length; index += 2) {
+      const x = points[index];
+      const y = points[index + 1];
       if (x === undefined || y === undefined) break;
       sink.lineTo(x, y);
     }
@@ -1394,12 +1515,14 @@ export function studioWetRibbonCarrierBatchPathData(
   batch: StudioWetRibbonCarrierBatch,
 ): string {
   return continuousBatchContours(batch.polygons).map((plannedPolygon) => {
-    const [firstX, firstY, ...remaining] = plannedPolygon.points;
+    const points = plannedPolygon.points;
+    const firstX = points[0];
+    const firstY = points[1];
     if (firstX === undefined || firstY === undefined) return "";
     let path = `M${formatPathNumber(firstX)} ${formatPathNumber(firstY)}`;
-    for (let index = 0; index < remaining.length; index += 2) {
-      const x = remaining[index];
-      const y = remaining[index + 1];
+    for (let index = 2; index < points.length; index += 2) {
+      const x = points[index];
+      const y = points[index + 1];
       if (x === undefined || y === undefined) break;
       path += `L${formatPathNumber(x)} ${formatPathNumber(y)}`;
     }

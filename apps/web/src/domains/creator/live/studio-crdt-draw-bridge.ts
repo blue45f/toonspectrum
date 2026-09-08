@@ -95,6 +95,7 @@ export interface StudioCrdtCompatibleDrawElement {
   watercolorPipeline?: "causal-walker-v2";
   strokeStyle?: unknown;
   shapeParams?: unknown;
+  smartShape?: unknown;
   sketch?: unknown;
   symmetry?: unknown;
   blendMode?: string;
@@ -114,6 +115,7 @@ export interface StudioCrdtCompatibleDrawElement {
 }
 
 const EXTENSION_KEYS = [
+  "smartShape",
   // 스탬프 브러시 튜닝(flow/hardness/minSize) — 확장 봉투로 무손실 왕복한다.
   "stamp",
   "stampPipeline",

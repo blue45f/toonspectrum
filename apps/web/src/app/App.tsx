@@ -8,6 +8,7 @@ import { apiPath } from "../infrastructure/api";
 import { AppShell } from "./AppShell";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
+import { StudioRouterDocumentNavigationBoundary } from "./StudioRouterDocumentNavigationBoundary";
 import { installStudioDocumentNavigationBridge } from "./studio-document-navigation";
 
 import { FloatingControls } from "@/shared/components/FloatingControls";
@@ -290,7 +291,9 @@ function AppRuntime() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppRuntime />
+      <StudioRouterDocumentNavigationBoundary>
+        <AppRuntime />
+      </StudioRouterDocumentNavigationBoundary>
     </BrowserRouter>
   );
 }

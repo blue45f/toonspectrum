@@ -165,6 +165,12 @@ export async function profileStudioBrushFrameBudget(
       readonly routeDiagnostics: StudioBrushCompetitiveRouteDiagnostics | null;
       readonly strokeDurationMs: number;
       readonly longTaskDurationsMs: readonly number[];
+      readonly taskTimeline: {
+        readonly pointerDownAt: number;
+        readonly pointerUpAt: number;
+        readonly tailEnd: number;
+        readonly tasks: readonly { startTime: number; duration: number }[];
+      };
       readonly longTaskObserverAvailable: boolean;
       readonly compositorCanvasCount: number;
       readonly renderWorkload?: BrowserRenderWorkload;
@@ -528,6 +534,7 @@ export async function profileStudioBrushFrameBudget(
             ? [entry.duration]
             : []
         )),
+        taskTimeline: { pointerDownAt: start, pointerUpAt: end, tailEnd, tasks: longTaskEntries.filter((entry) => entry.startTime <= tailEnd && entry.startTime + entry.duration >= start) },
         longTaskObserverAvailable,
         compositorCanvasCount,
         ...(captureRenderWorkload
