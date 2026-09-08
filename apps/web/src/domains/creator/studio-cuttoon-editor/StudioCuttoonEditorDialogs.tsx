@@ -184,6 +184,13 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
           workScope={effectiveWorkId}
           pages={pages}
           reducedMotion={appSettings.other.reduceMotion}
+          workspaceIntegration={{
+            workspace: s.animaticWorkspace,
+            persistenceStatus: { busy: s.animaticPersistenceBusy, error: s.animaticPersistenceError },
+            onHydrate: s.hydrateAnimaticWorkspace,
+            onCommit: s.commitAnimaticWorkspace,
+            capturePages: s.handleCapturePagesForIndices,
+          }}
           onClose={() => setAnimaticTimelineOpen(false)}
         />
       </Suspense>

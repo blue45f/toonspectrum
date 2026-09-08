@@ -74,6 +74,15 @@ export interface StudioAnimaticTimelinePanelProps {
     sample: StudioAnimaticPreviewSample,
     segment: StudioAnimaticSegment
   ) => ReactNode;
+  readonly externalDocument?: StudioAnimaticDocument;
+  readonly workspaceStatus?: { readonly busy: boolean; readonly error: string | null };
+  readonly workspaceControls?: ReactNode;
+  readonly timelineExtras?: ReactNode;
+  readonly renderShotThumbnail?: (segment: StudioAnimaticSegment) => ReactNode;
+  readonly previewOwnsTransform?: boolean;
+  readonly seekRequest?: { readonly timeMs: number; readonly token: number };
+  readonly onSelectedSegmentChange?: (segmentId: string) => void;
+  readonly onPlaybackChange?: (playing: boolean, timeMs: number) => void;
   readonly onClose?: () => void;
   readonly className?: string;
 }
@@ -197,6 +206,15 @@ export function StudioAnimaticTimelinePanel({
   onDocumentChange,
   onPreviewSample,
   renderPreview,
+  externalDocument,
+  workspaceStatus,
+  workspaceControls,
+  timelineExtras,
+  renderShotThumbnail,
+  previewOwnsTransform = false,
+  seekRequest,
+  onSelectedSegmentChange,
+  onPlaybackChange,
   onClose,
   className,
 }: StudioAnimaticTimelinePanelProps) {
@@ -270,7 +288,7 @@ export function StudioAnimaticTimelinePanel({
     };
   }, [initialDocument, persistenceTarget, workScope]);
 
-  const animatic = panelState.document;
+  const animatic = externalDocument ?? panelState.document;
   const planned = animatic
     ? planStudioAnimaticPreview(animatic, effectiveReducedMotion)
     : null;
@@ -299,6 +317,19 @@ export function StudioAnimaticTimelinePanel({
   const playbackDurationMs = plan?.totalDurationMs ?? 0;
   const playbackFps = plan?.fps ?? 1;
   const playbackLoop = animatic?.loop ?? false;
+
+  const activeSelectedSegmentId = selectedSegment?.id;
+  useEffect(() => {
+    if (activeSelectedSegmentId) onSelectedSegmentChange?.(activeSelectedSegmentId);
+  }, [onSelectedSegmentChange, activeSelectedSegmentId]);
+  useEffect(() => {
+    onPlaybackChange?.(playing, playheadRef.current);
+  }, [onPlaybackChange, playing]);
+  useEffect(() => {
+    if (!seekRequest) return;
+    setPlaying(false);
+    setPlayheadMs(Math.max(0, Math.min(playbackDurationMs, seekRequest.timeMs)));
+  }, [playbackDurationMs, seekRequest]);
 
   useEffect(() => {
     if (!effectiveReducedMotion) return;
@@ -354,6 +385,11 @@ export function StudioAnimaticTimelinePanel({
     document: StudioAnimaticDocument,
     successMessage: string
   ): void {
+    if (externalDocument) {
+      onDocumentChange?.(document);
+      setNotice({ tone: "good", message: successMessage });
+      return;
+    }
     if (persistenceTarget) {
       const generation = ++persistenceGenerationRef.current;
       setPanelState({ document, storageStatus: "ok" });
@@ -518,7 +554,7 @@ export function StudioAnimaticTimelinePanel({
     });
   }
 
-  const storageUnavailable = panelState.storageStatus === "unavailable"
+  const storageUnavailable = workspaceStatus ? Boolean(workspaceStatus.error) : panelState.storageStatus === "unavailable"
     || (storageTarget === null && persistenceTarget === null);
 
   return (
@@ -528,7 +564,7 @@ export function StudioAnimaticTimelinePanel({
       data-studio-animatic-authority={
         persistenceTarget ? "sqlite" : storageTarget ? "sync-adapter" : "memory"
       }
-      aria-busy={importBusy || persistenceBusy}
+      aria-busy={importBusy || persistenceBusy || workspaceStatus?.busy}
       className={cx(
         "flex w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel/95 shadow-xl backdrop-blur",
         className
@@ -541,7 +577,7 @@ export function StudioAnimaticTimelinePanel({
             웹툰 애니매틱
           </h2>
           <p className="mt-0.5 text-[0.63rem] leading-relaxed text-fg-3">
-            페이지·컷의 무음 타이밍과 카메라 동선을 브라우저에서 검수합니다.
+            페이지·컷의 타이밍과 카메라 동선을 브라우저에서 검수합니다.
           </p>
         </div>
         {onClose ? (
@@ -557,6 +593,12 @@ export function StudioAnimaticTimelinePanel({
       </header>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
+        {workspaceControls}
+        {workspaceStatus ? (
+          <p role="status" className="text-[0.7rem] text-fg-3">
+            {workspaceStatus.error ?? (workspaceStatus.busy ? "스토리보드와 미디어를 준비하고 저장하는 중…" : "스토리보드와 미디어를 이 기기에 저장했습니다.")}
+          </p>
+        ) : (
         <div
           className={cx(
             "rounded-xl border px-2.5 py-2 text-[0.65rem] leading-relaxed",
@@ -583,6 +625,7 @@ export function StudioAnimaticTimelinePanel({
             <p className="mt-1">{panelState.storageError}</p>
           ) : null}
         </div>
+        )}
 
         {effectiveReducedMotion ? (
           <p
@@ -617,8 +660,8 @@ export function StudioAnimaticTimelinePanel({
               <div className="relative aspect-[9/16] max-h-72 min-h-48 overflow-hidden bg-card">
                 {sample && activeSegment ? (
                   <div
-                    className="absolute inset-0 grid place-items-center p-5"
-                    style={{
+                    className={cx("absolute inset-0 grid place-items-center", !previewOwnsTransform && "p-5")}
+                    style={previewOwnsTransform ? undefined : {
                       opacity: previewOpacity(sample),
                       transform: `translate(${sample.camera.panXPercent + previewTransitionPan(sample)}%, ${sample.camera.panYPercent}%) scale(${sample.camera.zoom})`,
                       transformOrigin: "center",
@@ -762,6 +805,7 @@ export function StudioAnimaticTimelinePanel({
                         )}
                         style={{ width: timelineCardWidth(durationMs) }}
                       >
+                        {renderShotThumbnail?.(segment)}
                         <span className="block truncate text-[0.68rem] font-semibold text-fg">
                           {segment.label}
                         </span>
@@ -799,6 +843,7 @@ export function StudioAnimaticTimelinePanel({
                 </div>
               </div>
             </section>
+            {timelineExtras}
 
             <section
               aria-label="애니매틱 전체 설정"

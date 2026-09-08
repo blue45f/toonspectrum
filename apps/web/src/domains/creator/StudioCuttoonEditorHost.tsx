@@ -1846,6 +1846,11 @@ export function StudioCuttoonEditor({
 
   const {
     aiProvenance,
+    animaticWorkspace,
+    animaticPersistenceBusy,
+    animaticPersistenceError,
+    hydrateAnimaticWorkspace,
+    commitAnimaticWorkspace,
     characterBible,
     hydrateStudioSidecarDocuments,
     hydrateStudioSidecarSource,
@@ -28396,6 +28401,12 @@ function clearSelectionForEdit() {
       aiSettings={aiSettings}
       animTimeline={animTimeline}
       animaticTimelineOpen={animaticTimelineOpen}
+      animaticWorkspace={animaticWorkspace}
+      animaticPersistenceBusy={animaticPersistenceBusy}
+      animaticPersistenceError={animaticPersistenceError}
+      hydrateAnimaticWorkspace={hydrateAnimaticWorkspace}
+      commitAnimaticWorkspace={commitAnimaticWorkspace}
+      handleCapturePagesForIndices={handleCapturePagesForIndices}
       announceDrawingShortcut={announceDrawingShortcut}
       appSettings={appSettings}
       appSettingsInitialTab={appSettingsInitialTab}
