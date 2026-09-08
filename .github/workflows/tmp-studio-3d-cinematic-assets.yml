@@ -71,7 +71,7 @@ jobs:
           apps/web/src/domains/creator/bg3d/StudioBg3dProceduralStarterPanel.test.tsx
 
       - name: Run repository TypeScript check
-        run: pnpm exec tsc -p tsconfig.json --noEmit
+        run: NODE_OPTIONS='--max-old-space-size=8192' pnpm exec tsc -p tsconfig.json --noEmit
 
       - name: Check patch whitespace
         run: git diff --check
@@ -93,4 +93,4 @@ jobs:
           git commit -m "feat(studio): add cinematic procedural 3d asset pack"
           git push origin HEAD:feat/studio-3d-cinematic-assets-20260909
 
-# ARM runner trigger for the validated integration pass; this file deletes itself after success.
+# ARM runner trigger with the repository-standard 8 GiB TypeScript heap; this file deletes itself after success.
