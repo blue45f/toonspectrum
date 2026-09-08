@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioPageReviewPanel } from "./StudioPageReviewPanel";
+import {
+  StudioPageReviewPanel,
+  type StudioPageReviewItem,
+} from "./StudioPageReviewPanel";
+import { patchPageReviewState, type PageReviewPatch } from "./studio-page-review";
 
 const viewportState = vi.hoisted(() => ({ mobile: false }));
 
@@ -87,6 +92,50 @@ describe("StudioPageReviewPanel", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("applies multi-page review changes sequentially against fresh document state", async () => {
+    const onPatchReview = vi.fn();
+    const initialPages: StudioPageReviewItem[] = [
+      { id: "page-a", label: "도입", review: { status: "draft", locked: false } },
+      { id: "page-b", label: "전환", review: { status: "needs-review", locked: false } },
+      { id: "page-c", label: "결말", review: { status: "approved", locked: true } },
+    ];
+
+    function ControlledReviewPanel() {
+      const [pages, setPages] = useState(initialPages);
+      const patchReview = (pageId: string, patch: PageReviewPatch) => {
+        onPatchReview(pageId, patch);
+        setPages((current) => current.map((page) =>
+          page.id === pageId
+            ? { ...page, review: patchPageReviewState(page.review, patch) }
+            : page));
+      };
+      return (
+        <StudioPageReviewPanel
+          open
+          onClose={vi.fn()}
+          pages={pages}
+          currentPageId="page-a"
+          onSelectPage={vi.fn()}
+          onPatchReview={patchReview}
+        />
+      );
+    }
+
+    render(<ControlledReviewPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "표시 항목 전체 선택" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "일괄 검토 상태" }), {
+      target: { value: "approved" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "상태 적용" }));
+
+    await waitFor(() => expect(onPatchReview).toHaveBeenCalledTimes(2));
+    expect(onPatchReview.mock.calls).toEqual([
+      ["page-a", { status: "approved", locked: true }],
+      ["page-b", { status: "approved", locked: true }],
+    ]);
+    await waitFor(() => expect(screen.getByText("승인 3/3")).toBeTruthy());
   });
 
   it("keeps the full-screen modal contract on mobile", () => {
