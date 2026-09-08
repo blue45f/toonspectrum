@@ -6,6 +6,7 @@ import { StudioColorBlindFilterDefs } from "../StudioColorBlindPreview";
 import { useStudioCanvasViewportInteraction } from "./studio-canvas-viewport-interaction";
 import { useStudioCanvasViewportLiveSurfaces } from "./studio-canvas-viewport-live-surfaces";
 import { localizeText } from "./studio-canvas-viewport-primitives";
+import { useStudioHandNavigation } from "./useStudioHandNavigation";
 import { renderStudioCanvasStageHud } from "./StudioCanvasStageHud";
 import { StudioCanvasStatusRail } from "./StudioCanvasStatusRail";
 import { renderStudioCanvasStickyBanners } from "./StudioCanvasStickyBanners";
@@ -154,9 +155,6 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     onWrapDragLeave,
     onWrapDragOver,
     onWrapDrop,
-    onWrapMouseDown,
-    onWrapMouseMove,
-    onWrapMouseUp,
   } = stableHandlers;
   const {
     activeCanvasGroupName,
@@ -178,6 +176,15 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     zoomOutAtLimit,
     zoomOutUnavailableReason,
   } = interaction;
+
+  useStudioHandNavigation({
+    viewportRef: wrapRef,
+    handToolActive: tool === "hand",
+    temporaryHandActive: isSpacePressed,
+    middleButtonAction: appSettings.mouse.middleButton,
+    rightButtonAction: appSettings.mouse.rightButton,
+    touchOneFingerMode: appSettings.touch.oneFingerDrag,
+  });
 
   return (
     <div
@@ -274,10 +281,11 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
         zoomOutUnavailableReason,
       })}
       {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 마우스 핸들러는 클릭이 아니라 스페이스+드래그 패닝/에셋 드롭 전용이며 실제 상호작용은 내부 Konva Stage + document keydown(Space) 이 담당한다 */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 드래그 핸들러는 에셋 드롭 전용이고, 핸드 이동은 capture-phase 포인터 훅, 실제 편집은 내부 Konva Stage가 담당한다 */}
       <div
         ref={wrapRef}
         data-studio-canvas-viewport
+        data-studio-hand-navigation="pointer-capture-v1"
         data-studio-viewport-cursor={viewportCursorClassName.replace(
           "cursor-",
           ""
@@ -290,31 +298,29 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
         role="group"
+        aria-keyshortcuts="Space ArrowUp ArrowDown ArrowLeft ArrowRight"
         aria-label={localizeText(
           t,
-          "작업 캔버스 — 포커스 후 방향키로 스크롤",
+          "작업 캔버스 — 스페이스·드래그, 설정된 보조 버튼·드래그 또는 방향키로 이동",
           "studio.canvas.canvasAriaLabel"
         )}
-        onMouseDown={onWrapMouseDown}
-        onMouseMove={onWrapMouseMove}
-        onMouseUp={onWrapMouseUp}
-        onMouseLeave={onWrapMouseUp}
         onDragLeave={onWrapDragLeave}
         onDragOver={onWrapDragOver}
         onDrop={onWrapDrop}
         className={cn(
           // Canvas fills remaining viewport under thin menubar+toolbelt (~6.5rem).
-          "relative min-h-0 flex-1 overflow-auto rounded-none border-0 outline-none",
+          "relative min-h-0 flex-1 overflow-auto overscroll-contain rounded-none border-0 outline-none [scrollbar-gutter:stable]",
           "group/asset-drop transition-shadow data-[studio-asset-drop-active=true]:shadow-[inset_0_0_0_2px_oklch(0.72_0.18_45/0.9)]",
           "bg-[oklch(0.145_0.008_70)]",
           "[background-image:linear-gradient(oklch(0.162_0.008_70)_1px,transparent_1px),linear-gradient(90deg,oklch(0.162_0.008_70)_1px,transparent_1px)]",
           "[background-size:24px_24px]",
           "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent focus-visible:shadow-[inset_0_0_0_1px_oklch(0.72_0.14_55/0.45)] lg:max-h-none",
-          canvasOnlyMode && "min-h-0 flex-1 max-h-none overscroll-contain",
+          canvasOnlyMode && "min-h-0 flex-1 max-h-none",
           mobileImmersive
-            ? "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain"
+            ? "min-h-0 flex-1 max-h-none rounded-xl"
             : "max-h-[calc(100dvh-11rem)] min-h-[12rem] lg:max-h-none",
           viewportCursorClassName,
+          "data-[studio-hand-pan-armed=true]:select-none data-[studio-hand-pan-armed=true]:cursor-grab data-[studio-hand-pan-active=true]:!cursor-grabbing",
           (isSpacePressed || tool === "hand") && "select-none"
         )}
       >
