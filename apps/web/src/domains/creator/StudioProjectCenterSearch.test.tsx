@@ -120,6 +120,23 @@ describe("StudioProjectCenterSearch", () => {
     });
   });
 
+  it("links the searchbox to a stable result region without invalid popup ARIA", async () => {
+    render(<Fixture />);
+    const search = screen.getByRole("searchbox", {
+      name: "프로젝트 센터 도구 검색",
+    }) as HTMLInputElement;
+
+    fireEvent.change(search, { target: { value: "게시" } });
+    await waitFor(() => expect(findResultAction("게시 사전검사")).toBeDefined());
+
+    const controlledId = search.getAttribute("aria-controls");
+    expect(controlledId).toBeTruthy();
+    expect(document.getElementById(controlledId ?? "")?.getAttribute("role"))
+      .toBe("region");
+    expect(search.hasAttribute("aria-expanded")).toBe(false);
+    expect(search.hasAttribute("aria-activedescendant")).toBe(false);
+  });
+
   it("uses slash to focus search and Escape to clear scope before closing", async () => {
     render(<Fixture />);
     const search = screen.getByRole("searchbox", {
@@ -176,6 +193,28 @@ describe("StudioProjectCenterSearch", () => {
     fireEvent.click(recent as HTMLButtonElement);
     await waitFor(() => {
       expect(findResultAction("아카이브 백업")).toBeDefined();
+    });
+  });
+
+  it("uses the physical P key for macOS Option+P favorites", async () => {
+    render(<Fixture />);
+    const search = screen.getByRole("searchbox", {
+      name: "프로젝트 센터 도구 검색",
+    }) as HTMLInputElement;
+
+    fireEvent.change(search, { target: { value: "archive" } });
+    await waitFor(() => {
+      expect(findResultAction("아카이브 백업")).toBeDefined();
+    });
+    fireEvent.keyDown(search, {
+      key: "π",
+      code: "KeyP",
+      altKey: true,
+    });
+
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem(FAVORITE_STORAGE_KEY) ?? "[]"))
+        .toHaveLength(1);
     });
   });
 
