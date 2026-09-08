@@ -153,6 +153,24 @@ try {
   const video = await videoReady;
   await video.saveAs(join(scratch, "animatic.webm"));
   assert(readFileSync(join(scratch, "animatic.webm")).byteLength > 1000, "Encoded video is empty");
+  const metadata = await page.evaluate(async (data) => {
+    const video = document.createElement("video");
+    const url = URL.createObjectURL(new Blob([new Uint8Array(data)], { type: "video/webm" }));
+    const wait = (event: "loadedmetadata" | "seeked") => new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error(`Exported video ${event} timed out`)), 10000);
+      video.addEventListener(event, () => { clearTimeout(timeout); resolve(); }, { once: true });
+      video.addEventListener("error", () => { clearTimeout(timeout); reject(new Error("Exported video could not decode")); }, { once: true });
+    });
+    try {
+      const loaded = wait("loadedmetadata"); video.src = url; await loaded;
+      const duration = video.duration;
+      if (!Number.isFinite(duration) || duration <= 0) return { duration, seeked: false, width: video.videoWidth, height: video.videoHeight };
+      const seeking = wait("seeked"); video.currentTime = duration / 2; await seeking;
+      return { duration, seeked: Math.abs(video.currentTime - duration / 2) < 0.1, width: video.videoWidth, height: video.videoHeight };
+    } finally { video.removeAttribute("src"); video.load(); URL.revokeObjectURL(url); }
+  }, [...readFileSync(join(scratch, "animatic.webm"))]);
+  assert(Number.isFinite(metadata.duration) && metadata.duration > 0 && metadata.seeked && metadata.width === 720 && metadata.height === 1280, `Exported video metadata/seeking failed: ${JSON.stringify(metadata)}`);
+  evidence.videoMetadata = metadata;
   evidence.videoPath = join(scratch, "animatic.webm");
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 900 });

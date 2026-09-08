@@ -7,6 +7,7 @@ import type { MotionExportDeps, MotionRecorderLike } from "../export/studio-moti
 
 const { draw } = vi.hoisted(() => ({ draw: vi.fn() }));
 vi.mock("./studio-animatic-renderer", () => ({ drawStudioAnimaticFrame: draw }));
+vi.mock("./studio-animatic-recorded-webm", () => ({ finalizeStudioAnimaticRecordedWebm: async (blob: Blob) => blob }));
 afterEach(() => { draw.mockReset(); vi.unstubAllGlobals(); });
 
 function harness() {

@@ -2,6 +2,7 @@ import { createDefaultMotionExportDeps, pickMotionVideoMime, recommendVideoBitsP
 import { planStudioAnimaticPreview, sampleStudioAnimaticPreview } from "../studio-animatic-timeline";
 import { scheduleStudioAnimaticAudio } from "./studio-animatic-audio";
 import { drawStudioAnimaticFrame, type StudioAnimaticImages } from "./studio-animatic-renderer";
+import { finalizeStudioAnimaticRecordedWebm } from "./studio-animatic-recorded-webm";
 
 import type { StudioAnimaticWorkspaceSnapshot } from "./studio-animatic-workspace";
 
@@ -66,10 +67,19 @@ export async function exportStudioAnimaticVideo(request: StudioAnimaticVideoRequ
     }
     recorder = deps.createRecorder(stream, { mimeType, videoBitsPerSecond: recommendVideoBitsPerSecond(width, height, plan.fps) });
     const chunks: Blob[] = [];
+    let encodedBytes = 0;
     let encoderError: Error | null = null;
     let stoppedResolve: () => void = () => undefined;
     const stopped = new Promise<void>((resolve) => { stoppedResolve = resolve; });
-    recorder.ondataavailable = (event) => { if (event.data.size > 0) chunks.push(event.data); };
+    recorder.ondataavailable = (event) => {
+      encodedBytes += event.data.size;
+      if (encodedBytes > 256 * 1024 * 1024) {
+        encoderError = new Error("영상이 256MB 한도를 넘었습니다. 컷 길이를 줄여 나누어 내보내세요.");
+        interrupt?.(encoderError);
+        return;
+      }
+      if (event.data.size > 0) chunks.push(event.data);
+    };
     recorder.onstop = () => stoppedResolve();
     recorder.onerror = () => {
       encoderError = new Error("영상 인코딩 중 오류가 발생했습니다.");
@@ -110,7 +120,9 @@ export async function exportStudioAnimaticVideo(request: StudioAnimaticVideoRequ
     if (encoderError) throw encoderError;
     if (!chunks.length) throw new Error("영상 데이터가 생성되지 않았습니다.");
     request.onProgress?.(1);
-    return new Blob(chunks, { type: recorder.mimeType || mimeType });
+    const finalized = await finalizeStudioAnimaticRecordedWebm(new Blob(chunks, { type: recorder.mimeType || mimeType }), plan.totalDurationMs);
+    if (request.signal?.aborted) throw new DOMException("내보내기를 취소했습니다.", "AbortError");
+    return finalized;
   } finally {
     interrupt = null;
     request.signal?.removeEventListener("abort", aborted);
