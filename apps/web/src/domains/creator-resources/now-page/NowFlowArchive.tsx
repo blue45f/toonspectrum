@@ -38,6 +38,9 @@ function CreationFlowNav({ progressPercent, nextStep }: { progressPercent: numbe
       <a className={FLOW_LINK} href="#directing-mode">
         <Compass size={14} aria-hidden="true" /> 연출
       </a>
+      <a className={FLOW_LINK} href="#variation-lab">
+        <Shuffle size={14} aria-hidden="true" /> 변주
+      </a>
       <a className={FLOW_LINK} href="#scene-ingredients">
         <PackageSearch size={14} aria-hidden="true" /> 재료
       </a>
