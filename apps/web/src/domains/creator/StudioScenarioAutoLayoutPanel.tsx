@@ -26,6 +26,7 @@ export type StudioScenarioAutoLayoutPanelProps = StudioAiComicDirectorPanelProps
 
 const TRANSPARENT_FRAME_BACKGROUND =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lDFQAAAAAElFTkSuQmCC";
+const APPLY_KEY_PREFIX = "toonspectrum:studio-ai-comic-director:committed:";
 
 type LegacyScenarioApplyDecoration = DialogueBubbleSeed | Extract<El, { type: "image" }>;
 
@@ -54,6 +55,33 @@ function layerApplyDecorations(item: ScenarioPreviewItem): LegacyScenarioApplyDe
   return [...layerElements, ...nativeBubbles(item)];
 }
 
+function applyFingerprint(
+  props: StudioScenarioAutoLayoutPanelProps,
+  items: readonly ScenarioPreviewItem[],
+): string {
+  const serialized = JSON.stringify({
+    sessionId: props.sessionId ?? "legacy",
+    target: props.applyTarget,
+    baseDocumentRevision: props.baseDocumentRevision ?? null,
+    panels: items.map((item, index) => ({
+      index,
+      candidateId: item.selectedImageCandidateId ?? null,
+      candidateFingerprint: item.imageCandidates?.find(
+        (candidate) => candidate.id === item.selectedImageCandidateId,
+      )?.inputFingerprint ?? null,
+      dialogue: item.dialogue,
+      layerSource: item.layerManifest?.sourceCandidateId ?? null,
+      layerMethod: item.layerManifest?.method ?? null,
+    })),
+  });
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 export function StudioScenarioAutoLayoutPanel(
   props: StudioScenarioAutoLayoutPanelProps,
 ): ReactElement | null {
@@ -74,26 +102,29 @@ export function StudioScenarioAutoLayoutPanel(
 
   const applyWithEditableLayers = () => {
     const sourceItems = previewRef.current;
-    if (!sourceItems?.some((item) => item.layerManifest?.editable)) {
-      applyRef.current();
-      return;
-    }
+    if (!sourceItems) return;
+    const commitKey = `${APPLY_KEY_PREFIX}${applyFingerprint(props, sourceItems)}`;
+    if (globalThis.sessionStorage?.getItem(commitKey)) return;
+    globalThis.sessionStorage?.setItem(commitKey, new Date().toISOString());
 
     const restore = sourceItems.map((item) => ({
       bubbles: item.bubbles,
       imageDataUrl: item.imageDataUrl,
     }));
-    flushSync(() => {
-      sourceItems.forEach((item, index) => {
-        if (!item.layerManifest?.editable) return;
-        changeSceneRef.current(index, {
-          // Keep the frame slot truthful but transparent; the actual artwork follows as ordinary
-          // Studio image elements in background → foreground order.
-          imageDataUrl: TRANSPARENT_FRAME_BACKGROUND,
-          bubbles: layerApplyDecorations(item) as unknown as ScenarioPreviewItem["bubbles"],
+    const hasEditableLayers = sourceItems.some((item) => item.layerManifest?.editable);
+    if (hasEditableLayers) {
+      flushSync(() => {
+        sourceItems.forEach((item, index) => {
+          if (!item.layerManifest?.editable) return;
+          changeSceneRef.current(index, {
+            // Keep the frame slot truthful but transparent; the actual artwork follows as ordinary
+            // Studio image elements in background → foreground order.
+            imageDataUrl: TRANSPARENT_FRAME_BACKGROUND,
+            bubbles: layerApplyDecorations(item) as unknown as ScenarioPreviewItem["bubbles"],
+          });
         });
       });
-    });
+    }
 
     // flushSync rerenders the wrapper, so this ref now points at the host closure that sees the
     // apply-only decorations rather than the stale pre-transform preview.
@@ -103,6 +134,8 @@ export function StudioScenarioAutoLayoutPanel(
       // Successful legacy apply clears the preview. Restore only when it remained mounted because
       // review lock, persistence or another document guard rejected the commit.
       if (!previewRef.current) return;
+      globalThis.sessionStorage?.removeItem(commitKey);
+      if (!hasEditableLayers) return;
       restore.forEach((snapshot, index) => {
         changeSceneRef.current(index, snapshot);
       });
