@@ -40,9 +40,9 @@
 
 ## 검증과 정리
 
-최종 제품 코드 `7b215fb67a176056aae68a1d212c474f070a6038`에서 56개 파일의 회귀 테스트 965개(CI 정책 및 메뉴 검사 포함), 웹 TypeScript, 수정 파일 104개의 ESLint, Vite production build, 라이선스 고지, 정적 Studio 번들 및 CSP 검사를 통과했습니다. API TypeScript는 앞선 합본에서 통과했고 이후 `apps/api`와 `packages/core` 차이가 없음을 확인했습니다. 별도 opt-in CPU 실험 27개 및 scoped TypeScript/ESLint도 통과했습니다. 실행 기록과 SHA-256은 [verification.json](verification.json)에 있습니다. 최종 빌드 도중 제품 HEAD는 바뀌지 않았으며, dist 파일 10,615개의 해시 manifest도 남겼습니다. 이후 감사 문서 및 별도 검증 스크립트를 갱신할 수 있으며 제품 코드 차이는 따로 확인합니다.
+앞선 수집 단계의 제품 코드 `7b215fb67a176056aae68a1d212c474f070a6038`에서 56개 파일의 회귀 테스트 965개(CI 정책 및 메뉴 검사 포함), 웹 TypeScript, 수정 파일 104개의 ESLint, Vite production build, 라이선스 고지, 정적 Studio 번들 및 CSP 검사를 통과했습니다. API TypeScript는 앞선 합본에서 통과했고 이후 `apps/api`와 `packages/core` 차이가 없음을 확인했습니다. 별도 opt-in CPU 실험 27개 및 scoped TypeScript/ESLint도 통과했습니다. 실행 기록과 SHA-256은 [verification.json](verification.json)에 있습니다. 최종 빌드 도중 제품 HEAD는 바뀌지 않았으며, dist 파일 10,615개의 해시 manifest도 남겼습니다. 이후 감사 문서 및 별도 검증 스크립트를 갱신할 수 있으며 제품 코드 차이는 따로 확인합니다.
 
-전체 합본의 실제 브라우저/GPU 인수 검증과 최종 원격 head의 CI는 별도 확인 대상입니다. MR #960은 2026-09-08 14:43:09 UTC에 `557dd3fa419c615de70950d6d544c51b03bfb5fb`로 실제 병합됐으며, 병합 tree가 검증한 제품 코드 `7b215fb6`와 동일함을 확인했습니다. 이 병합은 다른 동시 작업에서 수행됐습니다. main 대상 MR의 최종 CI와 실제 브라우저/GPU 검증 완료 여부는 별도로 보고합니다. 이전 head의 일부 CI 통과를 최종 head의 통과로 재사용하지 않습니다.
+다음은 이전 수집 단계 기록이며 최종 제품의 실제 계정 결과는 아래 최종 main 병합 준비와 verification.json에 기록합니다. 원격 CI는 로컬 결과와 별도로 취급합니다. MR #960은 2026-09-08 14:43:09 UTC에 `557dd3fa419c615de70950d6d544c51b03bfb5fb`로 실제 병합됐으며, 병합 tree가 검증한 제품 코드 `7b215fb6`와 동일함을 확인했습니다. 이 병합은 다른 동시 작업에서 수행됐습니다. main 대상 MR의 최종 CI와 실제 브라우저/GPU 검증 완료 여부는 별도로 보고합니다. 이전 head의 일부 CI 통과를 최종 head의 통과로 재사용하지 않습니다.
 
 먼저 main 반영이 확인된 PR919 계열 clean worktree 1개를 제거했습니다. worktree의 고유·무시 파일 179개는 압축 후 개별 SHA-256을 재검증했습니다. 이어 최초 범위의 소스 ref를 통합 원격에 보존하고 로컬 브랜치 13개와 원격 브랜치 39개를 정리했습니다. 이 수치는 중복 없이 센 최초 소스 ref이며, 모두 main에 병합됐다는 뜻은 아닙니다. 미반영 소스의 제품 변경·검토 자료·원본 이력을 한 통합 MR에서 보존한 뒤 원래 이름의 브랜치를 정리했습니다. 원본 46개 SHA가 통합 이력에 도달 가능하며 `refs/cleanup-archive/all-unmerged-integration-20260908/`에서도 복구할 수 있습니다.
 
@@ -63,3 +63,17 @@ MR #959가 감사 도중 main `dce667137fca4849ecd5536fb4e8e9e3e54f4fa3`에 병�
 한계도 남깁니다. 정리된 빌드·캐시 경로 7개(당시 9,238파일)는 과거 파일별 해시가 없어 내부 모든 바이트의 동일 복구를 증명할 수 없습니다. 또한 후속 변경된 모든 기능을 다시 실행해 과거와의 완전한 의미 동일성을 확인한 것은 아닙니다. 의도적으로 보관한 운영/구조 제안과 benchmark를 현재 제품 기능으로 모두 활성화했다고 주장하지 않습니다.
 
 사용자가 마지막 두 소스 브랜치의 통합도 요청한 뒤 `ci-salvage-followup`의 9cdd7b96와 `issues-parallel-fixes`의 a4a7dd1b가 release 2797e837의 조상임을 확인했습니다. 두 원격 이름도 정확한 SHA를 archive에 보존하고 lease가 일치하는 경우에만 삭제했습니다. 확인 시점 원격에는 main과 release/salvage-integration-20260908만 남았습니다. main 병합용 MR은 [#961](https://github.com/blue45f/toonspectrum/pull/961)입니다.
+
+## 최종 main 병합 준비
+
+최종 제품 코드는 `0df3201b390f2d885bea9832ede0bd1593d682e6`입니다. 기존 통합 후속 4건(JSON 백업 전 획 반영, 텍스처 오류 초기화, 영상 준비 중 취소, 공유 최근 색상 기록), 비동기 저장소 거절 검사, 메뉴 구성 단순화를 추가했습니다. 최근 색상은 기존 공유 저장소의 12개 제한을 따릅니다.
+
+실제 계정 검사에서 드러난 클립 저장 오류도 수정했습니다. 런타임 획과 Smart Shape 원본의 선택적 객체 `undefined`를 저장 경계에서만 생략합니다. 일반 획과 Smart Shape를 실제 Host 경로로 이동·SQLite 저장·재로드·재삽입·재저장하는 회귀를 추가했습니다. 입력 배열은 자체 데이터 인덱스만 읽고 getter, 사용자 iterator, 비정규 prototype, 누락 인덱스 등을 거절합니다. 숫자·순환·예산·잘못된 값 거절과 실패 시 기존 라이브러리 보존은 유지합니다.
+
+이 정확한 코드에서 80개 테스트 파일의 **1,183개 테스트**, 전체 웹 TypeScript, 변경 파일 **107개의 ESLint**, production build, 라이선스 고지, 새 배포 디렉터리 검사, CSP 및 Studio bundle이 통과했습니다. API/core는 이전 통과 코드와 동일합니다. 새 빌드는 기존 QA 산출물을 변경하지 않는 별도 디렉터리에 만들었고 10,615개 파일의 SHA-256을 기록했습니다. 구체적 receipt와 제한은 [verification.json](verification.json)에 있습니다.
+
+기본 IDE checkout도 알려진 미추적 파일 3개(18,751바이트)를 원본·tar·해시로 보존한 뒤 정상 checkout으로 release 브랜치에 맞췄습니다. 기존 임시 로컬 브랜치는 원본 SHA를 archive에 남기고 제거했습니다. 서비스·의존성·ignored 자산은 유지했습니다.
+
+사용자는 코드를 검토해 문제가 없으면 CI 완료를 기다리지 않고 main에 병합하도록 명시적으로 요청했습니다. 같은 최종 빌드의 실제 계정 검사도 통과했습니다. JSON450은 기존 빈 JSON 캐시가 있어도 펜 입력 직후 백업에 마지막 획이 포함됨을 확인했습니다. AUTHCLIP452의 실제 로그인, Smart Shape 작성, 클립 저장·재로드·복구·삽입, 원본 ID/좌표 재매핑과 durable 저장, 클립 삭제 후 문서 유지, 초안 POST 201 및 새 브라우저 컨텍스트의 cloud GET 200과 정확한 PNG·원본 snapshot 일치까지 6개 동선이 모두 통과했습니다.
+
+브라우저 page error와 실패/차단 요청은 0건입니다. 일반 사용자의 admin 403, 기존 Konva layer 안내 외 재로드 시 LEASE_BUSY 경고 1건은 기록했습니다. 이후 복구·저장·재열기는 모두 성공했습니다. 앞선 AUTHCLIP451은 늦게 표시되는 복구 배너를 검증기가 놓친 것으로, 배너 표시·복구 선택·배너 제거를 기다리도록 절차를 수정했고 저장/픽셀 조건은 완화하지 않았습니다. 이 빌드의 realtime gateway 연결, CI 전체 통과, 운영 배포 완료를 대신 주장하지 않습니다.

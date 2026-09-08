@@ -1,122 +1,281 @@
 {
-  "verifiedAt": "2026-09-08T14:45:16.458650+00:00",
-  "frozenMain": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
-  "latestMainCompared": "dce667137fca4849ecd5536fb4e8e9e3e54f4fa3",
-  "testedProductHead": "7b215fb67a176056aae68a1d212c474f070a6038",
-  "testedProductTree": "eb0d3d51e7a7458ffcb878ec1a2b4c1e5d0de00c",
-  "postValidationChanges": "Audit documents and separately validated verifier fixes; application source must remain identical to tested product head.",
+  "verifiedAt": "2026-09-08T15:39:20.073499+00:00",
+  "testedProductHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+  "testedSourceTree": "930b2f445d369aa4f4f2fd43a6b1e77288b7fc2f",
+  "mainBaseline": "dce667137fca4849ecd5536fb4e8e9e3e54f4fa3",
   "focusedTests": {
-    "files": 56,
-    "numTotalTests": 965,
-    "numPassedTests": 965,
-    "numFailedTests": 0,
-    "success": true,
-    "includesCiPolicyAndMenuTests": true
+    "sourceHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+    "mode": "tests",
+    "startedAt": "2026-09-08T15:24:22.859507+00:00",
+    "tests": {
+      "numTotalTests": 1183,
+      "numPassedTests": 1183,
+      "numFailedTests": 0,
+      "success": true
+    },
+    "files": 80,
+    "endHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+    "sourceUnchanged": true,
+    "result": "PASS"
+  },
+  "webTypecheck": {
+    "sourceHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+    "mode": "types",
+    "startedAt": "2026-09-08T15:24:22.784733+00:00",
+    "endHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+    "sourceUnchanged": true,
+    "result": "PASS"
+  },
+  "eslint": {
+    "sourceHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+    "mode": "lint",
+    "startedAt": "2026-09-08T15:24:22.810619+00:00",
+    "files": 107,
+    "endHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+    "sourceUnchanged": true,
+    "result": "PASS"
+  },
+  "productionBuild": {
+    "sourceHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+    "mode": "build",
+    "startedAt": "2026-09-08T15:24:22.784828+00:00",
+    "distPath": "/private/tmp/toonspectrum-main-final-build-20260909/0df3201b390f/dist",
+    "distManifestSha256": "54f05571e2c2f3dec5d16ab07bf184a854a75f38acf124051f683f316ec144a7",
+    "files": 10615,
+    "endHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+    "sourceUnchanged": true,
+    "result": "PASS"
+  },
+  "apiTypecheck": {
+    "result": "PASS",
+    "unchangedPathsSincePriorValidation": [
+      "apps/api",
+      "packages/core"
+    ],
+    "changedPaths": [],
+    "additionalOwnerReceipt": "/Users/hjunkim/.codex/artifacts/toonspectrum-final413/ci448-handoff.json"
   },
   "cpuExperiments": {
     "tests": 27,
     "result": "pass",
     "pixelEquivalence": "Inkwash direct/tile is not pixel equivalent; see experiment-verification.json."
   },
-  "webTypecheck": {
-    "result": "pass",
-    "heapMB": 8192
+  "distManifest": {
+    "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/dist-manifest.json",
+    "sha256": "54f05571e2c2f3dec5d16ab07bf184a854a75f38acf124051f683f316ec144a7"
   },
-  "apiTypecheck": {
-    "result": "pass",
-    "verifiedSourcePrefix": "7270766ea",
-    "pathsUnchangedSinceVerification": [
-      "apps/api",
-      "packages/core"
-    ],
-    "changedPaths": []
+  "browserGpu": {
+    "status": "Final product source actual-account immediate JSON and six authored-clip browser flows PASS; residual storage warning recorded.",
+    "nativeAcceptance": {
+      "immediateJson": {
+        "sourceHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+        "result": "PASS",
+        "steps": [
+          {
+            "id": "actual-ui-login",
+            "status": "PASS",
+            "result": {
+              "loginHttp": 201,
+              "sessionHttp": 200,
+              "actualUiAccountId": "56b4e607-2dac-40c2-97f4-298c9ce1e531",
+              "httpOnlyCookie": true
+            }
+          },
+          {
+            "id": "blank-export-populates-unchanged-envelope-cache",
+            "status": "PASS",
+            "result": {
+              "emptyElements": 0,
+              "envelopeSha256": "400fb1643dcd8c299aacc7294cb510ef673c28151d11eae495789d99b294a3a0"
+            }
+          },
+          {
+            "id": "immediate-json-after-accepted-stroke-includes-stroke",
+            "status": "PASS",
+            "result": {
+              "elapsedAfterPointerUpMs": 112,
+              "beforeEnvelopeSha256": "400fb1643dcd8c299aacc7294cb510ef673c28151d11eae495789d99b294a3a0",
+              "afterEnvelopeSha256": "1fb7cf16e03a38bd46ed6b6c39a6286c95c5447103ac1670c98768e7f84067a7",
+              "exportedElements": 1,
+              "visibleLayerRowsAfterDownload": 0,
+              "id": "3b7db861-1955-438b-97ff-e956bccb7897",
+              "pixels": {
+                "width": 1440,
+                "height": 2160,
+                "opaque": 3110400,
+                "nonWhite": 3876,
+                "rgbaSha256": "8a61587ee00b3ecc101d08ca2b76b86ad773b53aa883aef74dd6830c1bf83d9a"
+              }
+            }
+          }
+        ],
+        "report": "/Users/hjunkim/.codex/artifacts/toonspectrum-final413/json450-after-results/report.json",
+        "reportSha256": "439caa0621eddb52c4ff365b8eca9474d91202cc5dbf1bffd99c0d969053f4e6",
+        "diagnostics": {
+          "result": "PASS",
+          "scope": "actual UI login, primed unchanged JSON cache, trusted stroke, immediate JSON backup including latest stroke; no post-stroke wait added",
+          "sourceHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+          "rawReportSha256": "439caa0621eddb52c4ff365b8eca9474d91202cc5dbf1bffd99c0d969053f4e6",
+          "expectedConsole": [
+            "Normal USER admin/me 403"
+          ],
+          "browserPageErrors": 0,
+          "requestFailures": 0,
+          "blockedRequests": 0,
+          "sockets": 0,
+          "before": {
+            "elements": 0,
+            "elapsedAfterPointerUpMs": 68,
+            "path": "/Users/hjunkim/.codex/artifacts/toonspectrum-final413/json450-before-results/report.json"
+          },
+          "after": {
+            "elapsedAfterPointerUpMs": 112,
+            "beforeEnvelopeSha256": "400fb1643dcd8c299aacc7294cb510ef673c28151d11eae495789d99b294a3a0",
+            "afterEnvelopeSha256": "1fb7cf16e03a38bd46ed6b6c39a6286c95c5447103ac1670c98768e7f84067a7",
+            "exportedElements": 1,
+            "visibleLayerRowsAfterDownload": 0,
+            "id": "3b7db861-1955-438b-97ff-e956bccb7897",
+            "pixels": {
+              "width": 1440,
+              "height": 2160,
+              "opaque": 3110400,
+              "nonWhite": 3876,
+              "rgbaSha256": "8a61587ee00b3ecc101d08ca2b76b86ad773b53aa883aef74dd6830c1bf83d9a"
+            }
+          },
+          "browserClosed": true,
+          "verifiedAt": "2026-09-08T15:29:50.997223+00:00"
+        }
+      },
+      "authoredClip": {
+        "sourceHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+        "result": "FUNCTIONAL_PASS_WITH_RECORDED_STORAGE_WARNING",
+        "steps": [
+          {
+            "id": "actual-ui-login",
+            "status": "PASS",
+            "result": {
+              "loginHttp": 201,
+              "sessionHttp": 200,
+              "actualUiAccountId": "56b4e607-2dac-40c2-97f4-298c9ce1e531",
+              "httpOnlyCookie": true
+            }
+          },
+          {
+            "id": "actual-smart-shape-author-and-confirm",
+            "status": "PASS",
+            "result": {
+              "id": "657af2fa-6442-4b26-a0af-b38e8db8c7f3",
+              "originalId": "657af2fa-6442-4b26-a0af-b38e8db8c7f3",
+              "kind": "rect",
+              "originalPoints": 30
+            }
+          },
+          {
+            "id": "save-clip-reload-insert-remaps-original",
+            "status": "PASS",
+            "result": {
+              "actualPrompt": true,
+              "actualReload": true,
+              "ids": [
+                "657af2fa-6442-4b26-a0af-b38e8db8c7f3",
+                "9876ce7c-4f73-4faf-a868-c731cf659ca9"
+              ],
+              "originalSnapshotIds": [
+                "657af2fa-6442-4b26-a0af-b38e8db8c7f3",
+                "9876ce7c-4f73-4faf-a868-c731cf659ca9"
+              ],
+              "dx": 10.799993566564638,
+              "dy": -33.38514998152448,
+              "pixels": {
+                "width": 1440,
+                "height": 2160,
+                "opaque": 3110400,
+                "nonWhite": 19859,
+                "rgbaSha256": "1fd4af81f8b704e0b51ec8762dae580e937d61758f227a7a7ad2410915fd0673"
+              }
+            }
+          },
+          {
+            "id": "delete-owned-clip-preserves-document-and-library-reload",
+            "status": "PASS",
+            "result": {
+              "removedOnlyOwnedClip": "QA smart clip 1788881572802",
+              "documentUnchanged": true,
+              "exactPixels": true
+            }
+          },
+          {
+            "id": "actual-ui-draft-save-completed-navigation",
+            "status": "PASS",
+            "result": {
+              "workId": "bbbda72c-0f3b-4d73-b813-b6535e28d79d",
+              "status": 201,
+              "finalPath": "/create/bbbda72c-0f3b-4d73-b813-b6535e28d79d"
+            }
+          },
+          {
+            "id": "fresh-cloud-owner-gets-exact-smart-shape-originals",
+            "status": "PASS",
+            "result": {
+              "http": 200,
+              "revision": 1,
+              "ids": [
+                "657af2fa-6442-4b26-a0af-b38e8db8c7f3",
+                "9876ce7c-4f73-4faf-a868-c731cf659ca9"
+              ],
+              "originalSnapshotsExact": true,
+              "cloudPixelsExact": true
+            }
+          }
+        ],
+        "report": "/Users/hjunkim/.codex/artifacts/toonspectrum-final413/authclip452-results/report.json",
+        "reportSha256": "58de93efdd095e4bb67bff39a779135b1465b205e0c81de69cf06f2b76231861",
+        "diagnostics": {
+          "result": "FUNCTIONAL_PASS_WITH_RECORDED_STORAGE_WARNING",
+          "sourceHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
+          "rawReportSha256": "58de93efdd095e4bb67bff39a779135b1465b205e0c81de69cf06f2b76231861",
+          "allSixActualBrowserFlowsPassed": true,
+          "expectedConsole": [
+            "Normal USER admin/me 403",
+            "Existing Konva six-layer performance advisory"
+          ],
+          "additionalWarning": "LEASE_BUSY during second reload; actual recovery, delete persistence, exact PNG, actual draft save201, new-context cloudGET200 all passed. Do not describe console as empty.",
+          "pageErrors": 0,
+          "requestFailures": 0,
+          "blockedRequests": 0,
+          "sockets": 0,
+          "browserClosed": true,
+          "workId": "bbbda72c-0f3b-4d73-b813-b6535e28d79d",
+          "verifiedAt": "2026-09-08T15:33:56.535176+00:00"
+        }
+      }
+    },
+    "gatewayLimit": "This immutable build does not set VITE_STUDIO_LIVE_ORIGIN; realtime gateway acceptance is separate from the verified REST save/reopen paths.",
+    "previousNativeEvidence": "/Users/hjunkim/.codex/artifacts/toonspectrum-final413/auth444-results",
+    "supersededHarnessFailure": "authclip451 missed the delayed recovery banner. authclip452 explicitly awaited the recovery decision and retained all durable data, geometry and pixel assertions."
   },
-  "eslint": {
-    "files": 104,
-    "result": "pass"
+  "mainPullRequest": {
+    "number": 961,
+    "url": "https://github.com/blue45f/toonspectrum/pull/961",
+    "headBranch": "release/salvage-integration-20260908",
+    "baseBranch": "main",
+    "status": "Ready for exact-head main merge under explicit user CI bypass authorization; actual merge recorded separately."
   },
-  "buildReceipt": {
-    "sourceHead": "7b215fb67a176056aae68a1d212c474f070a6038",
-    "sourceTree": "eb0d3d51e7a7458ffcb878ec1a2b4c1e5d0de00c",
-    "endHead": "7b215fb67a176056aae68a1d212c474f070a6038",
-    "sourceUnchanged": true,
-    "results": {
-      "final-build": 0,
-      "final-notices": 0,
-      "final-csp": 0,
-      "final-bundle": 0
-    }
+  "mergeAuthorization": "User explicitly requested main merge after code review without waiting for CI. No CI pass is inferred from local tests, and no check results are fabricated.",
+  "sourceReviews": {
+    "initialRecoveredCode": "verification/final-safety-review-worktree-agent.json",
+    "fourFollowups": "verification/small-fixes-code-review-e2fce9b46.json",
+    "clipProjection": "Source 90c81 plus 0df strict arrays; seven meaningful RED to GREEN regression cases. No unaddressed P1/P2 finding in reviewed scope."
   },
-  "build": "pass",
-  "licenseNotices": "pass",
-  "csp": "pass",
-  "staticStudioBundle": "pass",
-  "dist": {
-    "path": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/dist",
-    "fileCount": 10615,
-    "totalBytes": 2222076269,
-    "manifestSha256": "8f645cb1a6123eea9bee47082f0128c6994869a5c824ef2b53f8a66472238575"
+  "additionalSourceCommits": {
+    "smallFixes": "e2fce9b46aa60c0713e7d44f1ee1ae4373bf275a",
+    "asyncStorageTest": "9cdd7b9605666442325124250e52261d5de1bc44",
+    "menuBoundary": "2cc137d740bb5b3e140c45b1d91d4cc9f049a39f",
+    "authoredClip": "90c81d30eccf14afc605b9c30c7b870e72a61859",
+    "strictClipProjection": "0df3201b390f2d885bea9832ede0bd1593d682e6"
   },
-  "browserGpu": "Final aggregate native account/save/restart acceptance pending in coordinated QA task; no final aggregate runtime PASS claimed.",
-  "remoteCi": "Final pushed MR head CI must be inspected separately. Earlier-head results are not final-head evidence.",
-  "exportRecoverySources": [
-    "3fdc520c23e161e0f7b7e19fefb27dd9b4373bee",
-    "2f6c0baa8",
-    "376a210a6bb59749a5fd68d6db6ad742efda5aef"
-  ],
-  "menuCoverageFix": "3efb99121",
-  "finalCiSource": "3fedb55c33488add4931ab4ffe9c8c7672ffc209",
-  "logs": {
-    "final-tests.json": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-tests.json",
-      "sha256": "6075c063d289718f7c607896e6875b6ddfc256b9ef9b23f1e6e5e446d4f5b514"
-    },
-    "final-tests.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-tests.log",
-      "sha256": "4ee3014208aebaedc694772c6d542b10d43e160578a69de1c3e6c91681ea5d0c"
-    },
-    "final-web-types.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-web-types.log",
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "api-types.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/api-types.log",
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "final-eslint-receipt.json": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-eslint-receipt.json",
-      "sha256": "c88dc6f0c6dd6cf09b8feca32bf890083db53c9c269475d849672fb9aa37c165"
-    },
-    "final-eslint.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-eslint.log",
-      "sha256": "b77aa8c5ca50d43297909a3fee5369104844045f98da48b8d06af992e23c5257"
-    },
-    "final-build.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-build.log",
-      "sha256": "7f94a6831c2450d49a563f1af4483f04c8db01e4f6abc3230cefb5d377948803"
-    },
-    "final-notices.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-notices.log",
-      "sha256": "fa267be140584124b609f02316cd8d005bc4d14ea87fe49b66e0ea4db0119edc"
-    },
-    "final-csp.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-csp.log",
-      "sha256": "026e6f1d5ee14d96878c4142dc1f926f16c3f1c2408c577b5bf47ad3ba2219f1"
-    },
-    "final-bundle.log": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-bundle.log",
-      "sha256": "468c5ee7fcceb68ab198c189d6ad19ab7eaae1cccfced93cb0de7e2f426ccf1b"
-    },
-    "final-build-receipt.json": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/final-build-receipt.json",
-      "sha256": "e97ab1658168f7386ad2d84671eca3894aa60b9de615e6569af1df36074ab250"
-    },
-    "dist-manifest.json": {
-      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/dist-manifest.json",
-      "sha256": "8f645cb1a6123eea9bee47082f0128c6994869a5c824ef2b53f8a66472238575"
-    }
-  },
-  "collectionPullRequest": {
+  "collectionMerge": {
     "number": 960,
     "headBranch": "codex/integrate-unmerged-20260908",
     "baseBranch": "release/salvage-integration-20260908",
@@ -126,20 +285,71 @@
     "mergedAt": "2026-09-08T14:43:09Z",
     "productTreeIdenticalToTestedHead": true
   },
-  "mainPullRequest": {
-    "headBranch": "release/salvage-integration-20260908",
-    "baseBranch": "main",
-    "status": "Being prepared; current CI and native QA are separate from collection merge."
+  "previousProductVerification": {
+    "source": "7b215fb67a176056aae68a1d212c474f070a6038",
+    "tests": 965,
+    "currentFinalVerificationSupersedesPrior": true
   },
-  "verifierFollowup": {
-    "commit": "fd4277582c2112a20ff535811e4160397a69c26d",
-    "file": "scripts/verify-studio-brushes.mts",
-    "eslint": "pass",
-    "changedHelperTypecheck": "pass",
-    "cpuStatesPassed": 8,
-    "existingReactTestsPassed": 3,
-    "fullShapesBrowser": "pending",
-    "diagnosisLocalPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/mr960-shapes-diagnosis.json"
-  },
-  "applicationSourceUnchangedAtVerifierHead": "fd4277582c2112a20ff535811e4160397a69c26d"
+  "logs": {
+    "build-receipt.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/build-receipt.json",
+      "sha256": "8e74910156ee0c4f6bf75c4ef40949f4287b0a3a74c5ef91714f7d5bcffbf711"
+    },
+    "build.log": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/build.log",
+      "sha256": "e9f859a80c00f183c1937554a7aaf9affe1230ac976d9d4e54e38009da5de331"
+    },
+    "bundle.log": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/bundle.log",
+      "sha256": "1bb4d0278c2d23d08dbda6b558def1095635cce61f993c2adbee1d5b3b29ccb4"
+    },
+    "csp.log": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/csp.log",
+      "sha256": "2e8f082d12d4786679499a6fd66e9f8a04a04129aeacdd0ee84488e21b5ffe8d"
+    },
+    "dist-manifest.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/dist-manifest.json",
+      "sha256": "54f05571e2c2f3dec5d16ab07bf184a854a75f38acf124051f683f316ec144a7"
+    },
+    "eslint.log": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/eslint.log",
+      "sha256": "b77aa8c5ca50d43297909a3fee5369104844045f98da48b8d06af992e23c5257"
+    },
+    "lint-files.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/lint-files.json",
+      "sha256": "42a19b2fb35b1d6c8395b51eceb404c296fe73b6bccbcb2c9936f6bb7e38ad82"
+    },
+    "lint-receipt.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/lint-receipt.json",
+      "sha256": "bd529402d6b3c6106265a671c28f3bd8a2e82f6b172178969df3366218cc514b"
+    },
+    "notices.log": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/notices.log",
+      "sha256": "21189617ff82fbe2026511ef8e877ce13ed57602d219dbde55ab81097bf56507"
+    },
+    "test-files.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/test-files.json",
+      "sha256": "23bbf9ac29eee446c6f64f33f5edcb159f66e687e673da83e1f05c929795c88e"
+    },
+    "tests-receipt.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/tests-receipt.json",
+      "sha256": "401cef004f78240e98caa42c0e61188b63a8038940404806970659e025138e97"
+    },
+    "tests.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/tests.json",
+      "sha256": "0a1bd04cba9c5e024a697f4d037f0990c65ba27f5c0194de5fc075f120fac056"
+    },
+    "tests.log": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/tests.log",
+      "sha256": "8bbdede6b84eb7015d5fd3949882a1d0454295ecb9603a376bd5da221bd59096"
+    },
+    "types-receipt.json": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/types-receipt.json",
+      "sha256": "e26f69316f44526d358096f18deebe9413f39a5ebd24b26ce79a6fd4aa1687fc"
+    },
+    "web-types.log": {
+      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/web-types.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
 }
