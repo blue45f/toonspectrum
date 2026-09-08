@@ -21,6 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         runner:
+          - ubuntu-slim
           - ubuntu-24.04-arm
           - ubuntu-latest
     runs-on: ${{ matrix.runner }}
