@@ -52,10 +52,18 @@ export interface CharacterShaperBinding {
   readonly busyReason: string | null;
   readonly handSide: CharacterHandSide;
   readonly compareActive: boolean;
+  /** Candidate currently rendered only as a transient, non-document preview. */
+  readonly previewEntryId?: string | null;
   evaluate(entry: CharacterSlotEntry): CharacterSlotAvailability;
   /** Build the plan without executing it (used for tooltips / inspector explanations). */
   plan(entry: CharacterSlotEntry): CharacterApplyPlan;
   commit(entry: CharacterSlotEntry): CharacterShaperCommitResult;
+  /** Apply one candidate without taking history, autosave, or document authority. */
+  preview?(entry: CharacterSlotEntry): CharacterShaperCommitResult;
+  /** Restore the exact host snapshot captured before the current preview. */
+  cancelPreview?(): void;
+  /** Promote the matching preview to one committed history transaction. */
+  commitPreview?(entry: CharacterSlotEntry): CharacterShaperCommitResult;
   /** Apply a complete supported preset atomically; an unsupported field rejects the whole edit. */
   commitPreset(preset: CharacterPartPresetV1, document: CharacterDocumentV2): { readonly ok: boolean; readonly reason: string | null };
   /** Clear a slot back to "없음 / 원본" where the slot supports it. */
@@ -136,10 +144,13 @@ export interface CharacterSlotCardProps {
   readonly entry: CharacterSlotEntry;
   readonly availability: CharacterSlotAvailability;
   readonly selected: boolean;
+  readonly previewed?: boolean;
   readonly tabIndex: 0 | -1;
   readonly onCommit: (entry: CharacterSlotEntry) => void;
   readonly onHover: (entryId: string | null) => void;
   readonly onFocus: (entryId: string) => void;
+  readonly onPreviewStart?: (entry: CharacterSlotEntry) => void;
+  readonly onPreviewEnd?: (entryId: string) => void;
   readonly onKeyNavigate: (direction: "left" | "right" | "up" | "down" | "home" | "end") => void;
 }
 
