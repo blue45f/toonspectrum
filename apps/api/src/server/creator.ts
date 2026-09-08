@@ -35,6 +35,7 @@ export {
   type CreatorFollowStats,
   type CreatorPublicProfile,
 } from "./creator/follows";
+export { listSeries } from "./creator/publication-list-series";
 export {
   CreatorPublicationValidationError,
   addComment,
@@ -46,7 +47,6 @@ export {
   getWork,
   listChallenges,
   listComments,
-  listSeries,
   listWorks,
   promoteDueCreatorPublications,
   toggleLike,
