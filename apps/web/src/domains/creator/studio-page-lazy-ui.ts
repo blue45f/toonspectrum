@@ -450,6 +450,10 @@ const StudioQuickShapePanel = lazyRetry(
   () => import("./StudioQuickShapePanel").then((mod) => ({ default: mod.StudioQuickShapePanel })),
   "StudioQuickShapePanel"
 );
+const StudioSmartShapeEditDialog = lazyRetry(
+  () => import("./StudioSmartShapeEditDialog").then((mod) => ({ default: mod.StudioSmartShapeEditDialog })),
+  "StudioSmartShapeEditDialog"
+);
 const StudioFeatureTutorialHub = lazyRetry(
   () => import("./StudioFeatureTutorialHub").then((mod) => ({ default: mod.StudioFeatureTutorialHub })),
   "StudioFeatureTutorialHub"
@@ -886,6 +890,7 @@ export {
   StudioQuickActionsMenu,
   StudioQuickMaskPanel,
   StudioQuickShapePanel,
+  StudioSmartShapeEditDialog,
   StudioRasterAssetGrid,
   StudioRasterCrdtSurface,
   StudioReferencePanel,
