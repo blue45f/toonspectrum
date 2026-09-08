@@ -25,7 +25,7 @@ describe("professional bristle real Chromium WebGPU boundary", () => {
     expect(browserEntry).not.toContain("FakeGpu");
     expect(browserEntry).not.toContain("mockDevice");
     expect(verifier).toContain(
-      'const HARNESS_ENTRY = "/scripts/studio-professional-bristle-webgpu-browser.ts";',
+      'const HARNESS_ENTRY = `/@fs/${join(REPO_ROOT, "scripts/studio-professional-bristle-webgpu-browser.ts")}`;',
     );
     expect(verifier).toContain('appType: "custom"');
   });
