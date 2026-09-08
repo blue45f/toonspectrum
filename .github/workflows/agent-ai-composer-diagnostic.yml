@@ -15,7 +15,7 @@ concurrency:
 jobs:
   apply:
     if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-slim
+    runs-on: windows-latest
     timeout-minutes: 15
     env:
       HUSKY: '0'
@@ -24,13 +24,19 @@ jobs:
         with:
           ref: feat/studio-ai-comic-composer-20260909
           fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            apps/web/src/domains/creator
+            docs
+            scripts
+            .github/workflows
       - name: Apply guarded integration patch
         shell: bash
         run: |
           set -euo pipefail
           cat scripts/agent-ai-composer-patch.part-{01,02,03,04} > scripts/agent-apply-ai-composer.py
-          python3 -m py_compile scripts/agent-apply-ai-composer.py
-          python3 scripts/agent-apply-ai-composer.py
+          python -m py_compile scripts/agent-apply-ai-composer.py
+          python scripts/agent-apply-ai-composer.py
           rm scripts/agent-apply-ai-composer.py
           git diff --check
       - name: Verify production-loop invariants
