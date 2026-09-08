@@ -86,17 +86,23 @@ function createToolBelt(overrides: Record<string, unknown> = {}) {
     addBgScene: vi.fn(),
     addCatalogElement: vi.fn(),
     addRenderedImage: vi.fn(() => true),
+    addText: vi.fn(),
     applyAiAssistPresetPrompt: vi.fn(),
+    onPickImage: vi.fn(async () => undefined),
     openStudioObjectInsert: vi.fn(),
   };
   const setMenu = vi.fn();
   const toolBelt = {
     menu: "asset",
     assetTab: "mine",
+    activeSurfaceReviewLocked: false,
     assets: [],
+    canvasH: 1_200,
     sceneTemplates: { templates: [] },
+    selected: null,
     studioOptionalAssets: { bgSceneSections: [] },
     stableHandlers,
+    setBg3dOpen: vi.fn(),
     setMenu,
     ...overrides,
   } as unknown as StudioToolBeltContentProps;
@@ -117,6 +123,7 @@ afterEach(cleanup);
 beforeEach(() => {
   mocks.catalog = [];
   mocks.preload.mockReset();
+  window.localStorage.clear();
 });
 
 describe("StudioAssetToolPopoverWorkspace", () => {
@@ -288,6 +295,56 @@ describe("StudioAssetToolPopoverWorkspace", () => {
     };
     const { setMenu } = await renderRoute(source);
     await waitFor(() => expect(setMenu).toHaveBeenCalledWith("bubble"));
+  });
+
+  it("blocks immediate text insertion while the active surface is review-locked", async () => {
+    const { toolBelt, stableHandlers } = createToolBelt({
+      activeSurfaceReviewLocked: true,
+    });
+    render(<StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "텍스트 텍스트 추가" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 항목을 삽입해 주세요.",
+      ),
+    ).toBeTruthy();
+    expect(stableHandlers.addText).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: /최근 사용 0/u }),
+    ).toBeTruthy();
+  });
+
+  it("blocks image upload before invoking the owned importer while review-locked", async () => {
+    const { toolBelt, stableHandlers } = createToolBelt({
+      activeSurfaceReviewLocked: true,
+    });
+    const view = render(
+      <StudioAssetToolPopoverWorkspace toolBelt={toolBelt} />,
+    );
+    const input = view.container.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error("삽입 허브 파일 입력이 없습니다.");
+    }
+
+    fireEvent.change(input, {
+      target: {
+        files: [new File(["pixel"], "locked.png", { type: "image/png" })],
+      },
+    });
+
+    expect(
+      await screen.findByText(
+        "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 항목을 삽입해 주세요.",
+      ),
+    ).toBeTruthy();
+    expect(stableHandlers.onPickImage).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: /최근 사용 0/u }),
+    ).toBeTruthy();
   });
 
   it("hands empty-search context to the AI background tool", async () => {
