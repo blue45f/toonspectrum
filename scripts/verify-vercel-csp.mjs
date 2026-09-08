@@ -121,7 +121,7 @@ function inspectHtmlScripts(html) { // NOSONAR javascript:S3776
       start: tagStart,
       end: closingEnd + 1,
       attributes,
-      content: uncommented.slice(tagEnd + 1, closingStart),
+      content: html.slice(tagEnd + 1, closingStart),
     });
     index = closingEnd + 1;
   }
@@ -303,14 +303,12 @@ export function verifyVercelCspContract({ html, vercelConfig, bootstrapCompatSou
   verifyLegacyBootstrapSyntax(bootstrapCompatSource);
   verifyBootstrapBehavior(bootstrapCompatSource);
 
-  const inlineScripts = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gu)]
-    .filter((match) => !/\bsrc=/u.test(match[1] ?? ""));
-  for (const match of inlineScripts) {
-    const attributes = match[1] ?? "";
-    if (!/\btype=["']application\/ld\+json["']/u.test(attributes)) {
+  const inlineScripts = inspected.scripts.filter(({ attributes }) => !attributes.has("src"));
+  for (const { attributes, content } of inlineScripts) {
+    if (attributes.get("type")?.trim().toLowerCase() !== "application/ld+json") {
       throw new Error("Executable inline script found in built HTML.");
     }
-    const hash = scriptHash(match[2] ?? "");
+    const hash = scriptHash(content);
     if (!scriptTokens.includes(hash)) {
       throw new Error(`Inline JSON-LD hash is absent from script-src: ${hash}`);
     }
@@ -326,8 +324,8 @@ export function verifyVercelCspContract({ html, vercelConfig, bootstrapCompatSou
       "connect-src must contain 'self' and exactly one blob: source for verified Studio asset object URLs.",
     );
   }
-  if (!connections.includes("https://realtime.toonstudio.cloud")
-    || !connections.includes("wss://realtime.toonstudio.cloud")) {
+  if (!connections.some((source) => source === "https://realtime.toonstudio.cloud")
+    || !connections.some((source) => source === "wss://realtime.toonstudio.cloud")) {
     throw new Error("The exact production realtime origins are missing from connect-src.");
   }
   const supabaseOrigins = connections.filter((origin) =>
