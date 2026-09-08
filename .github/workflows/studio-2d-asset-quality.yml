@@ -1,7 +1,7 @@
 name: Studio 2D asset quality
 on:
   push:
-    branches: [main, 'feat/studio-2d-assets-*']
+    branches: [main, release/salvage-integration-20260908, 'feat/studio-2d-assets-*']
     paths:
       - 'apps/web/src/domains/creator/studio-bg*'
       - 'apps/web/src/domains/creator/studio-2d*'

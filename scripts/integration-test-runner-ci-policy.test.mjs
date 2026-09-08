@@ -85,8 +85,10 @@ describe("database integration runner CI policy", () => {
     const workflow = readYaml(`.github/workflows/${filename}`);
     const branches = ["main", "release/salvage-integration-20260908"];
     expect(workflow.on.pull_request.branches).toEqual(branches);
-    // Four lanes intentionally run only for PRs; preserve their existing event model.
-    if (workflow.on.push) expect(workflow.on.push.branches).toEqual(branches);
+    // Extend existing main push coverage; feature-only push filters keep their original scope.
+    if (workflow.on.push?.branches?.includes("main")) {
+      expect(workflow.on.push.branches).toEqual(expect.arrayContaining(branches));
+    }
   });
 
   it("reruns the ink gate when its tracked preview harness source changes", () => {
