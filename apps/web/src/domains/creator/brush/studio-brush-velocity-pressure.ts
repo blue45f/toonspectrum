@@ -29,7 +29,11 @@ import {
   studioInkFallbackPressure,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
-
+import {
+  DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE,
+  resolveStudioStylusPressureInput,
+  type StudioStylusPressureProfile,
+} from "./studio-stylus-pressure-profile";
 
 export const STUDIO_BRUSH_VELOCITY_PRESSURE_ADAPTER_VERSION =
   "brush-velocity-pressure-adapter-v1" as const;
@@ -38,6 +42,7 @@ export interface StudioBrushVelocityPressureSettings {
   readonly brushId?: unknown;
   readonly pressureCurve?: unknown;
   readonly pressureMinSize?: unknown;
+  readonly stylusPressureProfile?: StudioStylusPressureProfile;
   readonly useVelocityPressure?: boolean;
   readonly velocitySensitivity?: unknown;
   /** Causal nominal pressure for brushes without a family profile. */
@@ -76,6 +81,7 @@ interface StudioBrushVelocityPressureElementStart {
 interface StudioBrushVelocityPressureInputSettings {
   readonly pressureCurve?: unknown;
   readonly pressureMinSize?: unknown;
+  readonly stylusPressureProfile?: StudioStylusPressureProfile;
   readonly useVelocityPressure?: boolean;
   readonly velocitySensitivity?: unknown;
 }
@@ -125,20 +131,29 @@ export function advanceStudioBrushVelocityPressure(
     0.05,
     8
   );
-  const transition = advanceStudioVelocityPressure(state, pointer, {
-    nominalPressure,
-    // The preceding pressure resolver used a 0.75 response span. Preserve that calibrated range
-    // and change only the temporal behavior by adding the causal low-pass.
-    velocitySensitivity: velocityEnabled
-      ? (family?.velocitySensitivity ?? artistVelocitySensitivity)
-        * (family ? artistVelocitySensitivity : 1)
-        * 0.75
-      : 0,
-    velocityForMinimumPressure: family?.maxVelocity ?? 1.6,
-    minimumWidthRatio,
-    pressureExponent,
-    penPolicy: "hardware-precedence",
-  });
+  const profiledPressure = resolveStudioStylusPressureInput(
+    pointer.pointerType,
+    pointer.pressure,
+    settings.stylusPressureProfile ?? DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE,
+  );
+  const transition = advanceStudioVelocityPressure(
+    state,
+    { ...pointer, pressure: profiledPressure },
+    {
+      nominalPressure,
+      // The preceding pressure resolver used a 0.75 response span. Preserve that calibrated range
+      // and change only the temporal behavior by adding the causal low-pass.
+      velocitySensitivity: velocityEnabled
+        ? (family?.velocitySensitivity ?? artistVelocitySensitivity)
+          * (family ? artistVelocitySensitivity : 1)
+          * 0.75
+        : 0,
+      velocityForMinimumPressure: family?.maxVelocity ?? 1.6,
+      minimumWidthRatio,
+      pressureExponent,
+      penPolicy: "hardware-precedence",
+    },
+  );
   const nonHardware = transition.sample.hardwarePressure === null;
   const pressure = nonHardware
     && (transition.sample.source === "nominal" || !velocityEnabled)
@@ -181,6 +196,7 @@ export function initializeStudioBrushVelocityPressure(
       brushId: element.brush,
       pressureCurve: settings?.pressureCurve,
       pressureMinSize: settings?.pressureMinSize,
+      stylusPressureProfile: settings?.stylusPressureProfile,
       useVelocityPressure: settings?.useVelocityPressure,
       velocitySensitivity: settings?.velocitySensitivity,
       fallbackPressure:
@@ -209,13 +225,18 @@ export function resolveStudioBrushReleasePressure(
     return lastContactPressure;
   }
 
+  const profiledRawPressure = resolveStudioStylusPressureInput(
+    input.pointerType,
+    rawPressure,
+    input.stylusPressureProfile ?? DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE,
+  );
   const family = input.brushId === "pen"
     ? null
     : resolveStudioHybridPressureProfile(input.brushId);
   if (family && input.pointerType === "pen") {
     return resolveStudioHybridPressureSample(input.brushId, {
       pointerType: "pen",
-      rawPressure,
+      rawPressure: profiledRawPressure,
       pressureCurve: input.pressureCurve,
       simulateVelocity: false,
     })?.pressure ?? lastContactPressure;
@@ -223,7 +244,7 @@ export function resolveStudioBrushReleasePressure(
 
   return resolveBrushReleasePressureSample({
     pointerType: input.pointerType,
-    rawPressure,
+    rawPressure: profiledRawPressure,
     lastContactPressure,
     velocityFallbackEnabled: false,
     pressureCurve: input.pressureCurve,
