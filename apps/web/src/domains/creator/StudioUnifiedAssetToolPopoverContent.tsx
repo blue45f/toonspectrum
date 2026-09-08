@@ -18,6 +18,12 @@ import { BG_SCENES } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "./studio-chrome-ui";
 import { elBounds } from "./studio-element-geometry";
+import { listStudioElementLibrary } from "./studio-elements-catalog";
+import {
+  decorateStudioGenerated2dAsset,
+  STUDIO_GENERATED_BG_SCENES,
+  STUDIO_GENERATED_ELEMENT_ITEMS,
+} from "./studio-generated-2d-catalog";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
   resolveStudioInsertPlacement,
@@ -264,27 +270,34 @@ export function StudioUnifiedAssetToolPopoverContent({
     // Cold entry must not require visiting legacy background or scene tabs first.
     // Stable ids are deduplicated by the unified catalog.
     backgrounds: [
+      ...STUDIO_GENERATED_BG_SCENES,
       ...BG_SCENES,
       ...BG_SCENES_EXTRA,
       ...toolBelt.studioOptionalAssets.bgSceneSections.flatMap(
         (section) => section.scenes,
       ),
     ],
+    elements: [
+      ...STUDIO_GENERATED_ELEMENT_ITEMS,
+      ...listStudioElementLibrary(),
+    ],
     sceneTemplates: [
       ...SCENE_TEMPLATES,
       ...toolBelt.sceneTemplates.templates,
     ],
     localAssets: toolBelt.assets,
-  }).map((item) =>
-    item.source.kind === "scene-template"
-      ? {
-          ...item,
-          description: `${item.description} · 장면 도구에서 미리보기 후 배치합니다.`,
-          useMode: "open" as const,
-          useLabel: "장면 도구 열기",
-        }
-      : item,
-  );
+  })
+    .map(decorateStudioGenerated2dAsset)
+    .map((item) =>
+      item.source.kind === "scene-template"
+        ? {
+            ...item,
+            description: `${item.description} · 장면 도구에서 미리보기 후 배치합니다.`,
+            useMode: "open" as const,
+            useLabel: "장면 도구 열기",
+          }
+        : item,
+    );
   const initialView =
     toolBelt.assetTab === "community" ? "library" : "insert";
 
