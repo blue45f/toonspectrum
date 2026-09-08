@@ -19,23 +19,33 @@ function setOnline(value: boolean): void {
 
 function renderCenter(overrides: Partial<ComponentProps<typeof StudioDraftSaveCenter>> = {}) {
   const onSaveDraft = vi.fn(() => Promise.resolve());
+  const onContinuePendingSave = vi.fn(() => Promise.resolve());
   const onOpenVersions = vi.fn();
   const onExportBackup = vi.fn(() => Promise.resolve());
   render(
     <StudioDraftSaveCenter
       saving={false}
       workId="work-1"
+      workHydrated
+      workHydrationFailed={false}
       loadedWork={{ id: "work-1", revision: 7 }}
+      localCheckpointCount={3}
       serverCurrentRevision={7}
       serverRevisions={[{ revision: 7, createdAt: "2026-09-09T03:00:00.000Z" }]}
       autosaveDocumentLeadership={{ role: "leader", basis: "web-lock" }}
       onSaveDraft={onSaveDraft}
+      onContinuePendingSave={onContinuePendingSave}
       onOpenVersions={onOpenVersions}
       onExportBackup={onExportBackup}
       {...overrides}
     />,
   );
-  return { onSaveDraft, onOpenVersions, onExportBackup };
+  return {
+    onSaveDraft,
+    onContinuePendingSave,
+    onOpenVersions,
+    onExportBackup,
+  };
 }
 
 afterEach(() => {
@@ -56,6 +66,8 @@ describe("StudioDraftSaveCenter", () => {
     expect(screen.getByText("2단계 자동 보호")).not.toBeNull();
     expect(screen.getByText("이 탭이 복구 저장 담당")).not.toBeNull();
     expect(screen.getByText("서버 초안 revision #7")).not.toBeNull();
+    expect(screen.getByText("기기 체크포인트")).not.toBeNull();
+    expect(screen.getByText("3개")).not.toBeNull();
   });
 
   it("delegates manual save, version history and project backup to existing authorities", () => {
@@ -72,6 +84,55 @@ describe("StudioDraftSaveCenter", () => {
     fireEvent.click(screen.getByRole("button", { name: "저장 상태: 서버 r7 확인" }));
     fireEvent.click(screen.getByRole("button", { name: "프로젝트 백업" }));
     expect(actions.onExportBackup).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks an empty overwrite while the existing document is hydrating", () => {
+    setOnline(true);
+    const actions = renderCenter({ workHydrated: false });
+
+    fireEvent.click(screen.getByRole("button", { name: "저장 상태: 원고 불러오는 중" }));
+
+    expect(screen.getByRole("button", { name: "원고 불러오는 중" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "원고 로드 후 백업" })).toBeDisabled();
+    expect(actions.onSaveDraft).not.toHaveBeenCalled();
+  });
+
+  it("opens preserved recovery history after hydration failure", () => {
+    setOnline(true);
+    const actions = renderCenter({
+      workHydrated: false,
+      workHydrationFailed: true,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "저장 상태: 원고 복구 확인" }));
+    fireEvent.click(screen.getByRole("button", { name: "버전·복구 열기" }));
+
+    expect(actions.onOpenVersions).toHaveBeenCalledTimes(1);
+    expect(actions.onSaveDraft).not.toHaveBeenCalled();
+  });
+
+  it("continues the exact pending draft metadata intent", () => {
+    setOnline(true);
+    const actions = renderCenter({ pendingSaveIntent: "draft" });
+
+    fireEvent.click(screen.getByRole("button", { name: "저장 상태: 저장 정보 입력 필요" }));
+    fireEvent.click(screen.getByRole("button", { name: "초안 저장 계속" }));
+
+    expect(actions.onContinuePendingSave).toHaveBeenCalledTimes(1);
+    expect(actions.onSaveDraft).not.toHaveBeenCalled();
+  });
+
+  it("routes revision conflict to comparison instead of blind retry", () => {
+    setOnline(true);
+    const actions = renderCenter({
+      error: new Error("다른 팀원이 먼저 저장했습니다. 최신 공동 문서를 다시 불러와 주세요."),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "저장 상태: 저장 충돌 확인" }));
+    fireEvent.click(screen.getByRole("button", { name: "버전 비교·복원" }));
+
+    expect(actions.onOpenVersions).toHaveBeenCalledTimes(1);
+    expect(actions.onSaveDraft).not.toHaveBeenCalled();
   });
 
   it("queues one save while offline and replays it when connectivity returns", async () => {
