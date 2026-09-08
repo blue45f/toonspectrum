@@ -1,0 +1,124 @@
+name: Code scanning remediation context
+
+on:
+  push:
+    branches:
+      - codex/code-scanning-remediation-20260908
+
+permissions:
+  contents: read
+  security-events: read
+
+jobs:
+  collect-context:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout remediation branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Collect alert files and nearby source context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          import urllib.request
+          from pathlib import Path
+
+          repository = os.environ["GH_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          alerts = []
+          page = 1
+          while True:
+              request = urllib.request.Request(
+                  f"https://api.github.com/repos/{repository}/code-scanning/alerts?state=open&per_page=100&page={page}",
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "User-Agent": "toonspectrum-code-scanning-context",
+                  },
+              )
+              with urllib.request.urlopen(request) as response:
+                  batch = json.load(response)
+              alerts.extend(batch)
+              if len(batch) < 100:
+                  break
+              page += 1
+
+          root = Path.cwd().resolve()
+          output = root / "code-scanning-context"
+          output.mkdir(parents=True, exist_ok=True)
+          (output / "code-scanning-open-alerts.json").write_text(
+              json.dumps(alerts, ensure_ascii=False, indent=2), encoding="utf-8"
+          )
+
+          alert_paths = {
+              (alert.get("most_recent_instance") or {}).get("location", {}).get("path")
+              for alert in alerts
+          }
+          alert_paths.discard(None)
+
+          candidates = set()
+          text_suffixes = {".ts", ".tsx", ".mts", ".mjs", ".js", ".jsx", ".json", ".yaml", ".yml", ".md"}
+          root_files = [
+              "package.json",
+              "pnpm-workspace.yaml",
+              "turbo.json",
+              "vitest.config.ts",
+              "vitest.workspace.ts",
+              "eslint.config.mjs",
+              "tsconfig.json",
+          ]
+          for name in root_files:
+              candidate = root / name
+              if candidate.is_file():
+                  candidates.add(candidate)
+
+          for relative in sorted(alert_paths):
+              source = (root / relative).resolve()
+              if root not in source.parents or not source.is_file():
+                  continue
+              candidates.add(source)
+
+              parent = source.parent
+              for sibling in parent.iterdir():
+                  if sibling.is_file() and sibling.suffix.lower() in text_suffixes and sibling.stat().st_size <= 2_000_000:
+                      candidates.add(sibling.resolve())
+
+              current = parent
+              while root in current.parents or current == root:
+                  for pattern in ("package.json", "tsconfig*.json", "vitest*.ts", "eslint*.mjs"):
+                      for config in current.glob(pattern):
+                          if config.is_file() and config.stat().st_size <= 2_000_000:
+                              candidates.add(config.resolve())
+                  if current == root:
+                      break
+                  current = current.parent
+
+          copied = []
+          for source in sorted(candidates):
+              relative = source.relative_to(root)
+              destination = output / relative
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(source, destination)
+              copied.append(str(relative))
+
+          (output / "included-files.txt").write_text("\n".join(copied) + "\n", encoding="utf-8")
+          print(f"ALERT_COUNT={len(alerts)}")
+          print(f"UNIQUE_ALERT_FILE_COUNT={len(alert_paths)}")
+          print(f"CONTEXT_FILE_COUNT={len(copied)}")
+          PY
+
+      - name: Upload remediation context
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-scanning-remediation-context
+          path: code-scanning-context
+          if-no-files-found: error
+          retention-days: 1
