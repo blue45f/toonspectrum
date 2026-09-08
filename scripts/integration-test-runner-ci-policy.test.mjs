@@ -78,6 +78,31 @@ describe("database integration runner CI policy", () => {
     }
   });
 
+  it.each([
+    "feedback-community-validation.yml", "studio-2d-asset-quality.yml",
+    "studio-brush-filter-stability.yml", "studio-manual.yml", "studio-mesh-sync-repair.yml",
+  ])("keeps %s enabled while its changes are integrated before main", (filename) => {
+    const workflow = readYaml(`.github/workflows/${filename}`);
+    const branches = ["main", "release/salvage-integration-20260908"];
+    expect(workflow.on.pull_request.branches).toEqual(branches);
+    // Extend existing main push coverage; feature-only push filters keep their original scope.
+    if (workflow.on.push?.branches?.includes("main")) {
+      expect(workflow.on.push.branches).toEqual(expect.arrayContaining(branches));
+    }
+  });
+
+  it("reruns the ink gate when its tracked preview harness source changes", () => {
+    const workflow = readYaml(".github/workflows/studio-ink-live-commit.yml");
+    const harnessPath = "scripts/lib/studio-verify-preview-harness.mts";
+    // The .mjs import resolves to this tracked .mts source, so filtering only the import
+    // spelling silently misses modifications to the preview process/readiness/shutdown code.
+    expect(readText(harnessPath)).toContain("export function spawnVitePreview");
+    for (const event of ["pull_request", "push"]) {
+      expect(workflow.on[event].paths.some((pattern) => matchesGlob(harnessPath, pattern)))
+        .toBe(true);
+    }
+  });
+
   it("keeps the package entrypoints bound to the reviewed integration runners", () => {
     const packageManifest = readJson("package.json");
 
