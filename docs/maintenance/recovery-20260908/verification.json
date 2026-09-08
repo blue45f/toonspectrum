@@ -1,0 +1,66 @@
+{
+  "verifiedAt": "2026-09-08T14:04:08.826636+00:00",
+  "frozenMain": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+  "productSourceHeadAtBuild": "7b28f8596",
+  "productDiffAfterBuild": [],
+  "focusedTests": {
+    "numTotalTests": 777,
+    "numPassedTests": 777,
+    "numFailedTests": 0,
+    "success": true
+  },
+  "ciPolicyTests": 23,
+  "cpuExperiments": 27,
+  "webTypecheck": {
+    "result": "pass",
+    "heapMB": 8192,
+    "initialDefaultHeapAttempt": "OOM; rerun with repository standard heap succeeded"
+  },
+  "apiTypecheck": "pass (workspace dependency link restored before final run)",
+  "eslint": {
+    "files": 76,
+    "result": "pass"
+  },
+  "build": "pass",
+  "csp": "pass",
+  "staticStudioBundle": "pass",
+  "browserGpu": "No aggregate-wide runtime PASS claimed; owner is running separate native validation",
+  "logs": {
+    "tests.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/tests.log",
+      "sha256": "239e29a8adccec0cf3ef0f1c6377a4a6e52431f9f222dccd0a4c384552d45fb1"
+    },
+    "web-types-8gb.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/web-types-8gb.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "api-types.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/api-types.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "eslint-final.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/eslint-final.log",
+      "sha256": "b77aa8c5ca50d43297909a3fee5369104844045f98da48b8d06af992e23c5257"
+    },
+    "build.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/build.log",
+      "sha256": "6821b3da9cebedf7cc93d25125acfcd4ed641619190a566b6016f31aa2e66d59"
+    },
+    "notices.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/notices.log",
+      "sha256": "fa267be140584124b609f02316cd8d005bc4d14ea87fe49b66e0ea4db0119edc"
+    },
+    "csp.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/csp.log",
+      "sha256": "026e6f1d5ee14d96878c4142dc1f926f16c3f1c2408c577b5bf47ad3ba2219f1"
+    },
+    "bundle.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/bundle.log",
+      "sha256": "39dec4e2e49523ba1a7ab3be333434cfaef2eea81d533d477c43db6716463c4b"
+    },
+    "ci-policy-vitest.log": {
+      "localPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/ci-policy-vitest.log",
+      "sha256": "200a622ff8fe697d9b52c4e0d010bbbca6dfa38cca48e5e95715b53b698b0478"
+    }
+  }
+}

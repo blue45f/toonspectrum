@@ -1,0 +1,129 @@
+{
+  "mainAtReview": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+  "sourceRefs": {
+    "cpu-poc314": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+    "bg3d-origin": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
+    "smart-shape": "3fabba274b196440435efb0bb1d35f808ed78e1f",
+    "painttube-ab315": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+    "architecture": "0a630760455ad6ddc70e038caf86224861d42b1c",
+    "main-diag": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b"
+  },
+  "patches": [
+    {
+      "path": "source-patches/cpu-poc314.patch",
+      "sourceSha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+      "sha256": "21ced34c4dec49466672ec142ab61a20c5288a1105b8fbda5f79a31e241ba425",
+      "purpose": "Exact original recovery patch; not a command to apply old production/configuration files."
+    },
+    {
+      "path": "source-patches/bg3d-origin.patch",
+      "sourceSha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
+      "sha256": "85e46ac1b29fdcbc6f23597261e09e732a1273aeced2749e377b9ca47d9646d6",
+      "purpose": "Exact original recovery patch; not a command to apply old production/configuration files."
+    },
+    {
+      "path": "source-patches/smart-shape.patch",
+      "sourceSha": "3fabba274b196440435efb0bb1d35f808ed78e1f",
+      "sha256": "2e5d7931eaa48d1e15e373c4b6fd8a1c459407233a57224f0f3400273b737478",
+      "purpose": "Exact original recovery patch; not a command to apply old production/configuration files."
+    },
+    {
+      "path": "source-patches/painttube-ab315.patch",
+      "sourceSha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+      "sha256": "0b7ea97818623fb84869d34a872bd3aa24d8417e94801544c740de4ab939e95f",
+      "purpose": "Exact original recovery patch; not a command to apply old production/configuration files."
+    },
+    {
+      "path": "source-patches/architecture.patch",
+      "sourceSha": "0a630760455ad6ddc70e038caf86224861d42b1c",
+      "sha256": "a20c18dc7ffbb5e9e4ac6ee072f0cdb6f77a12fec6949a68b7827cf10ce5b035",
+      "purpose": "Exact original recovery patch; not a command to apply old production/configuration files."
+    },
+    {
+      "path": "source-patches/main-diag.patch",
+      "sourceSha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
+      "sha256": "c3fd8621fe83ca188f58ce13e03c113abba65def56966af99f1171a08799f154",
+      "purpose": "Exact original recovery patch; not a command to apply old production/configuration files."
+    }
+  ],
+  "files": [
+    {
+      "path": "evidence/cpu-poc314/ink-mesh-attempt.json",
+      "sourceSha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+      "sourcePath": "tests/benchmarks/results/ink-mesh-attempt.json",
+      "sha256": "911c276a67c7f4c0637d089120e2b21100be7bb458dacbef39834ef370f90374",
+      "adaptation": "none; historical measurement, not a current benchmark baseline"
+    },
+    {
+      "path": "evidence/cpu-poc314/ink-modeler-poc.json",
+      "sourceSha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+      "sourcePath": "tests/benchmarks/results/ink-modeler-poc.json",
+      "sha256": "e8e6e303f72a0da8867b966a7dae3cf720b21ae799bc996c51bedf8fc6aa12eb",
+      "adaptation": "none; historical measurement, not a current benchmark baseline"
+    },
+    {
+      "path": "evidence/architecture/bristle-model.json",
+      "sourceSha": "0a630760455ad6ddc70e038caf86224861d42b1c",
+      "sourcePath": "tests/benchmarks/results/bristle-model.json",
+      "sha256": "763ab0a046fe539869ee7860b3bd036854e8b61752aa56b8187d6f028ed84b92",
+      "adaptation": "none; historical measurement, not a current benchmark baseline"
+    },
+    {
+      "path": "evidence/architecture/living-ink-fluid.json",
+      "sourceSha": "0a630760455ad6ddc70e038caf86224861d42b1c",
+      "sourcePath": "tests/benchmarks/results/living-ink-fluid.json",
+      "sha256": "4b4e8ab0e68353d8775e04d71f47778d18264299637d658bedcf9df3e6d106ce",
+      "adaptation": "none; historical measurement, not a current benchmark baseline"
+    },
+    {
+      "path": "inkwash-parity.experiment.ts",
+      "sourceSha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
+      "sourcePath": "apps/web/src/domains/creator/inkwash-parity316.test.ts",
+      "adaptation": "Current repo alias imports, opt-in output path, CPU CanvasKit image-snapshot surface bridge with dimensions/resizing, texture-cache disposal, rendered-status assertion; original prefix assertion, stroke, region and pixel measurements retained."
+    },
+    {
+      "path": "ink-field.experiment.ts",
+      "sourceSha": "3fabba274b196440435efb0bb1d35f808ed78e1f",
+      "sourcePath": "scripts/.ink-field-diagnose.mts",
+      "adaptation": "Preserved field/sample math; opt-in Vitest container writes measurement-only JSON instead of console-only output."
+    },
+    {
+      "path": "fixtures/coverage-before315.ts",
+      "sourceSha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+      "sourcePath": "apps/web/src/domains/creator/studio-dynamic-brush-coverage-before315.ts",
+      "adaptation": "Only source imports rebased to current alias and sorted; all non-import TypeScript AST text equals original source."
+    },
+    {
+      "path": "fixtures/coverage-after315.ts",
+      "sourceSha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+      "sourcePath": "apps/web/src/domains/creator/studio-dynamic-brush-coverage-after315.ts",
+      "adaptation": "Only source imports rebased to current alias and sorted; all non-import TypeScript AST text equals original source."
+    },
+    {
+      "path": "painttube-ab.experiment.ts",
+      "sourceSha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
+      "sourcePath": "apps/web/src/domains/creator/painttube-ab315.test.ts",
+      "adaptation": "Current source alias and fixture imports, opt-in output path; typed readonly segmented-variation and threshold narrowing with same inputs; original 24 mark and exact CPU Skia pixel comparisons retained."
+    },
+    {
+      "path": "bg3d-origin-probe.tsx",
+      "sourceSha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
+      "sourcePath": "apps/web/tools/browser-harnesses/.bg3d-origin-probe.tsx",
+      "adaptation": "Current source alias, typed wake/DOM-ref control, explicit DOM canvas and supported WebGPU renderer parameters; browser/GPU not executed."
+    },
+    {
+      "path": "bg3d-origin-probe.mts",
+      "sourceSha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
+      "sourcePath": "scripts/.verify-bg3d-origin-probe.mts",
+      "adaptation": "Current root/config/fixture paths, double opt-in, own Vite port 0 and Chromium lifecycle, error recording, retained before/after measurement; browser/GPU not executed."
+    },
+    {
+      "path": "cpu-surface.ts",
+      "sourceSha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
+      "sourcePath": "apps/web/src/domains/creator/live/studio-live-paint-tube.pixel.test.ts",
+      "adaptation": "Reusable CPU image-snapshot adapter based on the existing pixel test; explicit dimensions/resizing and resource disposal."
+    }
+  ],
+  "status": "Recovered executable diagnostics and original evidence preserved; CPU 27 tests, scoped TypeScript and ESLint passed; browser/GPU intentionally not executed.",
+  "validation": "evidence/cpu-verification/validation.json"
+}
