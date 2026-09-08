@@ -103,20 +103,18 @@ try {
     assert.ok(match, `검색 결과 개수를 읽을 수 없습니다: ${status ?? ''}`);
     return Number(match[1].replaceAll(',', ''));
   };
-  const waitForResultCount = async (predicate, argument) => {
+  const waitForResultCount = async (expected) => {
     await page.waitForFunction(
-      ({ predicateName, value }) => {
+      (value) => {
         const status = document.querySelector(
           '[data-studio-cc0-library] [role="status"]',
         );
         const match = status?.textContent?.match(/검색 결과\s*([\d,]+)종/u);
         if (!match) return false;
         const count = Number(match[1].replaceAll(',', ''));
-        if (predicateName === 'greater') return count > value;
-        if (predicateName === 'different') return count !== value;
         return count === value;
       },
-      { predicateName: predicate, value: argument },
+      expected,
       { timeout: 30_000 },
     );
   };
@@ -133,6 +131,13 @@ try {
     (asset) => asset.license.provider === 'Poly Haven',
   );
   assert.ok(detailed.length > 0, 'Poly Haven 원본 에셋이 필요합니다.');
+  const finishedDetailed = detailed.filter(
+    (asset) => asset.role !== 'assembly-component' &&
+      asset.id !== 'polyhaven-modular-street-seating',
+  );
+  const expectedSurfaceCount = finishedDetailed.filter(
+    (asset) => asset.kind === 'surface-texture',
+  ).length;
   assert.ok(
     (
       await panel
@@ -144,22 +149,33 @@ try {
   steps.push('lazy loading and detailed originals first');
 
   await page.getByLabel('에셋 표현 스타일').selectOption('detailed');
+  await waitForResultCount(finishedDetailed.length);
   const detailedWithoutComponents = await readResultCount();
   assert.ok(
     detailedWithoutComponents > 0,
     '조립부품 제외 상세 결과가 하나 이상이어야 합니다.',
   );
+  assert.equal(
+    detailedWithoutComponents,
+    finishedDetailed.length,
+    '조립부품 제외 결과는 현재 매니페스트의 완성 에셋 수와 같아야 합니다.',
+  );
   const componentToggle = page.getByLabel('조립부품 포함', { exact: false });
   await componentToggle.check();
-  await waitForResultCount('greater', detailedWithoutComponents);
+  await waitForResultCount(detailed.length);
   const detailedWithComponents = await readResultCount();
   assert.ok(
     detailedWithComponents > detailedWithoutComponents &&
       detailedWithComponents <= manifest.assets.length,
     '조립부품 포함 결과는 증가하되 매니페스트 전체 수를 넘을 수 없습니다.',
   );
+  assert.equal(
+    detailedWithComponents,
+    detailed.length,
+    '조립부품 포함 결과는 현재 매니페스트의 상세 원본 수와 같아야 합니다.',
+  );
   await componentToggle.uncheck();
-  await waitForResultCount('equal', detailedWithoutComponents);
+  await waitForResultCount(finishedDetailed.length);
   steps.push(
     `component inclusion changes ${detailedWithoutComponents} to ${detailedWithComponents} without losing originals`,
   );
@@ -190,12 +206,17 @@ try {
   steps.push('actual same-origin GLB download verified by SHA-256');
 
   await panel.getByRole('button', { name: '표면 재질', exact: true }).click();
-  await waitForResultCount('different', detailedWithoutComponents);
+  await waitForResultCount(expectedSurfaceCount);
   const surfaceMaterialCount = await readResultCount();
   assert.ok(
     surfaceMaterialCount > 0 &&
       surfaceMaterialCount <= detailedWithoutComponents,
     '표면 재질 필터는 상세 원본의 유효한 부분집합을 반환해야 합니다.',
+  );
+  assert.equal(
+    surfaceMaterialCount,
+    expectedSurfaceCount,
+    '표면 재질 필터는 현재 매니페스트의 완성 표면 재질 수와 같아야 합니다.',
   );
   await panel.locator('article button[aria-label]').first().click();
   await page.evaluate(() => {
