@@ -35,7 +35,7 @@ describe("Smart Shape draft review", () => {
     render(<StudioSmartShapeEditDialog source={source} onConfirm={confirm} onCancel={cancel} />);
     fireEvent.click(screen.getByRole("button", { name: "도형 확정" }));
     expect(screen.getByRole("alert").textContent).toContain("원고나 레이어가 바뀌어");
-    fireEvent.click(screen.getByRole("button", { name: "취소", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(confirm).toHaveBeenCalledTimes(1);
   });
