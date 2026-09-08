@@ -19,7 +19,7 @@ describe("Studio Engine real WebGPU brush parity browser boundary", () => {
       'from "../apps/web/src/domains/creator/render/studio-engine-webgpu-brush-runtime"',
     );
     expect(verifier).toContain(
-      'const HARNESS_ENTRY = "/scripts/studio-engine-webgpu-brush-parity-browser.ts";',
+      'const HARNESS_ENTRY = `/@fs/${join(REPO_ROOT, "scripts/studio-engine-webgpu-brush-parity-browser.ts")}`;',
     );
     expect(verifier).toContain('appType: "custom"');
     expect(verifier).not.toContain("StudioPage");

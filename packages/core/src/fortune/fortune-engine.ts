@@ -170,6 +170,8 @@ export function dailySeed(characterId: string): string {
 }
 
 export function seededRandom(seed: string): () => number {
+  if (typeof seed !== "string") throw new TypeError("Fortune seed must be a string");
+  if (seed.length > 4096) throw new RangeError("Fortune seed exceeds 4096 characters");
   let h = 2166136261 >>> 0;
   for (let i = 0; i < seed.length; i++) {
     h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
@@ -266,19 +268,32 @@ function matchCharacterId(speaker: string): string | null {
 }
 
 function cleanLine(text: string): string {
-  return text
-    .trim()
-    .replace(/^["“'『「]+/, "")
-    .replace(/["”'』」]+$/, "")
-    .trim();
+  const trimmed = text.trim();
+  let start = 0;
+  let end = trimmed.length;
+  while (start < end && "\"“'『「".includes(trimmed[start])) start++;
+  while (end > start && "\"”'』」".includes(trimmed[end - 1])) end--;
+  return trimmed.slice(start, end).trim();
+}
+
+// Read each boundary once instead of retrying overlapping whitespace captures.
+function sceneDescription(line: string): string | undefined {
+  if (!line.startsWith("[") || !line.endsWith("]")) return undefined;
+  let body = line.slice(1, -1).trim();
+  if (body.startsWith("제")) body = body.slice(1).trimStart();
+  let digits = 0;
+  while (digits < body.length && body[digits] >= "0" && body[digits] <= "9") digits++;
+  if (digits === 0) return undefined;
+  body = body.slice(digits).trimStart();
+  if (!body.startsWith("컷")) return undefined;
+  body = body.slice(1).trimStart();
+  if (body && "-–—:|".includes(body[0])) body = body.slice(1).trimStart();
+  return body;
 }
 
 export function parsePanels(text: string, fallbackCharacterId: string): FortunePanel[] {
-  const sceneRe = /^\[\s*제?\s*\d+\s*컷\s*(?:[-–—:|]\s*)?(.*?)\s*\]$/; // [1컷 - 묘사] (제 접두 선택)
-  const bracketRe = /^\[\s*(.+?)\s*\]$/; // [임의 지문]
-  const sfxRe = /(?:효과음|SFX)\s*[:：]\s*(.+)$/i; // 효과음: 두근두근
-  const dialogueRe = /^([^"“'『「:：]{1,18}?)\s*[:：]\s*(.+)$/; // 이름: 대사
-
+  if (typeof text !== "string") throw new TypeError("Fortune panels must be text");
+  if (text.length > 65_536) throw new RangeError("Fortune panels exceed 65536 characters");
   const panels: FortunePanel[] = [];
   let current: FortunePanel | null = null;
   const ensurePanel = (scene: string | null = null) => {
@@ -293,37 +308,41 @@ export function parsePanels(text: string, fallbackCharacterId: string): FortuneP
     if (!line) continue;
 
     // 1) 컷 헤더 [N컷 - 묘사]
-    const sceneMatch = line.match(sceneRe);
-    if (sceneMatch) {
-      ensurePanel(cleanLine(sceneMatch[1]) || null);
+    const scene = sceneDescription(line);
+    if (scene !== undefined) {
+      ensurePanel(cleanLine(scene) || null);
       continue;
     }
 
     // 2) 효과음 단독 라인
-    const sfxMatch = line.match(sfxRe);
-    if (sfxMatch && line.length < 40) {
-      const panel = current ?? ensurePanel();
-      panel.lines.push({ speaker: "", characterId: null, text: "", sfx: cleanLine(sfxMatch[1]) });
-      continue;
+    if (line.length < 40) {
+      const marker = /(?:효과음|SFX)\s*[:：]/iu.exec(line);
+      const sound = marker ? line.slice(marker.index + marker[0].length).trimStart() : "";
+      if (sound) {
+        const panel = current ?? ensurePanel();
+        panel.lines.push({ speaker: "", characterId: null, text: "", sfx: cleanLine(sound) });
+        continue;
+      }
     }
 
     // 3) 그 외 대괄호 지문 → 새 컷의 장면 묘사로
-    const bracketMatch = line.match(bracketRe);
-    if (bracketMatch && !line.includes(":") && !line.includes("：")) {
-      ensurePanel(cleanLine(bracketMatch[1]) || null);
+    if (line.length > 2 && line.startsWith("[") && line.endsWith("]")
+      && !line.includes(":") && !line.includes("：")) {
+      ensurePanel(cleanLine(line.slice(1, -1)) || null);
       continue;
     }
 
     // 4) 대사 "이름: 대사" — 화자가 짧고 캐릭터로 매칭되거나 따옴표가 있을 때만
-    const dm = line.match(dialogueRe);
-    if (dm) {
-      const speaker = dm[1].trim();
+    const colon = line.search(/[:：]/u);
+    const speaker = colon >= 0 ? line.slice(0, colon).trimEnd() : "";
+    const dialogue = colon >= 0 ? line.slice(colon + 1).trimStart() : "";
+    if (speaker && speaker.length <= 18 && !/["“'『「]/u.test(speaker) && dialogue) {
       const characterId = matchCharacterId(speaker);
-      const hasQuote = /["“'『「]/.test(dm[2]);
+      const hasQuote = /["“'『「]/.test(dialogue);
       const looksLikeName = speaker.length <= 8 && !/[.!?…]/.test(speaker);
       if (characterId || hasQuote || looksLikeName) {
         const panel = current ?? ensurePanel();
-        panel.lines.push({ speaker, characterId, text: cleanLine(dm[2]) });
+        panel.lines.push({ speaker, characterId, text: cleanLine(dialogue) });
         continue;
       }
     }

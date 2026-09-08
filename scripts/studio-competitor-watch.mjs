@@ -5,6 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { htmlToText } from "./lib/html-text.mjs";
+
 import {
   STUDIO_COMPETITOR_REGISTRY_PATH,
   validateStudioCompetitorRegistry,
@@ -17,23 +19,8 @@ const MAX_BODY_BYTES = 2_000_000;
 const USER_AGENT =
   "ToonSpectrum-Studio-Competitor-Watch/1.0 (+https://github.com/blue45f/toonspectrum)";
 
-function decodeBasicEntities(value) {
-  return value
-    .replaceAll("&nbsp;", " ")
-    .replaceAll("&amp;", "&")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&#39;", "'");
-}
-
 export function normalizeCompetitorBody(input) {
-  return decodeBasicEntities(String(input ?? ""))
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/giu, " ")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/giu, " ")
-    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/giu, " ")
-    .replace(/<!--[\s\S]*?-->/gu, " ")
-    .replace(/<[^>]+>/gu, " ")
+  return htmlToText(input, { separator: " " })
     .replace(/\b(?:csrf|nonce|request|session)[-_ ]?(?:token|id)\b\s*[:=]\s*\S+/giu, " ")
     .replace(/\s+/gu, " ")
     .trim()
