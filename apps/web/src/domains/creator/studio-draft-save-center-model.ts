@@ -14,7 +14,10 @@ export type StudioDraftSaveTone =
   | "neutral";
 
 export type StudioDraftSavePhase =
+  | "load-risk"
+  | "loading"
   | "blocked"
+  | "metadata-required"
   | "saving"
   | "local-risk"
   | "server-risk"
@@ -25,6 +28,7 @@ export type StudioDraftSavePhase =
   | "local-only"
   | "preparing";
 
+export type StudioDraftSavePrimaryAction = "save" | "versions" | "metadata";
 export type StudioDraftSaveLocalRole = "leader" | "follower" | null;
 export type StudioDraftSaveReliabilityLevel = "ok" | "degraded" | "failed";
 
@@ -43,6 +47,9 @@ export interface StudioDraftSaveStatusSection {
 
 export interface StudioDraftSaveCenterInput {
   readonly isOnline: boolean;
+  readonly hydrated: boolean;
+  readonly hydrationFailed: boolean;
+  readonly metadataRequired: boolean;
   readonly saving: boolean;
   readonly deferredSave: boolean;
   readonly collaborationLocked: boolean;
@@ -53,6 +60,7 @@ export interface StudioDraftSaveCenterInput {
   readonly storageSignal: StudioDraftSaveReliabilitySignal | null;
   readonly hasServerDocument: boolean;
   readonly serverRevision: number | null;
+  readonly checkpointCount: number;
   readonly versionCount: number;
   readonly lastServerSaveAt: number | null;
   readonly serverSaveError: string | null;
@@ -68,6 +76,7 @@ export interface StudioDraftSaveCenterViewModel {
   readonly detail: string;
   readonly device: StudioDraftSaveStatusSection;
   readonly server: StudioDraftSaveStatusSection;
+  readonly primaryAction: StudioDraftSavePrimaryAction;
   readonly saveActionLabel: string;
   readonly saveActionDisabled: boolean;
   readonly canOpenVersions: boolean;
@@ -103,6 +112,13 @@ function degraded(signal: StudioDraftSaveReliabilitySignal | null): boolean {
   return signal?.level === "degraded";
 }
 
+function hasLocalDurabilityRisk(input: StudioDraftSaveCenterInput): boolean {
+  return failed(input.storageSignal)
+    || failed(input.localSaveSignal)
+    || degraded(input.storageSignal)
+    || degraded(input.localSaveSignal);
+}
+
 function signalDetail(signal: StudioDraftSaveReliabilitySignal): string {
   return signal.detail?.trim() || signal.title.trim() || "저장 상태를 확인해 주세요.";
 }
@@ -134,6 +150,22 @@ function deviceSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
     };
   }
 
+  if (input.hydrationFailed) {
+    return {
+      tone: "warning",
+      title: "기존 복구 지점을 확인할 수 있음",
+      detail: "원고를 불러오지 못했으므로 새 체크포인트를 만들기 전에 버전·체크포인트에서 정상 상태를 복원해 주세요.",
+    };
+  }
+
+  if (!input.hydrated) {
+    return {
+      tone: "progress",
+      title: "복구 저장 시작 대기 중",
+      detail: "기존 원고를 모두 불러온 뒤 이 기기의 내구 저장 권위를 활성화합니다.",
+    };
+  }
+
   if (input.localRole === "leader") {
     return {
       tone: "success",
@@ -158,11 +190,35 @@ function deviceSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
 }
 
 function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatusSection {
+  if (input.hydrationFailed) {
+    return {
+      tone: "danger",
+      title: "원고를 불러오지 못함",
+      detail: "빈 상태를 새 revision으로 저장하지 않습니다. 기존 버전 또는 체크포인트를 먼저 확인해 주세요.",
+    };
+  }
+
+  if (!input.hydrated) {
+    return {
+      tone: "progress",
+      title: "원고 불러오는 중",
+      detail: "서버·기기 원고의 호환성과 revision 좌표를 확인한 뒤 저장을 활성화합니다.",
+    };
+  }
+
   if (input.collaborationLocked) {
     return {
       tone: "warning",
       title: "서버 저장 권한 확인 필요",
       detail: "현재 문서가 잠겨 있어 새 서버 revision을 만들 수 없습니다.",
+    };
+  }
+
+  if (input.metadataRequired) {
+    return {
+      tone: "warning",
+      title: "저장 전 작품 정보 필요",
+      detail: "제목 등 필수 작품 정보를 입력하면 중단된 초안 저장을 같은 의도로 이어갑니다.",
     };
   }
 
@@ -239,10 +295,15 @@ export function resolveStudioDraftSaveCenter(
 ): StudioDraftSaveCenterViewModel {
   const device = deviceSection(input);
   const server = serverSection(input);
-  const localRisk = device.tone === "danger"
-    || (device.tone === "warning" && input.localRole !== "follower");
+  const localRisk = hasLocalDurabilityRisk(input);
   const hasServerRisk = server.tone === "danger";
   const serverRevision = normalizedRevision(input.serverRevision);
+  const checkpointCount = normalizedCount(input.checkpointCount);
+  const versionCount = normalizedCount(input.versionCount);
+  const canOpenVersions = true;
+  const serverConflict = Boolean(
+    input.serverSaveError && isStudioDraftSaveConflictMessage(input.serverSaveError),
+  );
 
   let phase: StudioDraftSavePhase;
   let tone: StudioDraftSaveTone;
@@ -250,22 +311,40 @@ export function resolveStudioDraftSaveCenter(
   let headline: string;
   let detail: string;
 
-  if (input.collaborationLocked) {
-    phase = "blocked";
-    tone = "warning";
-    compactLabel = "저장 권한 확인";
-    headline = "문서 잠금으로 서버 저장이 멈췄어요";
-    detail = "이 기기 복구 상태를 확인하고, 편집 권한 또는 문서 잠금을 해제한 뒤 다시 저장하세요.";
+  if (input.hydrationFailed) {
+    phase = "load-risk";
+    tone = "danger";
+    compactLabel = "원고 복구 확인";
+    headline = "원고를 불러오지 못해 저장을 막았어요";
+    detail = "빈 문서로 덮어쓰지 않고 기존 서버 revision과 이 기기 체크포인트를 보존했습니다.";
   } else if (localRisk) {
     phase = "local-risk";
     tone = "danger";
     compactLabel = "복구 저장 확인";
     headline = "이 기기 복구 경로를 확인해 주세요";
     detail = device.detail;
+  } else if (!input.hydrated) {
+    phase = "loading";
+    tone = "progress";
+    compactLabel = "원고 불러오는 중";
+    headline = "기존 원고와 저장 좌표를 확인하고 있어요";
+    detail = "하이드레이션이 끝나기 전에는 빈 상태를 저장하지 않습니다.";
+  } else if (input.collaborationLocked) {
+    phase = "blocked";
+    tone = "warning";
+    compactLabel = "저장 권한 확인";
+    headline = "문서 잠금으로 서버 저장이 멈췄어요";
+    detail = "이 기기 복구 상태를 확인하고, 편집 권한 또는 문서 잠금을 해제한 뒤 다시 저장하세요.";
+  } else if (input.metadataRequired) {
+    phase = "metadata-required";
+    tone = "warning";
+    compactLabel = "저장 정보 입력 필요";
+    headline = "작품 정보를 입력하면 초안 저장을 이어가요";
+    detail = server.detail;
   } else if (hasServerRisk) {
     phase = "server-risk";
     tone = "danger";
-    compactLabel = "서버 저장 실패";
+    compactLabel = serverConflict ? "저장 충돌 확인" : "서버 저장 실패";
     headline = server.title;
     detail = server.detail;
   } else if (input.saving) {
@@ -314,18 +393,30 @@ export function resolveStudioDraftSaveCenter(
     detail = "문서별 로컬 저장 담당과 서버 revision을 확인하는 동안 작업을 계속할 수 있습니다.";
   }
 
-  const versionCount = normalizedCount(input.versionCount);
-  const saveActionLabel = input.saving
-    ? "저장 중"
-    : input.collaborationLocked
-      ? "저장 권한 확인"
-      : !input.isOnline
-        ? input.deferredSave
-          ? "연결 후 저장 예약됨"
-          : "연결 후 저장 예약"
-        : input.serverSaveError
-          ? "서버 저장 다시 시도"
-          : "지금 서버에 저장";
+  const primaryAction: StudioDraftSavePrimaryAction = phase === "load-risk" || serverConflict
+    ? "versions"
+    : phase === "metadata-required"
+      ? "metadata"
+      : "save";
+  const saveActionLabel = phase === "load-risk"
+    ? "버전·복구 열기"
+    : phase === "loading"
+      ? "원고 불러오는 중"
+      : phase === "metadata-required"
+        ? "초안 저장 계속"
+        : serverConflict
+          ? "버전 비교·복원"
+          : input.saving
+            ? "저장 중"
+            : input.collaborationLocked
+              ? "저장 권한 확인"
+              : !input.isOnline
+                ? input.deferredSave
+                  ? "연결 후 저장 예약됨"
+                  : "연결 후 저장 예약"
+                : input.serverSaveError
+                  ? "서버 저장 다시 시도"
+                  : "지금 서버에 저장";
 
   return {
     phase,
@@ -335,10 +426,14 @@ export function resolveStudioDraftSaveCenter(
     detail,
     device,
     server,
+    primaryAction,
     saveActionLabel,
-    saveActionDisabled: input.saving || input.collaborationLocked,
-    canOpenVersions: input.hasServerDocument || versionCount > 0,
-    shouldPromoteBackup: localRisk || !input.isOnline || !input.hasServerDocument,
+    saveActionDisabled: phase === "saving" || phase === "loading" || phase === "blocked",
+    canOpenVersions,
+    shouldPromoteBackup: localRisk
+      || phase === "load-risk"
+      || !input.isOnline
+      || !input.hasServerDocument,
     ariaLiveMessage: `${compactLabel}. ${headline}`,
   };
 }
@@ -418,6 +513,9 @@ export function buildStudioDraftSaveDiagnostics(
     `generatedAt=${new Date(generatedAt).toISOString()}`,
     `phase=${model.phase}`,
     `online=${input.isOnline}`,
+    `hydrated=${input.hydrated}`,
+    `hydrationFailed=${input.hydrationFailed}`,
+    `metadataRequired=${input.metadataRequired}`,
     `saving=${input.saving}`,
     `deferredSave=${input.deferredSave}`,
     `collaborationLocked=${input.collaborationLocked}`,
@@ -428,7 +526,8 @@ export function buildStudioDraftSaveDiagnostics(
     `storageSignal=${value(input.storageSignal?.level)}`,
     `hasServerDocument=${input.hasServerDocument}`,
     `serverRevision=${value(normalizedRevision(input.serverRevision))}`,
-    `versionCount=${normalizedCount(input.versionCount)}`,
+    `checkpointCount=${normalizedCount(input.checkpointCount)}`,
+    `versionCount=${versionCount}`,
     `lastServerSaveAt=${input.lastServerSaveAt === null ? "none" : new Date(input.lastServerSaveAt).toISOString()}`,
     `serverRevisionLoading=${input.serverRevisionLoading}`,
     `serverRevisionError=${input.serverRevisionError ? "present" : "none"}`,
