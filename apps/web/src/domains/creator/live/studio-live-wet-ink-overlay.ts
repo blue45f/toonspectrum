@@ -372,10 +372,15 @@ function inkwashStrokeFieldGeometry(
     scale * 2,
     radiusCells + STUDIO_WET_INK_BRUSH_SIMULATION_STEPS + 2,
   );
-  const originX = minX - marginCells / scale;
-  const originY = minY - marginCells / scale;
-  const width = Math.ceil((maxX - minX) * scale) + marginCells * 2 + 1;
-  const height = Math.ceil((maxY - minY) * scale) + marginCells * 2 + 1;
+  // The shared committed wash uses integer field-cell origins. A fractional origin here makes
+  // the subsequent canonical replay grow/copy the already deposited field by a rounded offset,
+  // moving the accepted prefix at pointer-up even though its document points have not changed.
+  const originCellX = Math.floor(minX * scale) - marginCells;
+  const originCellY = Math.floor(minY * scale) - marginCells;
+  const originX = originCellX / scale;
+  const originY = originCellY / scale;
+  const width = Math.ceil(maxX * scale) + marginCells - originCellX + 1;
+  const height = Math.ceil(maxY * scale) + marginCells - originCellY + 1;
   if (width <= 0 || height <= 0 || !Number.isSafeInteger(width * height)) return null;
   return { originX, originY, width, height };
 }
