@@ -282,11 +282,12 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
 
     const hydrate = sidecarBetween(
       "function hydrateStudioSidecarSource(input: {",
-      "  return {\n    characterBible,",
+      "function hydrateStudioSidecarDocuments(",
     );
     // 수화는 사용자의 편집이 아니다 — raw setter 로 가고 저널 항목을 만들지 않는다.
     expect(hydrate).toContain("setCharacterBibleState(input.characterBible);");
     expect(hydrate).toContain("setWriterRoomState(input.writerRoom);");
+    expect(hydrate).toContain("setAnimaticWorkspaceState(null);");
     expect(hydrate).not.toContain("recordStudioSidecarHistoryEntry");
   });
 });

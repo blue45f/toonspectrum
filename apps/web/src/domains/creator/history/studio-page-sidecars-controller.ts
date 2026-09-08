@@ -1,4 +1,6 @@
-import { useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
+
+import type { StudioAnimaticWorkspaceDocument } from "../animatic/studio-animatic-workspace";
 
 import {
   normalizeStudioCharacterBible,
@@ -41,6 +43,52 @@ export function useStudioSidecarDocuments({
   );
   const writerRoomRef = useRef(writerRoom);
   writerRoomRef.current = writerRoom;
+
+  const [animaticWorkspace, setAnimaticWorkspaceState] = useState<StudioAnimaticWorkspaceDocument | null>(null);
+  const animaticWorkspaceRef = useRef(animaticWorkspace);
+  animaticWorkspaceRef.current = animaticWorkspace;
+  const [animaticPersistenceError, setAnimaticPersistenceError] = useState<string | null>(null);
+  const [animaticPersistenceBusy, setAnimaticPersistenceBusy] = useState(false);
+  const animaticWritesRef = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    if (!animaticWorkspace) return;
+    let active = true;
+    setAnimaticPersistenceBusy(true);
+    const retained = historyJournalRef.current.entries.flatMap((entry) =>
+      entry.kind === "sidecar" && entry.target === "animatic" ? [entry.before, entry.after] : []);
+    const write = animaticWritesRef.current.then(async () => {
+      const { createStudioAnimaticWorkspaceRepository } = await import("../animatic/studio-animatic-workspace-persistence");
+      await createStudioAnimaticWorkspaceRepository().save(animaticWorkspace, retained);
+    });
+    animaticWritesRef.current = write.catch(() => undefined);
+    void write.then(() => {
+      if (active) { setAnimaticPersistenceError(null); setAnimaticPersistenceBusy(false); }
+    }, (error: unknown) => {
+      if (active) {
+        setAnimaticPersistenceError(error instanceof Error ? error.message : String(error));
+        setAnimaticPersistenceBusy(false);
+      }
+    });
+    return () => { active = false; };
+  }, [animaticWorkspace, historyJournalRef]);
+
+  function hydrateAnimaticWorkspace(value: StudioAnimaticWorkspaceDocument): void {
+    animaticWorkspaceRef.current = value;
+    setAnimaticWorkspaceState(value);
+  }
+
+  function commitAnimaticWorkspace(before: StudioAnimaticWorkspaceDocument, after: StudioAnimaticWorkspaceDocument): boolean {
+    if (before.workScope !== after.workScope) return false;
+    if (animaticWorkspaceRef.current !== before) return false;
+    if (before === after) return true;
+    if (!markStudioDocumentChanged()) return false;
+    onBeforeRecordSidecar?.();
+    commitStudioHistoryJournal(recordStudioHistoryJournalSidecarEdit(historyJournalRef.current, {
+      kind: "sidecar", target: "animatic", before, after, at: Date.now(),
+    }, { coalesceWindowMs: 0 }));
+    hydrateAnimaticWorkspace(after);
+    return true;
+  }
 
   function recordStudioSidecarHistoryEntry(entry: StudioPageHistorySidecarEntry): void {
     onBeforeRecordSidecar?.();
@@ -85,15 +133,18 @@ export function useStudioSidecarDocuments({
     entry: StudioPageHistorySidecarEntry,
     direction: "undo" | "redo",
   ): boolean {
+    if (entry.target === "animatic" && animaticWorkspaceRef.current?.workScope !== entry.before.workScope) return false;
     if (!markStudioDocumentChanged()) return false;
     if (entry.target === "characterBible") {
       const value = direction === "undo" ? entry.before : entry.after;
       characterBibleRef.current = value;
       setCharacterBibleState(value);
-    } else {
+    } else if (entry.target === "writerRoom") {
       const value = direction === "undo" ? entry.before : entry.after;
       writerRoomRef.current = value;
       setWriterRoomState(value);
+    } else {
+      hydrateAnimaticWorkspace(direction === "undo" ? entry.before : entry.after);
     }
     return true;
   }
@@ -108,6 +159,10 @@ export function useStudioSidecarDocuments({
     writerRoomRef.current = input.writerRoom;
     setCharacterBibleState(input.characterBible);
     setWriterRoomState(input.writerRoom);
+    animaticWorkspaceRef.current = null;
+    setAnimaticWorkspaceState(null);
+    setAnimaticPersistenceBusy(false);
+    setAnimaticPersistenceError(null);
   }
 
   function hydrateStudioSidecarDocuments(input: Parameters<typeof hydrateStudioSidecarSource>[0]): void {
@@ -116,6 +171,11 @@ export function useStudioSidecarDocuments({
   }
 
   return {
+    animaticWorkspace,
+    animaticPersistenceBusy,
+    animaticPersistenceError,
+    hydrateAnimaticWorkspace,
+    commitAnimaticWorkspace,
     characterBible,
     characterBibleRef,
     writerRoom,

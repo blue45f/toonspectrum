@@ -540,13 +540,7 @@ async function openStudio3dRailTool(
     await toolbarSettings.click();
     const hiddenTools = page.getByRole("dialog", { name: "숨긴 도구" });
     await expect(hiddenTools).toBeVisible();
-    const labels = {
-      bg3d: /^(?:3D 배경|3D Background)$/i,
-      vrm3d: /^(?:3D 캐릭터|3D Character)$/i,
-      mannequin3d: /^(?:3D 데생 인형|3D Figure)$/i,
-      "hybrid-dcc": /^(?:외부 3D 편집 연결|Hybrid 3D DCC)$/i,
-    };
-    await hiddenTools.getByRole("button", { name: labels[toolId] }).click();
+    await hiddenTools.locator(`[data-studio-hidden-tool-id="${toolId}"]`).click();
     await expect(hiddenTools).toBeHidden();
     // Selection restores keyboard focus without reopening the settings coach.
     // Do not dismiss it here: a coach covering the new launcher is a regression.

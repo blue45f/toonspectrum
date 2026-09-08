@@ -47,7 +47,7 @@ beforeEach(() => {
 });
 
 describe("acquireStudioGpuPresentationDevice", () => {
-  it("borrows the Studio GPU fabric and keeps the native device and releases only its own lease", async () => {
+  it("preserves the native device identity and releases a shared lease exactly once", async () => {
     const createBuffer = vi.fn(function createBuffer(this: GPUDevice) {
       return this;
     });
@@ -74,6 +74,8 @@ describe("acquireStudioGpuPresentationDevice", () => {
     expect(acquired?.device).toBe(physicalDevice);
     expect(fabricHarness.acquireStudioGpuDevice).toHaveBeenCalledWith({ gpu });
     expect(requestAdapter).not.toHaveBeenCalled();
+    // WebIDL dictionary conversion in GPUCanvasContext.configure requires this identity.
+    expect(acquired?.device).toBe(physicalDevice);
     expect(acquired?.device.createBuffer({} as GPUBufferDescriptor)).toBe(
       physicalDevice,
     );

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { STUDIO_VRM_TEXTURE_PAINT_CHANNELS, studioVrmTexturePaintChannelEncoding } from "./studio-vrm-texture-paint-channel";
 
 import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
 import { buildVrmPoseDataUrlMetadata } from "./studio-vrm-poser-utils";
@@ -35,6 +36,25 @@ import {
 function mutableDefault(): Record<string, unknown> {
   return JSON.parse(JSON.stringify(createDefaultStudioVrmSceneDocument())) as Record<string, unknown>;
 }
+
+it("round-trips all surface channels with explicit encoding while rejecting an inconsistent scalar color space", () => {
+  const textures = STUDIO_VRM_TEXTURE_PAINT_CHANNELS.map((textureSlot, index) => ({
+    bindingKey: `gltf-material-2-${textureSlot}`, materialLocator: "gltf-material:2", textureSlot,
+    ...studioVrmTexturePaintChannelEncoding(textureSlot),
+    hash: `sha256:${String(index + 1).repeat(64)}`, mime: "image/png" as const,
+    byteSize: 128, width: 2, height: 2,
+  }));
+  const scene = normalizeStudioVrmSceneDocument({ ...mutableDefault(), surfacePaint: { version: 2, textures } });
+  expect(scene.surfacePaint.textures).toHaveLength(5);
+  const encoded = serializeStudioVrmSceneDocument(scene);
+  if (!encoded) throw new Error("Surface channel scene did not serialize");
+  expect(parseStudioVrmSceneDocument(encoded)?.surfacePaint).toEqual(scene.surfacePaint);
+  const corrupted = JSON.parse(encoded);
+  corrupted.surfacePaint.textures.find((texture: {textureSlot: string}) => texture.textureSlot === "roughness").colorSpace = "srgb";
+  expect(parseStudioVrmSceneDocument(JSON.stringify(corrupted))).toBeNull();
+  const legacy = { ...mutableDefault(), surfacePaint: { version: 1, textures: textures.map(({ colorSpace: _colorSpace, channelPacking: _packing, ...texture }) => texture) } };
+  expect(normalizeStudioVrmSceneDocument(legacy).surfacePaint.textures.map((texture) => texture.textureSlot)).toEqual(["baseColor"]);
+});
 
 function expectVrmSceneBudgetError(
   operation: () => unknown,
