@@ -82,6 +82,7 @@ export type StudioVersionIssueCode =
   | "review-server-digest-mismatch"
   | "server-content-digest-missing"
   | "approval-without-review"
+  | "approval-review-not-approved"
   | "approval-source-revision-invalid"
   | "approval-source-digest-missing"
   | "approval-review-mismatch"
@@ -247,6 +248,12 @@ export function validateStudioVersionCoordinates(
         message: "An approval must reference a review snapshot.",
       });
     } else {
+      if (review.status !== "approved") {
+        issues.push({
+          code: "approval-review-not-approved",
+          message: "An approval requires its matching review to be approved.",
+        });
+      }
       if (approval.reviewSnapshotId !== review.snapshotId) {
         issues.push({
           code: "approval-review-mismatch",
@@ -351,6 +358,7 @@ export function resolveStudioVersionProjection(
       || issue.code === "review-server-digest-mismatch"
       || issue.code === "server-content-digest-missing"
       || issue.code === "approval-without-review"
+      || issue.code === "approval-review-not-approved"
       || issue.code === "approval-source-revision-invalid"
       || issue.code === "approval-source-digest-missing"
       || issue.code === "approval-review-mismatch"

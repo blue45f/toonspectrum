@@ -8,11 +8,11 @@ import { studioToolButtonClass, StudioSliderRow } from "./studio-panel-ui";
 afterEach(cleanup);
 
 describe("studioToolButtonClass", () => {
-  it("keeps dense top-toolbar controls at least 44px tall on narrow viewports", () => {
-    const className = studioToolButtonClass(false, { dense: true });
+  it.each([false, true])("keeps dense top-toolbar controls at least 44px tall at every viewport (active: %s)", (active) => {
+    const classes = studioToolButtonClass(active, { dense: true }).split(/\s+/u);
 
-    expect(className).toContain("max-lg:h-11");
-    expect(className).toContain("max-lg:min-h-11");
+    expect(classes).toContain("h-11");
+    expect(classes).toContain("min-h-11");
   });
 });
 

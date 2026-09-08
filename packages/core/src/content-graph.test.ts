@@ -99,6 +99,22 @@ describe("content usage authorization", () => {
       .toEqual({ allowed: false, reason: "SURFACE_NOT_ALLOWED" });
   });
 
+  it.each([
+    ["marketplace-download", "originalDownload"],
+    ["studio-import", "projectImport"],
+    ["ai-input", "aiInput"],
+    ["ai-training", "aiTraining"],
+  ] as const)("requires the %s surface capability %s independently of context flags", (surface, permission) => {
+    const request = { ...usage, surface, willUseForAi: false };
+    for (const value of [false, null]) {
+      const snapshot = { ...rights, allowedSurfaces: [surface], [permission]: value };
+      expect(authorizeContentUsage(snapshot, request))
+        .toEqual({ allowed: false, reason: "SURFACE_NOT_ALLOWED" });
+    }
+    expect(authorizeContentUsage({ ...rights, allowedSurfaces: [surface], [permission]: true }, request))
+      .toEqual({ allowed: true });
+  });
+
   const capabilityCases: {
     permission: "commercialUse" | "transformation" | "redistribution" | "aiInput";
     requested: "commercialProject" | "willModify" | "willRedistribute" | "willUseForAi";

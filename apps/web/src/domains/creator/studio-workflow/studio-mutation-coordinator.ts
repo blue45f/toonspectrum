@@ -118,6 +118,7 @@ export interface StudioMutationCoordinatorOptions {
 
 export type StudioMutationValidationIssueCode =
   | "invalid-envelope"
+  | "idempotency-key-collision"
   | "duplicate-command-id"
   | "duplicate-domain-port"
   | "missing-domain-port"
@@ -315,6 +316,15 @@ export function createStudioMutationCoordinator(
   async function executeMutation(envelope: StudioMutationEnvelopeV2): Promise<StudioMutationReceipt> {
     const existing = await options.durability.findCommittedReceipt(envelope.idempotencyKey);
     if (existing) {
+      if (
+        existing.mutationId !== envelope.mutationId
+        || existing.transactionId !== envelope.transactionId
+      ) {
+        throw new StudioMutationConflictError([{
+          code: "idempotency-key-collision",
+          message: "The idempotency key belongs to a different Studio mutation or transaction.",
+        }]);
+      }
       return { ...existing, status: "idempotent-replay" };
     }
 

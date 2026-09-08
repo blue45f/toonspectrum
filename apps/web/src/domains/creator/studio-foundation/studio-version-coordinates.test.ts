@@ -114,6 +114,35 @@ describe("studio version coordinates", () => {
     expect(canCreateStudioPublishPackage(published, 7)).toBe(true);
   });
 
+  it.each(["draft", "in-review", "changes-requested", "superseded"] as const)("rejects approval and publication for a %s review", (status) => {
+    const coordinates = approvedCoordinates();
+    const review = coordinates.review;
+    if (review === null) throw new Error("approved fixture must include a review");
+    for (const revision of [7, 8]) {
+      const invalid: StudioVersionCoordinates = {
+        ...coordinates,
+        server: { revision, contentDigest: `digest-r${revision}` },
+        review: { ...review, status },
+        publish: {
+          packageId: "package-1",
+          approvalId: "approval-1",
+          sourceRevision: 7,
+          profileId: "webtoon",
+          profileVersion: 3,
+        },
+      };
+      expect(validateStudioVersionCoordinates(invalid).map((issue) => issue.code))
+        .toContain("approval-review-not-approved");
+      expect(resolveStudioVersionProjection(invalid)).toMatchObject({
+        approvalState: "invalid",
+        publishState: "invalid",
+        publishableRevision: null,
+      });
+      expect(canCreateStudioPublishPackage(invalid, 7)).toBe(false);
+      expect(canCreateStudioPublishPackage(invalid, 8)).toBe(false);
+    }
+  });
+
   it("requires non-empty, exact review and approval digests", () => {
     const coordinates = approvedCoordinates();
     const approval = coordinates.approval;

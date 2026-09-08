@@ -232,6 +232,47 @@ describe("Studio mutation coordinator", () => {
     expect(store.commit).not.toHaveBeenCalled();
   });
 
+  it.each(["mutationId", "transactionId"] as const)("rejects a reused key with a different %s without losing an edit", async (field) => {
+    const existing: StudioMutationReceipt = {
+      mutationId: "mutation-1",
+      transactionId: "transaction-1",
+      status: "committed",
+      localSequence: 1,
+      serverSyncState: "queued",
+      affectedSemanticIds: ["panel-1"],
+      committedDomains: ["page-state"],
+    };
+    const port = {
+      domain: "page-state" as const,
+      getSnapshot: vi.fn(() => ({ count: 0 })),
+      prepare: vi.fn(),
+      commit: vi.fn(),
+      restore: vi.fn(),
+    };
+    const store = durability(existing);
+    const coordinator = createStudioMutationCoordinator({
+      domains: [port],
+      durability: store,
+      getCurrentCoordinates: () => coordinates(),
+    });
+    const original = envelope([command("command-page", "page-state", "page-state/add-frame")]);
+
+    await expect(coordinator.execute({ ...original, [field]: "different-identity" }))
+      .rejects.toMatchObject({
+        name: "StudioMutationConflictError",
+        issues: [{ code: "idempotency-key-collision" }],
+      });
+    expect(port.getSnapshot).not.toHaveBeenCalled();
+    expect(port.prepare).not.toHaveBeenCalled();
+    expect(store.begin).not.toHaveBeenCalled();
+    expect(store.appendPrepared).not.toHaveBeenCalled();
+    expect(store.commit).not.toHaveBeenCalled();
+    await expect(coordinator.execute(original)).resolves.toEqual({
+      ...existing,
+      status: "idempotent-replay",
+    });
+  });
+
   it("rejects stale local bases before touching any domain", async () => {
     const port = {
       domain: "page-state" as const,

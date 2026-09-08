@@ -262,6 +262,16 @@ export interface UsageDecision {
     | "AI_INPUT_NOT_ALLOWED";
 }
 
+const SURFACE_CAPABILITIES: Partial<Record<
+  ContentUsageSurface,
+  "originalDownload" | "projectImport" | "aiInput" | "aiTraining"
+>> = {
+  "marketplace-download": "originalDownload",
+  "studio-import": "projectImport",
+  "ai-input": "aiInput",
+  "ai-training": "aiTraining",
+};
+
 /**
  * UI의 버튼 노출과 서버의 실제 다운로드·가져오기 실행에서 같은 판정을 사용한다.
  * `null`은 권리 미확인 상태이며 허용으로 해석하지 않는다.
@@ -287,6 +297,10 @@ export function authorizeContentUsage(
     return { allowed: false, reason: "MONETIZATION_NOT_ALLOWED" };
   }
   if (!rights.allowedSurfaces.includes(context.surface)) {
+    return { allowed: false, reason: "SURFACE_NOT_ALLOWED" };
+  }
+  const surfaceCapability = SURFACE_CAPABILITIES[context.surface];
+  if (surfaceCapability && rights[surfaceCapability] !== true) {
     return { allowed: false, reason: "SURFACE_NOT_ALLOWED" };
   }
   if (context.commercialProject && rights.commercialUse !== true) {
