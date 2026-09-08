@@ -723,6 +723,8 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
         effScale,
         canvasFlipH ? 1 : 0,
         canonicalDryMediaDevicePixelRatio,
+        paperSurfaceForPreview.kind,
+        paperSurfaceForPreview.seed,
       ].join(":")
     : "unavailable";
   const canonicalDryMediaViewportAuthority =

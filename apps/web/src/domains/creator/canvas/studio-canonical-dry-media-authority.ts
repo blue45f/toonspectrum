@@ -40,11 +40,20 @@ export function resolveStudioCanonicalDryMediaViewportAuthority(
     && authority.layoutKey === layoutKey
     ? authority
     : null;
-  const authorized = active?.status === "authorized" ? active : null;
+  const hasDocumentParity = (frame: StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority | null | undefined) => {
+    const receipt = frame?.documentParity;
+    return receipt?.status === "matched" && receipt.element === candidate
+      && receipt.layoutKey === layoutKey && receipt.channelTolerance === 0
+      && receipt.colorSpace === "srgb" && receipt.alphaEncoding === "straight-rgba8"
+      && receipt.comparedPixels > 0 && receipt.comparedPixels === receipt.width * receipt.height
+      && receipt.mismatchedPixels === 0 && receipt.maxChannelDelta === 0;
+  };
+  const authorized = active?.status === "authorized" && hasDocumentParity(active) ? active : null;
   const unavailable = active?.status === "unavailable" ? active : null;
   const retainsExactLastGood = unavailable?.retainsLastGoodFrame === true
     && unavailable.lastPresented?.element === candidate
-    && unavailable.lastPresented.layoutKey === layoutKey;
+    && unavailable.lastPresented.layoutKey === layoutKey
+    && hasDocumentParity(unavailable.lastPresented);
   const ownsDocumentPixels = authorized !== null || retainsExactLastGood;
   return Object.freeze({
     active,

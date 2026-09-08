@@ -24,23 +24,50 @@ const element = {
   brush: "dry-media",
 } as DrawEl;
 
-function authorized(): StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority {
+function authorized(target = element, layoutKey = "layout:1"): StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority {
   return {
     kind: "studio-canonical-vnext-dry-media-canvas-authority",
     version: 1,
     status: "authorized",
-    element,
-    layoutKey: "layout:1",
+    element: target,
+    layoutKey,
     canonicalPlanHash: "hash",
     dynamicPlanDigest: "sha256:dynamic",
     sourceDabCount: 2,
     texturedDabCount: 10,
     laneCount: 5,
     parityReceipt: {} as never,
+    documentParity: {
+      status: "matched", element: target, layoutKey,
+      width: 2, height: 1, comparedPixels: 2, mismatchedPixels: 0, maxChannelDelta: 0,
+      colorSpace: "srgb", alphaEncoding: "straight-rgba8", channelTolerance: 0,
+    },
   };
 }
 
 describe("canonical dry-media viewport authority", () => {
+  it("does not accept a GPU-internal self-parity receipt as document pixel equivalence", () => {
+    const frame = { ...authorized(), documentParity: undefined } as unknown as StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority;
+    expect(resolveStudioCanonicalDryMediaViewportAuthority(frame, element, "layout:1"))
+      .toMatchObject({ canvasVisible: false, hiddenElementId: null, authorized: null });
+  });
+
+  it("rejects stale paper/layout or element bindings inside an otherwise current receipt", () => {
+    for (const documentParity of [
+      { ...authorized().documentParity, layoutKey: "different-paper" },
+      { ...authorized().documentParity, element: { ...element } },
+      { ...authorized().documentParity, mismatchedPixels: 1 },
+    ]) {
+      const frame = { ...authorized(), documentParity };
+      expect(resolveStudioCanonicalDryMediaViewportAuthority(frame, element, "layout:1").hiddenElementId).toBeNull();
+      expect(resolveStudioCanonicalDryMediaViewportAuthority({
+        kind: frame.kind, version: 1, status: "unavailable", element, layoutKey: "layout:1",
+        reason: "device-lost", retainsLastGoodFrame: true, lastPresented: frame,
+        retryPolicy: "explicit-next-selection-only",
+      }, element, "layout:1").hiddenElementId).toBeNull();
+    }
+  });
+
   it("keeps Konva hidden for an exact authorized WebGPU frame", () => {
     expect(resolveStudioCanonicalDryMediaViewportAuthority(
       authorized(),
@@ -143,7 +170,7 @@ describe("canonical dry-media viewport authority", () => {
 
     // Same envelope, but the frame really was receipted in this layout → ownership stays.
     expect(resolveStudioCanonicalDryMediaViewportAuthority(
-      { ...unavailable, lastPresented: { ...staleFrame, layoutKey: "layout:2" } },
+      { ...unavailable, lastPresented: authorized(element, "layout:2") },
       element,
       "layout:2",
     ).hiddenElementId).toBe(element.id);
@@ -203,7 +230,7 @@ describe("canonical dry-media renderer selection", () => {
     expect(resolveStudioCanonicalDryMediaSelectedElement(dry, "lower-element")).toBeNull();
     expect(resolveStudioCanonicalDryMediaSelectedElement(dry, null)).toBeNull();
     expect(resolveStudioCanonicalDryMediaSelectedElement(null, dry.id)).toBeNull();
-    const oldFrame = { ...authorized(), element: dry };
+    const oldFrame = authorized(dry);
     expect(resolveStudioCanonicalDryMediaViewportAuthority(oldFrame, dry, "layout:1").canvasVisible)
       .toBe(true);
     for (const candidate of [
