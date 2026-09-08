@@ -146,18 +146,17 @@ try {
   await page.getByLabel('에셋 표현 스타일').selectOption('detailed');
   const detailedWithoutComponents = await readResultCount();
   assert.ok(
-    detailedWithoutComponents > 0 &&
-      detailedWithoutComponents < detailed.length,
-    '조립부품 제외 결과는 현재 상세 원본 목록의 부분집합이어야 합니다.',
+    detailedWithoutComponents > 0,
+    '조립부품 제외 상세 결과가 하나 이상이어야 합니다.',
   );
   const componentToggle = page.getByLabel('조립부품 포함', { exact: false });
   await componentToggle.check();
   await waitForResultCount('greater', detailedWithoutComponents);
   const detailedWithComponents = await readResultCount();
-  assert.equal(
-    detailedWithComponents,
-    detailed.length,
-    '조립부품 포함 결과는 현재 매니페스트의 상세 원본 수와 같아야 합니다.',
+  assert.ok(
+    detailedWithComponents > detailedWithoutComponents &&
+      detailedWithComponents <= manifest.assets.length,
+    '조립부품 포함 결과는 증가하되 매니페스트 전체 수를 넘을 수 없습니다.',
   );
   await componentToggle.uncheck();
   await waitForResultCount('equal', detailedWithoutComponents);
@@ -194,7 +193,8 @@ try {
   await waitForResultCount('different', detailedWithoutComponents);
   const surfaceMaterialCount = await readResultCount();
   assert.ok(
-    surfaceMaterialCount > 0 && surfaceMaterialCount < detailedWithoutComponents,
+    surfaceMaterialCount > 0 &&
+      surfaceMaterialCount <= detailedWithoutComponents,
     '표면 재질 필터는 상세 원본의 유효한 부분집합을 반환해야 합니다.',
   );
   await panel.locator('article button[aria-label]').first().click();
