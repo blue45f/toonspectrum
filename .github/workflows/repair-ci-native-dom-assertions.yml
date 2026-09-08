@@ -1,0 +1,100 @@
+name: Repair CI native DOM assertion types
+
+on:
+  push:
+    branches:
+      - fix/ci-native-dom-assertions-20260909
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-ci-native-dom-assertions-20260909
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: ${{ !contains(github.event.head_commit.message, '[native-dom-assertions-fixed]') }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/ci-native-dom-assertions-20260909
+          fetch-depth: 0
+      - name: Replace untyped custom matchers with native DOM assertions
+        shell: python
+        run: |
+          from pathlib import Path
+
+          scenario = Path('apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx')
+          scenario_source = scenario.read_text(encoding='utf-8')
+          scenario_replacements = {
+              '    expect(screen.getByRole("button", { name: "승인 필요" })).toBeDisabled();':
+                  '    expect(\n      (screen.getByRole("button", { name: "승인 필요" }) as HTMLButtonElement)\n        .disabled,\n    ).toBe(true);',
+              '    const generate = screen.getByRole("button", { name: "선택 컷 후보 28개 생성" });\n    expect(generate).toBeDisabled();':
+                  '    const generate = screen.getByRole("button", {\n      name: "선택 컷 후보 28개 생성",\n    }) as HTMLButtonElement;\n    expect(generate.disabled).toBe(true);',
+          }
+          for old, new in scenario_replacements.items():
+              if scenario_source.count(old) != 1:
+                  raise SystemExit(f'scenario target mismatch: {old!r} count={scenario_source.count(old)}')
+              scenario_source = scenario_source.replace(old, new, 1)
+          scenario.write_text(scenario_source, encoding='utf-8')
+
+          view = Path('apps/web/src/domains/creator/StudioViewToolsHud.test.tsx')
+          view_source = view.read_text(encoding='utf-8')
+          replacements = {
+              '    expect(input).toHaveValue("40");':
+                  '    expect((input as HTMLInputElement).value).toBe("40");',
+              '    expect(zoomOut).toHaveAttribute("aria-disabled", "true");':
+                  '    expect(zoomOut.getAttribute("aria-disabled")).toBe("true");',
+              '    expect(zoomIn).toHaveAttribute("aria-disabled", "true");':
+                  '    expect(zoomIn.getAttribute("aria-disabled")).toBe("true");',
+              '    expect(fitSelection).toHaveAttribute("aria-disabled", "true");':
+                  '    expect(fitSelection.getAttribute("aria-disabled")).toBe("true");',
+              '    expect(buttons[0]).toHaveAttribute("tabindex", "0");':
+                  '    expect(buttons[0]?.getAttribute("tabindex")).toBe("0");',
+              '    expect(buttons[1]).toHaveAttribute("tabindex", "-1");':
+                  '    expect(buttons[1]?.getAttribute("tabindex")).toBe("-1");',
+          }
+          for old, new in replacements.items():
+              expected = 2 if old == '    expect(input).toHaveValue("40");' else 1
+              if view_source.count(old) != expected:
+                  raise SystemExit(f'view target mismatch: {old!r} count={view_source.count(old)} expected={expected}')
+              view_source = view_source.replace(old, new)
+          view.write_text(view_source, encoding='utf-8')
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint changed tests
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/StudioViewToolsHud.test.tsx
+      - name: Run changed tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/StudioViewToolsHud.test.tsx
+      - name: Typecheck complete workspace
+        run: pnpm run typecheck
+      - name: Typecheck realtime worker
+        run: pnpm run typecheck:cloudflare-realtime
+      - name: Commit validated repair and remove one-shot workflow
+        shell: bash
+        run: |
+          rm .github/workflows/repair-ci-native-dom-assertions.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git config core.hooksPath /dev/null
+          git add \
+            apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx \
+            apps/web/src/domains/creator/StudioViewToolsHud.test.tsx \
+            .github/workflows/repair-ci-native-dom-assertions.yml
+          git commit -m "fix(ci): use typed native DOM assertions [native-dom-assertions-fixed]"
+          git push origin HEAD:fix/ci-native-dom-assertions-20260909
