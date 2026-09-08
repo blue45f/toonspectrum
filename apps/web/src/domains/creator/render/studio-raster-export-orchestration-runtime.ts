@@ -79,7 +79,7 @@ export interface StudioRasterExportOrchestrationInput {
     canvas: HTMLCanvasElement,
     settings: WatermarkSettings,
   ) => void;
-  readonly captureReadyStageForPage: (page: PageState) => Promise<Konva.Stage>;
+  readonly captureReadyStageForPage: (page: PageState, onReady?: (page: PageState) => void) => Promise<Konva.Stage>;
   readonly preserveStudioViewBeforeCapture: () => void;
   readonly setExportMenuOpen: (open: boolean) => void;
   readonly setSelectedId: (id: string | null) => void;
@@ -118,7 +118,6 @@ export function createStudioRasterExportOrchestration({
   exportFormat,
   exportScale,
   effectiveScale,
-  pageGrade,
   title,
   ensureSharedDocumentAvailableForExport,
   ensureWatermarkLoaded,
@@ -132,6 +131,12 @@ export function createStudioRasterExportOrchestration({
   setError,
   setCurrentPageId,
 }: StudioRasterExportOrchestrationInput): StudioRasterExportOrchestration {
+  async function capturePage(page: PageState) {
+    let capturedPage = page;
+    const stage = await captureReadyStageForPage(page, (readyPage) => { capturedPage = readyPage; });
+    return { stage, page: capturedPage };
+  }
+
   async function handleDownload() {
     if (!ensureSharedDocumentAvailableForExport()) return;
     const watermarkForExport = await ensureWatermarkLoaded();
@@ -142,7 +147,7 @@ export function createStudioRasterExportOrchestration({
     preserveStudioViewBeforeCapture();
     setIsExporting(true);
     try {
-      const stage = await captureReadyStageForPage(activePage);
+      const { stage, page: capturedPage } = await capturePage(activePage);
       const transparent = exportTransparent && exportFormat !== "jpg";
       const backgroundNode = transparent ? stage.findOne(".bg") : null;
       if (backgroundNode) {
@@ -152,7 +157,7 @@ export function createStudioRasterExportOrchestration({
       let canvas: HTMLCanvasElement;
       try {
         const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
-        canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
+        canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(capturedPage.grade));
       } finally {
         if (backgroundNode) {
           backgroundNode.show();
@@ -201,7 +206,7 @@ export function createStudioRasterExportOrchestration({
           globalThis.setTimeout(resolve, 0);
         }
       });
-      const stage = await captureReadyStageForPage(activePage);
+      const { stage, page: capturedPage } = await capturePage(activePage);
       const alphaCapable = format === "qoi" || format === "tga" || format === "pam";
       const transparent = exportTransparent && alphaCapable;
       const backgroundNode = transparent ? stage.findOne(".bg") : null;
@@ -212,7 +217,7 @@ export function createStudioRasterExportOrchestration({
       let canvas: HTMLCanvasElement;
       try {
         const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
-        canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
+        canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(capturedPage.grade));
       } finally {
         if (backgroundNode) {
           backgroundNode.show();
@@ -247,9 +252,9 @@ export function createStudioRasterExportOrchestration({
     preserveStudioViewBeforeCapture();
     setIsExporting(true);
     try {
-      const stage = await captureReadyStageForPage(activePage);
+      const { stage, page: capturedPage } = await capturePage(activePage);
       const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
-      const canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
+      const canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(capturedPage.grade));
       drawWatermarkOnCanvas(canvas, watermarkForExport);
       const { copyCanvasToClipboard } = await import("../export/studio-export");
       await copyCanvasToClipboard(canvas);
@@ -318,10 +323,10 @@ export function createStudioRasterExportOrchestration({
     try {
       for (const page of pages) {
         setCurrentPageId(page.id);
-        const stage = await captureReadyStageForPage(page);
+        const { stage, page: capturedPage } = await capturePage(page);
         const rawPageCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, scale);
         pageCanvases.push(
-          bakeStudioPageGradeIntoCanvas(rawPageCanvas, normalizePageGrade(page.grade))
+          bakeStudioPageGradeIntoCanvas(rawPageCanvas, normalizePageGrade(capturedPage.grade))
         );
       }
     } catch (error) {
@@ -409,10 +414,10 @@ export function createStudioRasterExportOrchestration({
         seen.add(index);
         const page = pages[index]!;
         setCurrentPageId(page.id);
-        const stage = await captureReadyStageForPage(page);
+        const { stage, page: capturedPage } = await capturePage(page);
         const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
         captured.push(
-          bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(page.grade))
+          bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(capturedPage.grade))
         );
       }
     } finally {
@@ -439,10 +444,10 @@ export function createStudioRasterExportOrchestration({
     const captured: HTMLCanvasElement[] = [];
     try {
       const page = pages.find((item) => item.id === currentPageId) ?? activePage;
-      const stage = await captureReadyStageForPage(page);
+      const { stage, page: capturedPage } = await capturePage(page);
       const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
       captured.push(
-        bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(page.grade))
+        bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(capturedPage.grade))
       );
     } finally {
       setCurrentPageId(originalPageId);
