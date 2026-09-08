@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_MENU_GROUP_SPEC } from "./studio-main-menu-group-spec";
+
 const readCreatorFile = (name: string) => readFileSync(
   new URL(`./${name}`, import.meta.url),
   "utf8",
@@ -31,12 +33,21 @@ describe("studio pixel-selection workbench integration", () => {
     expect(hudSource).toContain("data-studio-pixel-selection-hud=\"true\"");
   });
 
-  it("records the delivered surfaces as partial rather than inventing menubar commands", () => {
-    const source = readCreatorFile("studio-main-menu-group-spec.ts");
-    expect(source).toContain('part(\n        "Semantic/Object Select"');
-    expect(source).toContain('part(\n        "Expand/Shrink/Feather/Smooth"');
-    expect(source).toContain('part(\n        "Save Selection"');
-    expect(source).toContain('part(\n        "Selection HUD"');
+  it("does not claim menubar coverage for inspector-only and contextual capabilities", () => {
+    const selectGroup = STUDIO_MENU_GROUP_SPEC.find((group) => group.id === "select");
+    expect(selectGroup).toBeTruthy();
+
+    for (const spec of [
+      "Semantic/Object Select",
+      "Expand/Shrink/Feather/Smooth",
+      "Save Selection",
+      "Selection HUD",
+    ]) {
+      const row = selectGroup?.rows.find((candidate) => candidate.spec === spec);
+      expect(row?.coverage).toBe("absent");
+      expect(row?.items).toEqual([]);
+      expect(row?.note).toBeTruthy();
+    }
   });
 
   it("keeps the benchmark and menu commentary honest about local-only persistence", () => {
@@ -45,7 +56,7 @@ describe("studio pixel-selection workbench integration", () => {
       new URL("../../../../../docs/studio-selection-benchmark.md", import.meta.url),
       "utf8",
     );
-    expect(menuSource).toContain("now partially deliver");
+    expect(menuSource).toContain("outside the menubar");
     expect(benchmark).toContain("프로젝트/협업 데이터에는 포함하지 않는다");
     expect(benchmark).toContain("safe-area");
   });
