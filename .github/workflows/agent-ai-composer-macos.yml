@@ -1,0 +1,114 @@
+name: agent-ai-composer-macos
+
+on:
+  push:
+    branches: [feat/studio-ai-comic-composer-20260909]
+    paths: [.github/workflows/agent-ai-composer-macos.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-ai-composer-integration
+  cancel-in-progress: true
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/studio-ai-comic-composer-20260909
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply guarded integration
+        run: |
+          set -euo pipefail
+          cat scripts/agent-ai-composer-patch.part-{01,02,03,04} > scripts/agent-apply-ai-composer.py
+          python3 scripts/agent-apply-ai-composer.py
+          rm scripts/agent-apply-ai-composer.py
+      - name: Format production surfaces
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --write \
+            apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts \
+            apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.ts \
+            apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts \
+            apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts \
+            apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts \
+            apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.tsx \
+            apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.test.tsx \
+            apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx \
+            apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.test.tsx \
+            apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.tsx \
+            apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts \
+            apps/web/src/domains/creator/studio-scenario-layout.ts \
+            apps/web/src/domains/creator/StudioScenarioCandidateDesk.tsx \
+            apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx \
+            apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.tsx \
+            apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.test.tsx \
+            apps/web/src/domains/creator/StudioThreeDPreviewPanelStack.tsx \
+            apps/web/src/domains/creator/StudioLazyPanelStack.tsx \
+            apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx \
+            docs/studio-ai-comic-composer-benchmark-2026-09.md \
+            .github/workflows/studio-ai-comic-composer-quality.yml
+      - name: Test AI production loop
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts
+          apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts
+      - name: Lint AI production loop
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.ts
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
+          apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.tsx
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx
+          apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.tsx
+          apps/web/src/domains/creator/StudioThreeDPreviewPanelStack.tsx
+          apps/web/src/domains/creator/StudioLazyPanelStack.tsx
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+      - name: Build production Studio
+        run: pnpm run build
+      - name: Commit verified integration
+        run: |
+          set -euo pipefail
+          git add -A
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(studio): connect episode plans to reviewed AI cut candidates'
+          git push origin HEAD:feat/studio-ai-comic-composer-20260909
