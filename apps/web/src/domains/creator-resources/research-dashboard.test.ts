@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildResearchBriefMarkdown,
+  buildResearchCoverage,
   isResearchQueryValid,
   normalizeResearchQuery,
   researchNextAction,
@@ -86,6 +87,28 @@ describe("research dashboard summaries", () => {
     expect(sourceFreshness(grant, now).label).toContain("재확인 권장");
     expect(sourceFreshness(museum, now)).toMatchObject({ ageDays: 8, thresholdDays: 180, needsReview: false });
   });
+
+  it("turns observed workspace facts into an explicit coverage and gap map", () => {
+    const emptyCoverage = buildResearchCoverage(summarizeResearchWorkspace(workspace(), now));
+    expect(emptyCoverage).toHaveLength(6);
+    expect(emptyCoverage.every((item) => item.status === "missing")).toBe(true);
+
+    const value = workspace({
+      saved: [
+        resource({ id: "met:1", provider: "met", title: "Costume" }),
+        resource({ id: "openlibrary:1", provider: "openlibrary", title: "Edition" }),
+      ],
+      story: { title: "Night Train", protagonist: "Mina" },
+      checks: ["publish-rights"],
+    });
+    const coverage = buildResearchCoverage(summarizeResearchWorkspace(value, now));
+    expect(coverage.find((item) => item.id === "visual")).toMatchObject({ status: "covered" });
+    expect(coverage.find((item) => item.id === "edition")).toMatchObject({ status: "covered" });
+    expect(coverage.find((item) => item.id === "diversity")).toMatchObject({ status: "covered" });
+    expect(coverage.find((item) => item.id === "governance")).toMatchObject({ status: "attention" });
+    expect(coverage.find((item) => item.id === "story")).toMatchObject({ status: "attention" });
+    expect(coverage.find((item) => item.id === "production")).toMatchObject({ status: "covered" });
+  });
 });
 
 describe("research dashboard next action and exports", () => {
@@ -123,5 +146,27 @@ describe("research dashboard next action and exports", () => {
     expect(markdown).toContain("Costume reference");
     expect(markdown).toContain("https://www.metmuseum.org/art/collection/search/1");
     expect(markdown).toContain("권리 허가서나 법률 검토를 대신하지 않습니다");
+  });
+
+  it("includes the explicit research focus and bounded recent search trail when provided", () => {
+    const markdown = buildResearchBriefMarkdown(
+      workspace(),
+      new Date("2026-09-09T03:00:00.000Z"),
+      {
+        title: "1화 야간 역무실",
+        intentLabel: "소품·기술",
+        question: "역무원이 사용하는 도구는 무엇인가?",
+        context: "1920년대 겨울밤",
+        recentSearches: [
+          { mode: "assets", query: "1920 railway tools", searchedAt: "2026-09-09T02:00:00.000Z" },
+          { mode: "books", query: "railway history", searchedAt: "2026-09-09T02:30:00.000Z" },
+        ],
+      },
+    );
+    expect(markdown).toContain("## 이번 리서치 초점");
+    expect(markdown).toContain("리서치 이름: 1화 야간 역무실");
+    expect(markdown).toContain("조사 렌즈: 소품·기술");
+    expect(markdown).toContain("시각 레퍼런스: 1920 railway tools");
+    expect(markdown).toContain("글로벌 판본: railway history");
   });
 });

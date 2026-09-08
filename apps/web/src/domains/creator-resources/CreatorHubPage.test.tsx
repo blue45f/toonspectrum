@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CreatorHubPage } from "./CreatorHubPage";
+import { RESEARCH_DESK_SESSION_KEY } from "./research-desk-session";
 
 import type { CreatorResource, CreatorWorkspace } from "@/shared/lib/creator-resources";
 
@@ -81,6 +82,32 @@ describe("research command center", () => {
     expect(await screen.findByText("provider-status-loaded")).toBeTruthy();
   });
 
+  it("persists a bounded research focus, supports keyboard search, and records cross-source launches", async () => {
+    renderPage();
+    const title = screen.getByLabelText("리서치 이름");
+    const question = screen.getByLabelText("핵심 질문");
+    const context = screen.getByLabelText("시대·장소·제약");
+    fireEvent.change(title, { target: { value: "1화 야간 역무실" } });
+    fireEvent.change(question, { target: { value: "역무원이 쓰던 도구는 무엇인가?" } });
+    fireEvent.change(context, { target: { value: "1920년대 겨울밤" } });
+    fireEvent.click(screen.getByRole("button", { name: "작품·판본" }));
+
+    const search = screen.getByRole("searchbox", { name: "글로벌 판본 검색" });
+    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    expect(document.activeElement).toBe(search);
+    fireEvent.change(search, { target: { value: "Alice in Wonderland" } });
+    expect(screen.getByRole("button", { name: "시각 레퍼런스에서 Alice in Wonderland 검색" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "작가 기회에서 Alice in Wonderland 검색" }));
+
+    expect(screen.getByTestId("location").textContent).toBe("/opportunities?q=Alice+in+Wonderland&page=1");
+    await waitFor(() => {
+      const persisted = JSON.parse(localStorage.getItem(RESEARCH_DESK_SESSION_KEY)!) as { title: string; intent: string; history: unknown[] };
+      expect(persisted).toMatchObject({ title: "1화 야간 역무실", intent: "edition" });
+      expect(persisted.history).toHaveLength(1);
+    });
+    expect(screen.getByRole("button", { name: "작가 기회 검색어 Alice in Wonderland 다시 사용" })).toBeTruthy();
+  });
+
   it("shows workspace evidence, recent sources, filtering, removal, and a downloadable research brief", async () => {
     const saved = [
       resource({ id: "met:costume", provider: "met", title: "Costume reference", imageUrl: "https://images.metmuseum.org/CRDImages/as/original/DP251139.jpg" }),
@@ -104,6 +131,7 @@ describe("research command center", () => {
     const overview = screen.getByText("저장한 자료").closest("div")!;
     await waitFor(() => expect(within(overview).getByText("3")).toBeTruthy());
     expect(screen.getByRole("heading", { name: "다시 볼 자료" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "자료가 많은가보다 무엇이 비어 있는가" })).toBeTruthy();
     expect(container.querySelector('img[src="https://images.metmuseum.org/CRDImages/as/original/DP251139.jpg"]')).toBeTruthy();
     expect(screen.getByRole("heading", { name: "조사와 기획을 실제 장면으로 옮길 차례입니다" })).toBeTruthy();
 
