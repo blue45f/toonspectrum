@@ -1,0 +1,133 @@
+name: Codex studio insert batch preflight
+
+on:
+  push:
+    branches: [feat/studio-insert-batch-preflight-20260909]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: codex-studio-insert-batch-preflight
+  cancel-in-progress: true
+
+jobs:
+  integrate-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[codex-insert-batch-done]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/studio-insert-batch-preflight-20260909
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Mount and harden the owned insertion surface
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("apps/web/src/domains/creator/StudioUnifiedAssetToolPopoverContent.tsx")
+          source = path.read_text()
+          import_anchor = 'import { StudioInsertHubWorkspace } from "./StudioInsertHubWorkspace";\n'
+          import_line = 'import { StudioInsertBatchPreflight } from "./StudioInsertBatchPreflight";\n'
+          if import_line not in source:
+              if source.count(import_anchor) != 1:
+                  raise SystemExit(
+                      f"expected one insert workspace import anchor, found {source.count(import_anchor)}"
+                  )
+              source = source.replace(import_anchor, import_anchor + import_line, 1)
+
+          jsx_anchor = "      <StudioUnifiedAssetSmartLibrary\n"
+          jsx_line = "      <StudioInsertBatchPreflight toolBelt={toolBelt} />\n"
+          if jsx_line not in source:
+              if source.count(jsx_anchor) != 1:
+                  raise SystemExit(
+                      f"expected one smart-library JSX anchor, found {source.count(jsx_anchor)}"
+                  )
+              source = source.replace(jsx_anchor, jsx_line + jsx_anchor, 1)
+          path.write_text(source)
+
+          queue_path = Path("apps/web/src/domains/creator/StudioInsertBatchPreflight.tsx")
+          queue_source = queue_path.read_text()
+          queue_old = '''  function commitItems(
+            update: (
+              current: readonly BatchItem[],
+            ) => readonly BatchItem[],
+          ): void {
+            setItems((current) => {
+              const next = update(current);
+              itemsRef.current = next;
+              return next;
+            });
+          }
+          '''
+          queue_new = '''  function commitItems(
+            update: (
+              current: readonly BatchItem[],
+            ) => readonly BatchItem[],
+          ): void {
+            const next = update(itemsRef.current);
+            itemsRef.current = next;
+            setItems(next);
+          }
+          '''
+          if queue_old in queue_source:
+              queue_source = queue_source.replace(queue_old, queue_new, 1)
+          elif queue_new not in queue_source:
+              raise SystemExit("batch queue commit helper changed unexpectedly")
+          queue_path.write_text(queue_source)
+
+      - name: Autofix and focused lint
+        run: |
+          pnpm exec eslint --fix \
+            apps/web/src/domains/creator/StudioInsertBatchPreflight.tsx \
+            apps/web/src/domains/creator/StudioInsertBatchPreflight.test.tsx \
+            apps/web/src/domains/creator/studio-insert-batch-model.ts \
+            apps/web/src/domains/creator/studio-insert-batch-model.test.ts \
+            apps/web/src/domains/creator/StudioUnifiedAssetToolPopoverContent.tsx
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/StudioInsertBatchPreflight.tsx \
+            apps/web/src/domains/creator/StudioInsertBatchPreflight.test.tsx \
+            apps/web/src/domains/creator/studio-insert-batch-model.ts \
+            apps/web/src/domains/creator/studio-insert-batch-model.test.ts \
+            apps/web/src/domains/creator/StudioUnifiedAssetToolPopoverContent.tsx
+
+      - name: Focused insertion regression
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-insert-batch-model.test.ts \
+            apps/web/src/domains/creator/StudioInsertBatchPreflight.test.tsx \
+            apps/web/src/domains/creator/StudioInsertHubWorkspace.test.tsx \
+            apps/web/src/domains/creator/StudioAssetToolPopoverWorkspace.test.tsx
+
+      - name: Type and architecture gates
+        run: |
+          pnpm exec tsc -p tsconfig.json
+          pnpm run validate:architecture
+          pnpm run verify:studio-menus
+          git diff --check
+
+      - name: Commit verified integration and remove one-shot workflow
+        run: |
+          rm .github/workflows/codex-studio-insert-batch-preflight.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add \
+            apps/web/src/domains/creator/StudioInsertBatchPreflight.tsx \
+            apps/web/src/domains/creator/StudioInsertBatchPreflight.test.tsx \
+            apps/web/src/domains/creator/studio-insert-batch-model.ts \
+            apps/web/src/domains/creator/studio-insert-batch-model.test.ts \
+            apps/web/src/domains/creator/StudioUnifiedAssetToolPopoverContent.tsx \
+            docs/studio-insert-batch-preflight-benchmark-2026-09-09.md \
+            .github/workflows/codex-studio-insert-batch-preflight.yml
+          git commit -m "feat(studio): add batch insertion preflight [codex-insert-batch-done]"
+          git push origin HEAD:feat/studio-insert-batch-preflight-20260909
