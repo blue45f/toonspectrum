@@ -35,22 +35,24 @@ export {
   type CreatorFollowStats,
   type CreatorPublicProfile,
 } from "./creator/follows";
+export {
+  addComment,
+  createWork,
+  getWork,
+  listComments,
+  toggleLike,
+  updateWork,
+} from "./creator/publication-api";
 export { listSeries } from "./creator/publication-list-series";
 export {
   CreatorPublicationValidationError,
-  addComment,
   bumpViews,
-  createWork,
   deleteWork,
   getChallenge,
   getSeries,
-  getWork,
   listChallenges,
-  listComments,
   listWorks,
   promoteDueCreatorPublications,
-  toggleLike,
-  updateWork,
 } from "./creator/publication";
 export {
   createSeries,
