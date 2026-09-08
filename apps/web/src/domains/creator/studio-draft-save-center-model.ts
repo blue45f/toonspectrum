@@ -298,9 +298,6 @@ export function resolveStudioDraftSaveCenter(
   const localRisk = hasLocalDurabilityRisk(input);
   const hasServerRisk = server.tone === "danger";
   const serverRevision = normalizedRevision(input.serverRevision);
-  const checkpointCount = normalizedCount(input.checkpointCount);
-  const versionCount = normalizedCount(input.versionCount);
-  const canOpenVersions = true;
   const serverConflict = Boolean(
     input.serverSaveError && isStudioDraftSaveConflictMessage(input.serverSaveError),
   );
@@ -393,7 +390,8 @@ export function resolveStudioDraftSaveCenter(
     detail = "문서별 로컬 저장 담당과 서버 revision을 확인하는 동안 작업을 계속할 수 있습니다.";
   }
 
-  const primaryAction: StudioDraftSavePrimaryAction = phase === "load-risk" || serverConflict
+  const activeServerConflict = phase === "server-risk" && serverConflict;
+  const primaryAction: StudioDraftSavePrimaryAction = phase === "load-risk" || activeServerConflict
     ? "versions"
     : phase === "metadata-required"
       ? "metadata"
@@ -404,7 +402,7 @@ export function resolveStudioDraftSaveCenter(
       ? "원고 불러오는 중"
       : phase === "metadata-required"
         ? "초안 저장 계속"
-        : serverConflict
+        : activeServerConflict
           ? "버전 비교·복원"
           : input.saving
             ? "저장 중"
@@ -429,7 +427,7 @@ export function resolveStudioDraftSaveCenter(
     primaryAction,
     saveActionLabel,
     saveActionDisabled: phase === "saving" || phase === "loading" || phase === "blocked",
-    canOpenVersions,
+    canOpenVersions: true,
     shouldPromoteBackup: localRisk
       || phase === "load-risk"
       || !input.isOnline
@@ -527,7 +525,7 @@ export function buildStudioDraftSaveDiagnostics(
     `hasServerDocument=${input.hasServerDocument}`,
     `serverRevision=${value(normalizedRevision(input.serverRevision))}`,
     `checkpointCount=${normalizedCount(input.checkpointCount)}`,
-    `versionCount=${versionCount}`,
+    `versionCount=${normalizedCount(input.versionCount)}`,
     `lastServerSaveAt=${input.lastServerSaveAt === null ? "none" : new Date(input.lastServerSaveAt).toISOString()}`,
     `serverRevisionLoading=${input.serverRevisionLoading}`,
     `serverRevisionError=${input.serverRevisionError ? "present" : "none"}`,
