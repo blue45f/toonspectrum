@@ -11,7 +11,7 @@ import { AdminNotice, AdminSpinner } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
 import { useT } from "@/shared/lib/i18n";
-import { api, getApiErrorMessage, httpStatus } from "@/src/infrastructure/api";
+import { api, getApiErrorMessage, httpStatus } from "@/infrastructure/api";
 
 
 interface AppConfig {

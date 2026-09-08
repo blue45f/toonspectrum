@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { spectrumGradient, genreTextColor } from "@/shared/lib/genre-color";
 import { cn } from "@/shared/lib/utils";
-import { useInView } from "@/src/hooks/use-in-view";
+import { useInView } from "@/hooks/use-in-view";
 
 // 장르 믹스 스펙트럼 — 작품의 장르들을 가로 그라디언트로.
 // 시그니처 데이터 모티프: reveal 시 좌→우로 채워지고(reveal),

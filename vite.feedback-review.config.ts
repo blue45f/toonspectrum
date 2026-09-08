@@ -14,9 +14,7 @@ export default defineConfig({
   resolve: {
     alias: {
       // Match root vite.config.ts so FeedbackPage and feedback hooks resolve after the apps/web move.
-      "@/shared": path.resolve(webRoot, "src/shared"),
-      "@/domains": path.resolve(webRoot, "src/domains"),
-      "@": webRoot,
+      "@": path.resolve(webRoot, "src"),
     },
   },
   build: {

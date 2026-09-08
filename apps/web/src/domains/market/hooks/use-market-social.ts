@@ -18,7 +18,7 @@ import {
   toggleCreatorMarketplaceCommentLike,
   toggleCreatorMarketplaceReviewHelpful,
   upsertCreatorMarketplaceReview,
-} from "@/src/infrastructure/creator-marketplace-social-client";
+} from "@/infrastructure/creator-marketplace-social-client";
 
 export type MarketSocialLoadStatus = "idle" | "loading" | "ready" | "error";
 

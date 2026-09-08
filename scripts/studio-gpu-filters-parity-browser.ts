@@ -19,16 +19,16 @@
  * Settles window.__studioGpuFiltersParityResult to a success payload, an "unsupported" marker
  * (headless WebGPU unavailable), or a structured error.
  */
-import type { ImageFilterFields } from "@/src/domains/creator/render/studio-konva-filter-fields";
+import type { ImageFilterFields } from "@/domains/creator/render/studio-konva-filter-fields";
 
-import { applyGpuFilterChain, planStudioGpuFilterChain } from "@/src/domains/creator/render/studio-gpu-filter-apply";
-import { supportsStudioGpuFilters } from "@/src/domains/creator/render/studio-gpu-filter-runtime";
+import { applyGpuFilterChain, planStudioGpuFilterChain } from "@/domains/creator/render/studio-gpu-filter-apply";
+import { supportsStudioGpuFilters } from "@/domains/creator/render/studio-gpu-filter-runtime";
 import {
   applyImageFilters,
   buildImageFilters,
   registerStudioKonvaFilters,
   type KonvaLike,
-} from "@/src/domains/creator/render/studio-konva-filters";
+} from "@/domains/creator/render/studio-konva-filters";
 
 // Odd dimensions exercise row tails and 2D dispatch indexing rather than only aligned extents.
 const WIDTH = 193;

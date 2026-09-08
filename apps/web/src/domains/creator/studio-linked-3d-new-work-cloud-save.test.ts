@@ -7,7 +7,7 @@ import {
 
 import type { CreatorDraftCollaborationRoomResponse } from "./creator-draft-collaboration-client";
 import type { StudioDraftCollaborationIdentity } from "./studio-draft-collaboration";
-import type { CreateWorkInput } from "@/src/infrastructure/creator-client";
+import type { CreateWorkInput } from "@/infrastructure/creator-client";
 
 const now = Date.now();
 const identity: StudioDraftCollaborationIdentity = {

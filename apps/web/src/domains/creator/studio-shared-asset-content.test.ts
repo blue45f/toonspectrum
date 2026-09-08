@@ -5,7 +5,7 @@ import {
   verifyStudioSharedAssetContent,
 } from "./studio-shared-asset-content";
 
-import type { SharedAssetCatalogItem, SharedAssetContent } from "@/src/infrastructure/creator-client";
+import type { SharedAssetCatalogItem, SharedAssetContent } from "@/infrastructure/creator-client";
 
 const CATALOG_ITEM: SharedAssetCatalogItem = {
   id: "asset-1",

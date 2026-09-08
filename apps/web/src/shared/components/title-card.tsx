@@ -15,7 +15,7 @@ import { statsAreEstimated } from "@/shared/lib/estimate";
 import { useIsBookmarked } from "@/shared/lib/store";
 import { STATUS_LABEL } from "@/shared/lib/taxonomy";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 // 작품 카드 탭 — 탭 지점에 파티클 "팡" + 'pop' 효과음. 전역 클릭 'tick' 은 [data-no-sfx] 로
 // 억제하고 여기서 'pop' 만 울린다(중복 방지). 북마크 등 카드 내부 컨트롤 탭에는 반응하지 않는다.

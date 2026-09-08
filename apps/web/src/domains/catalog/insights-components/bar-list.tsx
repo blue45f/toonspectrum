@@ -1,6 +1,6 @@
 
 import { cn } from "@/shared/lib/utils";
-import { useInView } from "@/src/hooks/use-in-view";
+import { useInView } from "@/hooks/use-in-view";
 
 export interface BarListItem {
   label: string;

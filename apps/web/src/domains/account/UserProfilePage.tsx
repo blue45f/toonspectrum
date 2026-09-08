@@ -12,9 +12,9 @@ import { Stars } from "@/shared/components/ui/stars";
 import { useT } from "@/shared/lib/i18n";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount } from "@/shared/lib/utils";
-import { ErrorState } from "@/src/components/error-state";
-import { SeriesCard, WorkCard, WorkGridSkeleton } from "@/src/domains/creator/creator-community-ui";
-import { useDocumentTitle, useMetaDescription } from "@/src/hooks/use-document-title";
+import { ErrorState } from "@/components/error-state";
+import { SeriesCard, WorkCard, WorkGridSkeleton } from "@/domains/creator/creator-community-ui";
+import { useDocumentTitle, useMetaDescription } from "@/hooks/use-document-title";
 import {
   getCreatorProfile,
   listSeries,
@@ -23,8 +23,8 @@ import {
   type CreatorProfile,
   type SeriesSummary,
   type WorkSummary,
-} from "@/src/infrastructure/creator-client";
-import { useApiResource } from "@/src/infrastructure/use-api-resource";
+} from "@/infrastructure/creator-client";
+import { useApiResource } from "@/infrastructure/use-api-resource";
 
 
 // 회원 공개 프로필 — 리뷰 카드의 작성자명을 누르면 오는 /u/:userId.

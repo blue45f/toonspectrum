@@ -3,25 +3,25 @@ import { defineAppRoutes } from "../app-route-definition";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const AccountPage = lazyRetry(
-  () => import("@/src/domains/account/AccountPage").then((module) => ({
+  () => import("@/domains/account/AccountPage").then((module) => ({
     default: module.AccountPage,
   })),
   "AccountPage",
 );
 const UserProfilePage = lazyRetry(
-  () => import("@/src/domains/account/UserProfilePage").then((module) => ({
+  () => import("@/domains/account/UserProfilePage").then((module) => ({
     default: module.UserProfilePage,
   })),
   "UserProfilePage",
 );
 const SettingsPage = lazyRetry(
-  () => import("@/src/domains/account/SettingsPage").then((module) => ({
+  () => import("@/domains/account/SettingsPage").then((module) => ({
     default: module.SettingsPage,
   })),
   "SettingsPage",
 );
 const AuthCallbackPage = lazyRetry(
-  () => import("@/src/domains/account/AuthCallbackPage").then((module) => ({
+  () => import("@/domains/account/AuthCallbackPage").then((module) => ({
     default: module.AuthCallbackPage,
   })),
   "AuthCallbackPage",

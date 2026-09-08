@@ -21,7 +21,7 @@ import {
   type RelatedInfoItem,
 } from "@/shared/lib/title-related-info";
 import { cn } from "@/shared/lib/utils";
-import { useAppConfig } from "@/src/hooks/use-app-config";
+import { useAppConfig } from "@/hooks/use-app-config";
 
 const CATEGORIES: RelatedCategory[] = ["all", "youtube", "blog", "news", "wiki", "interview"];
 

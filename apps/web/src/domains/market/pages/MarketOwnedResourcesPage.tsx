@@ -25,17 +25,17 @@ import type { CreatorMarketplaceOwnedRelease } from "@/shared/lib/creator-market
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import { useSession } from "@/src/compat/auth-session-store";
-import Link from "@/src/compat/router-link";
+import { useSession } from "@/compat/auth-session-store";
+import Link from "@/compat/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
-} from "@/src/hooks/use-document-title";
+} from "@/hooks/use-document-title";
 import {
   deleteCreatorMarketplaceResource,
   listCreatorMarketplaceOwnedHeads,
   relistCreatorMarketplaceResource,
-} from "@/src/infrastructure/creator-marketplace-client";
+} from "@/infrastructure/creator-marketplace-client";
 
 const PAGE_SIZE = 20;
 type LoadState = "idle" | "loading" | "ready" | "error";

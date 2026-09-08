@@ -31,17 +31,17 @@ import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-mark
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import { useSession } from "@/src/compat/auth-session-store";
-import Link from "@/src/compat/router-link";
+import { useSession } from "@/compat/auth-session-store";
+import Link from "@/compat/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
-} from "@/src/hooks/use-document-title";
+} from "@/hooks/use-document-title";
 import {
   deleteCreatorMarketplaceResource,
   listCreatorMarketplaceOwnedHeads,
   relistCreatorMarketplaceResource,
-} from "@/src/infrastructure/creator-marketplace-client";
+} from "@/infrastructure/creator-marketplace-client";
 
 export function MarketManagePage() {
   useDocumentTitle("내 등록 에셋 관리 · 창작 마켓");

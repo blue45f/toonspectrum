@@ -2,7 +2,7 @@
 import { EyeOff, Eye } from "lucide-react";
 
 import { cn } from "@/shared/lib/utils";
-import { useRouter, useSearchParams, usePathname } from "@/src/compat/navigation";
+import { useRouter, useSearchParams, usePathname } from "@/compat/navigation";
 
 export type ReviewSort = "recent" | "likes" | "high" | "low";
 

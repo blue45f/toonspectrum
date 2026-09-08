@@ -8,7 +8,7 @@ import { RatingInput, ScaleSwitcher } from "@/shared/components/rating-input";
 import { Button } from "@/shared/components/ui/button";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
-import { useCelebrate } from "@/src/hooks/use-celebrate";
+import { useCelebrate } from "@/hooks/use-celebrate";
 
 
 const SUGGESTED = [

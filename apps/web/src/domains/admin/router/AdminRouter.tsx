@@ -22,8 +22,8 @@ import {
 import { AuthMenuShell } from "@/domains/auth/components/auth-menu-shell";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
-import Link from "@/src/compat/router-link";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import Link from "@/compat/router-link";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const AdminDashboard = lazyRetry(
   () =>

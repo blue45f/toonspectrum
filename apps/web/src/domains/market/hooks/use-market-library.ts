@@ -8,11 +8,11 @@ import type {
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { CreatorMarketplaceResourceRecordSchema } from "@/shared/lib/creator-marketplace-resource-contract";
-import { useSession } from "@/src/compat/auth-session-store";
+import { useSession } from "@/compat/auth-session-store";
 import {
   acquireCreatorMarketplaceCloudLibraryRelease,
   listCreatorMarketplaceCloudLibrary,
-} from "@/src/infrastructure/creator-marketplace-client";
+} from "@/infrastructure/creator-marketplace-client";
 
 export interface AcquiredMarketItem {
   id: string;

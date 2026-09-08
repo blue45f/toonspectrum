@@ -224,8 +224,8 @@ describe("gpu-bristle parity browser boundary (G5)", () => {
       expect(VERIFIER).toContain(`"${metric}"`);
     }
     // Two identically degenerate samples agree perfectly, so KS alone cannot see a uniform rake.
-    expect(VERIFIER).toContain("result.metrics?.gpuTerminalLoadStdDev <= 0");
-    expect(VERIFIER).toContain("result.metrics?.depositedSplatCount <= 0");
+    expect(VERIFIER).toContain("!(result.metrics?.gpuTerminalLoadStdDev > 0)");
+    expect(VERIFIER).toContain("!(result.metrics?.depositedSplatCount > 0)");
   });
 
   it("gates on the four-threshold picture admission, ridge contrast included", () => {

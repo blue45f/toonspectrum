@@ -7,7 +7,7 @@ import type { StudioSharedDocument } from "./studio-shared-document-client";
 import type {
   WorkDetail,
   WorkRevisionSummary,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 interface StudioCurrentValue<T> {
   readonly current: T;
@@ -170,7 +170,7 @@ export async function restoreStudioServerRevision({
       { getWork, restoreWorkRevision },
       { getStudioSharedDocument, isStudioSharedDocumentScopeCurrent },
     ] = await Promise.all([
-      import("@/src/infrastructure/creator-client"),
+      import("@/infrastructure/creator-client"),
       import("./studio-shared-document-client"),
     ]);
     if (

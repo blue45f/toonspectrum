@@ -5,7 +5,7 @@ import { HeroBannerBadge } from "./hero-banner-badge";
 import type { Title } from "@/shared/lib/types";
 
 import { genreColor, genreTextColor } from "@/shared/lib/genre-color";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 export function HeroBannerStatic({
   items,

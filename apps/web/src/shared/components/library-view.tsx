@@ -29,7 +29,7 @@ import { genreColor, spectrumGradient } from "@/shared/lib/genre-color";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { WEEK_DAYS } from "@/shared/lib/taxonomy";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
   const hydrated = useHydrated();

@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdminApiError, adminFetch, adminFetchText } from "./admin-client";
 
-import { HTTPError } from "@/src/infrastructure/api";
+import { HTTPError } from "@/infrastructure/api";
 
 const { raw } = vi.hoisted(() => ({ raw: vi.fn() }));
-vi.mock("@/src/infrastructure/api", () => ({
+vi.mock("@/infrastructure/api", () => ({
   api: { raw },
   apiPath: (path: string) => `https://api.qa.invalid${path}`,
   HTTPError: class extends Error {

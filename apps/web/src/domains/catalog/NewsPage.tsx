@@ -4,9 +4,9 @@ import { useState } from "react";
 
 import { Container } from "@/shared/components/section";
 import { cn, relativeDate } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
-import { useApiResource } from "@/src/infrastructure/use-api-resource";
+import Link from "@/compat/router-link";
+import { ErrorState } from "@/components/error-state";
+import { useApiResource } from "@/infrastructure/use-api-resource";
 
 
 // 카테고리는 scripts/news-gen.ts 의 NewsCategory 와 동일 키 — 정적 JSON 경계라 타입만 복제.

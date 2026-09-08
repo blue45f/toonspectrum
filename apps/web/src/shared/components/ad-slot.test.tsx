@@ -7,11 +7,11 @@ import { AdSlot } from "./ad-slot";
 // vitest 가 vi.hoisted/vi.mock 을 import 위로 끌어올리므로 모킹은 ad-slot 평가 전에 적용된다.
 const state = vi.hoisted(() => ({ monetizationEnabled: false, hasAdDesk: false }));
 
-vi.mock("@/src/hooks/use-app-config", () => ({
+vi.mock("@/hooks/use-app-config", () => ({
   useAppConfig: () => ({ monetizationEnabled: state.monetizationEnabled, loading: false }),
 }));
 
-vi.mock("@/src/components/deskcloud-native/config", () => ({
+vi.mock("@/components/deskcloud-native/config", () => ({
   adConfig: () =>
     state.hasAdDesk ? { endpoint: "https://addesk.example", publishableKey: "pk_demo" } : null,
 }));

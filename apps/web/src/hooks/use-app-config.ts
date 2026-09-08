@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { api } from "@/src/infrastructure/api";
+import { api } from "@/infrastructure/api";
 
 // 런타임 앱 설정(GET /api/config). 광고형 수익화 on/off + 콘텐츠 노출 킬스위치를 읽는다.
 // 수익화는 기본 OFF(관리자가 켜야 노출). 콘텐츠 플래그는 기본 ON(노출) — 관리자가 끄면 즉시 숨긴다.

@@ -9,7 +9,7 @@ import { createStudioAssetFavoriteId } from "./studio-asset-favorites";
 import { StudioAssetMenuPanel } from "./StudioAssetMenuPanel";
 
 import type { StudioAssetMenuPanelProps } from "./StudioAssetMenuPanel";
-import type { SharedAssetCatalogItem } from "@/src/infrastructure/creator-client";
+import type { SharedAssetCatalogItem } from "@/infrastructure/creator-client";
 
 const LOCAL_ASSET = {
   id: "local-1",

@@ -5,7 +5,7 @@ import { getTarotVisual, tarotAccent } from "./tarot-visuals";
 
 import type { FortuneResult, FortuneTab } from "./FortunePage";
 
-import { resolveAssetUrl } from "@/src/shared/catalog/catalog-static";
+import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 
 
 

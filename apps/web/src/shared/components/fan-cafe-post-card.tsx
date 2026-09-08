@@ -1,4 +1,4 @@
 /* eslint-disable react-refresh/only-export-components */
-export * from "@/src/domains/community/components/fan-cafe-post-card";
-export { default } from "@/src/domains/community/components/fan-cafe-post-card";
+export * from "@/domains/community/components/fan-cafe-post-card";
+export { default } from "@/domains/community/components/fan-cafe-post-card";
 

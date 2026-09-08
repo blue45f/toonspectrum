@@ -11,8 +11,8 @@ import { readMusicWorkId, scopeMusicBrief } from "./studio-music-work-scope";
 import type { LocalMusicTrack } from "./studio-music-client";
 
 import { buildMusicPrompt, defaultMusicBrief, MUSIC_DURATIONS, MUSIC_INSTRUMENTS, MUSIC_MOODS, MUSIC_PURPOSES, MUSIC_TERMS_URL, parseMusicBrief, type MusicBrief, type MusicStatus } from "@toonspectrum/core/studio-music";
-import { useSession } from "@/src/compat/auth-session-store";
-import { getApiErrorMessage } from "@/src/infrastructure/api";
+import { useSession } from "@/compat/auth-session-store";
+import { getApiErrorMessage } from "@/infrastructure/api";
 
 const inputClass = "w-full rounded-xl border border-line bg-canvas px-3 py-2.5 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50";
 const buttonClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line px-4 py-2 text-sm transition-colors hover:bg-panel focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";

@@ -1,4 +1,4 @@
-import { studioRouteOwnsDocumentTitle } from "@/src/domains/creator/studio-router/studio-route-manifest";
+import { studioRouteOwnsDocumentTitle } from "@/domains/creator/studio-router/studio-route-manifest";
 
 export interface AppRouteTitleLocation {
   readonly pathname: string;

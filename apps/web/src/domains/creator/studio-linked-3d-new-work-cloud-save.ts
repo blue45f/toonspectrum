@@ -16,7 +16,7 @@ import type { StudioLinked3dPassCloudUploadReceipt } from "./studio-linked-3d-pa
 import type {
   CreateWorkInput,
   UpdateWorkInput,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 export type StudioLinked3dNewWorkCloudSaveResult =
   | {

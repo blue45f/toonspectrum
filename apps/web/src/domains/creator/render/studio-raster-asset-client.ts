@@ -7,7 +7,7 @@ import {
   parseStudioRasterStoredReference,
   type StudioRasterAssetManifest,
 } from "@/shared/lib/studio-raster-asset-contract";
-import { api, apiPath, isHttpError, toApiError } from "@/src/infrastructure/api";
+import { api, apiPath, isHttpError, toApiError } from "@/infrastructure/api";
 
 export interface DownloadedStudioRasterAsset {
   readonly manifest: StudioRasterAssetManifest;

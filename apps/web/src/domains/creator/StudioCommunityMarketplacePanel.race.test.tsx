@@ -21,8 +21,8 @@ import type {
 
 import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
 import { useI18n } from "@/shared/lib/i18n";
-import { SessionContext } from "@/src/compat/auth-session-store";
-import { NotFoundError } from "@/src/infrastructure/use-api-resource";
+import { SessionContext } from "@/compat/auth-session-store";
+import { NotFoundError } from "@/infrastructure/use-api-resource";
 
 const mocks = vi.hoisted(() => ({
   acquireLibrary: vi.fn(),
@@ -53,7 +53,7 @@ const mocks = vi.hoisted(() => ({
   uninstallPack: vi.fn(),
 }));
 
-vi.mock("@/src/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/infrastructure/creator-marketplace-client", () => ({
   acquireCreatorMarketplaceCloudLibraryRelease: mocks.acquireLibrary,
   confirmCreatorMarketplaceStudioInstall: mocks.confirmInstall,
   deleteCreatorMarketplaceResource: mocks.deleteResource,

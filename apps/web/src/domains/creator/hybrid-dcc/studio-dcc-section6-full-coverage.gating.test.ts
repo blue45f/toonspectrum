@@ -42,6 +42,8 @@ import {
   studioSection6CoverageStats,
 } from "./studio-dcc-section6-full-catalog";
 
+// Workspace-root `docs/`, six levels above `apps/web/src/domains/creator/hybrid-dcc/`
+// (the 2026-09 apps/web move added two of them).
 const ARCH_DOC = resolve(
   __dirname,
   "../../../../../../docs/reference/studio-hybrid-dcc-section6-ids.md",

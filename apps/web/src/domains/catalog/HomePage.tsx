@@ -10,8 +10,8 @@ import { OpenSearchButton } from "@/shared/components/open-search-button";
 import { ShimmerTitle } from "@/shared/components/shimmer-title";
 import { spectrumGradient } from "@/shared/lib/genre-color";
 import { useT } from "@/shared/lib/i18n";
-import Link from "@/src/compat/router-link";
-import { useApiResource } from "@/src/infrastructure/use-api-resource";
+import Link from "@/compat/router-link";
+import { useApiResource } from "@/infrastructure/use-api-resource";
 
 const HeroBanner = lazy(() => import("@/shared/components/hero-banner").then((module) => ({ default: module.HeroBanner })));
 const HomeDeferredSections = lazy(() =>

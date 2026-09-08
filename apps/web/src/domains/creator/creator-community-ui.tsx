@@ -8,7 +8,7 @@ import { FORMAT_LABEL, SERIES_STATUS_LABEL } from "./creator-community-utils";
 import { CoverImage } from "@/shared/components/cover-image";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 import {
   createSeries,
   updateSeries,
@@ -16,7 +16,7 @@ import {
   type SeriesStatus,
   type SeriesSummary,
   type WorkSummary,
-} from "@/src/infrastructure/creator-client";
+} from "@/infrastructure/creator-client";
 
 
 // 아바타 컬러 hex → 그라디언트 원형 + 이니셜 (review-card 패턴 재사용)

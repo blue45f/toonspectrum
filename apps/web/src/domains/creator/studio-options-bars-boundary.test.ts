@@ -125,11 +125,11 @@ describe("Studio options-bars module boundary", () => {
       "react",
       "./brush/studio-draw-color-swatches",
       "./studio-page-lazy-ui",
-      "@/src/hooks/use-media-query",
+      "@/hooks/use-media-query",
     ]);
     expect(optionsBars.allImports).not.toContain("konva");
     expect(optionsBars.allImports).not.toContain("react-konva");
-    expect(optionsBars.allImports).not.toContain("@/src/hooks/use-resizable");
+    expect(optionsBars.allImports).not.toContain("@/hooks/use-resizable");
     expect(optionsBars.source).not.toContain("localStorage");
     expect(optionsBars.source).not.toContain("saveStudioBrushSlotsState");
     expect(optionsBars.source).not.toContain("saveStudioProDrawPrefs");

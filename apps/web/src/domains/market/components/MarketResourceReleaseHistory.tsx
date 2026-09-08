@@ -9,8 +9,8 @@ import type {
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { findStarterMarketplaceResourceById } from "@/shared/lib/creator-marketplace-starter-catalog";
-import Link from "@/src/compat/router-link";
-import { getCreatorMarketplaceResourceHistory } from "@/src/infrastructure/creator-marketplace-client";
+import Link from "@/compat/router-link";
+import { getCreatorMarketplaceResourceHistory } from "@/infrastructure/creator-marketplace-client";
 
 const HISTORY_PAGE_SIZE = 8;
 

@@ -16,7 +16,7 @@ import {
   type InquiryCategory,
   type InquiryStatus,
 } from "@/shared/lib/inquiry-api";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 // 문의(Inquiry) 게시판 (/support) — desk-platform 공개 API 연동.
 // 카테고리 선택 → 제목/내용(+선택 이름/이메일) → 허니팟 → 제출(POST). 하단에 공개 게시판(GET).

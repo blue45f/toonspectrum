@@ -10,7 +10,7 @@ import type { Title } from "@/shared/lib/types";
 import { statsAreEstimated } from "@/shared/lib/estimate";
 import { formatCount } from "@/shared/lib/format";
 import { genreColor } from "@/shared/lib/genre-color";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 export const HERO_BANNER_AUTOPLAY_MS = 5500;
 

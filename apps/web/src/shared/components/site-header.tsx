@@ -14,9 +14,9 @@ import { cx } from "@/shared/lib/cx";
 import { useT } from "@/shared/lib/i18n";
 import { keepInlineText } from "@/shared/lib/text";
 import { useUi } from "@/shared/lib/ui-store";
-import { isImmersiveMobileRoute } from "@/src/app/routes/immersive-mobile-route";
-import { usePathname } from "@/src/compat/navigation";
-import Link from "@/src/compat/router-link";
+import { isImmersiveMobileRoute } from "@/app/routes/immersive-mobile-route";
+import { usePathname } from "@/compat/navigation";
+import Link from "@/compat/router-link";
 
 const NAV = [
   { i18n: "nav.home", href: "/", exact: true },

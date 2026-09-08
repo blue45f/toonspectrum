@@ -42,14 +42,7 @@ process.env.DATABASE_URL = testDatabaseTarget.databaseUrl;
 
 export default defineConfig({
   resolve: {
-    // Array form keeps longer `@/shared` / `@/domains` / `@/src` matches ahead of bare `@`
-    // for rolldown/vite-node resolvers that do not sort by find length.
-    alias: [
-      { find: "@/shared", replacement: path.resolve(root, "apps/web/src/shared") },
-      { find: "@/domains", replacement: path.resolve(root, "apps/web/src/domains") },
-      { find: "@/src", replacement: path.resolve(root, "apps/web/src") },
-      { find: "@", replacement: path.resolve(root, "apps/web") },
-    ],
+    alias: { "@": path.resolve(root, "apps/web/src") },
   },
   test: {
     // 수집 루트를 이 설정 파일의 디렉터리에 고정한다(기본값은 process.cwd()라 어디서

@@ -1,4 +1,4 @@
-import { resolveStudioRoute } from "@/src/domains/creator/studio-router/studio-route-manifest";
+import { resolveStudioRoute } from "@/domains/creator/studio-router/studio-route-manifest";
 
 /**
  * 전용 작업공간은 자체 셸과 로딩 상태를 소유한다. 앱 인트로를 그 위에 다시 올리면

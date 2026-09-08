@@ -8,7 +8,7 @@ import {
 } from "./studio-realtime-provider-runtime";
 
 import { withCsrfHeader } from "@/shared/lib/csrf";
-import { apiPath } from "@/src/infrastructure/api";
+import { apiPath } from "@/infrastructure/api";
 
 const DEFAULT_TICKET_TIMEOUT_MS = 8_000;
 const MAX_TICKET_RESPONSE_BYTES = 16 * 1024;

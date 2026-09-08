@@ -9,7 +9,7 @@ import { downloadText, useCreatorWorkspace } from "./workspace";
 import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@/shared/lib/creator-resources";
 
 import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
-import { apiPath } from "@/src/infrastructure/api";
+import { apiPath } from "@/infrastructure/api";
 
 type ResourceSearchProvider = Extract<ResourceProvider, "met" | "kakao" | "bizinfo">;
 interface ResourceSearchConfig {

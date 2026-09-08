@@ -8,18 +8,18 @@
  * editable reference record, or source pixel buffer to the companion window.
  */
 
-import type { StudioAsset } from "@/src/domains/creator/studio-asset-library";
+import type { StudioAsset } from "@/domains/creator/studio-asset-library";
 import type {
   StudioCompanionReferencePreviewInput,
   StudioCompanionReferencePreviewItem,
   StudioCompanionReferencePreviewSource,
-} from "@/src/domains/creator/studio-companion-reference-preview";
+} from "@/domains/creator/studio-companion-reference-preview";
 import type {
   StudioReferenceBoardDocument,
   StudioReferenceBoardItem,
   StudioReferenceBoardSha256,
-} from "@/src/domains/creator/studio-reference-board";
-import type { StudioReferenceImageRaster } from "@/src/domains/creator/studio-reference-color-sampler";
+} from "@/domains/creator/studio-reference-board";
+import type { StudioReferenceImageRaster } from "@/domains/creator/studio-reference-color-sampler";
 
 export const STUDIO_COMPANION_REFERENCE_SOURCE_WIDTH = 1_280;
 export const STUDIO_COMPANION_REFERENCE_SOURCE_HEIGHT = 720;
@@ -450,9 +450,9 @@ function materializeStudioCompanionReferenceRaster(
 
 async function loadDefaultDependencies(): Promise<StudioCompanionReferenceSourceDependencies> {
   const [assetLibrary, referenceBoard, colorSampler, rasterWorker] = await Promise.all([
-    import("@/src/domains/creator/studio-asset-library"),
-    import("@/src/domains/creator/studio-reference-board"),
-    import("@/src/domains/creator/studio-reference-color-sampler"),
+    import("@/domains/creator/studio-asset-library"),
+    import("@/domains/creator/studio-reference-board"),
+    import("@/domains/creator/studio-reference-color-sampler"),
     import("./studio-companion-reference-raster-worker-client"),
   ]);
   const processor = rasterWorker.createStudioCompanionReferenceRasterWorkerProcessor({

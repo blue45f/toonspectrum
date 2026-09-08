@@ -12,11 +12,11 @@ import {
   type StudioCompanionReferenceSourceDependencies,
 } from "./studio-companion-reference-source-runtime";
 
-import type { StudioAsset } from "@/src/domains/creator/studio-asset-library";
+import type { StudioAsset } from "@/domains/creator/studio-asset-library";
 import type {
   StudioReferenceBoardDocument,
   StudioReferenceBoardItem,
-} from "@/src/domains/creator/studio-reference-board";
+} from "@/domains/creator/studio-reference-board";
 
 const HASH_A = `sha256:${"a".repeat(64)}` as const;
 const HASH_B = `sha256:${"b".repeat(64)}` as const;

@@ -44,7 +44,7 @@ import { normalizeCreatorMarketplaceLegacySemver } from "@/shared/lib/creator-ma
 import {
   getCreatorMarketplaceResource,
   getCreatorMarketplaceResourceIdentity,
-} from "@/src/infrastructure/creator-marketplace-client";
+} from "@/infrastructure/creator-marketplace-client";
 
 export const STUDIO_CREATOR_PACK_SQLITE_NAMESPACE = "studio-creator-pack-v12";
 

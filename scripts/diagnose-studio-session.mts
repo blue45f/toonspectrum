@@ -6,12 +6,13 @@ import { chromium, type Page } from "playwright";
 import { materializeStudioBrushCatalogSelection } from "../apps/web/src/domains/creator/brush/studio-brush-selection";
 import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
 
+import { viteManifestKey } from "./lib/repo-paths.mjs";
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
 
 const out = process.env.STUDIO_SESSION_EVIDENCE ?? "/tmp/studio-session-evidence";
 mkdirSync(out, { recursive: true });
 const manifest = JSON.parse(readFileSync("dist/.vite/manifest.json", "utf8"));
-const storePath = `/${manifest["src/domains/creator/studio-autosave-sqlite-store.ts"].file}`;
+const storePath = `/${manifest[viteManifestKey("apps/web/src/domains/creator/studio-autosave-sqlite-store.ts")].file}`;
 const ids = ["pen", "pencil", "pencil--side-shade", "inkwash-water-brush", "core-round", "flex-ink", "precision-pencil"];
 const server = spawn("pnpm", ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", "4179", "--strictPort"], { stdio: "ignore" });
 const url = "http://127.0.0.1:4179/studio";

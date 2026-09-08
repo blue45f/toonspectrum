@@ -33,13 +33,13 @@ import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { CREATOR_MARKETPLACE_RUNTIME_BY_KIND } from "@/shared/lib/creator-marketplace-resource-contract";
 import { cn } from "@/shared/lib/utils";
-import { useSession } from "@/src/compat/auth-session-store";
-import Link from "@/src/compat/router-link";
+import { useSession } from "@/compat/auth-session-store";
+import Link from "@/compat/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
-} from "@/src/hooks/use-document-title";
-import { publishCreatorMarketplaceResource } from "@/src/infrastructure/creator-marketplace-client";
+} from "@/hooks/use-document-title";
+import { publishCreatorMarketplaceResource } from "@/infrastructure/creator-marketplace-client";
 
 export function MarketPublishPage() {
   useDocumentTitle("에셋 등록 · 창작 마켓");

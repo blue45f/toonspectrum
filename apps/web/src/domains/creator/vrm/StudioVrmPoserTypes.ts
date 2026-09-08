@@ -21,7 +21,7 @@ import type { StudioVrmTrackingCalibrationRepository } from "./studio-vrm-tracki
 import type { StudioVrmUserIkResult } from "./studio-vrm-user-ik";
 import type { StudioVrmIkEffectorBone, StudioVrmIkHandleControl } from "./StudioVrmJointHandles";
 import type { StudioVrmTexturePaintPanelSettings } from "./StudioVrmTexturePaintPanel";
-import type { SharedAssetCatalogPage } from "@/src/infrastructure/creator-client";
+import type { SharedAssetCatalogPage } from "@/infrastructure/creator-client";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 export type StudioVrmPoserProps = {

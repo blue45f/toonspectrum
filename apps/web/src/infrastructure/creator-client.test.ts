@@ -33,11 +33,11 @@ const { apiGet, apiPatch, apiPost, createStudioSharedAssetPreview, toApiError } 
   toApiError: vi.fn(async () => new Error("안전한 API 오류")),
 }));
 
-vi.mock("@/src/domains/creator/studio-shared-asset-preview", () => ({
+vi.mock("@/domains/creator/studio-shared-asset-preview", () => ({
   createStudioSharedAssetPreview,
 }));
 
-vi.mock("@/src/infrastructure/api", () => ({
+vi.mock("@/infrastructure/api", () => ({
   api: {
     delete: vi.fn(),
     get: apiGet,

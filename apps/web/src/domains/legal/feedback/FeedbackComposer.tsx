@@ -8,7 +8,7 @@ import {
   FEEDBACK_AREAS, FEEDBACK_AREA_LABELS, FEEDBACK_KINDS, FEEDBACK_KIND_LABELS, validateFeedbackInput,
 } from "@toonspectrum/core/feedback";
 import { isFeedbackEntry } from "@toonspectrum/core/feedback-response";
-import { api, getApiErrorMessage } from "@/src/infrastructure/api";
+import { api, getApiErrorMessage } from "@/infrastructure/api";
 
 interface Props {
   kind: FeedbackKind;

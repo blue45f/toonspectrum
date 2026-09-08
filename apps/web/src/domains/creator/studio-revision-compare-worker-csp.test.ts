@@ -411,10 +411,7 @@ describe("revision comparison Worker strict-CSP bootstrap", () => {
         resolve: {
           alias: [
             { find: "virtual:revision-client", replacement: CLIENT_PATH },
-            // Match vite.config.ts: longer `@/shared` / `@/domains` before `@` -> apps/web.
-            { find: "@/shared", replacement: join(REPOSITORY_ROOT, "src/shared") },
-            { find: "@/domains", replacement: join(REPOSITORY_ROOT, "src/domains") },
-            { find: "@", replacement: REPOSITORY_ROOT },
+            { find: "@", replacement: join(REPOSITORY_ROOT, "src") },
           ],
         },
         build: {

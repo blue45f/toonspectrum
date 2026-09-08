@@ -9,7 +9,7 @@ import {
 
 import { adminFetch, type AdminApiError, type AdminMe } from "./admin-client";
 
-import { useSession } from "@/src/compat/auth-session-store";
+import { useSession } from "@/compat/auth-session-store";
 
 export type AdminGate =
   | { kind: "loading" }

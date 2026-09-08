@@ -13,7 +13,7 @@ import { useT } from "@/shared/lib/i18n";
 import { type RankedTitle, explainScore, type RankAxis } from "@/shared/lib/ranking";
 import { TYPE_LABEL, STATUS_LABEL } from "@/shared/lib/taxonomy";
 import { cn, formatCount } from "@/shared/lib/utils";
-import Link from "@/src/compat/router-link";
+import Link from "@/compat/router-link";
 
 // 미니 표지 썸네일
 export function MiniPoster({

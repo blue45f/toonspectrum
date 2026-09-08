@@ -6,7 +6,7 @@ import {
   type StudioTeamStatus,
 } from "./studio-team-client";
 
-import { api, toApiError } from "@/src/infrastructure/api";
+import { api, toApiError } from "@/infrastructure/api";
 
 
 export const STUDIO_SHARED_WORKS_PATH = "/creator/team/works";

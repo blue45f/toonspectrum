@@ -6,12 +6,12 @@ import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from "@pix
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-import { pickNaturalIdlePose } from "@/src/domains/creator/studio-pose-presets";
+import { pickNaturalIdlePose } from "@/domains/creator/studio-pose-presets";
 import {
   applyPoseToVrm,
   estimateVrmPalmNormal,
   type PoseBoneMap,
-} from "@/src/domains/creator/vrm/studio-vrm-poser-utils";
+} from "@/domains/creator/vrm/studio-vrm-poser-utils";
 
 const statusEl = document.getElementById("status")!;
 

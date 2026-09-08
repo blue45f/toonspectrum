@@ -278,26 +278,23 @@ export async function loadAppI18nLocale(
         if (typeof resolvedFetch !== "function") {
           throw new Error("The Fetch API is unavailable in this runtime.");
         }
-        const merged: Record<string, string> = {};
-        let missingNamespaceCount = 0;
-        for (const namespace of APP_I18N_NAMESPACES) {
+        // Fetch independent namespaces together, then merge in manifest order.
+        const parts = await Promise.all(APP_I18N_NAMESPACES.map(async (namespace) => {
           const url = appI18nAssetUrl(assetLocale, options.baseUrl, namespace);
           const response = await resolvedFetch(url, {
             cache: "force-cache",
             credentials: "same-origin",
           });
-          // Optional orphan namespaces (contact/fortune/play) are absent for many locales.
-          if (response.status === 404) {
-            missingNamespaceCount += 1;
-            continue;
-          }
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status} for ${url}`);
-          }
+          // Optional namespaces are absent for many locales.
+          if (response.status === 404) return null;
+          if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
           const part = parseAppI18nDictionary(await response.text());
           if (!part) throw new Error(`Malformed app dictionary asset for "${assetLocale}/${namespace}".`);
-          Object.assign(merged, part);
-        }
+          return part;
+        }));
+        const merged: Record<string, string> = {};
+        for (const part of parts) if (part) Object.assign(merged, part);
+        const missingNamespaceCount = parts.filter((part) => part === null).length;
         if (Object.keys(merged).length === 0) {
           throw new Error(
             missingNamespaceCount > 0
@@ -380,16 +377,24 @@ export async function loadStudioAssetIfAvailable(
           ? (window as unknown as Record<string, string>).__VITE_BASE_URL__
           : "/";
       const normBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+      // Optional Studio loading keeps available namespaces when another request fails.
+      const parts = await Promise.all(STUDIO_I18N_NAMESPACES.map(async (namespace) => {
+        try {
+          const response = await fetch(
+            `${normBaseUrl}i18n/studio/${namespace}/${assetLocale}.json`,
+            { cache: "force-cache", credentials: "same-origin" },
+          );
+          if (!response.ok) return null;
+          const data: unknown = await response.json();
+          return data && typeof data === "object" && !Array.isArray(data)
+            ? (data as Record<string, string>)
+            : null;
+        } catch {
+          return null;
+        }
+      }));
       const merged: Record<string, string> = {};
-      for (const namespace of STUDIO_I18N_NAMESPACES) {
-        const response = await fetch(
-          `${normBaseUrl}i18n/studio/${namespace}/${assetLocale}.json`,
-          { cache: "force-cache", credentials: "same-origin" },
-        );
-        if (!response.ok) continue;
-        const data = await response.json();
-        if (data && typeof data === "object" && !Array.isArray(data)) Object.assign(merged, data);
-      }
+      for (const part of parts) if (part) Object.assign(merged, part);
       if (Object.keys(merged).length > 0) {
         registerI18nLocaleEntries(assetLocale, merged);
         if (assetLocale !== normalized) registerI18nLocaleEntries(normalized, merged);

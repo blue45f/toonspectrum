@@ -24,7 +24,7 @@ import type {
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import { useSession } from "@/src/compat/auth-session-store";
+import { useSession } from "@/compat/auth-session-store";
 
 interface MarketCommentsSectionProps {
   resourceId: string;

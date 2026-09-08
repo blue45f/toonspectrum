@@ -25,13 +25,13 @@ import type { CreatorMarketplaceResourceIdentity, CreatorMarketplaceResourceReco
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import { useSession } from "@/src/compat/auth-session-store";
-import Link from "@/src/compat/router-link";
+import { useSession } from "@/compat/auth-session-store";
+import Link from "@/compat/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
-} from "@/src/hooks/use-document-title";
-import { getCreatorMarketplaceResourceIdentity, publishCreatorMarketplaceResource } from "@/src/infrastructure/creator-marketplace-client";
+} from "@/hooks/use-document-title";
+import { getCreatorMarketplaceResourceIdentity, publishCreatorMarketplaceResource } from "@/infrastructure/creator-marketplace-client";
 
 const MAX_SOURCE_FILE_BYTES = 512 * 1024;
 
