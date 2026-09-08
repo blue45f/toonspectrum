@@ -29,7 +29,8 @@ describe("palette, Brand Kit and clip product SQLite authority", () => {
     expect(page).toMatch(/import\(\s*["']\.\/studio-saved-clip-sqlite-repository["']\s*\)/u);
     expect(page).toContain("clipMutationTailRef.current.then(run, run)");
     expect(page).toContain("repository.list()");
-    expect(page).toContain("repository.save(clip)");
+    expect(page).toContain("prepareStudioSavedClipElements(clip.els)");
+    expect(page).toContain("repository.save(preparedClip())");
     expect(page).toContain("repository.delete(id)");
     expect(page).not.toContain("savePalette(globalThis.localStorage");
     expect(page).not.toContain("listClips(globalThis.localStorage");
