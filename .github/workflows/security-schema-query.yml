@@ -1,0 +1,31 @@
+name: Temporary security schema query
+
+on:
+  push:
+    branches:
+      - security/code-scanning-audit-20260908
+
+permissions:
+  contents: read
+
+jobs:
+  query:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: security/code-scanning-remediation-20260908
+          fetch-depth: 1
+      - name: Locate entitlement and organization contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'QUERY_BEGIN'
+          rg -n --hidden -g '!node_modules' -g '!dist' -g '!coverage' \
+            'resolveCreatorMarketplaceEntitlement|creator_marketplace_entitlement_grant|organizationId|organization.*member|member.*organization|organization.*user|user.*organization|team.*member|member.*team' \
+            apps packages scripts | head -n 1200 || true
+          echo 'QUERY_END'
+          echo 'TABLES_BEGIN'
+          rg -n --hidden -g '*.sql' 'CREATE TABLE.*(organization|team|member)|"organization|organization"|membership|memberId|member_id' apps/api/src/db scripts | head -n 1200 || true
+          echo 'TABLES_END'
