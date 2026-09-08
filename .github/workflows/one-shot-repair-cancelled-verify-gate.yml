@@ -1,0 +1,79 @@
+name: One-shot repair cancelled verify gate
+
+on:
+  push:
+    branches:
+      - ci/repair-cancelled-verify-gate-20260908
+    paths:
+      - .github/workflows/one-shot-repair-cancelled-verify-gate.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ci/repair-cancelled-verify-gate-20260908
+          fetch-depth: 1
+      - name: Make cancelled CI runs release their verify gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          workflow_path = Path('.github/workflows/ci.yml')
+          text = workflow_path.read_text(encoding='utf-8')
+          expression = '$' + '{{ always() }}'
+          replacement_expression = '$' + '{{ always() && !cancelled() }}'
+          anchor = (
+              '    name: verify\n'
+              '    needs: [lint, typecheck, build, test, test-serial, studio-3d-runtime]\n'
+              f'    if: {expression}'
+          )
+          replacement = (
+              '    name: verify\n'
+              '    needs: [lint, typecheck, build, test, test-serial, studio-3d-runtime]\n'
+              f'    if: {replacement_expression}'
+          )
+          if text.count(anchor) != 1:
+              raise SystemExit(
+                  f'expected exactly one verify gate anchor, found {text.count(anchor)}'
+              )
+
+          old_comment = (
+              '    # 상류 잡이 실패·취소돼도 이 체크는 실패로 보고돼야 한다 — 병합 중립적인 "skipped" 로 끝나는\n'
+              '    # 일이 없도록 언제나 실행해 결과를 직접 읽는다.'
+          )
+          new_comment = (
+              '    # 상류 잡이 실패하면 이 체크를 실행해 실패로 보고한다. 다만 더 최신 HEAD 때문에 workflow 자체가\n'
+              '    # concurrency로 취소된 경우에는 stale verify 잡을 예약하지 않아 다음 실행의 큐를 막지 않는다.'
+          )
+          if text.count(old_comment) != 1:
+              raise SystemExit(
+                  f'expected exactly one verify gate comment, found {text.count(old_comment)}'
+              )
+
+          workflow_path.write_text(
+              text.replace(old_comment, new_comment, 1).replace(anchor, replacement, 1),
+              encoding='utf-8',
+          )
+          PY
+          git diff --check
+          grep -F 'if: ${{ always() && !cancelled() }}' .github/workflows/ci.yml
+      - name: Commit the repair and retire this temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/one-shot-repair-cancelled-verify-gate.yml
+          git add .github/workflows/ci.yml
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(ci): release verify gate when superseded runs are cancelled'
+          git push origin HEAD:ci/repair-cancelled-verify-gate-20260908
