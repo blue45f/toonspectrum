@@ -1,0 +1,36 @@
+name: agent-ai-composer-diagnostic
+
+on:
+  push:
+    branches:
+      - feat/studio-ai-comic-composer-20260909
+    paths:
+      - .github/workflows/agent-ai-composer-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Inspect scenario integration seams
+        shell: bash
+        run: |
+          set -euo pipefail
+          file='apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
+          for needle in \
+            'createStudioScenarioImageGenerationExecutors' \
+            'function onChangeScenarioScene' \
+            'function onGenerateScenarioImages' \
+            'onGenerateScenarioImages,' \
+            'function onRemoveScenarioScene'; do
+            echo "===== ${needle} ====="
+            grep -n -F -B 18 -A 36 "$needle" "$file" || true
+          done
+          echo '===== modal apply ====='
+          grep -n -F -B 20 -A 28 'onApplyPrompt(firstBatchPrompt)' apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx || true
+          echo '===== scenario panel preview map ====='
+          grep -n -F -B 20 -A 60 'preview.map' apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.tsx || true
