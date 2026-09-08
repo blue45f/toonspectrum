@@ -32,6 +32,14 @@ import {
   type StudioDraftSaveStatusSection,
   type StudioDraftSaveTone,
 } from "./studio-draft-save-center-model";
+import {
+  clearStudioDraftSaveOutbox,
+  createStudioDraftSaveOutboxEntry,
+  isStudioDraftSaveOutboxSatisfied,
+  readStudioDraftSaveOutbox,
+  writeStudioDraftSaveOutbox,
+  type StudioDraftSaveOutboxStorage,
+} from "./studio-draft-save-outbox";
 import { STUDIO_SERVER_AUTOSAVE_IDLE_MS } from "./studio-page-editor-runtime-contracts";
 import { useStudioReliabilityStatus } from "./use-studio-reliability-status";
 
@@ -95,6 +103,15 @@ function readOnlineStatus(): boolean {
   return typeof navigator === "undefined" ? true : navigator.onLine;
 }
 
+function readOutboxStorage(): StudioDraftSaveOutboxStorage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message.trim().slice(0, 500);
   if (typeof error === "string" && error.trim()) return error.trim().slice(0, 500);
@@ -103,6 +120,13 @@ function errorMessage(error: unknown): string {
 
 function safeCount(value: number): number {
   return Number.isInteger(value) && value > 0 ? value : 0;
+}
+
+function stableWorkId(values: readonly unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
 }
 
 function newestRevisionCreatedAt(
@@ -197,16 +221,21 @@ export function StudioDraftSaveCenter({
   const [open, setOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(readOnlineStatus);
   const [deferredSave, setDeferredSave] = useState(false);
+  const [deferredSaveQueuedAt, setDeferredSaveQueuedAt] = useState<number | null>(null);
+  const [deferredSaveDurable, setDeferredSaveDurable] = useState(false);
+  const [outboxWarning, setOutboxWarning] = useState<string | null>(null);
   const [manualSaveError, setManualSaveError] = useState<string | null>(null);
   const [observedServerSaveAt, setObservedServerSaveAt] = useState<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const replayInFlightRef = useRef(false);
   const previousSaveRef = useRef<{ saving: boolean; revision: number | null }>({
     saving,
     revision: null,
   });
   const dialogId = useId();
   const checkpointCount = safeCount(localCheckpointCount);
+  const outboxWorkId = stableWorkId([workId, loadedWork?.id, sharedDocument?.workId]);
 
   const serverRevision = resolveStudioDraftServerRevision([
     serverCurrentRevision,
@@ -214,9 +243,7 @@ export function StudioDraftSaveCenter({
     loadedWork?.revision,
     ...serverRevisions.map((entry) => entry.revision),
   ]);
-  const hasServerDocument = Boolean(
-    sharedDocument?.workId?.trim() || loadedWork?.id?.trim() || workId?.trim(),
-  );
+  const hasServerDocument = Boolean(outboxWorkId);
   const explicitServerSaveAt = resolveStudioDraftServerSavedAt({
     sharedUpdatedAt: sharedDocument?.updatedAt,
     revisions: [{ createdAt: newestRevisionCreatedAt(serverRevisions) }],
@@ -275,18 +302,55 @@ export function StudioDraftSaveCenter({
   const backupAvailable = workHydrated && !workHydrationFailed;
   const promoteBackup = model.shouldPromoteBackup && backupAvailable;
 
-  const invokeSave = useCallback(() => {
+  const queueDeferredSave = useCallback(() => {
+    const queuedAt = Date.now();
+    let durable = false;
+    if (outboxWorkId) {
+      const entry = createStudioDraftSaveOutboxEntry({
+        workId: outboxWorkId,
+        serverRevision,
+        hasServerDocument,
+        now: queuedAt,
+      });
+      durable = entry !== null && writeStudioDraftSaveOutbox({
+        storage: readOutboxStorage(),
+        entry,
+      });
+    }
+    setDeferredSaveQueuedAt(queuedAt);
+    setDeferredSaveDurable(durable);
+    setDeferredSave(true);
+    setOutboxWarning(durable
+      ? null
+      : "저장 예약을 새로고침 복구 영역에 기록하지 못했습니다. 이 탭을 유지하고 연결 후 다시 저장해 주세요.");
+  }, [hasServerDocument, outboxWorkId, serverRevision]);
+
+  const clearDeferredSave = useCallback((surfaceFailure = false): boolean => {
+    const cleared = outboxWorkId === null
+      || clearStudioDraftSaveOutbox({ storage: readOutboxStorage(), workId: outboxWorkId });
+    if (!cleared && surfaceFailure) {
+      setOutboxWarning("서버 저장 예약을 정리하지 못했습니다. 중복 저장은 revision 검증으로 차단되지만 새로고침 전에 상태를 다시 확인해 주세요.");
+      return false;
+    }
+    setDeferredSave(false);
+    setDeferredSaveQueuedAt(null);
+    setDeferredSaveDurable(false);
+    if (cleared) setOutboxWarning(null);
+    return cleared;
+  }, [outboxWorkId]);
+
+  const invokeSave = useCallback(async (restoreDeferredOnFailure = false): Promise<boolean> => {
     setManualSaveError(null);
     try {
-      void Promise.resolve(onSaveDraft()).catch((cause: unknown) => {
-        setManualSaveError(errorMessage(cause));
-        setOpen(true);
-      });
+      await Promise.resolve(onSaveDraft());
+      return true;
     } catch (cause) {
+      if (restoreDeferredOnFailure) queueDeferredSave();
       setManualSaveError(errorMessage(cause));
       setOpen(true);
+      return false;
     }
-  }, [onSaveDraft]);
+  }, [onSaveDraft, queueDeferredSave]);
 
   const requestSave = useCallback(() => {
     if (
@@ -296,16 +360,23 @@ export function StudioDraftSaveCenter({
       || workHydrationFailed
     ) return;
     if (!isOnline) {
-      setDeferredSave(true);
+      setManualSaveError(null);
+      queueDeferredSave();
       setOpen(true);
       return;
     }
-    setDeferredSave(false);
-    invokeSave();
+    const restoreDeferredOnFailure = deferredSave;
+    clearDeferredSave(false);
+    void invokeSave(restoreDeferredOnFailure).then((success) => {
+      if (success) clearDeferredSave(true);
+    });
   }, [
+    clearDeferredSave,
     collaborationDocumentLocked,
+    deferredSave,
     invokeSave,
     isOnline,
+    queueDeferredSave,
     saving,
     workHydrated,
     workHydrationFailed,
@@ -339,6 +410,35 @@ export function StudioDraftSaveCenter({
     requestSave();
   }, [model.primaryAction, model.saveActionDisabled, onContinuePendingSave, onOpenVersions, requestSave]);
 
+  const cancelDeferredSave = useCallback(() => {
+    if (!clearDeferredSave(true)) return;
+    setOpen(true);
+  }, [clearDeferredSave]);
+
+  useEffect(() => {
+    if (!outboxWorkId) return;
+    const entry = readStudioDraftSaveOutbox({
+      storage: readOutboxStorage(),
+      workId: outboxWorkId,
+    });
+    if (!entry) {
+      setDeferredSave(false);
+      setDeferredSaveQueuedAt(null);
+      setDeferredSaveDurable(false);
+      return;
+    }
+    if (isStudioDraftSaveOutboxSatisfied(entry, serverRevision)) {
+      clearStudioDraftSaveOutbox({ storage: readOutboxStorage(), workId: outboxWorkId });
+      setDeferredSave(false);
+      setDeferredSaveQueuedAt(null);
+      setDeferredSaveDurable(false);
+      return;
+    }
+    setDeferredSaveQueuedAt(entry.queuedAt);
+    setDeferredSaveDurable(true);
+    setDeferredSave(true);
+  }, [outboxWorkId, serverRevision]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onOnline = () => setIsOnline(true);
@@ -356,20 +456,33 @@ export function StudioDraftSaveCenter({
       !deferredSave
       || !isOnline
       || saving
+      || replayInFlightRef.current
+      || autosaveDocumentLeadership?.role === "follower"
       || collaborationDocumentLocked
+      || collaborationOperationSyncPending
       || !workHydrated
       || workHydrationFailed
       || pendingSaveIntent === "draft"
+      || serverSaveError !== null
     ) return;
-    setDeferredSave(false);
-    invokeSave();
+    replayInFlightRef.current = true;
+    clearDeferredSave(false);
+    void invokeSave(true).then((success) => {
+      if (success) clearDeferredSave(true);
+    }).finally(() => {
+      replayInFlightRef.current = false;
+    });
   }, [
+    autosaveDocumentLeadership?.role,
+    clearDeferredSave,
     collaborationDocumentLocked,
+    collaborationOperationSyncPending,
     deferredSave,
     invokeSave,
     isOnline,
     pendingSaveIntent,
     saving,
+    serverSaveError,
     workHydrated,
     workHydrationFailed,
   ]);
@@ -388,9 +501,10 @@ export function StudioDraftSaveCenter({
     if (previous.saving && !saving && revisionAdvanced) {
       setObservedServerSaveAt(Date.now());
       setManualSaveError(null);
+      clearDeferredSave(false);
     }
     previousSaveRef.current = { saving, revision: serverRevision };
-  }, [saving, serverRevision]);
+  }, [clearDeferredSave, saving, serverRevision]);
 
   useEffect(() => {
     if (!open || typeof document === "undefined") return;
@@ -536,6 +650,31 @@ export function StudioDraftSaveCenter({
             </div>
           </dl>
 
+          {deferredSave ? (
+            <div className="mt-3 rounded-xl border border-warning/40 bg-warning-soft/20 p-3 text-xs text-warning">
+              <p className="font-bold">서버 저장 예약 보존 중</p>
+              <p className="mt-1 leading-relaxed">
+                {deferredSaveDurable
+                  ? "원고 본문을 복제하지 않고 저장 의도만 이 탭의 세션 저장소에 기록했습니다. 새로고침 후에도 복구합니다."
+                  : "현재 탭 메모리에만 예약되어 있습니다. 새로고침하거나 탭을 닫기 전에 연결 후 저장해 주세요."}
+                {deferredSaveQueuedAt === null ? "" : ` · 예약 ${formatStudioDraftSaveTime(deferredSaveQueuedAt)}`}
+              </p>
+              <button
+                type="button"
+                onClick={cancelDeferredSave}
+                className="mt-2 min-h-9 rounded-lg border border-current/30 px-2.5 py-1.5 font-bold hover:bg-warning-soft/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                저장 예약 취소
+              </button>
+            </div>
+          ) : null}
+
+          {outboxWarning ? (
+            <p role="status" className="mt-3 rounded-xl border border-warning/40 bg-warning-soft/25 p-2.5 text-xs font-semibold leading-relaxed text-warning">
+              {outboxWarning}
+            </p>
+          ) : null}
+
           {serverRevisionError ? (
             <p role="status" className="mt-3 rounded-xl border border-warning/40 bg-warning-soft/25 p-2.5 text-xs font-semibold leading-relaxed text-warning">
               서버 버전 기록을 불러오지 못했습니다. 현재 편집 내용은 그대로 두고 체크포인트 패널에서 다시 시도할 수 있습니다.
@@ -592,7 +731,7 @@ export function StudioDraftSaveCenter({
           </div>
 
           <p className="mt-3 text-[0.68rem] leading-relaxed text-fg-3">
-            오프라인 저장 예약은 현재 문서의 이 탭 세션에서 한 번만 실행됩니다. 충돌 시에는 자동 덮어쓰기 대신 버전 비교·복원 흐름을 사용합니다.
+            오프라인 저장 예약은 현재 문서의 이 탭에서만 실행되며 새로고침 후에도 복구됩니다. 탭을 닫아 예약이 사라져도 원고 내용은 기존 기기 복구 저장소에 남습니다. 충돌 시에는 자동 덮어쓰기 대신 버전 비교·복원 흐름을 사용합니다.
           </p>
         </div>
       ) : null}
