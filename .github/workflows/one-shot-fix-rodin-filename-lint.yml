@@ -1,0 +1,68 @@
+name: One-shot fix Rodin filename lint
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/one-shot-fix-rodin-filename-lint.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-shot-fix-rodin-filename-lint
+  cancel-in-progress: true
+
+jobs:
+  fix:
+    if: github.event.pull_request.head.ref == 'release/main-final-924176-immutable-20260908' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: release/main-final-924176-immutable-20260908
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/one-shot-fix-rodin-filename-lint.yml
+            apps/api/src/modules/studio-ai/studio-hyper3d-rodin-provider.ts
+      - name: Replace the control-character regular expression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/api/src/modules/studio-ai/studio-hyper3d-rodin-provider.ts')
+          text = path.read_text(encoding='utf-8')
+          old = r'''  if (!trimmed || trimmed.length > 180 || /[\\/\u0000]/u.test(trimmed)) {'''
+          new = '''  if (
+            !trimmed ||
+            trimmed.length > 180 ||
+            trimmed.includes("/") ||
+            trimmed.includes("\\\\") ||
+            trimmed.includes(String.fromCharCode(0))
+          ) {'''.replace('          ', '')
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one stale filename regex, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          git diff --check
+          if grep -n '\\u0000' apps/api/src/modules/studio-ai/studio-hyper3d-rodin-provider.ts; then
+            echo 'stale control-character regex remains' >&2
+            exit 1
+          fi
+      - name: Commit the repair and retire this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/one-shot-fix-rodin-filename-lint.yml
+          git add apps/api/src/modules/studio-ai/studio-hyper3d-rodin-provider.ts
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(studio-ai): avoid control-character regex in filename validation'
+          git push origin HEAD:release/main-final-924176-immutable-20260908
