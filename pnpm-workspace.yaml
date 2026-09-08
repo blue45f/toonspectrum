@@ -92,14 +92,6 @@ overrides:
   # 없어, 트리에 이미 있는 0.25 수정 버전으로 좁혀 실제 TS 로더를 검증한다.
   '@esbuild-kit/core-utils>esbuild': 0.25.12
 
-auditConfig:
-  ignoreGhsas:
-    # react-router 7.18.2 contains the upstream RSC CSRF backport, but the
-    # registry advisory range has not yet incorporated that release. The
-    # executable verifier rejects Framework/RSC dependencies, entry points and
-    # APIs, pins the reviewed 7.18.2 pair, and expires this metadata exception.
-    - GHSA-qwww-vcr4-c8h2
-
 # eslint-plugin-jsx-a11y 6.10.2 is the current release and has not yet widened
 # its peer range for ESLint 10. The repository executes the plugin under
 # ESLint 10 in strict lint plus a direct minimatch compatibility regression.

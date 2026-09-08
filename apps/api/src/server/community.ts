@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { validateAttachmentImages } from "../../../web/src/shared/lib/image-attach";
+import { escapeLikePattern } from "./sql-like";
 import {
   communityCafeMembers,
   communityCafes,
@@ -215,10 +216,6 @@ export function parseFanPostCursor(value: unknown): FanCafePostCursor | null {
 export function encodeFanPostCursor(cursor: FanCafePostCursor): string {
   if (cursor.replyCount === undefined) return `${cursor.createdAt}:${cursor.id}`;
   return `${cursor.replyCount}:${cursor.createdAt}:${cursor.id}`;
-}
-
-function escapeLikePattern(value: string): string {
-  return value.replace(/[%_]/g, "\\$&");
 }
 
 export function parseReplyParent(value: unknown): string | null {

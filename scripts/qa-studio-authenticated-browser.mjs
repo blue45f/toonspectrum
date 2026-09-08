@@ -692,7 +692,7 @@ async function main() { // NOSONAR javascript:S3776
       "| Result | Severity | Case | Details |",
       "|---|---|---|---|",
       ...results.map((result) =>
-        `| ${result.passed ? "PASS" : "FAIL"} | ${result.severity} | ${result.id} | ${safeText(JSON.stringify(result.details), 240).replace(/\|/gu, "\\|")} |`
+        `| ${result.passed ? "PASS" : "FAIL"} | ${result.severity} | ${result.id} | ${safeText(JSON.stringify(result.details), 240).replace(/[\\|]/gu, "\\$&")} |`
       ),
       "",
       "## Runtime diagnostics",

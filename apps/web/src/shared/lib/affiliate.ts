@@ -34,11 +34,13 @@ export const AFFILIATE_REGISTRY: Record<string, AffiliateConfig> = {
 };
 
 export function isAffiliateSupported(platformId: string): boolean {
-  return Object.prototype.hasOwnProperty.call(AFFILIATE_REGISTRY, platformId);
+  return typeof platformId === "string"
+    && Object.prototype.hasOwnProperty.call(AFFILIATE_REGISTRY, platformId);
 }
 
 export function buildAffiliateUrl(platformId: string, originalUrl: string): string {
-  if (!originalUrl) return "";
+  if (typeof originalUrl !== "string" || !originalUrl) return "";
+  if (!isAffiliateSupported(platformId)) return originalUrl;
 
   const config = AFFILIATE_REGISTRY[platformId];
   if (!config) return originalUrl;

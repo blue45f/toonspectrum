@@ -18,7 +18,7 @@ import {
 function injectedGoogleFontHrefs(): string[] {
   return [...document.head.querySelectorAll("link[rel='stylesheet']")]
     .map((link) => (link as HTMLLinkElement).href)
-    .filter((href) => href.includes("fonts.googleapis.com"));
+    .filter((href) => new URL(href).origin === "https://fonts.googleapis.com");
 }
 
 beforeEach(() => {

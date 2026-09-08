@@ -183,6 +183,10 @@ export function issueStudioVoiceIcePolicy(options: {
     .digest("base64url")
     .slice(0, 32);
   const username = `${expiresAtSeconds}:${opaqueIdentity}`;
+  // coturn TURN REST credentials require HMAC-SHA1, rather than an unkeyed
+  // SHA-1 digest. Changing this MAC breaks --use-auth-secret authentication.
+  // https://github.com/coturn/coturn/blob/master/README.turnserver#turn-rest-api
+  // The private work/user identity above still uses HMAC-SHA256.
   const credential = createHmac("sha1", configuration.turnSharedSecret)
     .update(username)
     .digest("base64");
