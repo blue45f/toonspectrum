@@ -2,16 +2,19 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { defaultStudioAppSettings } from "../studio-app-settings";
 import { bindStudioCuttoonStagePointersDown } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-down";
 import { bindStudioCuttoonStagePointersDownArmed } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-down-armed";
 import { bindStudioCuttoonStagePointersFinish } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-finish";
 import { bindStudioCuttoonStagePointersMove } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-move";
 import { bindStudioCuttoonStagePointersUp } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-up";
+import { buildStudioShortcutHandler } from "../studio-page-shortcut-dispatcher";
 import { useStudioVectorNodeBubbleEdit } from "./studio-node-bubble-edit-controller";
 
 import type { StudioCuttoonStagePointersApi } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-api";
 import type { StudioCuttoonStagePointersHost } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-types";
 import type { DrawEl } from "../studio-element-model";
+import type { StudioShortcutHandlerContext } from "../studio-page-shortcut-dispatcher";
 
 beforeEach(() => {
   vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
@@ -115,6 +118,55 @@ describe("node editing pointer ownership at the stage boundary", () => {
     expect(f.hook.result.current.pendingNodeEditDraftRef.current).toBeNull();
     expect(f.release).toHaveBeenCalledWith(7);
     expect(globalThis.cancelAnimationFrame).toHaveBeenCalledWith(1);
+  });
+
+  it("cancels down → move → Escape → up through the actual shortcut dispatcher", () => {
+    const f = fixture();
+    act(() => f.hook.result.current.setNodeEditTool("move"));
+    f.begin(); f.move();
+    act(() => vi.mocked(globalThis.requestAnimationFrame).mock.calls.at(-1)![0](0));
+    expect(f.hook.result.current.nodeEditDraft).not.toBeNull();
+    f.move(); // Keep a second preview frame pending when Escape arrives.
+    const shortcuts = buildStudioShortcutHandler(new Proxy({
+      ...f.hostValues,
+      ...f.hook.result.current,
+      appSettingsRef: { current: defaultStudioAppSettings() },
+      cancelStudioRasterPreparation: () => false,
+      cancelCanvasGroupDrag: () => false,
+      hasActiveDrawingPointerSession: () => false,
+    }, {
+      get(values, property: string) {
+        return Reflect.get(values, property) ?? (property.endsWith("Ref") ? { current: null } : undefined);
+      },
+    }) as unknown as StudioShortcutHandlerContext);
+    // A pointerup in the same event batch must observe cancellation before React renders.
+    act(() => {
+      shortcuts(new KeyboardEvent("keydown", { key: "Escape", code: "Escape" }));
+      f.api.onStageUp(f.event(7));
+    });
+    expect(f.patchEl).not.toHaveBeenCalled();
+    expect(f.hook.result.current.nodeEditTool).toBeNull();
+    expect(f.hook.result.current.nodeEditDragRef.current).toBeNull();
+    expect(f.hook.result.current.pendingNodeEditDraftRef.current).toBeNull();
+    expect(f.hook.result.current.nodeEditDraft).toBeNull();
+    expect(f.hook.result.current.nodeEditRafRef.current).toBeNull();
+    expect(globalThis.cancelAnimationFrame).toHaveBeenCalledWith(1);
+    expect(f.release).toHaveBeenCalledExactlyOnceWith(7);
+  });
+
+  it("discards the previous drag when a functional update selects another node tool", () => {
+    const f = fixture();
+    act(() => f.hook.result.current.setNodeEditTool("move"));
+    f.begin(); f.move();
+    act(() => {
+      f.hook.result.current.setNodeEditTool((current) => current === "move" ? "width" : current);
+      f.api.onStageUp(f.event(7));
+    });
+    expect(f.hook.result.current.nodeEditTool).toBe("width");
+    expect(f.patchEl).not.toHaveBeenCalled();
+    expect(f.hook.result.current.nodeEditDragRef.current).toBeNull();
+    expect(f.hook.result.current.pendingNodeEditDraftRef.current).toBeNull();
+    expect(f.release).toHaveBeenCalledExactlyOnceWith(7);
   });
 
   it.each(["pointerup", "pointercancel", "lostpointercapture"])("cleans an outside-stage %s only for the owner", (type) => {

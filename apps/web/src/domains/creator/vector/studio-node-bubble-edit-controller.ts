@@ -7,6 +7,7 @@ import type {
   NodeDragSession,
   NodeEditTool,
 } from "../studio-node-edit";
+import type { SetStateAction } from "react";
 
 export type BubbleShapePointerCaptureTarget = {
   releasePointerCapture?: (pointerId: number) => void;
@@ -20,7 +21,7 @@ export function useStudioVectorNodeBubbleEdit({
   selectedId,
 }: UseStudioVectorNodeBubbleEditOptions) {
   // ── 벡터 노드 편집(자유선 점 이동·굵기) ──
-  const [nodeEditTool, setNodeEditTool] = useState<NodeEditTool | null>(null);
+  const [nodeEditTool, setNodeEditToolState] = useState<NodeEditTool | null>(null);
   const nodeEditDragRef = useRef<StudioNodeEditPointerSession | null>(null);
   const nodeEditRafRef = useRef<number | null>(null);
   const pendingNodeEditDraftRef = useRef<{ elId: string; points: number[]; pressures: number[] } | null>(null);
@@ -38,6 +39,12 @@ export function useStudioVectorNodeBubbleEdit({
   const resetNodeEditSession = useCallback(() => cancelStudioNodeEditPointer({
     nodeEditDragRef, pendingNodeEditDraftRef, nodeEditRafRef, setNodeEditDraft,
   }), []);
+
+  const setNodeEditTool = useCallback((next: SetStateAction<NodeEditTool | null>) => {
+    // Escape/tool transitions must revoke ownership before a same-tick pointerup can commit.
+    resetNodeEditSession();
+    setNodeEditToolState(next);
+  }, [resetNodeEditSession]);
 
   useEffect(() => {
     const cancelOutsideStage = (event: PointerEvent) => {
@@ -59,7 +66,7 @@ export function useStudioVectorNodeBubbleEdit({
   useEffect(() => {
     void selectedId;
     resetNodeEditSession();
-    setNodeEditTool(null);
+    setNodeEditToolState(null);
   }, [selectedId, resetNodeEditSession]);
 
   const [nodeSmoothStrength, setNodeSmoothStrength] = useState(NODE_SMOOTH_DEFAULT_STRENGTH);
