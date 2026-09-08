@@ -10,6 +10,7 @@ import {
 } from "./creator-collaboration.repository";
 import { creatorDraftCollaborationRepositoryProvider } from "./creator-draft-collaboration.repository";
 import { CreatorController } from "./creator.controller";
+import { CreatorPublicationSchedulerService } from "./creator-publication-scheduler.service";
 import { CreatorService } from "./creator.service";
 import {
   StudioRasterAssetUploadGuard,
@@ -93,6 +94,7 @@ const supabaseObjectStorageModule =
     studioTeamCommentRepositoryProvider,
     studioVoiceIceConfigurationProvider,
     studioWorkAssetRepositoryProvider,
+    CreatorPublicationSchedulerService,
     CreatorService,
     StudioRasterAssetService,
     StudioRemoteReferenceImageService,
