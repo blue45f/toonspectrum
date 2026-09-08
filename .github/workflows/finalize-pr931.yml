@@ -1,0 +1,148 @@
+name: Finalize Dependabot PR 931
+
+on:
+  push:
+    branches:
+      - automation/finalize-pr931-20260908-v4
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  actions: write
+  security-events: read
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      PR_NUMBER: '931'
+      HEAD_BRANCH: security/dependabot-zero-audit-main-20260908-v3
+      COMPLETION_TAG: dependabot-remediation-2026-09-08-complete
+      AUTOMATION_REF: heads/automation/finalize-pr931-20260908-v4
+    steps:
+      - name: Ensure CI runs, merge through core, and verify alert closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          rerun_used=0
+          reopen_used=0
+
+          normalize_pr() {
+            local merged state base
+            merged="$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}" --jq '.merged')"
+            if [[ "$merged" == 'true' ]]; then
+              return 0
+            fi
+            state="$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}" --jq '.state')"
+            base="$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}" --jq '.base.ref')"
+            if [[ "$state" != 'open' || "$base" != 'main' ]]; then
+              gh api --method PATCH "repos/${REPOSITORY}/pulls/${PR_NUMBER}" \
+                -f state=open -f base=main \
+                -f title='fix(security): resolve all Dependabot alerts' >/dev/null
+            fi
+            gh pr merge "$PR_NUMBER" --repo "$REPOSITORY" --auto --squash || true
+          }
+
+          trigger_pr_ci() {
+            gh api --method PATCH "repos/${REPOSITORY}/pulls/${PR_NUMBER}" -f state=closed >/dev/null
+            sleep 3
+            gh api --method PATCH "repos/${REPOSITORY}/pulls/${PR_NUMBER}" \
+              -f state=open -f base=main >/dev/null
+          }
+
+          normalize_pr
+
+          for attempt in $(seq 1 120); do
+            pr_json="$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}")"
+            merged="$(jq -r '.merged' <<<"$pr_json")"
+            state="$(jq -r '.state' <<<"$pr_json")"
+            head_sha="$(jq -r '.head.sha' <<<"$pr_json")"
+            base_ref="$(jq -r '.base.ref' <<<"$pr_json")"
+
+            if [[ "$merged" == 'true' ]]; then
+              main_sha="$(gh api "repos/${REPOSITORY}/branches/main" --jq '.commit.sha')"
+              set +e
+              alerts_json="$(gh api -H 'Accept: application/vnd.github+json' \
+                "repos/${REPOSITORY}/dependabot/alerts?state=open&per_page=100" \
+                --paginate --slurp 2>"${RUNNER_TEMP}/dependabot-alerts.err")"
+              alerts_exit="$?"
+              set -e
+              if [[ "$alerts_exit" -ne 0 ]]; then
+                cat "${RUNNER_TEMP}/dependabot-alerts.err" >&2
+                exit "$alerts_exit"
+              fi
+              open_count="$(jq '[.[][]] | length' <<<"$alerts_json")"
+              echo "merged=true main=${main_sha} open_dependabot_alerts=${open_count}"
+              if [[ "$open_count" -eq 0 ]]; then
+                encoded_tag="${COMPLETION_TAG//\//%2F}"
+                if gh api "repos/${REPOSITORY}/git/ref/tags/${encoded_tag}" >/dev/null 2>&1; then
+                  gh api --method PATCH "repos/${REPOSITORY}/git/refs/tags/${encoded_tag}" \
+                    -f sha="$main_sha" -F force=true >/dev/null
+                else
+                  gh api --method POST "repos/${REPOSITORY}/git/refs" \
+                    -f ref="refs/tags/${COMPLETION_TAG}" -f sha="$main_sha" >/dev/null
+                fi
+                gh api --method DELETE "repos/${REPOSITORY}/git/refs/${AUTOMATION_REF}" >/dev/null 2>&1 || true
+                echo "completion_tag=${COMPLETION_TAG} sha=${main_sha}"
+                exit 0
+              fi
+              sleep 30
+              continue
+            fi
+
+            if [[ "$state" != 'open' || "$base_ref" != 'main' ]]; then
+              normalize_pr
+              sleep 5
+              continue
+            fi
+
+            checks_json="$(gh api -H 'Accept: application/vnd.github+json' \
+              "repos/${REPOSITORY}/commits/${head_sha}/check-runs?per_page=100")"
+            core_status="$(jq -r '[.check_runs[] | select(.name == "core" and .app.slug == "github-actions")] | sort_by(.started_at // .created_at) | last | .status // "missing"' <<<"$checks_json")"
+            core_conclusion="$(jq -r '[.check_runs[] | select(.name == "core" and .app.slug == "github-actions")] | sort_by(.started_at // .created_at) | last | .conclusion // "pending"' <<<"$checks_json")"
+            echo "attempt=${attempt} head=${head_sha} core_status=${core_status} core_conclusion=${core_conclusion}"
+
+            if [[ "$core_status" == 'completed' && "$core_conclusion" == 'success' ]]; then
+              gh pr merge "$PR_NUMBER" --repo "$REPOSITORY" --squash \
+                --subject 'fix(security): resolve all Dependabot alerts' \
+                --body 'Resolves all audited dependency advisories and restores pnpm frozen-lockfile consistency.'
+              sleep 5
+              continue
+            fi
+
+            if [[ "$core_status" == 'completed' && "$core_conclusion" =~ ^(failure|cancelled|timed_out|action_required|startup_failure|stale)$ ]]; then
+              latest_run_id="$(gh api "repos/${REPOSITORY}/actions/workflows/ci.yml/runs?branch=${HEAD_BRANCH}&event=pull_request&per_page=20" \
+                --jq '.workflow_runs | sort_by(.created_at) | last | .id // empty')"
+              if [[ -n "$latest_run_id" && "$rerun_used" -eq 0 ]]; then
+                echo "rerunning failed CI run ${latest_run_id}"
+                gh run rerun "$latest_run_id" --repo "$REPOSITORY"
+                rerun_used=1
+                sleep 30
+                continue
+              fi
+              echo "Required core failed after recovery attempt: ${core_conclusion}" >&2
+              latest_run_id="$(gh api "repos/${REPOSITORY}/actions/workflows/ci.yml/runs?branch=${HEAD_BRANCH}&event=pull_request&per_page=20" \
+                --jq '.workflow_runs | sort_by(.created_at) | last | .id // empty')"
+              if [[ -n "$latest_run_id" ]]; then
+                gh run view "$latest_run_id" --repo "$REPOSITORY" --log-failed || true
+              fi
+              exit 1
+            fi
+
+            if [[ "$core_status" == 'missing' && "$attempt" -ge 4 && "$reopen_used" -eq 0 ]]; then
+              echo 'No core check found; reopening PR to trigger pull_request CI.'
+              trigger_pr_ci
+              reopen_used=1
+              sleep 30
+              continue
+            fi
+
+            sleep 30
+          done
+
+          echo 'Finalization conditions were not met before timeout.' >&2
+          exit 1
