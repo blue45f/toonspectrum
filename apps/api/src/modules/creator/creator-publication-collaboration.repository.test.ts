@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -173,33 +174,37 @@ describe("prepareCreatorPublicationSharedDocumentPatch", () => {
     });
   });
 
-  it("deactivates an invalid scheduled challenge release so the sweeper cannot replay it", () => {
-    const prepared = prepareCreatorPublicationSharedDocumentPatch({
-      shared: sharedDocument({
-        role: "owner",
-        status: "draft",
-        challengeId: "challenge-1",
-      }),
-      patch: {
-        status: "published",
-        doc: writeCreatorPublicationDirective(
-          {},
-          completeDirective({
-            mode: "scheduled",
-            visibility: "unlisted",
-            scheduledAt: "2026-09-08T09:00:00.000Z",
-          }),
-        ),
-      },
-      now,
-    });
+  it("rejects an invalid scheduled challenge release before repository mutation", () => {
+    const attempt = () =>
+      prepareCreatorPublicationSharedDocumentPatch({
+        shared: sharedDocument({
+          role: "owner",
+          status: "draft",
+          challengeId: "challenge-1",
+        }),
+        patch: {
+          status: "published",
+          doc: writeCreatorPublicationDirective(
+            {},
+            completeDirective({
+              mode: "scheduled",
+              visibility: "unlisted",
+              scheduledAt: "2026-09-08T09:00:00.000Z",
+            }),
+          ),
+        },
+        now,
+      });
 
-    expect(prepared.status).toBe("draft");
-    expect(readCreatorPublicationDirective(prepared.doc)).toMatchObject({
-      mode: "immediate",
-      visibility: "unlisted",
-      scheduledAt: null,
-      publishedAt: null,
-    });
+    expect(attempt).toThrow(BadRequestException);
+    try {
+      attempt();
+    } catch (error) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).getResponse()).toMatchObject({
+        code: "creator_publication_invalid",
+        message: "예약 시간은 현재보다 최소 1분 뒤여야 합니다.",
+      });
+    }
   });
 });
