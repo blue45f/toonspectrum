@@ -49,7 +49,7 @@ describe("StudioPublishPreflightPanel keyboard ownership", () => {
     const view = render(<StudioPublishPreflightPanel {...options} />);
     const dialog = screen.getByRole("dialog", { name: "Publish Pack 사전검사" });
     const first = screen.getByRole("button", { name: "Publish Pack 사전검사 닫기" });
-    const last = screen.getByRole("button", { name: "확인", exact: true });
+    const last = screen.getByRole("button", { name: "확인" });
 
     expect(document.activeElement).toBe(first);
     expect(trigger.hasAttribute("inert")).toBe(true);
