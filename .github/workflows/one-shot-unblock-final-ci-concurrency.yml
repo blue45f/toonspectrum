@@ -34,11 +34,15 @@ jobs:
 
           path = Path('.github/workflows/ci.yml')
           text = path.read_text(encoding='utf-8')
-          old = "  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}"
-          new = old + "-release-final-g2"
-          if text.count(old) != 1:
-              raise SystemExit(f'expected one CI concurrency group, found {text.count(old)}')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          lines = text.splitlines()
+          matches = [index for index, line in enumerate(lines) if line.startswith('  group: ')]
+          if len(matches) != 1:
+              raise SystemExit(f'expected one CI concurrency group, found {len(matches)}')
+          index = matches[0]
+          if '-release-final-g2' in lines[index]:
+              raise SystemExit('final CI concurrency suffix already present')
+          lines[index] = lines[index] + '-release-final-g2'
+          path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
           PY
           grep -F -- '-release-final-g2' .github/workflows/ci.yml
           git diff --check
