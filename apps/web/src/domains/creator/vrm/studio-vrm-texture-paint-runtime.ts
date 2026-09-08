@@ -1,3 +1,4 @@
+import { StudioVrmPaintMaterialView, type StudioVrmPaintMaterialViewSnapshot } from "./studio-vrm-paint-material-view";
 import * as THREE from "three";
 
 import {
@@ -377,6 +378,9 @@ export interface StudioVrmTexturePaintHistorySnapshot {
 export interface StudioVrmTexturePaintRuntimeSnapshot {
   readonly channel: StudioVrmTexturePaintChannel;
   readonly supportedChannels: readonly StudioVrmTexturePaintChannel[];
+  readonly materials: readonly StudioVrmPaintMaterialViewSnapshot[];
+  readonly selectedMaterialId: string | null;
+  readonly soloMaterialId: string | null;
   readonly status: StudioVrmTexturePaintRuntimeStatus;
   readonly activeOperation:
     | "fill"
@@ -1482,6 +1486,7 @@ export class StudioVrmTexturePaintRuntime {
   private historyBytes = 0;
   private aggregateRgbaBytes = 0;
   private aggregateTargetResidentBytes = 0;
+  private readonly materialView: StudioVrmPaintMaterialView;
   private selectedTarget: PaintTarget | null = null;
   private sampling: PendingColorSample | null = null;
   private filling: PendingFill | null = null;
@@ -1500,6 +1505,7 @@ export class StudioVrmTexturePaintRuntime {
     options: CreateStudioVrmTexturePaintRuntimeOptions = {},
   ) {
     this.scene = scene;
+    this.materialView = new StudioVrmPaintMaterialView(collectSceneMaterialBindings(scene));
     this.options = normalizeOptions(options);
     this.supportedPaintChannels = Object.freeze([...this.materialChannels.supportedChannels(scene)]);
     this.snapshot = this.createSnapshot();
@@ -1514,11 +1520,48 @@ export class StudioVrmTexturePaintRuntime {
     if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
       return this.fail("pointer-active");
     }
-    if (!this.supportedPaintChannels.includes(channel)) {
+    const selectedMaterial = this.materialView.selectedMaterial();
+    if (!this.supportedPaintChannels.includes(channel)
+      || (selectedMaterial && !studioVrmMaterialSupportsPaintChannel(selectedMaterial, channel))) {
       return this.fail("channel-unsupported");
     }
     this.selectedChannel = channel;
-    this.selectedTarget = this.targets.find((target) => target.channel === channel) ?? null;
+    this.selectedTarget = this.targets.find((target) => target.channel === channel
+      && (!selectedMaterial || target.bindings.has(selectedMaterial as BaseColorMaterial))) ?? null;
+    this.lastError = null;
+    this.publish();
+    return success(this.snapshot);
+  }
+
+  selectMaterial(id: string | null): StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintRuntimeSnapshot> {
+    if (this.disposed) return this.fail("disposed");
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) return this.fail("pointer-active");
+    if (!this.materialView.select(id)) return this.fail("material-missing");
+    const material = this.materialView.selectedMaterial();
+    if (material && !studioVrmMaterialSupportsPaintChannel(material, this.selectedChannel)) {
+      this.selectedChannel = this.supportedPaintChannels.find((channel) =>
+        studioVrmMaterialSupportsPaintChannel(material, channel)) ?? "baseColor";
+    }
+    this.selectedTarget = this.targets.find((target) => target.channel === this.selectedChannel
+      && (!material || target.bindings.has(material as BaseColorMaterial))) ?? null;
+    this.lastError = null;
+    this.publish();
+    return success(this.snapshot);
+  }
+
+  setMaterialSolo(solo: boolean): StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintRuntimeSnapshot> {
+    if (this.disposed) return this.fail("disposed");
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) return this.fail("pointer-active");
+    if (!this.materialView.setSolo(solo)) return this.fail("material-missing");
+    this.lastError = null;
+    this.publish();
+    return success(this.snapshot);
+  }
+
+  setMaterialVisible(id: string, visible: boolean): StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintRuntimeSnapshot> {
+    if (this.disposed) return this.fail("disposed");
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) return this.fail("pointer-active");
+    if (!this.materialView.setVisible(id, visible)) return this.fail("material-missing");
     this.lastError = null;
     this.publish();
     return success(this.snapshot);
@@ -2560,6 +2603,7 @@ export class StudioVrmTexturePaintRuntime {
       target.bindings.clear();
     }
 
+    this.materialView.dispose();
     this.materialChannels.dispose();
     this.targetsByOriginal.clear();
     this.targetsByPainted.clear();
@@ -2773,6 +2817,7 @@ export class StudioVrmTexturePaintRuntime {
     if (!objectBelongsToScene(object, this.scene)) return failure("hit-outside-scene");
     const material = materialAtHit(object as THREE.Mesh, hit);
     if (!material) return failure("material-missing");
+    if (!this.materialView.accepts(material)) return failure("target-mismatch");
 
     let map: THREE.Texture | null;
     try {
@@ -3416,7 +3461,10 @@ export class StudioVrmTexturePaintRuntime {
   }
 
   private publish(): void {
-    if (this.selectedTarget) this.selectedChannel = this.selectedTarget.channel;
+    if (this.selectedTarget) {
+      this.selectedChannel = this.selectedTarget.channel;
+      this.materialView.reveal(this.selectedTarget.bindings.keys());
+    }
     this.snapshot = this.createSnapshot();
     for (const listener of this.listeners) {
       try {
@@ -3428,6 +3476,7 @@ export class StudioVrmTexturePaintRuntime {
   }
 
   private createSnapshot(): StudioVrmTexturePaintRuntimeSnapshot {
+    const materials = this.materialView.snapshot();
     const targetSnapshots = this.targets.map((target) => Object.freeze({
       channel: target.channel,
       id: target.id,
@@ -3479,7 +3528,11 @@ export class StudioVrmTexturePaintRuntime {
             : null;
     return Object.freeze({
       channel: this.selectedChannel,
-      supportedChannels: this.supportedPaintChannels,
+      supportedChannels: materials.find((material) => material.id === this.materialView.selectedId)?.supportedChannels
+        ?? this.supportedPaintChannels,
+      materials,
+      selectedMaterialId: this.materialView.selectedId,
+      soloMaterialId: this.materialView.soloId,
       status,
       activeOperation,
       activePointerId: this.pending?.pointerId ?? this.active?.pointerId ?? null,

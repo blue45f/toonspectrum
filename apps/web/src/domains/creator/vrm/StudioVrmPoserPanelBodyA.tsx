@@ -1,3 +1,4 @@
+import { StudioVrmPaintMaterialControls } from "./StudioVrmPaintMaterialControls";
 /**
   type CustomPose,
   type ExpressionAction,
@@ -366,6 +367,8 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
 
               {!hideOnCharacterSection("surface") ? <StudioVrmTextureExportButton runtime={texturePaintRuntime}
                 disabled={texturePaintDisabledReason.length > 0 || texturePaintStrokeActive || (texturePaintSnapshot?.targets.length ?? 0) === 0} /> : null}
+              {!hideOnCharacterSection("surface") ? <StudioVrmPaintMaterialControls runtime={texturePaintRuntime}
+                snapshot={texturePaintSnapshot} disabled={texturePaintDisabledReason.length > 0 || texturePaintStrokeActive} /> : null}
               <StudioVrmTexturePaintPanel
                 channel={texturePaintSnapshot?.channel ?? "baseColor"}
                 supportedChannels={texturePaintSnapshot?.supportedChannels ?? ["baseColor"]}

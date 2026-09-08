@@ -1,3 +1,4 @@
+import { StudioVrmPaintMaterialControls } from "../vrm/StudioVrmPaintMaterialControls";
 /**
  * Character Shaper — 표면 드로잉 HUD.
  *
@@ -142,6 +143,7 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
           if (disabled) return;
           if (h.texturePaintRuntime?.setChannel(next).ok) h.setTexturePaintEyedropperActive?.(false);
         }} />
+      <StudioVrmPaintMaterialControls runtime={h.texturePaintRuntime ?? null} snapshot={snapshot} disabled={disabled} />
       <StudioVrmTextureExportButton runtime={h.texturePaintRuntime ?? null} disabled={disabled || (snapshot?.targets?.length ?? 0) === 0} />
       <div role="group" aria-label="도구" className="flex shrink-0 items-center gap-1">
         {tools.map((tool) => {
