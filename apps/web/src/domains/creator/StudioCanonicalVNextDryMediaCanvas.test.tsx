@@ -29,6 +29,7 @@ const harness = vi.hoisted(() => {
     deferDeviceCreation: false,
     failSurfaceCreates: 0,
     failPresentations: 0,
+    configurationFailure: null as string | null,
     snapshotDraws: 0,
     pendingDeviceResolvers: [] as Array<() => void>,
     createDevice() {
@@ -78,6 +79,7 @@ const harness = vi.hoisted(() => {
       this.deferDeviceCreation = false;
       this.failSurfaceCreates = 0;
       this.failPresentations = 0;
+      this.configurationFailure = null;
       this.snapshotDraws = 0;
       this.pendingDeviceResolvers.length = 0;
       releasePresentation = null;
@@ -166,6 +168,9 @@ vi.mock("./render/studio-engine-webgpu-presentation-surface", () => ({
       surface: {
         configure(layout: unknown) {
           harness.configureCalls.push(layout);
+          if (harness.configurationFailure) {
+            return { status: "rejected" as const, reason: harness.configurationFailure };
+          }
           return { status: "ready" as const };
         },
         dispose() {
@@ -298,6 +303,21 @@ describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
       />,
     );
     expect(canvas?.style.visibility).toBe("visible");
+  });
+
+  it("retains the surface rejection reason and does not compile or authorize it", async () => {
+    harness.configurationFailure = "surface-limit";
+    const onAuthorityChange = vi.fn();
+    const view = render(
+      <StudioCanonicalVNextDryMediaCanvas {...baseProps} onAuthorityChange={onAuthorityChange} />,
+    );
+    await waitFor(() => expect(onAuthorityChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "unavailable", reason: "surface-config:surface-limit" }),
+    ));
+    expect(harness.compileCalls).toHaveLength(0);
+    expect(view.container.querySelector("[data-studio-canonical-vnext-dry-media-reason]"))
+      .toMatchObject({ dataset: expect.objectContaining({ studioCanonicalVnextDryMediaReason: "surface-config:surface-limit" }) });
+    expect(harness.disposedSurfaces).toBe(1);
   });
 
   it("never promotes a stale in-flight frame after the candidate is released", async () => {
