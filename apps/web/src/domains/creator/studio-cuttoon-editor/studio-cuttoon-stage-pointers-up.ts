@@ -6,6 +6,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { flushSync } from "react-dom";
+import { cancelStudioNodeEditPointer, ownsStudioNodeEditPointer, studioNodeEditSourceMatches } from "../vector/studio-node-edit-pointer-session";
 
 import { resolveStudioCapturedBrushDynamicsPresetId } from "../brush/studio-brush-dynamics";
 import {
@@ -481,20 +482,17 @@ export function bindStudioCuttoonStagePointersUp(
     // crop 의 "적용" 버튼과 다름) nodeEditDraft state 가 아니라 항상-최신인 ref 를 읽는다. state 를
     // 읽으면 React 의 비동기 업데이트 때문에 드래그의 마지막 프레임을 놓칠 수 있다.
     if (nodeEditDragRef.current) {
-      const { elId } = nodeEditDragRef.current;
-      nodeEditDragRef.current = null;
-      if (nodeEditRafRef.current !== null) {
-        globalThis.cancelAnimationFrame(nodeEditRafRef.current);
-        nodeEditRafRef.current = null;
-      }
+      const drag = nodeEditDragRef.current;
+      if (!ownsStudioNodeEditPointer(drag, pointerEvent)) return;
+      const { elId } = drag;
       const finalDraft = pendingNodeEditDraftRef.current;
-      pendingNodeEditDraftRef.current = null;
-      setNodeEditDraft(null);
+      cancelStudioNodeEditPointer(h);
       const current = elementById.get(elId);
       if (
         finalDraft &&
         finalDraft.elId === elId &&
         current?.type === "draw" &&
+        studioNodeEditSourceMatches(drag, current) &&
         !activeSurfaceReviewLocked &&
         !isEffectivelyLocked(current, groups)
       ) {
