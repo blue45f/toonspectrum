@@ -6,6 +6,7 @@ on:
     paths:
       - "apps/web/src/domains/creator/ai/studio-ai-comic-director-*.ts"
       - "apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel*.tsx"
+      - "apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel*.tsx"
       - "apps/web/src/domains/creator/studio-router/**"
       - "apps/web/src/domains/creator/studio-scenario-layout.ts"
       - "apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad*.tsx"
@@ -13,8 +14,6 @@ on:
       - "apps/api/src/modules/studio-ai/studio-ai.module.ts"
       - "apps/api/src/db/schema/studio-ai-comic-director.schema.ts"
       - "apps/api/src/db/schema/index.ts"
-      - "apps/api/src/db/migrations/0045_studio_ai_comic_director.sql"
-      - "scripts/production-database-migrations.manifest"
       - ".github/workflows/studio-ai-comic-director-complete.yml"
   workflow_dispatch:
 
@@ -55,9 +54,9 @@ jobs:
           apps/web/src/domains/creator/ai/studio-ai-comic-director-session.test.ts
           apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts
           apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.test.tsx
+          apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.test.tsx
           apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx
           apps/api/src/modules/studio-ai/studio-ai-comic-director.contract.test.ts
-          scripts/run-production-database-migrations.test.mjs
 
       - name: Lint changed production path
         run: pnpm run lint:quick
