@@ -145,8 +145,9 @@ try {
       await row.locator('[data-studio-layer-kind-badge]').click();
       await expect(row).toHaveAttribute("aria-selected", "true");
       const selected = await capture("selected");
-      result.selectedCanvas = await page.locator('[data-studio-canonical-vnext-dry-media="true"]')
+      const selectedCanvas = await page.locator('[data-studio-canonical-vnext-dry-media="true"]')
         .evaluate(canvas => ({ attributes: { ...(canvas as HTMLElement).dataset }, visibility: getComputedStyle(canvas).visibility }));
+      result.selectedCanvas = selectedCanvas;
       await page.getByRole("button", { name: "해제", exact: true }).click();
       const deselected = await capture("deselected");
       await row.locator('[data-studio-layer-kind-badge]').click();
@@ -166,6 +167,21 @@ try {
       }
       for (const comparison of comparisons) assert.equal(comparison.changedPixels, 0,
         `${id}: ${comparison.state} must not change the saved picture`);
+      // A globally disabled specialist would also preserve the screenshot. Require evidence that
+      // the real candidate was rendered and compared before deciding who may own its pixels.
+      const receipt = selectedCanvas.attributes.studioCanonicalVnextDryMediaDocumentParity;
+      assert.ok(receipt, "The candidate must have measured document-parity evidence");
+      const parity = JSON.parse(receipt) as { status: string; comparedPixels: number;
+        mismatchedPixels: number; channelTolerance: number; colorSpace: string; alphaEncoding: string };
+      assert.ok(parity.status === "matched" || parity.status === "mismatch");
+      assert.ok(parity.comparedPixels > 0);
+      assert.equal(parity.channelTolerance, 0);
+      assert.equal(parity.colorSpace, "srgb");
+      assert.equal(parity.alphaEncoding, "straight-rgba8");
+      assert.equal(selectedCanvas.attributes.studioCanonicalVnextDryMediaAuthorized,
+        parity.status === "matched" ? "true" : "false");
+      assert.equal(selectedCanvas.visibility, parity.status === "matched" ? "visible" : "hidden");
+      assert.equal(parity.mismatchedPixels === 0, parity.status === "matched");
       assert.equal(await page.locator('[data-studio-canonical-vnext-dry-media-unavailable]').count(), 0);
       assert.deepEqual(httpErrors, []);
       assert.deepEqual(errors, []);
