@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { randomUUID } from "node:crypto";
+
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -17,7 +19,7 @@ vi.mock("@/src/domains/market/remotes/market-resource-remote", () => ({
 }));
 
 const listResources = vi.mocked(listCreatorMarketplaceResources);
-const PUBLISHER_ID = "123e4567-e89b-42d3-a456-426614174000";
+const PUBLISHER_ID = randomUUID();
 
 function resource(id: string, name = id): CreatorMarketplaceResourceRecord {
   return { id, name } as CreatorMarketplaceResourceRecord;

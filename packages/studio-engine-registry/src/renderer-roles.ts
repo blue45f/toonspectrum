@@ -661,7 +661,7 @@ export const RENDERER_ROLES_LEDGER_PATH =
   "packages/studio-engine-registry/src/renderer-roles.ts" as const;
 
 function cell(value: string): string {
-  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r\n|[\r\n]/g, " ");
 }
 
 function codeList(values: readonly string[]): string {

@@ -21,7 +21,9 @@ function normalizedRequestPath(value: string): string | null {
     return null;
   }
   const rooted = decoded.startsWith("/") ? decoded : `/${decoded}`;
-  const normalized = rooted.length > 1 ? rooted.replace(/\/+$/u, "") : rooted;
+  let end = rooted.length;
+  while (end > 1 && rooted[end - 1] === "/") end -= 1;
+  const normalized = rooted.slice(0, end);
   // Nest/Express routes are case-insensitive by default, so the security
   // classifier must canonicalize case before matching the same route family.
   return normalized.toLowerCase();
