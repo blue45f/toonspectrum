@@ -42,7 +42,7 @@ ToonSpectrum에는 이미 다음 전문 기능이 존재한다.
 | KROCK.io | 프레임 단위 리뷰, 핀·댓글·첨부, 버전 비교, 실시간 동기화, 상태·Kanban·일정·작업, PDF | 검토 상태별 4열 보드, 수정 요청·검토 요청 중심의 운영 필터, 향후 프레임 주석과 버전 diff 우선순위 설정 |
 | Milanote | 무한 캔버스, 드래그 재배열, 템플릿, 이미지/영상/PDF 혼합, 댓글·공유·알림, PDF export | 자유 배치보다 ToonSpectrum의 페이지 순서 권위를 유지하되, 탐색 속도를 높이는 검색·밀도 조절·보드 뷰 제공 |
 | Animatic.app | 프레임별 notes/dialogue/SFX, 팀·클라이언트 초대, pitch 조절 가능한 오디오와 애니매틱 | 페이지 메모와 검토 메모가 검색·CSV 인계에서 사라지지 않도록 통합하고 기존 애니매틱과 중복 구현하지 않음 |
-| 연구: *Expressive Storyboarding with Generative AI* | AI가 빠른 탐색과 사용자 정의에는 도움을 주지만, 참여 애니메이터들은 중요한 보드에서 직접 그리기를 더 선호. 연속 줌 캔버스와 자유 스케치가 창작 통제에 중요 | AI를 자동 적용하지 않고 제안·초안 도구로 유지. Control Room은 사람이 전체 흐름을 판단하고 수정할 수 있는 감독 인터페이스로 설계 |
+| 연구: *AnimAgents: Coordinating Multi-Stage Animation Pre-Production with Human-Multi-Agent Collaboration* | 전문 크리에이티브 디렉터·애니메이터 대상 형성 연구에서 분절된 도구 간 산출물 조정, 대량 정보 관리, 단계 간 연속성과 창작 통제 유지가 핵심 문제로 확인됨. 후속 시스템은 기획·각본·디자인·스토리보드별 전용 보드와 단계 인지형 조정을 제공 | AI 생성량을 늘리는 대신 사람이 전체 제작 상태를 판독하는 Control Room을 두고, 기존 AI·작화·3D 결과를 하나의 운영 흐름에서 감독하도록 설계 |
 
 ## 3. 경쟁 우위 목표
 
@@ -213,4 +213,4 @@ ToonSpectrum에는 이미 다음 전문 기능이 존재한다.
 - KROCK.io creative review and storyboard: https://krock.io/
 - Milanote storyboard maker: https://milanote.com/product/storyboarding
 - Animatic.app: https://www.animatic.app/
-- Expressive Storyboarding with Generative AI: https://arxiv.org/abs/2409.00074
+- AnimAgents — human/multi-agent animation pre-production: https://arxiv.org/abs/2511.17906
