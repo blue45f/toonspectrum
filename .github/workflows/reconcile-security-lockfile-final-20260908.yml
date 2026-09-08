@@ -1,0 +1,117 @@
+name: Reconcile security lockfile final
+
+on:
+  push:
+    branches:
+      - release/final-main-merge-4888b061-immutable-20260908
+    paths:
+      - .github/workflows/reconcile-security-lockfile-final-20260908.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reconcile-security-lockfile-final-20260908
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out current dependency graph
+        uses: actions/checkout@v6
+        with:
+          ref: release/final-main-merge-4888b061-immutable-20260908
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .npmrc
+            package.json
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            apps/*/package.json
+            packages/*/package.json
+            patches/**
+            .github/workflows/reconcile-security-lockfile-final-20260908.yml
+
+      - name: Set up pnpm 11.4.0
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Remove redundant direct drizzle override
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('pnpm-workspace.yaml')
+          text = path.read_text(encoding='utf-8')
+          line = "  drizzle-orm: '>=0.45.2'\n"
+          if line in text:
+              text = text.replace(line, '', 1)
+              path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Regenerate and validate the frozen lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --lockfile-only --no-frozen-lockfile
+          pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Require zero advisories at every severity
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          pnpm audit --json --audit-level low > "$RUNNER_TEMP/security-audit.json" 2> "$RUNNER_TEMP/security-audit.err"
+          audit_exit="$?"
+          set -e
+          AUDIT_EXIT="$audit_exit" node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/security-audit.json`, 'utf8'));
+          const source = report?.metadata?.vulnerabilities ?? {};
+          const counts = Object.fromEntries(
+            ['info', 'low', 'moderate', 'high', 'critical'].map((severity) => [severity, Number(source[severity] ?? 0)]),
+          );
+          counts.total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+          const auditExit = Number(process.env.AUDIT_EXIT ?? '1');
+          console.log(JSON.stringify({ counts, auditExit }, null, 2));
+          if (auditExit !== 0 || counts.total !== 0) {
+            console.error(readFileSync(`${process.env.RUNNER_TEMP}/security-audit.err`, 'utf8'));
+            console.error(JSON.stringify(report, null, 2));
+            process.exit(1);
+          }
+          NODE
+
+      - name: Commit only the consistent audited dependency graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch='release/final-main-merge-4888b061-immutable-20260908'
+          unexpected="$({ git diff --name-only; git diff --cached --name-only; } | sort -u | grep -Ev '^(pnpm-lock\.yaml|pnpm-workspace\.yaml)$' || true)"
+          if [[ -n "$unexpected" ]]; then
+            echo 'Unexpected generated changes:' >&2
+            echo "$unexpected" >&2
+            exit 1
+          fi
+          git add pnpm-lock.yaml pnpm-workspace.yaml
+          git rm .github/workflows/reconcile-security-lockfile-final-20260908.yml
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(deps): align audited lockfile with pnpm 11.4'
+          git pull --rebase origin "$branch"
+          git push origin HEAD:"$branch"
