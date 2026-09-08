@@ -2,7 +2,7 @@ import { useParams } from "react-router-dom";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
-import { StudioBrushV5Composer } from "./StudioBrushV5Composer";
+import { StudioBrushV5QualityWorkbench } from "./StudioBrushV5QualityWorkbench";
 
 export function StudioBrushLabPage() {
   const params = useParams<{ workId?: string; sourceWorkId?: string }>();
@@ -26,12 +26,12 @@ export function StudioBrushLabPage() {
               Creator Technology Lab
             </p>
             <h1 className="mt-1 text-2xl font-black tracking-tight text-fg sm:text-3xl">
-              브러시 스튜디오 V5
+              브러시 스튜디오 V5 · Quality Authority
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-fg-3">
-              필기감, 스트로크 엔진, 촉, 표면, 재료, 안료, 복수 물리 엔진, 패턴과 마감을
-              조합해 독립적인 브러시 프로그램을 제작합니다. 기존 프리셋 재생 모델에 맞추지 않고
-              V5 프로그램 자체를 새 권위로 사용합니다.
+              기존 재생 모델과 마이그레이션 제약 없이, 실제 필기감과 재료 충실도를 새 권위로 사용합니다.
+              입력 교정, WebGPU 캐리어, 자연매체·습식·강모·입자 물리, 안료 K/S·LUT, 패턴 위상과
+              commit/export 품질을 하나의 검증 가능한 브러시 프로그램으로 설계합니다.
             </p>
           </div>
           <a
@@ -43,13 +43,14 @@ export function StudioBrushLabPage() {
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-[0.68rem] font-bold text-fg-2">
           {[
-            "WebGPU 우선",
-            "Inkwash",
-            "Krita PaintOp",
-            "libmypaint · Hokusai",
-            "Spectral · Open K/S · Mixbox",
-            "복수 물리",
-            "패턴 그래프",
+            "동등 질감 WebGPU 우선",
+            "필압·틸트·호버·팜리젝션",
+            "Inkwash · Thin-film",
+            "Krita · libmypaint · Hokusai",
+            "Spectral · Open K/S · pigment-painter",
+            "Mixbox 조건부",
+            "72개 품질 렌디션",
+            "결정적 패턴 위상",
           ].map((label) => (
             <span key={label} className="rounded-full border border-line bg-bg-2/55 px-3 py-1.5">
               {label}
@@ -58,7 +59,7 @@ export function StudioBrushLabPage() {
         </div>
       </header>
 
-      <StudioBrushV5Composer scope={scope} />
+      <StudioBrushV5QualityWorkbench scope={scope} />
     </main>
   );
 }
