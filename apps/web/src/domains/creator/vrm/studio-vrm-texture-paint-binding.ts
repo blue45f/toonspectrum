@@ -1,3 +1,8 @@
+import {
+  canonicalizeStudioVrmTexturePaintChannel,
+  type StudioVrmTexturePaintChannel,
+} from "./studio-vrm-texture-paint-channel";
+
 export const STUDIO_VRM_TEXTURE_PAINT_MATERIAL_LOCATOR_USER_DATA_KEY =
   "studioVrmMaterialLocator" as const;
 export const STUDIO_VRM_TEXTURE_PAINT_BASE_COLOR_SLOT = "baseColor" as const;
@@ -5,7 +10,7 @@ export const STUDIO_VRM_TEXTURE_PAINT_BASE_COLOR_SLOT = "baseColor" as const;
 export interface StudioVrmTexturePaintBindingDescriptor {
   readonly bindingKey: string;
   readonly materialLocator: string;
-  readonly textureSlot: typeof STUDIO_VRM_TEXTURE_PAINT_BASE_COLOR_SLOT;
+  readonly textureSlot: StudioVrmTexturePaintChannel;
 }
 
 interface StudioVrmTexturePaintMaterialLocatorTarget {
@@ -29,26 +34,31 @@ export function canonicalizeStudioVrmTexturePaintMaterialLocator(
     : null;
 }
 
-function bindingKeyForLocator(materialLocator: string): string | null {
+function bindingKeyForLocator(
+  materialLocator: string,
+  channel: StudioVrmTexturePaintChannel,
+): string | null {
   const safeStem = materialLocator
     .replace(/^gltf-material:/u, "gltf-material-")
     .replace(/^scene-path:/u, "scene-path-")
     .replaceAll("/", "-");
-  const key = `${safeStem}-${STUDIO_VRM_TEXTURE_PAINT_BASE_COLOR_SLOT}`;
+  const key = `${safeStem}-${channel}`;
   return BINDING_KEY_PATTERN.test(key) ? key : null;
 }
 
 export function createStudioVrmTexturePaintBindingDescriptor(
   materialLocator: string,
+  channel: StudioVrmTexturePaintChannel = STUDIO_VRM_TEXTURE_PAINT_BASE_COLOR_SLOT,
 ): StudioVrmTexturePaintBindingDescriptor | null {
   const locator = canonicalizeStudioVrmTexturePaintMaterialLocator(materialLocator);
   if (!locator) return null;
-  const bindingKey = bindingKeyForLocator(locator);
+  if (!canonicalizeStudioVrmTexturePaintChannel(channel)) return null;
+  const bindingKey = bindingKeyForLocator(locator, channel);
   if (!bindingKey) return null;
   return Object.freeze({
     bindingKey,
     materialLocator: locator,
-    textureSlot: STUDIO_VRM_TEXTURE_PAINT_BASE_COLOR_SLOT,
+    textureSlot: channel,
   });
 }
 
@@ -58,7 +68,7 @@ export function isCanonicalStudioVrmTexturePaintBindingDescriptor(
   return BINDING_KEY_PATTERN.test(value.bindingKey)
     && canonicalizeStudioVrmTexturePaintMaterialLocator(value.materialLocator)
       === value.materialLocator
-    && value.textureSlot === STUDIO_VRM_TEXTURE_PAINT_BASE_COLOR_SLOT;
+    && canonicalizeStudioVrmTexturePaintChannel(value.textureSlot) !== null;
 }
 
 /** Stamps a loader-provided glTF material index without persisting a Three.js UUID. */

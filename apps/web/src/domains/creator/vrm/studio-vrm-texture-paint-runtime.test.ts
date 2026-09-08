@@ -132,6 +132,46 @@ function unwrap<T>(result: StudioVrmTexturePaintRuntimeResult<T>): T {
   return result.value;
 }
 
+it("restores and edits independent packed material channels with atomic cross-channel Undo and Redo", async () => {
+  const packedPixels = rgba(8, 8, [32, 128, 64, 255]);
+  const packed = new THREE.DataTexture(packedPixels, 8, 8);
+  const material = new THREE.MeshStandardMaterial({ map: packed, roughnessMap: packed, metalnessMap: packed });
+  stampStudioVrmTexturePaintMaterialLocator(material, 2);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+  const scene = new THREE.Group(); scene.add(mesh);
+  const canvas = canvasHarness();
+  const runtime = createStudioVrmTexturePaintRuntime(scene, {
+    createCanvas: canvas.createCanvas,
+    readTextureImage: (texture) => {
+      const image = texture.image as StudioVrmTexturePaintReadableImage;
+      return readable(image.width, image.height, image.data);
+    },
+  });
+  try {
+    unwrap(await runtime.rehydrateTarget({ binding: { bindingKey: "gltf-material-2-roughness", materialLocator: "gltf-material:2", textureSlot: "roughness" }, image: readable(8, 8, rgba(8, 8, [192, 192, 192, 255])) }));
+    unwrap(await runtime.rehydrateTarget({ binding: { bindingKey: "gltf-material-2-metalness", materialLocator: "gltf-material:2", textureSlot: "metalness" }, image: readable(8, 8, rgba(8, 8, [48, 48, 48, 255])) }));
+    expect(runtime.getSnapshot().channel).toBe("metalness");
+    expect(material.map).toBe(packed);
+    expect(material.roughnessMap).not.toBe(material.metalnessMap);
+    const before = unwrap(runtime.exportPaintedTargets());
+    unwrap(runtime.setChannel("roughness"));
+    unwrap(await runtime.beginStroke({ pointerId: 71, hit: hit(mesh), style: { ...INK, color: "#ffffff" } }));
+    expectFailure(runtime.setChannel("metalness"), "pointer-active");
+    unwrap(runtime.commitStroke(71));
+    const edited = unwrap(runtime.exportPaintedTargets());
+    expect(edited).not.toEqual(before);
+    unwrap(runtime.setChannel("metalness"));
+    unwrap(runtime.undo());
+    expect(runtime.getSnapshot().channel).toBe("roughness");
+    expect(unwrap(runtime.exportPaintedTargets())).toEqual(before);
+    unwrap(runtime.redo());
+    expect(unwrap(runtime.exportPaintedTargets())).toEqual(edited);
+    expect(packed.image.data).toEqual(packedPixels);
+  } finally { runtime.dispose(); material.dispose(); packed.dispose(); mesh.geometry.dispose(); }
+  expect(material.roughnessMap).toBe(packed);
+  expect(material.metalnessMap).toBe(packed);
+});
+
 function expectFailure<T>(
   result: StudioVrmTexturePaintRuntimeResult<T>,
   code: string,
@@ -318,6 +358,76 @@ function connectedLargeGeometry(triangleCount = 4_097): THREE.BufferGeometry {
   geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
   return geometry;
 }
+
+describe("material selection and viewport isolation", () => {
+  it("pins ray hits to the selected material, fences active strokes, and preserves byte-exact history", async () => {
+    const scene = new THREE.Group();
+    const sourceA = new THREE.Texture();
+    const sourceB = new THREE.Texture();
+    const a = meshWithMap(sourceA);
+    const b = meshWithMap(sourceB);
+    a.material.name = "Jacket";
+    b.material.name = "Boots";
+    scene.add(a.mesh, b.mesh);
+    const canvas = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: imageReader(new Map([[sourceA, readable(8, 8)], [sourceB, readable(8, 8)]])),
+    });
+    const materials = runtime.getSnapshot().materials;
+    const jacket = materials.find((entry) => entry.label === "Jacket")!.id;
+    const boots = materials.find((entry) => entry.label === "Boots")!.id;
+    unwrap(runtime.selectMaterial(jacket));
+    expectFailure(await runtime.beginStroke({ pointerId: 1, hit: hit(b.mesh), style: INK }), "target-mismatch");
+    expect(canvas.canvases).toHaveLength(0);
+    unwrap(await runtime.beginStroke({ pointerId: 2, hit: hit(a.mesh), style: INK }));
+    expectFailure(runtime.selectMaterial(boots), "pointer-active");
+    expectFailure(runtime.setMaterialSolo(true), "pointer-active");
+    expectFailure(runtime.setMaterialVisible(jacket, false), "pointer-active");
+    unwrap(runtime.commitStroke(2));
+    const before = unwrap(runtime.exportPaintedTargets());
+    unwrap(runtime.selectMaterial(boots));
+    unwrap(runtime.setMaterialSolo(true));
+    expect(a.material.visible).toBe(false);
+    expect(b.material.visible).toBe(true);
+    unwrap(runtime.undo());
+    expect(runtime.getSnapshot()).toMatchObject({ selectedMaterialId: jacket, soloMaterialId: jacket });
+    expect(a.material.visible).toBe(true);
+    expect(b.material.visible).toBe(false);
+    unwrap(runtime.redo());
+    expect(unwrap(runtime.exportPaintedTargets())).toEqual(before);
+    runtime.dispose();
+    expect(a.material.visible).toBe(true);
+    expect(b.material.visible).toBe(true);
+    expect(a.material.map).toBe(sourceA);
+    expect(b.material.map).toBe(sourceB);
+  });
+
+  it("isolates material groups independently, retains explicit hidden state, and restores the original visibility", () => {
+    const materials = [new THREE.MeshStandardMaterial(), new THREE.MeshBasicMaterial(), new THREE.MeshBasicMaterial()];
+    materials[2]!.visible = false;
+    const scene = new THREE.Group();
+    scene.add(new THREE.Mesh(new THREE.BoxGeometry(), materials));
+    const runtime = createStudioVrmTexturePaintRuntime(scene);
+    const [a, b, c] = runtime.getSnapshot().materials;
+    unwrap(runtime.selectMaterial(a!.id));
+    expect(runtime.getSnapshot().supportedChannels).toContain("roughness");
+    unwrap(runtime.setChannel("roughness"));
+    unwrap(runtime.setMaterialVisible(b!.id, false));
+    unwrap(runtime.setMaterialSolo(true));
+    expect(materials.map((material) => material.visible)).toEqual([true, false, false]);
+    unwrap(runtime.setMaterialSolo(false));
+    expect(materials.map((material) => material.visible)).toEqual([true, false, false]);
+    unwrap(runtime.selectMaterial(b!.id));
+    expect(runtime.getSnapshot().channel).toBe("baseColor");
+    expectFailure(runtime.setChannel("roughness"), "channel-unsupported");
+    unwrap(runtime.setMaterialVisible(b!.id, true));
+    unwrap(runtime.setMaterialVisible(c!.id, true));
+    expect(materials.map((material) => material.visible)).toEqual([true, true, true]);
+    runtime.dispose();
+    expect(materials.map((material) => material.visible)).toEqual([true, true, false]);
+  });
+});
 
 describe("Studio VRM texture-paint runtime", () => {
   it("fails closed when a frozen custom material rejects a stable locator stamp", () => {

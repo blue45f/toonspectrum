@@ -1,3 +1,4 @@
+import { StudioVrmPaintMaterialControls } from "./StudioVrmPaintMaterialControls";
 /**
   type CustomPose,
   type ExpressionAction,
@@ -5,6 +6,7 @@
  * Studio VRM poser view slice extracted from `StudioVrmPoser.tsx` (behavior unchanged).
  * The caller passes one host object; this component destructures the original local names.
  */
+import { StudioVrmTextureExportButton } from "./StudioVrmTextureExportButton";
 import {
   FlipHorizontal2,
   Search,
@@ -363,7 +365,17 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                 </div>
               </section>
 
+              {!hideOnCharacterSection("surface") ? <StudioVrmTextureExportButton runtime={texturePaintRuntime}
+                disabled={texturePaintDisabledReason.length > 0 || texturePaintStrokeActive || (texturePaintSnapshot?.targets.length ?? 0) === 0} /> : null}
+              {!hideOnCharacterSection("surface") ? <StudioVrmPaintMaterialControls runtime={texturePaintRuntime}
+                snapshot={texturePaintSnapshot} disabled={texturePaintDisabledReason.length > 0 || texturePaintStrokeActive} /> : null}
               <StudioVrmTexturePaintPanel
+                channel={texturePaintSnapshot?.channel ?? "baseColor"}
+                supportedChannels={texturePaintSnapshot?.supportedChannels ?? ["baseColor"]}
+                onChannelChange={(channel) => {
+                  if (texturePaintDisabledReason.length > 0 || texturePaintStrokeActive) return;
+                  if (texturePaintRuntime?.setChannel(channel).ok) setTexturePaintEyedropperActive(false);
+                }}
                 hidden={hideOnCharacterSection("surface")}
                 disabled={!texturePaintRuntime || texturePaintDisabledReason.length > 0}
                 settings={texturePaintSettings}

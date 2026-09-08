@@ -3,7 +3,6 @@ import {
   STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS,
   STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES,
   STUDIO_VRM_SURFACE_PAINT_TOTAL_MAX_BYTES,
-  STUDIO_VRM_SURFACE_PAINT_BASE_COLOR_SLOT,
   type StudioVrmSurfacePaintSettings,
   type StudioVrmSurfacePaintTexture,
 } from "./studio-vrm-scene-document";
@@ -22,6 +21,7 @@ import {
   getStudioVrmTexturePaintLibraryArtifact,
   saveStudioVrmTexturePaintLibraryArtifact,
 } from "./studio-vrm-texture-paint-library";
+import { studioVrmTexturePaintChannelEncoding } from "./studio-vrm-texture-paint-channel";
 
 import type {
   StudioVrmTexturePaintBindingDescriptor,
@@ -288,8 +288,10 @@ export async function persistStudioVrmTexturePaintRuntime(
     await deps.saveArtifact(artifact, { signal: options.signal });
   }
   return Object.freeze({
-    version: 1,
-    textures: Object.freeze(textures),
+    version: textures.some((texture) => texture.textureSlot !== "baseColor") ? 2 : 1,
+    textures: Object.freeze(textures.some((texture) => texture.textureSlot !== "baseColor")
+      ? textures.map((texture) => Object.freeze({ ...texture, ...studioVrmTexturePaintChannelEncoding(texture.textureSlot) }))
+      : textures),
   });
 }
 
@@ -395,7 +397,7 @@ async function rollbackAppliedBindings(
         binding: {
           bindingKey: entry.texture.bindingKey,
           materialLocator: entry.texture.materialLocator,
-          textureSlot: STUDIO_VRM_SURFACE_PAINT_BASE_COLOR_SLOT,
+          textureSlot: entry.texture.textureSlot,
         },
         image: entry.image,
       });
@@ -456,7 +458,7 @@ export async function rehydrateStudioVrmTexturePaintRuntime(
         binding: {
           bindingKey: entry.texture.bindingKey,
           materialLocator: entry.texture.materialLocator,
-          textureSlot: STUDIO_VRM_SURFACE_PAINT_BASE_COLOR_SLOT,
+          textureSlot: entry.texture.textureSlot,
         },
         image: entry.image,
         signal: options.signal,

@@ -33,11 +33,19 @@
  */
 
 import { STUDIO_PAGES_HISTORY_MAX_ENTRIES } from "./studio-history-retention-budget";
+import type { StudioAnimaticWorkspaceDocument } from "./animatic/studio-animatic-workspace";
 /** 저널이 추적하는 히스토리 밖 문서. */
-export type StudioHistoryJournalSidecarTarget = "characterBible" | "writerRoom";
+export type StudioHistoryJournalSidecarTarget = "characterBible" | "writerRoom" | "animatic";
 
 /** 사이드카 편집 한 건 — 이전/다음 문서를 모두 들고 있어야 undo·redo 가 대칭이 된다. */
 export type StudioHistoryJournalSidecarEntry<Bible, Writer> =
+  | {
+      readonly kind: "sidecar";
+      readonly target: "animatic";
+      readonly before: StudioAnimaticWorkspaceDocument;
+      readonly after: StudioAnimaticWorkspaceDocument;
+      readonly at: number;
+    }
   | {
       readonly kind: "sidecar";
       readonly target: "characterBible";
@@ -95,6 +103,7 @@ export const STUDIO_HISTORY_JOURNAL_SIDECAR_COALESCE_MS = 800;
 const PAGES_ENTRY = Object.freeze({ kind: "pages" as const });
 
 const SIDECAR_LABELS: Record<StudioHistoryJournalSidecarTarget, string> = {
+  animatic: "스토리보드·애니매틱",
   characterBible: "캐릭터 바이블",
   writerRoom: "Writer Room",
 };
@@ -194,11 +203,16 @@ function coalesceStudioHistoryJournalSidecarEntry<Bible, Writer>(
   next: StudioHistoryJournalSidecarEntry<Bible, Writer>,
   coalesceWindowMs: number
 ): StudioHistoryJournalSidecarEntry<Bible, Writer> | null {
+  if (coalesceWindowMs <= 0) return null;
   if (!previous || previous.kind !== "sidecar") return null;
   if (next.at - previous.at > coalesceWindowMs || next.at < previous.at) return null;
   // 합쳐도 `before` 는 사슬의 **첫** 값을 유지한다. 그래야 ⌘Z 한 번이 타이핑 묶음 전체를 되돌린다.
   if (next.target === "characterBible") {
     return previous.target === "characterBible" ? { ...next, before: previous.before } : null;
+  }
+  if (next.target === "animatic") {
+    return previous.target === "animatic" && previous.after.workScope === next.after.workScope
+      ? { ...next, before: previous.before } : null;
   }
   return previous.target === "writerRoom" ? { ...next, before: previous.before } : null;
 }
