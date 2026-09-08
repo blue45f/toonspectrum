@@ -111,7 +111,7 @@ describe("StudioFileControlCenter", () => {
 
     fireEvent.change(input, { target: { files: [file] } });
 
-    expect(await screen.findByText("episode.psd")).toBeTruthy();
+    expect((await screen.findAllByText("episode.psd")).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("가져오기 가능 · 손실 확인")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "PSD 가져오기 열기" }));
     expect(psd).toHaveBeenCalledTimes(1);
