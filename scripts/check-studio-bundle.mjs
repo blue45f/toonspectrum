@@ -4,6 +4,7 @@ import path from "node:path";
 import { gzipSync } from "node:zlib";
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
+import { isStudioCrdtRuntimeEntry } from "./lib/studio-crdt-bundle-boundary.mjs";
 
 const outputDirectory = path.resolve(process.env.STUDIO_BUNDLE_DIR ?? DIST_DIR);
 const manifestPath = path.join(outputDirectory, ".vite", "manifest.json");
@@ -548,10 +549,8 @@ if (!fs.existsSync(manifestPath)) {
       fail(`SVG/PSD engines returned to the Studio static graph: ${eagerDocumentEngines.join(", ")}`);
     }
 
-    const eagerCrdtRuntime = matchingEntries(
-      studioKeys,
-      /(?:studio-crdt-document|studio-crdt-room-binding|node_modules.*\/yjs\/)/,
-    );
+    const eagerCrdtRuntime = [...studioKeys].filter((key) =>
+      isStudioCrdtRuntimeEntry(key, manifest[key]));
     if (eagerCrdtRuntime.length > 0) {
       fail(`Yjs/CRDT runtime returned to the Studio static graph: ${eagerCrdtRuntime.join(", ")}`);
     }
