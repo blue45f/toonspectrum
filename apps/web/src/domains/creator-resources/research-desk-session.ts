@@ -92,7 +92,12 @@ function recordOf(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function cleanText(value: unknown, maximum: number): string {
+function boundedDraftText(value: unknown, maximum: number): string {
+  if (typeof value !== "string") return "";
+  return value.slice(0, maximum);
+}
+
+function cleanQueryText(value: unknown, maximum: number): string {
   if (typeof value !== "string") return "";
   return value.normalize("NFKC").trim().replace(/\s+/gu, " ").slice(0, maximum);
 }
@@ -136,7 +141,7 @@ export function sanitizeResearchDeskSession(value: unknown): ResearchDeskSession
   for (const row of rows) {
     const entry = recordOf(row);
     if (!isSearchMode(entry.mode)) continue;
-    const query = normalizeResearchQuery(cleanText(entry.query, 80));
+    const query = normalizeResearchQuery(cleanQueryText(entry.query, 80));
     const searchedAt = normalizeTimestamp(entry.searchedAt);
     if (!isResearchQueryValid(query) || !searchedAt) continue;
     const identity = `${entry.mode}:${query.toLocaleLowerCase("ko-KR")}`;
@@ -148,9 +153,9 @@ export function sanitizeResearchDeskSession(value: unknown): ResearchDeskSession
 
   return {
     version: SESSION_VERSION,
-    title: cleanText(input.title, TITLE_LIMIT),
-    question: cleanText(input.question, QUESTION_LIMIT),
-    context: cleanText(input.context, CONTEXT_LIMIT),
+    title: boundedDraftText(input.title, TITLE_LIMIT),
+    question: boundedDraftText(input.question, QUESTION_LIMIT),
+    context: boundedDraftText(input.context, CONTEXT_LIMIT),
     intent: isIntent(input.intent) ? input.intent : "scene",
     lastMode: isSearchMode(input.lastMode) ? input.lastMode : "assets",
     history,
@@ -204,9 +209,9 @@ export function clearResearchSearchHistory(session: ResearchDeskSession): Resear
 }
 
 export function isResearchDeskSessionEmpty(session: ResearchDeskSession): boolean {
-  return !session.title
-    && !session.question
-    && !session.context
+  return !session.title.trim()
+    && !session.question.trim()
+    && !session.context.trim()
     && !session.history.length
     && session.intent === "scene"
     && session.lastMode === "assets";
