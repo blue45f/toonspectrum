@@ -151,7 +151,7 @@ export function StudioDualColorWell({
             aria-keyshortcuts="Shift+C"
             data-studio-transparent-color-well="true"
             className={cn(
-              "grid size-6 shrink-0 place-items-center rounded-md border shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110 motion-reduce:transform-none",
+              "grid size-11 shrink-0 place-items-center rounded-md border shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110 motion-reduce:transform-none",
               STUDIO_FOCUS_RING,
               isTransparent
                 ? "ring-2 ring-accent ring-offset-1 ring-offset-panel border-transparent"
@@ -178,7 +178,7 @@ export function StudioDualColorWell({
             aria-keyshortcuts="X"
             data-studio-color-swap="true"
             className={cn(
-              "grid size-7 place-items-center rounded-lg border border-line/80 bg-card/80 text-fg-3",
+              "grid size-11 shrink-0 place-items-center rounded-lg border border-line/80 bg-card/80 text-fg-3",
               "hover:border-line-strong hover:bg-raised hover:text-fg",
               STUDIO_EASE,
               STUDIO_FOCUS_RING
