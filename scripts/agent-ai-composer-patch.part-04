@@ -1,0 +1,204 @@
+                      createdAt: requestProvenance.createdAt,
+                    })
+                    // The failed attempt belongs in the operation ledger. The reviewed image,
+                    // alternatives and approval remain authoritative until a replacement succeeds.
+                    : { ...item, imageError: imageResult.error }''',
+)
+
+# Editor host: canonical import, candidate persistence through relayout and truthful local provenance.
+replace_once(
+    "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+    'import { createStudioScenarioImageGenerationExecutors } from "./ai/studio-scenario-image-generation";',
+    '''import { createStudioScenarioImageGenerationExecutors } from "./ai/studio-scenario-image-generation";
+import type { StudioAiComicComposerHandoff } from "./ai/studio-ai-comic-composer-handoff";''',
+)
+replace_once(
+    "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+    '''    textAiProvenance: StudioTextAiProvenance;
+  } | null>(null);''',
+    '''    textAiProvenance: StudioTextAiProvenance | null;
+  } | null>(null);''',
+)
+replace_once(
+    "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+    '''  function relayoutScenarioDrafts(
+    items: ScenarioPreviewItem[],''',
+    '''  function onImportScenarioProductionPlan(handoff: StudioAiComicComposerHandoff) {
+    if (
+      collaborationAccessRef.current.locked
+      || scenarioBusy
+      || scenarioRegeneratingIndex !== null
+    ) return;
+    const existingFrames =
+      scenarioApplyTarget === "current-page"
+        ? elements.filter((element): element is FrameEl => element.type === "frame")
+        : [];
+    const { panels, nextCanvasH } = layoutScenarioPanels(
+      existingFrames,
+      CANVAS_W,
+      scenarioApplyTarget === "current-page" ? canvasH : 1080,
+      handoff.scenes
+    );
+    setScenarioStoryText(handoff.storyText);
+    setScenarioSceneCountHint(
+      handoff.totalCuts >= 2 && handoff.totalCuts <= 10 ? handoff.totalCuts : undefined
+    );
+    setScenarioError(null);
+    setScenarioProgress(null);
+    setScenarioStageLabel(null);
+    setScenarioResult({
+      items: panels.map((panel) => ({
+        ...panel,
+        preferredVariantCount: handoff.variants,
+      })),
+      nextCanvasH,
+      characterDescription: handoff.characterDescription,
+      // The handoff is a deterministic local transform of an existing plan, not a new model call.
+      textAiProvenance: null,
+    });
+  }
+
+  function relayoutScenarioDrafts(
+    items: ScenarioPreviewItem[],''',
+)
+replace_once(
+    "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+    '''      items: layout.panels.map((panel, index) => ({
+        ...panel,
+        ...(items[index]?.imageDataUrl ? { imageDataUrl: items[index].imageDataUrl } : {}),
+        ...(items[index]?.imageError ? { imageError: items[index].imageError } : {}),
+        ...(items[index]?.imageProvenance ? { imageProvenance: items[index].imageProvenance } : {}),
+      })),''',
+    '''      items: layout.panels.map((panel, index) => ({
+        ...panel,
+        ...(items[index]?.imageDataUrl ? { imageDataUrl: items[index].imageDataUrl } : {}),
+        ...(items[index]?.imageError ? { imageError: items[index].imageError } : {}),
+        ...(items[index]?.imageProvenance ? { imageProvenance: items[index].imageProvenance } : {}),
+        ...(items[index]?.imageCandidates ? { imageCandidates: items[index].imageCandidates } : {}),
+        ...(items[index]?.selectedImageCandidateId
+          ? { selectedImageCandidateId: items[index].selectedImageCandidateId }
+          : {}),
+        ...(items[index]?.approvedImageCandidateId
+          ? { approvedImageCandidateId: items[index].approvedImageCandidateId }
+          : {}),
+        ...(items[index]?.preferredVariantCount
+          ? { preferredVariantCount: items[index].preferredVariantCount }
+          : {}),
+      })),''',
+)
+replace_once(
+    "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+    '''    patch: {
+      beatType?: ScenarioBeatType;
+      summary?: string;
+      imagePrompt?: string;
+      dialogue?: string;
+      continuity?: ScenarioPreviewItem["continuity"];
+    }''',
+    '    patch: Partial<ScenarioPreviewItem>',
+)
+replace_once(
+    "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+    '''        const imagePromptChanged =
+          typeof patch.imagePrompt === "string" && patch.imagePrompt !== item.imagePrompt;
+        return {
+          ...item,
+          ...patch,
+          // 프롬프트와 더 이상 대응하지 않는 이미지를 조용히 유지하지 않는다.
+          ...(imagePromptChanged
+            ? { imageDataUrl: undefined, imageError: undefined, imageProvenance: undefined }
+            : {}),
+        };''',
+    '''        const generationInputChanged =
+          (typeof patch.imagePrompt === "string" && patch.imagePrompt !== item.imagePrompt)
+          || ("continuity" in patch && patch.continuity !== item.continuity);
+        return {
+          ...item,
+          ...patch,
+          // 현재 입력과 대응하지 않는 이미지는 작업 이미지에서 내리되 후보 이력은 보존한다.
+          ...(generationInputChanged
+            ? { imageDataUrl: undefined, imageError: undefined, imageProvenance: undefined }
+            : {}),
+        };''',
+)
+replace_once(
+    "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+    '''          ...(item.continuity ? { continuity: item.continuity } : {}),
+          textAiProvenance: scenarioResult.textAiProvenance,
+        },''',
+    '''          ...(item.continuity ? { continuity: item.continuity } : {}),
+          ...(scenarioResult.textAiProvenance
+            ? { textAiProvenance: scenarioResult.textAiProvenance }
+            : {}),
+        },''',
+)
+replace_once(
+    "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx",
+    '''    onGenerateScenario,
+    onGenerateScenarioImages,
+    onRegenerateScenarioImage,''',
+    '''    onGenerateScenario,
+    onGenerateScenarioImages,
+    onImportScenarioProductionPlan,
+    onRegenerateScenarioImage,''',
+)
+
+# Production boundary test now asserts the complete editable handoff rather than the old prompt detour.
+replace_once(
+    "apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts",
+    '''    expect(popover).toContain(
+      "<StudioAiEpisodeProductionGateway onApplyPrompt={applyEpisodeBatchPrompt} />"
+    );''',
+    '''    expect(popover).toContain(
+      "<StudioAiEpisodeProductionGateway onApplyPlan={applyEpisodeProductionPlan} />"
+    );''',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts",
+    '''  it("hands approved prompts back to the existing non-destructive AI tool flow", () => {
+    expect(popover).toContain('setAiAssistTool("composition")');
+    expect(popover).toContain("setAiCompositionDraft(trimmed)");
+    expect(popover).toContain("pushStudioAiRecentPrompt");
+    expect(popover).toContain('setMenu("aiAssist")');
+  });''',
+    '''  it("hands the complete approved episode into the editable scenario production flow", () => {
+    expect(popover).toContain("createStudioAiComicComposerHandoff(plan)");
+    expect(popover).toContain("requestStudioAiComicComposerOpen(handoff)");
+    expect(popover).toContain("handoff.totalCuts");
+    expect(popover).not.toContain("applyEpisodeBatchPrompt");
+  });''',
+)
+
+# Direct modal contract coverage for the new full-plan path; legacy prompt coverage remains intact.
+replace_once(
+    "apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.test.tsx",
+    '''  it("copies the deterministic production manifest with truthful feedback", async () => {''',
+    '''  it("hands the complete deterministic plan to the editable comic composer", () => {
+    const onApplyPlan = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <StudioAiEpisodeProductionModal
+        open
+        onClose={onClose}
+        onApplyPlan={onApplyPlan}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "편집 가능한 컷 제작으로 넘기기" }));
+
+    expect(onApplyPlan).toHaveBeenCalledTimes(1);
+    expect(onApplyPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        version: 1,
+        totalCuts: expect.any(Number),
+        scenes: expect.any(Array),
+        batches: expect.any(Array),
+      })
+    );
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("copies the deterministic production manifest with truthful feedback", async () => {''',
+)
+
+print("AI comic composer patch applied successfully")

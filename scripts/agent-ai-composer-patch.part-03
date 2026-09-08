@@ -1,0 +1,210 @@
+    });
+  };
+  const approveCandidate = (index: number, candidateId: string) => {
+    const item = preview?.[index];
+    if (!item || editingLocked) return;
+    const next = approveScenarioImageCandidate(item, candidateId);
+    onChangeScene(index, {
+      imageCandidates: next.imageCandidates,
+      selectedImageCandidateId: next.selectedImageCandidateId,
+      approvedImageCandidateId: next.approvedImageCandidateId,
+      imageDataUrl: next.imageDataUrl,
+      imageProvenance: next.imageProvenance,
+      imageError: next.imageError,
+    });
+  };
+
+  const modal = (''',
+)
+replace_once(
+    "apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.tsx",
+    '              <div className="grid gap-2 md:grid-cols-2">',
+    '''              <StudioScenarioCandidateDesk
+                items={preview!}
+                referenceSignature={referenceSignature}
+                busy={editingLocked}
+                imageGenerationReady={imageGenerationReady}
+                disabledReason={imageGenerationDisabledReason}
+                onGenerate={onGenerateImages}
+                onSelectCandidate={selectCandidate}
+                onApproveCandidate={approveCandidate}
+              />
+              <div className="grid gap-2 md:grid-cols-2">''',
+)
+# React click events must not be forwarded as a generation request object.
+replace_once(
+    "apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.tsx",
+    'onClick={onGenerateImages}',
+    'onClick={() => onGenerateImages()}',
+)
+
+# Image executor: selected-cut planning, additive candidates, stale fingerprints and failure preservation.
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    'import { captureStudioAiGeneratedAssetProvenance } from "./studio-ai-generated-asset-model";',
+    '''import {
+  appendScenarioImageCandidate,
+  planStudioScenarioImageGeneration,
+  scenarioImageInputFingerprint,
+  scenarioImageReferenceSignature,
+  type StudioScenarioImageGenerationRequest,
+} from "./studio-scenario-candidate-workflow";
+import { captureStudioAiGeneratedAssetProvenance } from "./studio-ai-generated-asset-model";''',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    '  textAiProvenance: StudioTextAiProvenance;\n}',
+    '  textAiProvenance: StudioTextAiProvenance | null;\n}',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    '  readonly executeGenerateScenarioImages: () => Promise<void>;',
+    '  readonly executeGenerateScenarioImages: (request?: StudioScenarioImageGenerationRequest) => Promise<void>;',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    '  async function executeGenerateScenarioImages() {',
+    '  async function executeGenerateScenarioImages(request: StudioScenarioImageGenerationRequest = {}) {',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    '''    const targetIndexes = snapshot.items.flatMap((item, index) => (item.imageDataUrl ? [] : [index]));
+    if (targetIndexes.length === 0) return;
+
+    scenarioCancelRef.current = false;''',
+    '''    const tasks = planStudioScenarioImageGeneration(snapshot.items, request);
+    if (tasks.length === 0) return;
+    const referenceSignature = scenarioImageReferenceSignature(
+      scenarioImageReferenceDocument.references
+    );
+
+    scenarioCancelRef.current = false;''',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    '    setScenarioProgress({ done: 0, total: targetIndexes.length });',
+    '    setScenarioProgress({ done: 0, total: tasks.length });',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    '''      for (let taskIndex = 0; taskIndex < targetIndexes.length; taskIndex++) {
+        if (scenarioCancelRef.current || controller.signal.aborted) break;
+        const index = targetIndexes[taskIndex];
+        const panel = snapshot.items[index];''',
+    '''      for (let taskIndex = 0; taskIndex < tasks.length; taskIndex++) {
+        if (scenarioCancelRef.current || controller.signal.aborted) break;
+        const task = tasks[taskIndex];
+        const index = task.index;
+        const panel = snapshot.items[index];''',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    '''          panel.imagePrompt,
+        ]
+          .filter((value) => value.trim().length > 0)''',
+    '''          panel.imagePrompt,
+          task.variantCount > 1
+            ? `[후보 ${task.variant}/${task.variantCount}] 같은 연출 요구를 유지하되 표정·실루엣·카메라 미세 선택지를 달리합니다.`
+            : "",
+        ]
+          .filter((value) => value.trim().length > 0)''',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    '''        if (imageResult.ok) {
+          const dataUrl = imageResult.data.dataUrl;
+          referenceImageDataUrl ??= dataUrl;
+          setScenarioResult((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  items: previous.items.map((item, itemIndex) =>
+                    itemIndex === index
+                      ? { ...item, imageDataUrl: dataUrl, imageError: undefined, imageProvenance: requestProvenance }
+                      : item
+                  ),
+                }
+              : previous
+          );
+        } else {
+          setScenarioResult((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  items: previous.items.map((item, itemIndex) =>
+                    itemIndex === index
+                      ? { ...item, imageDataUrl: undefined, imageError: imageResult.error, imageProvenance: undefined }
+                      : item
+                  ),
+                }
+              : previous
+          );
+        }
+        setScenarioProgress({ done: taskIndex + 1, total: targetIndexes.length });''',
+    '''        if (imageResult.ok) {
+          const dataUrl = imageResult.data.dataUrl;
+          referenceImageDataUrl ??= dataUrl;
+          setScenarioResult((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  items: previous.items.map((item, itemIndex) =>
+                    itemIndex === index
+                      ? appendScenarioImageCandidate(item, {
+                          id: operationId,
+                          imageDataUrl: dataUrl,
+                          imageProvenance: requestProvenance,
+                          inputFingerprint: scenarioImageInputFingerprint(
+                            panel,
+                            referenceSignature
+                          ),
+                          createdAt: requestProvenance.createdAt,
+                        })
+                      : item
+                  ),
+                }
+              : previous
+          );
+        } else {
+          setScenarioResult((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  items: previous.items.map((item, itemIndex) =>
+                    itemIndex === index ? { ...item, imageError: imageResult.error } : item
+                  ),
+                }
+              : previous
+          );
+        }
+        setScenarioProgress({ done: taskIndex + 1, total: tasks.length });''',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    '''    const controller = beginScenarioRequest();
+    setScenarioRegeneratingIndex(index);''',
+    '''    const referenceSignature = scenarioImageReferenceSignature(
+      scenarioImageReferenceDocument.references
+    );
+    const controller = beginScenarioRequest();
+    setScenarioRegeneratingIndex(index);''',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts",
+    '''                  ? {
+                        ...item,
+                        imageDataUrl: imageResult.data.dataUrl,
+                        imageError: undefined,
+                        imageProvenance: requestProvenance,
+                      }
+                    // The failed attempt belongs in the operation ledger. The reviewed image
+                    // and its provenance remain authoritative until a replacement succeeds.
+                    : { ...item, imageError: imageResult.error }''',
+    '''                  ? appendScenarioImageCandidate(item, {
+                      id: operationId,
+                      imageDataUrl: imageResult.data.dataUrl,
+                      imageProvenance: requestProvenance,
+                      inputFingerprint: scenarioImageInputFingerprint(
+                        panel,
+                        referenceSignature
+                      ),

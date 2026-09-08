@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def read(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def write(path: str, text: str) -> None:
+    target = ROOT / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    print(f"write {path}")
+
+
+def replace_once(path: str, old: str, new: str) -> None:
+    text = read(path)
+    count = text.count(old)
+    if count != 1:
+        raise RuntimeError(f"{path}: expected one exact match, found {count}: {old[:120]!r}")
+    write(path, text.replace(old, new, 1))
+
+
+def replace_all(path: str, old: str, new: str, expected: int) -> None:
+    text = read(path)
+    count = text.count(old)
+    if count != expected:
+        raise RuntimeError(f"{path}: expected {expected} exact matches, found {count}: {old[:120]!r}")
+    write(path, text.replace(old, new))
+
+
+def regex_once(path: str, pattern: str, replacement: str, flags: int = 0) -> None:
+    text = read(path)
+    next_text, count = re.subn(pattern, replacement, text, count=1, flags=flags)
+    if count != 1:
+        raise RuntimeError(f"{path}: expected one regex match, found {count}: {pattern[:120]!r}")
+    write(path, next_text)
+
+# Scenario document model: reviewed candidates, explicit selection/approval and preferred variant count.
+replace_once(
+    "apps/web/src/domains/creator/studio-scenario-layout.ts",
+    'export type ScenarioPanelAspect = "square" | "portrait" | "landscape";\n\nexport function scenarioPanelAspect',
+    '''export type ScenarioPanelAspect = "square" | "portrait" | "landscape";
+export type ScenarioImageVariantCount = 1 | 2 | 4;
+
+export interface ScenarioImageCandidate {
+  id: string;
+  imageDataUrl: string;
+  imageProvenance?: StudioPublishAiProvenance;
+  inputFingerprint: string;
+  createdAt: string;
+}
+
+export function scenarioPanelAspect''',
+)
+replace_once(
+    "apps/web/src/domains/creator/studio-scenario-layout.ts",
+    '''export interface ScenarioPreviewItem extends ScenarioPanelSeed {
+  imageDataUrl?: string;
+  imageError?: string;
+  imageProvenance?: StudioPublishAiProvenance;
+}''',
+    '''export interface ScenarioPreviewItem extends ScenarioPanelSeed {
+  imageDataUrl?: string;
+  imageError?: string;
+  imageProvenance?: StudioPublishAiProvenance;
+  imageCandidates?: ScenarioImageCandidate[];
+  selectedImageCandidateId?: string;
+  approvedImageCandidateId?: string;
+  preferredVariantCount?: ScenarioImageVariantCount;
+}''',
+)
+
+# Episode preflight can now hand the complete deterministic production plan to the comic composer.
+replace_once(
+    "apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx",
+    '''  type StudioAiEpisodeContinuityLocks,
+  type StudioAiEpisodeIssueSeverity,
+  type StudioAiProductionMode,''',
+    '''  type StudioAiEpisodeContinuityLocks,
+  type StudioAiEpisodeIssueSeverity,
+  type StudioAiEpisodeProductionPlan,
+  type StudioAiProductionMode,''',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx",
+    '''export interface StudioAiEpisodeProductionModalProps {
+  readonly open: boolean;
+  readonly onClose: () => void;
+  readonly onApplyPrompt?: (prompt: string) => void;
+}''',
+    '''export interface StudioAiEpisodeProductionModalProps {
+  readonly open: boolean;
+  readonly onClose: () => void;
+  readonly onApplyPlan?: (plan: StudioAiEpisodeProductionPlan) => void;
+  /** Legacy prompt handoff retained for callers that only own a single image tool. */
+  readonly onApplyPrompt?: (prompt: string) => void;
+}''',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx",
+    '''export function StudioAiEpisodeProductionModal({
+  open,
+  onClose,
+  onApplyPrompt,
+}: StudioAiEpisodeProductionModalProps): ReactElement | null {''',
+    '''export function StudioAiEpisodeProductionModal({
+  open,
+  onClose,
+  onApplyPlan,
+  onApplyPrompt,
+}: StudioAiEpisodeProductionModalProps): ReactElement | null {''',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx",
+    '  const canApply = Boolean(onApplyPrompt && firstBatchPrompt && !hasBlocker);',
+    '  const canApply = Boolean((onApplyPlan || onApplyPrompt) && firstBatchPrompt && !hasBlocker);',
+)
+replace_once(
+    "apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx",
+    '''              {onApplyPrompt ? (
+                <button
+                  type="button"
+                  disabled={!canApply}
+                  onClick={() => {
+                    if (!canApply) return;
+                    onApplyPrompt(firstBatchPrompt);
+                    onClose();
+                  }}
+                  className={cn(
+                    "col-span-2 inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-black text-on-accent hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45 sm:col-span-1",
+                    STUDIO_EASE,
+                    STUDIO_FOCUS_RING,
+                    STUDIO_TOUCH_TARGET
+                  )}
+                >
+                  <WandSparkles size={14} aria-hidden />
+                  첫 배치를 구도 도구에 적용
+                </button>
+              ) : null}''',
+    '''              {onApplyPlan || onApplyPrompt ? (
+                <button
+                  type="button"
+                  disabled={!canApply}
+                  onClick={() => {
+                    if (!canApply) return;
+                    if (onApplyPlan) onApplyPlan(plan);
+                    else onApplyPrompt?.(firstBatchPrompt);
+                    onClose();
+                  }}
+                  className={cn(
+                    "col-span-2 inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-black text-on-accent hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45 sm:col-span-1",
+                    STUDIO_EASE,
+                    STUDIO_FOCUS_RING,
+                    STUDIO_TOUCH_TARGET
+                  )}
+                >
+                  <WandSparkles size={14} aria-hidden />
+                  {onApplyPlan ? "편집 가능한 컷 제작으로 넘기기" : "첫 배치를 구도 도구에 적용"}
+                </button>
+              ) : null}''',
+)
+
+# Keep the lazy/intent boundary while supporting full-plan and legacy prompt consumers.
+write(
+    "apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.tsx",
+    '''import { Suspense, useEffect, useState } from "react";
+
+import { subscribeStudioAiEpisodeProductionOpenRequest } from "./studio-ai-episode-production-intent";
+import { studioAiEpisodeProductionModalLoader } from "./studio-ai-episode-production-loader";
+
+import type { StudioAiEpisodeProductionPlan } from "./studio-ai-episode-production-director";
+
+import { lazyRetry } from "@/shared/lib/lazy-retry";
+
+const StudioAiEpisodeProductionModal = lazyRetry(
+  studioAiEpisodeProductionModalLoader.load,
+  "StudioAiEpisodeProductionModal",
+);
+
+export interface StudioAiEpisodeProductionGatewayProps {
+  readonly onApplyPlan?: (plan: StudioAiEpisodeProductionPlan) => void;
+  readonly onApplyPrompt?: (prompt: string) => void;
+}
+
+/** Own only the optional dialog lifetime, never the host's menu or image-tool state. */
+export function StudioAiEpisodeProductionGateway({
+  onApplyPlan,
+  onApplyPrompt,
+}: StudioAiEpisodeProductionGatewayProps) {
+  const [open, setOpen] = useState(false);
+  // Subscribe also consumes pre-mount requests, and stays intact through StrictMode's replay.
+  useEffect(() => subscribeStudioAiEpisodeProductionOpenRequest(() => setOpen(true)), []);
+  const applyPlan = (plan: StudioAiEpisodeProductionPlan) => {
+    onApplyPlan?.(plan);
+    setOpen(false);
+  };
+  const applyPrompt = (prompt: string) => {
+    onApplyPrompt?.(prompt);
+    setOpen(false);
+  };
+  if (!open) return null;
+  return (
+    <Suspense fallback={null}>
+      <StudioAiEpisodeProductionModal
