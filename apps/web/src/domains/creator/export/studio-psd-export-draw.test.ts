@@ -108,6 +108,28 @@ describe("PSD custom draw node capture", () => {
     for (const { capture } of strokes) expect(capture).toHaveBeenCalledTimes(1);
   });
 
+  it("captures custom draw pixels when stroke padding disguises zero geometry bounds", async () => {
+    const { node, capture, element } = addDraw("stroke-padding");
+    node.getChildren()[0]!.setAttrs({ stroke: "#4936e8", strokeWidth: 12 });
+    expect(node.getClientRect()).toEqual({ x: -6, y: -6, width: 12, height: 12 });
+    expect(node.getClientRect({ skipStroke: true, skipShadow: true }))
+      .toEqual({ x: 0, y: 0, width: 0, height: 0 });
+    capture.mockImplementation((options = {}) => pixelCanvas(
+      options.width ?? 1, options.height ?? 1, 80, 102, [{ x: 24, y: 36 }],
+    ).canvas);
+    const result = await exportPagePsd(stage, [{ ...element, opacity: 0.4 }], 32, 48, 1, {
+      includeBackground: false,
+    });
+    const psd = readPsd(await result.blob.arrayBuffer(), {
+      useImageData: true, skipCompositeImageData: true,
+    });
+    expect(psd.children).toHaveLength(1);
+    const child = psd.children![0]!;
+    expect([child.left, child.top, child.right, child.bottom]).toEqual([24, 36, 25, 37]);
+    expect(child.imageData?.data).toEqual(new Uint8ClampedArray([80, 50, 80, 102]));
+    expect(child.opacity).toBe(1);
+  });
+
   it("captures document pixels at the output scale and restores the exact view", async () => {
     stage.position({ x: -13, y: 17 });
     stage.scale({ x: -0.37, y: 0.37 });

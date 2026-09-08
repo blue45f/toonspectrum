@@ -1235,10 +1235,13 @@ export async function exportPagePsd(
 
     // 뷰(화면 줌 반영) 공간 사각형 — toCanvas() 캡처 좌표계와 동일해야 한다.
     const rawAbs = node.getClientRect();
-    // Custom sceneFunc strokes paint pixels without declaring Shape width/height. Konva reports
-    // zero bounds for their Group, but stage PNG capture still paints them. Capture that same
-    // node over the explicit document rectangle, without guessing brush/effect bounds.
-    const documentCapture = el.type === "draw" && (rawAbs.width < 1 || rawAbs.height < 1);
+    // Custom sceneFuncs can have zero geometry even when Konva adds a nonzero stroke/shadow
+    // box around the origin. Those decorative bounds do not enclose their painted pixels.
+    // Detect the unstyled geometry, then capture the same node over the document and trim RGBA.
+    const drawGeometry = el.type === "draw"
+      ? node.getClientRect({ skipStroke: true, skipShadow: true })
+      : null;
+    const documentCapture = drawGeometry !== null && (drawGeometry.width < 1 || drawGeometry.height < 1);
     // 문서(줌·팬 무관) 공간 사각형 — PSD left/top 좌표계.
     const rawDoc = documentCapture
       ? { x: 0, y: 0, width: canvasW, height: canvasH }
