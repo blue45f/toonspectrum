@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, matchesGlob } from "node:path";
 
 import { describe, expect, it } from "vitest";
 import { parseCLI } from "vitest/node";
@@ -38,7 +38,11 @@ const HEADED_PARITY_COMMAND =
   'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console';
 
 describe("database integration runner CI policy", () => {
-  it.each(["ci.yml", "bg3d-runtime-regression.yml", "studio-ink-live-commit.yml"])(
+  it.each([
+    "ci.yml", "bg3d-runtime-regression.yml", "studio-ink-live-commit.yml",
+    "studio-production-integrity.yml", "character-merge-validation.yml",
+    "studio-finishing-quality.yml",
+  ])(
     "runs %s for both main and the active integration branch",
     (filename) => {
       const workflow = readYaml(`.github/workflows/${filename}`);
@@ -49,6 +53,30 @@ describe("database integration runner CI policy", () => {
       }
     },
   );
+
+  it.each([
+    "studio-production-integrity.yml", "character-merge-validation.yml",
+    "studio-finishing-quality.yml",
+  ])("reruns %s when shared bundle validation changes", (filename) => {
+    const workflow = readYaml(`.github/workflows/${filename}`);
+    // The CRDT classifier repair changed only tooling, so these failed lanes previously never
+    // reran. Evaluate the event filters against real repair/dependency paths on both event types.
+    for (const event of ["pull_request", "push"]) {
+      const paths = workflow.on[event].paths;
+      for (const changedFile of [
+        "scripts/check-studio-bundle.mjs",
+        "scripts/lib/studio-crdt-bundle-boundary.mjs",
+        "scripts/lib/studio-crdt-bundle-boundary.test.mjs",
+        "scripts/lib/repo-paths.mjs",
+        "scripts/integration-test-runner-ci-policy.test.mjs",
+        "vite.config.ts", "package.json", "pnpm-lock.yaml",
+      ]) {
+        expect(paths.some((pattern) => matchesGlob(changedFile, pattern)),
+          `${filename} ${event} misses ${changedFile}`).toBe(true);
+      }
+      expect(paths.some((pattern) => matchesGlob("README.md", pattern))).toBe(false);
+    }
+  });
 
   it("keeps the package entrypoints bound to the reviewed integration runners", () => {
     const packageManifest = readJson("package.json");
