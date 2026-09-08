@@ -2,11 +2,11 @@
 export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
   "/now": "오늘의 영감",
   "/research": "창작 리서치 데스크",
-  "/research/assets": "창작 레퍼런스",
+  "/research/assets": "창작 레퍼런스 아틀라스",
   "/research/books": "글로벌 만화·도서 판본 탐색",
   "/creator-hub": "창작 허브",
   "/opportunities": "작가 기회센터",
-  "/creator-hub/references": "창작 레퍼런스",
+  "/creator-hub/references": "창작 레퍼런스 아틀라스",
   "/learn/recipes": "웹툰 제작 레시피",
   "/story-lab": "스토리 연구실",
   "/discover/works": "만화·작법서 탐색",

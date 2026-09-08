@@ -1,7 +1,8 @@
 import { Loader2 } from "lucide-react";
-import { Suspense, memo, useMemo } from "react";
+import { Suspense, memo, useEffect, useMemo } from "react";
 
 import { isStudioAiConfigured } from "./ai/studio-ai-client";
+import { subscribeStudioAiComicComposerOpenRequest } from "./ai/studio-ai-comic-composer-intent";
 import { StudioBg3dRetainedOwnerRouteBridge } from "./bg3d/StudioBg3dRetainedOwnerRouteBridge";
 import {
   StudioBackground3D,
@@ -138,6 +139,7 @@ type StudioScrollScenarioPreviewPanelStackHandlers = Pick<
   | "onDiscardScenarioPreview"
   | "onGenerateScenario"
   | "onGenerateScenarioImages"
+  | "onImportScenarioProductionPlan"
   | "onRegenerateScenarioImage"
   | "onRemoveScenarioScene"
   | "onScenarioApplyTargetChange"
@@ -620,11 +622,30 @@ export const StudioScrollScenarioPreviewPanelStack = memo(function StudioScrollS
     onDiscardScenarioPreview,
     onGenerateScenario,
     onGenerateScenarioImages,
+    onImportScenarioProductionPlan,
     onRegenerateScenarioImage,
     onRemoveScenarioScene,
     onScenarioApplyTargetChange,
     setCurrentPageId,
   } = stableHandlers;
+
+  useEffect(
+    () =>
+      subscribeStudioAiComicComposerOpenRequest((handoff) => {
+        setScenarioStoryText(handoff.storyText);
+        setScenarioSceneCountHint(
+          handoff.totalCuts >= 2 && handoff.totalCuts <= 10 ? handoff.totalCuts : undefined
+        );
+        onImportScenarioProductionPlan(handoff);
+        setScenarioOpen(true);
+      }),
+    [
+      onImportScenarioProductionPlan,
+      setScenarioOpen,
+      setScenarioSceneCountHint,
+      setScenarioStoryText,
+    ]
+  );
 
   return (
     <>

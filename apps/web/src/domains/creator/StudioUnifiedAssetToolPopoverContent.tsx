@@ -20,6 +20,7 @@ import {
   buildStudioUnifiedAssetCatalog,
   type StudioUnifiedAssetItem,
 } from "./studio-unified-asset-catalog";
+import { StudioUnifiedAssetSmartLibrary } from "./StudioUnifiedAssetSmartLibrary";
 import { StudioUnifiedAssetWorkspace } from "./StudioUnifiedAssetWorkspace";
 
 import type { StudioMenu } from "./studio-editor-tool-model";
@@ -144,6 +145,8 @@ export function StudioUnifiedAssetToolPopoverContent({
         }
       : item,
   );
+  const initialView =
+    toolBelt.assetTab === "community" ? "library" : "discover";
 
   return (
     <>
@@ -161,23 +164,29 @@ export function StudioUnifiedAssetToolPopoverContent({
         }}
         items={ASSET_MENU_ITEMS}
       />
-      <StudioUnifiedAssetWorkspace
-        initialView={
-          toolBelt.assetTab === "community" ? "library" : "discover"
-        }
+      <StudioUnifiedAssetSmartLibrary
         items={items}
-        legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
+        defaultCollapsed={initialView === "library"}
         onUseItem={(item) => routeUnifiedAsset(item, toolBelt)}
-        onOpenAi={(prompt) => {
-          if (prompt) {
-            toolBelt.stableHandlers.applyAiAssistPresetPrompt(
-              "background",
-              prompt,
-            );
-          }
-          toolBelt.setMenu("aiAssist");
-        }}
-      />
+      >
+        {({ items: visibleItems, onUseItem }) => (
+          <StudioUnifiedAssetWorkspace
+            initialView={initialView}
+            items={visibleItems}
+            legacyContent={<StudioAssetLegacyPanel toolBelt={toolBelt} />}
+            onUseItem={onUseItem}
+            onOpenAi={(prompt) => {
+              if (prompt) {
+                toolBelt.stableHandlers.applyAiAssistPresetPrompt(
+                  "background",
+                  prompt,
+                );
+              }
+              toolBelt.setMenu("aiAssist");
+            }}
+          />
+        )}
+      </StudioUnifiedAssetSmartLibrary>
     </>
   );
 }
