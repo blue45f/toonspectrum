@@ -34,30 +34,18 @@ export type StudioInsertHubCategory =
   | "media"
   | "3d"
   | "mine";
-
 export type StudioInsertHubCollection = "all" | "favorites" | "recent";
 export type StudioInsertPlacementMode = "auto" | "page" | "selection";
 export type StudioInsertPlacementSupport = "none" | "image";
+export type StudioInsertHubIcon = StudioInsertActionId;
 
-export type StudioInsertHubIcon =
-  | "text"
-  | "bubble"
-  | "upload"
-  | "stock"
-  | "template"
-  | "collage"
-  | "elements"
-  | "scene"
-  | "clip"
-  | "sticker"
-  | "emeres"
-  | "background3d"
-  | "ai";
+type InsertCategory = Exclude<StudioInsertHubCategory, "all">;
+type ActionCategory = Exclude<StudioInsertHubCategory, "all" | "mine">;
 
 export interface StudioInsertHubActionDefinition {
   readonly id: `action:${StudioInsertActionId}`;
   readonly actionId: StudioInsertActionId;
-  readonly category: Exclude<StudioInsertHubCategory, "all" | "mine">;
+  readonly category: ActionCategory;
   readonly title: string;
   readonly description: string;
   readonly keywords: readonly string[];
@@ -71,7 +59,7 @@ export interface StudioInsertHubEntryBase {
   readonly id: string;
   readonly title: string;
   readonly description: string;
-  readonly category: Exclude<StudioInsertHubCategory, "all">;
+  readonly category: InsertCategory;
   readonly categoryLabel: string;
   readonly keywords: readonly string[];
   readonly badges: readonly string[];
@@ -473,10 +461,10 @@ export function toggleStudioInsertFavorite(
   if (!id) return normalized;
   const favoriteIds = normalized.favoriteIds.includes(id)
     ? normalized.favoriteIds.filter((candidate) => candidate !== id)
-    : [
-        id,
-        ...normalized.favoriteIds.filter((candidate) => candidate !== id),
-      ].slice(0, STUDIO_INSERT_HUB_MAX_FAVORITES);
+    : [id, ...normalized.favoriteIds.filter((candidate) => candidate !== id)].slice(
+        0,
+        STUDIO_INSERT_HUB_MAX_FAVORITES,
+      );
   return Object.freeze({
     ...normalized,
     favoriteIds: Object.freeze(favoriteIds),
@@ -494,18 +482,17 @@ export function recordStudioInsertRecent(
     id,
     ...normalized.recentIds.filter((candidate) => candidate !== id),
   ].slice(0, STUDIO_INSERT_HUB_MAX_RECENTS);
-  return Object.freeze({
-    ...normalized,
-    recentIds: Object.freeze(recentIds),
-  });
+  return Object.freeze({ ...normalized, recentIds: Object.freeze(recentIds) });
 }
 
 export function setStudioInsertPlacementMode(
   preferences: StudioInsertHubPreferences,
   placementMode: StudioInsertPlacementMode,
 ): StudioInsertHubPreferences {
-  const normalized = normalizeStudioInsertHubPreferences(preferences);
-  return Object.freeze({ ...normalized, placementMode });
+  return Object.freeze({
+    ...normalizeStudioInsertHubPreferences(preferences),
+    placementMode,
+  });
 }
 
 export function reconcileStudioInsertHubPreferences(
@@ -528,9 +515,7 @@ export function reconcileStudioInsertHubPreferences(
   });
 }
 
-function insertCategoryForAsset(
-  item: StudioUnifiedAssetItem,
-): Exclude<StudioInsertHubCategory, "all"> {
+function insertCategoryForAsset(item: StudioUnifiedAssetItem): InsertCategory {
   if (item.category === "scene") return "scene";
   if (item.category === "element") return "element";
   if (item.category === "3d") return "3d";
@@ -581,7 +566,7 @@ export function buildStudioInsertHubEntries(
 export function countStudioInsertHubEntries(
   entries: readonly StudioInsertHubEntry[],
 ): StudioInsertHubCounts {
-  const counts: StudioInsertHubCounts = {
+  const counts = {
     all: entries.length,
     quick: 0,
     scene: 0,
@@ -589,9 +574,9 @@ export function countStudioInsertHubEntries(
     media: 0,
     "3d": 0,
     mine: 0,
-  };
+  } satisfies Record<StudioInsertHubCategory, number>;
   for (const entry of entries) counts[entry.category] += 1;
-  return counts;
+  return Object.freeze(counts);
 }
 
 function normalizeSearchValue(value: string): string {
