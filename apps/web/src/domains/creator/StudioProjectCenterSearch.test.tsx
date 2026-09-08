@@ -7,6 +7,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -90,6 +91,13 @@ function Fixture({
   );
 }
 
+function ClosingFixture() {
+  const [open, setOpen] = useState(true);
+  return open
+    ? <Fixture onBackup={() => setOpen(false)} />
+    : <p>프로젝트 센터 닫힘</p>;
+}
+
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
@@ -166,7 +174,7 @@ describe("StudioProjectCenterSearch", () => {
     });
   });
 
-  it("supports synonym search, keyboard execution and recent history", async () => {
+  it("supports synonym search, IME-safe keyboard execution and recent history", async () => {
     const onBackup = vi.fn();
     render(<Fixture onBackup={onBackup} />);
     const search = screen.getByRole("searchbox", {
@@ -177,13 +185,13 @@ describe("StudioProjectCenterSearch", () => {
     await waitFor(() => {
       expect(findResultAction("아카이브 백업")).toBeDefined();
     });
-    fireEvent.keyDown(search, { key: "Enter" });
+    fireEvent.keyDown(search, { key: "Enter", isComposing: true });
+    expect(onBackup).not.toHaveBeenCalled();
 
+    fireEvent.keyDown(search, { key: "Enter" });
     expect(onBackup).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
-      expect(JSON.parse(window.localStorage.getItem(RECENT_STORAGE_KEY) ?? "[]"))
-        .toHaveLength(1);
-    });
+    expect(JSON.parse(window.localStorage.getItem(RECENT_STORAGE_KEY) ?? "[]"))
+      .toHaveLength(1);
 
     fireEvent.change(search, { target: { value: "" } });
     const recent = document.querySelector<HTMLButtonElement>(
@@ -194,6 +202,23 @@ describe("StudioProjectCenterSearch", () => {
     await waitFor(() => {
       expect(findResultAction("아카이브 백업")).toBeDefined();
     });
+  });
+
+  it("persists recent history before a delegated command closes the center", async () => {
+    render(<ClosingFixture />);
+    const search = screen.getByRole("searchbox", {
+      name: "프로젝트 센터 도구 검색",
+    }) as HTMLInputElement;
+
+    fireEvent.change(search, { target: { value: "archive" } });
+    await waitFor(() => {
+      expect(findResultAction("아카이브 백업")).toBeDefined();
+    });
+    fireEvent.keyDown(search, { key: "Enter" });
+
+    await screen.findByText("프로젝트 센터 닫힘");
+    expect(JSON.parse(window.localStorage.getItem(RECENT_STORAGE_KEY) ?? "[]"))
+      .toHaveLength(1);
   });
 
   it("uses the physical P key for macOS Option+P favorites", async () => {
@@ -207,15 +232,20 @@ describe("StudioProjectCenterSearch", () => {
       expect(findResultAction("아카이브 백업")).toBeDefined();
     });
     fireEvent.keyDown(search, {
+      key: "p",
+      code: "KeyP",
+      altKey: true,
+      ctrlKey: true,
+    });
+    expect(window.localStorage.getItem(FAVORITE_STORAGE_KEY)).toBeNull();
+
+    fireEvent.keyDown(search, {
       key: "π",
       code: "KeyP",
       altKey: true,
     });
-
-    await waitFor(() => {
-      expect(JSON.parse(window.localStorage.getItem(FAVORITE_STORAGE_KEY) ?? "[]"))
-        .toHaveLength(1);
-    });
+    expect(JSON.parse(window.localStorage.getItem(FAVORITE_STORAGE_KEY) ?? "[]"))
+      .toHaveLength(1);
   });
 
   it("persists favorites and exposes them as a dedicated view", async () => {
@@ -230,10 +260,8 @@ describe("StudioProjectCenterSearch", () => {
     });
     fireEvent.click(favorite);
 
-    await waitFor(() => {
-      expect(JSON.parse(window.localStorage.getItem(FAVORITE_STORAGE_KEY) ?? "[]"))
-        .toHaveLength(1);
-    });
+    expect(JSON.parse(window.localStorage.getItem(FAVORITE_STORAGE_KEY) ?? "[]"))
+      .toHaveLength(1);
 
     fireEvent.change(search, { target: { value: "" } });
     const favorites = document.querySelector<HTMLButtonElement>(
