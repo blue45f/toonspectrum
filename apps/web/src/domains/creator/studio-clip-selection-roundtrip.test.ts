@@ -155,6 +155,43 @@ describe("selection projection keeps strict JSON storage", () => {
     expect(getter).not.toHaveBeenCalled();
   });
 
+  it.each(["nested", "elements"] as const)("rejects %s array accessors without evaluating them", (location) => {
+    const getter = vi.fn(() => ({ id: "substituted" }));
+    const values = Object.defineProperty([{ id: "original" }], "0", { get: getter, enumerable: true });
+    const descriptor = Object.getOwnPropertyDescriptor(values, "0");
+    const elements = location === "elements" ? values : [{ id: "draw", samples: values }];
+    expect(() => clipRuntime.prepareStudioSavedClipElements(elements)).toThrow();
+    expect(getter).not.toHaveBeenCalled();
+    expect(Object.getOwnPropertyDescriptor(values, "0")).toEqual(descriptor);
+  });
+
+  it.each(["nested", "elements"] as const)("rejects %s custom array iterators without substituting data", (location) => {
+    const values = [{ id: "original" }, { id: "retained" }];
+    const iterator = vi.fn(function* () { yield { id: "substituted" }; });
+    Object.defineProperty(values, Symbol.iterator, { value: iterator });
+    const elements = location === "elements" ? values : [{ id: "draw", samples: values }];
+    expect(() => clipRuntime.prepareStudioSavedClipElements(elements)).toThrow();
+    expect(iterator).not.toHaveBeenCalled();
+    expect(values.length).toBe(2);
+    expect(values[0]).toEqual({ id: "original" });
+    expect(values[1]).toEqual({ id: "retained" });
+  });
+
+  it.each(["nested", "elements"] as const)("rejects %s non-plain arrays and holes", (location) => {
+    class AuthoredArray extends Array<unknown> {}
+    for (const values of [new AuthoredArray({ id: "draw" }), Array(1), [undefined]]) {
+      const elements = location === "elements" ? values : [{ id: "draw", samples: values }];
+      expect(() => clipRuntime.prepareStudioSavedClipElements(elements)).toThrow();
+    }
+  });
+
+  it("rejects symbol-keyed object metadata without dropping it", () => {
+    const key = Symbol("retained metadata");
+    const source = { id: "draw", [key]: "must not disappear" };
+    expect(() => clipRuntime.prepareStudioSavedClipElements([source])).toThrow();
+    expect(source[key]).toBe("must not disappear");
+  });
+
   it("leaves the existing SQLite library untouched when authored metadata is invalid", async () => {
     const database = await openStudioLocalDatabase({ vfs: "memory" });
     databases.push(database);

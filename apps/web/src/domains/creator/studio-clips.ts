@@ -71,6 +71,23 @@ interface CanonicalJsonBudget {
   nodes: number;
 }
 
+function mapClipProjectionArray<T>(source: readonly unknown[], project: (value: unknown) => T): T[] {
+  // Only length and dense own indices belong to a JSON array; never consult an iterator.
+  if (!Array.isArray(source) || Object.getPrototypeOf(source) !== Array.prototype
+    || Reflect.ownKeys(source).length !== source.length + 1) {
+    throw new StudioSavedClipLibraryError("invalid-clip", "클립 요소에 비정규 배열이 있습니다.");
+  }
+  const result: T[] = [];
+  for (let index = 0; index < source.length; index += 1) {
+    const property = Object.getOwnPropertyDescriptor(source, index);
+    if (!property || !("value" in property)) {
+      throw new StudioSavedClipLibraryError("invalid-clip", "클립 요소 배열에 누락 값 또는 접근자 속성이 있습니다.");
+    }
+    result.push(project(property.value));
+  }
+  return result;
+}
+
 function canonicalizeJsonValue(
   value: unknown,
   budget: CanonicalJsonBudget,
@@ -92,6 +109,9 @@ function canonicalizeJsonValue(
     return value;
   }
   if (Array.isArray(value)) {
+    if (omitUndefinedObjectProperties) {
+      return mapClipProjectionArray(value, (item) => canonicalizeJsonValue(item, budget, depth + 1, true));
+    }
     return Array.from(value, (item) => canonicalizeJsonValue(item, budget, depth + 1, omitUndefinedObjectProperties));
   }
   if (!value || typeof value !== "object") {
@@ -102,6 +122,9 @@ function canonicalizeJsonValue(
     throw new StudioSavedClipLibraryError("invalid-clip", "클립 요소에 직렬화할 수 없는 객체가 있습니다.");
   }
   const source = value as Record<string, unknown>;
+  if (omitUndefinedObjectProperties && Object.getOwnPropertySymbols(source).length > 0) {
+    throw new StudioSavedClipLibraryError("invalid-clip", "클립 요소에 직렬화할 수 없는 심볼 속성이 있습니다.");
+  }
   const keys = Object.keys(source).sort();
   if (keys.length > 512 || keys.some((key) => key.length === 0 || key.length > 256)) {
     throw new StudioSavedClipLibraryError("library-too-large", "클립 요소 속성 수 또는 이름이 안전 한도를 넘었습니다.");
@@ -114,7 +137,7 @@ function canonicalizeJsonValue(
     }
     if (omitUndefinedObjectProperties && property.value === undefined) continue;
     Object.defineProperty(result, key, {
-      value: canonicalizeJsonValue(source[key], budget, depth + 1, omitUndefinedObjectProperties),
+      value: canonicalizeJsonValue(omitUndefinedObjectProperties ? property.value : source[key], budget, depth + 1, omitUndefinedObjectProperties),
       enumerable: true, configurable: true, writable: true,
     });
   }
@@ -131,7 +154,7 @@ export function prepareStudioSavedClipElements(elements: readonly unknown[]): un
     throw new StudioSavedClipLibraryError("invalid-clip", "클립 요소 수가 저장 계약에 맞지 않습니다.");
   }
   const budget = { nodes: 0 };
-  return Array.from(elements, (element) => {
+  return mapClipProjectionArray(elements, (element) => {
     const value = canonicalizeJsonValue(element, budget, 0, true);
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       throw new StudioSavedClipLibraryError("invalid-clip", "클립 요소는 객체여야 합니다.");
