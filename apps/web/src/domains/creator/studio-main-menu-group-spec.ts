@@ -230,17 +230,23 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
         "select/poly-lasso",
       ),
       has("Magic Wand/Color Range", "select/magic-wand", "select/color-range"),
-      gap(
+      part(
         "Semantic/Object Select",
-        "AI 피사체 분리는 ‘레이어 분리’로 있으나 결과가 선택 영역이 아니라 레이어라 이 행을 채우지 못한다.",
+        "인스펙터 선택 작업대에서 레이어 불투명도와 온디바이스 AI 피사체를 현재 결합 모드로 선택한다. 독립 메인 메뉴 명령은 아직 없다.",
       ),
-      gap(
+      part(
         "Expand/Shrink/Feather/Smooth",
-        "확장·축소·페더는 선택 도구 패널의 슬라이더로만 있고 명령이 아니다. Smooth 는 아예 없다.",
+        "선택 도구 패널과 캔버스 HUD에서 확장·축소·페더·면적 보존 스무딩을 제공한다. 메인 메뉴 수치 대화상자는 아직 없다.",
       ),
       has("Quick Mask", "select/quick-mask"),
-      gap("Save Selection", "선택 실행취소·다시실행만 있고 이름 붙인 선택 저장은 없다."),
-      gap("Selection HUD", "요소 선택용 컨텍스트 바만 있고 픽셀 선택용 HUD 는 없다."),
+      part(
+        "Save Selection",
+        "이미지 단위·기기 로컬 이름 저장/불러오기를 제공한다. 프로젝트·CRDT 영구 채널과 팀 동기화는 아직 없다.",
+      ),
+      part(
+        "Selection HUD",
+        "픽셀 선택 대상 근처에 safe-area 인지 HUD를 제공한다. 사용자가 명령 구성을 편집하는 기능은 아직 없다.",
+      ),
     ],
     extras: [
       ours("select/select-all", "모두 선택 — §15.3 행에 명시가 없으나 Select 가 정본 위치다."),
