@@ -113,7 +113,8 @@ function customBones(
   const source: unknown = h.customBones;
   if (!source || typeof source !== "object" || Array.isArray(source)) return {};
   const values: Record<string, readonly [number, number, number]> = {};
-  for (const [bone, value] of Object.entries(source)) {
+  for (const [bone, entry] of Object.entries(source)) {
+    const value = entry && typeof entry === "object" && "rotation" in entry ? entry.rotation : entry;
     if (
       !Array.isArray(value) ||
       value.length !== 3 ||
@@ -439,15 +440,12 @@ export function useCharacterPlatformWorkbench(
       if (!Array.isArray(values) || values.length > 500) {
         throw new Error("프리셋 목록 형식이 올바르지 않습니다.");
       }
-      let count = 0;
-      for (const value of values) {
-        const result = await PRESET_STORE.save(value as CharacterPartPresetV1);
-        if (!scope.active) return 0;
-        if (result.status === "error") {
-          throw new Error(result.message ?? "프리셋 저장에 실패했습니다.");
-        }
-        count += 1;
+      const result = await PRESET_STORE.saveMany(values);
+      if (!scope.active) return 0;
+      if (result.status === "error") {
+        throw new Error(result.message ?? "프리셋 저장에 실패했습니다.");
       }
+      const count = values.length;
       setNotice(`프리셋 ${count}개를 불러왔습니다.`);
       return count;
     } catch (error) {
@@ -493,7 +491,7 @@ export function useCharacterPlatformWorkbench(
       generationId: Date.now(),
       source: "manual",
       root: Object.freeze({
-        position: [0, 0, 0] as const,
+        position: [0, typeof h.customYOffset === "number" && Number.isFinite(h.customYOffset) ? h.customYOffset : 0, 0] as const,
         rotation: [0, 0, 0, 1] as const,
       }),
       bones: quaternions,
@@ -516,19 +514,24 @@ export function useCharacterPlatformWorkbench(
       footPositions: feet,
       profile: createDefaultCharacterPoseConstraintProfile(),
     });
-    h.handlePhotoPoseApply({
+    const applied = h.handlePhotoPoseApply({
       sourceName: "현재 포즈 · Pose V2 안정화",
       bones: eulerBones(solved.candidate.bones),
+      yOffset: solved.candidate.root.position[1],
       landmarks: [],
       worldLandmarks: [],
       confidence: poseConfidence(),
       fingerEdits: {},
       detectedHandSides: [],
     });
+    if (applied === false) {
+      setNotice("현재 포즈를 적용할 수 없습니다. 진행 중인 포즈 편집을 마친 뒤 다시 시도해 주세요.");
+      return false;
+    }
     setNotice(
       `Pose V2 적용 · 본 ${solved.appliedBones.length}개 · 유지 ${solved.preservedBones.length}개` +
         (Math.abs(solved.groundedBy) > 0.0001
-          ? ` · 접지 보정 ${solved.groundedBy.toFixed(3)}m 계산`
+          ? ` · 접지 보정 ${solved.groundedBy.toFixed(3)}m 적용`
           : ""),
     );
     return true;

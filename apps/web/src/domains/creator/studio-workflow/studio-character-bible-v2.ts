@@ -359,13 +359,14 @@ export function resolveStudioCharacterContextV2(
   if (!character) throw new Error(`Unknown Studio character: ${input.characterId}`);
 
   const episodeNo = input.episodeNo ?? null;
-  const approvedInRange = character.versions.filter((version) =>
-    version.status === "approved" && rangeContains(version, episodeNo)
-  );
   const canonical = character.versions.find((version) =>
     version.id === character.canonicalVersionId
   );
-  const version = approvedInRange.at(-1) ?? canonical;
+  const version = episodeNo === null
+    ? canonical
+    : character.versions.filter((candidate) =>
+        candidate.status === "approved" && rangeContains(candidate, episodeNo)
+      ).at(-1) ?? canonical;
   if (!version) throw new Error(`Character ${character.id} has no resolvable version.`);
 
   const requestedVariantIds = cleanList(input.variantIds ?? []);

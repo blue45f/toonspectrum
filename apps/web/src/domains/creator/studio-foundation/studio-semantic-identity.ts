@@ -59,6 +59,7 @@ export interface StudioIdentityIndexV1 {
 }
 
 export type StudioIdentityIssueCode =
+  | "invalid-kind"
   | "invalid-work-scope"
   | "invalid-semantic-id"
   | "invalid-reference"
@@ -418,6 +419,15 @@ export function validateStudioIdentityIndex(
       } else {
         referenceOwners.set(key, link.semanticId);
       }
+    }
+
+    if (!STUDIO_SEMANTIC_ENTITY_KINDS.includes(link.kind)) {
+      issues.push({
+        code: "invalid-kind",
+        semanticId: link.semanticId,
+        message: "Identity link has an unknown semantic entity kind.",
+      });
+      continue;
     }
 
     const expectedState = deriveStudioIdentityLinkState(

@@ -121,6 +121,71 @@ describe("Studio Character Bible v2", () => {
     expect(receipt.contextDigestInput).toContain("노란 우비");
   });
 
+  it.each([undefined, null])("defaults to the canonical version without an episode: %s", (episodeNo) => {
+    const migrated = baseV2();
+    const character = migrated.characters[0];
+    const canonical: StudioCharacterVersionV2 = {
+      ...character.versions[0],
+      effectiveToEpisodeNo: 10,
+      references: [{
+        id: "canonical-front",
+        role: "front",
+        assetRevisionId: "canonical-image:r1",
+        label: "Canonical front",
+      }],
+    };
+    const later: StudioCharacterVersionV2 = {
+      ...canonical,
+      id: "character-sua:canon:2",
+      effectiveFromEpisodeNo: 17,
+      effectiveToEpisodeNo: null,
+      appearance: { ...canonical.appearance, hair: "Different episode appearance" },
+      locks: { appearance: "soft" },
+      references: [],
+    };
+    const bible: StudioCharacterBibleV2 = {
+      ...migrated,
+      characters: [{ ...character, versions: [canonical, later] }],
+    };
+
+    const context = resolveStudioCharacterContextV2(bible, {
+      characterId: character.id,
+      ...(episodeNo === undefined ? {} : { episodeNo }),
+    });
+
+    expect(context).toMatchObject({
+      characterVersionId: canonical.id,
+      appearance: canonical.appearance,
+      references: canonical.references,
+      locks: canonical.locks,
+    });
+    const receipt = createStudioCharacterPromptReceiptV2(context);
+    expect(receipt.characterVersionId).toBe(canonical.id);
+    expect(receipt.hardLockedFields).toEqual(["appearance", "colors"]);
+    expect(JSON.parse(receipt.contextDigestInput)).toMatchObject({
+      appearance: canonical.appearance,
+      references: canonical.references,
+      locks: canonical.locks,
+    });
+    expect(resolveStudioCharacterContextV2(bible, {
+      characterId: character.id,
+      episodeNo: 17,
+    }).characterVersionId).toBe(later.id);
+    expect(resolveStudioCharacterContextV2(bible, {
+      characterId: character.id,
+      episodeNo: 12,
+    }).characterVersionId).toBe(canonical.id);
+  });
+
+  it("does not substitute another approved version for a missing default canonical version", () => {
+    const migrated = baseV2();
+    const character = migrated.characters[0];
+    expect(() => resolveStudioCharacterContextV2({
+      ...migrated,
+      characters: [{ ...character, canonicalVersionId: "missing-version" }],
+    }, { characterId: character.id })).toThrow(/no resolvable version/u);
+  });
+
   it("rejects a variant outside its declared work or scene scope", () => {
     const migrated = baseV2();
     const character = migrated.characters[0];

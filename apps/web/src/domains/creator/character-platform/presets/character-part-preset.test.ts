@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { CHARACTER_SLOT_KINDS } from "../../character-shaper/character-shaper-contract";
 import {
@@ -67,6 +67,37 @@ class MemoryStorage {
 }
 
 describe("character part presets", () => {
+  it("validates the entire import before any write or version change", async () => {
+    const storage = new MemoryStorage();
+    const store = createCharacterPartPresetStore(async () => storage);
+    const preset = createCharacterPartPreset({ presetId: "batch-one", name: "Batch one", kind: "slot", scope: "personal", document: document("eyes:cat"), slot: "eyes" });
+    await store.save(preset);
+    const before = store.getSnapshot();
+    const writes = vi.spyOn(storage, "set");
+    expect(() => store.saveMany([{ ...preset, name: "Changed" }, { schemaVersion: 99 }])).toThrow();
+    expect(writes).not.toHaveBeenCalled();
+    expect(store.getSnapshot()).toBe(before);
+    const reloaded = createCharacterPartPresetStore(async () => storage);
+    await reloaded.refresh();
+    expect(reloaded.list()[0]).toEqual(preset);
+  });
+
+  it("stores a valid batch once and keeps the old library on a storage failure", async () => {
+    const storage = new MemoryStorage();
+    const store = createCharacterPartPresetStore(async () => storage);
+    const preset = createCharacterPartPreset({ presetId: "batch-one", name: "Batch one", kind: "slot", scope: "personal", document: document("eyes:cat"), slot: "eyes" });
+    const writes = vi.spyOn(storage, "set");
+    await store.saveMany([preset, { ...preset, presetId: "batch-two" }]);
+    expect(writes).toHaveBeenCalledOnce();
+    const before = store.list();
+    writes.mockRejectedValueOnce(new Error("SQLite unavailable"));
+    expect((await store.saveMany([{ ...preset, name: "Changed" }, { ...preset, presetId: "batch-three" }])).status).toBe("error");
+    expect(store.list()).toEqual(before);
+    const reloaded = createCharacterPartPresetStore(async () => storage);
+    await reloaded.refresh();
+    expect(reloaded.list()).toEqual(before);
+  });
+
   it("captures one slot and only its related controls and colours", () => {
     const preset = createCharacterPartPreset({
       presetId: "eyes:cold-cat",

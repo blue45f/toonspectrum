@@ -217,6 +217,7 @@ export function rebuildCharacterSurfaceInkGroup(scene: Scene, document: Characte
         geometry.computeBoundingSphere();
         const ink = source instanceof SkinnedMesh ? new SkinnedMesh(geometry, materialFor(stroke)) : new Mesh(geometry, materialFor(stroke));
         if (source instanceof SkinnedMesh && ink instanceof SkinnedMesh) {
+          ink.bindMode = source.bindMode;
           ink.bind(source.skeleton, source.bindMatrix.clone());
           ink.bindMatrixInverse.copy(source.bindMatrixInverse);
         }
@@ -225,7 +226,14 @@ export function rebuildCharacterSurfaceInkGroup(scene: Scene, document: Characte
         ink.renderOrder = 10_000;
         ink.frustumCulled = false;
         ink.matrixAutoUpdate = false;
-        ink.matrix.copy(source.matrixWorld);
+        // Keep one disposable group owner, but refresh each ribbon from its source on every
+        // scene transform update. A one-time world matrix copy detaches ink after pose edits.
+        const updateMatrixWorld = ink.updateMatrixWorld.bind(ink);
+        ink.updateMatrixWorld = (force) => {
+          source.updateWorldMatrix(true, false);
+          ink.matrix.copy(group.matrixWorld).invert().multiply(source.matrixWorld);
+          updateMatrixWorld(force);
+        };
         group.add(ink);
       } catch {
         // Corrupt/orphaned data remains recoverable but is omitted from rendering.
@@ -233,5 +241,6 @@ export function rebuildCharacterSurfaceInkGroup(scene: Scene, document: Characte
     }
   }
   scene.add(group);
+  group.updateMatrixWorld(true);
   return group;
 }

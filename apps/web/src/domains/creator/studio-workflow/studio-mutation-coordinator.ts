@@ -404,8 +404,9 @@ export function createStudioMutationCoordinator(
         if (!item.changed) continue;
         const port = ports.get(item.domain);
         if (!port) throw new Error(`Mutation port disappeared: ${item.domain}`);
-        await port.commit(item.nextSnapshot);
+        // A port can mutate its owner before an asynchronous commit rejects.
         committed.push(item);
+        await port.commit(item.nextSnapshot);
       }
       await options.durability.commit(
         record,

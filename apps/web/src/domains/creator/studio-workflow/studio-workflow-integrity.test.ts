@@ -11,7 +11,11 @@ import {
 
 import type { StudioAssetLicenseRevisionV2, StudioAssetReferenceV2 } from "./studio-asset-reference-v2";
 import type { StudioCharacterBibleV2 } from "./studio-character-bible-v2";
-import type { StudioGenerationCandidateV1, StudioGenerationInputSnapshotV1 } from "./studio-generation-candidate";
+import {
+  computeStudioGenerationInputSnapshotDigest,
+  type StudioGenerationCandidateV1,
+  type StudioGenerationInputSnapshotV1,
+} from "./studio-generation-candidate";
 
 import {
   createStudioApproval,
@@ -157,10 +161,11 @@ function reviewBundle(threads: readonly StudioReviewThreadV1[] = []) {
   };
 }
 
-function generationSnapshot(): StudioGenerationInputSnapshotV1 {
-  return {
+function generationSnapshot(
+  patch: Partial<Omit<StudioGenerationInputSnapshotV1, "snapshotDigest">> = {},
+): StudioGenerationInputSnapshotV1 {
+  const input: Omit<StudioGenerationInputSnapshotV1, "snapshotDigest"> = {
     version: 1,
-    snapshotDigest: "generation-input-digest-1",
     workScope: "work:episode-1",
     localDocumentDigest: "digest-r42",
     serverRevision: 42,
@@ -172,7 +177,9 @@ function generationSnapshot(): StudioGenerationInputSnapshotV1 {
     editMask: null,
     protectMask: null,
     createdAt: NOW,
+    ...patch,
   };
+  return { ...input, snapshotDigest: computeStudioGenerationInputSnapshotDigest(input) };
 }
 
 function generationCandidate(
@@ -293,7 +300,7 @@ describe("Studio workflow integrity", () => {
     "requires a candidate to reference a supplied generation input: %s",
     (kind) => {
       const generationSnapshots = kind === "omitted" ? undefined
-        : kind === "empty" ? [] : [{ ...generationSnapshot(), snapshotDigest: "another-input-digest" }];
+        : kind === "empty" ? [] : [generationSnapshot({ semanticPanelId: "another-panel" })];
       const report = evaluateStudioWorkflowIntegrity({
         versionCoordinates: approvedCoordinates(),
         review: reviewBundle(),
@@ -335,7 +342,7 @@ describe("Studio workflow integrity", () => {
       review: reviewBundle(),
       publishSource: { serverRevision: 42, contentDigest: "digest-r42" },
       generationSnapshots: [
-        { ...generationSnapshot(), snapshotDigest: "another-input-digest" },
+        generationSnapshot({ targetElementId: "another-element" }),
         generationSnapshot(),
       ],
       generationCandidates: [generationCandidate(), generationCandidate("candidate-2")],
@@ -359,6 +366,39 @@ describe("Studio workflow integrity", () => {
       expect.objectContaining({ category: "generation", path: "generationSnapshots[0]" }),
     ]));
   });
+
+  it.each(["character", "reference", "edit-mask", "protect-mask", "target", "metadata"] as const)(
+    "blocks review, approval and publish when deserialized generation %s changes behind a recorded digest",
+    (kind) => {
+      const source = generationSnapshot();
+      const changed = JSON.parse(JSON.stringify(source)) as StudioGenerationInputSnapshotV1;
+      const patch: Partial<StudioGenerationInputSnapshotV1> = kind === "character"
+        ? { characterPins: [{ characterId: "character-1", characterVersionId: "character-1:v2", variantIds: [], promptReceiptDigest: "changed-prompt" }] }
+        : kind === "reference" ? { references: [{ role: "composition", asset: asset(), strength: 0.5 }] }
+          : kind === "edit-mask" ? { editMask: asset() }
+            : kind === "protect-mask" ? { protectMask: asset() }
+              : kind === "target" ? { targetElementId: "changed-target" }
+                : { workScope: "work:changed" };
+      const report = evaluateStudioWorkflowIntegrity({
+        versionCoordinates: approvedCoordinates(),
+        review: reviewBundle(),
+        publishSource: { serverRevision: 42, contentDigest: "digest-r42" },
+        generationSnapshots: [{ ...changed, ...patch }],
+        generationCandidates: [generationCandidate("candidate-1", source.snapshotDigest)],
+      });
+
+      expect(report.canRequestReview).toBe(false);
+      expect(report.canApprove).toBe(false);
+      expect(report.canPublish).toBe(false);
+      expect(report.issues.filter((issue) => issue.category === "generation")).toEqual([
+        expect.objectContaining({
+          id: expect.stringContaining("snapshot-digest-mismatch"),
+          path: "generationSnapshots[0]",
+          blocks: ["review", "approval", "publish"],
+        }),
+      ]);
+    },
+  );
 
   it("blocks publish when the requested source differs from the immutable approval", () => {
     const report = evaluateStudioWorkflowIntegrity({

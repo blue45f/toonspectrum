@@ -1,6 +1,6 @@
-import { BufferGeometry, Float32BufferAttribute, Group, InterleavedBuffer, InterleavedBufferAttribute, Mesh, Scene } from "three";
+import { Bone, BufferGeometry, Float32BufferAttribute, Group, InterleavedBuffer, InterleavedBufferAttribute, Mesh, Scene, Skeleton, SkinnedMesh } from "three";
 import { describe, expect, it, vi } from "vitest";
-import { characterSurfaceObjectPath, characterSurfaceTopologyRevision, reconcileCharacterSurfaceInkTopology } from "./character-surface-ink-three-mesh";
+import { characterSurfaceObjectPath, characterSurfaceTopologyRevision, disposeCharacterSurfaceInkGroup, rebuildCharacterSurfaceInkGroup, reconcileCharacterSurfaceInkTopology } from "./character-surface-ink-three-mesh";
 import { createEmptyCharacterSurfaceInkDocument, addCharacterSurfaceInkStroke } from "./character-surface-ink";
 
 function fixture() {
@@ -63,5 +63,42 @@ describe("geometry revision lifecycle", () => {
   it("supports empty geometry without inventing a triangle identity", () => {
     const mesh = new Mesh(new BufferGeometry()); mesh.name = "empty";
     expect(characterSurfaceTopologyRevision("model-a", mesh)).toBe(characterSurfaceTopologyRevision("model-a", mesh));
+  });
+});
+
+describe("surface ink transform ownership", () => {
+  it.each([false, true])("tracks root and source transforms after creation (skinned=%s)", (skinned) => {
+    const f = fixture();
+    let source = f.mesh;
+    if (skinned) {
+      source = new SkinnedMesh(f.geometry);
+      source.name = f.mesh.name;
+      f.mesh.removeFromParent();
+      f.root.add(source);
+      const bone = new Bone();
+      source.add(bone);
+      (source as SkinnedMesh).bind(new Skeleton([bone]));
+    }
+    const group = rebuildCharacterSurfaceInkGroup(f.scene, f.document);
+    const ink = group.children[0] as Mesh;
+    expect(ink).toBeInstanceOf(skinned ? SkinnedMesh : Mesh);
+    f.root.position.set(4, -2, 7);
+    f.root.rotation.set(0.2, 0.7, -0.4);
+    f.root.scale.set(1.5, 0.8, 2);
+    source.position.set(-1, 0.5, 3);
+    source.rotation.set(0.1, -0.2, 0.3);
+    group.position.set(2, 3, 4);
+    for (const offset of [0, 0.75]) {
+      f.root.position.y += offset;
+      f.scene.updateMatrixWorld(true);
+      ink.matrixWorld.elements.forEach((value, index) => {
+        expect(value).toBeCloseTo(source.matrixWorld.elements[index], 10);
+      });
+    }
+    const dispose = vi.spyOn(ink.geometry, "dispose");
+    disposeCharacterSurfaceInkGroup(group);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(group.parent).toBeNull();
+    expect(source.parent).toBe(f.root);
   });
 });

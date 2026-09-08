@@ -125,6 +125,54 @@ describe("Studio asset reference v2", () => {
     );
   });
 
+  it.each(["unknown", "unrecognized", null, undefined])(
+    "blocks modified publication without an explicit modification grant: %s",
+    (modification) => {
+      const unestablished = {
+        ...license(),
+        modification,
+      } as unknown as StudioAssetLicenseRevisionV2;
+      for (const commercial of [false, true]) {
+        const decision = decideStudioAssetPublishUse(asset(), unestablished, {
+          commercial,
+          modified: true,
+          attributionIncluded: true,
+        });
+
+        expect(decision.allowed).toBe(false);
+        expect(decision.issues).toContainEqual(expect.objectContaining({
+          code: "modification-unknown",
+          blocking: true,
+        }));
+      }
+    },
+  );
+
+  it.each([null, "license-background-1:r1"])(
+    "blocks modified publication when its license is unavailable: %s",
+    (licenseRevisionId) => {
+      const decision = decideStudioAssetPublishUse(asset({ licenseRevisionId }), null, {
+        commercial: false,
+        modified: true,
+        attributionIncluded: true,
+      });
+
+      expect(decision.allowed).toBe(false);
+      expect(decision.issues).toContainEqual(expect.objectContaining({
+        code: "modification-unknown",
+        blocking: true,
+      }));
+    },
+  );
+
+  it("does not require modification permission for unmodified publication", () => {
+    expect(decideStudioAssetPublishUse(asset(), license({ modification: "unknown" }), {
+      commercial: true,
+      modified: false,
+      attributionIncluded: true,
+    }).allowed).toBe(true);
+  });
+
   it("permits a pinned commercial asset only when required attribution is included", () => {
     expect(decideStudioAssetPublishUse(asset(), license(), {
       commercial: true,

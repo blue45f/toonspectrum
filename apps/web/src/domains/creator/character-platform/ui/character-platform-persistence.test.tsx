@@ -70,9 +70,12 @@ function manifest(modelId: string) {
   };
 }
 function ink(name: string, modelKey = name): CharacterSurfaceInkDocument {
+  const anchor = { meshAssetId: "face", topologyRevision: modelKey, primitiveIndex: 0, triangleIndex: 0,
+    barycentric: [1, 0, 0] as const, localNormal: [0, 0, 1] as const, localTangent: [1, 0, 0] as const,
+    skinIndices: [0, 0, 0, 0] as const, skinWeights: [1, 0, 0, 0] as const, pressure: 0.5, width: 1 };
   return { version: 1, layers: [{ layerId: name, name, visible: true, locked: false, opacity: 1, blendMode: "normal", strokes: [{
     strokeId: `stroke-${name}`, meshAssetId: "face", topologyRevision: modelKey, status: "valid",
-    anchors: [{ meshAssetId: "face", topologyRevision: modelKey, primitiveIndex: 0, triangleIndex: 0, barycentric: [1, 0, 0], localNormal: [0, 0, 1], localTangent: [1, 0, 0], skinIndices: [0, 0, 0, 0], skinWeights: [1, 0, 0, 0], pressure: 0.5, width: 1 }],
+    anchors: [anchor, { ...anchor, barycentric: [0, 1, 0] }],
     style: { color: "#111111", widthMode: "surface", baseWidth: 0.02, opacity: 1, taperStart: 0, taperEnd: 0, pressureWidth: 0, pressureOpacity: 0, smoothing: 0, surfaceOffset: 0.001, cap: "round", join: "round", frontFacesOnly: true },
   }] }] };
 }
@@ -147,7 +150,7 @@ describe("character SQLite persistence", () => {
       ? { ...previous, layers: Array.from({ length: 33 }, (_, i) => ({ ...layer, layerId: String(i), strokes: [] })) }
       : { ...previous, layers: [{ ...layer, strokes: kind === "strokes"
         ? Array.from({ length: 2_001 }, (_, i) => ({ ...stroke, strokeId: String(i), anchors: [] }))
-        : [{ ...stroke, anchors: [{ ...stroke.anchors[0]!, barycentric: [Number.NaN, 0, 0] }] }] }] };
+        : [{ ...stroke, anchors: [{ ...stroke.anchors[0]!, barycentric: [Number.NaN, 0, 0] }, stroke.anchors[1]!] }] }] };
     await expect(saveCharacterSurfaceInkDocument("bounded", candidate)).rejects.toThrow("3D 펜선");
     expect(database.set).toHaveBeenCalledTimes(1);
     expect(await loadCharacterSurfaceInkDocument("bounded")).toEqual(previous);
@@ -158,7 +161,7 @@ describe("character SQLite persistence", () => {
   it("saves and reloads ink at the existing 2000 stroke limit", async () => {
     const previous = ink("limit");
     const layer = previous.layers[0]!;
-    const candidate = { ...previous, layers: [{ ...layer, strokes: Array.from({ length: 2_000 }, (_, i) => ({ ...layer.strokes[0]!, strokeId: String(i), anchors: [] })) }] };
+    const candidate = { ...previous, layers: [{ ...layer, strokes: Array.from({ length: 2_000 }, (_, i) => ({ ...layer.strokes[0]!, strokeId: String(i) })) }] };
     await saveCharacterSurfaceInkDocument("at-limit", candidate);
     expect(await loadCharacterSurfaceInkDocument("at-limit")).toEqual(candidate);
   });

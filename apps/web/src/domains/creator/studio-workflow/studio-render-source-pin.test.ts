@@ -195,6 +195,53 @@ describe("Studio render source pins", () => {
     ]));
   });
 
+  it.each([0, 2, "1", null, undefined])(
+    "rejects an unsupported deserialized motion receipt version: %s",
+    (version) => {
+      const receipt = {
+        version,
+        id: "motion-render-1",
+        motionDocumentId: "motion-document-1",
+        source: motionSource(),
+        range: { startMs: 0, endMs: 5000 },
+        frameRate: 24,
+        output: asset("motion-output", "motion-output:r1", HASH_B, "video/mp4"),
+        renderedAt: NOW,
+      } as unknown as StudioMotionRenderReceiptV1;
+
+      expect(validateStudioMotionRenderReceipt(receipt)).toEqual([{
+        code: "unsupported-version",
+        path: "motionReceipt.version",
+        message: expect.any(String),
+      }]);
+    },
+  );
+
+  it.each([0, 2, "1", null, undefined])(
+    "rejects an unsupported source version directly and inside a motion receipt: %s",
+    (version) => {
+      const source = { ...motionSource(), version } as unknown as StudioMotionSourcePinV1;
+      const receipt: StudioMotionRenderReceiptV1 = {
+        version: 1,
+        id: "motion-render-1",
+        motionDocumentId: "motion-document-1",
+        source,
+        range: { startMs: 0, endMs: 5000 },
+        frameRate: 24,
+        output: asset("motion-output", "motion-output:r1", HASH_B, "video/mp4"),
+        renderedAt: NOW,
+      };
+      const expected = [{
+        code: "unsupported-version",
+        path: "motionSource.version",
+        message: expect.any(String),
+      }];
+
+      expect(validateStudioMotionSourcePin(source)).toEqual(expected);
+      expect(validateStudioMotionRenderReceipt(receipt)).toEqual(expected);
+    },
+  );
+
   it("rejects duplicate motion panels and missing source digests", () => {
     const invalid = {
       ...motionSource(),

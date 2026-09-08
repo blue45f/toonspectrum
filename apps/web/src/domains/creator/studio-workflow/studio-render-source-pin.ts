@@ -78,6 +78,7 @@ export interface StudioRenderStaleness {
 }
 
 export type StudioRenderSourceIssueCode =
+  | "unsupported-version"
   | "invalid-id"
   | "invalid-source-revision"
   | "missing-source-digest"
@@ -223,6 +224,13 @@ export function compareStudioSceneReceiptToSource(input: {
 export function validateStudioMotionSourcePin(
   source: StudioMotionSourcePinV1,
 ): readonly StudioRenderSourceIssue[] {
+  if (source.version !== 1) {
+    return [{
+      code: "unsupported-version",
+      path: "motionSource.version",
+      message: "Motion source schema version is unsupported.",
+    }];
+  }
   const issues: StudioRenderSourceIssue[] = [];
   if (!SAFE_ID.test(source.workId)) {
     issues.push({
@@ -296,6 +304,13 @@ export function compareStudioMotionSourceToCurrent(
 export function validateStudioMotionRenderReceipt(
   receipt: StudioMotionRenderReceiptV1,
 ): readonly StudioRenderSourceIssue[] {
+  if (receipt.version !== 1) {
+    return [{
+      code: "unsupported-version",
+      path: "motionReceipt.version",
+      message: "Motion render receipt schema version is unsupported.",
+    }];
+  }
   const issues = [...validateStudioMotionSourcePin(receipt.source)];
   if (!SAFE_ID.test(receipt.id) || !SAFE_ID.test(receipt.motionDocumentId)) {
     issues.push({

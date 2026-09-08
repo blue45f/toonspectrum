@@ -1,5 +1,3 @@
-import { compareCodeUnitStrings } from "@/shared/lib/compare-code-unit-strings";
-
 import {
   createEmptyStudioIdentityIndex,
   validateStudioIdentityIndex,
@@ -14,7 +12,7 @@ import type {
   StudioProjectPublishPackSnapshot,
   StudioProjectSnapshot,
 } from "../studio-project-snapshot";
-import { createSha256Portable } from "../studio-sha256";
+import { digestStudioCanonicalJsonValue as digestJsonValue } from "./studio-canonical-json";
 
 import {
   migrateStudioCharacterBibleV1ToV2,
@@ -217,23 +215,6 @@ function normalizeArchive(archive: StudioProjectArchiveV3): StudioProjectArchive
     || !Number.isFinite(result.content.panelGutter)
   ) throw new TypeError("Studio archive section fields are invalid.");
   return result;
-}
-
-function canonicalJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalJsonValue);
-  if (isRecord(value)) {
-    return Object.fromEntries(Object.keys(value).sort(compareCodeUnitStrings).map((key) => [
-      key,
-      canonicalJsonValue(value[key]),
-    ]));
-  }
-  return value;
-}
-
-function digestJsonValue(value: unknown): string {
-  const hasher = createSha256Portable();
-  hasher.update(new TextEncoder().encode(JSON.stringify(canonicalJsonValue(value))));
-  return `sha256:${hasher.finalizeHex()}`;
 }
 
 /** The root binds all persisted payload, including v2 compatibility, but never external workspace. */
