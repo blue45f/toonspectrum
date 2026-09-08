@@ -42,3 +42,4 @@ apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql
 apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql
 apps/api/src/db/migrations/0043_admin_runtime_schema.sql
 apps/api/src/db/migrations/0044_creator_work_entitlement_authorization.sql
+apps/api/src/db/migrations/0045_studio_ai_comic_director.sql
