@@ -14,7 +14,7 @@ import {
 } from "./research-desk-session";
 
 describe("research desk session persistence", () => {
-  it("sanitizes focus fields, validates enums, deduplicates history, and keeps the newest eight entries", () => {
+  it("bounds draft fields without breaking in-progress whitespace, validates enums, deduplicates history, and keeps the newest eight entries", () => {
     const history = Array.from({ length: 11 }, (_, index) => ({
       mode: index % 2 ? "books" : "assets",
       query: ` query ${index} `,
@@ -32,8 +32,8 @@ describe("research desk session persistence", () => {
     });
 
     expect(session.title).toHaveLength(80);
-    expect(session.question).toBe("야간 기차역의 구조는?");
-    expect(session.context).toBe("1920년대 겨울밤");
+    expect(session.question).toBe("  야간   기차역의  구조는? ");
+    expect(session.context).toBe("  1920년대   겨울밤 ");
     expect(session.intent).toBe("scene");
     expect(session.lastMode).toBe("assets");
     expect(session.history).toHaveLength(8);
@@ -74,6 +74,23 @@ describe("research desk focus and search history", () => {
     expect(session.history[0]).toMatchObject({ mode: "books", query: "query 7", searchedAt: "2026-09-10T00:00:00.000Z" });
     expect(session.history.filter((entry) => entry.mode === "books" && entry.query === "query 7")).toHaveLength(1);
     expect(recordResearchSearch(session, "assets", "x")).toBe(session);
+  });
+
+  it("preserves spaces and line breaks while a creator is still drafting", () => {
+    const session = updateResearchDeskFocus(createResearchDeskSession(), {
+      title: "1화 ",
+      question: "야간  역무실에서\n어떤 도구를 썼을까?",
+      context: " 1920년대 · 겨울밤 ",
+    });
+
+    expect(session.title).toBe("1화 ");
+    expect(session.question).toBe("야간  역무실에서\n어떤 도구를 썼을까?");
+    expect(session.context).toBe(" 1920년대 · 겨울밤 ");
+    expect(isResearchDeskSessionEmpty(updateResearchDeskFocus(createResearchDeskSession(), {
+      title: "  ",
+      question: "\n",
+      context: " ",
+    }))).toBe(true);
   });
 
   it("tracks meaningful focus separately from the creator workspace and can clear only search history", () => {
