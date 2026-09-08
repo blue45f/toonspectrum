@@ -185,6 +185,7 @@ function StudioOilProgramMatrix({
             <button
               key={recipe.id}
               type="button"
+              aria-label={`유화 조합: ${recipe.name}`}
               aria-pressed={selected}
               onClick={() => emit(recipe.programs)}
               className={cn(

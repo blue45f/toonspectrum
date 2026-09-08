@@ -101,7 +101,7 @@ describe("StudioBrushEngineProgramControls", () => {
       "건조 임파스토",
       "풀 피직스",
     ]) {
-      expect(screen.getByRole("button", { name: new RegExp(`^${name}`, "u") })).toBeTruthy();
+      expect(screen.getByRole("button", { name: `유화 조합: ${name}` })).toBeTruthy();
     }
     expect(screen.getByText("2³ 조합")).toBeTruthy();
   });
@@ -115,7 +115,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /^건조 임파스토/u }));
+    fireEvent.click(screen.getByRole("button", { name: "유화 조합: 건조 임파스토" }));
     expect(onChange).toHaveBeenCalledWith(
       studioBrushEngineProgramSetFromOil({
         bristlePhysics: false,
@@ -253,7 +253,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /^부드러운 강모/u }));
+    fireEvent.click(screen.getByRole("button", { name: "유화 조합: 부드러운 강모" }));
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
