@@ -30,6 +30,7 @@ const harness = vi.hoisted(() => {
     deferDeviceCreation: false,
     failSurfaceCreates: 0,
     failPresentations: 0,
+    compileRejection: null as string | null,
     configurationFailure: null as string | null,
     snapshotDraws: 0,
     documentParityStatus: "matched" as "matched" | "mismatch" | "unavailable",
@@ -81,6 +82,7 @@ const harness = vi.hoisted(() => {
       this.deferDeviceCreation = false;
       this.failSurfaceCreates = 0;
       this.failPresentations = 0;
+      this.compileRejection = null;
       this.configurationFailure = null;
       this.snapshotDraws = 0;
       this.documentParityStatus = "matched";
@@ -123,6 +125,11 @@ vi.mock("./studio-canonical-vnext-dry-media-product-adapter", () => ({
     signal?: AbortSignal;
   }) {
     harness.compileCalls.push(request);
+    if (harness.compileRejection) return {
+      status: "unavailable" as const,
+      reason: "quality-gate-rejected" as const,
+      detail: harness.compileRejection,
+    };
     return {
       status: "ready" as const,
       dynamicPlanDigest: "sha256:dynamic-plan",
@@ -281,6 +288,24 @@ afterEach(() => {
 });
 
 describe("StudioCanonicalVNextDryMediaCanvas authority handoff", () => {
+  it("keeps ordinary document selection quiet when candidate tip geometry is unsupported", async () => {
+    harness.compileRejection = "tangent-alignment-required";
+    const onAuthorityChange = vi.fn();
+    const view = render(<StudioCanonicalVNextDryMediaCanvas {...baseProps} onAuthorityChange={onAuthorityChange} />);
+    await waitFor(() => expect(onAuthorityChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: "unavailable", reason: "compile:quality-gate-rejected:tangent-alignment-required",
+      retainsLastGoodFrame: false, lastPresented: null,
+    })));
+    expect(onAuthorityChange.mock.calls.some(([authority]) => authority?.status === "authorized")).toBe(false);
+    expect(onAuthorityChange.mock.calls.at(-1)![0].documentParity).toBeUndefined();
+    expect(view.queryByRole("alert")).toBeNull();
+    const canvas = view.container.querySelector<HTMLCanvasElement>("[data-studio-canonical-vnext-dry-media]");
+    expect(canvas?.style.visibility).toBe("hidden");
+    expect(canvas?.dataset.studioCanonicalVnextDryMediaDocumentParity).toBeUndefined();
+    await waitFor(() => expect(harness.disposedSurfaces).toBe(1));
+    expect(harness.disposedRuntimes).toBe(1);
+  });
+
   it.each(["element", "layout", "paper"] as const)("does not attach old comparison metrics to a changed %s while explicit reselection is required", async (changed) => {
     harness.documentParityStatus = "mismatch";
     const onAuthorityChange = vi.fn();

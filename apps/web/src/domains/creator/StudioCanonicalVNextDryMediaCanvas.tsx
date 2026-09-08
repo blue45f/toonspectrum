@@ -404,6 +404,11 @@ export function StudioCanonicalVNextDryMediaCanvas({
         ? lastAuthorizedRef.current
         : null;
       const retainsLastGoodFrame = lastPresented !== null;
+      // Candidate admission is automatic when selecting an ordinary stroke. Rejecting its
+      // unsupported tip geometry is not a document failure: the ordinary pixels still own it.
+      // Keep the diagnostic reason, and preserve alerts for failures of an authorized frame.
+      const rejectedCandidate = !retainsLastGoodFrame
+        && reason.startsWith("compile:quality-gate-rejected:");
       if (!lastPresented) {
         lastAuthorizedRef.current = null;
         clearPresentedSnapshot(snapshotCanvas);
@@ -416,7 +421,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
         canvas.dataset.studioCanonicalVnextDryMediaReason = reason;
       }
       setDisplay({
-        state: documentRetained ? "document-retained"
+        state: documentRetained || rejectedCandidate ? "document-retained"
           : retainsLastGoodFrame ? "last-good-unavailable" : "unavailable",
         reason,
       });
