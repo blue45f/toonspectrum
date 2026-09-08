@@ -19,17 +19,16 @@ async function ensureLocalPreviewTransport(page: Page, label: string): Promise<v
   if (EXISTING_ORIGIN) return;
 
   const liveMode = page.locator("[data-studio-live-mode]").first();
-  if (
-    await liveMode
-      .getAttribute("data-studio-live-mode", { timeout: 800 })
-      .catch(() => null) === "local"
-  ) return;
+  const currentMode = await liveMode
+    .getAttribute("data-studio-live-mode", { timeout: 800 })
+    .catch(() => null);
+  if (currentMode === "local") return;
 
   const presenceDock = page.locator('[data-studio-presence-dock="true"]').first();
   await presenceDock.waitFor({ state: "visible", timeout: 20_000 });
 
   const fallback = page.getByRole("button", { name: "로컬 탭 모드", exact: true }).first();
-  if (!await fallback.isVisible().catch(() => false)) {
+  if (!(await fallback.isVisible().catch(() => false))) {
     const teamAction = page.locator('[data-studio-presence-team-action="true"]').first();
     if (await teamAction.isVisible().catch(() => false)) {
       await teamAction.click({ force: true });
