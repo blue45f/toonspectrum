@@ -1,0 +1,70 @@
+name: Apply comment inbox touch target
+
+on:
+  push:
+    branches:
+      - fix/comment-inbox-touch-target-20260908
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the issue branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/comment-inbox-touch-target-20260908
+
+      - name: Apply bounded comment inbox patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          source_path = Path("apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx")
+          source = source_path.read_text(encoding="utf-8")
+          old = '"relative min-h-9 shrink-0 gap-1.5 px-2.5 text-[0.72rem] disabled:cursor-not-allowed disabled:opacity-50"'
+          new = '"relative min-h-11 shrink-0 gap-1.5 px-2.5 text-[0.72rem] disabled:cursor-not-allowed disabled:opacity-50"'
+          if source.count(old) != 1:
+              raise SystemExit(f"expected one desktop comment inbox class, found {source.count(old)}")
+          source_path.write_text(source.replace(old, new, 1), encoding="utf-8")
+
+          test_path = Path("apps/web/src/domains/creator/StudioCommentInbox.touch-target.test.ts")
+          test_path.write_text("\n".join([
+              'import { readFileSync } from "node:fs";',
+              '',
+              'import { describe, expect, it } from "vitest";',
+              '',
+              'const source = readFileSync(',
+              '  new URL("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx", import.meta.url),',
+              '  "utf8",',
+              ');',
+              '',
+              'describe("Studio comment inbox touch target", () => {',
+              '  it("keeps the desktop review trigger at least 44px tall", () => {',
+              '    const triggerStart = source.indexOf(\'data-studio-comments-inbox="true"\');',
+              '    const triggerEnd = source.indexOf("</button>", triggerStart);',
+              '',
+              '    expect(triggerStart).toBeGreaterThan(-1);',
+              '    expect(triggerEnd).toBeGreaterThan(triggerStart);',
+              '    const trigger = source.slice(triggerStart, triggerEnd);',
+              '    expect(trigger).toContain("min-h-11");',
+              '    expect(trigger).not.toContain("min-h-9");',
+              '  });',
+              '});',
+              '',
+          ]), encoding="utf-8")
+          PY
+
+          rm .github/workflows/apply-comment-inbox-touch-target.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx \
+            apps/web/src/domains/creator/StudioCommentInbox.touch-target.test.ts \
+            .github/workflows/apply-comment-inbox-touch-target.yml
+          git commit -m "fix(a11y): enlarge desktop comment inbox trigger"
+          git push origin HEAD:fix/comment-inbox-touch-target-20260908
