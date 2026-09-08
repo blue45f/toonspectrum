@@ -267,6 +267,16 @@ export interface UsageDecision {
  * `null`은 권리 미확인 상태이며 허용으로 해석하지 않는다.
  * `validUntil`이 있으면 해당 시각부터 만료되며, 해석할 수 없는 시각도 거절한다.
  */
+const SURFACE_CAPABILITIES: Partial<Record<
+  ContentUsageSurface,
+  "originalDownload" | "projectImport" | "aiInput" | "aiTraining"
+>> = {
+  "marketplace-download": "originalDownload",
+  "studio-import": "projectImport",
+  "ai-input": "aiInput",
+  "ai-training": "aiTraining",
+};
+
 export function authorizeContentUsage(
   rights: RightsDecision,
   context: UsageContext,
@@ -286,11 +296,11 @@ export function authorizeContentUsage(
   if (!rights.allowedMonetizationModels.includes(context.monetization)) {
     return { allowed: false, reason: "MONETIZATION_NOT_ALLOWED" };
   }
-  if (
-    !rights.allowedSurfaces.includes(context.surface)
-    || (context.surface === "studio-import" && rights.projectImport !== true)
-    || (context.surface === "marketplace-download" && rights.originalDownload !== true)
-  ) {
+  if (!rights.allowedSurfaces.includes(context.surface)) {
+    return { allowed: false, reason: "SURFACE_NOT_ALLOWED" };
+  }
+  const surfaceCapability = SURFACE_CAPABILITIES[context.surface];
+  if (surfaceCapability && rights[surfaceCapability] !== true) {
     return { allowed: false, reason: "SURFACE_NOT_ALLOWED" };
   }
   if (context.commercialProject && rights.commercialUse !== true) {

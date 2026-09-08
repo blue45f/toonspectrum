@@ -831,6 +831,7 @@ import {
   preloadStudioReferencePanel,
   preloadStudioSavePayloadRuntime,
   preloadStudioTextEditOverlay,
+  StudioSmartShapeEditDialog,
   type StudioWebtoonGuidesModule,
 } from "./studio-page-lazy-ui";
 import { pageDisplayName } from "./studio-page-meta";
@@ -964,6 +965,10 @@ import {
   type QuickShapeKind,
 } from "./studio-quickshape";
 import { resolveStudioSmartShapeBrushEffectAvailability } from "./studio-smart-shape-brush-effect";
+import {
+  bindStudioSmartShapeHostControllers,
+  type StudioSmartShapeEditSession,
+} from "./studio-smart-shape-host-session";
 import {
   filterStudioRasterAssets,
   STUDIO_RASTER_ASSETS,
@@ -5922,6 +5927,7 @@ export function StudioCuttoonEditor({
   }, [activePage.id, activePage.drawingAssist]);
   const perspectiveRulerActive = drawingAssistDocument.perspective.active;
   const [quickShapeActive, setQuickShapeActive] = useState(false); // 기본 꺼짐
+  const [smartShapeEditSession, setSmartShapeEditSession] = useState<StudioSmartShapeEditSession | null>(null);
   const vanishingPoints = drawingAssistDocument.perspective.points;
   const perspectiveEyeLevelY = drawingAssistDocument.perspective.eyeLevelY;
   const perspectiveLockHorizon = drawingAssistDocument.perspective.lockHorizon;
@@ -18437,6 +18443,7 @@ const puppetWarpArmed =
     let handler: ((e: KeyboardEvent) => void) | null = null;
     shortcutRef.current = (e: KeyboardEvent) => {
       handler ??= buildStudioShortcutHandler({
+        openSmartShapeEditor,
         activateDrawToolWithProperties,
         activatePixelSelectionToolFromInspector,
         activatePrimaryCanvasTool,
@@ -25281,9 +25288,17 @@ function clearSelectionForEdit() {
   function handleImportProjectArchive(event: React.ChangeEvent<HTMLInputElement>) {
     return projectArchiveOrchestration.handleImportProjectArchive(event);
   }
+  const { openSmartShapeEditor, confirmSmartShapeEditor } = bindStudioSmartShapeHostControllers({
+    session: smartShapeEditSession, setSession: setSmartShapeEditSession,
+    drawingRef, drawingPointerTransportRef, nodeEditDragRef, currentPageIdRef, collaborationAccessRef,
+    elements, selectedId, groups, elementById, activeSurfaceReviewLocked,
+    captureStudioMutationTicket, canApplyStudioMutation, commit,
+    setError, setSelectedId, setMarqueeIds, setMenu, setNodeEditTool, activatePrimaryCanvasTool, announceDrawingShortcut,
+  });
   // 메뉴 항목 onSelect 클로저가 참조하는 에디터 핸들러의 안정 번들 — 그룹 배열 useMemo가
   // 렌더마다 무효화되지 않게 하고, 이벤트 시점엔 항상 최신 클로저를 호출한다.
   const studioMainMenuActions = useStudioStableHandlers({
+    openSmartShapeEditor,
     activatePrimaryCanvasTool,
     addPage,
     addText,
@@ -25760,6 +25775,7 @@ function clearSelectionForEdit() {
           selectDrawMode: (mode) => {
             studioMainMenuActions.activatePrimaryCanvasTool("draw", mode);
           },
+          correctCurrentStroke: studioMainMenuActions.openSmartShapeEditor,
           enableSmartShape: () => {
             studioMainMenuActions.activatePrimaryCanvasTool("draw", "pen");
             setQuickShapeActive(true);
@@ -25901,6 +25917,7 @@ function clearSelectionForEdit() {
     "quick-mask": !quickActionsDisabledActions.has("quick-mask"),
     "wet-mix": !quickActionsDisabledActions.has("wet-mix"),
     "dodge-burn": !quickActionsDisabledActions.has("dodge-burn"),
+    "correct-current-stroke": !activePageMutationLocked,
   };
   const quickAccessCatalog: readonly StudioQuickAccessCommandMeta[] =
     quickAccessIntegration?.buildStudioQuickAccessCommandCatalog(
@@ -25921,6 +25938,8 @@ function clearSelectionForEdit() {
       void handleSave("draft");
     } else if (intent.kind === "pixel-transform") {
       openPixelSelectionTransform();
+    } else if (intent.kind === "correct-current-stroke") {
+      openSmartShapeEditor();
     }
   }
   // 모바일 한 손 모드에서 퀵 메뉴 트리거 자체를 DOM 순서로 좌/우 끝에 옮긴다.
@@ -28846,6 +28865,7 @@ function clearSelectionForEdit() {
       quickMaskTintCanvas={quickMaskTintCanvas}
       quickMaskTintColor={quickMaskTintColor}
       quickMaskTintOpacity={quickMaskTintOpacity}
+      onCorrectCurrentStroke={studioMainMenuActions.openSmartShapeEditor}
       quickShapeActive={quickShapeActive}
       railMoreOpen={railMoreOpen}
       rasterFavoriteOnly={rasterFavoriteOnly}
@@ -29417,6 +29437,12 @@ function clearSelectionForEdit() {
         onFlushWorkspacePersistence={flushHybridDccWorkspacePersistence}
       >
         {editorSurface}
+        {smartShapeEditSession ? <Suspense fallback={null}>
+          <StudioSmartShapeEditDialog key={`${smartShapeEditSession.pageId}:${smartShapeEditSession.source.id}`}
+            source={smartShapeEditSession.source}
+            onCancel={() => setSmartShapeEditSession(null)}
+            onConfirm={confirmSmartShapeEditor} />
+        </Suspense> : null}
         <StudioWebtoonAssistantModal
           open={webtoonAssistantOpen}
           onClose={() => setWebtoonAssistantOpen(false)}

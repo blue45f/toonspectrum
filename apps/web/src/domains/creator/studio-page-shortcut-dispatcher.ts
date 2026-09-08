@@ -56,6 +56,7 @@ import type { Dispatch, SetStateAction } from "react";
  * 유지한다. 모든 멤버는 StudioPage 의 원래 이름과 1:1 로 대응한다.
  */
 export interface StudioShortcutHandlerContext {
+  readonly openSmartShapeEditor?: () => void;
   readonly activateDrawToolWithProperties: (nextDrawMode?: DrawMode) => void;
   readonly activatePixelSelectionToolFromInspector: (
     kind: SelectionToolKind | "circle" | "wand" | "color-range"
@@ -280,6 +281,7 @@ export function buildStudioShortcutHandler(
   ctx: StudioShortcutHandlerContext
 ): (e: KeyboardEvent) => void {
   const {
+    openSmartShapeEditor,
     activateDrawToolWithProperties,
     activatePixelSelectionToolFromInspector,
     activatePrimaryCanvasTool,
@@ -549,6 +551,9 @@ export function buildStudioShortcutHandler(
 
       // 앱 설정 → Shortcuts: user-bound chords (tool switchers etc.).
       const sc = appSettingsRef.current.shortcuts;
+      if (!e.repeat && matchStudioShortcut(sc["correct-current-stroke"], e) && openSmartShapeEditor) {
+        e.preventDefault(); openSmartShapeEditor(); return;
+      }
       if (matchStudioShortcut(sc["tool-select"], e)) {
         e.preventDefault();
         activatePrimaryCanvasTool("select");

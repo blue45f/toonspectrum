@@ -96,7 +96,7 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
     ]);
   });
 
-  it("runs cheap live-scene admission on every cache hit while caching only profile attestation", () => {
+  it("runs cheap live-scene admission on every cache hit while caching profile-and-budget attestation", () => {
     const cachedBranch = sourceBetweenIn(
       admissionSource,
       "const cached = args.cache.get(args.record.id);",
@@ -106,6 +106,7 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "assertStudioBg3dModelPlacementAdmission({",
       "if (!cached.admissionPolicyKeys?.has(policyKey))",
       "admitStoredBg3dModelForRendering(args.record.id",
+      "if (!args.isActive() || !isPolicyCurrent()) throw new StudioBg3dStaleModalOperationError()",
       "cached.admissionPolicyKeys ??= new Set<string>()",
       "cached.admissionPolicyKeys.add(policyKey)",
       "cached.admittedProfiles.add(policy.profile)",

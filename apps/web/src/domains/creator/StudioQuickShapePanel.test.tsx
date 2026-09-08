@@ -31,4 +31,20 @@ describe("StudioQuickShapePanel", () => {
     fireEvent.click(tutorial);
     expect(onOpenTutorial).toHaveBeenCalledOnce();
   });
+
+  it("exposes the current-stroke editor door when the host wires it", () => {
+    const onCorrectCurrentStroke = vi.fn();
+    render(
+      <StudioQuickShapePanel
+        active
+        matchedKindLabel="직선"
+        onToggleActive={vi.fn()}
+        onCorrectCurrentStroke={onCorrectCurrentStroke}
+      />,
+    );
+    const correct = screen.getByRole("button", { name: "현재 스트로크 교정…" });
+    expect(correct.className).toContain("min-h-11");
+    fireEvent.click(correct);
+    expect(onCorrectCurrentStroke).toHaveBeenCalledOnce();
+  });
 });

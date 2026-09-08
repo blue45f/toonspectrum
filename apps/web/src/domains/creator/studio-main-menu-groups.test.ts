@@ -150,6 +150,7 @@ function createUiActions(): StudioMainMenuUiActions {
     openShortcuts: vi.fn(),
     selectDrawMode: vi.fn(),
     enableSmartShape: vi.fn(),
+    correctCurrentStroke: vi.fn(),
     activateTransformTool: vi.fn(),
     openImageAdjustments: vi.fn(),
     openLayerMask: vi.fn(),
@@ -614,6 +615,10 @@ describe("buildStudioMainMenuGroups", () => {
     menuItem(groups, "comic", "page").onSelect();
     menuItem(groups, "brush", "pen").onSelect();
     menuItem(groups, "brush", "smart-shape").onSelect();
+    const correctStroke = menuItem(groups, "brush", "correct-current-stroke");
+    expect(correctStroke.searchActivation).toBe("execute");
+    expect(correctStroke.disabled).toBe(false);
+    correctStroke.onSelect();
     menuItem(groups, "brush", "fill").onSelect();
     menuItem(groups, "ai", "ai-assist").onSelect();
 
@@ -633,6 +638,7 @@ describe("buildStudioMainMenuGroups", () => {
     expect(editor.addPage).toHaveBeenCalledOnce();
     expect(ui.selectDrawMode).toHaveBeenCalledWith("pen");
     expect(ui.enableSmartShape).toHaveBeenCalledOnce();
+    expect(ui.correctCurrentStroke).toHaveBeenCalledOnce();
     expect(editor.toggleAdvancedFill).toHaveBeenCalledOnce();
     expect(ui.openStudioMenu).toHaveBeenCalledWith("aiAssist");
   });
