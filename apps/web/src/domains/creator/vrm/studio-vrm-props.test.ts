@@ -390,6 +390,53 @@ describe("VRM 소품 카탈로그", () => {
 });
 
 describe("부착 인스턴스 생성·직렬화", () => {
+  it.each(["missing", "throwing"])("uses secure random bytes when randomUUID is %s", (mode) => {
+    const getRandomValues = vi.fn((bytes: Uint8Array) => bytes.fill(0xab));
+    const random = vi.spyOn(Math, "random");
+    vi.stubGlobal("crypto", {
+      getRandomValues,
+      ...(mode === "throwing" ? { randomUUID: () => { throw new Error("Unavailable"); } } : {}),
+    });
+    try {
+      const first = createPropInstance("mug")!;
+      const second = createPropInstance("mug")!;
+      expect(first.uid).toMatch(/^mug-abababab-abab-4bab-abab-abababababab-/u);
+      expect(second.uid).not.toBe(first.uid);
+      expect(getRandomValues).toHaveBeenCalledTimes(2);
+      expect(random).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it.each(["missing", "throwing"])("preserves saved IDs without weak randomness when crypto is %s", async (mode) => {
+    const random = vi.spyOn(Math, "random");
+    const now = vi.spyOn(Date, "now").mockReturnValue(123456789);
+    const unavailable = () => { throw new Error("Unavailable"); };
+    vi.stubGlobal("crypto", mode === "missing" ? undefined : {
+      randomUUID: unavailable,
+      getRandomValues: unavailable,
+    });
+    try {
+      vi.resetModules();
+      const beforeReload = await import("./studio-vrm-props");
+      const saved = beforeReload.serializeVrmProps([beforeReload.createPropInstance("mug")!])!;
+      vi.resetModules();
+      const afterReload = await import("./studio-vrm-props");
+      const loaded = afterReload.parseVrmProps(saved);
+      const added = afterReload.createPropInstance("mug")!;
+      expect(loaded.items[0].uid).toBe(saved.items[0].uid);
+      expect(added.uid).not.toBe(loaded.items[0].uid);
+      expect(random).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+      now.mockRestore();
+      vi.resetModules();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("카탈로그 기본값으로 인스턴스를 만든다", () => {
     const inst = createPropInstance("smartphone", "fixed");
     expect(inst).not.toBeNull();

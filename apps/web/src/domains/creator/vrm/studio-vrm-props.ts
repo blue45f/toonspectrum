@@ -906,11 +906,20 @@ function isValidPropUid(value: unknown): value is string {
 
 function secureRandomUuid(): string | null {
   try {
-    return typeof globalThis.crypto?.randomUUID === "function"
-      ? globalThis.crypto.randomUUID()
-      : null;
+    if (typeof globalThis.crypto?.randomUUID === "function") {
+      return globalThis.crypto.randomUUID();
+    }
   } catch {
-    // 일부 임베디드 WebView는 crypto를 노출해도 호출 시 예외를 던질 수 있다.
+    // Some embedded WebViews expose randomUUID but reject calls to it.
+  }
+  try {
+    if (typeof globalThis.crypto?.getRandomValues !== "function") return null;
+    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  } catch {
     return null;
   }
 }
@@ -923,8 +932,10 @@ function propUidCandidate(seed?: string): string {
   if (uuid) return `${prefix}-${uuid}-${counter}`;
 
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).slice(2, 12).padEnd(10, "0");
-  return `${prefix}-${timestamp}-${counter}-${random}`;
+  // These are document-local object identifiers, never authorization tokens.
+  // Keep offline WebViews usable without pretending a weak PRNG is secure.
+  // The issued-ID registry also reserves saved IDs before allocating new ones.
+  return `${prefix}-${timestamp}-${counter}`;
 }
 
 /** 저장·재실행 뒤에도 충돌하기 어려운 UI 인스턴스 키(테스트에서는 uid를 직접 주입할 수 있다). */

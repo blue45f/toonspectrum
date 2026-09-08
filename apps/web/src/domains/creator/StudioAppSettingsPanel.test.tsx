@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 
+// @ts-expect-error -- jsdom is a test-only runtime fixture and does not bundle TypeScript types.
+import { JSDOM } from "jsdom";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -58,11 +60,26 @@ function openingButtonTagByAriaLabel(html: string, label: string): string {
 }
 
 function openingButtonTagByText(html: string, text: string): string {
-  const button = (html.match(/<button\b[^>]*>[\s\S]*?<\/button>/gu) ?? []).find((markup) =>
-    markup.replace(/<[^>]+>/gu, "").trim() === text
+  const fragment = JSDOM.fragment(html) as DocumentFragment;
+  const button = Array.from(fragment.querySelectorAll("button")).find((element) =>
+    element.textContent?.trim() === text
   );
-  return button?.match(/^<button\b[^>]*>/u)?.[0] ?? "";
+  return button?.outerHTML.match(/^<button\b[^>]*>/u)?.[0] ?? "";
 }
+
+describe("settings button text lookup", () => {
+  it("uses parsed text for nested markup and encoded literal tags", () => {
+    expect(openingButtonTagByText(
+      '<button data-target="nested"><span>High</span> quality</button>',
+      "High quality",
+    )).toContain('data-target="nested"');
+    expect(openingButtonTagByText(
+      '<button data-target="literal">&lt;script&gt; &amp; quality</button>',
+      "<script> & quality",
+    )).toContain('data-target="literal"');
+    expect(openingButtonTagByText("<button>Other</button>", "Missing")).toBe("");
+  });
+});
 
 describe("StudioAppSettingsPanel", () => {
   beforeEach(() => {
