@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { JSDOM } from "jsdom";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -58,11 +59,24 @@ function openingButtonTagByAriaLabel(html: string, label: string): string {
 }
 
 function openingButtonTagByText(html: string, text: string): string {
-  const button = (html.match(/<button\b[^>]*>[\s\S]*?<\/button>/gu) ?? []).find((markup) =>
-    markup.replace(/<[^>]+>/gu, "").trim() === text
+  const button = [...JSDOM.fragment(html).querySelectorAll("button")].find((element) =>
+    (element.textContent ?? "").trim() === text
   );
-  return button?.match(/^<button\b[^>]*>/u)?.[0] ?? "";
+  // Inspect only the button's own attributes; nested controls must not satisfy its assertions.
+  return (button?.cloneNode(false) as HTMLButtonElement | undefined)?.outerHTML ?? "";
 }
+
+describe("settings button markup lookup", () => {
+  it("reads nested rendered text and HTML entities without treating markup as sanitized text", () => {
+    const html = renderToStaticMarkup(
+      <button className="min-h-11" aria-pressed="true"><span>{"도구 < & >"}</span></button>,
+    );
+    const tag = openingButtonTagByText(html, "도구 < & >");
+    expect(tag).toContain('aria-pressed="true"');
+    expect(tag).toContain('class="min-h-11"');
+    expect(openingButtonTagByText(html, "없는 버튼")).toBe("");
+  });
+});
 
 describe("StudioAppSettingsPanel", () => {
   beforeEach(() => {

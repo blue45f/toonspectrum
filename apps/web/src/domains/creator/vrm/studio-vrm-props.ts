@@ -922,9 +922,16 @@ function propUidCandidate(seed?: string): string {
   const uuid = secureRandomUuid();
   if (uuid) return `${prefix}-${uuid}-${counter}`;
 
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).slice(2, 12).padEnd(10, "0");
-  return `${prefix}-${timestamp}-${counter}-${random}`;
+  // WebViews may omit randomUUID while still exposing Web Crypto's random-byte source.
+  // A saved instance must never silently fall back to predictable Math.random entropy.
+  const bytes = new Uint8Array(16);
+  try {
+    globalThis.crypto.getRandomValues(bytes);
+  } catch (cause) {
+    throw new Error("안전한 소품 식별자를 생성할 수 없습니다.", { cause });
+  }
+  const entropy = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${prefix}-${entropy}-${counter}`;
 }
 
 /** 저장·재실행 뒤에도 충돌하기 어려운 UI 인스턴스 키(테스트에서는 uid를 직접 주입할 수 있다). */
