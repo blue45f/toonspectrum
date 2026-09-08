@@ -554,6 +554,10 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     const stage = page.locator(".konvajs-content").first();
     await stage.waitFor({ state: "visible" });
     await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
+    // Focus can leave a tool hint over the canvas after the pointer moves away.
+    // Dismiss it through the shipped keyboard action before capturing the blank artwork.
+    await page.keyboard.press("Escape");
+    await page.locator('[data-studio-tool-hint="true"]:visible').waitFor({ state: "hidden" });
     const baseline = await captureStableStage(page, stage);
     writeFileSync(baselinePath, baseline);
     const surfaceDiagnostics = [await recordStageSurfaces(stage, "baseline")];

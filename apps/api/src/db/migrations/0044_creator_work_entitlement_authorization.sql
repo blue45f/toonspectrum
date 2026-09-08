@@ -23,11 +23,18 @@ BEGIN
         USING ERRCODE = '23514', CONSTRAINT = 'creator_work_catalog_asset_binding_entitlement_evidence';
     END IF;
 
-    IF ROW(NEW."workId", NEW."attachmentId", NEW."releaseId", NEW."entitlementGrantId")
-      IS NOT DISTINCT FROM
-      ROW(OLD."workId", OLD."attachmentId", OLD."releaseId", OLD."entitlementGrantId")
+    IF ROW(
+      NEW."workId", NEW."attachmentId", NEW."assetType", NEW."releaseId", NEW."entryId",
+      NEW."artifactSetId", NEW."selectedArtifactId", NEW."expectedContentDigest",
+      NEW."licenseSnapshotId", NEW."entitlementGrantId", NEW."useReceiptId"
+    ) IS NOT DISTINCT FROM ROW(
+      OLD."workId", OLD."attachmentId", OLD."assetType", OLD."releaseId", OLD."entryId",
+      OLD."artifactSetId", OLD."selectedArtifactId", OLD."expectedContentDigest",
+      OLD."licenseSnapshotId", OLD."entitlementGrantId", OLD."useReceiptId"
+    )
     THEN
-      -- Warning/state, profile and resolution metadata preserve the original reference.
+      -- Only warning/state, quality profile and resolution time preserve the original use.
+      -- Replacing its entry, bytes, license, asset type or receipt requires authorization again.
       -- insertedBy is nullable attribution, not authorization; retain its ON DELETE SET NULL.
       -- This does not authorize delivery or a new insertion: the resolver still checks
       -- revocation and existingWorkSurvives whenever the historical reference is used.
