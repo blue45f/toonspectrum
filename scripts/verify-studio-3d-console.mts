@@ -721,7 +721,7 @@ export function collectStudioVrmMannequinChromaFailures(
   const failures: string[] = [];
   if (baseline.pixelCount <= 0 || baseline.ratio < STUDIO_VRM_COLOR_MIN_RATIO) {
     failures.push(
-      `the default VRM frame is not demonstrably colored (${baseline.ratio.toFixed(4)})`,
+      `the VRM color fixture is not demonstrably colored (${baseline.ratio.toFixed(4)})`,
     );
   }
   if (mannequin.pixelCount <= 0 || mannequin.ratio > STUDIO_VRM_MANNEQUIN_MAX_RATIO) {
@@ -1080,8 +1080,14 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     exact: true,
   });
   await vrmCanvas.waitFor({ state: "visible", timeout: 5_000 });
-  const baselineChroma = await measureSettledStudioVrmChroma(page, vrmCanvas, "baseline");
   await characterDialog.getByRole("tab", { name: "체형·색", exact: true }).click();
+  // The default avatar's pale hair and neutral clothing sit on the chroma threshold in
+  // SwiftShader. Give the restoration check an explicit colored fixture through the shipped UI
+  // so changing an avatar's default palette cannot turn a correct restore into a one-pixel failure.
+  const topColor = characterDialog.getByRole("textbox", { name: "상의/드레스 HEX 색상", exact: true });
+  await topColor.fill("#c32673");
+  await topColor.press("Tab");
+  const baselineChroma = await measureSettledStudioVrmChroma(page, vrmCanvas, "baseline");
   const mannequinSwitch = characterDialog.getByRole("switch", {
     name: "중립 데생 인형 보기",
     exact: true,
