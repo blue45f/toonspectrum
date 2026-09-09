@@ -16,6 +16,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createCharacterExportPreflight, formatCharacterBytes } from "../export/character-export-preflight";
 import { STUDIO_FOCUS_RING } from "../../studio-panel-ui";
 import { isCharacterShaperTypingTarget, pushCharacterShaperKeyLayer } from "../../character-shaper/character-shaper-ui-model";
+import { CharacterCanonicalPartsPanel } from "./CharacterCanonicalPartsPanel";
 import { useCharacterPlatformWorkbench } from "./use-character-platform-workbench";
 
 import type { CharacterSlotKind } from "../../character-shaper/character-shaper-contract";
@@ -287,6 +288,11 @@ export function CharacterPlatformWorkbench({ h, binding }: {
           }}><Download size={14} aria-hidden />내보내기</button>
           <button type="button" className={BUTTON} disabled={!workbench.canonicalManifest} onClick={workbench.removeCanonicalManifest}><Trash2 size={14} aria-hidden />연결 해제</button>
         </div>
+        {workbench.canonicalManifest ? (
+          <div className="mt-3 border-t border-line pt-3">
+            <CharacterCanonicalPartsPanel workbench={workbench.canonicalParts} />
+          </div>
+        ) : null}
       </Section>
     </div>
   );

@@ -18,6 +18,96 @@ export type CharacterSemanticPart =
   | "shoes"
   | "accessory";
 
+export type CharacterCanonicalPartSlot =
+  | "eyes"
+  | "irises"
+  | "nose"
+  | "mouth"
+  | "ears"
+  | "hair"
+  | "top"
+  | "bottom"
+  | "shoes"
+  | "accessory";
+
+export type CharacterCanonicalPartSelector =
+  | {
+      readonly kind: "nodes";
+      readonly names: readonly string[];
+    }
+  | {
+      readonly kind: "semantic";
+      readonly semantic:
+        | "eyes"
+        | "irises"
+        | "hair"
+        | "tops"
+        | "bottoms"
+        | "onepiece"
+        | "shoes"
+        | "accessory";
+    };
+
+export interface CharacterCanonicalPartLod {
+  readonly id: string;
+  readonly sourceFile: string;
+  readonly sourceSha256: string;
+  /** Use this LOD when the projected part height is at or below this many CSS pixels. */
+  readonly maximumProjectedHeightPx: number;
+}
+
+export interface CharacterCanonicalPartFitDriver {
+  readonly measurement: string;
+  readonly reference: number;
+  readonly axis: "x" | "y" | "z" | "uniform";
+  readonly weight: number;
+  readonly minimumScale: number;
+  readonly maximumScale: number;
+}
+
+export interface CharacterCanonicalPartDescriptor {
+  readonly id: string;
+  readonly label: string;
+  readonly slot: CharacterCanonicalPartSlot;
+  readonly thumbnail?: string;
+  readonly source: {
+    /** A bundled or same-origin donor VRM/GLB. Cross-origin sources are deliberately unsupported. */
+    readonly format: "vrm-donor" | "glb-part";
+    readonly file: string;
+    readonly sha256: string;
+    readonly selector: CharacterCanonicalPartSelector;
+  };
+  readonly binding: {
+    readonly kind: "skinned-transplant" | "socket" | "rigid-follow";
+    readonly targetSocket?: string;
+    readonly targetBone?: string;
+    readonly requiredRigRevisions?: readonly string[];
+    readonly requiredTopologyFamilies?: readonly CharacterTopologyFamily[];
+  };
+  readonly fitting: {
+    readonly drivers: readonly CharacterCanonicalPartFitDriver[];
+    readonly clearanceMeters: number;
+    readonly hideTargetPart: boolean;
+    readonly correctiveMorphs: Readonly<Record<string, number>>;
+  };
+  readonly lods: readonly CharacterCanonicalPartLod[];
+  readonly semanticLayers: readonly CharacterSemanticPart[];
+  readonly quality: {
+    readonly minimumScore: number;
+    readonly accepted: boolean;
+    readonly reportFile: string;
+    readonly goldenPoseIds: readonly string[];
+    readonly goldenCameraIds: readonly string[];
+  };
+  readonly provenance: {
+    readonly creatorId: string;
+    readonly sourceLicense: string;
+    readonly commercialUse: boolean;
+    readonly redistribution: boolean;
+    readonly derivativeUse: boolean;
+  };
+}
+
 export interface CharacterCanonicalIdentity {
   readonly assetId: string;
   readonly version: string;
@@ -96,6 +186,8 @@ export interface CharacterCanonicalManifestV2 {
     readonly sockets: readonly CharacterCanonicalSocket[];
     readonly colliders: readonly CharacterCanonicalCollisionShape[];
   };
+  /** Optional modular authored parts. Absence preserves the original V2 contract exactly. */
+  readonly parts?: readonly CharacterCanonicalPartDescriptor[];
   readonly exports: {
     readonly supportedPasses: readonly CharacterSemanticPassId[];
     readonly psdLayerMap: Readonly<Partial<Record<CharacterSemanticPassId, string>>>;
@@ -125,6 +217,19 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function isSha256(value: unknown): value is string {
+  return typeof value === "string" && /^(?:sha256:)?[0-9a-f]{64}$/iu.test(value);
+}
+
+function isSameOriginAssetPath(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 1024) return false;
+  if (/[\\\u0000-\u001f\u007f]/u.test(value)) return false;
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/iu.test(value)) return false;
+  const path = value.split(/[?#]/u, 1)[0] ?? "";
+  if (path.length === 0) return false;
+  return !path.split("/").some((segment) => segment === "." || segment === "..");
+}
+
 function isStringArray(value: unknown, maximum = 256): value is readonly string[] {
   return Array.isArray(value) && value.length <= maximum && value.every(isString);
 }
@@ -136,6 +241,12 @@ function isTuple(value: unknown, length: number): value is readonly number[] {
 function isSemanticPart(value: string): value is CharacterSemanticPart {
   return [
     "face", "eyes", "irises", "skin", "hair-front", "hair-back", "top", "bottom", "shoes", "accessory",
+  ].includes(value);
+}
+
+function isPartSlot(value: unknown): value is CharacterCanonicalPartSlot {
+  return typeof value === "string" && [
+    "eyes", "irises", "nose", "mouth", "ears", "hair", "top", "bottom", "shoes", "accessory",
   ].includes(value);
 }
 
@@ -180,6 +291,77 @@ function isCollider(value: unknown): value is CharacterCanonicalCollisionShape {
     && isTuple(value.offset, 3);
 }
 
+function isPartSelector(value: unknown): value is CharacterCanonicalPartSelector {
+  if (!isRecord(value)) return false;
+  if (value.kind === "nodes") return isStringArray(value.names, 128) && value.names.length > 0;
+  if (value.kind !== "semantic") return false;
+  return typeof value.semantic === "string" && [
+    "eyes", "irises", "hair", "tops", "bottoms", "onepiece", "shoes", "accessory",
+  ].includes(value.semantic);
+}
+
+function isFitDriver(value: unknown): value is CharacterCanonicalPartFitDriver {
+  if (!isRecord(value) || !isString(value.measurement)) return false;
+  if (!["x", "y", "z", "uniform"].includes(String(value.axis))) return false;
+  if (![value.reference, value.weight, value.minimumScale, value.maximumScale].every(isFiniteNumber)) return false;
+  return Number(value.reference) > 0
+    && Number(value.weight) >= 0
+    && Number(value.weight) <= 1
+    && Number(value.minimumScale) > 0
+    && Number(value.maximumScale) >= Number(value.minimumScale);
+}
+
+function isPartLod(value: unknown): value is CharacterCanonicalPartLod {
+  return isRecord(value)
+    && isString(value.id)
+    && isSameOriginAssetPath(value.sourceFile)
+    && isSha256(value.sourceSha256)
+    && isFiniteNumber(value.maximumProjectedHeightPx)
+    && Number(value.maximumProjectedHeightPx) > 0;
+}
+
+function isPartDescriptor(value: unknown): value is CharacterCanonicalPartDescriptor {
+  if (!isRecord(value) || !isString(value.id) || !isString(value.label) || !isPartSlot(value.slot)) return false;
+  if (value.thumbnail !== undefined && !isSameOriginAssetPath(value.thumbnail)) return false;
+  const source = value.source;
+  if (!isRecord(source) || !["vrm-donor", "glb-part"].includes(String(source.format))) return false;
+  if (!isSameOriginAssetPath(source.file) || !isSha256(source.sha256) || !isPartSelector(source.selector)) return false;
+
+  const binding = value.binding;
+  if (!isRecord(binding) || !["skinned-transplant", "socket", "rigid-follow"].includes(String(binding.kind))) return false;
+  if (binding.targetSocket !== undefined && !isString(binding.targetSocket)) return false;
+  if (binding.targetBone !== undefined && !isString(binding.targetBone)) return false;
+  if (binding.requiredRigRevisions !== undefined && !isStringArray(binding.requiredRigRevisions, 32)) return false;
+  if (binding.requiredTopologyFamilies !== undefined) {
+    if (!Array.isArray(binding.requiredTopologyFamilies) || binding.requiredTopologyFamilies.length > 3) return false;
+    if (!binding.requiredTopologyFamilies.every((family) => ["toon-standard", "toon-young", "toon-sd"].includes(String(family)))) return false;
+  }
+  if ((binding.kind === "socket" || binding.kind === "rigid-follow") && !binding.targetSocket && !binding.targetBone) return false;
+
+  const fitting = value.fitting;
+  if (!isRecord(fitting) || !Array.isArray(fitting.drivers) || fitting.drivers.length > 32 || !fitting.drivers.every(isFitDriver)) return false;
+  if (!isFiniteNumber(fitting.clearanceMeters) || Number(fitting.clearanceMeters) < 0 || Number(fitting.clearanceMeters) > 0.2) return false;
+  if (typeof fitting.hideTargetPart !== "boolean" || !isRecord(fitting.correctiveMorphs)) return false;
+  if (!Object.entries(fitting.correctiveMorphs).every(([key, weight]) => isString(key) && isFiniteNumber(weight) && Number(weight) >= -1 && Number(weight) <= 1)) return false;
+
+  if (!Array.isArray(value.lods) || value.lods.length > 8 || !value.lods.every(isPartLod)) return false;
+  if (!Array.isArray(value.semanticLayers) || value.semanticLayers.length === 0 || value.semanticLayers.length > 8) return false;
+  if (!value.semanticLayers.every((item) => typeof item === "string" && isSemanticPart(item))) return false;
+
+  const quality = value.quality;
+  if (!isRecord(quality) || !isFiniteNumber(quality.minimumScore) || Number(quality.minimumScore) < 0 || Number(quality.minimumScore) > 100) return false;
+  if (typeof quality.accepted !== "boolean" || !isSameOriginAssetPath(quality.reportFile)) return false;
+  if (!isStringArray(quality.goldenPoseIds, 256) || !isStringArray(quality.goldenCameraIds, 64)) return false;
+
+  const provenance = value.provenance;
+  return isRecord(provenance)
+    && isString(provenance.creatorId)
+    && isString(provenance.sourceLicense)
+    && typeof provenance.commercialUse === "boolean"
+    && typeof provenance.redistribution === "boolean"
+    && typeof provenance.derivativeUse === "boolean";
+}
+
 function ensureUnique(values: readonly string[], label: string): void {
   if (new Set(values).size !== values.length) {
     throw new CharacterCanonicalManifestError("CHARACTER_MANIFEST_DUPLICATE", `${label}에 중복 항목이 있습니다.`);
@@ -212,6 +394,10 @@ export function isCharacterCanonicalManifestV2(value: unknown): value is Charact
   if (!Array.isArray(fitting.sockets) || fitting.sockets.length > 256 || !fitting.sockets.every(isSocket)) return false;
   if (!Array.isArray(fitting.colliders) || fitting.colliders.length > 256 || !fitting.colliders.every(isCollider)) return false;
 
+  if (value.parts !== undefined) {
+    if (!Array.isArray(value.parts) || value.parts.length > 512 || !value.parts.every(isPartDescriptor)) return false;
+  }
+
   const exports = value.exports;
   if (!isRecord(exports) || !isStringArray(exports.supportedPasses, 64) || !isRecord(exports.psdLayerMap)) return false;
   if (!Object.values(exports.psdLayerMap).every(isString)) return false;
@@ -241,6 +427,10 @@ export function parseCharacterCanonicalManifestV2(value: unknown): CharacterCano
   ensureUnique(value.fitting.sockets.map((item) => item.id), "부착 소켓");
   ensureUnique(value.fitting.colliders.map((item) => item.id), "충돌체");
   ensureUnique(value.exports.supportedPasses, "렌더 패스");
+  if (value.parts) {
+    ensureUnique(value.parts.map((item) => item.id), "캐릭터 파츠");
+    for (const part of value.parts) ensureUnique(part.lods.map((lod) => lod.id), `${part.label} LOD`);
+  }
   return value;
 }
 
@@ -257,5 +447,6 @@ export function canonicalManifestCapabilityIds(
   if (Object.keys(manifest.morphs).length > 0) capabilities.add("semantic-morphs");
   if (manifest.fitting.sockets.length > 0) capabilities.add("attachment-sockets");
   if (manifest.fitting.colliders.length > 0) capabilities.add("collision-profile");
+  if ((manifest.parts?.length ?? 0) > 0) capabilities.add("modular-character-parts");
   return Object.freeze([...capabilities].sort(compareCodeUnitStrings));
 }

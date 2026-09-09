@@ -122,7 +122,7 @@ describe("studio verified download package", () => {
     ).rejects.toMatchObject({
       code: "MIME_MISMATCH",
       pageIndex: 0,
-    });
+    } satisfies Partial<StudioDownloadPackageError>);
   });
 
   it("honors an already aborted package request before reading page bytes", async () => {
@@ -149,6 +149,6 @@ describe("studio verified download package", () => {
       ),
     ).rejects.toMatchObject({
       code: "ABORTED",
-    });
+    } satisfies Partial<StudioDownloadPackageError>);
   });
 });
