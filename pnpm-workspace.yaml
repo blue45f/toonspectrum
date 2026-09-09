@@ -38,10 +38,11 @@ allowBuilds:
 
 overrides:
   handlebars: '>=4.7.9'
-  multer: '>=2.2.0'
+  multer: '>=2.3.0'
   undici: '^7.29.0'
   ws: '>=8.21.0'
   form-data: '>=4.0.6'
+  'colord@<2.9.4': 2.9.4
   hono: '>=4.12.25'
   find-my-way: '>=8.2.2'
   '@fastify/middie': '>=9.3.2'
@@ -50,9 +51,9 @@ overrides:
   'socket.io-parser@>=4.0.0 <4.2.7': 4.2.7
   'minimatch@3.1.5>brace-expansion': 5.0.9
   'brace-expansion@>=3.0.0 <5.0.9': 5.0.9
-  'js-yaml@>=4.0.0 <4.3.1': 4.3.1
+  'js-yaml@>=4.0.0 <4.3.2': 4.3.2
   'postcss@>=8.0.0 <8.5.23': 8.5.23
-  'sharp@<0.35.0': 0.35.2
+  'sharp@<0.35.4': 0.35.4
   # 이전에 루트 package.json 의 npm 전용 "overrides" 에 있던 핀. pnpm 워크스페이스는 그 블록을
   # 읽지 않아 실제로는 아무것도 고정하지 못했다(@vercel/fun 이 tar 7.5.7 로 해석되고 있었다).
   # 같은 트리에 이미 존재하는 tar 7.5.22 로 수렴시킨다.
@@ -67,9 +68,10 @@ overrides:
   'path-to-regexp@>=8.0.0 <8.4.2': 8.4.2
   serialize-javascript: '>=7.0.3'
   piscina: '>=4.9.3'
-  vitest: '4.1.9'
-  '@vitest/coverage-v8': '4.1.9'
-  '@vitest/ui': '4.1.9'
+  vitest: '4.1.11'
+  '@vitest/coverage-v8': '4.1.11'
+  '@vitest/ui': '4.1.11'
+  '@vitest/mocker@>=2.1.0 <4.1.11': 4.1.11
   vite: '>=8.0.16'
   jspdf: '>=4.2.1'
   babylonjs-gltf2interface: '9.19.0'

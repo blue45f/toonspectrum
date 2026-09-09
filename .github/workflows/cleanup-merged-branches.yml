@@ -17,13 +17,15 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: merged-branch-cleanup
-  cancel-in-progress: true
+  # Preserve a cleanup that has acquired a runner; a later tick may replace only stale pending work.
+  # The v2 suffix detaches this lightweight runner generation from legacy queued ubuntu-latest runs.
+  group: merged-branch-cleanup-v2
+  cancel-in-progress: false
 
 jobs:
   cleanup:
     name: Delete branches already integrated into main
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 8
     steps:
       - name: Fetch cleanup script from the triggering main commit
