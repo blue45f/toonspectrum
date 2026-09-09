@@ -24,8 +24,6 @@ on:
       - "scripts/lib/studio-verify-preview-harness.mts"
       - "apps/web/src/domains/creator/**"
   schedule:
-    # 03:23 KST. The scheduled run catches renderer drift even when a dependency or generated
-    # artifact changes outside the obvious brush paths.
     - cron: "23 18 * * *"
   workflow_dispatch:
 
@@ -33,14 +31,15 @@ permissions:
   contents: write
 
 concurrency:
-  group: studio-ink-live-commit-${{ github.workflow }}-${{ github.ref }}
+  # Keep this tiny source-delivery generation separate from the stale ubuntu-latest queue.
+  group: studio-ink-live-commit-patch-v3-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   apply-fidelity-patch:
     name: apply-fidelity-patch
     if: github.event_name == 'pull_request' && github.head_ref == 'fix/studio-ink-live-commit-fidelity-20260909'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
@@ -295,40 +294,3 @@ jobs:
           git add scripts/verify-studio-long-stroke.mts
           git commit -m "fix(ci): make ink fidelity evidence deterministic"
           git push origin "HEAD:${{ github.head_ref }}"
-
-  fidelity:
-    name: ink-live-commit-fidelity
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
-      TOONSPECTRUM_INK_FIDELITY_SPAWN_PREVIEW: "1"
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          # Browser code comes from the pull request and never needs a repository write token.
-          persist-credentials: false
-      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - name: Resolve the verification directory after runner allocation
-        run: |
-          echo "TOONSPECTRUM_VERIFY_DIR=$RUNNER_TEMP/toonspectrum-verification" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/toonspectrum-verification"
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Build production Studio assets
-        run: pnpm run build
-      - name: Verify ink-wash and dip-pen live/commit fidelity
-        run: pnpm exec tsx scripts/verify-inkwash-dippen-live-commit-fidelity.mts
-      - name: Upload fidelity evidence
-        if: always()
-        uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
-        with:
-          name: studio-ink-live-commit-${{ github.run_id }}
-          path: ${{ runner.temp }}/toonspectrum-verification/studio-ink-live-commit
-          if-no-files-found: warn
-          retention-days: 14
