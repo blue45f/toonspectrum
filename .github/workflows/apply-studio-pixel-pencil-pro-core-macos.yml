@@ -17,6 +17,9 @@ jobs:
     if: ${{ !contains(github.event.head_commit.message, '[pixel-pencil-pro-core-applied]') }}
     runs-on: macos-latest
     timeout-minutes: 60
+    env:
+      # Keep the focused verifier aligned with the protected main CI typecheck budget.
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - name: Sparse partial-clone feature branch
         env:
