@@ -3,11 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fillStudioPixelPencilCells,
   isStudioPixelPencilRenderMode,
+  normalizeStudioPixelPencilStrokeWidth,
   packStudioPixelPencilCells,
   planStudioPixelPencilCells,
+  planStudioPixelPencilSampleUpdate,
   shouldAppendStudioPixelPencilSample,
   studioPixelPencilCellAt,
   STUDIO_PIXEL_PENCIL_MAX_ABS_CELL,
+  STUDIO_PIXEL_PENCIL_MAX_STROKE_WIDTH,
   STUDIO_PIXEL_PENCIL_RENDER_MODE,
 } from "./studio-pixel-pencil";
 
@@ -54,6 +57,44 @@ describe("studio pixel pencil", () => {
       nextX: 0.9,
       nextY: 2.9,
     })).toBe(false);
+  });
+
+  it("plans Aseprite-style pixel-perfect corner cleanup without mutating samples", () => {
+    const points = [0.2, 0.2, 1.2, 0.2];
+    const before = [...points];
+
+    expect(planStudioPixelPencilSampleUpdate({
+      points,
+      nextX: 1.2,
+      nextY: 1.2,
+      strokeWidth: 1,
+    })).toBe("replace-tail");
+    expect(planStudioPixelPencilSampleUpdate({
+      points,
+      nextX: 2.2,
+      nextY: 0.2,
+      strokeWidth: 1,
+    })).toBe("append");
+    expect(planStudioPixelPencilSampleUpdate({
+      points,
+      nextX: 1.2,
+      nextY: 0.8,
+      strokeWidth: 1,
+    })).toBe("ignore");
+    expect(planStudioPixelPencilSampleUpdate({
+      points,
+      nextX: 1.2,
+      nextY: 1.2,
+      strokeWidth: 2,
+    })).toBe("append");
+    expect(planStudioPixelPencilSampleUpdate({
+      points,
+      nextX: 1.2,
+      nextY: 1.2,
+      strokeWidth: 1,
+      pixelPerfect: false,
+    })).toBe("append");
+    expect(points).toEqual(before);
   });
 
   it("fills horizontal and vertical gaps between sparse pointer samples", () => {
@@ -140,6 +181,24 @@ describe("studio pixel pencil", () => {
       reason,
       cells: [],
     });
+  });
+
+  it("normalizes integer tip sizes and rejects unsafe widths before cell planning", () => {
+    expect(normalizeStudioPixelPencilStrokeWidth(undefined)).toBe(1);
+    expect(normalizeStudioPixelPencilStrokeWidth(3.6)).toBe(4);
+    expect(normalizeStudioPixelPencilStrokeWidth(500)).toBe(
+      STUDIO_PIXEL_PENCIL_MAX_STROKE_WIDTH
+    );
+    expect(normalizeStudioPixelPencilStrokeWidth(0)).toBeNull();
+    expect(normalizeStudioPixelPencilStrokeWidth(Number.POSITIVE_INFINITY)).toBeNull();
+    expect(planStudioPixelPencilCells({
+      points: [0, 0],
+      strokeWidth: Number.POSITIVE_INFINITY,
+    })).toMatchObject({ complete: false, reason: "invalid-stroke-width", cells: [] });
+    expect(planStudioPixelPencilCells({
+      points: [-STUDIO_PIXEL_PENCIL_MAX_ABS_CELL, 0],
+      strokeWidth: 2,
+    })).toMatchObject({ complete: false, reason: "coordinate-out-of-range", cells: [] });
   });
 
   it("rejects malformed limits instead of silently accepting an unbounded job", () => {
