@@ -51,6 +51,23 @@ describe("selectSupersededActionsRuns", () => {
     expect(selected[0]).toMatchObject({ reason: "pull-request-closed" });
   });
 
+  it("cancels an unlinked PR run when its head is no longer open", () => {
+    const selected = selectSupersededActionsRuns(
+      [run({ id: 12, branch: "feature/closed", createdAt: "2026-09-10T00:02:00Z", pr: null })],
+      { openPullHeadBranches: new Set(["feature/open"]) },
+    );
+    expect(selected).toHaveLength(1);
+    expect(selected[0]).toMatchObject({ reason: "pull-request-no-longer-open" });
+  });
+
+  it("keeps an unlinked run when its head still belongs to an open PR", () => {
+    const selected = selectSupersededActionsRuns(
+      [run({ id: 13, branch: "feature/open", createdAt: "2026-09-10T00:02:00Z", pr: null })],
+      { openPullHeadBranches: new Set(["feature/open"]) },
+    );
+    expect(selected).toEqual([]);
+  });
+
   it("protects the cleanup workflow's current run", () => {
     const selected = selectSupersededActionsRuns(
       [
