@@ -64,7 +64,7 @@ export const SITE_NAVIGATION_ITEMS = {
   studio: item("studio", "/studio", Palette, "스튜디오", "Studio", "드로잉·레이어·필터 작업", "Draw with brushes, layers and filters"),
   comic: item("comic", "/studio/comic", LayoutGrid, "컷툰 만들기", "Comic maker", "컷·말풍선·대사를 한 화면에서", "Arrange panels, dialogue and balloons"),
   shaper: item("shaper", "/shaper", UserRoundPen, "캐릭터 셰이퍼", "Character shaper", "캐릭터·포즈·구도를 입체적으로", "Shape characters, poses and composition"),
-  market: item("market", "/market", Store, "에셋 마켓", "Asset market", "배경·소품·템플릿을 작업에 연결", "Find backgrounds, props and templates"),
+  market: item("market", "/market", Store, "에셋 마켓", "Asset market", "찾기·설치·배포까지 창작 에셋을 한곳에서", "Find, install and publish creative assets"),
   gallery: item("gallery", "/create", Images, "창작 갤러리", "Creator gallery", "다른 창작자의 작품과 제작 흐름", "Meet creators and their work"),
   explore: item("explore", "/discover", Compass, "찾기", "Discover", "검색·취향·추천·랭킹에서 원하는 방식으로 작품 발견", "Find stories through search, taste, recommendations or rankings"),
   ranking: item("ranking", "/ranking", TrendingUp, "통합 랭킹", "Rankings", "기간과 지표별 인기 흐름", "See trends across periods and signals"),
@@ -86,13 +86,14 @@ export const SITE_NAVIGATION_ITEMS = {
 const I = SITE_NAVIGATION_ITEMS;
 
 /**
- * Desktop keeps four conventional destinations; the purpose-first Create action
- * is rendered as the visually distinct header CTA so the top-level model stays
- * at five choices rather than turning into another feature strip.
+ * Desktop gives the asset ecosystem its own first-class destination. Create remains
+ * the visually distinct CTA, so the header communicates six stable product pillars
+ * without expanding into a feature-by-feature strip.
  */
 export const PRIMARY_SITE_NAVIGATION = [
   I.home,
   I.explore,
+  I.market,
   I.community,
   I.me,
 ] as const;
@@ -128,7 +129,7 @@ export const MOBILE_SITE_TABS = [
   I.home,
   I.explore,
   I.make,
-  I.community,
+  I.market,
   I.me,
 ] as const;
 
