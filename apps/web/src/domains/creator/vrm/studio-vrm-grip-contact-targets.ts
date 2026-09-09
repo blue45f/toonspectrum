@@ -1,10 +1,14 @@
 import * as THREE from "three";
 
+export type StudioVrmGripFingerOrdinal = 0 | 1 | 2 | 3;
+
 export interface StudioVrmGripContactTargetInput {
   readonly center: THREE.Vector3;
   readonly axis: THREE.Vector3;
   readonly fallbackRadial: THREE.Vector3;
   readonly fingertipWorldPositions: readonly THREE.Vector3[];
+  /** Original Index/Middle/Ring/Little ordinal for each supplied fingertip. */
+  readonly fingerOrdinals?: readonly StudioVrmGripFingerOrdinal[];
   readonly gripRadius: number;
   readonly handSize: number;
   readonly side: "left" | "right";
@@ -28,22 +32,37 @@ function safeNormalized(value: THREE.Vector3, fallback: THREE.Vector3): THREE.Ve
   return new THREE.Vector3(1, 0, 0);
 }
 
+function resolveOrdinals(input: StudioVrmGripContactTargetInput): readonly StudioVrmGripFingerOrdinal[] | null {
+  const count = input.fingertipWorldPositions.length;
+  if (count < 1 || count > FINGER_AXIAL_FACTORS.length) return null;
+  if (input.fingerOrdinals === undefined) {
+    return Object.freeze(Array.from({ length: count }, (_, index) => index as StudioVrmGripFingerOrdinal));
+  }
+  if (
+    input.fingerOrdinals.length !== count
+    || new Set(input.fingerOrdinals).size !== count
+    || input.fingerOrdinals.some((ordinal) => !Number.isSafeInteger(ordinal) || ordinal < 0 || ordinal > 3)
+  ) return null;
+  return input.fingerOrdinals;
+}
+
 /**
- * Creates one stable target per fingertip around a cylindrical/handle grip.
+ * Creates one stable target per unlocked fingertip around a cylindrical/handle grip.
  *
  * The old contact refinement pulled every finger toward the same point, producing a pinched,
  * collapsed silhouette. This planner preserves each finger's initial circumferential side while
- * distributing index→little along the grip axis. Targets are frozen before the iterative solver,
- * so the goal cannot move as joints are changed.
+ * distributing Index→Little along the authored grip axis. Original finger ordinals survive joint
+ * locks, so locking one finger never shifts the remaining fingers into another finger's target.
  */
 export function createStudioVrmGripContactTargets(
   input: StudioVrmGripContactTargetInput,
 ): StudioVrmGripContactTargets | null {
+  const ordinals = resolveOrdinals(input);
   if (
-    !finiteVector(input.center)
+    !ordinals
+    || !finiteVector(input.center)
     || !finiteVector(input.axis)
     || !finiteVector(input.fallbackRadial)
-    || input.fingertipWorldPositions.length !== FINGER_AXIAL_FACTORS.length
     || input.fingertipWorldPositions.some((point) => !finiteVector(point))
     || !Number.isFinite(input.gripRadius)
     || input.gripRadius <= 0
@@ -74,11 +93,11 @@ export function createStudioVrmGripContactTargets(
     const radial = fromCenter.clone().addScaledVector(axis, -fromCenter.dot(axis));
     const radialDirection = safeNormalized(radial, fallbackRadial).multiplyScalar(handedness);
     // Preserve the actual initial circumferential side; handedness is only used when the finger is
-    // degenerate on the axis. Flipping a valid radial vector would move a right/left hand through
-    // the prop instead of toward its nearest surface.
+    // degenerate on the axis. Flipping a valid radial vector would move a hand through the prop.
     if (radial.lengthSq() > 1e-10) radialDirection.copy(radial.normalize());
+    const ordinal = ordinals[index]!;
     return input.center.clone()
-      .addScaledVector(axis, axialSpan * FINGER_AXIAL_FACTORS[index]!)
+      .addScaledVector(axis, axialSpan * FINGER_AXIAL_FACTORS[ordinal]!)
       .addScaledVector(radialDirection, surfaceRadius);
   });
 
