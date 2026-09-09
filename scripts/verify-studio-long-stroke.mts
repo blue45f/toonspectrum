@@ -47,7 +47,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { chromium, type Browser, type CDPSession, type Page } from "playwright";
+import { chromium, type Browser, type CDPSession, type Locator, type Page } from "playwright";
 
 import { STUDIO_CANVAS_WIDTH } from "../apps/web/src/domains/creator/canvas/studio-canvas-constants";
 
@@ -72,6 +72,13 @@ const SPAWN_PREVIEW = process.env.TOONSPECTRUM_LONG_STROKE_SPAWN_PREVIEW === "1"
 const OUT_DIR = join(process.env.TOONSPECTRUM_VERIFY_DIR ?? tmpdir(), "studio-long-stroke");
 const REPORT_PATH = join(OUT_DIR, "report.json");
 const VIEWPORT = { width: 1600, height: 1000 } as const;
+/** High-contrast evidence colour, deliberately distinct from white paper and editor chrome. */
+const EVIDENCE_STROKE_COLOR = "#0b9b6d";
+/** Transient editor chrome is not raster evidence and must never satisfy an ink assertion. */
+const EVIDENCE_CHROME_SELECTOR = [
+  '[data-studio-tool-hint="true"]',
+  '[data-studio-brush-hud="true"]',
+].join(",");
 
 // ── 임계값(리포트 thresholds 에 그대로 실린다) ─────────────────────────────────────────────
 const PERF_SAMPLES = Number(process.env.TOONSPECTRUM_LONG_STROKE_PERF_SAMPLES ?? "3200") || 3_200;
@@ -273,6 +280,106 @@ async function dismissChrome(page: Page): Promise<void> {
     }
     await page.waitForTimeout(250);
   }
+}
+
+async function firstVisible(locator: Locator): Promise<Locator> {
+  const count = await locator.count();
+  for (let index = 0; index < count; index += 1) {
+    const candidate = locator.nth(index);
+    if (await candidate.isVisible().catch(() => false)) return candidate;
+  }
+  throw new Error(`no visible locator matched ${String(locator)}`);
+}
+
+/**
+ * Evidence screenshots intentionally exclude transient tooltip/HUD chrome and use a
+ * deterministic, high-contrast paint colour. The previous gate captured a rich tooltip in
+ * 00-blank and then counted its disappearance as committed ink while all three ink frames
+ * were actually white.
+ */
+async function prepareEvidenceFixture(page: Page): Promise<Readonly<{
+  strokeColor: string;
+  transparentColorDisabled: boolean;
+  hiddenChromeSelector: string;
+}>> {
+  await page.addStyleTag({
+    content: `${EVIDENCE_CHROME_SELECTOR} { display: none !important; }`,
+  });
+  await page.keyboard.press("Escape").catch(() => undefined);
+
+  const pressedTransparent = page.locator(
+    '[data-studio-transparent-color-well="true"][aria-pressed="true"]',
+  );
+  for (let index = 0; index < await pressedTransparent.count(); index += 1) {
+    const toggle = pressedTransparent.nth(index);
+    if (await toggle.isVisible().catch(() => false)) await toggle.click();
+  }
+
+  const colorInput = await firstVisible(
+    page.locator('input[type="color"][aria-label^="주 색 선택"]'),
+  );
+  await colorInput.fill(EVIDENCE_STROKE_COLOR);
+  await page.waitForFunction(
+    ({ color, selector }) => {
+      const visibleInputs = Array.from(
+        document.querySelectorAll<HTMLInputElement>(selector),
+      ).filter((input) => input.getBoundingClientRect().width > 0);
+      return visibleInputs.some((input) => input.value.toLowerCase() === color);
+    },
+    {
+      color: EVIDENCE_STROKE_COLOR,
+      selector: 'input[type="color"][aria-label^="주 색 선택"]',
+    },
+    { timeout: 5_000 },
+  );
+  const state = await page.evaluate(({ chromeSelector, color }) => {
+    const chromeVisible = Array.from(document.querySelectorAll(chromeSelector)).some((node) => {
+      const style = getComputedStyle(node);
+      const rect = node.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden"
+        && rect.width > 0 && rect.height > 0;
+    });
+    const transparentColorEnabled = Array.from(document.querySelectorAll(
+      '[data-studio-transparent-color-well="true"]',
+    )).some((node) => node.getAttribute("aria-pressed") === "true");
+    const visibleColorMatches = Array.from(document.querySelectorAll<HTMLInputElement>(
+      'input[type="color"][aria-label^="주 색 선택"]',
+    )).some((input) => input.getBoundingClientRect().width > 0
+      && input.value.toLowerCase() === color);
+    return { chromeVisible, transparentColorEnabled, visibleColorMatches };
+  }, { chromeSelector: EVIDENCE_CHROME_SELECTOR, color: EVIDENCE_STROKE_COLOR });
+  invariant(!state.chromeVisible, "transient tooltip/HUD chrome remained in raster evidence");
+  invariant(!state.transparentColorEnabled, "transparent-colour drawing stayed enabled");
+  invariant(state.visibleColorMatches,
+    `evidence stroke colour did not settle to ${EVIDENCE_STROKE_COLOR}`);
+  return Object.freeze({
+    strokeColor: EVIDENCE_STROKE_COLOR,
+    transparentColorDisabled: true,
+    hiddenChromeSelector: EVIDENCE_CHROME_SELECTOR,
+  });
+}
+
+/** Fail before drawing when any sampled gesture point is covered by editor chrome. */
+async function assertGesturePathReachesCanvas(page: Page, box: Box): Promise<readonly unknown[]> {
+  const points = [0, 0.25, 0.5, 0.75, 1].map((amount) => ({
+    amount,
+    ...gesturePoint(box, amount),
+  }));
+  const hits = await page.evaluate((samples) => samples.map((sample) => {
+    const target = document.elementFromPoint(sample.x, sample.y);
+    const canvas = target?.closest(".konvajs-content") ?? null;
+    return {
+      ...sample,
+      reachesCanvas: canvas !== null,
+      target: target
+        ? `${target.tagName.toLowerCase()}${target.id ? `#${target.id}` : ""}`
+        : null,
+    };
+  }), points);
+  const misses = hits.filter((hit) => !hit.reachesCanvas);
+  invariant(misses.length === 0,
+    `gesture path is covered before drawing: ${JSON.stringify(misses)}`);
+  return Object.freeze(hits);
 }
 
 /**
@@ -872,8 +979,10 @@ async function main(): Promise<void> {
     const brush = await resolveBrush(page);
     await activateBrushOperation(page, brush.operation);
     if (brush.name) await selectBrush(page, brush.name, brush.operation, brush.id);
+    const evidenceFixture = await prepareEvidenceFixture(page);
     log(`brush: ${brush.name ?? "(active pen)"} width ${brush.width} (${brush.source}) · webgpu flag ${WEBGPU}`);
     report.brush = brush;
+    report.evidenceFixture = evidenceFixture;
     report.frameGraphDocument = await page.locator("[data-studio-frame-graph-document]").first()
       .getAttribute("data-studio-frame-graph-document").catch(() => null);
 
@@ -900,6 +1009,7 @@ async function main(): Promise<void> {
       full, visible: box, clip, padCss, regions, localPathPoints,
       pathMode: SCREEN_FILL_PATH ? "screen-fill-serpentine" : "diagonal",
     };
+    report.gestureHitTest = await assertGesturePathReachesCanvas(page, box);
     check("stage-present", true,
       `paper ${Math.round(full.width)}×${Math.round(full.height)} @ (${Math.round(full.x)},${Math.round(full.y)}),`
       + ` visible ${Math.round(box.width)}×${Math.round(box.height)}, clip ${Math.round(clip.width)}×${Math.round(clip.height)}`);
@@ -928,7 +1038,8 @@ async function main(): Promise<void> {
     await page.waitForTimeout(PENDING_RECHECK_MS - COMMIT_SETTLE_MS);
     const settledShot = await shot(page, clip, "03-settled");
     const committed = await readCommittedStroke(page);
-    const inkDiff = await diffShots(page, blankShot, committedShot, {});
+    const blankVsLiveDiff = await diffShots(page, blankShot, liveShot, regions);
+    const inkDiff = await diffShots(page, blankShot, committedShot, regions);
     const liveDiff = await diffShots(page, liveShot, committedShot, regions);
     const settleDiff = await diffShots(page, committedShot, settledShot, {});
     const deliveryRatio = Math.min(1, Math.max(parityCounters.moves, parityCounters.coalesced) / dispatched);
@@ -952,11 +1063,28 @@ async function main(): Promise<void> {
       gestureLengthCss, cssToDocument, gestureLengthDocument, committedPathLength,
       committedPoints, expectedCommittedPoints: expectedPoints, sampleSpacing: committed?.sampleSpacing ?? null,
       drawCount: committed?.drawCount ?? null, pendingStrokeDurability: committed?.pendingStrokeDurability ?? null,
-      diffs: { blankVsCommitted: inkDiff, liveVsCommitted: liveDiff, committed300VsSettled900: settleDiff },
+      diffs: {
+      blankVsLive: blankVsLiveDiff,
+      blankVsCommitted: inkDiff,
+      liveVsCommitted: liveDiff,
+      committed300VsSettled900: settleDiff,
+    },
     };
     const gpuNote = gpuValidationWarnings > 0 ? ` · ${gpuValidationWarnings} WebGPU validation warnings` : "";
-    check("ink-committed", inkDiff.changedPixels >= INK_MIN_CHANGED_PIXELS,
-      `blank→committed changedPixels=${inkDiff.changedPixels} (min ${INK_MIN_CHANGED_PIXELS})${gpuNote}`);
+    const liveFirstHalf = blankVsLiveDiff.regions.firstHalf!;
+    const committedFirstHalf = inkDiff.regions.firstHalf!;
+    const committedSecondHalf = inkDiff.regions.secondHalf!;
+    const committedPathChanged = committedFirstHalf.changed + committedSecondHalf.changed;
+    check("live-first-half-ink", liveFirstHalf.changed >= INK_MIN_CHANGED_PIXELS,
+      `blank→live first-half changed=${liveFirstHalf.changed}/${liveFirstHalf.pixels}`
+      + ` (min ${INK_MIN_CHANGED_PIXELS})`);
+    check("committed-second-half-ink", committedSecondHalf.changed >= INK_MIN_CHANGED_PIXELS,
+      `blank→committed second-half changed=${committedSecondHalf.changed}/${committedSecondHalf.pixels}`
+      + ` (min ${INK_MIN_CHANGED_PIXELS})${gpuNote}`);
+    check("ink-committed", committedPathChanged >= INK_MIN_CHANGED_PIXELS,
+      `blank→committed path regions changed=${committedPathChanged}`
+      + ` (first=${committedFirstHalf.changed}, second=${committedSecondHalf.changed},`
+      + ` min ${INK_MIN_CHANGED_PIXELS})${gpuNote}`);
     if (committed && committedPoints !== null && committedPathLength !== null) {
       const lower = Math.ceil(expectedPoints * (1 - POINT_COUNT_TOLERANCE));
       const upper = dispatched + POINT_COUNT_EXTRA_MAX;

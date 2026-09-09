@@ -1,0 +1,70 @@
+name: Fix PR 1057 CI regressions
+
+on:
+  push:
+    branches: [feat/studio-ai-comic-director-complete-20260909]
+    paths:
+      - ".github/workflows/fix-pr1057-ci.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-pr1057-ci
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/studio-ai-comic-director-complete-20260909
+          fetch-depth: 0
+
+      - name: Apply exact CI fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          replacements = {
+              "apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts": [
+                  (
+                      'expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(7);',
+                      'expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(8);',
+                  ),
+              ],
+              "apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts": [
+                  ('imageGeneratePath: "/images/generations",', 'imageGenerationPath: "/images/generations",'),
+              ],
+              "apps/web/src/domains/creator/studio-generated-2d-backgrounds.ts": [
+                  (
+                      'import { STUDIO_GENERATED_GENRE_BG_SCENES } from "./studio-generated-2d-backgrounds-genre";',
+                      'import { STUDIO_GENERATED_INTERIOR_BG_SCENES } from "./studio-generated-2d-backgrounds-genre";',
+                  ),
+                  (
+                      'import { STUDIO_GENERATED_INTERIOR_BG_SCENES } from "./studio-generated-2d-backgrounds-interiors";',
+                      'import { STUDIO_GENERATED_GENRE_BG_SCENES } from "./studio-generated-2d-backgrounds-interiors";',
+                  ),
+              ],
+          }
+
+          for filename, edits in replacements.items():
+              path = Path(filename)
+              source = path.read_text(encoding="utf-8")
+              for old, new in edits:
+                  count = source.count(old)
+                  if count != 1:
+                      raise RuntimeError(f"{filename}: expected exactly one match for {old!r}, found {count}")
+                  source = source.replace(old, new, 1)
+              path.write_text(source, encoding="utf-8")
+
+          Path(".github/workflows/fix-pr1057-ci.yml").unlink()
+
+      - name: Commit fixes to the PR branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix(ci): resolve AI comic director integration regressions"
+          git push origin HEAD:feat/studio-ai-comic-director-complete-20260909

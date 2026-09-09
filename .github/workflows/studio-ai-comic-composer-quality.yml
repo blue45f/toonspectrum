@@ -1,0 +1,100 @@
+# Production-loop gate for editable episode handoff, directed panel planning and non-destructive candidates.
+name: Studio AI comic director quality
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/web/src/domains/creator/ai/studio-ai-comic-composer-*.ts"
+      - "apps/web/src/domains/creator/ai/studio-ai-comic-director*.ts"
+      - "apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel*.tsx"
+      - "apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad*.tsx"
+      - "apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow*.ts"
+      - "apps/web/src/domains/creator/ai/studio-scenario-image-generation*.ts"
+      - "apps/web/src/domains/creator/ai/StudioAiEpisodeProduction*.tsx"
+      - "apps/web/src/domains/creator/ai/StudioAiToolPopoverBody*.ts*"
+      - "apps/web/src/domains/creator/StudioScenarioCandidateDesk*.tsx"
+      - "apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel*.tsx"
+      - "apps/web/src/domains/creator/StudioThreeDPreviewPanelStack.tsx"
+      - "apps/web/src/domains/creator/StudioLazyPanelStack.tsx"
+      - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
+      - "apps/web/src/domains/creator/studio-scenario-layout.ts"
+      - ".github/workflows/studio-ai-comic-composer-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-ai-comic-director-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify director, episode handoff, candidate review and scenario reliability
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-director.test.ts
+          apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts
+          apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts
+
+      - name: Lint comic director production surfaces
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-director.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-director.test.ts
+          apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx
+          apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx
+          apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.ts
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
+          apps/web/src/domains/creator/ai/studio-scenario-image-generation.ts
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.tsx
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.tsx
+          apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.tsx
+          apps/web/src/domains/creator/StudioThreeDPreviewPanelStack.tsx
+          apps/web/src/domains/creator/StudioLazyPanelStack.tsx
+
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+
+      - name: Build production Studio
+        run: pnpm run build

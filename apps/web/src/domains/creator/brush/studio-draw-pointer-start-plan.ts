@@ -27,7 +27,11 @@ import {
   type FixedRateStrokeQuantizedSample,
 } from "../studio-fixed-rate-stroke-filter";
 import { captureStudioOutlineStrokeContractV1 } from "../studio-outline-stroke-contract";
-import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "../studio-pixel-pencil";
+import {
+  normalizeStudioPixelPencilStrokeWidth,
+  STUDIO_PIXEL_PENCIL_MIN_STROKE_WIDTH,
+  STUDIO_PIXEL_PENCIL_RENDER_MODE,
+} from "../studio-pixel-pencil";
 
 import { isStudioBrushEraserAliasId } from "./studio-brush-alias-profile";
 import { resolveStudioBrushDynamicsSelectionPresetId } from "./studio-brush-dynamics";
@@ -140,7 +144,11 @@ export function planStudioDrawPointerStart(
     strokeWidth,
     symmetry,
   } = input;
-  const brushFamily = resolveStudioBrushRenderFamily(brush);
+const brushFamily = resolveStudioBrushRenderFamily(brush);
+const resolvedStrokeWidth = drawMode === "pixel"
+  ? normalizeStudioPixelPencilStrokeWidth(strokeWidth)
+    ?? STUDIO_PIXEL_PENCIL_MIN_STROKE_WIDTH
+  : strokeWidth;
   const namedEraser =
     drawMode === "eraser" && resolveStudioBrushPresetOperation(brush) === "erase";
   const lowDensityEraser = namedEraser && isStudioBrushEraserAliasId(brush);
@@ -266,7 +274,7 @@ export function planStudioDrawPointerStart(
     id: input.id,
     type: "draw" as const,
     stroke: color,
-    strokeWidth,
+    strokeWidth: resolvedStrokeWidth,
     opacity: brushOpacity,
     brush: drawMode === "pen"
       ? (brush === STUDIO_PIXEL_PENCIL_RENDER_MODE ? "pen" : brush)
@@ -286,7 +294,10 @@ export function planStudioDrawPointerStart(
     stamp: drawMode === "pen" && stampTuning && stampKind && !hasBrushDynamics ? { ...stampTuning } : undefined,
     stampPipeline: drawMode === "pen" && stampKind && !hasBrushDynamics ? "causal-walker-v2" as const : undefined,
     watercolorPipeline: causalWatercolor ? "causal-walker-v2" as const : undefined,
-    symmetry: drawMode === "pixel" ? undefined : resolveStudioStrokeSymmetry(symmetry, brush),
+symmetry: resolveStudioStrokeSymmetry(
+  symmetry,
+  drawMode === "pixel" ? STUDIO_PIXEL_PENCIL_RENDER_MODE : brush
+),
   };
   const element: DrawEl = drawMode === "shape"
     ? {
@@ -302,7 +313,7 @@ export function planStudioDrawPointerStart(
         kind: "freehand",
         mode: drawMode === "eraser" ? "eraser" : "pen",
         points: [strokeOrigin.x, strokeOrigin.y],
-        strokeWidth: drawMode === "pixel" ? 1 : strokeWidth,
+        strokeWidth: resolvedStrokeWidth,
         fill: drawMode === "lasso-fill" ? color : undefined,
         pressures: [drawMode === "pixel" ? 1 : pressure],
         pressureModel,

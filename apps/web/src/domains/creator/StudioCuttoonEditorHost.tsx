@@ -71,6 +71,7 @@ import {
   type StudioAiPendingOperationInput,
 } from "./ai/studio-ai-provenance-recorder";
 import { createStudioScenarioImageGenerationExecutors } from "./ai/studio-scenario-image-generation";
+import type { StudioAiComicComposerHandoff } from "./ai/studio-ai-comic-composer-handoff";
 import {
   planStudioBg3dLtDetachComposite,
   planStudioBg3dLtDrawingAssist,
@@ -15245,7 +15246,7 @@ const puppetWarpArmed =
     items: ScenarioPreviewItem[];
     nextCanvasH: number;
     characterDescription: string;
-    textAiProvenance: StudioTextAiProvenance;
+    textAiProvenance: StudioTextAiProvenance | null;
   } | null>(null);
   const [scenarioRegeneratingIndex, setScenarioRegeneratingIndex] = useState<number | null>(null);
   // 루프 경계의 협조적 취소 플래그 + 현재 네트워크 요청을 즉시 끊는 AbortController. 텍스트 장면 설계,
@@ -19095,6 +19096,41 @@ const puppetWarpArmed =
     }
   }
 
+  function onImportScenarioProductionPlan(handoff: StudioAiComicComposerHandoff) {
+    if (
+      collaborationAccessRef.current.locked
+      || scenarioBusy
+      || scenarioRegeneratingIndex !== null
+    ) return;
+    const existingFrames =
+      scenarioApplyTarget === "current-page"
+        ? elements.filter((element): element is FrameEl => element.type === "frame")
+        : [];
+    const { panels, nextCanvasH } = layoutScenarioPanels(
+      existingFrames,
+      CANVAS_W,
+      scenarioApplyTarget === "current-page" ? canvasH : 1080,
+      handoff.scenes
+    );
+    setScenarioStoryText(handoff.storyText);
+    setScenarioSceneCountHint(
+      handoff.totalCuts >= 2 && handoff.totalCuts <= 10 ? handoff.totalCuts : undefined
+    );
+    setScenarioError(null);
+    setScenarioProgress(null);
+    setScenarioStageLabel(null);
+    setScenarioResult({
+      items: panels.map((panel) => ({
+        ...panel,
+        preferredVariantCount: handoff.variants,
+      })),
+      nextCanvasH,
+      characterDescription: handoff.characterDescription,
+      // The handoff is a deterministic local transform of an existing plan, not a new model call.
+      textAiProvenance: null,
+    });
+  }
+
   function relayoutScenarioDrafts(
     items: ScenarioPreviewItem[],
     target: "current-page" | "new-page" = scenarioApplyTarget
@@ -19122,6 +19158,16 @@ const puppetWarpArmed =
         ...(items[index]?.imageDataUrl ? { imageDataUrl: items[index].imageDataUrl } : {}),
         ...(items[index]?.imageError ? { imageError: items[index].imageError } : {}),
         ...(items[index]?.imageProvenance ? { imageProvenance: items[index].imageProvenance } : {}),
+        ...(items[index]?.imageCandidates ? { imageCandidates: items[index].imageCandidates } : {}),
+        ...(items[index]?.selectedImageCandidateId
+          ? { selectedImageCandidateId: items[index].selectedImageCandidateId }
+          : {}),
+        ...(items[index]?.approvedImageCandidateId
+          ? { approvedImageCandidateId: items[index].approvedImageCandidateId }
+          : {}),
+        ...(items[index]?.preferredVariantCount
+          ? { preferredVariantCount: items[index].preferredVariantCount }
+          : {}),
       })),
     };
   }
@@ -19136,26 +19182,21 @@ const puppetWarpArmed =
 
   function onChangeScenarioScene(
     index: number,
-    patch: {
-      beatType?: ScenarioBeatType;
-      summary?: string;
-      imagePrompt?: string;
-      dialogue?: string;
-      continuity?: ScenarioPreviewItem["continuity"];
-    }
+    patch: Partial<ScenarioPreviewItem>
   ) {
     if (scenarioBusy || scenarioRegeneratingIndex !== null) return;
     setScenarioResult((previous) => {
       if (!previous || !previous.items[index]) return previous;
       const items = previous.items.map((item, itemIndex) => {
         if (itemIndex !== index) return item;
-        const imagePromptChanged =
-          typeof patch.imagePrompt === "string" && patch.imagePrompt !== item.imagePrompt;
+        const generationInputChanged =
+          (typeof patch.imagePrompt === "string" && patch.imagePrompt !== item.imagePrompt)
+          || ("continuity" in patch && patch.continuity !== item.continuity);
         return {
           ...item,
           ...patch,
-          // 프롬프트와 더 이상 대응하지 않는 이미지를 조용히 유지하지 않는다.
-          ...(imagePromptChanged
+          // 현재 입력과 대응하지 않는 이미지는 작업 이미지에서 내리되 후보 이력은 보존한다.
+          ...(generationInputChanged
             ? { imageDataUrl: undefined, imageError: undefined, imageProvenance: undefined }
             : {}),
         };
@@ -19245,7 +19286,9 @@ const puppetWarpArmed =
           type: item.beatType,
           summary: item.summary,
           ...(item.continuity ? { continuity: item.continuity } : {}),
-          textAiProvenance: scenarioResult.textAiProvenance,
+          ...(scenarioResult.textAiProvenance
+            ? { textAiProvenance: scenarioResult.textAiProvenance }
+            : {}),
         },
         ...(item.imageProvenance ? { aiProvenance: item.imageProvenance } : {}),
         ...(item.imageDataUrl ? { bg: item.imageDataUrl } : {}),
@@ -27468,6 +27511,7 @@ function clearSelectionForEdit() {
     onDiscardScenarioPreview,
     onGenerateScenario,
     onGenerateScenarioImages,
+    onImportScenarioProductionPlan,
     onRegenerateScenarioImage,
     onRemoveScenarioScene,
     onScenarioApplyTargetChange,

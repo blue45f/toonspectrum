@@ -2,8 +2,13 @@ import { providerAvailability, upstreamRetrySeconds } from "../../../../web/src/
 import {
   httpsUrl, isProvider, parseDeadline, parseResource, recordOf, textOf,
 } from "../../../../web/src/shared/lib/creator-resources";
+import {
+  isReferenceSearchField,
+  MET_DEPARTMENT_IDS,
+} from "../../../../web/src/shared/lib/reference-assets";
 
 import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "../../../../web/src/shared/lib/creator-resources";
+import type { ReferenceSearchField } from "../../../../web/src/shared/lib/reference-assets";
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 export interface ResourceEngineOptions {
@@ -25,6 +30,17 @@ const PROVIDER_KEY: Record<ResourceProvider, string> = {
   kakao: "KAKAO_REST_API_KEY",
   bizinfo: "BIZINFO_API_KEY",
 };
+
+interface MetSearchFilters {
+  field: ReferenceSearchField;
+  departmentId: string;
+  medium: string;
+  geoLocation: string;
+  dateBegin?: number;
+  dateEnd?: number;
+  isHighlight: boolean;
+}
+
 function plainText(value: unknown, max = 1200): string {
   return textOf(value, 20000).replace(/<[^>]*>/gu, " ").replace(/&(nbsp|amp|lt|gt|quot);/gu, " ").replace(/\s+/gu, " ").trim().slice(0, max);
 }
@@ -76,6 +92,63 @@ function validUpstreamShape(url: URL, value: unknown): boolean {
   }
   return false;
 }
+function optionalInputText(input: Record<string, unknown>, key: string, maximumLength = 80): string {
+  const value = input[key];
+  if (value === undefined || value === "") return "";
+  if (typeof value !== "string" || value.length > maximumLength || /[\u0000-\u001f\u007f]/u.test(value)) {
+    throw new ResourceInputError("검색 필터 형식이 올바르지 않습니다.");
+  }
+  const trimmed = value.trim();
+  if (trimmed.length < 2) throw new ResourceInputError("검색 필터는 2자 이상 입력하세요.");
+  return trimmed;
+}
+function optionalInputYear(input: Record<string, unknown>, key: string): number | undefined {
+  const value = input[key];
+  if (value === undefined || value === "") return undefined;
+  if ((typeof value !== "string" && typeof value !== "number") || String(value).length > 6) {
+    throw new ResourceInputError("연대 필터 형식이 올바르지 않습니다.");
+  }
+  const year = Number(value);
+  if (!Number.isInteger(year) || year < -10000 || year > 3000) {
+    throw new ResourceInputError("연대는 기원전 10000년부터 서기 3000년 사이의 정수로 입력하세요.");
+  }
+  return year;
+}
+function parseMetFilters(input: Record<string, unknown>): MetSearchFilters {
+  const rawField = input.field ?? "all";
+  if (typeof rawField !== "string" || !isReferenceSearchField(rawField)) {
+    throw new ResourceInputError("지원하지 않는 검색 범위입니다.");
+  }
+  const departmentId = input.departmentId === undefined || input.departmentId === ""
+    ? ""
+    : typeof input.departmentId === "string"
+      ? input.departmentId.trim()
+      : "";
+  if (input.departmentId !== undefined && input.departmentId !== "" && !MET_DEPARTMENT_IDS.has(departmentId)) {
+    throw new ResourceInputError("지원하지 않는 Met 부서입니다.");
+  }
+  const dateBegin = optionalInputYear(input, "dateBegin");
+  const dateEnd = optionalInputYear(input, "dateEnd");
+  if ((dateBegin === undefined) !== (dateEnd === undefined)) {
+    throw new ResourceInputError("연대 범위는 시작 연도와 종료 연도를 함께 입력하세요.");
+  }
+  if (dateBegin !== undefined && dateEnd !== undefined && dateBegin > dateEnd) {
+    throw new ResourceInputError("시작 연도는 종료 연도보다 늦을 수 없습니다.");
+  }
+  const rawHighlight = input.isHighlight;
+  if (rawHighlight !== undefined && rawHighlight !== "" && rawHighlight !== "true" && rawHighlight !== "false" && rawHighlight !== true && rawHighlight !== false) {
+    throw new ResourceInputError("대표작 필터 형식이 올바르지 않습니다.");
+  }
+  return {
+    field: rawField,
+    departmentId,
+    medium: optionalInputText(input, "medium"),
+    geoLocation: optionalInputText(input, "geoLocation"),
+    ...(dateBegin !== undefined ? { dateBegin } : {}),
+    ...(dateEnd !== undefined ? { dateEnd } : {}),
+    isHighlight: rawHighlight === "true" || rawHighlight === true,
+  };
+}
 async function limitedJson(response: Response): Promise<unknown> {
   if (!response.ok || response.redirected || !response.headers.get("content-type")?.toLowerCase().includes("json")) { await response.body?.cancel(); throw new Error("upstream_response"); }
   const size = Number(response.headers.get("content-length"));
@@ -96,6 +169,7 @@ async function limitedJson(response: Response): Promise<unknown> {
     return JSON.parse(output) as unknown;
   } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
 }
+
 export function createResourceEngine(options: ResourceEngineOptions) {
   const now = options.now ?? Date.now;
   const cache = new Map<string, { until: number; value: unknown; fetchedAt: string; bytes: number }>();
@@ -159,9 +233,27 @@ export function createResourceEngine(options: ResourceEngineOptions) {
     pending.set(identity, task);
     return task;
   }
-  async function met(query: string, page: number): Promise<ResourceSearchResult> {
+
+  async function met(query: string, page: number, filters: MetSearchFilters): Promise<ResourceSearchResult> {
     const url = new URL("https://collectionapi.metmuseum.org/public/collection/v1.1/search");
-    url.search = new URLSearchParams({ q: query, hasImages: "true", offset: String((page - 1) * PAGE_SIZE), limit: String(PAGE_SIZE) }).toString();
+    const search = new URLSearchParams({
+      q: query,
+      hasImages: "true",
+      offset: String((page - 1) * PAGE_SIZE),
+      limit: String(PAGE_SIZE),
+    });
+    if (filters.field === "title") search.set("title", "true");
+    if (filters.field === "tags") search.set("tags", "true");
+    if (filters.field === "artistCulture") search.set("artistOrCulture", "true");
+    if (filters.departmentId) search.set("departmentId", filters.departmentId);
+    if (filters.medium) search.set("medium", filters.medium);
+    if (filters.geoLocation) search.set("geoLocation", filters.geoLocation);
+    if (filters.dateBegin !== undefined && filters.dateEnd !== undefined) {
+      search.set("dateBegin", String(filters.dateBegin));
+      search.set("dateEnd", String(filters.dateEnd));
+    }
+    if (filters.isHighlight) search.set("isHighlight", "true");
+    url.search = search.toString();
     const source = await request(url);
     const data = recordOf(source.value);
     if (typeof data.total !== "number" || !Number.isFinite(data.total) || (data.objectIDs !== null && !Array.isArray(data.objectIDs))) throw new Error("upstream_schema");
@@ -179,18 +271,65 @@ export function createResourceEngine(options: ResourceEngineOptions) {
           if (item.isPublicDomain !== true || textOf(item.rightsAndReproduction)) return null;
           const imageUrl = httpsUrl(item.primaryImageSmall, ["images.metmuseum.org"]);
           if (!imageUrl) return null;
-          return parseResource({ id: `met:${id}`, provider: "met", title: item.title,
-            creator: item.artistDisplayName, sourceUrl: item.objectURL, imageUrl,
-            description: [item.culture, item.period, item.medium].map((value) => textOf(value)).filter(Boolean).join(" · "),
-            license: "CC0", credit: item.creditLine, dateLabel: item.objectDate, fetchedAt: detail.fetchedAt });
+          const tags = rowsOf(item.tags)
+            .map((tag) => plainText(recordOf(tag).term, 80))
+            .filter(Boolean)
+            .slice(0, 24);
+          const additionalImageUrls = rowsOf(item.additionalImages)
+            .map((image) => httpsUrl(image, ["images.metmuseum.org"]))
+            .filter(Boolean)
+            .slice(0, 8);
+          return parseResource({
+            id: `met:${id}`,
+            provider: "met",
+            title: item.title,
+            creator: item.artistDisplayName,
+            sourceUrl: item.objectURL,
+            imageUrl,
+            description: [item.culture, item.period, item.dynasty, item.objectName, item.medium]
+              .map((value) => plainText(value, 300))
+              .filter(Boolean)
+              .join(" · "),
+            license: "CC0",
+            credit: item.creditLine,
+            dateLabel: item.objectDate,
+            fetchedAt: detail.fetchedAt,
+            asset: {
+              objectName: item.objectName,
+              department: item.department,
+              culture: item.culture,
+              period: item.period,
+              dynasty: item.dynasty,
+              medium: item.medium,
+              dimensions: item.dimensions,
+              classification: item.classification,
+              country: item.country,
+              objectBeginDate: item.objectBeginDate,
+              objectEndDate: item.objectEndDate,
+              isHighlight: item.isHighlight === true,
+              tags,
+              originalImageUrl: httpsUrl(item.primaryImage, ["images.metmuseum.org"]),
+              additionalImageUrls,
+            },
+          });
         } catch { failed += 1; return null; }
       }));
       items.push(...group.filter((item): item is CreatorResource => item !== null));
     }
-    return { provider: "met", status: failed === ids.length && ids.length > 0 ? "unavailable" : failed ? "partial" : "ready", items,
-      page, hasMore: page < 20 && data.total > page * PAGE_SIZE, fetchedAt: source.fetchedAt,
-      message: failed ? "일부 자료를 조회하지 못했습니다. 다음 검색에서 다시 확인하세요." : "검색 결과 중 공개 이용과 미리보기가 확인된 자료만 표시합니다. 결과가 적어도 다음 페이지에 자료가 있을 수 있습니다." };
+    return {
+      provider: "met",
+      status: failed === ids.length && ids.length > 0 ? "unavailable" : failed ? "partial" : "ready",
+      items,
+      page,
+      hasMore: page < 20 && data.total > page * PAGE_SIZE,
+      fetchedAt: source.fetchedAt,
+      total: data.total,
+      message: failed
+        ? "일부 작품의 공개 이용 조건이나 상세 정보를 확인하지 못했습니다. 검증된 결과만 표시합니다."
+        : "검색 후보 중 공개 도메인, CC0 표시와 안전한 미리보기가 확인된 작품만 표시합니다.",
+    };
   }
+
   async function openLibrary(query: string, page: number): Promise<ResourceSearchResult> {
     const url = new URL("https://openlibrary.org/search.json");
     url.search = new URLSearchParams({
@@ -243,6 +382,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
       message: "Open Library의 사람 중심 저용량 검색 메타데이터입니다. 표지·원문 재배포 권한을 의미하지 않으며 대량 카탈로그 수집에는 공식 데이터 덤프를 사용해야 합니다.",
     };
   }
+
   async function openBd(query: string, page: number): Promise<ResourceSearchResult> {
     const isbn = normalizeIsbn(query);
     if (!isbn || page > 1) {
@@ -299,6 +439,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
       message: "openBD의 일본 도서 소개용 서지정보입니다. 데이터를 임의로 변경하거나 원본 데이터베이스 형태로 재판매하지 않으며 수정·삭제를 서비스에 반영해야 합니다.",
     };
   }
+
   async function kakao(query: string, page: number, key: string): Promise<ResourceSearchResult> {
     const url = new URL("https://dapi.kakao.com/v3/search/book");
     url.search = new URLSearchParams({ query, page: String(page), size: String(PAGE_SIZE), sort: "accuracy" }).toString();
@@ -317,6 +458,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
       page, hasMore: !meta.is_end && page < 20, fetchedAt: source.fetchedAt,
       message: "카카오 도서 검색 메타데이터입니다. 표지·본문 재배포 또는 각색 권한을 제공하지 않으며, 같은 제목을 같은 작품으로 자동 병합하지 않습니다." };
   }
+
   async function bizinfo(query: string, page: number, key: string): Promise<ResourceSearchResult> {
     const url = new URL("https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do");
     url.search = new URLSearchParams({ crtfcKey: key, dataType: "json", searchCnt: "100", pageUnit: "100", pageIndex: "1" }).toString();
@@ -342,6 +484,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
       hasMore: unique.length > page * PAGE_SIZE, fetchedAt: source.fetchedAt,
       message: "기업마당 최근 최대 100건 안에서 검색합니다. 전체 웹툰 공모전 목록이 아닙니다. 접수 상태·정확한 마감 시간·신청 자격은 원문에서 확인하세요." };
   }
+
   return {
     describe() {
       const env = options.env();
@@ -353,14 +496,15 @@ export function createResourceEngine(options: ResourceEngineOptions) {
       if (typeof input.q !== "string" || input.q.trim().length < 2 || input.q.length > 80 || Array.from(input.q).some((character) => character.charCodeAt(0) < 32)) throw new ResourceInputError("검색어는 2~80자로 입력하세요.");
       const page = input.page === undefined ? 1 : Number(input.page);
       if ((typeof input.page !== "string" && input.page !== undefined && typeof input.page !== "number") || !Number.isInteger(page) || page < 1 || page > 20) throw new ResourceInputError("페이지는 1~20 범위여야 합니다.");
-      takeClient(clientId);
       const provider: ResourceProvider = input.provider;
+      const metFilters = provider === "met" ? parseMetFilters(input) : null;
+      takeClient(clientId);
       const result = (status: "not_configured" | "unavailable", message: string): ResourceSearchResult => ({ provider, status, items: [], page, hasMore: false, fetchedAt: null, message });
       const keyName = PROVIDER_KEY[provider];
       const key = keyName ? options.env()[keyName]?.trim() ?? "" : "";
       if (keyName && !key) return result("not_configured", "서버 API 인증키가 등록되지 않았습니다. 공식 사이트에서 직접 확인할 수 있습니다.");
       try {
-        if (provider === "met") return await met(input.q.trim(), page);
+        if (provider === "met" && metFilters) return await met(input.q.trim(), page, metFilters);
         if (provider === "openlibrary") return await openLibrary(input.q.trim(), page);
         if (provider === "openbd") return await openBd(input.q.trim(), page);
         if (provider === "kakao") return await kakao(input.q.trim(), page, key);

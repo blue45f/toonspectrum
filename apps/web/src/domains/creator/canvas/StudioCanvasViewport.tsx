@@ -6,6 +6,8 @@ import { StudioColorBlindFilterDefs } from "../StudioColorBlindPreview";
 import { useStudioCanvasViewportInteraction } from "./studio-canvas-viewport-interaction";
 import { useStudioCanvasViewportLiveSurfaces } from "./studio-canvas-viewport-live-surfaces";
 import { localizeText } from "./studio-canvas-viewport-primitives";
+import { useStudioHandNavigation } from "./useStudioHandNavigation";
+import { useStudioHandShortcutController } from "./useStudioHandShortcutController";
 import { renderStudioCanvasStageHud } from "./StudioCanvasStageHud";
 import { StudioCanvasStatusRail } from "./StudioCanvasStatusRail";
 import { renderStudioCanvasStickyBanners } from "./StudioCanvasStickyBanners";
@@ -17,6 +19,7 @@ import type {
   StudioHokusaiLiveOverlaySurfaceBinding,
   StudioLivingInkOverlaySurfaceBinding,
 } from "./StudioCanvasViewportTypes";
+import { StudioViewInspectorHud } from "./StudioViewInspectorHud";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -52,10 +55,13 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
    * detached once, which is the contract a ref callback is supposed to have.
    */
   const { setPixiMountParent } = live;
-  const bindZoomHost = useCallback((node: HTMLDivElement | null) => {
-    zoomHostNodeRef.current = node;
-    setPixiMountParent(node);
-  }, [setPixiMountParent, zoomHostNodeRef]);
+  const bindZoomHost = useCallback(
+    (node: HTMLDivElement | null) => {
+      zoomHostNodeRef.current = node;
+      setPixiMountParent(node);
+    },
+    [setPixiMountParent, zoomHostNodeRef]
+  );
   const interaction = useStudioCanvasViewportInteraction(props);
   const {
     activeCatalogBrushName,
@@ -65,6 +71,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     advancedFillBusy,
     advancedFillPreview,
     appSettings,
+    appSettingsPersistenceState,
     autosaveDocumentLeadership,
     autosaveLiveJam,
     autosaveRestoreBlockedReason,
@@ -126,6 +133,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     clearAutosave,
     dismissQuickStart,
     clearCanvasSelection,
+    commitAppSettings,
     commitPages,
     downloadAutosaveBackup,
     duplicateSelected,
@@ -151,9 +159,6 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     onWrapDragLeave,
     onWrapDragOver,
     onWrapDrop,
-    onWrapMouseDown,
-    onWrapMouseMove,
-    onWrapMouseUp,
   } = stableHandlers;
   const {
     activeCanvasGroupName,
@@ -175,182 +180,241 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     zoomOutAtLimit,
     zoomOutUnavailableReason,
   } = interaction;
+  const togglePersistentHandTool = useCallback(() => {
+    setTool((currentTool) => (currentTool === "hand" ? "select" : "hand"));
+  }, [setTool]);
+
+  useStudioHandShortcutController({
+    appSettings,
+    settingsReady: appSettingsPersistenceState !== "loading",
+    commitAppSettings,
+    onToggleHandTool: togglePersistentHandTool,
+  });
+  useStudioHandNavigation({
+    viewportRef: wrapRef,
+    handToolActive: tool === "hand",
+    temporaryHandActive: isSpacePressed,
+    middleButtonAction: appSettings.mouse.middleButton,
+    rightButtonAction: appSettings.mouse.rightButton,
+    touchOneFingerMode: appSettings.touch.oneFingerDrag,
+  });
+
+  const handAriaShortcuts = [
+    appSettings.shortcuts["tool-hand"],
+    "Space",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-        <div
-          className={cn(
-            "relative min-h-0 min-w-0 flex-1 lg:min-w-[16rem]",
-            "flex flex-col overflow-hidden",
-            canvasOnlyMode && "overflow-hidden",
-            mobileImmersive && "overflow-hidden"
-          )}
-          data-studio-logical-w={CANVAS_W}
-        >
-          <StudioCanvasStatusRail
-            activeGroupName={activeCanvasGroupName}
-            mobileImmersive={mobileImmersive}
-            hasAutosave={hasAutosave}
-            autosaveDocumentLeadership={autosaveDocumentLeadership}
-            autosaveLiveJam={autosaveLiveJam}
-            autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
-            selectionCount={canvasSelectionEls.length}
-            selectionGroupName={completeSelectionGroup?.name ?? null}
-            selectionLockState={selectionLockState}
-            groupSelectionDisabledReason={groupSelectionDisabledReason}
-            lockSelectionDisabledReason={selectionMutationDisabledReason}
-            layoutSelectionDisabledReason={selectionMutationDisabledReason}
-            alignmentSelectionDisabledReason={alignmentSelectionDisabledReason}
-            advancedFillBusy={advancedFillBusy}
-            advancedFillPreviewMessage={advancedFillPreview?.message ?? null}
-            advancedFillActive={advancedFillActive}
-            onDownloadAutosaveBackup={downloadAutosaveBackup}
-            onRestoreAutosave={restoreAutosave}
-            onClearAutosave={clearAutosave}
-            onGroupSelection={groupSelectedElements}
-            onUngroupSelection={completeSelectionGroup ? ungroupSelectedElements : undefined}
-            onToggleSelectionLock={toggleSelectedElementsLocked}
-            onReorderSelection={reorderSelectedElements}
-            onAlignSelection={alignSelected}
-            onZoomToSelection={zoomToSelection}
-            onFlipSelection={flipSelected}
-            showBubbleMerge={showBubbleMerge}
-            bubbleMergeDisabledReason={bubbleMergeReason}
-            onMergeBubbles={mergeSelectedBubbles}
-            onDuplicateSelection={duplicateSelected}
-            onRemoveSelection={removeSelected}
-            onClearSelection={clearCanvasSelection}
-            onCancelAdvancedFillPreview={cancelAdvancedFillPreview}
-            onApplyAdvancedFillPreview={applyAdvancedFillPreview}
-            onCancelAdvancedFillCalculation={toggleAdvancedFill}
-          />
-          {/* 색맹 시뮬레이션용 숨김 SVG filter defs — filter id 는 문서 전역 참조라 위치 무관, 정적이라 무조건 마운트 */}
-          <StudioColorBlindFilterDefs />
-          {renderStudioCanvasStageHud({
-            activeCatalogBrushName,
-            activePage,
-            activePageIndex,
-            appSettings,
-            brushOpacity,
-            canvasOnlyMode,
-            drawMode,
-            drawShape,
-            enterCanvasOnlyMode,
-            eraserPresetActive,
-            fitCanvasToWidth,
-            isMobile,
-            liveDrawPressureStore,
-            mobileImmersive,
-            pageSequenceOpen,
-            pressureCurve,
-            quickShapeActive,
-            scale,
-            selected,
-            setCanvasOnlyMode,
-            setPageSequenceOpen,
-            setStudioUiDensity,
-            setZoom,
-            setZoomLocked,
-            shapeFill,
-            stabilizer,
-            stabilizerMode,
-            strokeWidth,
-            symmetryType,
-            t,
-            toggleWheelCanvasMode,
-            tool,
-            uiDensityMode,
-            viewBusyReason,
-            viewTransformSuppressed,
-            zoom,
-            zoomInAtLimit,
-            zoomInUnavailableReason,
-            zoomLocked,
-            zoomOutAtLimit,
-            zoomOutUnavailableReason,
-          })}
-          {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
-          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 마우스 핸들러는 클릭이 아니라 스페이스+드래그 패닝/에셋 드롭 전용이며 실제 상호작용은 내부 Konva Stage + document keydown(Space) 이 담당한다 */}
-          <div
-            ref={wrapRef}
-            data-studio-canvas-viewport
-            data-studio-viewport-cursor={viewportCursorClassName.replace("cursor-", "")}
-            data-studio-draw-dock-safe-area={tool === "draw" && !canvasOnlyMode ? "true" : undefined}
-            data-studio-mobile-dock-safe-area={isMobile ? "true" : undefined}
-            // 스크롤 뷰포트를 키보드 포커스 가능하게 해 방향키 스크롤 허용(WCAG scrollable-region) — focusable 은 의도적.
-            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-            tabIndex={0}
-            role="group"
-            aria-label={localizeText(t, "작업 캔버스 — 포커스 후 방향키로 스크롤", "studio.canvas.canvasAriaLabel")}
-            onMouseDown={onWrapMouseDown}
-            onMouseMove={onWrapMouseMove}
-            onMouseUp={onWrapMouseUp}
-            onMouseLeave={onWrapMouseUp}
-            onDragLeave={onWrapDragLeave}
-            onDragOver={onWrapDragOver}
-            onDrop={onWrapDrop}
-            className={cn(
-              // Canvas fills remaining viewport under thin menubar+toolbelt (~6.5rem).
-              "relative min-h-0 flex-1 overflow-auto rounded-none border-0 outline-none",
-              "group/asset-drop transition-shadow data-[studio-asset-drop-active=true]:shadow-[inset_0_0_0_2px_oklch(0.72_0.18_45/0.9)]",
-              "bg-[oklch(0.145_0.008_70)]",
-              "[background-image:linear-gradient(oklch(0.162_0.008_70)_1px,transparent_1px),linear-gradient(90deg,oklch(0.162_0.008_70)_1px,transparent_1px)]",
-              "[background-size:24px_24px]",
-              "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent focus-visible:shadow-[inset_0_0_0_1px_oklch(0.72_0.14_55/0.45)] lg:max-h-none",
-              canvasOnlyMode && "min-h-0 flex-1 max-h-none overscroll-contain",
-              mobileImmersive
-                ? "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain"
-                : "max-h-[calc(100dvh-11rem)] min-h-[12rem] lg:max-h-none",
-              viewportCursorClassName,
-              (isSpacePressed || tool === "hand") && "select-none"
-            )}
-          >
-          {renderStudioCanvasStickyBanners({
-            activePage,
-            canvasFlipH,
-            canvasRotation,
-            closeViewToolWithFocus,
-            collaborationDocumentUnavailable,
-            commentPinArmed,
-            commitPages,
-            dismissQuickStart,
-            effScale,
-            fitCanvasToWidth,
-            followingStudioSessionId,
-            navigate,
-            pages,
-            remixId,
-            resetView,
-            rotateCanvasView,
-            setActualPixelView,
-            setCurrentPageId,
-            setFollowingStudioSessionId,
-            setSelectedId,
-            setTeamPanelOpen,
-            setTool,
-            setZoom,
-            sourceHydrationPending,
-            stopStudioCommentPlacementSession,
-            studioCrdtOperationSyncReady,
-            t,
-            toggleHorizontalCanvasView,
-            viewTool,
-            workHydrationFailed,
-            workHydrationUnsupportedFormat,
-            workId,
-            zoom,
-          })}
+    <div
+      className={cn(
+        "relative min-h-0 min-w-0 flex-1 lg:min-w-[16rem]",
+        "flex flex-col overflow-hidden",
+        canvasOnlyMode && "overflow-hidden",
+        mobileImmersive && "overflow-hidden"
+      )}
+      data-studio-logical-w={CANVAS_W}
+    >
+      <StudioCanvasStatusRail
+        activeGroupName={activeCanvasGroupName}
+        mobileImmersive={mobileImmersive}
+        hasAutosave={hasAutosave}
+        autosaveDocumentLeadership={autosaveDocumentLeadership}
+        autosaveLiveJam={autosaveLiveJam}
+        autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
+        selectionCount={canvasSelectionEls.length}
+        selectionGroupName={completeSelectionGroup?.name ?? null}
+        selectionLockState={selectionLockState}
+        groupSelectionDisabledReason={groupSelectionDisabledReason}
+        lockSelectionDisabledReason={selectionMutationDisabledReason}
+        layoutSelectionDisabledReason={selectionMutationDisabledReason}
+        alignmentSelectionDisabledReason={alignmentSelectionDisabledReason}
+        advancedFillBusy={advancedFillBusy}
+        advancedFillPreviewMessage={advancedFillPreview?.message ?? null}
+        advancedFillActive={advancedFillActive}
+        onDownloadAutosaveBackup={downloadAutosaveBackup}
+        onRestoreAutosave={restoreAutosave}
+        onClearAutosave={clearAutosave}
+        onGroupSelection={groupSelectedElements}
+        onUngroupSelection={
+          completeSelectionGroup ? ungroupSelectedElements : undefined
+        }
+        onToggleSelectionLock={toggleSelectedElementsLocked}
+        onReorderSelection={reorderSelectedElements}
+        onAlignSelection={alignSelected}
+        onZoomToSelection={zoomToSelection}
+        onFlipSelection={flipSelected}
+        showBubbleMerge={showBubbleMerge}
+        bubbleMergeDisabledReason={bubbleMergeReason}
+        onMergeBubbles={mergeSelectedBubbles}
+        onDuplicateSelection={duplicateSelected}
+        onRemoveSelection={removeSelected}
+        onClearSelection={clearCanvasSelection}
+        onCancelAdvancedFillPreview={cancelAdvancedFillPreview}
+        onApplyAdvancedFillPreview={applyAdvancedFillPreview}
+        onCancelAdvancedFillCalculation={toggleAdvancedFill}
+      />
+      {/* 색맹 시뮬레이션용 숨김 SVG filter defs — filter id 는 문서 전역 참조라 위치 무관, 정적이라 무조건 마운트 */}
+      <StudioColorBlindFilterDefs />
+      {renderStudioCanvasStageHud({
+        activeCatalogBrushName,
+        activePage,
+        activePageIndex,
+        appSettings,
+        brushOpacity,
+        canvasOnlyMode,
+        drawMode,
+        drawShape,
+        enterCanvasOnlyMode,
+        eraserPresetActive,
+        fitCanvasToWidth,
+        isMobile,
+        liveDrawPressureStore,
+        mobileImmersive,
+        pageSequenceOpen,
+        pressureCurve,
+        quickShapeActive,
+        scale,
+        selected,
+        setCanvasOnlyMode,
+        setPageSequenceOpen,
+        setStudioUiDensity,
+        setZoom,
+        setZoomLocked,
+        shapeFill,
+        stabilizer,
+        stabilizerMode,
+        strokeWidth,
+        symmetryType,
+        t,
+        toggleWheelCanvasMode,
+        tool,
+        uiDensityMode,
+        viewBusyReason,
+        viewTransformSuppressed,
+        zoom,
+        zoomInAtLimit,
+        zoomInUnavailableReason,
+        zoomLocked,
+        zoomOutAtLimit,
+        zoomOutUnavailableReason,
+      })}
+      {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 드래그 핸들러는 에셋 드롭 전용이고, 핸드 이동은 capture-phase 포인터 훅, 실제 편집은 내부 Konva Stage가 담당한다 */}
+      <div
+        ref={wrapRef}
+        data-studio-canvas-viewport
+        data-studio-hand-navigation="pointer-capture-v2"
+        data-studio-hand-shortcut={
+          appSettings.shortcuts["tool-hand"] || undefined
+        }
+        data-studio-viewport-cursor={viewportCursorClassName.replace(
+          "cursor-",
+          ""
+        )}
+        data-studio-draw-dock-safe-area={
+          tool === "draw" && !canvasOnlyMode ? "true" : undefined
+        }
+        data-studio-mobile-dock-safe-area={isMobile ? "true" : undefined}
+        // 스크롤 뷰포트를 키보드 포커스 가능하게 해 방향키 스크롤 허용(WCAG scrollable-region) — focusable 은 의도적.
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        tabIndex={0}
+        role="group"
+        aria-keyshortcuts={handAriaShortcuts}
+        aria-label={localizeText(
+          t,
+          "작업 캔버스 — H로 핸드 전환, 스페이스·드래그, 설정된 보조 버튼·드래그 또는 방향키로 이동",
+          "studio.canvas.canvasAriaLabel"
+        )}
+        onDragLeave={onWrapDragLeave}
+        onDragOver={onWrapDragOver}
+        onDrop={onWrapDrop}
+        className={cn(
+          // Canvas fills remaining viewport under thin menubar+toolbelt (~6.5rem).
+          "relative min-h-0 flex-1 overflow-auto overscroll-contain rounded-none border-0 outline-none [scrollbar-gutter:stable]",
+          "group/asset-drop transition-shadow data-[studio-asset-drop-active=true]:shadow-[inset_0_0_0_2px_oklch(0.72_0.18_45/0.9)]",
+          "bg-[oklch(0.145_0.008_70)]",
+          "[background-image:linear-gradient(oklch(0.162_0.008_70)_1px,transparent_1px),linear-gradient(90deg,oklch(0.162_0.008_70)_1px,transparent_1px)]",
+          "[background-size:24px_24px]",
+          "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent focus-visible:shadow-[inset_0_0_0_1px_oklch(0.72_0.14_55/0.45)] lg:max-h-none",
+          canvasOnlyMode && "min-h-0 flex-1 max-h-none",
+          mobileImmersive
+            ? "min-h-0 flex-1 max-h-none rounded-xl"
+            : "max-h-[calc(100dvh-11rem)] min-h-[12rem] lg:max-h-none",
+          viewportCursorClassName,
+          "data-[studio-hand-pan-armed=true]:select-none data-[studio-hand-pan-armed=true]:cursor-grab data-[studio-hand-pan-active=true]:!cursor-grabbing",
+          (isSpacePressed || tool === "hand") && "select-none"
+        )}
+      >
+        {renderStudioCanvasStickyBanners({
+          activePage,
+          canvasFlipH,
+          canvasRotation,
+          closeViewToolWithFocus,
+          collaborationDocumentUnavailable,
+          commentPinArmed,
+          commitPages,
+          dismissQuickStart,
+          effScale,
+          fitCanvasToWidth,
+          followingStudioSessionId,
+          navigate,
+          pages,
+          remixId,
+          resetView,
+          rotateCanvasView,
+          selectionCount: canvasSelectionEls.length,
+          setActualPixelView,
+          setCurrentPageId,
+          setFollowingStudioSessionId,
+          setSelectedId,
+          setTeamPanelOpen,
+          setTool,
+          setZoom,
+          sourceHydrationPending,
+          stopStudioCommentPlacementSession,
+          studioCrdtOperationSyncReady,
+          t,
+          toggleHorizontalCanvasView,
+          viewTool,
+          workHydrationFailed,
+          workHydrationUnsupportedFormat,
+          workId,
+          zoom,
+          zoomToSelection,
+        })}
 
-          <StudioCanvasViewportStageHost
-            viewport={props}
-            live={live}
-            interaction={interaction}
-            bindZoomHost={bindZoomHost}
-          />
-          </div>
-          <StudioCanvasViewportHudOverlays
-            viewport={props}
-            interaction={interaction}
-          />
-        </div>
+        <StudioCanvasViewportStageHost
+          viewport={props}
+          live={live}
+          interaction={interaction}
+          bindZoomHost={bindZoomHost}
+        />
+      </div>
+      <StudioCanvasViewportHudOverlays
+        viewport={props}
+        interaction={interaction}
+      />
+      <StudioViewInspectorHud
+        viewportRef={wrapRef}
+        zoom={zoom}
+        canvasRotation={canvasRotation}
+        canvasFlipH={canvasFlipH}
+        selectionCount={canvasSelectionEls.length}
+        viewDisabledReason={viewBusyReason}
+        onZoomToSelection={zoomToSelection}
+        onFitCanvasToWidth={fitCanvasToWidth}
+        onActualPixels={setActualPixelView}
+        onResetView={resetView}
+        onRotateLeft={() => rotateCanvasView("left")}
+        onRotateRight={() => rotateCanvasView("right")}
+        onToggleFlip={toggleHorizontalCanvasView}
+      />
+    </div>
   );
 });

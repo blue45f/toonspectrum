@@ -5,7 +5,11 @@ import {
 } from "../studio-comipo-assembly";
 import { parseDialogueScript } from "../studio-dialogue";
 import { PANEL_LAYOUTS, type PanelLayoutPreset } from "../studio-panel-layouts";
-import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES } from "../studio-pose-presets";
+import {
+  EXPRESSION_PRESETS,
+  EXTRA_POSE_PRESETS,
+  NATURAL_IDLE_POSES,
+} from "../studio-pose-presets";
 import {
   diagnoseStudioSceneRecipe,
   STUDIO_SCENE_RECIPE_VERSION,
@@ -15,6 +19,13 @@ import {
   type StudioSceneCharacterSlot,
 } from "../studio-scene-recipe";
 import { SCENE_TEMPLATES, type SceneTemplate } from "../studio-scene-templates";
+
+import {
+  createQuickComicPreflightReport,
+  recommendQuickComicLayout,
+  type QuickComicLayoutRecommendation,
+  type QuickComicPreflightReport,
+} from "./studio-quick-comic-preflight";
 
 export const QUICK_COMIC_STEPS = [
   { id: "layout", label: "컷 레이아웃" },
@@ -43,6 +54,7 @@ export interface QuickComicPreview {
   scene: SceneTemplate | null;
   dialogueCount: number;
   assembly: ComipoAssemblyResult;
+  preflight: QuickComicPreflightReport;
 }
 
 const PREFERRED_LAYOUT_ID = "layout_two_rows";
@@ -90,6 +102,15 @@ export function createQuickComicInput(draft: QuickComicDraft): ComipoAssemblyInp
   };
 }
 
+export function recommendQuickComicLayoutForDraft(
+  draft: QuickComicDraft
+): QuickComicLayoutRecommendation {
+  return recommendQuickComicLayout({
+    dialogueScript: draft.dialogueScript,
+    sceneTemplateId: draft.sceneTemplateId,
+  });
+}
+
 export function createQuickComicPreview(draft: QuickComicDraft): QuickComicPreview | null {
   const input = createQuickComicInput(draft);
   if (!input) return null;
@@ -101,13 +122,23 @@ export function createQuickComicPreview(draft: QuickComicDraft): QuickComicPrevi
     : null;
   const assembly = assembleComipoPage(input);
   if (!assembly) return null;
+  const dialogueCount = input.dialogueScript
+    ? parseDialogueScript(input.dialogueScript).length
+    : 0;
 
   return {
     input,
     layout,
     scene,
-    dialogueCount: input.dialogueScript ? parseDialogueScript(input.dialogueScript).length : 0,
+    dialogueCount,
     assembly,
+    preflight: createQuickComicPreflightReport({
+      layoutId: layout.id,
+      sceneTemplateId: scene?.id ?? null,
+      dialogueScript: input.dialogueScript ?? "",
+      assemblyComposable: assembly.composable,
+      assemblyBubbleCount: assembly.bubbleCount,
+    }),
   };
 }
 
@@ -116,7 +147,7 @@ export function quickComicRecipeReferenceCatalog(): StudioSceneRecipeReferenceCa
   return {
     sets: new Set(SCENE_TEMPLATES.map((template) => template.id)),
     poses: new Set(
-      [...NATURAL_IDLE_POSES, ...EXTRA_POSE_PRESETS].map((preset) => preset.id),
+      [...NATURAL_IDLE_POSES, ...EXTRA_POSE_PRESETS].map((preset) => preset.id)
     ),
     expressions: new Set(EXPRESSION_PRESETS.map((preset) => preset.id)),
   };
@@ -128,7 +159,7 @@ export function quickComicRecipeReferenceCatalog(): StudioSceneRecipeReferenceCa
  * null — 호출부는 기존 preview 경로와 같은 실패 의미를 쓴다.
  */
 export function createQuickComicSceneRecipe(
-  draft: QuickComicDraft,
+  draft: QuickComicDraft
 ): StudioSceneRecipe | null {
   const layout = PANEL_LAYOUTS.find((candidate) => candidate.id === draft.layoutId);
   if (!layout) return null;
@@ -141,7 +172,7 @@ export function createQuickComicSceneRecipe(
     cast,
     defaultCamera: { angle: "front", zoom: 1 },
     defaultLighting: "day",
-    shots: layout.frames.map((frame, index) => ({
+    shots: layout.frames.map((_, index) => ({
       id: `${layout.id}-frame-${index + 1}`,
       label: `컷 ${index + 1}`,
       camera: {
@@ -156,7 +187,7 @@ export function createQuickComicSceneRecipe(
 
 /** 레시피 진단 중 Quick Comic이 즉시 고칠 수 있는 것(dangling 레퍼런스)만 돌려준다. */
 export function diagnoseQuickComicSceneRecipe(
-  draft: QuickComicDraft,
+  draft: QuickComicDraft
 ): readonly StudioSceneRecipeDiagnostic[] {
   const recipe = createQuickComicSceneRecipe(draft);
   if (!recipe) return [];

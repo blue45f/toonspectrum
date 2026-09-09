@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { planStudioToolHintPosition } from "./studio-tool-hint-position";
+import {
+  planStudioToolHintPosition,
+  readStudioToolHintViewport,
+} from "./studio-tool-hint-position";
 
 const anchor = (left: number, top: number, width = 40, height = 40) => ({
   left,
@@ -61,5 +64,96 @@ describe("planStudioToolHintPosition", () => {
     expect(result.left).toBe(8);
     expect(result.top).toBe(8);
     expect(result.arrowOffset).toBeGreaterThanOrEqual(16);
+  });
+
+  it("reserves rich-coach dimensions before expansion so the side stays stable", () => {
+    const compact = planStudioToolHintPosition({
+      anchor: anchor(720, 240),
+      viewportWidth: 1024,
+      viewportHeight: 768,
+      popupWidth: 240,
+      popupHeight: 112,
+      selectionPopupWidth: 304,
+      selectionPopupHeight: 312,
+    });
+    const expanded = planStudioToolHintPosition({
+      anchor: anchor(720, 240),
+      viewportWidth: 1024,
+      viewportHeight: 768,
+      popupWidth: 304,
+      popupHeight: 312,
+      selectionPopupWidth: 304,
+      selectionPopupHeight: 312,
+      previousSide: compact.side,
+    });
+
+    expect(compact.side).toBe("left");
+    expect(expanded.side).toBe(compact.side);
+  });
+
+  it("uses hysteresis when the reserved size misses by only measurement noise", () => {
+    const result = planStudioToolHintPosition({
+      anchor: anchor(664, 220),
+      viewportWidth: 1024,
+      viewportHeight: 768,
+      popupWidth: 240,
+      popupHeight: 112,
+      selectionPopupWidth: 304,
+      selectionPopupHeight: 312,
+      previousSide: "right",
+    });
+
+    expect(result.side).toBe("right");
+  });
+
+  it("clamps into an offset visual viewport instead of the hidden layout viewport", () => {
+    const result = planStudioToolHintPosition({
+      anchor: anchor(112, 84, 32, 32),
+      viewportLeft: 100,
+      viewportTop: 60,
+      viewportWidth: 360,
+      viewportHeight: 640,
+      popupWidth: 328,
+      popupHeight: 210,
+      preferredSide: "top",
+    });
+
+    expect(result.left).toBeGreaterThanOrEqual(108);
+    expect(result.left + 328).toBeLessThanOrEqual(452);
+    expect(result.top).toBeGreaterThanOrEqual(68);
+    expect(result.top + 210).toBeLessThanOrEqual(692);
+  });
+});
+
+describe("readStudioToolHintViewport", () => {
+  it("prefers VisualViewport dimensions and offsets when browser chrome changes", () => {
+    const previousDescriptor = Object.getOwnPropertyDescriptor(globalThis, "visualViewport");
+    Object.defineProperty(globalThis, "visualViewport", {
+      configurable: true,
+      value: {
+        width: 320,
+        height: 480,
+        offsetLeft: 42,
+        offsetTop: 96,
+      },
+    });
+
+    try {
+      expect(readStudioToolHintViewport()).toEqual({
+        left: 42,
+        top: 96,
+        right: 362,
+        bottom: 576,
+        width: 320,
+        height: 480,
+        source: "visual",
+      });
+    } finally {
+      if (previousDescriptor) {
+        Object.defineProperty(globalThis, "visualViewport", previousDescriptor);
+      } else {
+        Reflect.deleteProperty(globalThis, "visualViewport");
+      }
+    }
   });
 });
