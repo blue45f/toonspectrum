@@ -73,27 +73,32 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-function useActive() {
+function pathMatchesAny(pathname: string, prefixes: readonly string[]): boolean {
+  return prefixes.some((prefix) => matchesPrefix(pathname, prefix));
+}
+
+/** Exact destination state for drawer/utility items. A child page must not make
+ * both its purpose hub and the child destination announce aria-current="page". */
+function useDestinationActive() {
   const path = usePathname();
   return (href: string, exact?: boolean) => {
     if (exact) return path === href;
-    if (href === "/discover") {
-      return DISCOVER_PURPOSE_PREFIXES.some((prefix) => matchesPrefix(path, prefix));
-    }
-    if (href === "/make") {
-      // Asset library/wishlist are personal collection surfaces even though the
-      // marketplace itself belongs to the creation journey.
-      if (MY_PURPOSE_PREFIXES.some((prefix) => matchesPrefix(path, prefix))) return false;
-      return CREATE_PURPOSE_PREFIXES.some((prefix) => matchesPrefix(path, prefix));
-    }
-    if (href === "/community") {
-      return COMMUNITY_PURPOSE_PREFIXES.some((prefix) => matchesPrefix(path, prefix));
-    }
-    if (href === "/my") {
-      return MY_PURPOSE_PREFIXES.some((prefix) => matchesPrefix(path, prefix));
-    }
+    if (href === "/market" && pathMatchesAny(path, MY_PURPOSE_PREFIXES)) return false;
     return path === href || path.startsWith(`${href}/`);
   };
+}
+
+/** Broader state used only by the five top-level purpose choices. */
+function purposeActive(pathname: string, href: string, exact?: boolean): boolean {
+  if (exact || href === "/") return pathname === href;
+  if (href === "/discover") return pathMatchesAny(pathname, DISCOVER_PURPOSE_PREFIXES);
+  if (href === "/make") {
+    if (pathMatchesAny(pathname, MY_PURPOSE_PREFIXES)) return false;
+    return pathMatchesAny(pathname, CREATE_PURPOSE_PREFIXES);
+  }
+  if (href === "/community") return pathMatchesAny(pathname, COMMUNITY_PURPOSE_PREFIXES);
+  if (href === "/my") return pathMatchesAny(pathname, MY_PURPOSE_PREFIXES);
+  return matchesPrefix(pathname, href);
 }
 
 function matchesMobileNavigationViewport() {
@@ -126,7 +131,7 @@ function MobileNavigationFallback() {
 }
 
 export function SiteHeader() {
-  const isActive = useActive();
+  const isActive = useDestinationActive();
   const pathname = usePathname();
   const language = useI18n((state) => state.lang);
   const locale = siteNavigationLocale(language);
@@ -141,6 +146,7 @@ export function SiteHeader() {
   const shouldRenderMobileNavigation = menuOpen || isMobileNavigationViewport;
   const hideBottomTabs = isImmersiveMobileRoute(pathname);
   const create = SITE_NAVIGATION_ITEMS.make;
+  const isPurposeActive = (href: string, exact?: boolean) => purposeActive(pathname, href, exact);
 
   // 수동 닫기 뒤에는 모달 격리가 풀린 다음 호출 버튼으로 포커스를 되돌린다.
   // 라우트 이동과 데스크톱 전환은 새 화면/내비게이션이 포커스를 이어받으므로 복원하지 않는다.
@@ -203,7 +209,7 @@ export function SiteHeader() {
             className="ml-2 hidden items-center gap-0.5 rounded-2xl border border-line/60 bg-panel/60 p-1 shadow-sm min-[1360px]:flex"
           >
             {PRIMARY_SITE_NAVIGATION.map((item) => {
-              const active = isActive(item.href, item.exact);
+              const active = isPurposeActive(item.href, item.exact);
               return (
                 <Link
                   key={item.id}
@@ -253,11 +259,11 @@ export function SiteHeader() {
             <Link
               href={create.href}
               aria-label={siteNavigationText(create.label, locale)}
-              aria-current={isActive(create.href) ? "page" : undefined}
+              aria-current={isPurposeActive(create.href) ? "page" : undefined}
               title={siteNavigationText(create.description, locale)}
               className={cx(
                 "group relative hidden h-11 shrink-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm transition-all duration-200 ease-out-expo sm:flex",
-                isActive(create.href)
+                isPurposeActive(create.href)
                   ? "border-accent bg-accent text-on-accent"
                   : "border-line-strong bg-fg text-canvas hover:-translate-y-0.5 hover:border-fg"
               )}
@@ -295,6 +301,7 @@ export function SiteHeader() {
             panelRef={panelRef}
             closeMenu={closeMenu}
             isActive={isActive}
+            isPurposeActive={isPurposeActive}
             hideBottomTabs={hideBottomTabs}
           />
         </Suspense>
