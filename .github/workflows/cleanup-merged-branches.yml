@@ -17,13 +17,14 @@ permissions:
   pull-requests: write
 
 concurrency:
+  # Preserve a cleanup that has acquired a runner; a later tick may replace only stale pending work.
   group: merged-branch-cleanup
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   cleanup:
     name: Delete branches already integrated into main
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 8
     steps:
       - name: Fetch cleanup script from the triggering main commit
