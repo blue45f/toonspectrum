@@ -14,8 +14,11 @@ concurrency:
 
 jobs:
   patch:
-    runs-on: macos-15
+    runs-on: windows-2025
     timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v6
         with:
@@ -30,13 +33,11 @@ jobs:
           cache: pnpm
 
       - name: Patch shared storage ownership
-        shell: bash
         run: |
           set -euo pipefail
-          python3 scripts/patch-help-center-storage-boundary.py
+          python scripts/patch-help-center-storage-boundary.py
 
       - name: Validate focused boundary
-        shell: bash
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile
@@ -48,7 +49,6 @@ jobs:
           git diff --check
 
       - name: Commit source-only repair
-        shell: bash
         run: |
           set -euo pipefail
           git config user.name toonstudio-ci
