@@ -1,14 +1,18 @@
 name: Main full QA · isolated diagnostics
 
+# `core` and domain workflows own pull-request gating. This intentionally broad diagnostic
+# matrix runs after merge (and on demand) so it can find cross-domain drift without occupying
+# dozens of PR runners or duplicating type/build work before every merge.
 on:
-  pull_request:
+  push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: main-full-qa-fast-${{ github.head_ref || github.ref_name }}
+  group: main-full-qa-fast-${{ github.ref_name }}
   cancel-in-progress: true
 
 env:
