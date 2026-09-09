@@ -78,7 +78,7 @@ export function SiteHeader() {
   const panelRef = useRef<HTMLDivElement>(null);
   const shouldRenderMobileNavigation = menuOpen || isMobileNavigationViewport;
   const hideBottomTabs = isImmersiveMobileRoute(pathname);
-  const studio = SITE_NAVIGATION_ITEMS.studio;
+  const create = SITE_NAVIGATION_ITEMS.make;
 
   // 수동 닫기 뒤에는 모달 격리가 풀린 다음 호출 버튼으로 포커스를 되돌린다.
   // 라우트 이동과 데스크톱 전환은 새 화면/내비게이션이 포커스를 이어받으므로 복원하지 않는다.
@@ -189,13 +189,13 @@ export function SiteHeader() {
             </button>
 
             <Link
-              href={studio.href}
-              aria-label={siteNavigationText(studio.label, locale)}
-              aria-current={isActive(studio.href) ? "page" : undefined}
-              title={siteNavigationText(studio.description, locale)}
+              href={create.href}
+              aria-label={siteNavigationText(create.label, locale)}
+              aria-current={isActive(create.href) ? "page" : undefined}
+              title={siteNavigationText(create.description, locale)}
               className={cx(
                 "group relative hidden h-11 shrink-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm transition-all duration-200 ease-out-expo sm:flex",
-                isActive(studio.href)
+                isActive(create.href)
                   ? "border-accent bg-accent text-on-accent"
                   : "border-line-strong bg-fg text-canvas hover:-translate-y-0.5 hover:border-fg"
               )}
@@ -203,7 +203,7 @@ export function SiteHeader() {
               <span aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-on-accent/40 to-transparent" />
               <Palette size={16} className="shrink-0 transition-transform duration-200 group-hover:-rotate-6 group-hover:scale-110" />
               <span className="hidden min-w-max whitespace-nowrap xl:inline-block">
-                {keepInlineText(siteNavigationText(studio.label, locale))}
+                {keepInlineText(siteNavigationText(create.label, locale))}
               </span>
             </Link>
 
