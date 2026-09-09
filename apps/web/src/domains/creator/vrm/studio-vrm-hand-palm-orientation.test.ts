@@ -63,6 +63,39 @@ function applyNaturalIdle(vrm: import("@pixiv/three-vrm").VRM, characterId: stri
   return pose;
 }
 
+function worldPosition(node: THREE.Object3D | null | undefined): THREE.Vector3 | null {
+  return node?.getWorldPosition(new THREE.Vector3()) ?? null;
+}
+
+function wristKinkDegrees(vrm: import("@pixiv/three-vrm").VRM, side: "left" | "right"): number | null {
+  const humanoid = vrm.humanoid;
+  const lower = humanoid?.getNormalizedBoneNode(`${side}LowerArm`);
+  const hand = humanoid?.getNormalizedBoneNode(`${side}Hand`);
+  const middle = humanoid?.getNormalizedBoneNode(`${side}MiddleProximal`)
+    ?? humanoid?.getNormalizedBoneNode(`${side}MiddleDistal`);
+  if (!lower || !hand || !middle) return null;
+  const lowerPos = worldPosition(lower)!;
+  const handPos = worldPosition(hand)!;
+  const middlePos = worldPosition(middle)!;
+  const forearm = handPos.clone().sub(lowerPos);
+  const handAxis = middlePos.clone().sub(handPos);
+  if (forearm.lengthSq() < 1e-8 || handAxis.lengthSq() < 1e-8) return null;
+  const dot = THREE.MathUtils.clamp(forearm.normalize().dot(handAxis.normalize()), -1, 1);
+  return THREE.MathUtils.radToDeg(Math.acos(dot));
+}
+
+function approximateAvatarHeight(vrm: import("@pixiv/three-vrm").VRM): number | null {
+  const humanoid = vrm.humanoid;
+  const head = worldPosition(humanoid?.getNormalizedBoneNode("head"));
+  const leftFoot = worldPosition(humanoid?.getNormalizedBoneNode("leftFoot"));
+  const rightFoot = worldPosition(humanoid?.getNormalizedBoneNode("rightFoot"));
+  const feet = [leftFoot, rightFoot].filter((value): value is THREE.Vector3 => value !== null);
+  if (!head || feet.length === 0) return null;
+  const footY = Math.min(...feet.map((value) => value.y));
+  const value = head.y - footY;
+  return Number.isFinite(value) && value > 0.4 ? value : null;
+}
+
 describe("desiredRelaxedPalmNormal", () => {
   it("prefers medial + down + forward, not camera-back", () => {
     const left = desiredRelaxedPalmNormal(
@@ -77,10 +110,8 @@ describe("desiredRelaxedPalmNormal", () => {
     );
     expect(left.x).toBeLessThan(0);
     expect(right.x).toBeGreaterThan(0);
-    // Hands in front of torso must not request a strongly rearward palm.
     expect(left.z).toBeGreaterThan(-0.15);
     expect(right.z).toBeGreaterThan(-0.15);
-    // Mild thigh-facing bias (not extreme — that forced spun wrists).
     expect(left.y).toBeLessThan(-0.12);
     expect(right.y).toBeLessThan(-0.12);
   });
@@ -92,7 +123,6 @@ describe("relaxed hand palm orientation across bundled characters", () => {
 
     for (const character of CHARACTERS) {
       const vrm = await loadBundledVrm(character.file);
-      // Skip non-humanoid / missing hands.
       if (
         !vrm.humanoid?.getNormalizedBoneNode("leftHand")
         || !vrm.humanoid?.getNormalizedBoneNode("rightHand")
@@ -109,27 +139,55 @@ describe("relaxed hand palm orientation across bundled characters", () => {
         continue;
       }
 
-      // Medial with side-aware winding (no 100°+ wrist spins).
-      if (left.x >= -0.15) {
-        failures.push(`${character.name}: left palm not medial (x=${left.x.toFixed(2)})`);
+      if (left.x >= -0.15) failures.push(`${character.name}: left palm not medial (x=${left.x.toFixed(2)})`);
+      if (right.x <= 0.15) failures.push(`${character.name}: right palm not medial (x=${right.x.toFixed(2)})`);
+      if (left.z < -0.55) failures.push(`${character.name}: left palm too camera-back (z=${left.z.toFixed(2)})`);
+      if (right.z < -0.55) failures.push(`${character.name}: right palm too camera-back (z=${right.z.toFixed(2)})`);
+      if (left.y > 0.35) failures.push(`${character.name}: left palm too up (y=${left.y.toFixed(2)})`);
+      if (right.y > 0.35) failures.push(`${character.name}: right palm too up (y=${right.y.toFixed(2)})`);
+    }
+
+    expect(failures, failures.join(" | ")).toEqual([]);
+  }, 180_000);
+
+  it("keeps relaxed wrists beside the same-side thigh instead of crossing or kinking", async () => {
+    const failures: string[] = [];
+
+    for (const character of CHARACTERS) {
+      const vrm = await loadBundledVrm(character.file);
+      applyNaturalIdle(vrm, character.id);
+      const humanoid = vrm.humanoid;
+      const hips = worldPosition(humanoid?.getNormalizedBoneNode("hips"));
+      const leftHand = worldPosition(humanoid?.getNormalizedBoneNode("leftHand"));
+      const rightHand = worldPosition(humanoid?.getNormalizedBoneNode("rightHand"));
+      const leftKnee = worldPosition(humanoid?.getNormalizedBoneNode("leftLowerLeg"));
+      const rightKnee = worldPosition(humanoid?.getNormalizedBoneNode("rightLowerLeg"));
+      const height = approximateAvatarHeight(vrm);
+      if (!hips || !leftHand || !rightHand || !leftKnee || !rightKnee || !height) continue;
+
+      // Same-side placement: left/right hands must not cross the body midline in a relaxed stand.
+      if (leftHand.x <= hips.x) failures.push(`${character.name}: left hand crossed torso center`);
+      if (rightHand.x >= hips.x) failures.push(`${character.name}: right hand crossed torso center`);
+
+      // Hands should hang around the upper/mid thigh: below the hips, but not substantially below knee.
+      const hipSlack = height * 0.05;
+      const kneeSlack = height * 0.08;
+      if (leftHand.y > hips.y + hipSlack || leftHand.y < leftKnee.y - kneeSlack) {
+        failures.push(`${character.name}: left hand vertical placement unnatural (hand=${leftHand.y.toFixed(2)}, hip=${hips.y.toFixed(2)}, knee=${leftKnee.y.toFixed(2)})`);
       }
-      if (right.x <= 0.15) {
-        failures.push(`${character.name}: right palm not medial (x=${right.x.toFixed(2)})`);
+      if (rightHand.y > hips.y + hipSlack || rightHand.y < rightKnee.y - kneeSlack) {
+        failures.push(`${character.name}: right hand vertical placement unnatural (hand=${rightHand.y.toFixed(2)}, hip=${hips.y.toFixed(2)}, knee=${rightKnee.y.toFixed(2)})`);
       }
-      // Avoid "hand backs to camera" look (strong -Z on both).
-      if (left.z < -0.55) {
-        failures.push(`${character.name}: left palm too camera-back (z=${left.z.toFixed(2)})`);
-      }
-      if (right.z < -0.55) {
-        failures.push(`${character.name}: right palm too camera-back (z=${right.z.toFixed(2)})`);
-      }
-      // Reject only clearly palm-up residuals.
-      if (left.y > 0.35) {
-        failures.push(`${character.name}: left palm too up (y=${left.y.toFixed(2)})`);
-      }
-      if (right.y > 0.35) {
-        failures.push(`${character.name}: right palm too up (y=${right.y.toFixed(2)})`);
-      }
+
+      // A relaxed wrist can bend, but a gross 65°+ break reads as a dislocated/spun hand.
+      const leftKink = wristKinkDegrees(vrm, "left");
+      const rightKink = wristKinkDegrees(vrm, "right");
+      if (leftKink !== null && leftKink > 65) failures.push(`${character.name}: left wrist kink ${leftKink.toFixed(1)}°`);
+      if (rightKink !== null && rightKink > 65) failures.push(`${character.name}: right wrist kink ${rightKink.toFixed(1)}°`);
+
+      // Gross lateral runaway check, normalized to the character's own scale.
+      if (Math.abs(leftHand.x - hips.x) > height * 0.34) failures.push(`${character.name}: left hand too far from body`);
+      if (Math.abs(rightHand.x - hips.x) > height * 0.34) failures.push(`${character.name}: right hand too far from body`);
     }
 
     expect(failures, failures.join(" | ")).toEqual([]);
