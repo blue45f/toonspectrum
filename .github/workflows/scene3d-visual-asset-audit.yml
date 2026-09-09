@@ -1,0 +1,88 @@
+name: Scene3D visual asset audit
+
+on:
+  push:
+    branches:
+      - audit/scene3d-assets-20260910
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contact-sheets:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install image compositor
+        run: python3 -m pip install --disable-pip-version-check pillow
+      - name: Build character and environment contact sheets
+        shell: bash
+        run: |
+          mkdir -p artifacts/scene3d-visual-audit
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps, ImageDraw
+          import json, math
+
+          root = Path('.')
+          out = root / 'artifacts/scene3d-visual-audit'
+          out.mkdir(parents=True, exist_ok=True)
+
+          groups = {
+              'characters': sorted((root / 'apps/web/public/assets/3d/characters/thumbnails').rglob('*.png')),
+              'environments': sorted((root / 'apps/web/public/assets/3d/environments').rglob('thumbnails/*.png')),
+              'existing-modular-contact': sorted((root / 'artifacts/studio-asset-expansion/previews/modular-v1').glob('contact-*.png')),
+          }
+
+          CELL_W, CELL_H = 260, 320
+          IMAGE_W, IMAGE_H = 244, 244
+          COLS = 5
+          PAGE_SIZE = 25
+
+          def fit_rgba(path):
+              image = Image.open(path).convert('RGBA')
+              image.thumbnail((IMAGE_W, IMAGE_H), Image.Resampling.LANCZOS)
+              canvas = Image.new('RGBA', (IMAGE_W, IMAGE_H), (238, 238, 238, 255))
+              x = (IMAGE_W - image.width) // 2
+              y = (IMAGE_H - image.height) // 2
+              canvas.alpha_composite(image, (x, y))
+              return canvas.convert('RGB')
+
+          index = {'groups': {}}
+          for group, files in groups.items():
+              index['groups'][group] = [str(path) for path in files]
+              if group == 'existing-modular-contact':
+                  # Preserve the original curated sheets as-is for direct inspection.
+                  for path in files:
+                      target = out / f'{group}-{path.name}'
+                      target.write_bytes(path.read_bytes())
+                  continue
+              for page_index in range(math.ceil(len(files) / PAGE_SIZE)):
+                  page_files = files[page_index * PAGE_SIZE:(page_index + 1) * PAGE_SIZE]
+                  rows = math.ceil(len(page_files) / COLS)
+                  sheet = Image.new('RGB', (COLS * CELL_W, rows * CELL_H), (250, 250, 250))
+                  draw = ImageDraw.Draw(sheet)
+                  for i, path in enumerate(page_files):
+                      col, row = i % COLS, i // COLS
+                      x, y = col * CELL_W, row * CELL_H
+                      rendered = fit_rgba(path)
+                      sheet.paste(rendered, (x + 8, y + 8))
+                      label = path.stem[:36]
+                      draw.text((x + 8, y + 258), f'{page_index * PAGE_SIZE + i + 1}. {label}', fill=(20, 20, 20))
+                      sub = str(path.parent.relative_to(root))[-42:]
+                      draw.text((x + 8, y + 278), sub, fill=(85, 85, 85))
+                      draw.rectangle((x, y, x + CELL_W - 1, y + CELL_H - 1), outline=(190, 190, 190))
+                  sheet.save(out / f'{group}-{page_index + 1:02d}.jpg', quality=92, subsampling=0)
+
+          (out / 'index.json').write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding='utf-8')
+          print(json.dumps({key: len(value) for key, value in groups.items()}, indent=2))
+          PY
+      - name: Upload visual evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: scene3d-visual-asset-audit
+          path: artifacts/scene3d-visual-audit/
+          retention-days: 7
+          if-no-files-found: error
