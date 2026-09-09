@@ -30,7 +30,9 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
     );
   }
 
-  const grouped = Object.entries(Object.groupBy(workbench.options, (option) => option.part.slot));
+  const grouped = Object.keys(SLOT_LABELS)
+    .map((slot) => [slot, workbench.options.filter((option) => option.part.slot === slot)] as const)
+    .filter(([, options]) => options.length > 0);
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -55,7 +57,7 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
         <section key={slot} className="space-y-1.5">
           <h4 className="text-[0.66rem] font-bold text-fg-2">{SLOT_LABELS[slot as keyof typeof SLOT_LABELS] ?? slot}</h4>
           <div className="grid grid-cols-2 gap-2">
-            {options!.map((option) => {
+            {options.map((option) => {
               const selected = option.selected;
               const applying = workbench.busyPartId === option.part.id;
               const disabled = option.status !== "supported" || (workbench.busyPartId !== null && !applying);
