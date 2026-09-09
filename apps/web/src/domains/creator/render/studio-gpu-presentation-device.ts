@@ -57,6 +57,16 @@ function once(release: () => void): () => void {
   };
 }
 
+function safeDestroyDedicatedDevice(device: GPUDevice): void {
+  try {
+    device.destroy();
+  } catch {
+    // Teardown must stay fail-closed. Browsers/providers can surface an exception after a
+    // device-loss or already-destroyed transition; React unmount/recovery must not crash the
+    // Studio while cleaning up a dedicated compatibility device.
+  }
+}
+
 async function acquireDedicatedDevice(
   gpu: GPU,
   canvasFormat: StudioGpuCanvasFormat,
@@ -72,7 +82,7 @@ async function acquireDedicatedDevice(
       deviceEpoch: 1,
       canvasFormat,
       ownership: "dedicated" as const,
-      release: once(() => device.destroy()),
+      release: once(() => safeDestroyDedicatedDevice(device)),
     });
   } catch {
     return null;
