@@ -20,6 +20,8 @@ const OUTPUT_MIN_HEIGHT = 2160;
 const OUTPUT_MAX_EDGE = 4096;
 const DEFAULT_FAR = 5000;
 
+type Scene3dShadowMapSize = 512 | 1024 | 2048 | 4096;
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -110,6 +112,17 @@ function resolveProjectionOutputSize(
   });
 }
 
+function projectShadowMapSize(
+  source: StudioBg3dSceneDocument["quality"]["desktop"]["shadowMapSize"],
+): Scene3dShadowMapSize {
+  // BG3D still accepts a 256px legacy preview tier. Scene3D starts at 512px, so projection must
+  // upgrade it rather than create a document that violates the Scene3D type contract.
+  if (source >= 4096) return 4096;
+  if (source >= 2048) return 2048;
+  if (source >= 1024) return 1024;
+  return 512;
+}
+
 function projectDirectionalLight(
   id: string,
   name: string,
@@ -140,6 +153,10 @@ export function projectStudioBg3dDocumentToScene3d(input: {
 }): StudioScene3dDocumentV1 {
   const { source } = input;
   const now = input.now ?? new Date().toISOString();
+  const sourceShots = source.shots ?? [];
+  const activeSourceShot = source.activeShotId
+    ? sourceShots.find((shot) => shot.id === source.activeShotId)
+    : undefined;
   const assets = source.attachments.map(projectAttachment);
   const entities: StudioScene3dEntity[] = source.nodes.map((node) => {
     const base = {
@@ -169,7 +186,7 @@ export function projectStudioBg3dDocumentToScene3d(input: {
   });
 
   const mainCamera = projectCamera(source.camera, "camera:main", "메인 카메라");
-  const shotCameras = (source.shots ?? []).map((shot) => projectCamera(
+  const shotCameras = sourceShots.map((shot) => projectCamera(
     { ...source.camera, ...(shot.camera ?? {}) },
     `camera:shot:${shot.id}`,
     `${shot.name} 카메라`,
@@ -193,7 +210,7 @@ export function projectStudioBg3dDocumentToScene3d(input: {
     assets: Object.freeze(assets),
     entities: Object.freeze(entities),
     cameras: Object.freeze([mainCamera, ...shotCameras]),
-    activeCameraId: source.activeShotId ? `camera:shot:${source.activeShotId}` : mainCamera.id,
+    activeCameraId: activeSourceShot ? `camera:shot:${activeSourceShot.id}` : mainCamera.id,
     lights: Object.freeze([
       projectDirectionalLight("light:key", "키 라이트", source.lighting.key),
       projectDirectionalLight("light:fill", "필 라이트", source.lighting.fill),
@@ -218,7 +235,7 @@ export function projectStudioBg3dDocumentToScene3d(input: {
         enabled: source.render.shadows,
         mode: "csm",
         cascades: 3,
-        mapSize: source.quality.desktop.shadowMapSize,
+        mapSize: projectShadowMapSize(source.quality.desktop.shadowMapSize),
       }),
       effects: Object.freeze({
         ssgi: false,
@@ -244,7 +261,7 @@ export function projectStudioBg3dDocumentToScene3d(input: {
       smartLayer: true,
       semanticPasses: Object.freeze(["beauty", "line", "shadow", "depth", "normal", "object-id", "material-id"] as const),
     }),
-    shots: Object.freeze((source.shots ?? []).map((shot) => Object.freeze({
+    shots: Object.freeze(sourceShots.map((shot) => Object.freeze({
       id: shot.id,
       name: shot.name,
       cameraId: `camera:shot:${shot.id}`,
