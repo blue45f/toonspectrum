@@ -527,13 +527,16 @@ export function useStudioVrmPoserRuntimeD(h: StudioVrmPoserHost): void {
         setLibraryEntries((current: VrmLibraryEntry[]) => current.map((entry: VrmLibraryEntry) => {
           const visible = hydratedById.get(entry.id);
           if (visible) return visible;
-          const isBundledStaticThumbnail = entry.source === "sample"
-            && entry.thumbnail?.startsWith("/vrm/thumbnails/");
+          // Bundled sample thumbnails are immutable same-origin files under
+          // /assets/3d/characters/thumbnails/**. Never evict them when the OPFS thumbnail
+          // hydration window moves: doing so turns a real character preview into the
+          // name/initials SVG fallback until another hydration pass happens. Only uploaded
+          // data-URL thumbnails need bounded window eviction.
           if (
+            entry.source === "sample" ||
             entry.source === "memory" ||
             entry.id === activeModelIdRef.current ||
-            entry.thumbnail === null ||
-            isBundledStaticThumbnail
+            entry.thumbnail === null
           ) return entry;
           return { ...entry, thumbnail: null };
         }));
