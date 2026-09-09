@@ -1,3 +1,4 @@
+# Runs only long enough to materialize the reviewed final patch on the synchronized main tree.
 name: Studio tooltip final patch
 
 on:
