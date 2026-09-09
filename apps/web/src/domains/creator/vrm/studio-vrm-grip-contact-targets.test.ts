@@ -35,6 +35,27 @@ describe("Studio VRM grip contact targets", () => {
     }
   });
 
+  it("preserves original finger ordinals when a locked finger is omitted", () => {
+    const source = points();
+    const result = createStudioVrmGripContactTargets({
+      center: new THREE.Vector3(),
+      axis: new THREE.Vector3(0, 1, 0),
+      fallbackRadial: new THREE.Vector3(1, 0, 0),
+      fingertipWorldPositions: [source[0]!, source[2]!, source[3]!],
+      fingerOrdinals: [0, 2, 3],
+      gripRadius: 0.008,
+      handSize: 0.075,
+      side: "right",
+    });
+
+    expect(result).not.toBeNull();
+    const ys = result!.targets.map((target) => target.y);
+    expect(ys[0]).toBeGreaterThan(ys[1]!);
+    expect(ys[1]).toBeGreaterThan(ys[2]!);
+    // Ring keeps the ring slot; it is not shifted into the omitted Middle slot.
+    expect(ys[1]).toBeLessThan(0);
+  });
+
   it("uses the nearest circumferential side from the authored hand pose", () => {
     const input = points();
     input[0]!.x = -0.03;
@@ -68,13 +89,24 @@ describe("Studio VRM grip contact targets", () => {
     expect(result!.tolerance).toBeLessThan(0.075 * 0.2);
   });
 
-  it("fails closed for malformed grip metrics", () => {
+  it("fails closed for malformed grip metrics or duplicate ordinals", () => {
     expect(createStudioVrmGripContactTargets({
       center: new THREE.Vector3(),
       axis: new THREE.Vector3(0, 0, 0),
       fallbackRadial: new THREE.Vector3(1, 0, 0),
       fingertipWorldPositions: points().slice(0, 3),
       gripRadius: Number.NaN,
+      handSize: 0.075,
+      side: "left",
+    })).toBeNull();
+
+    expect(createStudioVrmGripContactTargets({
+      center: new THREE.Vector3(),
+      axis: new THREE.Vector3(0, 1, 0),
+      fallbackRadial: new THREE.Vector3(1, 0, 0),
+      fingertipWorldPositions: points().slice(0, 2),
+      fingerOrdinals: [1, 1],
+      gripRadius: 0.008,
       handSize: 0.075,
       side: "left",
     })).toBeNull();
