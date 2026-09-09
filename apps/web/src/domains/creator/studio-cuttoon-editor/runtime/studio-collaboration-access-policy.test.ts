@@ -4,7 +4,7 @@ import { projectStudioCollaborationAccessPolicy } from "./studio-collaboration-a
 
 const localDocument = {
   expectsSharedDocument: false,
-  liveJam: false,
+  joinedLiveJam: false,
   realtimeSession: false,
   participantCanEdit: false,
   documentReady: false,
@@ -12,9 +12,9 @@ const localDocument = {
   documentAccessLocked: false,
 } as const;
 
-const unsavedLiveJam = {
+const joinedUnsavedLiveJam = {
   ...localDocument,
-  liveJam: true,
+  joinedLiveJam: true,
   realtimeSession: true,
   participantCanEdit: true,
 } as const;
@@ -27,8 +27,8 @@ const savedTeamDocument = {
 } as const;
 
 describe("projectStudioCollaborationAccessPolicy", () => {
-  it("커서만 준비된 저장 전 작업실은 CRDT 문서와 최초 frontier가 준비될 때까지 잠근다", () => {
-    expect(projectStudioCollaborationAccessPolicy(unsavedLiveJam)).toEqual({
+  it("다른 탭이 연 저장 전 작업실은 CRDT 문서와 최초 frontier가 준비될 때까지 잠근다", () => {
+    expect(projectStudioCollaborationAccessPolicy(joinedUnsavedLiveJam)).toEqual({
       operationSyncRequired: true,
       operationDurabilityRequired: false,
       operationSyncReady: false,
@@ -39,7 +39,7 @@ describe("projectStudioCollaborationAccessPolicy", () => {
 
   it("저장 전 작업실은 문서가 수렴하면 autosave follower 탭도 공동 편집을 허용한다", () => {
     expect(projectStudioCollaborationAccessPolicy({
-      ...unsavedLiveJam,
+      ...joinedUnsavedLiveJam,
       documentReady: true,
       editsDurablyProtected: false,
     })).toEqual({
@@ -47,6 +47,20 @@ describe("projectStudioCollaborationAccessPolicy", () => {
       operationDurabilityRequired: false,
       operationSyncReady: true,
       operationSyncPending: false,
+      documentLocked: false,
+    });
+  });
+
+  it("새 문서 소유자 탭은 realtime lane 준비 중에도 로컬 편집을 잠그지 않는다", () => {
+    expect(projectStudioCollaborationAccessPolicy({
+      ...localDocument,
+      realtimeSession: true,
+      participantCanEdit: true,
+    })).toEqual({
+      operationSyncRequired: true,
+      operationDurabilityRequired: false,
+      operationSyncReady: false,
+      operationSyncPending: true,
       documentLocked: false,
     });
   });

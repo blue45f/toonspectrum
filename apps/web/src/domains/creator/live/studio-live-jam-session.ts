@@ -37,6 +37,23 @@ export function resolveStudioLiveSessionWorkId(input: {
     ?? input.instantWorkId;
 }
 
+/**
+ * Distinguishes the tab that owns an auto-published instant room from a tab that joined it.
+ *
+ * A new Studio document publishes its own `instantWorkId` into `?room=` after mount. Treating that
+ * owner as a remote join makes the whole editor fail-closed while the live transport/CRDT bridge is
+ * still booting (or unavailable), which can disable Pen/Eraser on an otherwise local draft. A real
+ * joining tab has a different per-tab `instantWorkId`, so the room mismatch is a stable boundary:
+ * owners keep editing locally while the realtime lane warms up; joiners still wait for convergence.
+ */
+export function isStudioJoinedLiveJamRoom(input: {
+  roomId: string | null;
+  instantWorkId: string;
+}): boolean {
+  const roomId = input.roomId?.trim() ?? "";
+  return roomId.length > 0 && roomId !== input.instantWorkId;
+}
+
 const STUDIO_LIVE_SHARED_PAGE_ID_MAX = 160;
 
 /**

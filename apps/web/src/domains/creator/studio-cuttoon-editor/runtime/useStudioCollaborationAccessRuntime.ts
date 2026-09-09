@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import {
+  isStudioJoinedLiveJamRoom,
   resolveStudioLiveSessionWorkId,
   shouldExpectStudioSharedDocument,
   shouldRequireStudioLiveServer,
@@ -154,7 +155,14 @@ export function useStudioCollaborationAccessRuntime({
     && studioCrdtSceneRuntimeRef.current
     && studioCrdtReconciledDocument === studioCrdtDocument,
   );
+  // The owner of a new document still starts the realtime transport in the background so sharing
+  // remains instant. Only a tab that joined somebody else's room is editing an authoritative remote
+  // frontier and must therefore block mutations until CRDT convergence completes.
   const studioLiveJam = Boolean(liveRoomQueryParam || !workId);
+  const joinedStudioLiveJam = isStudioJoinedLiveJamRoom({
+    roomId: liveRoomQueryParam,
+    instantWorkId,
+  });
   const requiresStudioLiveServer = shouldRequireStudioLiveServer({
     expectsSharedDocument,
     draftCollaborationReady: draftCollaboration?.status === "ready",
@@ -168,7 +176,7 @@ export function useStudioCollaborationAccessRuntime({
     operationSyncRequired: collaborationOperationSyncRequired,
   } = projectStudioCollaborationAccessPolicy({
     expectsSharedDocument,
-    liveJam: studioLiveJam,
+    joinedLiveJam: joinedStudioLiveJam,
     realtimeSession: isRealtimeTeamSession,
     participantCanEdit: Boolean(studioLiveParticipant && !collaborationReadOnly),
     documentReady: studioCrdtDocumentReady,
