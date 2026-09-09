@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 const ROOT_HOME = "apps/web/src/domains/creator-resources/CreatorHomePage.tsx";
 const MAKE_HUB = "apps/web/src/domains/creator-resources/MakeHubPage.tsx";
 const CREATOR_ROUTES = "apps/web/src/app/routes/groups/creator-resources.routes.tsx";
+const ACCOUNT_ROUTES = "apps/web/src/app/routes/groups/account.routes.tsx";
+const SITE_NAVIGATION = "apps/web/src/shared/components/site-navigation.ts";
 const LEGAL_ROUTES = "apps/web/src/app/routes/groups/legal.routes.tsx";
 const MARKET_NAV = "apps/web/src/domains/market/components/MarketNavHeader.tsx";
 const RANDOM_PAGE = "apps/web/src/domains/catalog/RandomPage.tsx";
@@ -24,6 +26,14 @@ describe("purpose-first product UX foundation", () => {
     expect(hub).toContain('/studio?preset=webtoon');
     expect(hub).toContain('/studio?preset=4cut');
     expect(hub).toContain('/studio?preset=illustration');
+  });
+
+  it("routes My Space as the global account destination while preserving detailed account pages", () => {
+    const routes = readFileSync(ACCOUNT_ROUTES, "utf8");
+    const navigation = readFileSync(SITE_NAVIGATION, "utf8");
+    expect(routes).toContain('path: "/my"');
+    expect(routes).toContain('path: "/me"');
+    expect(navigation).toContain('item("me", "/my"');
   });
 
   it("exposes searchable help and accessibility destinations", () => {
