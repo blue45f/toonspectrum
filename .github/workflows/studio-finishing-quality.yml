@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main, release/salvage-integration-20260908]
     paths:
+      - 'vitest.setup.ts'
       - 'scripts/check-studio-bundle.mjs'
       - 'scripts/lib/studio-crdt-bundle-boundary*'
       - 'scripts/lib/repo-paths.mjs'
@@ -16,6 +17,8 @@ on:
       - 'apps/web/src/domains/creator/StudioContinuityPanel*.tsx'
       - 'apps/web/src/domains/creator/StudioFinishQualityView*.tsx'
       - 'apps/web/src/domains/creator/StudioLazyPanelStack*.tsx'
+      - 'apps/web/src/domains/creator/StudioMenubarContent*.tsx'
+      - 'apps/web/src/domains/creator/StudioMenubarContent.test-fixture.ts'
       - 'apps/web/src/domains/creator/studio-main-menu-items-production.ts'
       - 'apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig*.tsx'
       - 'scripts/verify-studio-menus.mts'
@@ -24,6 +27,7 @@ on:
   push:
     branches: [main, release/salvage-integration-20260908]
     paths:
+      - 'vitest.setup.ts'
       - 'scripts/check-studio-bundle.mjs'
       - 'scripts/lib/studio-crdt-bundle-boundary*'
       - 'scripts/lib/repo-paths.mjs'
@@ -36,6 +40,8 @@ on:
       - 'apps/web/src/domains/creator/StudioContinuityPanel*.tsx'
       - 'apps/web/src/domains/creator/StudioFinishQualityView*.tsx'
       - 'apps/web/src/domains/creator/StudioLazyPanelStack*.tsx'
+      - 'apps/web/src/domains/creator/StudioMenubarContent*.tsx'
+      - 'apps/web/src/domains/creator/StudioMenubarContent.test-fixture.ts'
       - 'apps/web/src/domains/creator/studio-main-menu-items-production.ts'
       - 'apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig*.tsx'
       - 'scripts/verify-studio-menus.mts'
