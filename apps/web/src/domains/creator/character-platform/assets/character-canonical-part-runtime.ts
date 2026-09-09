@@ -299,9 +299,19 @@ function bakeRestGeometryToTarget(
   const indices = new THREE.Vector4();
   const weights = new THREE.Vector4();
   for (let vertex = 0; vertex < position.count; vertex += 1) {
-    sourcePoint.fromBufferAttribute(position, vertex).applyMatrix4(source.matrixWorld);
-    indices.fromBufferAttribute(skinIndex, vertex);
-    weights.fromBufferAttribute(skinWeight, vertex);
+    sourcePoint.set(position.getX(vertex), position.getY(vertex), position.getZ(vertex)).applyMatrix4(source.matrixWorld);
+    indices.set(
+      skinIndex.getX(vertex),
+      skinIndex.getY(vertex),
+      skinIndex.getZ(vertex),
+      skinIndex.getW(vertex),
+    );
+    weights.set(
+      skinWeight.getX(vertex),
+      skinWeight.getY(vertex),
+      skinWeight.getZ(vertex),
+      skinWeight.getW(vertex),
+    );
     output.set(0, 0, 0);
     let totalWeight = 0;
     for (let component = 0; component < 4; component += 1) {
@@ -352,6 +362,12 @@ function relativeTransform(source: THREE.Object3D, anchor: THREE.Object3D): THRE
   return anchor.matrixWorld.clone().invert().multiply(source.matrixWorld);
 }
 
+function sceneLocalTransform(source: THREE.Object3D, sourceRoot: THREE.Object3D): THREE.Matrix4 {
+  sourceRoot.updateWorldMatrix(true, true);
+  source.updateWorldMatrix(true, false);
+  return sourceRoot.matrixWorld.clone().invert().multiply(source.matrixWorld);
+}
+
 function sourceAnchorForRigid(sourceVrm: VRM | null, part: CharacterCanonicalPartDescriptor): THREE.Object3D | null {
   if (!sourceVrm) return null;
   const boneName = part.binding.targetBone as HumanBoneName | undefined;
@@ -387,6 +403,7 @@ function targetAnchor(
 function cloneRigidToAnchor(
   source: THREE.Mesh,
   sourceAnchor: THREE.Object3D | null,
+  sourceRoot: THREE.Object3D,
   targetAnchorNode: THREE.Object3D,
   plan: CharacterCanonicalPartPlan,
 ): THREE.Mesh {
@@ -397,15 +414,10 @@ function cloneRigidToAnchor(
   mesh.renderOrder = source.renderOrder;
   mesh.frustumCulled = false;
   mesh.userData = { ...source.userData };
-  if (sourceAnchor) {
-    const relative = relativeTransform(source, sourceAnchor);
-    relative.decompose(mesh.position, mesh.quaternion, mesh.scale);
-  } else {
-    source.updateWorldMatrix(true, false);
-    const targetInverse = targetAnchorNode.matrixWorld.clone().invert();
-    const relative = targetInverse.multiply(source.matrixWorld);
-    relative.decompose(mesh.position, mesh.quaternion, mesh.scale);
-  }
+  const relative = sourceAnchor
+    ? relativeTransform(source, sourceAnchor)
+    : sceneLocalTransform(source, sourceRoot);
+  relative.decompose(mesh.position, mesh.quaternion, mesh.scale);
   mesh.scale.multiply(new THREE.Vector3(plan.scale.x, plan.scale.y, plan.scale.z));
   if (plan.clearanceMeters > 0) {
     const factor = 1 + plan.clearanceMeters;
@@ -527,7 +539,7 @@ export class CharacterCanonicalPartSession {
         const sourceAnchor = sourceAnchorForRigid(sourceLease.vrm, part);
         for (const sourceMesh of sourceMeshes) {
           if (sourceMesh instanceof THREE.SkinnedMesh) continue;
-          const cloned = cloneRigidToAnchor(sourceMesh, sourceAnchor, target, plan);
+          const cloned = cloneRigidToAnchor(sourceMesh, sourceAnchor, sourceLease.scene, target, plan);
           cloned.userData.characterCanonicalPart = true;
           cloned.userData.characterCanonicalPartId = part.id;
           cloned.userData.characterSemanticLayer = semanticLayerForSlot(part.slot);
