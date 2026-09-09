@@ -1,0 +1,63 @@
+name: Studio large epics deep fixes
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-large-epics-deep-fix-v10.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      BRANCH: codex/studio-large-epics-closure-20260909
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply the final union-safe assertion
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          test = Path('apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts')
+          text = test.read_text().replace(
+            '    expect(graph.nodes.find((node) => node.id === "layer-effect-1-glow")?.enabled).toBe(false);',
+            '    const glow = graph.nodes.find((node) => node.id === "layer-effect-1-glow");\n    expect(glow?.kind === "live-effect" ? glow.enabled : undefined).toBe(false);',
+          )
+          test.write_text(text)
+          PY
+          pnpm exec eslint --fix --max-warnings=0 apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts
+          pnpm exec vitest run apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          rm -f .github/workflows/studio-large-epics-deep-fix-v10.yml
+
+      - name: Publish with retries
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps .github/workflows/studio-large-epics-deep-fix-v10.yml
+          git commit -m "fix(studio): narrow effect graph regression assertions"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$BRANCH"
+            if git rebase "origin/$BRANCH" && git push origin HEAD:"$BRANCH"; then exit 0; fi
+            git rebase --abort || true
+            sleep $((attempt * 7))
+          done
+          exit 1
