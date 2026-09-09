@@ -37,6 +37,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  source-snapshot:
+    name: source-snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Upload verifier source snapshot
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
+        with:
+          name: studio-long-stroke-source-${{ github.run_id }}
+          path: scripts/verify-studio-long-stroke.mts
+          if-no-files-found: error
+          retention-days: 1
+
   fidelity:
     name: ink-live-commit-fidelity
     runs-on: ubuntu-latest
