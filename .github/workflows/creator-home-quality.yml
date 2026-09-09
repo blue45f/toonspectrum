@@ -50,7 +50,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: creator-home-quality-${{ github.event.pull_request.number || github.ref }}
+  group: creator-home-quality-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 jobs:
   creator-home:
