@@ -1,11 +1,19 @@
 import { CreatorHomeExperience } from "../marketing/CreatorHomeExperience";
 import "../marketing/creator-home-experience-interactions.css";
 
+import { ProductIntentStart } from "./ProductIntentStart";
+
 /**
- * The root route owns one coherent creator journey. Research and inspiration
- * destinations are integrated into the experience instead of being appended as
- * a disconnected second homepage.
+ * The root route starts with a purpose-first launcher, then keeps the richer
+ * creator journey as the deeper product story. This preserves the proven
+ * Studio/research continuity while removing feature-name hunting from the
+ * first screen.
  */
 export function CreatorHomePage() {
-  return <CreatorHomeExperience />;
+  return (
+    <>
+      <ProductIntentStart />
+      <CreatorHomeExperience />
+    </>
+  );
 }
