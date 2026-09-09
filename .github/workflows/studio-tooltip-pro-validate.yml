@@ -93,18 +93,16 @@ jobs:
           }
           writeFileSync(testPath, test.replace(marker, internalScrollTest + marker));
           NODE
-      - name: Format tooltip sources
+      - name: Format tooltip TypeScript
         run: |
-          pnpm exec prettier --write \
+          pnpm dlx prettier@3.6.2 --write \
             apps/web/src/domains/creator/StudioToolHint.tsx \
             apps/web/src/domains/creator/components/StudioToolHintBubble.tsx \
             apps/web/src/domains/creator/studio-tool-hint-position.ts \
             apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
             apps/web/src/domains/creator/studio-tool-hint-exposure.ts \
             apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
-            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx \
-            apps/web/src/styles/globals.css \
-            docs/studio-tooltip-ux-v2-2026-09-09.md
+            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx
       - name: Lint tooltip sources
         run: |
           pnpm exec eslint --max-warnings=0 \
