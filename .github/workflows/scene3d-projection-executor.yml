@@ -45,6 +45,128 @@ jobs:
                   subprocess.run(script, shell=True, executable='/bin/bash', check=True, env=env)
                   print('::endgroup::')
           PY
+      - name: Preserve canonical lens math and output aspect ratio
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.ts')
+          text = path.read_text(encoding='utf-8')
+
+          import_anchor = '''} from "../bg3d/studio-bg3d-scene-document";
+          import {
+          '''
+          import_replacement = '''} from "../bg3d/studio-bg3d-scene-document";
+          import { studioBg3dFovDegreesToFocalLength } from "../bg3d/studio-bg3d-lens";
+          import {
+          '''
+          if text.count(import_anchor) != 1:
+              raise SystemExit('projection lens import anchor changed')
+          text = text.replace(import_anchor, import_replacement, 1)
+
+          old_focal = '''          function focalLengthFromVerticalFov(fovDegrees: number): number {
+            const radians = clamp(fovDegrees, 1, 179) * Math.PI / 180;
+            return clamp(18 / Math.tan(radians / 2), 8, 300);
+          }
+
+          '''
+          if text.count(old_focal) != 1:
+              raise SystemExit('legacy focal conversion anchor changed')
+          text = text.replace(old_focal, '', 1)
+          text = text.replace(
+              'focalLengthMm: focalLengthFromVerticalFov(source.fovDegrees),',
+              'focalLengthMm: studioBg3dFovDegreesToFocalLength(source.fovDegrees),',
+              1,
+          )
+
+          helper_anchor = '''          function projectDirectionalLight(
+          '''
+          helper = '''          function resolveProjectionOutputSize(
+            exportHeight: number,
+            exportAspectRatio: number,
+          ): { readonly width: number; readonly height: number } {
+            const requestedHeight = clamp(
+              Math.round(exportHeight),
+              OUTPUT_MIN_HEIGHT,
+              OUTPUT_MAX_EDGE,
+            );
+            const aspect = clamp(exportAspectRatio, 0.1, 10);
+            const requestedWidth = requestedHeight * aspect;
+            const fitScale = Math.min(
+              1,
+              OUTPUT_MAX_EDGE / Math.max(requestedWidth, requestedHeight),
+            );
+            return Object.freeze({
+              width: Math.max(64, Math.round(requestedWidth * fitScale)),
+              height: Math.max(64, Math.round(requestedHeight * fitScale)),
+            });
+          }
+
+          '''
+          if text.count(helper_anchor) != 1:
+              raise SystemExit('projection output helper anchor changed')
+          text = text.replace(helper_anchor, helper + helper_anchor, 1)
+
+          old_size = '''            const height = clamp(Math.round(source.output.exportHeight), OUTPUT_MIN_HEIGHT, OUTPUT_MAX_EDGE);
+            const aspect = clamp(source.output.exportAspectRatio ?? 1, 0.1, 10);
+            const width = clamp(Math.round(height * aspect), 64, OUTPUT_MAX_EDGE);
+          '''
+          new_size = '''            const { width, height } = resolveProjectionOutputSize(
+              source.output.exportHeight,
+              source.output.exportAspectRatio ?? 1,
+            );
+          '''
+          if text.count(old_size) != 1:
+              raise SystemExit('projection output sizing anchor changed')
+          text = text.replace(old_size, new_size, 1)
+          path.write_text(text, encoding='utf-8')
+
+          Path(
+            'apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection-math.test.ts'
+          ).write_text('''import { describe, expect, it } from "vitest";
+
+import { studioBg3dFovDegreesToFocalLength } from "../bg3d/studio-bg3d-lens";
+import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "../bg3d/studio-bg3d-scene-document";
+import { projectStudioBg3dDocumentToScene3d } from "./studio-scene3d-bg3d-projection";
+
+describe("BG3D projection math contracts", () => {
+  it("uses the canonical 24mm vertical-sensor focal conversion", () => {
+    const projected = projectStudioBg3dDocumentToScene3d({
+      documentId: "lens-contract",
+      source: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      now: "2026-09-10T00:00:00.000Z",
+    });
+
+    expect(projected.cameras[0]?.focalLengthMm).toBeCloseTo(
+      studioBg3dFovDegreesToFocalLength(
+        DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera.fovDegrees,
+      ),
+      12,
+    );
+  });
+
+  it("fits landscape output inside 4096px without changing its aspect ratio", () => {
+    const aspect = 2.4;
+    const projected = projectStudioBg3dDocumentToScene3d({
+      documentId: "landscape-contract",
+      source: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+        output: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output,
+          exportHeight: 2160,
+          exportAspectRatio: aspect,
+        },
+      },
+      now: "2026-09-10T00:00:00.000Z",
+    });
+
+    expect(Math.max(projected.output.width, projected.output.height)).toBeLessThanOrEqual(4096);
+    expect(projected.output.width / projected.output.height).toBeCloseTo(aspect, 2);
+  });
+});
+''', encoding='utf-8')
+          PY
       - name: Remove control-regex lint debt from the touched document
         shell: bash
         run: |
@@ -75,11 +197,13 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm exec vitest run \
             apps/web/src/domains/creator/scene3d/studio-scene3d-document.test.ts \
-            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection-math.test.ts
           pnpm exec eslint --max-warnings=0 \
             apps/web/src/domains/creator/scene3d/studio-scene3d-document.ts \
             apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.ts \
-            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection-math.test.ts
           git diff --check
       - name: Commit materialized product slice
         shell: bash
