@@ -16,6 +16,7 @@ describe("isDatabaseAvailabilityError", () => {
     ["Neon compute quota (insufficient resources)", pgError("53000", "compute time quota exceeded")],
     ["connection exception SQLSTATE", pgError("08006", "connection_failure")],
     ["cannot connect now", pgError("57P03", "the database system is starting up")],
+    ["runtime role lacks optional schema DDL privilege", pgError("42501", "permission denied for schema public")],
     ["node network errno", pgError("ECONNREFUSED", "connect ECONNREFUSED 127.0.0.1:5432")],
     [
       "wrapped cause code",
@@ -44,6 +45,14 @@ describe("runSchemaPreflightToleratingDbUnavailability", () => {
     await expect(
       runSchemaPreflightToleratingDbUnavailability("test preflight", async () => {
         throw pgError("53000", "compute time quota exceeded");
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it("continues when a DML-only runtime role cannot provision an optional schema", async () => {
+    await expect(
+      runSchemaPreflightToleratingDbUnavailability("test preflight", async () => {
+        throw pgError("42501", "permission denied for schema public");
       })
     ).resolves.toBeUndefined();
   });
