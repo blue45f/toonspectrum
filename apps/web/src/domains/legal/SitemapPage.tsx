@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Sparkles,
   UserRound,
+  UsersRound,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -100,6 +101,19 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       destination("/random", "랜덤 발견", "Random discovery", "조건에 맞는 작품 무작위 추천", "Discover a random matching story"),
       destination("/tags", "태그로 찾기", "Explore tags", "인기·유사 태그 탐색", "Explore popular and related tags"),
       destination("/news", "업계 소식", "Industry news", "웹툰·웹소설 관련 소식", "Follow webtoon and web novel news"),
+    ],
+  },
+  {
+    id: "participation",
+    icon: UsersRound,
+    label: { ko: "참여·피드백", en: "Participation & feedback" },
+    description: {
+      ko: "관심사를 함께 나누고 서비스 개선에 참여",
+      en: "Share interests with others and help improve the service",
+    },
+    items: [
+      destination("/community/cafes", "장르 카페", "Genre cafés", "관심 장르별 모임과 대화", "Meet and talk around favorite genres"),
+      destination("/feedback", "제보·제안", "Feedback", "버그·아이디어·기능 요청", "Report bugs and suggest ideas or features"),
     ],
   },
   {
