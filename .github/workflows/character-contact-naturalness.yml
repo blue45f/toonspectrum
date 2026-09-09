@@ -6,7 +6,15 @@ on:
     paths:
       - .github/workflows/character-contact-naturalness.yml
       - scripts/verify-character-contact-naturalness.mjs
+      - scripts/verify-vrm-hand-visual-audit.mts
+      - apps/web/tools/browser-harnesses/hand-compare.html
+      - apps/web/tools/browser-harnesses/hand-compare-main.ts
+      - apps/web/tools/browser-harnesses/props-compare.html
+      - apps/web/tools/browser-harnesses/props-compare-main.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-contact-refinement.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-grip-contact-targets.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-prop-rig.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-poser-utils.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-portrait-framing.ts
       - apps/web/src/domains/creator/vrm/StudioVrmGripContactRefine.tsx
   push:
@@ -14,7 +22,15 @@ on:
     paths:
       - .github/workflows/character-contact-naturalness.yml
       - scripts/verify-character-contact-naturalness.mjs
+      - scripts/verify-vrm-hand-visual-audit.mts
+      - apps/web/tools/browser-harnesses/hand-compare.html
+      - apps/web/tools/browser-harnesses/hand-compare-main.ts
+      - apps/web/tools/browser-harnesses/props-compare.html
+      - apps/web/tools/browser-harnesses/props-compare-main.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-contact-refinement.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-grip-contact-targets.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-prop-rig.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-poser-utils.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-portrait-framing.ts
       - apps/web/src/domains/creator/vrm/StudioVrmGripContactRefine.tsx
 
@@ -44,3 +60,31 @@ jobs:
           node-version: 24
       - name: Verify contact, rollback, replay and portrait math
         run: node --experimental-strip-types --test scripts/verify-character-contact-naturalness.mjs
+
+  character-hand-visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Install workspace
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium runtime
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Render enlarged idle-hand and prop-contact evidence
+        run: pnpm exec tsx scripts/verify-vrm-hand-visual-audit.mts
+      - name: Upload hand visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vrm-hand-visual-audit
+          path: artifacts/vrm-hand-visual-audit/
+          retention-days: 7
+          if-no-files-found: error
