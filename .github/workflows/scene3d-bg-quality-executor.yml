@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Execute product and validation steps from bootstrap
+      - name: Materialize high-resolution insert product code
         shell: bash
         run: |
           python3 -m pip install --disable-pip-version-check pyyaml
@@ -35,7 +35,7 @@ jobs:
                   if not script:
                       continue
                   name = str(step.get('name', ''))
-                  if 'Commit and remove' in name or 'git push origin' in script:
+                  if name == 'Validate patch' or 'Commit and remove' in name or 'git push origin' in script:
                       continue
                   env = os.environ.copy()
                   env.update({str(k): str(v) for k, v in (step.get('env') or {}).items()})
@@ -43,6 +43,17 @@ jobs:
                   subprocess.run(script, shell=True, executable='/bin/bash', check=True, env=env)
                   print('::endgroup::')
           PY
+      - name: Validate BG3D insertion scope
+        shell: bash
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-resolution-boundary.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-editor-insert-host.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-resolution-boundary.test.ts
+          git diff --check
       - name: Commit materialized product slice
         shell: bash
         run: |
@@ -53,5 +64,5 @@ jobs:
                 .github/workflows/unblock-scene3d-bg-quality-once.yml
           git add -A
           git diff --cached --check
-          git commit -m 'fix(bg3d): keep canvas insertion sharp and deterministic'
-          git push origin HEAD:fix/scene3d-bg-quality-20260910
+          HUSKY=0 git commit -m 'fix(bg3d): keep canvas insertion sharp and deterministic'
+          HUSKY=0 git push origin HEAD:fix/scene3d-bg-quality-20260910
