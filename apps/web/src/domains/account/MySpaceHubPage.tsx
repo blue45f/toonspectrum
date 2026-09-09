@@ -24,7 +24,6 @@ const COPY = {
     body: "프로젝트, 공개한 작품, 서재, 에셋, 활동과 설정을 각각 찾지 않아도 됩니다. 내 공간에서 필요한 다음 화면으로 바로 이동하세요.",
     syncLocal: "현재 기록은 이 브라우저를 중심으로 보관됩니다. 로그인하면 지원되는 데이터는 계정과 이어집니다.",
     syncAccount: "로그인한 계정과 이 브라우저의 작업을 이어서 사용할 수 있습니다. 프로젝트별 저장 위치는 각 작업공간에서 확인하세요.",
-    syncLoading: "계정과 이 브라우저의 기록 상태를 확인하고 있습니다.",
     open: "열기",
     section: "내 공간 바로가기",
     stats: ["읽기 상태", "평가", "컬렉션"],
@@ -45,7 +44,6 @@ const COPY = {
     body: "You should not have to hunt separately for projects, published work, library data, assets, activity and settings. My Space connects the next destination directly.",
     syncLocal: "Current history is primarily stored in this browser. Sign in to continue supported data with your account.",
     syncAccount: "Continue with your signed-in account and work available in this browser. Check each workspace for project-specific storage details.",
-    syncLoading: "Checking account and browser history status.",
     open: "Open",
     section: "My Space destinations",
     stats: ["Reading states", "Ratings", "Collections"],
@@ -79,11 +77,7 @@ export function MySpaceHubPage() {
   const stats = hydrated
     ? [Object.keys(reads).length, Object.keys(ratings).length, collections.length]
     : [0, 0, 0];
-  const syncCopy = sessionStatus === "loading"
-    ? copy.syncLoading
-    : sessionStatus === "authenticated"
-      ? copy.syncAccount
-      : copy.syncLocal;
+  const syncCopy = sessionStatus === "authenticated" ? copy.syncAccount : copy.syncLocal;
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
