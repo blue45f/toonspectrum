@@ -1,5 +1,6 @@
 name: Validate AI Comic Director main
 
+# Manual rerun after applying all typecheck regression repairs.
 on:
   push:
     branches: [ci/validate-ai-comic-director-main-20260909]
