@@ -1,4 +1,4 @@
-name: Cleanup merged branches
+name: Cleanup merged branches and stale Actions runs
 
 on:
   schedule:
@@ -14,20 +14,18 @@ on:
 
 permissions:
   actions: write
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
+  issues: read
+  pull-requests: read
 
 concurrency:
-  # Preserve a cleanup that has acquired a runner; a later tick may replace only stale pending work.
-  # The v2 suffix detaches this lightweight runner generation from legacy queued ubuntu-latest runs.
-  group: merged-branch-cleanup-v2
-  cancel-in-progress: false
+  group: merged-branch-cleanup-v3
+  cancel-in-progress: true
 
 jobs:
   cleanup:
-    name: Delete integrated branches and stale Actions runs
-    runs-on: ubuntu-slim
+    name: Audit integrated branches and drain stale Actions runs
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 8
     steps:
       - name: Fetch cleanup scripts from the triggering main commit
@@ -44,13 +42,13 @@ jobs:
             node --check "$RUNNER_TEMP/${script}"
           done
 
-      - name: Remove only branches proven to be integrated
+      - name: Audit branches without deleting active work
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          node "$RUNNER_TEMP/cleanup-merged-branches.mjs" --all --apply \
+          node "$RUNNER_TEMP/cleanup-merged-branches.mjs" --all \
             | tee "$RUNNER_TEMP/cleanup-report.json"
 
       - name: Cancel superseded queued and running workflow runs
@@ -69,50 +67,33 @@ jobs:
         if: always()
         shell: bash
         run: |
-          if [[ ! -s "$RUNNER_TEMP/cleanup-report.json" ]]; then
-            {
-              echo "### Merged branch cleanup"
-              echo
-              echo "No branch cleanup report was produced."
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            node <<'NODE'
-            const { appendFileSync, readFileSync } = require("node:fs");
-            const report = JSON.parse(
-              readFileSync(`${process.env.RUNNER_TEMP}/cleanup-report.json`, "utf8"),
-            );
-            const lines = [
-              "### Merged branch cleanup",
-              "",
-              `- Deleted: ${report.deleted.length}`,
-              `- Closed duplicate PRs: ${report.closedPullRequests.length}`,
-              `- Preserved or skipped: ${report.skipped.length}`,
-            ];
-            if (report.deleted.length > 0) {
-              lines.push("", "#### Deleted branches");
-              for (const item of report.deleted) {
-                lines.push(`- \`${item.branch}\` (${item.proof})`);
-              }
-            }
-            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
-            NODE
-          fi
+          set -u
+          {
+            echo "### Branch cleanup audit"
+            echo
+            if [[ -s "$RUNNER_TEMP/cleanup-report.json" ]]; then
+              deleted="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).deleted.length' "$RUNNER_TEMP/cleanup-report.json")"
+              skipped="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).skipped.length' "$RUNNER_TEMP/cleanup-report.json")"
+              echo "- Destructive branch deletion: disabled"
+              echo "- Integrated branch candidates (dry-run): ${deleted}"
+              echo "- Preserved or unique branches: ${skipped}"
+            else
+              echo "- No branch audit report was produced."
+            fi
 
-          if [[ -s "$RUNNER_TEMP/actions-queue-cleanup.json" ]]; then
-            node <<'NODE'
-            const { appendFileSync, readFileSync } = require("node:fs");
-            const report = JSON.parse(
-              readFileSync(`${process.env.RUNNER_TEMP}/actions-queue-cleanup.json`, "utf8"),
-            );
-            const lines = [
-              "",
-              "### Actions queue cleanup",
-              "",
-              `- Active push/PR runs scanned: ${report.activeRunsScanned}`,
-              `- Superseded/closed-PR candidates: ${report.candidateRuns}`,
-              `- Cancellation requests accepted: ${report.cancelled.length}`,
-              `- Already terminal while cleaning: ${report.skipped.length}`,
-            ];
-            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
-            NODE
-          fi
+            echo
+            echo "### Actions queue cleanup"
+            echo
+            if [[ -s "$RUNNER_TEMP/actions-queue-cleanup.json" ]]; then
+              scanned="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).activeRunsScanned' "$RUNNER_TEMP/actions-queue-cleanup.json")"
+              candidates="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).candidateRuns' "$RUNNER_TEMP/actions-queue-cleanup.json")"
+              cancelled="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).cancelled.length' "$RUNNER_TEMP/actions-queue-cleanup.json")"
+              terminal="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).skipped.length' "$RUNNER_TEMP/actions-queue-cleanup.json")"
+              echo "- Active push/PR runs scanned: ${scanned}"
+              echo "- Superseded/closed-PR candidates: ${candidates}"
+              echo "- Cancellation requests accepted: ${cancelled}"
+              echo "- Already terminal while cleaning: ${terminal}"
+            else
+              echo "- No Actions queue cleanup report was produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
