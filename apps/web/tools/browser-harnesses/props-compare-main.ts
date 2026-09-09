@@ -1,8 +1,8 @@
 /**
  * Dev-only prop attachment comparison page. Open /tools/browser-harnesses/props-compare.html via Vite.
- * Applies the same production path as StudioVrmPoser (pose → metrics → auto-grip →
- * follower math) and renders 4 views: full, right hand + mug(handle), left hand +
- * book(flat), and a grip contact closeup.
+ * Applies the same production path as StudioVrmPoser (pose → metrics → auto-grip → palm correction
+ * → product contact pass → follower math) and renders 4 views: full, right hand + mug(handle),
+ * left hand + book(flat), and a grip contact closeup.
  */
 import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
 import * as THREE from "three";
@@ -10,11 +10,12 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { pickNaturalIdlePose } from "@/domains/creator/studio-pose-presets";
 import { resolveStudioVrmFingerAuthority } from "@/domains/creator/vrm/studio-vrm-auto-grip-authority";
+import { createStudioVrmGripContactPasses } from "@/domains/creator/vrm/StudioVrmGripContactRefine";
 import {
   applyFingerRotations,
   applyPoseToVrm,
   correctVrmHangingHandPalmTwist,
-  refineVrmGripFingerWrap,
+  estimateVrmPalmNormal,
   stripFingerBones,
   type FingerRotationMap,
   type PoseBoneMap,
@@ -41,6 +42,69 @@ function setStatus(text: string) {
 }
 
 type HandSide = "left" | "right";
+
+type VisualHandMetric = {
+  readonly palmNormal: readonly [number, number, number] | null;
+  readonly wristKinkDeg: number | null;
+  readonly handFromHips: readonly [number, number, number] | null;
+};
+
+type PropsCompareWindow = Window & {
+  __propsCompareReady?: boolean;
+  __propsCompareName?: string;
+  __propsCompareMetrics?: {
+    readonly characterId: string;
+    readonly characterName: string;
+    readonly left: VisualHandMetric;
+    readonly right: VisualHandMetric;
+  };
+};
+
+function tuple(vector: THREE.Vector3 | null): readonly [number, number, number] | null {
+  return vector ? [vector.x, vector.y, vector.z] : null;
+}
+
+function wristKinkDegrees(vrm: VRM, side: HandSide): number | null {
+  const humanoid = vrm.humanoid;
+  const lower = humanoid?.getNormalizedBoneNode(`${side}LowerArm`);
+  const hand = humanoid?.getNormalizedBoneNode(`${side}Hand`);
+  const middle = humanoid?.getNormalizedBoneNode(`${side}MiddleProximal`)
+    ?? humanoid?.getNormalizedBoneNode(`${side}MiddleDistal`);
+  if (!lower || !hand || !middle) return null;
+  const lowerPos = lower.getWorldPosition(new THREE.Vector3());
+  const handPos = hand.getWorldPosition(new THREE.Vector3());
+  const middlePos = middle.getWorldPosition(new THREE.Vector3());
+  const forearm = handPos.clone().sub(lowerPos);
+  const handAxis = middlePos.clone().sub(handPos);
+  if (forearm.lengthSq() < 1e-8 || handAxis.lengthSq() < 1e-8) return null;
+  const dot = THREE.MathUtils.clamp(forearm.normalize().dot(handAxis.normalize()), -1, 1);
+  return THREE.MathUtils.radToDeg(Math.acos(dot));
+}
+
+function visualHandMetric(vrm: VRM, side: HandSide): VisualHandMetric {
+  const humanoid = vrm.humanoid;
+  const hand = humanoid?.getNormalizedBoneNode(`${side}Hand`);
+  const hips = humanoid?.getNormalizedBoneNode("hips");
+  const handPos = hand?.getWorldPosition(new THREE.Vector3()) ?? null;
+  const hipsPos = hips?.getWorldPosition(new THREE.Vector3()) ?? null;
+  const fromHips = handPos && hipsPos ? handPos.clone().sub(hipsPos) : null;
+  return {
+    palmNormal: tuple(estimateVrmPalmNormal(vrm, side)),
+    wristKinkDeg: wristKinkDegrees(vrm, side),
+    handFromHips: tuple(fromHips),
+  };
+}
+
+function fmtMetric(metric: VisualHandMetric) {
+  const palm = metric.palmNormal
+    ? metric.palmNormal.map((value) => value.toFixed(2)).join(",")
+    : "n/a";
+  const kink = metric.wristKinkDeg === null ? "n/a" : `${metric.wristKinkDeg.toFixed(1)}°`;
+  const hip = metric.handFromHips
+    ? metric.handFromHips.map((value) => value.toFixed(2)).join(",")
+    : "n/a";
+  return `palm=(${palm}) wrist=${kink} hand-hips=(${hip})`;
+}
 
 async function loadVrm(url: string): Promise<VRM> {
   const loader = new GLTFLoader();
@@ -87,7 +151,6 @@ function instance(
   const mirrorPosition: [number, number, number] = mirrored
     ? [-def.defaultPosition[0], def.defaultPosition[1], def.defaultPosition[2]]
     : [...def.defaultPosition];
-  // Production instances carry a concrete anchor id; grip readiness fails closed without it.
   const anchor = def.anchors.find((candidate) => candidate.role === "primary")
     ?? def.anchors.find((candidate) => candidate.role === "surface")
     ?? def.anchors[0];
@@ -155,7 +218,6 @@ async function attachProp(
 
   const secondary = resolveSecondaryPropTarget(def, item);
   if (secondary && secondary.influence > 0) {
-    // Two-bone IK is a live-frame feature; the harness reports it in the note instead.
     setStatus(`${item.propId}: secondary ${secondary.bone} influence ${secondary.influence}`);
   }
   return group;
@@ -207,13 +269,13 @@ class Panel {
     if (!focus) return;
     const side: HandSide = this.kind === "right-item" || this.kind === "close" ? "right" : "left";
     const outside = side === "left" ? 1 : -1;
-    const distance = this.kind === "close" ? 0.42 : 0.5;
+    const distance = this.kind === "close" ? 0.34 : 0.46;
     this.camera.position.set(
       focus.x + outside * distance * 0.8,
-      focus.y + 0.16,
+      focus.y + 0.13,
       focus.z + distance,
     );
-    this.camera.lookAt(focus.x - outside * 0.02, focus.y - 0.04, focus.z);
+    this.camera.lookAt(focus.x - outside * 0.015, focus.y - 0.025, focus.z);
   }
 
   render(scene: THREE.Scene) {
@@ -230,6 +292,7 @@ const panels = {
 
 let currentScene: THREE.Scene | null = null;
 let currentVrm: VRM | null = null;
+let requestSequence = 0;
 
 function renderAll() {
   if (!currentScene || !currentVrm) return;
@@ -248,9 +311,13 @@ function animate() {
 animate();
 
 async function selectCharacter(id: string, url: string, name: string) {
+  const request = ++requestSequence;
+  const auditWindow = window as PropsCompareWindow;
+  auditWindow.__propsCompareReady = false;
   setStatus(`${name} 로딩…`);
   try {
     const vrm = await loadVrm(url);
+    if (request !== requestSequence) return;
     const pose = pickNaturalIdlePose(id);
     const bones = pose.bones as PoseBoneMap;
 
@@ -269,31 +336,13 @@ async function selectCharacter(id: string, url: string, name: string) {
     applyFingerRotations(vrm, effective);
     correctVrmHangingHandPalmTwist(vrm);
     vrm.humanoid?.update();
+    vrm.scene.updateMatrixWorld(true);
 
-    // Grip contact refinement: amplify finger curls until fingertips reach the palm socket.
-    const gripTargets: Array<{
-      side: "left" | "right";
-      socketWorldPoint: THREE.Vector3;
-      gripRadius: number;
-      goalBias?: number;
-    }> = [];
-    for (const [side, propId] of [["right", "mug"], ["left", "book"]] as const) {
-      const node = vrm.humanoid?.getNormalizedBoneNode(`${side}Hand`);
-      const def2 = propDefById(propId);
-      if (!node || !def2?.grip) continue;
-      const socketWorld = new THREE.Vector3(...metrics.handSockets[`${side}Hand` as const].position);
-      node.localToWorld(socketWorld);
-      gripTargets.push({
-        side,
-        socketWorldPoint: socketWorld,
-        gripRadius: def2.grip.radius,
-        goalBias: def2.grip.kind === "flat" || def2.grip.kind === "support" ? 0.012 : 0,
-      });
-    }
-    if (gripTargets.length > 0) {
-      refineVrmGripFingerWrap(vrm, gripTargets);
-      vrm.humanoid!.update();
-    }
+    // Exact product contact authority: no legacy refineVrmGripFingerWrap shortcut.
+    const contactPasses = createStudioVrmGripContactPasses(vrm, items, metrics, []);
+    contactPasses.forEach((pass) => pass.run());
+    vrm.humanoid?.update();
+    vrm.scene.updateMatrixWorld(true);
 
     const scene = new THREE.Scene();
     scene.add(vrm.scene);
@@ -307,40 +356,44 @@ async function selectCharacter(id: string, url: string, name: string) {
       const group = await attachProp(scene, vrm, item, metrics);
       if (group) attachedGroups.push(group);
     }
-    const gripCount = items.filter((item) => item.rig?.autoFingerPose).length;
-    void gripCount;
-    const gripLeft = Object.keys(autoGrip).filter((k) => k.startsWith("left")).length;
-    const gripRight = Object.keys(autoGrip).filter((k) => k.startsWith("right")).length;
+    const gripLeft = Object.keys(autoGrip).filter((key) => key.startsWith("left")).length;
+    const gripRight = Object.keys(autoGrip).filter((key) => key.startsWith("right")).length;
     const resolvedInfo = items.map((item) => {
       const def = propDefById(item.propId)!;
       const resolved = resolvePropAttachment(def, item, metrics);
       return `${item.propId}@${item.bone}: anchor=${resolved.anchorId} src=${resolved.socketSource} fit=${resolved.fit.kind} scale=${resolved.scale.toFixed(2)}`;
     }).join("\n");
 
-    // Re-apply pose AFTER adding scene so matrices are consistent, then re-render.
     vrm.scene.updateMatrixWorld(true);
     currentScene = scene;
     currentVrm = vrm;
     renderAll();
 
+    const left = visualHandMetric(vrm, "left");
+    const right = visualHandMetric(vrm, "right");
     const note =
       `${name} · mug(오른손 handle) + book(왼손 flat)\n` +
-      `autoGrip L=${gripLeft} R=${gripRight} attached=${attachedGroups.length}/2\n` +
+      `autoGrip L=${gripLeft} R=${gripRight} contactPasses=${contactPasses.length} attached=${attachedGroups.length}/2\n` +
+      `L ${fmtMetric(left)}\nR ${fmtMetric(right)}\n` +
       resolvedInfo;
     for (const id2 of ["full-note", "right-note", "left-note", "close-note"] as const) {
       const el = document.getElementById(id2);
       if (el) el.textContent = note;
     }
+    auditWindow.__propsCompareName = name;
+    auditWindow.__propsCompareMetrics = { characterId: id, characterName: name, left, right };
+    auditWindow.__propsCompareReady = true;
     setStatus(`${name} 준비`);
   } catch (error) {
     console.error(error);
+    (window as PropsCompareWindow).__propsCompareReady = false;
     setStatus(`실패: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
-document.querySelectorAll<HTMLButtonElement>("#bar button[data-id]").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    void selectCharacter(btn.dataset.id!, btn.dataset.url!, btn.dataset.name!);
+document.querySelectorAll<HTMLButtonElement>("#bar button[data-id]").forEach((button) => {
+  button.addEventListener("click", () => {
+    void selectCharacter(button.dataset.id!, button.dataset.url!, button.dataset.name!);
   });
 });
 
