@@ -173,17 +173,19 @@ export function MarketFitLabPage() {
               {FILTERS.map((filter) => {
                 const Icon = filter.icon;
                 const active = fitFilter === filter.id;
+                const count = counts[filter.id];
                 return (
                   <button
                     key={filter.id}
                     type="button"
+                    aria-label={`${filter.label} ${count}`}
                     aria-pressed={active}
                     onClick={() => setFitFilter(filter.id)}
                     className={filterClass(active)}
                   >
                     <Icon className="size-3.5" aria-hidden="true" />
                     {filter.label}
-                    <span className="numeral tnum opacity-80">{counts[filter.id]}</span>
+                    <span className="numeral tnum opacity-80" aria-hidden="true">{count}</span>
                   </button>
                 );
               })}
