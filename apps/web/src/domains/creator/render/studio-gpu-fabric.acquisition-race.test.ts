@@ -28,7 +28,9 @@ function createFakeDevice(): FakeDeviceHarness {
   const destroy = vi.fn();
   const device = {
     destroy,
-    lost: new Promise<GPUDeviceLostInfo>(() => undefined),
+    lost: new Promise<GPUDeviceLostInfo>(() => {
+      // 이 경쟁 조건 테스트에서는 device-loss가 발생하지 않는다.
+    }),
     limits: {},
     features: new Set<string>(),
   } as unknown as GPUDevice;
