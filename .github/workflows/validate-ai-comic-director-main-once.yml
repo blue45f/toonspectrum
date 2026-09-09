@@ -1,0 +1,56 @@
+name: Validate AI Comic Director main
+
+on:
+  push:
+    branches: [ci/validate-ai-comic-director-main-20260909]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-ai-comic-director-main-20260909
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run focused regression tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts
+          apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
+
+      - name: Lint corrected integration files
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts
+          apps/web/src/domains/creator/studio-generated-2d-backgrounds.ts
+          apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
+
+      - name: Typecheck complete frontend
+        run: pnpm exec tsc -p tsconfig.json
+
+      - name: Validate architecture
+        run: pnpm run validate:architecture
+
+      - name: Build production application
+        run: pnpm run build
