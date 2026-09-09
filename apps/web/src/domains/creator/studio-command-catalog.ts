@@ -73,9 +73,9 @@ const NORMALIZED_BASE_CATALOG: readonly StudioCommandCatalogEntry[] = Object.fre
         ]),
         aliases: Object.freeze([
           ...entry.aliases,
-          { vendor: "toonstudio", locale: "ko", term: "브러시 스튜디오" },
-          { vendor: "toonstudio", locale: "ko", term: "브러시 상세 설정" },
-          { vendor: "toonstudio", locale: "en", term: "Brush Studio" },
+          { vendor: "toonstudio", locale: "ko", term: "브러시 스튜디오" } as const,
+          { vendor: "toonstudio", locale: "ko", term: "브러시 상세 설정" } as const,
+          { vendor: "toonstudio", locale: "en", term: "Brush Studio" } as const,
         ]),
         note: "The in-editor Brush Studio edits the current brush; the dedicated brush.lab command owns guided brush authoring.",
       });
