@@ -48,7 +48,6 @@ jobs:
       - name: Validate preview-only scope
         shell: bash
         run: |
-          corepack enable
           pnpm install --frozen-lockfile
           pnpm exec vitest run \
             apps/web/src/domains/creator/vrm/studio-vrm-bundled-thumbnail-stability.test.ts \
