@@ -6,12 +6,16 @@ import {
 import {
   CharacterCanonicalPartSession,
 } from "../assets/character-canonical-part-runtime";
+import {
+  evaluateCharacterProductionLibraryReadiness,
+} from "../assets/character-production-library-readiness";
 
 import type {
   CharacterCanonicalManifestV2,
   CharacterCanonicalPartDescriptor,
   CharacterCanonicalPartSlot,
 } from "../assets/character-canonical-manifest";
+import type { CharacterProductionLibraryReadiness } from "../assets/character-production-library-readiness";
 import type { StudioAsyncKeyValueStore } from "../../studio-local-database";
 import type { StudioVrmPoserHost } from "../../vrm/StudioVrmPoserHost";
 
@@ -43,6 +47,7 @@ export interface CharacterCanonicalPartOption {
 export interface CharacterCanonicalPartsWorkbench {
   readonly options: readonly CharacterCanonicalPartOption[];
   readonly selections: Selections;
+  readonly readiness: CharacterProductionLibraryReadiness | null;
   readonly busyPartId: string | null;
   readonly error: string | null;
   readonly apply: (partId: string) => Promise<boolean>;
@@ -139,8 +144,6 @@ export function useCharacterCanonicalParts(input: {
       if (!active || generation !== generationRef.current) return;
       const restored = session.selections;
       setSelections(restored);
-      // Persist the authoritative runtime result so deleted, incompatible, or corrupt old IDs
-      // cannot keep retrying on every Studio launch.
       await writeSelections(modelId, restored);
     }).catch((restoreError: unknown) => {
       if (!active || generation !== generationRef.current) return;
@@ -166,6 +169,10 @@ export function useCharacterCanonicalParts(input: {
       });
     }));
   }, [manifest, selections]);
+
+  const readiness = useMemo(() => (
+    manifest ? evaluateCharacterProductionLibraryReadiness(manifest) : null
+  ), [manifest]);
 
   const apply = useCallback(async (partId: string): Promise<boolean> => {
     if (!manifest || !sessionRef.current || busyPartId) return false;
@@ -228,6 +235,7 @@ export function useCharacterCanonicalParts(input: {
   return Object.freeze({
     options,
     selections,
+    readiness,
     busyPartId,
     error,
     apply,
