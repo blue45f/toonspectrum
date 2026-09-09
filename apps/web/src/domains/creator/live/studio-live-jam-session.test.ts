@@ -6,6 +6,7 @@ import {
   isStudioLiveJamWorkId,
   openStudioLiveCompanionTab,
   readStudioLiveRoomQuery,
+  resolveStudioLiveInstantWorkIdForTab,
   resolveStudioLiveSessionWorkId,
   shouldExpectStudioSharedDocument,
   shouldPublishStudioLiveJamRoom,
@@ -13,7 +14,16 @@ import {
   shouldSeedStudioLiveSharedBootstrapPage,
   studioLiveSharedBootstrapPageId,
   withStudioLiveJamRoom,
+  type StudioLiveOwnerRoomSessionStorage,
 } from "./studio-live-jam-session";
+
+function sessionStorageFixture(): StudioLiveOwnerRoomSessionStorage {
+  const values = new Map<string, string>();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => { values.set(key, value); },
+  };
+}
 
 describe("studio live jam session", () => {
   it("reads and writes the Magma room query without treating it as a saved work", () => {
@@ -63,6 +73,55 @@ describe("studio live jam session", () => {
       roomId: instant,
       instantWorkId: "work-instant-other-tab",
     })).toBe(true);
+  });
+
+  it("keeps an owner room editable after reload while a fresh companion tab remains a joiner", () => {
+    const ownerStorage = sessionStorageFixture();
+    const ownerRoom = resolveStudioLiveInstantWorkIdForTab({
+      workId: null,
+      remixId: null,
+      roomId: null,
+      storage: ownerStorage,
+      now: () => 1,
+      random: () => 0.5,
+    });
+
+    const reloadedOwnerId = resolveStudioLiveInstantWorkIdForTab({
+      workId: null,
+      remixId: null,
+      roomId: ownerRoom,
+      storage: ownerStorage,
+      now: () => 2,
+      random: () => 0.25,
+    });
+    expect(reloadedOwnerId).toBe(ownerRoom);
+    expect(isStudioJoinedLiveJamRoom({ roomId: ownerRoom, instantWorkId: reloadedOwnerId })).toBe(false);
+
+    const companionId = resolveStudioLiveInstantWorkIdForTab({
+      workId: null,
+      remixId: null,
+      roomId: ownerRoom,
+      storage: sessionStorageFixture(),
+      now: () => 2,
+      random: () => 0.25,
+    });
+    expect(companionId).not.toBe(ownerRoom);
+    expect(isStudioJoinedLiveJamRoom({ roomId: ownerRoom, instantWorkId: companionId })).toBe(true);
+  });
+
+  it("fails open for the local mount when tab storage is unavailable", () => {
+    const blockedStorage: StudioLiveOwnerRoomSessionStorage = {
+      getItem: () => { throw new Error("blocked"); },
+      setItem: () => { throw new Error("blocked"); },
+    };
+    expect(() => resolveStudioLiveInstantWorkIdForTab({
+      workId: null,
+      remixId: null,
+      roomId: null,
+      storage: blockedStorage,
+      now: () => 1,
+      random: () => 0.5,
+    })).not.toThrow();
   });
 
   it("resolves the same session id for a first tab and a second tab that only has the room query", () => {
