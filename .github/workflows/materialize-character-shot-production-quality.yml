@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Decode and apply bounded implementation payload
+      - name: Decode and materialize complete implementation files
         shell: bash
         run: |
           set -euo pipefail
@@ -34,6 +34,7 @@ jobs:
           import io
           import json
           import pathlib
+          import re
           import tarfile
           import zlib
 
@@ -91,27 +92,46 @@ jobs:
           if not applied:
               text = decoded.decode("utf-8")
               stripped = text.lstrip()
-              if stripped.startswith("diff --git ") or stripped.startswith("*** Begin Patch"):
-                  if stripped.startswith("*** Begin Patch"):
-                      start = text.find("*** Begin Patch")
-                      end = text.rfind("*** End Patch")
-                      if end < 0:
-                          raise SystemExit(
-                              "Recovered payload is an incomplete apply_patch envelope; "
-                              f"decoded tail={text[-240:]!r}"
-                          )
-                      text = text[start + len("*** Begin Patch"):end].strip() + "\n"
+              if stripped.startswith("from __future__ import annotations") and "FILES = {" in text:
+                  pattern = re.compile(
+                      r"^\s*'([^'\n]+)':\s*'([A-Za-z0-9+/=]+)',\s*$",
+                      re.MULTILINE,
+                  )
+                  matches = list(pattern.finditer(text))
+                  if not matches:
+                      raise SystemExit("Staging script contained no complete file entries")
+                  total_bytes = 0
+                  paths: list[str] = []
+                  for match in matches:
+                      name, payload = match.groups()
+                      destination = safe_path(name)
+                      content = base64.b64decode(payload, validate=True)
+                      content.decode("utf-8")
+                      destination.parent.mkdir(parents=True, exist_ok=True)
+                      destination.write_bytes(content)
+                      total_bytes += len(content)
+                      paths.append(name)
+                  print(
+                      f"Recovered {len(paths)} complete files ({total_bytes} bytes) "
+                      "from the truncated staging script:"
+                  )
+                  for name in paths:
+                      print(f"  - {name}")
+                  tail = text[matches[-1].end():]
+                  incomplete = re.search(r"'([^'\n]+)':\s*'([A-Za-z0-9+/=]*)$", tail)
+                  if incomplete:
+                      print(
+                          "Incomplete final entry intentionally excluded:",
+                          incomplete.group(1),
+                          f"base64_chars={len(incomplete.group(2))}",
+                      )
+                  applied = True
+              elif stripped.startswith("diff --git "):
                   patch_path = pathlib.Path("/tmp/character-shot-production.patch")
                   patch_path.write_text(text, encoding="utf-8")
                   print(f"PATCH_FILE={patch_path}")
               elif stripped.startswith("{"):
-                  try:
-                      payload = json.loads(text)
-                  except json.JSONDecodeError as error:
-                      raise SystemExit(
-                          "Recovered payload is incomplete JSON: "
-                          f"{error}; tail={text[-240:]!r}"
-                      ) from error
+                  payload = json.loads(text)
                   files = payload.get("files")
                   if not isinstance(files, dict) or not files or len(files) > 500:
                       raise SystemExit("Invalid JSON payload file map")
@@ -126,9 +146,10 @@ jobs:
               else:
                   preview = stripped[:240].replace("\n", "\\n")
                   tail = stripped[-240:].replace("\n", "\\n")
-                  raise SystemExit(
-                      f"Unknown staged payload format: head={preview}; tail={tail}"
-                  )
+                  raise SystemExit(f"Unknown staged payload: head={preview}; tail={tail}")
+
+          if not applied and not pathlib.Path("/tmp/character-shot-production.patch").exists():
+              raise SystemExit("Payload produced no materialized files")
           PY
 
           if [[ -f /tmp/character-shot-production.patch ]]; then
