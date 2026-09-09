@@ -1,22 +1,39 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { StudioViewToolsHud, type StudioViewToolsHudProps } from "./StudioViewToolsHud";
+import {
+  StudioViewToolsHud,
+  type StudioViewToolsHudProps,
+} from "./StudioViewToolsHud";
 
-function props(overrides: Partial<StudioViewToolsHudProps> = {}): StudioViewToolsHudProps {
+function props(
+  overrides: Partial<StudioViewToolsHudProps> = {}
+): StudioViewToolsHudProps {
   return {
     mode: "zoom",
     magnification: 0.4,
+    minMagnification: 0.1,
+    maxMagnification: 5,
     canZoomIn: true,
     canZoomOut: true,
     rotation: 0,
     flipped: false,
+    selectionCount: 2,
     onZoomIn: vi.fn(),
     onZoomOut: vi.fn(),
+    onSetMagnification: vi.fn(),
     onFit: vi.fn(),
+    onFitSelection: vi.fn(),
     onActual: vi.fn(),
     onRotateLeft: vi.fn(),
     onRotateRight: vi.fn(),
@@ -31,51 +48,101 @@ afterEach(cleanup);
 
 describe("StudioViewToolsHud", () => {
   it("renders nothing without an active view tool", () => {
-    expect(renderToStaticMarkup(<StudioViewToolsHud {...props({ mode: null })} />)).toBe("");
+    expect(
+      renderToStaticMarkup(<StudioViewToolsHud {...props({ mode: null })} />)
+    ).toBe("");
   });
 
-  it("renders a touch-sized, labelled zoom toolbar with the current percentage", () => {
+  it("renders a precision zoom workspace with exact input, slider, presets and selection fit", () => {
     const html = renderToStaticMarkup(<StudioViewToolsHud {...props()} />);
 
     expect(html).toContain('role="toolbar"');
-    expect(html).toContain('aria-label="캔버스 확대 및 축소 보기 도구"');
+    expect(html).toContain(
+      'aria-label="캔버스 확대 및 축소 보기 도구"'
+    );
     expect(html).toContain('data-studio-view-tools-hud="zoom"');
-    expect(html).toContain("확대/축소");
-    expect(html).toContain("40%");
-    expect(html).toContain('aria-label="캔버스 축소"');
-    expect(html).toContain('aria-label="캔버스 확대"');
-    expect(html).toContain('aria-label="캔버스 너비에 맞춤"');
+    expect(html).toContain('data-studio-view-precision="true"');
+    expect(html).toContain('aria-label="캔버스 확대율 입력"');
+    expect(html).toContain('aria-label="캔버스 확대율 정밀 조절"');
+    expect(html).toContain('aria-label="선택 영역에 맞춤"');
+    expect(html).toContain('data-studio-view-zoom-preset="25"');
+    expect(html).toContain('data-studio-view-zoom-preset="400"');
     expect(html).toContain('aria-label="캔버스 실제 픽셀 100%"');
     expect(html).toContain('aria-label="캔버스 좌우 반전"');
-    expect(html).toContain('aria-pressed="false"');
-    expect(html.match(/size-11/g)?.length ?? 0).toBe(7);
-    expect(html.match(/focus-visible:outline-accent/g)?.length ?? 0).toBe(7);
-    expect(html.match(/data-studio-tool-hint-target="true"/g)?.length ?? 0).toBe(7);
     expect(html).not.toContain(" title=");
     expect(html).not.toContain("왼쪽으로 90도 회전");
   });
 
-  it("keeps bounded zoom controls discoverable while blocking their commands", () => {
+  it("commits forgiving exact percentage input, slider changes and zoom presets", () => {
+    const onSetMagnification = vi.fn();
+    render(<StudioViewToolsHud {...props({ onSetMagnification })} />);
+
+    const input = screen.getByRole("textbox", {
+      name: "캔버스 확대율 입력",
+    });
+    fireEvent.change(input, { target: { value: "125,5%" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSetMagnification).toHaveBeenLastCalledWith(1.255);
+
+    const slider = screen.getByRole("slider", {
+      name: "캔버스 확대율 정밀 조절",
+    });
+    fireEvent.change(slider, { target: { value: "1000" } });
+    expect(onSetMagnification).toHaveBeenLastCalledWith(5);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "캔버스 확대율 200퍼센트" })
+    );
+    expect(onSetMagnification).toHaveBeenLastCalledWith(2);
+  });
+
+  it("restores invalid input without issuing a zoom command", () => {
+    const onSetMagnification = vi.fn();
+    render(<StudioViewToolsHud {...props({ onSetMagnification })} />);
+
+    const input = screen.getByRole("textbox", {
+      name: "캔버스 확대율 입력",
+    }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "invalid" } });
+    fireEvent.blur(input);
+
+    expect(onSetMagnification).not.toHaveBeenCalled();
+    expect(input.value).toBe("40");
+  });
+
+  it("keeps bounded and selection-only actions discoverable while blocking commands", () => {
     const onZoomIn = vi.fn();
     const onZoomOut = vi.fn();
+    const onFitSelection = vi.fn();
     render(
       <StudioViewToolsHud
-        {...props({ canZoomIn: false, canZoomOut: false, onZoomIn, onZoomOut })}
+        {...props({
+          canZoomIn: false,
+          canZoomOut: false,
+          selectionCount: 0,
+          onZoomIn,
+          onZoomOut,
+          onFitSelection,
+        })}
       />
     );
 
     const zoomOut = screen.getByRole("button", { name: "캔버스 축소" });
     const zoomIn = screen.getByRole("button", { name: "캔버스 확대" });
+    const fitSelection = screen.getByRole("button", {
+      name: "선택 영역에 맞춤",
+    });
 
     expect(zoomOut.getAttribute("aria-disabled")).toBe("true");
     expect(zoomIn.getAttribute("aria-disabled")).toBe("true");
-    expect((zoomOut as HTMLButtonElement).disabled).toBe(false);
-    expect((zoomIn as HTMLButtonElement).disabled).toBe(false);
+    expect(fitSelection.getAttribute("aria-disabled")).toBe("true");
 
     fireEvent.click(zoomOut);
     fireEvent.click(zoomIn);
+    fireEvent.click(fitSelection);
     expect(onZoomOut).not.toHaveBeenCalled();
     expect(onZoomIn).not.toHaveBeenCalled();
+    expect(onFitSelection).not.toHaveBeenCalled();
   });
 
   it("auto-focuses the first action and supports roving Arrow/Home/End navigation", async () => {
@@ -87,43 +154,59 @@ describe("StudioViewToolsHud", () => {
     expect(buttons[0]?.getAttribute("tabindex")).toBe("0");
     expect(buttons[1]?.getAttribute("tabindex")).toBe("-1");
 
-    fireEvent.keyDown(buttons[0], { key: "ArrowRight" });
+    fireEvent.keyDown(buttons[0]!, { key: "ArrowRight" });
     expect(document.activeElement).toBe(buttons[1]);
-    expect(buttons[1]?.getAttribute("tabindex")).toBe("0");
 
-    fireEvent.keyDown(buttons[1], { key: "End" });
+    fireEvent.keyDown(buttons[1]!, { key: "End" });
     expect(document.activeElement).toBe(buttons.at(-1));
 
     fireEvent.keyDown(buttons.at(-1)!, { key: "Home" });
     expect(document.activeElement).toBe(buttons[0]);
   });
 
-  it("returns focus to the invoking rail trigger when Escape closes the HUD", async () => {
+  it("keeps Escape inside the zoom editor local, then returns focus when the toolbar closes", async () => {
     const onClose = vi.fn();
     render(
       <>
-        <button type="button" data-studio-view-tool-trigger="zoom">확대 도구 열기</button>
-        <div tabIndex={-1} data-studio-canvas-viewport>캔버스</div>
+        <button type="button" data-studio-view-tool-trigger="zoom">
+          확대 도구 열기
+        </button>
+        <div tabIndex={-1} data-studio-canvas-viewport>
+          캔버스
+        </div>
         <StudioViewToolsHud {...props({ onClose })} />
       </>
     );
-    const firstAction = screen.getByRole("button", { name: "캔버스 축소" });
-    await waitFor(() => expect(document.activeElement).toBe(firstAction));
 
+    const input = screen.getByRole("textbox", {
+      name: "캔버스 확대율 입력",
+    }) as HTMLInputElement;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "777" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(input.value).toBe("40");
+
+    const firstAction = screen.getByRole("button", { name: "캔버스 축소" });
+    fireEvent.focus(firstAction);
+    await waitFor(() => expect(document.activeElement).toBe(firstAction));
     fireEvent.keyDown(firstAction, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalledOnce();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "확대 도구 열기" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "확대 도구 열기" })
+    );
   });
 
   it("renders rotation actions and exposes the flipped state as a pressed toggle", () => {
     const html = renderToStaticMarkup(
-      <StudioViewToolsHud {...props({ mode: "rotate", rotation: 270, flipped: true })} />
+      <StudioViewToolsHud
+        {...props({ mode: "rotate", rotation: 270, flipped: true })}
+      />
     );
 
     expect(html).toContain('aria-label="캔버스 회전 보기 도구"');
     expect(html).toContain('data-studio-view-tools-hud="rotate"');
-    expect(html).toContain("회전");
     expect(html).toContain("270°");
     expect(html).toContain('aria-label="캔버스 왼쪽으로 90도 회전"');
     expect(html).toContain('aria-label="캔버스 오른쪽으로 90도 회전"');

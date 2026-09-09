@@ -1,4 +1,5 @@
 import { projectStudioAiProvenanceForPublish } from "../../../web/src/domains/creator/ai/studio-ai-provenance";
+import { toPublicCreatorPublicationDirective } from "../../../web/src/shared/lib/creator-publication-contract";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -63,7 +64,8 @@ function publicPublishPack(value: unknown): Record<string, unknown> | undefined 
 /**
  * Projects an owner-editable Studio document into the subset safe to return with a public work.
  * Render/layout data and explicit AI disclosure remain available; private editorial discussion,
- * character-planning notes, rights self-check answers, and page review assignments are removed.
+ * character-planning notes, rights self-check answers, schedule timezone, future release timestamp,
+ * and page review assignments are removed.
  */
 export function toPublicCreatorDoc(value: unknown): Record<string, unknown> {
   if (!isRecord(value)) return {};
@@ -74,6 +76,7 @@ export function toPublicCreatorDoc(value: unknown): Record<string, unknown> {
     releaseSchedule: _releaseSchedule,
     publicationAnalytics: _publicationAnalytics,
     aiProvenance,
+    publication,
     publishPack,
     pagesList,
     ...rest
@@ -82,6 +85,10 @@ export function toPublicCreatorDoc(value: unknown): Record<string, unknown> {
   if (Array.isArray(pagesList)) result.pagesList = pagesList.map(publicPage);
   if (aiProvenance !== undefined) {
     result.aiProvenance = projectStudioAiProvenanceForPublish(aiProvenance);
+  }
+  if (publication !== undefined) {
+    const safePublication = toPublicCreatorPublicationDirective(publication);
+    if (safePublication) result.publication = safePublication;
   }
   const safePublishPack = publicPublishPack(publishPack);
   if (safePublishPack) result.publishPack = safePublishPack;

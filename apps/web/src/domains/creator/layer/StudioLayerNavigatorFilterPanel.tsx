@@ -1,6 +1,6 @@
 import { Layers3, X } from "lucide-react";
 
-
+import { StudioLayerFilterPresetShelf } from "./StudioLayerFilterPresetShelf";
 import {
   STUDIO_LAYER_COLORS,
   STUDIO_LAYER_COLOR_LABELS,
@@ -10,6 +10,9 @@ import {
   STUDIO_LAYER_KINDS,
   STUDIO_LAYER_ROLES,
   STUDIO_LAYER_ROLE_LABELS,
+  STUDIO_LAYER_SMART_VIEWS,
+  STUDIO_LAYER_SMART_VIEW_DESCRIPTIONS,
+  STUDIO_LAYER_SMART_VIEW_LABELS,
   type StudioLayerFlag,
   type StudioLayerNavigatorFilters,
 } from "./studio-layer-navigator";
@@ -19,7 +22,7 @@ import {
   STUDIO_LAYER_NAVIGATOR_KIND_ICONS as KIND_ICONS,
 } from "./studio-layer-navigator-row-ui";
 
-import type { RefObject } from "react";
+import type { ChangeEvent, RefObject } from "react";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -56,6 +59,8 @@ export function StudioLayerNavigatorFilterPanel({
   filterActive,
   stats,
 }: StudioLayerNavigatorFilterPanelProps) {
+  const activeSmartView = filters.smart ?? "all";
+
   function toggleFilterFlag(flag: StudioLayerFlag) {
     setFilters((current) => ({
       ...current,
@@ -75,14 +80,14 @@ export function StudioLayerNavigatorFilterPanel({
       tabIndex={-1}
       hidden={!open}
       className={cn(
-        "absolute inset-x-2 z-30 max-h-[min(28rem,62vh)] overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-2xl",
+        "absolute inset-x-2 z-30 max-h-[min(36rem,62vh)] overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-3 shadow-2xl",
         filterActive ? "top-[9.5rem]" : "top-[7.75rem]"
       )}
     >
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xs font-bold text-fg">레이어 필터</p>
-          <p className="text-[0.6rem] text-fg-3">기능 필터는 모두 만족하는 레이어만 표시합니다.</p>
+          <p className="text-[0.6rem] text-fg-3">구조 필터와 검색 조건을 조합해 대형 원고를 빠르게 좁힙니다.</p>
         </div>
         <button
           type="button"
@@ -100,6 +105,46 @@ export function StudioLayerNavigatorFilterPanel({
           <X size={14} />
         </button>
       </div>
+
+      <fieldset className="mt-3">
+        <legend className="mb-1 text-[0.62rem] font-bold text-fg-2">스마트 보기</legend>
+        <div className="grid grid-cols-2 gap-1">
+          {STUDIO_LAYER_SMART_VIEWS.map((view) => (
+            <button
+              key={view}
+              type="button"
+              data-studio-layer-smart-view={view}
+              onClick={() =>
+                setFilters((current) => {
+                  if (view === "all") {
+                    const next: StudioLayerNavigatorFilters = { ...current };
+                    delete next.smart;
+                    return next;
+                  }
+                  return { ...current, smart: view };
+                })
+              }
+              aria-pressed={activeSmartView === view}
+              aria-describedby={`${id}-smart-view-description`}
+              className={cn(
+                compactControl,
+                "justify-start text-left",
+                activeSmartView === view && "border-accent bg-accent-soft text-accent"
+              )}
+              title={STUDIO_LAYER_SMART_VIEW_DESCRIPTIONS[view]}
+            >
+              {STUDIO_LAYER_SMART_VIEW_LABELS[view]}
+            </button>
+          ))}
+        </div>
+        <p
+          id={`${id}-smart-view-description`}
+          aria-live="polite"
+          className="mt-1.5 rounded-md bg-raised/70 px-2 py-1.5 text-[0.58rem] leading-relaxed text-fg-3"
+        >
+          {STUDIO_LAYER_SMART_VIEW_DESCRIPTIONS[activeSmartView]}
+        </p>
+      </fieldset>
 
       <fieldset className="mt-3">
         <legend className="mb-1 text-[0.62rem] font-bold text-fg-2">종류</legend>
@@ -130,7 +175,7 @@ export function StudioLayerNavigatorFilterPanel({
           표시 상태
           <select
             value={filters.visibility}
-            onChange={(event) =>
+            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               setFilters((current) => ({
                 ...current,
                 visibility: event.target.value as StudioLayerNavigatorFilters["visibility"],
@@ -150,7 +195,7 @@ export function StudioLayerNavigatorFilterPanel({
           잠금 상태
           <select
             value={filters.lock}
-            onChange={(event) =>
+            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               setFilters((current) => ({
                 ...current,
                 lock: event.target.value as StudioLayerNavigatorFilters["lock"],
@@ -170,7 +215,7 @@ export function StudioLayerNavigatorFilterPanel({
           작업 역할
           <select
             value={filters.role}
-            onChange={(event) =>
+            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               setFilters((current) => ({
                 ...current,
                 role: event.target.value as StudioLayerNavigatorFilters["role"],
@@ -194,7 +239,7 @@ export function StudioLayerNavigatorFilterPanel({
           색 라벨
           <select
             value={filters.color}
-            onChange={(event) =>
+            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               setFilters((current) => ({
                 ...current,
                 color: event.target.value as StudioLayerNavigatorFilters["color"],
@@ -238,6 +283,22 @@ export function StudioLayerNavigatorFilterPanel({
           ))}
         </div>
       </fieldset>
+
+      <details className="mt-3 rounded-lg border border-line bg-card/60 px-2.5 py-2">
+        <summary className={cn("cursor-pointer text-[0.65rem] font-bold text-fg-2", focusRing)}>
+          고급 검색 문법
+        </summary>
+        <div className="mt-2 space-y-1.5 text-[0.58rem] leading-relaxed text-fg-3">
+          <p>공백은 AND, 쉼표는 같은 필드 안의 OR, 앞의 <code className="text-fg-2">-</code>는 제외입니다. 따옴표로 공백이 있는 이름을 묶을 수 있습니다.</p>
+          <code className="block rounded bg-panel px-2 py-1 text-fg-2">kind:draw role:lineart -is:hidden</code>
+          <code className="block rounded bg-panel px-2 py-1 text-fg-2">group:&quot;주인공 선화&quot; opacity:&lt;50%</code>
+          <code className="block rounded bg-panel px-2 py-1 text-fg-2">is:mask-disabled</code>
+          <code className="block rounded bg-panel px-2 py-1 text-fg-2">kind:image,bubble view:attention</code>
+          <p>필드: <span className="text-fg-2">kind, role, color, group, name, text, id, is/has, opacity, view</span></p>
+        </div>
+      </details>
+
+      <StudioLayerFilterPresetShelf filters={filters} setFilters={setFilters} />
 
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-2">
         <span className="text-[0.6rem] text-fg-3">

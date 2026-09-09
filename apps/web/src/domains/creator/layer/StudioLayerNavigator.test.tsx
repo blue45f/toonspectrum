@@ -93,7 +93,7 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain('data-studio-layer-selection-state="current"');
     expect(html).toContain('data-studio-layer-selection-marker="current"');
     expect(html).toContain(
-      'aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G"'
+      'aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"'
     );
     expect(html).toContain('data-studio-shortcut-boundary="true"');
     expect(html).toContain("레이어 3");
@@ -276,8 +276,9 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain("레이어 500");
     expect(html.match(/role="treeitem"/g)).toHaveLength(500);
     expect(html.match(/content-visibility:auto/g)).toHaveLength(500);
-    // 표시 · 잠금 · 불투명도 · … — four inline controls per row after Wave C.
-    expect(html.match(/data-layer-row-control="true"/g)).toHaveLength(2_000);
+    // 표시 · 잠금 · 불투명도 · … · drag — five inline controls per row.
+    expect(html.match(/data-layer-row-control="true"/g)).toHaveLength(2_500);
+    expect(html.match(/data-studio-layer-drag-handle="item"/g)).toHaveLength(500);
     expect(html.match(/data-studio-layer-row-action="lock"/g)).toHaveLength(500);
     expect(html.match(/data-studio-layer-row-action="opacity"/g)).toHaveLength(500);
     expect(html.match(/tabindex="-1"/g)?.length ?? 0).toBeGreaterThanOrEqual(2_000);

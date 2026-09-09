@@ -319,35 +319,34 @@ export function createStudioRasterExportOrchestration({
     preserveStudioViewBeforeCapture();
     setIsExporting(true);
     const pageCanvases: HTMLCanvasElement[] = [];
+    let phase: "capture" | "encode" | "bundle" = "capture";
 
     try {
-      for (const page of pages) {
-        setCurrentPageId(page.id);
-        const { stage, page: capturedPage } = await capturePage(page);
-        const rawPageCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, scale);
-        pageCanvases.push(
-          bakeStudioPageGradeIntoCanvas(rawPageCanvas, normalizePageGrade(capturedPage.grade))
-        );
+      try {
+        for (const page of pages) {
+          setCurrentPageId(page.id);
+          const { stage, page: capturedPage } = await capturePage(page);
+          const rawPageCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, scale);
+          pageCanvases.push(
+            bakeStudioPageGradeIntoCanvas(rawPageCanvas, normalizePageGrade(capturedPage.grade))
+          );
+        }
+      } finally {
+        setCurrentPageId(originalPageId);
+        setMasterEditMode(originalMasterEditMode);
       }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "페이지 캡처를 준비하지 못했어요.");
-      return;
-    } finally {
-      setCurrentPageId(originalPageId);
-      setMasterEditMode(originalMasterEditMode);
-      setIsExporting(false);
-    }
 
-    if (pageCanvases.length === 0) return;
-    const chunks = split
-      ? splitPagesForExport(
-          pageCanvases.map((canvas) => canvas.height),
-          spacing * scale,
-          1
-        )
-      : [pageCanvases.map((_, index) => index)];
+      if (pageCanvases.length === 0) return;
+      const chunks = split
+        ? splitPagesForExport(
+            pageCanvases.map((canvas) => canvas.height),
+            spacing * scale,
+            1
+          )
+        : [pageCanvases.map((_, index) => index)];
+      const deliveries: Array<{ blob: Blob; fileName: string }> = [];
+      phase = "encode";
 
-    try {
       for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
         const chunk = chunks[chunkIndex]!;
         const compositeCanvas = document.createElement("canvas");
@@ -374,24 +373,55 @@ export function createStudioRasterExportOrchestration({
           currentY += pageCanvas.height + spacing * scale;
         }
         drawWatermarkOnCanvas(compositeCanvas, watermarkForExport);
-        const blob = await canvasToBlob(
-          compositeCanvas,
-          exportMimeType(exportFormat),
-          exportQuality(exportFormat)
-        );
-        downloadBlob(
-          blob,
-          stripExportFileName(title, exportFormat, {
-            index: chunkIndex,
-            total: chunks.length,
-          })
-        );
-        if (chunkIndex < chunks.length - 1) {
-          await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
+        try {
+          deliveries.push({
+            blob: await canvasToBlob(
+              compositeCanvas,
+              exportMimeType(exportFormat),
+              exportQuality(exportFormat)
+            ),
+            fileName: stripExportFileName(title, exportFormat, {
+              index: chunkIndex,
+              total: chunks.length,
+            }),
+          });
+        } finally {
+          // Encoded Blob owns the bytes now; release the large temporary raster before ZIP work.
+          compositeCanvas.width = 1;
+          compositeCanvas.height = 1;
         }
       }
+
+      if (deliveries.length === 0) return;
+      if (deliveries.length === 1) {
+        const delivery = deliveries[0]!;
+        downloadBlob(delivery.blob, delivery.fileName);
+      } else {
+        phase = "bundle";
+        const { buildStudioDownloadBundle } = await import("../export/studio-download-bundle");
+        const bundle = await buildStudioDownloadBundle({
+          title,
+          files: deliveries,
+          crc32ExecutionMode: "worker",
+        });
+        downloadBlob(bundle.blob, bundle.fileName);
+      }
+      setError(null);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "이미지 내보내기에 실패했어요.");
+      const fallback = phase === "capture"
+        ? "페이지 캡처를 준비하지 못했어요."
+        : phase === "bundle"
+          ? "분할 이미지를 ZIP 다운로드 묶음으로 만들지 못했어요."
+          : "이미지 내보내기에 실패했어요.";
+      setError(error instanceof Error ? error.message : fallback);
+    } finally {
+      setCurrentPageId(originalPageId);
+      setMasterEditMode(originalMasterEditMode);
+      setIsExporting(false);
+      for (const canvas of pageCanvases) {
+        canvas.width = 1;
+        canvas.height = 1;
+      }
     }
   }
 

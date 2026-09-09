@@ -1,4 +1,4 @@
-import { ChevronDown, LayoutPanelTop } from "lucide-react";
+import { ChevronDown, LayoutPanelTop, PackageOpen } from "lucide-react";
 import { Suspense, useState, type ComponentType } from "react";
 
 import {
@@ -13,6 +13,7 @@ import {
   updateStudioWorkspaceLiveLayout,
 } from "./studio-workspaces";
 
+import type { StudioWorkspaceInterchangeDialogProps } from "./StudioWorkspaceInterchangeDialog";
 import type { StudioWorkspaceMenuProps } from "./StudioWorkspaceMenu";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
@@ -22,18 +23,37 @@ type StudioWorkspaceMenuModule = {
   default: ComponentType<StudioWorkspaceMenuProps>;
 };
 
+type StudioWorkspaceInterchangeDialogModule = {
+  default: ComponentType<StudioWorkspaceInterchangeDialogProps>;
+};
+
 const studioWorkspaceMenuLoader = createStudioIntentLazyLoader<StudioWorkspaceMenuModule>(() =>
   import("./StudioWorkspaceMenu").then((module) => ({ default: module.StudioWorkspaceMenu }))
 );
+const studioWorkspaceInterchangeDialogLoader =
+  createStudioIntentLazyLoader<StudioWorkspaceInterchangeDialogModule>(() =>
+    import("./StudioWorkspaceInterchangeDialog").then((module) => ({
+      default: module.StudioWorkspaceInterchangeDialog,
+    }))
+  );
 
 const LazyStudioWorkspaceMenu = lazyRetry(
   studioWorkspaceMenuLoader.load,
   "StudioWorkspaceMenu"
 );
+const LazyStudioWorkspaceInterchangeDialog = lazyRetry(
+  studioWorkspaceInterchangeDialogLoader.load,
+  "StudioWorkspaceInterchangeDialog"
+);
 
 /** Warms the optional workspace manager without activating or moving focus. */
 function preloadStudioWorkspaceMenu(): void {
   studioWorkspaceMenuLoader.preload();
+}
+
+/** Warms the portable workspace review dialog without reading or writing files. */
+function preloadStudioWorkspaceInterchangeDialog(): void {
+  studioWorkspaceInterchangeDialogLoader.preload();
 }
 
 type StudioWorkspaceMenuGateProps = Omit<
@@ -137,20 +157,82 @@ function StudioWorkspaceMenuTrigger({
   );
 }
 
+function StudioWorkspaceInterchangeTrigger({
+  open,
+  busy,
+  onActivate,
+}: {
+  readonly open: boolean;
+  readonly busy: boolean;
+  readonly onActivate: () => void;
+}) {
+  return (
+    <span
+      className="relative inline-flex shrink-0"
+      data-testid="studio-workspace-interchange-gate"
+      data-studio-shortcut-boundary="true"
+    >
+      <button
+        type="button"
+        onClick={onActivate}
+        onPointerEnter={preloadStudioWorkspaceInterchangeDialog}
+        onPointerDown={preloadStudioWorkspaceInterchangeDialog}
+        onFocus={preloadStudioWorkspaceInterchangeDialog}
+        data-testid="studio-workspace-interchange-toggle"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-busy={busy || undefined}
+        aria-label="작업공간 가져오기·내보내기"
+        title="작업공간 가져오기·내보내기"
+        className={cn(
+          "grid size-11 place-items-center rounded-lg border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-panel",
+          open && "border-accent/60 bg-accent-soft text-accent"
+        )}
+      >
+        <PackageOpen
+          size={STUDIO_ICON_SIZE.contextMenu}
+          strokeWidth={STUDIO_ICON_STROKE}
+          aria-hidden
+          className={studioChromeIconClass({ tone: open ? "accent" : "default" })}
+        />
+      </button>
+      {busy ? (
+        <span
+          className="pointer-events-none absolute inset-x-2 bottom-0 h-0.5 overflow-hidden rounded-full bg-line"
+          aria-hidden
+        >
+          <span className="block h-full w-1/2 animate-pulse rounded-full bg-accent motion-reduce:animate-none" />
+        </span>
+      ) : null}
+      <span className="sr-only" role="status" aria-live="polite">
+        {busy ? "작업공간 이동 도구를 여는 중입니다." : ""}
+      </span>
+    </span>
+  );
+}
+
 /**
- * Keeps the 1,800-line workspace manager out of the drawing route until the
- * creator shows intent. Hover/focus warms the chunk; click mounts it already
- * open so mouse, touch, and keyboard all keep the original one-action flow.
+ * Keeps the workspace manager and portable transfer dialog out of the drawing route until the
+ * creator shows intent. Each trigger warms its own chunk and preserves a one-action open flow.
  */
 export function StudioWorkspaceMenuGate(
   props: StudioWorkspaceMenuGateProps
 ) {
   const [activationAttempt, setActivationAttempt] = useState(0);
   const [managerReady, setManagerReady] = useState(false);
+  const [interchangeActivationAttempt, setInterchangeActivationAttempt] = useState(0);
+  const [interchangeReady, setInterchangeReady] = useState(false);
+  const [interchangeOpen, setInterchangeOpen] = useState(false);
   const activated = activationAttempt > 0;
+  const interchangeActivated = interchangeActivationAttempt > 0;
 
   return (
-    <>
+    <div
+      className="inline-flex min-w-0 items-center gap-1"
+      role="group"
+      aria-label="작업공간"
+      data-testid="studio-workspace-control-group"
+    >
       {!managerReady ? (
         <StudioWorkspaceMenuTrigger
           state={props.state}
@@ -170,6 +252,27 @@ export function StudioWorkspaceMenuGate(
           />
         </Suspense>
       ) : null}
-    </>
+
+      <StudioWorkspaceInterchangeTrigger
+        open={interchangeOpen}
+        busy={interchangeActivated && !interchangeReady && !interchangeOpen}
+        onActivate={() => {
+          if (interchangeOpen) return;
+          setInterchangeReady(false);
+          setInterchangeActivationAttempt((attempt) => attempt + 1);
+        }}
+      />
+      {interchangeActivated ? (
+        <Suspense fallback={null}>
+          <LazyStudioWorkspaceInterchangeDialog
+            {...props}
+            initialOpen
+            openRequest={interchangeActivationAttempt}
+            onInitialOpenReady={setInterchangeReady}
+            onOpenChange={setInterchangeOpen}
+          />
+        </Suspense>
+      ) : null}
+    </div>
   );
 }

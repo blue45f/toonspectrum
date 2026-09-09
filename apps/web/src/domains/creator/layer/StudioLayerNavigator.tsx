@@ -6,6 +6,7 @@ import {
   FolderMinus,
   FolderPlus,
   Ghost,
+  GripVertical,
   Crosshair,
   Grid2X2,
   Layers3,
@@ -26,6 +27,7 @@ import {
   useId,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
@@ -66,6 +68,15 @@ import {
   STUDIO_LAYER_NAVIGATOR_FOCUS_RING as focusRing,
   studioLayerNavigatorItemStatusLabel as itemStatusLabel,
 } from "./studio-layer-navigator-row-ui";
+import {
+  resolveStudioLayerGroupDropIntent,
+  resolveStudioLayerItemDropIntent,
+  studioLayerDragSourceGroup,
+  studioLayerDropIntentEqual,
+  studioLayerDropSideFromPointer,
+  type StudioLayerDragPayload,
+  type StudioLayerDropIntent,
+} from "./studio-layer-drag";
 import { StudioLayerNavigatorBatchBar } from "./StudioLayerNavigatorBatchBar";
 import { StudioLayerNavigatorFilterPanel } from "./StudioLayerNavigatorFilterPanel";
 import {
@@ -75,7 +86,11 @@ import {
 import { StudioLayerNavigatorTree } from "./StudioLayerNavigatorTree";
 
 
-import type { LayerGroup } from "../studio-layers";
+import type {
+  LayerGroup,
+  LayerItemReorderDirection,
+  LayerSelectionDropSide,
+} from "../studio-layers";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -124,6 +139,22 @@ export type StudioLayerNavigatorAction =
   | { type: "assign-items-to-group"; ids: readonly string[]; groupId?: string }
   | { type: "set-items-role"; ids: readonly string[]; role?: StudioLayerRole }
   | { type: "set-items-color"; ids: readonly string[]; color?: StudioLayerColor }
+  | { type: "reorder-items"; ids: readonly string[]; direction: LayerItemReorderDirection }
+  | {
+      type: "drop-items";
+      ids: readonly string[];
+      targetId: string;
+      side: LayerSelectionDropSide;
+      mode: "units" | "to-root";
+    }
+  | {
+      type: "drop-items";
+      ids: readonly string[];
+      targetId: string;
+      side: LayerSelectionDropSide;
+      mode: "within-group" | "into-group";
+      groupId: string;
+    }
   /** up=FRONT/높은 z 쪽, down=BACK/낮은 z 쪽. 필터 활성 중에는 UI가 명령을 내보내지 않는다. */
   | { type: "move-item"; id: string; direction: "up" | "down" }
   | { type: "move-group"; groupId: string; direction: "up" | "down" }
@@ -222,6 +253,39 @@ function isLayerRowControl(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("[data-layer-row-control]") !== null;
 }
 
+
+function layerOrderShortcutDirection(
+  event: ReactKeyboardEvent<HTMLElement>
+): LayerItemReorderDirection | null {
+  const command = event.metaKey || event.ctrlKey;
+  if (command && !event.altKey) {
+    if (event.code === "BracketRight" || event.key === "]") {
+      return event.shiftKey ? "front" : "forward";
+    }
+    if (event.code === "BracketLeft" || event.key === "[") {
+      return event.shiftKey ? "back" : "backward";
+    }
+  }
+  if (event.altKey && !command) {
+    if (event.key === "ArrowUp") return event.shiftKey ? "front" : "forward";
+    if (event.key === "ArrowDown") return event.shiftKey ? "back" : "backward";
+  }
+  return null;
+}
+
+function layerOrderDirectionLabel(direction: LayerItemReorderDirection): string {
+  switch (direction) {
+    case "front":
+      return "맨 앞으로";
+    case "back":
+      return "맨 뒤로";
+    case "forward":
+      return "한 단계 앞으로";
+    case "backward":
+      return "한 단계 뒤로";
+  }
+}
+
 /**
  * The host can only bake a merge when every source is an image layer; anything else falls back to a
  * non-destructive group, which *adds* a row. A control called 병합 that grows the layer list is the
@@ -292,6 +356,7 @@ export function StudioLayerNavigator({
   const mergeFallbackNoteId = useId();
   const flattenFallbackNoteId = useId();
   const mergeDownFallbackNoteId = useId();
+  const dragHelpId = useId();
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<StudioLayerNavigatorFilters>(() => ({
     ...DEFAULT_STUDIO_LAYER_NAVIGATOR_FILTERS,
@@ -304,6 +369,9 @@ export function StudioLayerNavigator({
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [actionTarget, setActionTarget] = useState<ActionTarget | null>(null);
   const [readOnlyCollapsed, setReadOnlyCollapsed] = useState<Record<string, boolean>>({});
+  const [draggingLabel, setDraggingLabel] = useState<string | null>(null);
+  const [dragAnnouncement, setDragAnnouncement] = useState("");
+  const [dropIntent, setDropIntent] = useState<StudioLayerDropIntent | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
@@ -313,8 +381,11 @@ export function StudioLayerNavigator({
   const actionFallbackKeyRef = useRef<string | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const rowRefs = useRef(new Map<string, HTMLElement>());
+  const dragPayloadRef = useRef<StudioLayerDragPayload | null>(null);
+  const dropIntentRef = useRef<StudioLayerDropIntent | null>(null);
 
   const displayItems = stableFrontToBack(items);
+  const displayItemById = new Map(displayItems.map((item) => [item.id, item]));
   const availableGroups = uniqueGroups(groups).map((group) =>
     readOnly && Object.hasOwn(readOnlyCollapsed, group.id)
       ? { ...group, collapsed: readOnlyCollapsed[group.id] }
@@ -448,6 +519,11 @@ export function StudioLayerNavigator({
     setFilterOpen(false);
     setMobileMultiSelect(false);
     setReadOnlyCollapsed({});
+    dragPayloadRef.current = null;
+    dropIntentRef.current = null;
+    setDraggingLabel(null);
+    setDragAnnouncement("");
+    setDropIntent(null);
     actionFallbackKeyRef.current = null;
   }, [pageKey]);
 
@@ -657,6 +733,35 @@ export function StudioLayerNavigator({
       setSelectionAnchorId(visibleItemIds[0] ?? null);
       return;
     }
+    const reorderDirection = layerOrderShortcutDirection(event);
+    if (reorderDirection) {
+      event.preventDefault();
+      event.stopPropagation();
+      const reorderIds = target.kind === "group"
+        ? target.itemIds
+        : selectedIdSet.has(target.entry.item.id)
+          ? selectedIds
+          : [target.entry.item.id];
+      if (filterActive) {
+        setDragAnnouncement("검색·필터를 지운 뒤 레이어 순서를 바꿀 수 있어요.");
+        return;
+      }
+      const reorderGate = studioLiveSelectionEditGate({
+        selectedIds: reorderIds,
+        ownershipByItemId: liveOwnershipByItemId,
+      });
+      if (readOnly || reorderGate.allowed === false || reorderIds.length === 0) {
+        setDragAnnouncement(
+          reorderGate.reason ?? "현재 상태에서는 레이어 순서를 바꿀 수 없어요."
+        );
+        return;
+      }
+      onAction({ type: "reorder-items", ids: [...reorderIds], direction: reorderDirection });
+      setDragAnnouncement(
+        `${reorderIds.length}개 레이어를 ${layerOrderDirectionLabel(reorderDirection)} 이동했습니다.`
+      );
+      return;
+    }
     if ((event.shiftKey && event.key === "F10") || event.key === "ContextMenu") {
       event.preventDefault();
       event.stopPropagation();
@@ -765,6 +870,207 @@ export function StudioLayerNavigator({
     });
   }
 
+
+  function updateLayerDropIntent(next: StudioLayerDropIntent | null) {
+    dropIntentRef.current = next;
+    setDropIntent((current) => (studioLayerDropIntentEqual(current, next) ? current : next));
+  }
+
+  function finishLayerDrag() {
+    dragPayloadRef.current = null;
+    setDraggingLabel(null);
+    updateLayerDropIntent(null);
+  }
+
+  function seedNativeLayerDrag(
+    event: ReactDragEvent<HTMLElement>,
+    payload: StudioLayerDragPayload
+  ) {
+    dragPayloadRef.current = payload;
+    setDraggingLabel(payload.label);
+    updateLayerDropIntent(null);
+    event.dataTransfer.effectAllowed = "move";
+    try {
+      event.dataTransfer.setData("application/x-toonstudio-layer", JSON.stringify(payload.ids));
+      event.dataTransfer.setData("text/plain", payload.label);
+    } catch {
+      // Some embedded WebViews restrict custom data types; the in-memory payload remains canonical.
+    }
+  }
+
+  function beginItemLayerDrag(
+    event: ReactDragEvent<HTMLElement>,
+    itemId: string
+  ) {
+    const item = displayItemById.get(itemId);
+    if (!item || filterActive || readOnly) {
+      event.preventDefault();
+      return;
+    }
+    const ids = selectedIdSet.has(itemId)
+      ? [...new Set(selectedIds)].filter((id) => displayItemById.has(id)).slice(0, 500)
+      : [itemId];
+    if (ids.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const gate = studioLiveSelectionEditGate({
+      selectedIds: ids,
+      ownershipByItemId: liveOwnershipByItemId,
+    });
+    if (gate.allowed === false) {
+      event.preventDefault();
+      setDragAnnouncement(gate.reason ?? "다른 참가자가 편집 중인 레이어예요.");
+      return;
+    }
+    if (!selectedIdSet.has(itemId)) {
+      onSelectionChange(ids);
+      setSelectionAnchorId(itemId);
+    }
+    seedNativeLayerDrag(event, {
+      kind: "items",
+      ids,
+      sourceGroupId: studioLayerDragSourceGroup(displayItems, ids),
+      label: ids.length > 1 ? `선택 레이어 ${ids.length}개` : item.label,
+    });
+  }
+
+  function beginGroupLayerDrag(
+    event: ReactDragEvent<HTMLElement>,
+    groupId: string,
+    groupName: string,
+    itemIds: readonly string[]
+  ) {
+    if (filterActive || readOnly || itemIds.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const gate = studioLiveSelectionEditGate({
+      selectedIds: itemIds,
+      ownershipByItemId: liveOwnershipByItemId,
+    });
+    if (gate.allowed === false) {
+      event.preventDefault();
+      setDragAnnouncement(gate.reason ?? "다른 참가자가 편집 중인 그룹이에요.");
+      return;
+    }
+    if (!itemIds.every((id) => selectedIdSet.has(id))) replaceWithGroupItems(itemIds);
+    seedNativeLayerDrag(event, {
+      kind: "group",
+      ids: [...itemIds],
+      groupId,
+      sourceGroupId: groupId,
+      label: `${groupName} 그룹 · ${itemIds.length}개`,
+    });
+  }
+
+  function updateItemLayerDrop(
+    event: ReactDragEvent<HTMLElement>,
+    itemId: string,
+    targetKey: string
+  ) {
+    const payload = dragPayloadRef.current;
+    const item = displayItemById.get(itemId);
+    if (!payload || !item || filterActive || readOnly) {
+      updateLayerDropIntent(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const intent = resolveStudioLayerItemDropIntent({
+      payload,
+      targetKey,
+      targetId: itemId,
+      targetGroupId: item.groupId ?? null,
+      side: studioLayerDropSideFromPointer(event.clientY, rect.top, rect.height),
+    });
+    if (!intent) {
+      event.dataTransfer.dropEffect = "none";
+      updateLayerDropIntent(null);
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    updateLayerDropIntent(intent);
+  }
+
+  function updateGroupLayerDrop(
+    event: ReactDragEvent<HTMLElement>,
+    groupId: string,
+    targetKey: string,
+    itemIds: readonly string[]
+  ) {
+    const payload = dragPayloadRef.current;
+    if (!payload || filterActive || readOnly) {
+      updateLayerDropIntent(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const intent = resolveStudioLayerGroupDropIntent({
+      payload,
+      targetKey,
+      targetGroupId: groupId,
+      targetId: itemIds[0] ?? null,
+      relativeY: (event.clientY - rect.top) / Math.max(1, rect.height),
+    });
+    if (!intent) {
+      event.dataTransfer.dropEffect = "none";
+      updateLayerDropIntent(null);
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    updateLayerDropIntent(intent);
+  }
+
+  function leaveLayerDropTarget(event: ReactDragEvent<HTMLElement>, targetKey: string) {
+    const related = event.relatedTarget;
+    if (related instanceof Node && event.currentTarget.contains(related)) return;
+    if (dropIntentRef.current?.targetKey === targetKey) updateLayerDropIntent(null);
+  }
+
+  function commitLayerDrop(event: ReactDragEvent<HTMLElement>) {
+    const payload = dragPayloadRef.current;
+    const intent = dropIntentRef.current;
+    if (!payload || !intent) {
+      finishLayerDrag();
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (intent.kind === "into-group") {
+      onAction({
+        type: "assign-items-to-group",
+        ids: [...payload.ids],
+        groupId: intent.groupId,
+      });
+      setDragAnnouncement(`${payload.label}를 그룹 안으로 이동했습니다.`);
+    } else if (intent.mode === "within-group" || intent.mode === "into-group") {
+      onAction({
+        type: "drop-items",
+        ids: [...payload.ids],
+        targetId: intent.targetId,
+        side: intent.side,
+        mode: intent.mode,
+        groupId: intent.groupId,
+      });
+      setDragAnnouncement(`${payload.label}의 그룹 내 순서를 변경했습니다.`);
+    } else {
+      onAction({
+        type: "drop-items",
+        ids: [...payload.ids],
+        targetId: intent.targetId,
+        side: intent.side,
+        mode: intent.mode,
+      });
+      setDragAnnouncement(
+        intent.mode === "to-root"
+          ? `${payload.label}를 그룹 밖으로 이동했습니다.`
+          : `${payload.label}의 레이어 순서를 변경했습니다.`
+      );
+    }
+    finishLayerDrag();
+  }
+
   // 행 memo 를 깨지 않는 identity-stable 이벤트 브리지 — 이벤트 시점에 최신 클로저를 읽는다.
   const rowHandlers = useStudioStableHandlers<LayerNavigatorRowHandlers>({
     onRowFocus: (key) => setFocusedKey(key),
@@ -795,6 +1101,11 @@ export function StudioLayerNavigator({
     onOpenItemActionMenu: (event, itemId) => {
       openActionMenu(event, { kind: "item", id: itemId });
     },
+    onItemDragStart: (event, itemId) => beginItemLayerDrag(event, itemId),
+    onItemDragEnd: finishLayerDrag,
+    onItemDragOver: (event, itemId, key) => updateItemLayerDrop(event, itemId, key),
+    onItemDragLeave: (event, key) => leaveLayerDropTarget(event, key),
+    onItemDrop: commitLayerDrop,
     registerRowRef: (key, node) => {
       if (node) rowRefs.current.set(key, node);
       else rowRefs.current.delete(key);
@@ -825,6 +1136,15 @@ export function StudioLayerNavigator({
     const item = entry.item;
     const editing = renameTarget?.kind === "item" && renameTarget.id === item.id;
     const liveOwnership = liveOwnershipByItemId.get(item.id) ?? null;
+    const rowDragIds = selectedIdSet.has(item.id) ? selectedIds : [item.id];
+    const rowDragGate = studioLiveSelectionEditGate({
+      selectedIds: rowDragIds,
+      ownershipByItemId: liveOwnershipByItemId,
+    });
+    const rowDropSide =
+      dropIntent?.kind === "around" && dropIntent.targetKey === key
+        ? dropIntent.side
+        : null;
     return (
       <LayerNavigatorItemRow
         key={key}
@@ -850,6 +1170,9 @@ export function StudioLayerNavigator({
         actionPopoverId={actionPopoverId}
         stableHandlers={rowHandlers}
         liveOwnership={liveOwnership}
+        dragEnabled={!editing && !filterActive && !readOnly && rowDragGate.allowed !== false}
+        dropSide={rowDropSide}
+        dragHelpId={dragHelpId}
       />
     );
   }
@@ -860,6 +1183,7 @@ export function StudioLayerNavigator({
       aria-label="전문 레이어 내비게이터"
       data-page-key={pageKey}
       data-studio-shortcut-boundary="true"
+      data-studio-layer-dragging={draggingLabel ? "true" : "false"}
     >
       {/* The icon-only merge doors keep a stable accessible name; the caveat rides along as a
           description so a screen-reader user hears "그룹으로 묶인다" before activating them. */}
@@ -1044,6 +1368,28 @@ export function StudioLayerNavigator({
             </button>
           </div>
         ) : null}
+        <p
+          id={dragHelpId}
+          className={cn(
+            "mt-1.5 flex min-h-5 items-center gap-1 text-[0.58rem] leading-relaxed",
+            filterActive ? "text-warning" : draggingLabel ? "text-accent" : "text-fg-3"
+          )}
+        >
+          <GripVertical size={11} aria-hidden />
+          <span className="min-w-0 flex-1 truncate">
+            {filterActive
+              ? "검색·필터를 지우면 끌어서 순서를 바꿀 수 있어요"
+              : draggingLabel
+                ? `${draggingLabel} 이동 중 · 선은 순서, 그룹 중앙은 소속`
+                : "핸들로 순서 변경 · 그룹 중앙에 놓아 소속 이동"}
+          </span>
+          <kbd className="shrink-0 rounded border border-line bg-card px-1 py-0.5 font-mono text-[0.52rem]">
+            ⌘[ / ⌘]
+          </kbd>
+        </p>
+        <p aria-live="polite" aria-atomic="true" className="sr-only">
+          {dragAnnouncement}
+        </p>
       </div>
 
       <StudioLayerNavigatorFilterPanel
@@ -1070,6 +1416,18 @@ export function StudioLayerNavigator({
           batchUnlockBlockedCount={batchUnlockBlockedCount}
           mutationDisabled={mutationDisabled}
           readOnly={readOnly}
+          reorderDisabled={mutationDisabled || filterActive || batchSelectedIds.length === 0}
+          reorderUnavailableReason={
+            readOnly
+              ? "읽기 전용 작업공간에서는 레이어 순서를 바꿀 수 없어요."
+              : filterActive
+                ? "검색·필터를 지운 뒤 전체 레이어 순서를 바꿀 수 있어요."
+                : liveSelectionBlocked
+                  ? selectionEditGate.reason ?? undefined
+                  : batchSelectedIds.length === 0
+                    ? "먼저 레이어를 선택하세요."
+                    : undefined
+          }
           batchMergeFallbackNote={batchMergeFallbackNote}
           flattenVisibleFallbackNote={flattenVisibleFallbackNote}
           mergeFallbackNoteId={mergeFallbackNoteId}
@@ -1089,6 +1447,24 @@ export function StudioLayerNavigator({
           tabStopKey={tabStopKey}
           mutationDisabled={mutationDisabled}
           mobileMultiSelect={mobileMultiSelect}
+          dragEnabled={!readOnly && !filterActive}
+          dragHelpId={dragHelpId}
+          dropIntent={dropIntent}
+          isGroupDragBlocked={(itemIds) =>
+            studioLiveSelectionEditGate({
+              selectedIds: itemIds,
+              ownershipByItemId: liveOwnershipByItemId,
+            }).allowed === false
+          }
+          onGroupDragStart={(event, group, itemIds) =>
+            beginGroupLayerDrag(event, group.id, group.name, itemIds)
+          }
+          onGroupDragEnd={finishLayerDrag}
+          onGroupDragOver={(event, group, key, itemIds) =>
+            updateGroupLayerDrop(event, group.id, key, itemIds)
+          }
+          onGroupDragLeave={leaveLayerDropTarget}
+          onGroupDrop={commitLayerDrop}
           getGroupItemIds={(groupId) =>
             displayItems.filter((item) => item.groupId === groupId).map((item) => item.id)
           }

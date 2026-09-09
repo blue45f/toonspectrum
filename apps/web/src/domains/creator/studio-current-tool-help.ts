@@ -1,24 +1,25 @@
 /**
  * §15.3 Help ▸ Current Tool Help — "지금 잡고 있는 도구가 뭘 하는 물건인가".
  *
- * 정직성 규율이 이 파일의 설계를 결정한다. 우리에게는 **산문 도움말(HelpGraph)이
- * 아직 없다.** Wave A 카탈로그는 명령마다 `helpNodeId` 를 들고 있지만 그 노드를
- * 채운 문서는 한 글자도 없다. 그래서 이 모듈은 도움말이 있는 척하지 않는다.
- * `authoredHelp: false` 를 그대로 내보내고, 대신 **실재하는 것**만 모아 준다.
+ * 정직성 규율이 이 파일의 설계를 결정한다. 카탈로그에서 확인할 수 있는 실제 값과
+ * 출하된 작성형 Guided Help를 결합하되, 존재하지 않는 문서나 실행 경로를 지어내지 않는다.
  *
  * - 카탈로그의 한국어·영어 라벨과 설명(있으면)
  * - 그 도구가 실제로 주장하는 단축키
  * - CSP·Photoshop·Krita·Procreate 에서 이 도구를 부르던 이름(별칭 실측치)
  * - 통합 검색 색인이 그 이름으로 찾아 주는 관련 명령·속성·패널·튜토리얼
+ * - 현재 명령 ID에 실제 작성형 Guided Help 문서가 있는지 여부
  *
  * 관련 항목을 손으로 적지 않고 검색 색인에서 끌어오는 이유: 손으로 적은 표는
  * 기능이 바뀌면 조용히 거짓말이 된다. 색인은 카탈로그가 바뀌면 같이 바뀐다.
+ * 작성형 도움말 존재 여부도 같은 이유로 Guided Help 그래프에서 직접 확인한다.
  *
  * 순수 모듈 — React·DOM 없음.
  */
 
 import { STUDIO_COMMAND_CATALOG } from "./studio-command-catalog";
 import { searchStudio } from "./studio-command-search";
+import { studioGuidedHelpArticleForCommand } from "./studio-guided-help";
 
 import type { StudioCommandCatalogEntry } from "./studio-command-catalog";
 import type { StudioSearchEntry } from "./studio-command-search";
@@ -48,10 +49,7 @@ export interface StudioToolHelpView {
   readonly description: string | null;
   readonly shortcut: string | null;
   readonly helpNodeId: string;
-  /**
-   * 이 도움말 노드를 채운 **산문 문서가 있는가**. 지금은 언제나 `false` 다.
-   * HelpGraph 가 실제로 출하되면 이 값이 근거와 함께 바뀌어야 한다.
-   */
+  /** 이 명령 ID에 연결된 작성형 Guided Help 문서가 실제로 출하됐는가. */
   readonly authoredHelp: boolean;
   readonly aliases: readonly TerminologyAlias[];
   readonly related: readonly StudioToolHelpRelatedItem[];
@@ -81,7 +79,7 @@ function localized(
 const RELATED_LIMIT = 8;
 
 /**
- * 카탈로그 + 검색 색인에서 실재하는 것만 모아 도구 도움말 뷰를 만든다.
+ * 카탈로그 + 검색 색인 + 작성형 도움말 그래프에서 실재하는 것만 모아 뷰를 만든다.
  * 모르는 명령 id 면 `null` — 빈 껍데기를 만들어 "도움말이 있다"고 속이지 않는다.
  */
 export function buildStudioToolHelp(commandId: string): StudioToolHelpView | null {
@@ -125,7 +123,7 @@ export function buildStudioToolHelp(commandId: string): StudioToolHelpView | nul
     description: ko.description ?? en.description,
     shortcut: entry.shortcut ?? null,
     helpNodeId: entry.helpNodeId,
-    authoredHelp: false,
+    authoredHelp: studioGuidedHelpArticleForCommand(entry.id) !== null,
     aliases: entry.aliases,
     related,
     tutorialIds,

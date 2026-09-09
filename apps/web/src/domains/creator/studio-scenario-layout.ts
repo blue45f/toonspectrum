@@ -7,11 +7,8 @@
  * 프롬프트가 이 문법으로 응답하도록 모델에 지시한다).
  *
  * 프레임 배치는 StudioPage.addFrame()의 "가장 아래 프레임 다음에 이어붙이기" 정책을 여러 장면
- * 배치용으로 일반화한 것이다 — 항상 현재 페이지의 기존 컷 아래로 세로 스크롤 웹툰처럼 이어붙인다
- * (완전히 새 페이지를 만들지 않는다 — 기존 장면 템플릿/대사 일괄 삽입 기능과 동일하게 "현재 페이지에
- * 이어붙이기"를 관례로 따른다. 사용자가 새 페이지에 생성하고 싶으면 먼저 페이지를 추가하면 된다).
- *
- * 각 패널의 높이는 그 장면 대사량(말풍선 스택 높이)에 맞춰 자동으로 정해진다(최소/최대 상한 有).
+ * 배치용으로 일반화한 것이다 — 항상 현재 페이지의 기존 컷 아래로 세로 스크롤 웹툰처럼 이어붙인다.
+ * 각 패널의 높이는 그 장면 대사량(말풍선 스택 높이)에 맞춰 자동으로 정해진다.
  *
  * Konva/DOM 의존 없음, 순수·결정적.
  */
@@ -30,8 +27,6 @@ const BUBBLE_BOTTOM_PAD = 32;
 
 export type ScenarioFrameRect = { x: number; y: number; width: number; height: number };
 
-/** studio-scenario-scenes.ScenarioSceneDraft와 구조 호환(그 타입을 직접 import하지 않아 두 모듈이
- *  서로 독립적으로 테스트 가능 — studio-ai-client.ts가 둘을 이어붙인다). */
 export interface ScenarioSceneInput {
   beatType?: ScenarioBeatType;
   summary?: string;
@@ -40,9 +35,93 @@ export interface ScenarioSceneInput {
   continuity?: Omit<StudioStoryBeat, "sceneId">;
 }
 
-/** 패널 가로세로 비를 3단계로 단순화 — AI 이미지 생성 사이즈 프리셋(정사각/세로/가로) 선택에만 쓰인다
- *  (studio-ai-client.StudioAiImageSize로의 매핑은 호출부 책임 — 이 모듈은 AI 클라이언트를 모른다). */
 export type ScenarioPanelAspect = "square" | "portrait" | "landscape";
+export type ScenarioImageVariantCount = 1 | 2 | 4;
+export type ScenarioImageQualityProfile = "draft" | "balanced" | "final";
+export type ScenarioImageVariationStrategy = "subtle" | "directorial" | "coverage";
+
+export interface ScenarioImageQualityFinding {
+  readonly id: string;
+  readonly severity: "review" | "info";
+  readonly category:
+    | "resolution"
+    | "alpha"
+    | "edge-clipping"
+    | "contrast"
+    | "exposure"
+    | "semantic-unknown";
+  readonly message: string;
+}
+
+export interface ScenarioImageQualityReport {
+  readonly version: 1;
+  readonly width: number;
+  readonly height: number;
+  readonly pixelCount: number;
+  readonly opaqueCoverage: number;
+  readonly edgeOccupancy: number;
+  readonly meanLuminance: number;
+  readonly contrast: number;
+  readonly confidence: "measured";
+  readonly findings: readonly ScenarioImageQualityFinding[];
+  readonly analyzedAt: string;
+}
+
+export interface ScenarioImageRepairRecord {
+  readonly version: 1;
+  readonly target:
+    | "identity"
+    | "face"
+    | "expression"
+    | "hands"
+    | "anatomy"
+    | "costume"
+    | "prop"
+    | "background"
+    | "lighting"
+    | "composition"
+    | "text-artifact"
+    | "outpaint";
+  readonly parentCandidateId: string;
+  readonly maskFingerprint: string;
+  readonly prompt: string;
+  readonly provider: string;
+  readonly model: string;
+  readonly createdAt: string;
+}
+
+export interface ScenarioImageLayer {
+  readonly id: string;
+  readonly name: string;
+  readonly role: "foreground" | "background" | "provider-layer";
+  readonly imageDataUrl: string;
+  readonly sourceCandidateId: string;
+}
+
+export interface ScenarioImageLayerManifest {
+  readonly version: 1;
+  readonly method: "provider-native" | "manual-mask" | "single-layer";
+  readonly editable: boolean;
+  readonly sourceCandidateId: string;
+  readonly layers: readonly ScenarioImageLayer[];
+  readonly createdAt: string;
+  readonly limitation?: string;
+}
+
+export interface ScenarioImageCandidate {
+  id: string;
+  imageDataUrl: string;
+  imageProvenance?: StudioPublishAiProvenance;
+  inputFingerprint: string;
+  createdAt: string;
+  /** Provider-neutral review metadata; it never claims a model-side seed or unsupported control. */
+  qualityProfile?: ScenarioImageQualityProfile;
+  variationStrategy?: ScenarioImageVariationStrategy;
+  variationLabel?: string;
+  qualityReport?: ScenarioImageQualityReport;
+  repair?: ScenarioImageRepairRecord;
+  layerManifest?: ScenarioImageLayerManifest;
+}
 
 export function scenarioPanelAspect(width: number, height: number): ScenarioPanelAspect {
   if (height <= 0) return "square";
@@ -65,12 +144,17 @@ export interface ScenarioPanelSeed {
   aspect: ScenarioPanelAspect;
 }
 
-/** 미리보기 카드 1개 — ScenarioPanelSeed(레이아웃 계산 결과) + 이미지 생성 결과(성공/실패는 상호
- *  배타적이지 않게 둘 다 optional로 둔다 — "아직 생성 전"은 둘 다 없음으로 표현). */
 export interface ScenarioPreviewItem extends ScenarioPanelSeed {
   imageDataUrl?: string;
   imageError?: string;
   imageProvenance?: StudioPublishAiProvenance;
+  imageCandidates?: ScenarioImageCandidate[];
+  selectedImageCandidateId?: string;
+  approvedImageCandidateId?: string;
+  preferredVariantCount?: ScenarioImageVariantCount;
+  qualityReport?: ScenarioImageQualityReport;
+  layerManifest?: ScenarioImageLayerManifest;
+  approvalRevision?: number;
 }
 
 export interface ScenarioLayoutResult {
@@ -79,10 +163,6 @@ export interface ScenarioLayoutResult {
   nextCanvasH: number;
 }
 
-/**
- * 기존 프레임들 다음에 장면(scene) 개수만큼 새 패널을 세로로 이어붙인다. 빈 scenes 배열이면 빈
- * 결과(panels: [], nextCanvasH: 기존 canvasH 그대로 — 축소하지 않는다).
- */
 export function layoutScenarioPanels(
   existingFrames: readonly ScenarioFrameRect[],
   canvasW: number,
@@ -91,34 +171,50 @@ export function layoutScenarioPanels(
 ): ScenarioLayoutResult {
   const frameW = Math.max(1, canvasW - MARGIN * 2);
   const bottomFrame = existingFrames.reduce<ScenarioFrameRect | null>(
-    (best, f) => (!best || f.y + f.height > best.y + best.height ? f : best),
-    null
+    (best, frame) => (!best || frame.y + frame.height > best.y + best.height ? frame : best),
+    null,
   );
   let cursorY = bottomFrame ? bottomFrame.y + bottomFrame.height + MARGIN : MARGIN;
   const panels: ScenarioPanelSeed[] = [];
 
   for (const scene of scenes) {
     const lines = parseDialogueScript(scene.dialogue);
-    const seedsAtOrigin = lines.length > 0 ? layoutDialogueBubbles(lines, { canvasWidth: frameW, startY: 0 }) : [];
-    const bubbleStackHeight = seedsAtOrigin.reduce((max, s) => Math.max(max, s.y + s.height), 0);
+    const seedsAtOrigin = lines.length > 0
+      ? layoutDialogueBubbles(lines, { canvasWidth: frameW, startY: 0 })
+      : [];
+    const bubbleStackHeight = seedsAtOrigin.reduce(
+      (maximum, seed) => Math.max(maximum, seed.y + seed.height),
+      0,
+    );
     const height = Math.min(
       MAX_FRAME_HEIGHT,
       Math.max(
         MIN_FRAME_HEIGHT,
-        bubbleStackHeight > 0 ? bubbleStackHeight + BUBBLE_TOP_PAD + BUBBLE_BOTTOM_PAD : MIN_FRAME_HEIGHT
-      )
+        bubbleStackHeight > 0
+          ? bubbleStackHeight + BUBBLE_TOP_PAD + BUBBLE_BOTTOM_PAD
+          : MIN_FRAME_HEIGHT,
+      ),
     );
-    const frame: ScenarioFrameRect = { x: MARGIN, y: cursorY, width: frameW, height };
-    const bubbles: DialogueBubbleSeed[] = seedsAtOrigin.map((s) => ({
-      ...s,
-      x: s.x + frame.x,
-      y: s.y + frame.y + BUBBLE_TOP_PAD,
+    const frame: ScenarioFrameRect = {
+      x: MARGIN,
+      y: cursorY,
+      width: frameW,
+      height,
+    };
+    const bubbles: DialogueBubbleSeed[] = seedsAtOrigin.map((seed) => ({
+      ...seed,
+      x: seed.x + frame.x,
+      y: seed.y + frame.y + BUBBLE_TOP_PAD,
     }));
     panels.push({
       frame,
       bubbles,
       beatType: normalizeScenarioBeatType(scene.beatType),
-      summary: scene.summary?.trim() || scene.imagePrompt.trim() || scene.dialogue.trim().split("\n")[0] || "장면",
+      summary:
+        scene.summary?.trim()
+        || scene.imagePrompt.trim()
+        || scene.dialogue.trim().split("\n")[0]
+        || "장면",
       imagePrompt: scene.imagePrompt,
       dialogue: scene.dialogue,
       ...(scene.continuity ? { continuity: scene.continuity } : {}),

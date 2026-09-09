@@ -1,4 +1,6 @@
 import {
+  ChevronsDown,
+  ChevronsUp,
   Eye,
   EyeOff,
   Grid2X2,
@@ -31,6 +33,8 @@ export interface StudioLayerNavigatorBatchBarProps {
   batchUnlockBlockedCount: number;
   mutationDisabled: boolean;
   readOnly: boolean;
+  reorderDisabled: boolean;
+  reorderUnavailableReason: string | undefined;
   batchMergeFallbackNote: string | null;
   flattenVisibleFallbackNote: string | null;
   mergeFallbackNoteId: string;
@@ -54,6 +58,8 @@ export function StudioLayerNavigatorBatchBar({
   batchUnlockBlockedCount,
   mutationDisabled,
   readOnly,
+  reorderDisabled,
+  reorderUnavailableReason,
   batchMergeFallbackNote,
   flattenVisibleFallbackNote,
   mergeFallbackNoteId,
@@ -85,6 +91,62 @@ export function StudioLayerNavigatorBatchBar({
         선택 {batchSelectedIds.length}개
         {outsideSelectionCount > 0 ? ` · 밖 ${outsideSelectionCount}` : ""}
       </span>
+      <StudioToolHintTarget
+        disabled={reorderDisabled}
+        unavailableReason={reorderUnavailableReason}
+        preferredSide="top"
+        hint={{
+          id: "layer-batch-bring-front",
+          title: "선택 레이어 맨 앞으로",
+          description: "선택과 그 선택이 속한 그룹을 하나의 안정적인 블록으로 맨 앞에 배치합니다.",
+          preview: "layer-actions",
+          tip: "⌘⇧] 또는 Ctrl+Shift+] 단축키도 사용할 수 있어요.",
+        }}
+      >
+        <button
+          type="button"
+          disabled={reorderDisabled}
+          onClick={() =>
+            onAction({ type: "reorder-items", ids: batchSelectedIds, direction: "front" })
+          }
+          className={cn(
+            "grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+            coarseTarget,
+            focusRing
+          )}
+          aria-label={`선택 ${batchSelectedIds.length}개 맨 앞으로`}
+        >
+          <ChevronsUp size={13} />
+        </button>
+      </StudioToolHintTarget>
+      <StudioToolHintTarget
+        disabled={reorderDisabled}
+        unavailableReason={reorderUnavailableReason}
+        preferredSide="top"
+        hint={{
+          id: "layer-batch-send-back",
+          title: "선택 레이어 맨 뒤로",
+          description: "선택과 그 선택이 속한 그룹을 하나의 안정적인 블록으로 맨 뒤에 배치합니다.",
+          preview: "layer-actions",
+          tip: "⌘⇧[ 또는 Ctrl+Shift+[ 단축키도 사용할 수 있어요.",
+        }}
+      >
+        <button
+          type="button"
+          disabled={reorderDisabled}
+          onClick={() =>
+            onAction({ type: "reorder-items", ids: batchSelectedIds, direction: "back" })
+          }
+          className={cn(
+            "grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+            coarseTarget,
+            focusRing
+          )}
+          aria-label={`선택 ${batchSelectedIds.length}개 맨 뒤로`}
+        >
+          <ChevronsDown size={13} />
+        </button>
+      </StudioToolHintTarget>
       <StudioToolHintTarget
         disabled={mutationDisabled || batchShowIds.length === 0}
         unavailableReason={
