@@ -31,7 +31,7 @@ await replaceExact(
 
 await replacePattern(
   shellPath,
-  /function compactFallbackStyle\([\s\S]*?\n}\n\nfunction StudioToolHintCompactFallback/u,
+  /function compactFallbackStyle\([\s\S]*?\n\}\n\nfunction StudioToolHintCompactFallback/u,
   `function compactFallbackStyle(
   anchor: DOMRect,
   preferredSide: StudioToolHintSide | undefined,
