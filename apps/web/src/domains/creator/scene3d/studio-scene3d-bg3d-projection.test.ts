@@ -94,4 +94,28 @@ describe("BG3D → Scene3D projection", () => {
     expect(projected.cameras).toHaveLength(2);
     expect(projected.cameras[1]?.focalLengthMm).toBeGreaterThan(projected.cameras[0]!.focalLengthMm);
   });
+
+  it("upgrades the legacy 256px shadow tier and recovers a stale active shot", () => {
+    const source: StudioBg3dSceneDocument = {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      activeShotId: "deleted-shot",
+      shots: [],
+      quality: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.quality,
+        desktop: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.quality.desktop,
+          shadowMapSize: 256,
+        },
+      },
+    };
+
+    const projected = projectStudioBg3dDocumentToScene3d({
+      documentId: "scene:legacy-shadow",
+      source,
+    });
+
+    expect(projected.activeCameraId).toBe("camera:main");
+    expect(projected.render.shadows.mapSize).toBe(512);
+    expect(isStudioScene3dDocument(projected)).toBe(true);
+  });
 });
