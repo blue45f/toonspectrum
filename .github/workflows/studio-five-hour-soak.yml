@@ -1,0 +1,173 @@
+name: Studio 5h stability soak
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "apps/web/src/domains/creator/**"
+      - "scripts/verify-studio-five-hour-soak.mts"
+      - "scripts/analyze-studio-five-hour-visual.mts"
+      - "scripts/lib/studio-inapp-sweep-harness.mts"
+      - "scripts/lib/studio-verify-preview-harness.mts"
+      - ".github/workflows/studio-five-hour-soak.yml"
+  schedule:
+    # 02:30 Asia/Seoul — five-hour run finishes before the Korean workday for overnight evidence.
+    - cron: "30 17 * * *"
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Soak duration per profile (minimum recommended: 300)"
+        required: false
+        default: "300"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-five-hour-soak-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  CI: "1"
+  NODE_OPTIONS: --max-old-space-size=8192
+  SOAK_MINUTES: ${{ github.event.inputs.minutes || '300' }}
+
+jobs:
+  production-build:
+    name: production Studio bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:bundle
+      - name: Require production manifest
+        run: test -s dist/.vite/manifest.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: studio-five-hour-dist-${{ github.sha }}
+          path: dist/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
+
+  pull-request-critical-soak:
+    name: 5h critical · ${{ matrix.id }}
+    if: github.event_name == 'pull_request'
+    needs: production-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: desktop
+            profile: desktop
+            webgpu: "0"
+          - id: kakaotalk-android
+            profile: kakaotalk-android-360
+            webgpu: "0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/download-artifact@v6
+        with:
+          name: studio-five-hour-dist-${{ github.sha }}
+          path: dist
+      - name: Keep one real Studio session active for at least five hours
+        env:
+          TOONSPECTRUM_SOAK_MINUTES: ${{ env.SOAK_MINUTES }}
+          TOONSPECTRUM_SOAK_PROFILE: ${{ matrix.profile }}
+          TOONSPECTRUM_SOAK_WEBGPU: ${{ matrix.webgpu }}
+          TOONSPECTRUM_SOAK_OUT: artifacts/studio-five-hour-soak/${{ matrix.id }}
+        run: pnpm exec tsx scripts/verify-studio-five-hour-soak.mts
+      - name: Analyze every 10-minute visual checkpoint
+        if: always()
+        env:
+          TOONSPECTRUM_SOAK_OUT: artifacts/studio-five-hour-soak/${{ matrix.id }}
+        run: pnpm exec tsx scripts/analyze-studio-five-hour-visual.mts
+      - name: Preserve 10-minute checkpoints, screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-five-hour-${{ matrix.id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/studio-five-hour-soak/${{ matrix.id }}/
+          if-no-files-found: warn
+          retention-days: 14
+
+  overnight-full-soak:
+    name: overnight 5h · ${{ matrix.id }}
+    if: github.event_name != 'pull_request'
+    needs: production-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: desktop
+            profile: desktop
+            webgpu: "0"
+          - id: desktop-webgpu
+            profile: desktop
+            webgpu: "1"
+          - id: kakaotalk-android
+            profile: kakaotalk-android-360
+            webgpu: "0"
+          - id: instagram-ios
+            profile: instagram-ios-390
+            webgpu: "0"
+          - id: naver-android
+            profile: naver-android-412
+            webgpu: "0"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/download-artifact@v6
+        with:
+          name: studio-five-hour-dist-${{ github.sha }}
+          path: dist
+      - name: Long-session Studio soak
+        env:
+          TOONSPECTRUM_SOAK_MINUTES: ${{ env.SOAK_MINUTES }}
+          TOONSPECTRUM_SOAK_PROFILE: ${{ matrix.profile }}
+          TOONSPECTRUM_SOAK_WEBGPU: ${{ matrix.webgpu }}
+          TOONSPECTRUM_SOAK_OUT: artifacts/studio-five-hour-soak/${{ matrix.id }}
+        run: pnpm exec tsx scripts/verify-studio-five-hour-soak.mts
+      - name: Analyze every 10-minute visual checkpoint
+        if: always()
+        env:
+          TOONSPECTRUM_SOAK_OUT: artifacts/studio-five-hour-soak/${{ matrix.id }}
+        run: pnpm exec tsx scripts/analyze-studio-five-hour-visual.mts
+      - name: Preserve 10-minute checkpoints, screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: studio-five-hour-${{ matrix.id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/studio-five-hour-soak/${{ matrix.id }}/
+          if-no-files-found: warn
+          retention-days: 14
