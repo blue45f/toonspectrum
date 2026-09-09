@@ -30,12 +30,28 @@ import {
   Pencil,
   Shapes,
   SlidersHorizontal,
+  Sparkles,
   Upload,
   Wind,
 } from "lucide-react";
 
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
+
+/** Keep the current document/remix context when moving into the full Brush Studio V6 workspace. */
+export function studioBrushLabHref(pathname: string): string {
+  const work = /^\/studio\/work\/([^/]+)/u.exec(pathname);
+  if (work?.[1]) return `/studio/work/${work[1]}/brush-lab`;
+  const remix = /^\/studio\/remix\/([^/]+)/u.exec(pathname);
+  if (remix?.[1]) return `/studio/remix/${remix[1]}/brush-lab`;
+  return "/studio/brush-lab";
+}
+
+function openGuidedBrushLab(): void {
+  const location = globalThis.location;
+  if (!location) return;
+  location.assign(studioBrushLabHref(location.pathname));
+}
 
 /**
  * The former product-only `그리기` group. The group id became `brush` to match
@@ -117,11 +133,17 @@ export function buildStudioBrushMenuItems({
     {
       id: "brush-studio",
       commandId: "brush.studio",
-      label: "브러시 스튜디오…",
+      label: "현재 브러시 세부 설정…",
       icon: SlidersHorizontal,
       onSelect: () => {
         ui.openBrushStudio();
       },
+    },
+    {
+      id: "brush-lab",
+      label: "목적별 브러시 제작실…",
+      icon: Sparkles,
+      onSelect: openGuidedBrushLab,
     },
     {
       id: "natural-media",
