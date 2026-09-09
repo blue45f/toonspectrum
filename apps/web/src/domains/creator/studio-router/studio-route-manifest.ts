@@ -25,6 +25,7 @@ export type StudioCompanionRouteSurface =
 
 export type StudioRouteKind =
   | "companion"
+  | "composition"
   | "editor"
   | "invalid"
   | "lift3d"
@@ -51,6 +52,24 @@ export const STUDIO_ROUTE_MANIFEST = Object.freeze([
     kind: "editor",
     ownsDocumentTitle: true,
     pattern: "/studio/(work/:workId|remix/:sourceWorkId)?/:surface(canvas|comic|animation|brushes|bg3d|poser|character)?",
+  },
+  {
+    id: "studio-composition",
+    kind: "composition",
+    ownsDocumentTitle: true,
+    pattern: "/studio/compose/:sessionId",
+  },
+  {
+    id: "studio-work-composition",
+    kind: "composition",
+    ownsDocumentTitle: true,
+    pattern: "/studio/work/:workId/compose/:sessionId",
+  },
+  {
+    id: "studio-remix-composition",
+    kind: "composition",
+    ownsDocumentTitle: true,
+    pattern: "/studio/remix/:sourceWorkId/compose/:sessionId",
   },
   {
     id: "studio-publish",
@@ -131,6 +150,14 @@ export interface StudioEditorRouteResolution extends StudioResolvedRouteBase {
   readonly workspaceRoute: StudioWorkspaceRoute;
 }
 
+export interface StudioCompositionRouteResolution extends StudioResolvedRouteBase {
+  readonly kind: "composition";
+  readonly sessionId: string;
+  readonly workId: string | null;
+  readonly remixSourceWorkId: string | null;
+  readonly editorHref: string;
+}
+
 export interface StudioPublishRouteResolution extends StudioResolvedRouteBase {
   readonly kind: "publish";
   readonly workId: string | null;
@@ -187,6 +214,7 @@ export interface StudioInvalidRouteResolution
 
 export type StudioRouteResolution =
   | StudioCompanionRouteResolution
+  | StudioCompositionRouteResolution
   | StudioEditorRouteResolution
   | StudioInvalidRouteResolution
   | StudioLift3dRouteResolution
@@ -252,6 +280,72 @@ function cleanIdentityQuery(
   params.delete("mode");
   params.delete("remix");
   return params;
+}
+
+function compositionSessionId(value: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+  return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u.test(decoded) ? decoded : null;
+}
+
+function resolveComposition(
+  pathname: string,
+  search: string | URLSearchParams | undefined,
+): StudioCompositionRouteResolution | StudioInvalidRouteResolution | null {
+  const segments = normalizedSegments(pathname);
+  if (segments === null) return invalidResolution(pathname, search, "invalid-path");
+  const cleanSearch = cleanIdentityQuery(search);
+  if (segments.length === 3 && segments[1] === "compose") {
+    const sessionId = compositionSessionId(segments[2]);
+    if (!sessionId) return invalidResolution(pathname, search, "invalid-path");
+    const canonicalPathname = `/studio/compose/${encodeURIComponent(sessionId)}`;
+    return Object.freeze({
+      canonicalHref: href(canonicalPathname, cleanSearch),
+      canonicalPathname,
+      kind: "composition",
+      lifecycleKey: `/studio/draft/composition:${encodeURIComponent(sessionId)}`,
+      ownsDocumentTitle: true,
+      sessionId,
+      workId: null,
+      remixSourceWorkId: null,
+      editorHref: "/studio",
+    });
+  }
+  if (
+    segments.length !== 5
+    || (segments[1] !== "work" && segments[1] !== "remix")
+    || segments[3] !== "compose"
+  ) {
+    return null;
+  }
+  const sessionId = compositionSessionId(segments[4]);
+  if (!sessionId) return invalidResolution(pathname, search, "invalid-path");
+  const scope = segments[1] as "work" | "remix";
+  const workspace = parseStudioWorkspaceRoute({
+    pathname: `/studio/${scope}/${segments[2]}/canvas`,
+  });
+  if (!workspace.valid) return invalidResolution(pathname, search, workspace);
+  if (workspace.presentation !== "editor") {
+    return invalidResolution(pathname, search, "invalid-mode");
+  }
+  const identity = scope === "work" ? workspace.workId : workspace.remixSourceWorkId;
+  if (!identity) return invalidResolution(pathname, search, "invalid-path");
+  const canonicalPathname = `/studio/${scope}/${encodeURIComponent(identity)}/compose/${encodeURIComponent(sessionId)}`;
+  return Object.freeze({
+    canonicalHref: href(canonicalPathname, cleanSearch),
+    canonicalPathname,
+    kind: "composition",
+    lifecycleKey: `/studio/${studioWorkspaceDocumentIdentity(workspace)}/composition:${encodeURIComponent(sessionId)}`,
+    ownsDocumentTitle: true,
+    sessionId,
+    workId: workspace.workId,
+    remixSourceWorkId: workspace.remixSourceWorkId,
+    editorHref: studioWorkspaceCanonicalHref(workspace),
+  });
 }
 
 function resolveCanonicalPublish(
@@ -344,8 +438,6 @@ function resolveCompanion(
     return null;
   }
   const canonicalPathname = `/studio/companion/${surface}`;
-  // The detached page still consumes `view`; the identity nevertheless lives in the path. Keeping
-  // this redundant compatibility value lets old and new companion builds interoperate safely.
   params.set("view", surface);
   return Object.freeze({
     canonicalHref: href(canonicalPathname, params),
@@ -357,10 +449,6 @@ function resolveCompanion(
   });
 }
 
-/**
- * 2D → 3D 리프트 작업대. 편집 문서와 독립된 도구 화면이라 문서 런타임을 열지 않는다.
- * 알 수 없는 `subject` 값은 정규화하면서 떨어뜨려, 주소로 프리셋을 밀어 넣지 못하게 한다.
- */
 function resolveLift3d(
   pathname: string,
   search: string | URLSearchParams | undefined,
@@ -558,6 +646,8 @@ export function resolveStudioRoute({
   pathname,
   search,
 }: StudioRouteLocationInput): StudioRouteResolution {
+  const composition = resolveComposition(pathname, search);
+  if (composition !== null) return composition;
   const publish = resolveCanonicalPublish(pathname, search);
   if (publish !== null) return publish;
   const companion = resolveCompanion(pathname, search);

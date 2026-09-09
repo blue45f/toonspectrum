@@ -85,6 +85,8 @@ describe("StudioAiComicDirectorPanel", () => {
     ).toBeTruthy();
     expect(screen.getByRole("checkbox", { name: "컷 1 제작 선택" })).toBeTruthy();
     expect(screen.getByRole("textbox", { name: "1번 장면 그림 프롬프트" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /이야기·기준/u }));
     expect(screen.getByText("작품 바이블 · AI 이미지 참조 팩")).toBeTruthy();
   });
 
