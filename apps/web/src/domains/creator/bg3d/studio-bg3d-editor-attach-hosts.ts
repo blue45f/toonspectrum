@@ -6,6 +6,7 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { attachStudioBg3dEditorSessionHost } from "./studio-bg3d-editor-session-host";
 import { attachStudioBg3dEditorSceneOpsHost } from "./studio-bg3d-editor-scene-ops-host";
+import { attachStudioBg3dEditorTemplateSwitchHost } from "./studio-bg3d-editor-template-switch-host";
 import { attachStudioBg3dEditorTransformHost } from "./studio-bg3d-editor-transform-host";
 import { attachStudioBg3dEditorPlacementHost } from "./studio-bg3d-editor-placement-host";
 import { attachStudioBg3dEditorLtHost } from "./studio-bg3d-editor-lt-host";
@@ -20,6 +21,7 @@ import { attachStudioBg3dEditorMiscHost } from "./studio-bg3d-editor-misc-host";
 export function attachStudioBg3dEditorHosts(h) {
   attachStudioBg3dEditorSessionHost(h);
   attachStudioBg3dEditorSceneOpsHost(h);
+  attachStudioBg3dEditorTemplateSwitchHost(h);
   attachStudioBg3dEditorTransformHost(h);
   attachStudioBg3dEditorPlacementHost(h);
   attachStudioBg3dEditorLtHost(h);
