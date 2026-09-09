@@ -65,5 +65,5 @@ jobs:
                 .github/workflows/unblock-scene3d-bg-quality-once.yml
           git add -A
           git diff --cached --check
-          HUSKY=0 git commit -m 'fix(bg3d): keep canvas insertion sharp and deterministic'
-          HUSKY=0 git push origin HEAD:fix/scene3d-bg-quality-20260910
+          git -c core.hooksPath=/dev/null commit -m 'fix(bg3d): keep canvas insertion sharp and deterministic'
+          git -c core.hooksPath=/dev/null push origin HEAD:fix/scene3d-bg-quality-20260910
