@@ -29,7 +29,11 @@ import {
   studioInkFallbackPressure,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
-
+import {
+  DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE,
+  resolveStudioStylusPressureInput,
+  type StudioStylusPressureProfile,
+} from "./studio-stylus-pressure-profile";
 
 export const STUDIO_BRUSH_VELOCITY_PRESSURE_ADAPTER_VERSION =
   "brush-velocity-pressure-adapter-v1" as const;
@@ -38,6 +42,7 @@ export interface StudioBrushVelocityPressureSettings {
   readonly brushId?: unknown;
   readonly pressureCurve?: unknown;
   readonly pressureMinSize?: unknown;
+  readonly stylusPressureProfile?: StudioStylusPressureProfile;
   readonly useVelocityPressure?: boolean;
   readonly velocitySensitivity?: unknown;
   /** Causal nominal pressure for brushes without a family profile. */
@@ -76,9 +81,21 @@ interface StudioBrushVelocityPressureElementStart {
 interface StudioBrushVelocityPressureInputSettings {
   readonly pressureCurve?: unknown;
   readonly pressureMinSize?: unknown;
+  readonly stylusPressureProfile?: StudioStylusPressureProfile;
   readonly useVelocityPressure?: boolean;
   readonly velocitySensitivity?: unknown;
 }
+
+/**
+ * The velocity state is already one-stroke authority. Associate its immutable device profile here
+ * so every authoritative, predicted and raw-preview sample stays on the pointerdown calibration
+ * even though existing call sites intentionally rebuild their small pressure setting object.
+ */
+const profileByVelocityState = new WeakMap<
+  StudioVelocityPressureState,
+  StudioStylusPressureProfile
+>();
+let activeStrokePressureProfile = DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE;
 
 function finiteOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -90,6 +107,15 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 function clamp01(value: unknown, fallback: number): number {
   return clamp(finiteOr(value, fallback), 0, 1);
+}
+
+function pressureProfileForTransition(
+  state: StudioVelocityPressureState | null | undefined,
+  explicit: StudioStylusPressureProfile | undefined,
+): StudioStylusPressureProfile {
+  if (explicit) return explicit;
+  if (!state) return DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE;
+  return profileByVelocityState.get(state) ?? activeStrokePressureProfile;
 }
 
 /**
@@ -125,20 +151,34 @@ export function advanceStudioBrushVelocityPressure(
     0.05,
     8
   );
-  const transition = advanceStudioVelocityPressure(state, pointer, {
-    nominalPressure,
-    // The preceding pressure resolver used a 0.75 response span. Preserve that calibrated range
-    // and change only the temporal behavior by adding the causal low-pass.
-    velocitySensitivity: velocityEnabled
-      ? (family?.velocitySensitivity ?? artistVelocitySensitivity)
-        * (family ? artistVelocitySensitivity : 1)
-        * 0.75
-      : 0,
-    velocityForMinimumPressure: family?.maxVelocity ?? 1.6,
-    minimumWidthRatio,
-    pressureExponent,
-    penPolicy: "hardware-precedence",
-  });
+  const pressureProfile = pressureProfileForTransition(
+    state,
+    settings.stylusPressureProfile,
+  );
+  const profiledPressure = resolveStudioStylusPressureInput(
+    pointer.pointerType,
+    pointer.pressure,
+    pressureProfile,
+  );
+  const transition = advanceStudioVelocityPressure(
+    state,
+    { ...pointer, pressure: profiledPressure },
+    {
+      nominalPressure,
+      // The preceding pressure resolver used a 0.75 response span. Preserve that calibrated range
+      // and change only the temporal behavior by adding the causal low-pass.
+      velocitySensitivity: velocityEnabled
+        ? (family?.velocitySensitivity ?? artistVelocitySensitivity)
+          * (family ? artistVelocitySensitivity : 1)
+          * 0.75
+        : 0,
+      velocityForMinimumPressure: family?.maxVelocity ?? 1.6,
+      minimumWidthRatio,
+      pressureExponent,
+      penPolicy: "hardware-precedence",
+    },
+  );
+  profileByVelocityState.set(transition.state, pressureProfile);
   const nonHardware = transition.sample.hardwarePressure === null;
   const pressure = nonHardware
     && (transition.sample.source === "nominal" || !velocityEnabled)
@@ -168,6 +208,8 @@ export function initializeStudioBrushVelocityPressure(
   settings: StudioBrushVelocityPressureInputSettings | null | undefined,
 ): StudioVelocityPressureState | null {
   if (drawMode === "shape" || drawMode === "pixel") return null;
+  activeStrokePressureProfile = settings?.stylusPressureProfile
+    ?? DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE;
   return advanceStudioBrushVelocityPressure(
     null,
     {
@@ -181,6 +223,7 @@ export function initializeStudioBrushVelocityPressure(
       brushId: element.brush,
       pressureCurve: settings?.pressureCurve,
       pressureMinSize: settings?.pressureMinSize,
+      stylusPressureProfile: activeStrokePressureProfile,
       useVelocityPressure: settings?.useVelocityPressure,
       velocitySensitivity: settings?.velocitySensitivity,
       fallbackPressure:
@@ -209,13 +252,18 @@ export function resolveStudioBrushReleasePressure(
     return lastContactPressure;
   }
 
+  const profiledRawPressure = resolveStudioStylusPressureInput(
+    input.pointerType,
+    rawPressure,
+    input.stylusPressureProfile ?? activeStrokePressureProfile,
+  );
   const family = input.brushId === "pen"
     ? null
     : resolveStudioHybridPressureProfile(input.brushId);
   if (family && input.pointerType === "pen") {
     return resolveStudioHybridPressureSample(input.brushId, {
       pointerType: "pen",
-      rawPressure,
+      rawPressure: profiledRawPressure,
       pressureCurve: input.pressureCurve,
       simulateVelocity: false,
     })?.pressure ?? lastContactPressure;
@@ -223,7 +271,7 @@ export function resolveStudioBrushReleasePressure(
 
   return resolveBrushReleasePressureSample({
     pointerType: input.pointerType,
-    rawPressure,
+    rawPressure: profiledRawPressure,
     lastContactPressure,
     velocityFallbackEnabled: false,
     pressureCurve: input.pressureCurve,
