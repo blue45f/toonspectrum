@@ -10,16 +10,16 @@ import {
   findStudioOriginalFreeAssetPackage,
 } from "./studio-original-free-asset-packs";
 
-describe("ToonSpectrum original free starter asset packs", () => {
-  it("ships three selectable packages and 24 unique non-blockout SVG assets", () => {
-    expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(3);
-    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(24);
+describe("ToonStudio original free starter asset packs", () => {
+  it("ships nine selectable packages and 72 unique non-blockout SVG assets", () => {
+    expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(9);
+    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(72);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.map((pkg) => pkg.id)).size)
-      .toBe(3);
+      .toBe(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.length);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSETS.map((asset) => asset.id)).size)
-      .toBe(24);
+      .toBe(STUDIO_ORIGINAL_FREE_ASSETS.length);
     expect(new Set(STUDIO_ORIGINAL_FREE_ASSETS.map((asset) => asset.contentFingerprint)).size)
-      .toBe(24);
+      .toBe(STUDIO_ORIGINAL_FREE_ASSETS.length);
   });
 
   it("makes provenance and CC0-safe rights explicit at package and item level", () => {
@@ -61,14 +61,23 @@ describe("ToonSpectrum original free starter asset packs", () => {
 
   it("searches across Korean names and tags and intersects package/category filters", () => {
     expect(filterStudioOriginalFreeAssets({ query: "병원" }).map((asset) => asset.id))
-      .toEqual([]); // The blockout remains resolvable by ID, but is not a new-selection result.
-    expect(filterStudioOriginalFreeAssets({
+      .toEqual([]); // Retired blockouts remain resolvable by ID but are not selectable.
+
+    const overlays = filterStudioOriginalFreeAssets({
       query: "오버레이",
       categories: ["atmosphere-fx"],
-    })).toHaveLength(8);
+    });
+    expect(overlays.length).toBeGreaterThanOrEqual(16);
+    expect(overlays.map((asset) => asset.id)).toContain("original-fx-shock-burst");
+    expect(overlays.map((asset) => asset.id)).toContain("original-night-bokeh");
+
     expect(filterStudioOriginalFreeAssets({
       packageIds: ["original-daily-props"],
       categories: ["daily-prop"],
+    })).toHaveLength(8);
+    expect(filterStudioOriginalFreeAssets({
+      packageIds: ["original-webtoon-ui-kit"],
+      categories: ["daily-prop", "genre-prop"],
     })).toHaveLength(8);
     expect(filterStudioOriginalFreeAssets({
       packageIds: ["original-daily-props"],
@@ -76,15 +85,21 @@ describe("ToonSpectrum original free starter asset packs", () => {
     })).toEqual([]);
   });
 
-  it("finds assets and packages defensively and creates a placeable local record", () => {
-    const asset = findStudioOriginalFreeAsset("original-city-bicycle");
-    expect(asset?.name).toBe("도시 자전거");
+  it("preserves stable legacy identities while exposing new authored material", () => {
+    const legacyAsset = findStudioOriginalFreeAsset("original-city-bicycle");
+    expect(legacyAsset?.name).toBe("도시 자전거");
+
+    const newAsset = findStudioOriginalFreeAsset("original-city-commuter-bike");
+    expect(newAsset?.name).toBe("생활 자전거");
+    expect(findStudioOriginalFreeAssetPackage("original-urban-props-kit")?.includedItems)
+      .toHaveLength(8);
+
     expect(findStudioOriginalFreeAsset(null)).toBeNull();
     expect(findStudioOriginalFreeAsset("missing")).toBeNull();
     expect(findStudioOriginalFreeAssetPackage("original-daily-props")?.includedItems)
       .toHaveLength(8);
 
-    const record = createStudioOriginalFreeAssetRecord(asset!);
+    const record = createStudioOriginalFreeAssetRecord(legacyAsset!);
     expect(record).toMatchObject({
       id: "starter:original-city-bicycle",
       name: "도시 자전거",
@@ -93,6 +108,6 @@ describe("ToonSpectrum original free starter asset packs", () => {
       kind: "original-procedural",
     });
     expect(record.dataUrl).toMatch(/^data:image\/svg\+xml;charset=utf-8,/);
-    expect(decodeURIComponent(record.dataUrl.split(",")[1] ?? "")).toBe(asset?.svg);
+    expect(decodeURIComponent(record.dataUrl.split(",")[1] ?? "")).toBe(legacyAsset?.svg);
   });
 });
