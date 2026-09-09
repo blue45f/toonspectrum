@@ -1,3 +1,5 @@
+import { useRef } from "react";
+
 import {
   STUDIO_EASE,
   STUDIO_FOCUS_RING,
@@ -64,9 +66,32 @@ export function StudioDualColorWell({
   onTransparentToggle?: () => void;
 }) {
   const showSecondary = Boolean(onSecondaryChange && secondary !== undefined);
+  // Native color pickers vary on whether they continuously emit `input` and/or finish with
+  // `change`. Listen to both, but coalesce the same value within one browser task so parent
+  // history/recent-colour side effects run exactly once. This also makes synthetic/browser
+  // automation and embedded WebViews converge on the same controlled React state.
+  const primaryDispatchRef = useRef<string | null>(null);
+  const secondaryDispatchRef = useRef<string | null>(null);
+  const dispatchColor = (
+    kind: "primary" | "secondary",
+    value: string,
+  ): void => {
+    const normalized = value.toLowerCase();
+    const dispatchRef = kind === "primary" ? primaryDispatchRef : secondaryDispatchRef;
+    if (dispatchRef.current === normalized) return;
+    dispatchRef.current = normalized;
+    if (kind === "primary") onPrimaryChange(value);
+    else onSecondaryChange?.(value);
+    queueMicrotask(() => {
+      if (dispatchRef.current === normalized) dispatchRef.current = null;
+    });
+  };
+  const catalogBrushId = undefined;
   return (
     <div
       data-studio-dual-color-well="true"
+      data-studio-primary-color={primary.toLowerCase()}
+      data-studio-secondary-color={secondary?.toLowerCase()}
       className={cn("flex shrink-0 items-center gap-1.5", className)}
       role="group"
       aria-label="색상"
@@ -113,7 +138,8 @@ export function StudioDualColorWell({
               <input
                 type="color"
                 value={secondary}
-                onChange={(event) => onSecondaryChange?.(event.target.value)}
+                onInput={(event) => dispatchColor("secondary", event.currentTarget.value)}
+                onChange={(event) => dispatchColor("secondary", event.currentTarget.value)}
                 className="absolute inset-0 size-full cursor-pointer opacity-0"
                 aria-label={`보조 색 선택 · 현재 ${secondary}`}
               />
@@ -133,7 +159,8 @@ export function StudioDualColorWell({
             <input
               type="color"
               value={primary}
-              onChange={(event) => onPrimaryChange(event.target.value)}
+              onInput={(event) => dispatchColor("primary", event.currentTarget.value)}
+              onChange={(event) => dispatchColor("primary", event.currentTarget.value)}
               className="absolute inset-0 size-full cursor-pointer opacity-0"
               aria-label={`주 색 선택 · 현재 ${primary}`}
             />
