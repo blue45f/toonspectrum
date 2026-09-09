@@ -45,6 +45,19 @@ jobs:
                   subprocess.run(script, shell=True, executable='/bin/bash', check=True, env=env)
                   print('::endgroup::')
           PY
+      - name: Preserve optional anatomy fields in existing presets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts')
+          text = path.read_text(encoding='utf-8')
+          old = 'if (source[key] !== undefined || STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS[key] !== undefined) {'
+          new = 'if (source[key] !== undefined) {'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one optional anatomy clamp, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Validate mannequin anatomy scope
         shell: bash
         run: |
