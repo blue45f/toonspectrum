@@ -70,8 +70,8 @@ describe("BG3D → Scene3D projection", () => {
       uri: "attachment:chair",
       quality: { accepted: false, score: 0 },
     });
-    expect(projected.output.height).toBe(2160);
-    expect(projected.output.width).toBe(1620);
+    expect(projected.output.height).toBe(640);
+    expect(projected.output.width).toBe(480);
     expect(projected.output.pixelRatio).toBe(1);
     expect(projected.lights.map((light) => light.id)).toEqual(["light:key", "light:fill"]);
   });
@@ -88,7 +88,7 @@ describe("BG3D → Scene3D projection", () => {
       activeShotId: "close-up",
     };
 
-    const projected = projectStudioBg3dDocumentToScene3d({ documentId: "scene:shot", source });
+    const projected = projectStudioBg3dDocumentToScene3d({ documentId: "scene:shot", source, viewportAspectRatio: 1 });
 
     expect(projected.activeCameraId).toBe("camera:shot:close-up");
     expect(projected.cameras).toHaveLength(2);

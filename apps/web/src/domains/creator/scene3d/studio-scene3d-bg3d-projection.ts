@@ -16,7 +16,7 @@ import {
   type StudioScene3dTransform,
 } from "./studio-scene3d-document";
 
-const OUTPUT_MIN_HEIGHT = 2160;
+const OUTPUT_MIN_HEIGHT = 256;
 const OUTPUT_MAX_EDGE = 4096;
 const DEFAULT_FAR = 5000;
 
@@ -145,9 +145,20 @@ function projectDirectionalLight(
   });
 }
 
+export type StudioScene3dProjectionErrorCode = "missing-viewport-aspect-ratio";
+
+export class StudioScene3dProjectionError extends Error {
+  constructor(readonly code: StudioScene3dProjectionErrorCode, message: string) {
+    super(message);
+    this.name = "StudioScene3dProjectionError";
+  }
+}
+
 export function projectStudioBg3dDocumentToScene3d(input: {
   readonly documentId: string;
   readonly source: StudioBg3dSceneDocument;
+  /** Required only when the legacy document intentionally follows the live viewport ratio. */
+  readonly viewportAspectRatio?: number;
   readonly revision?: number;
   readonly now?: string;
 }): StudioScene3dDocumentV1 {
@@ -191,9 +202,20 @@ export function projectStudioBg3dDocumentToScene3d(input: {
     `camera:shot:${shot.id}`,
     `${shot.name} 카메라`,
   ));
+  const outputAspectRatio = source.output.exportAspectRatio ?? input.viewportAspectRatio;
+  if (
+    typeof outputAspectRatio !== "number"
+    || !Number.isFinite(outputAspectRatio)
+    || outputAspectRatio <= 0
+  ) {
+    throw new StudioScene3dProjectionError(
+      "missing-viewport-aspect-ratio",
+      "자동 출력 비율을 투영하려면 현재 뷰포트 비율이 필요합니다.",
+    );
+  }
   const { width, height } = resolveProjectionOutputSize(
     source.output.exportHeight,
-    source.output.exportAspectRatio ?? 1,
+    outputAspectRatio,
   );
   const mode = source.background.mode === "transparent"
     ? "transparent"
@@ -219,6 +241,16 @@ export function projectStudioBg3dDocumentToScene3d(input: {
       mode,
       color: source.background.color,
       assetId: null,
+      proceduralSkyPresetId:
+        source.background.mode === "sky-preset" ? source.background.skyPresetId : null,
+      fog: source.background.fogEnabled
+        ? Object.freeze({
+          enabled: true,
+          color: source.background.fogColor ?? source.background.color,
+          near: source.background.fogNear ?? 1,
+          far: source.background.fogFar ?? 100,
+        })
+        : null,
       rotationDegrees: source.background.panoramaRotation,
       intensity: source.lighting.ambientIntensity,
       groundEnabled: true,
@@ -228,9 +260,9 @@ export function projectStudioBg3dDocumentToScene3d(input: {
     render: Object.freeze({
       profile: "webtoon",
       colorSpace: "srgb",
-      toneMapping: source.render.toneMapping === "aces" ? "aces" : "neutral",
+      toneMapping: source.render.toneMapping,
       exposure: source.render.exposure,
-      antialiasing: source.render.antialias ? "msaa" : "ssaa",
+      antialiasing: source.render.antialias ? "msaa" : "none",
       shadows: Object.freeze({
         enabled: source.render.shadows,
         mode: "csm",
@@ -245,7 +277,7 @@ export function projectStudioBg3dDocumentToScene3d(input: {
         depthOfField: false,
       }),
       toon: Object.freeze({
-        enabled: source.output.tone.mode !== "none",
+        enabled: source.output.tone.mode !== "none" || source.output.line.enabled,
         rampSteps: Math.max(2, source.output.tone.levels),
         outline: source.output.line.enabled,
         outlineWidthPx: source.output.line.widthPx,
@@ -255,6 +287,8 @@ export function projectStudioBg3dDocumentToScene3d(input: {
     output: Object.freeze({
       width,
       height,
+      sourceAspectRatioMode:
+        source.output.exportAspectRatio === undefined ? "viewport" : "fixed",
       pixelRatio: 1,
       transparent: source.output.transparentBackground || source.background.mode === "transparent",
       preserveAlpha: true,

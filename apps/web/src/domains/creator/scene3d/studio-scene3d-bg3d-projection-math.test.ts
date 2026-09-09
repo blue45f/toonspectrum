@@ -9,6 +9,7 @@ describe("BG3D projection math contracts", () => {
     const projected = projectStudioBg3dDocumentToScene3d({
       documentId: "lens-contract",
       source: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      viewportAspectRatio: 1,
       now: "2026-09-10T00:00:00.000Z",
     });
 
@@ -38,4 +39,52 @@ describe("BG3D projection math contracts", () => {
     expect(Math.max(projected.output.width, projected.output.height)).toBeLessThanOrEqual(4096);
     expect(projected.output.width / projected.output.height).toBeCloseTo(aspect, 2);
   });
+
+  it("fails closed when an automatic legacy ratio has no live viewport measurement", () => {
+    expect(() => projectStudioBg3dDocumentToScene3d({
+      documentId: "missing-viewport-contract",
+      source: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+    })).toThrowError(expect.objectContaining({ code: "missing-viewport-aspect-ratio" }));
+  });
+
+  it("preserves disabled AA, no tone mapping, sky identity, fog, and viewport ratio", () => {
+    const projected = projectStudioBg3dDocumentToScene3d({
+      documentId: "render-contract",
+      viewportAspectRatio: 0.75,
+      source: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+        render: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.render,
+          antialias: false,
+          toneMapping: "none",
+        },
+        background: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+          mode: "sky-preset",
+          skyPresetId: "sunset",
+          fogEnabled: true,
+          fogColor: "#445566",
+          fogNear: 2,
+          fogFar: 80,
+        },
+      },
+      now: "2026-09-10T00:00:00.000Z",
+    });
+
+    expect(projected.output).toMatchObject({
+      width: 480,
+      height: 640,
+      sourceAspectRatioMode: "viewport",
+    });
+    expect(projected.render).toMatchObject({
+      antialiasing: "none",
+      toneMapping: "none",
+    });
+    expect(projected.environment).toMatchObject({
+      mode: "procedural-sky",
+      proceduralSkyPresetId: "sunset",
+      fog: { enabled: true, color: "#445566", near: 2, far: 80 },
+    });
+  });
+
 });
