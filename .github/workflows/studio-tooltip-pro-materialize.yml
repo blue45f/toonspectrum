@@ -1,0 +1,77 @@
+name: Studio tooltip pro materialize
+
+on:
+  push:
+    branches:
+      - feat/studio-tooltip-pro-v2-20260909
+    paths:
+      - scripts/apply-studio-tooltip-pro-v2.mjs
+      - .github/workflows/studio-tooltip-pro-materialize.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-tooltip-pro-materialize-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    if: ${{ !contains(github.event.head_commit.message, 'refine tooltip interaction and motion') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply tooltip UX v2 source changes
+        run: node scripts/apply-studio-tooltip-pro-v2.mjs
+      - name: Format touched sources
+        run: |
+          pnpm exec prettier --write \
+            apps/web/src/domains/creator/StudioToolHint.tsx \
+            apps/web/src/domains/creator/components/StudioToolHintBubble.tsx \
+            apps/web/src/domains/creator/studio-tool-hint-position.ts \
+            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
+            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx \
+            apps/web/src/styles/globals.css \
+            docs/studio-tooltip-ux-v2-2026-09-09.md
+      - name: Lint touched TypeScript
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/StudioToolHint.tsx \
+            apps/web/src/domains/creator/components/StudioToolHintBubble.tsx \
+            apps/web/src/domains/creator/studio-tool-hint-position.ts \
+            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
+            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx
+      - name: Run tooltip regression portfolio
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
+            apps/web/src/domains/creator/studio-tool-hint-coordinator.test.ts \
+            apps/web/src/domains/creator/StudioToolHint.test.tsx \
+            apps/web/src/domains/creator/StudioToolHint.interaction.test.tsx \
+            apps/web/src/domains/creator/StudioToolHint.focus-return.test.tsx \
+            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx \
+            apps/web/src/domains/creator/studio-tool-hint.semantic-contract.test.ts
+      - name: Verify patch integrity
+        run: git diff --check
+      - name: Commit materialized implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(studio): refine tooltip interaction and motion"
+          git push origin HEAD:${{ github.ref_name }}
