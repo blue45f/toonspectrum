@@ -19,6 +19,10 @@ import { MARKET_KINDS, MARKET_LICENSES } from "../models/market-kind";
 import { MARKET_CURATED_THEMES } from "../models/market-theme";
 
 import { Container } from "@/shared/components/section";
+import {
+  FriendlyQuickGuide,
+  PurposeExperienceStage,
+} from "@/shared/components/purpose-experience-stage";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import Link from "@/compat/router-link";
 import {
@@ -29,18 +33,18 @@ import {
 } from "@/hooks/use-document-title";
 
 const MARKET_HOME_DESCRIPTION =
-  "브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋, 3D 에셋과 소품을 살펴보고 ToonSpectrum Studio에서 바로 활용하세요.";
+  "브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋과 소품을 찾고 시험한 뒤 ToonStudio 프로젝트에 바로 연결하세요.";
 
 export function MarketHomePage() {
   const latest = useMarketResources({ limit: 12, sort: "newest" });
   const hasLatestItems = latest.items.length > 0;
   const hasFatalLatestError = Boolean(latest.error) && !hasLatestItems;
 
-  useDocumentTitle("창작 마켓");
+  useDocumentTitle("에셋 마켓");
   useMetaDescription(MARKET_HOME_DESCRIPTION);
   usePageSocialMeta({
     canonicalPath: "/market",
-    title: "창작 마켓 · 툰스펙트럼",
+    title: "에셋 마켓 · 툰스튜디오",
     description: MARKET_HOME_DESCRIPTION,
   });
   useJsonLd(marketHomeJsonLd(latest.items));
@@ -65,50 +69,76 @@ export function MarketHomePage() {
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-7 sm:py-10">
           <MarketNavHeader />
-          <p className="eyebrow text-accent mt-6">Creator Market</p>
-          <h1 className="mt-2 text-pretty text-3xl font-bold leading-[1.1] sm:mt-2.5 sm:text-4xl lg:text-[2.8rem]">
-            창작 마켓
-          </h1>
-          <p className="mt-2.5 max-w-xl text-pretty font-serif text-base italic leading-relaxed text-fg-2 sm:mt-3 sm:text-lg">
-            스튜디오에서 태어난 창작 리소스가 다음 작가의 도구가 되는 곳.
-          </p>
-          <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-line pt-4 sm:mt-7 sm:pt-5">
-            <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "md" })}>
-              <Store className="h-4 w-4" aria-hidden="true" />
-              리소스 둘러보기
-            </Link>
-            <Link
-              href="/market/publish"
-              className={buttonClass({
-                variant: "outline",
-                size: "md",
-                className: "border-accent text-accent hover:bg-accent/10",
-              })}
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              에셋 등록하기
-            </Link>
-            <Link
-              href="/studio?assetMarket=community&communityView=share"
-              className={buttonClass({ variant: "outline", size: "md" })}
-            >
-              <Upload className="h-4 w-4" aria-hidden="true" />
-              스튜디오에서 공유하기
-            </Link>
-            <span className="rounded-full bg-good/15 px-2.5 py-1 text-xs font-medium text-good">
-              전 리소스 무료 공유
-            </span>
+          <div className="mt-6 grid gap-7 xl:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] xl:items-center">
+            <div>
+              <p className="eyebrow text-accent">Creator Asset Market</p>
+              <h1 className="mt-2 text-pretty font-display text-[clamp(2.2rem,6vw,4.6rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">
+                에셋 마켓
+              </h1>
+              <p className="mt-3 max-w-xl text-pretty font-serif text-base italic leading-relaxed text-fg-2 sm:text-lg">
+                스튜디오에서 태어난 창작 리소스가 다음 작가의 도구가 되는 곳.
+              </p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-3">
+                마음에 드는 에셋을 찾고, 상세 화면에서 제작 조건과 사용권을 확인한 뒤 내 에셋에 추가해 Studio에서 바로 시험해 보세요.
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-line pt-4 sm:mt-7 sm:pt-5">
+                <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "md" })}>
+                  <Store className="h-4 w-4" aria-hidden="true" />
+                  에셋 찾기
+                </Link>
+                <Link
+                  href="/market/publish"
+                  className={buttonClass({
+                    variant: "outline",
+                    size: "md",
+                    className: "border-accent text-accent hover:bg-accent/10",
+                  })}
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  에셋 배포하기
+                </Link>
+                <Link
+                  href="/studio?assetMarket=community&communityView=share"
+                  className={buttonClass({ variant: "outline", size: "md" })}
+                >
+                  <Upload className="h-4 w-4" aria-hidden="true" />
+                  Studio에서 공유
+                </Link>
+                <span className="rounded-full bg-good/15 px-2.5 py-1 text-xs font-medium text-good">
+                  현재 모든 에셋 무료
+                </span>
+              </div>
+            </div>
+
+            <PurposeExperienceStage
+              variant="market"
+              ariaLabel="에셋을 찾고 시험한 뒤 Studio에서 사용하는 흐름 미리보기"
+              steps={["에셋 찾기", "조건·미리보기", "Studio에서 사용"]}
+            />
           </div>
+
+          <FriendlyQuickGuide
+            className="mt-5"
+            title="마켓이 처음이라면 이 3단계만 확인하세요"
+            description="무료 에셋이어도 사용권과 호환성은 꼭 확인해야 합니다. 설치와 계정 보관도 서로 다른 단계입니다."
+            steps={[
+              "탐색에서 종류·라이선스·Studio 호환 조건으로 후보를 좁힙니다.",
+              "상세 화면에서 실제 미리보기, 버전, 사용권과 제작 적합성을 확인합니다.",
+              "내 에셋에 추가한 뒤 Studio에서 설치·시험하고 프로젝트에 적용합니다.",
+            ]}
+            actionLabel="상세 탐색 시작"
+            actionHref="/market/browse"
+          />
         </Container>
       </section>
 
-      {/* ── Curated Thematic Exhibitions (Acon3D & Clip Studio Benchmark) ── */}
       <section className="border-b border-line bg-card/40 py-8 sm:py-10">
         <Container size="wide">
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <p className="eyebrow text-accent">Theme Exhibition</p>
               <h2 className="mt-1 text-lg font-bold text-fg sm:text-xl">장르별 웹툰 기획전</h2>
+              <p className="mt-1 text-xs leading-5 text-fg-3">장면 분위기와 제작 목적이 비슷한 에셋을 묶어 빠르게 비교할 수 있습니다.</p>
             </div>
             <Link
               href="/market/browse"
@@ -126,25 +156,25 @@ export function MarketHomePage() {
                   href={`/market/browse?tag=${encodeURIComponent(theme.tag)}`}
                   className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-line bg-card p-4 transition-all duration-200 hover:-translate-y-1 hover:border-line-strong hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 >
-                  <div className={`absolute -right-8 -top-8 size-28 rounded-full bg-gradient-to-br ${theme.gradient} blur-2xl opacity-60 group-hover:opacity-100 transition-opacity`} />
+                  <div className={`absolute -right-8 -top-8 size-28 rounded-full bg-gradient-to-br ${theme.gradient} blur-2xl opacity-60 transition-all duration-500 group-hover:scale-125 group-hover:opacity-100`} />
                   <div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1 rounded-full bg-raised px-2 py-0.5 text-[0.65rem] font-bold text-accent">
                         <Sparkles className="size-2.5" aria-hidden="true" />
                         {theme.badge}
                       </span>
-                      <ThemeIcon className="size-4 text-fg-3 group-hover:text-accent transition-colors" aria-hidden="true" />
+                      <ThemeIcon className="size-4 text-fg-3 transition-all group-hover:-rotate-6 group-hover:scale-110 group-hover:text-accent" aria-hidden="true" />
                     </div>
-                    <h3 className="mt-2.5 text-sm font-bold text-fg group-hover:text-accent transition-colors">
+                    <h3 className="mt-2.5 text-sm font-bold text-fg transition-colors group-hover:text-accent">
                       {theme.title}
                     </h3>
-                    <p className="mt-1 text-xs text-fg-3 line-clamp-2 leading-relaxed">
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-3">
                       {theme.subtitle}
                     </p>
                   </div>
                   <div className="mt-4 flex items-center justify-between border-t border-line/60 pt-2.5 text-[0.7rem] font-medium text-fg-2">
-                    <span className="text-accent font-semibold">#{theme.tag} 모음</span>
-                    <span className="flex items-center gap-1 text-fg-3 group-hover:translate-x-0.5 transition-transform">
+                    <span className="font-semibold text-accent">#{theme.tag} 모음</span>
+                    <span className="flex items-center gap-1 text-fg-3 transition-transform group-hover:translate-x-1">
                       보러가기 <ArrowRight className="size-3" aria-hidden="true" />
                     </span>
                   </div>
@@ -156,7 +186,10 @@ export function MarketHomePage() {
       </section>
 
       <Container size="wide" className="py-8 sm:py-10 lg:py-12">
-        <h2 className="eyebrow text-fg-3">리소스 종류</h2>
+        <div>
+          <h2 className="eyebrow text-fg-3">리소스 종류</h2>
+          <p className="mt-1 text-xs leading-5 text-fg-3">무엇을 찾는지 알고 있다면 종류에서 바로 시작하는 것이 가장 빠릅니다.</p>
+        </div>
         <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-7">
           {MARKET_KINDS.map((kind) => {
             const KindIcon = kind.icon;
@@ -164,16 +197,17 @@ export function MarketHomePage() {
               <li key={kind.kind}>
                 <Link
                   href={`/market/browse?kind=${kind.kind}`}
-                  className="group flex h-full flex-col gap-2 rounded-xl border border-line bg-card p-3.5 transition-[border-color,transform] duration-200 ease-out-expo hover:-translate-y-0.5 hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                  className="group relative flex h-full flex-col gap-2 overflow-hidden rounded-xl border border-line bg-card p-3.5 transition-all duration-200 ease-out-expo hover:-translate-y-1 hover:border-line-strong hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 >
+                  <span aria-hidden="true" className="absolute -right-6 -top-6 size-16 rounded-full bg-accent/0 blur-xl transition-colors group-hover:bg-accent/10" />
                   <KindIcon
                     strokeWidth={1.5}
-                    className="h-6 w-6 transition-colors duration-200"
+                    className="relative h-6 w-6 transition-transform duration-200 group-hover:-rotate-3 group-hover:scale-110"
                     style={{ color: `oklch(0.78 0.11 ${kind.hue})` }}
                     aria-hidden="true"
                   />
-                  <span className="text-sm font-semibold text-fg">{kind.label}</span>
-                  <span className="line-clamp-2 text-xs leading-snug text-fg-3">{kind.description}</span>
+                  <span className="relative text-sm font-semibold text-fg">{kind.label}</span>
+                  <span className="relative line-clamp-2 text-xs leading-snug text-fg-3">{kind.description}</span>
                 </Link>
               </li>
             );
@@ -181,13 +215,15 @@ export function MarketHomePage() {
         </ul>
       </Container>
 
-      {/* ── 3D Special Spotlight (Clip Studio & Acon3D 3D Benchmark) ── */}
       {materials3D.length > 0 ? (
         <Container size="wide" className="pb-10 sm:pb-12">
           <div className="flex items-baseline justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Cuboid className="size-4 text-accent" aria-hidden="true" />
-              <h2 className="text-base font-bold text-fg sm:text-lg">3D 데생 소체 & 배경 특별관</h2>
+            <div>
+              <div className="flex items-center gap-2">
+                <Cuboid className="size-4 text-accent" aria-hidden="true" />
+                <h2 className="text-base font-bold text-fg sm:text-lg">3D 데생 소체 & 배경 특별관</h2>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-fg-3">구도·카메라·배경 작업을 빠르게 시작할 수 있는 3D 자원을 모았습니다.</p>
             </div>
             <Link
               href="/market/browse?kind=3d-asset"
@@ -214,7 +250,7 @@ export function MarketHomePage() {
               <li key={tag}>
                 <Link
                   href={`/market/browse?tag=${encodeURIComponent(tag)}`}
-                  className="inline-flex min-h-11 items-center rounded bg-raised px-3 py-2 text-xs text-fg-2 transition-colors duration-150 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                  className="inline-flex min-h-11 items-center rounded bg-raised px-3 py-2 text-xs text-fg-2 transition-all duration-150 hover:-translate-y-0.5 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 >
                   #{tag}
                 </Link>
@@ -226,7 +262,10 @@ export function MarketHomePage() {
 
       <Container size="wide" className="pb-10 sm:pb-12">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="eyebrow text-fg-3">최근 공유</h2>
+          <div>
+            <h2 className="eyebrow text-fg-3">최근 공유</h2>
+            <p className="mt-1 text-xs leading-5 text-fg-3">최근 공개된 에셋을 실제 미리보기와 함께 확인합니다.</p>
+          </div>
           <Link
             href="/market/browse"
             className="inline-flex min-h-6 items-center text-sm text-accent hover:text-accent-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:min-h-11"
@@ -246,7 +285,7 @@ export function MarketHomePage() {
               최근 공유 리소스를 불러올 수 없어요
             </h3>
             <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">
-              일시적인 네트워크 문제이거나 서버 장애일 수 있어요.
+              일시적인 네트워크 문제이거나 서버 장애일 수 있어요. 현재 페이지에서 다시 시도해도 다른 작업에는 영향을 주지 않습니다.
             </p>
             <button
               type="button"
@@ -301,7 +340,7 @@ export function MarketHomePage() {
                   아직 공유된 리소스가 없어요
                 </h3>
                 <p className="mx-auto mt-1.5 max-w-md text-sm text-fg-2">
-                  스튜디오에서 창작한 3D 에셋, 브러시, 팔레트를 마켓 커뮤니티에 가장 먼저 공유해 보세요!
+                  Studio에서 창작한 3D 에셋, 브러시, 팔레트를 마켓 커뮤니티에 가장 먼저 공유해 보세요.
                 </p>
                 <div className="mt-5 flex justify-center">
                   <Link
@@ -309,7 +348,7 @@ export function MarketHomePage() {
                     className={buttonClass({ variant: "solid", size: "sm" })}
                   >
                     <Upload className="mr-1.5 size-3.5" aria-hidden="true" />
-                    스튜디오에서 첫 리소스 공유하기
+                    Studio에서 첫 리소스 공유하기
                   </Link>
                 </div>
               </div>
@@ -319,10 +358,13 @@ export function MarketHomePage() {
       </Container>
 
       <Container size="wide" className="pb-14">
-        <h2 className="eyebrow text-fg-3">사용권 안내</h2>
+        <div>
+          <h2 className="eyebrow text-fg-3">사용권 안내</h2>
+          <p className="mt-1 text-xs leading-5 text-fg-3">무료 여부와 별개로 상업 이용, 수정, 출처 표기 조건을 확인하세요.</p>
+        </div>
         <ul className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
           {MARKET_LICENSES.map((license) => (
-            <li key={license.license} className="rounded-xl border border-line bg-card p-4">
+            <li key={license.license} className="rounded-xl border border-line bg-card p-4 transition-colors hover:border-accent/30 hover:bg-raised/60">
               <h3 className="text-sm font-semibold text-fg">{license.label}</h3>
               <p className="mt-1.5 text-xs leading-relaxed text-fg-2">{license.summary}</p>
               <a
