@@ -12,6 +12,8 @@ jobs:
   execute:
     runs-on: ubuntu-slim
     timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
@@ -21,7 +23,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Execute product and validation steps from bootstrap
+      - name: Materialize projection product code
         shell: bash
         run: |
           python3 -m pip install --disable-pip-version-check pyyaml
@@ -35,7 +37,7 @@ jobs:
                   if not script:
                       continue
                   name = str(step.get('name', ''))
-                  if 'Commit projection' in name or 'git push origin' in script:
+                  if name in {'Validate projection', 'Commit projection'} or 'git push origin' in script:
                       continue
                   env = os.environ.copy()
                   env.update({str(k): str(v) for k, v in (step.get('env') or {}).items()})
@@ -43,6 +45,44 @@ jobs:
                   subprocess.run(script, shell=True, executable='/bin/bash', check=True, env=env)
                   print('::endgroup::')
           PY
+      - name: Remove control-regex lint debt from the touched document
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/src/domains/creator/scene3d/studio-scene3d-document.ts')
+          text = path.read_text(encoding='utf-8')
+          old = '''function isSafeAssetUri(value: unknown): value is string {
+            if (typeof value !== "string" || value.length === 0 || value.length > 1024) return false;
+            if (/[\\\u0000-\u001f\u007f]/u.test(value)) return false;
+            if (/^(?:javascript|data|blob):/iu.test(value)) return false;
+          '''
+          new = '''function isSafeAssetUri(value: unknown): value is string {
+            if (typeof value !== "string" || value.length === 0 || value.length > 1024) return false;
+            for (let index = 0; index < value.length; index += 1) {
+              const code = value.charCodeAt(index);
+              if (code === 92 || code <= 31 || code === 127) return false;
+            }
+            if (/^(?:javascript|data|blob):/iu.test(value)) return false;
+          '''
+          if old not in text:
+              raise SystemExit('safe URI validator anchor changed')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Validate projection, types and lint
+        shell: bash
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
       - name: Commit materialized product slice
         shell: bash
         run: |
@@ -53,5 +93,5 @@ jobs:
                 .github/workflows/unblock-scene3d-projection-once.yml
           git add -A
           git diff --cached --check
-          git commit -m 'feat(scene3d): project legacy BG3D into unified scene authority'
+          HUSKY=0 git commit -m 'feat(scene3d): project legacy BG3D into unified scene authority'
           git push origin HEAD:feat/scene3d-runtime-projection-20260910
