@@ -1,0 +1,76 @@
+name: BG3D atomic template switch bootstrap
+
+on:
+  push:
+    branches: [fix/bg3d-template-switch-atomic-20260910]
+    paths: [.github/workflows/bg3d-template-switch-atomic-bootstrap.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/bg3d-template-switch-atomic-20260910
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Replace legacy append behavior with one atomic catalog-template slot
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          host = Path('apps/web/src/domains/creator/bg3d/studio-bg3d-editor-scene-ops-host.ts')
+          text = host.read_text(encoding='utf-8')
+          anchor = '''} from "./studio-bg3d-template-instance";\nimport { readStudioBg3dTemplateStaticModelWorldBounds } from "./studio-bg3d-template-organizer-bounds";\n'''
+          replacement = '''} from "./studio-bg3d-template-instance";\nimport { planStudioBg3dCatalogTemplateSwitch } from "./studio-bg3d-template-switch-plan";\nimport { readStudioBg3dTemplateStaticModelWorldBounds } from "./studio-bg3d-template-organizer-bounds";\n'''
+          if text.count(anchor) != 1:
+            raise SystemExit('scene-ops import anchor changed')
+          text = text.replace(anchor, replacement, 1)
+
+          start_marker = '  const addSceneTemplate = (templateId: string) => {'
+          end_marker = '  h.addSceneTemplate = addSceneTemplate;'
+          start = text.index(start_marker)
+          end = text.index(end_marker, start) + len(end_marker)
+          new_block = '''  const addSceneTemplate = (templateId: string) => {\n    const template = BG_SCENE_TEMPLATES.find((t) => t.id === templateId);\n    if (!template || isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;\n    const live = physicsRuntimeSourceRef.current;\n    const switchPlan = planStudioBg3dCatalogTemplateSwitch({\n      primitives: live.primitives,\n      customModels: live.customModels,\n    });\n    if (!switchPlan) {\n      setError("현재 템플릿과 연결된 외부 오브젝트가 있어 안전하게 전환하지 못했습니다.");\n      return;\n    }\n\n    const rawParts = instantiateSceneTemplate(template, switchPlan.insertionOffset);\n    if (rawParts.length === 0) return;\n    const nodeLimit = Math.min(\n      STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,\n      live.document.budgets.complexity.maxNodes,\n    );\n    const finalNodeCount = switchPlan.retainedPrimitives.length\n      + switchPlan.retainedCustomModels.length\n      + rawParts.length;\n    if (finalNodeCount > nodeLimit) {\n      setError(`이 장면에는 오브젝트를 최대 ${nodeLimit.toLocaleString()}개까지 둘 수 있습니다.`);\n      return;\n    }\n\n    const allocation = allocateStudioBg3dTemplateInstanceNodeIds({\n      sourceKind: "catalog",\n      sourceId: template.id,\n      insertionOffset: switchPlan.insertionOffset,\n      nodeCount: rawParts.length,\n      occupiedNodeIds: switchPlan.occupiedNodeIds,\n      createSeed: () => generateId(),\n    });\n    if (!allocation) {\n      setError("템플릿을 한 묶음으로 추적할 안전한 식별자를 만들지 못해 장면을 변경하지 않았습니다.");\n      return;\n    }\n    const parts = rawParts.map((part, index) => ({ ...part, id: allocation.nodeIds[index] }));\n    const nextPrimitives = [...switchPlan.retainedPrimitives, ...parts];\n    const nextCustomModels = [...switchPlan.retainedCustomModels];\n    const before = createStudioBg3dHistorySnapshot({\n      primitives: live.primitives,\n      customModels: live.customModels,\n      document: live.document,\n    });\n\n    // One command owns the entire switch: history first, then runtime + React publication.\n    commitImmediateHistoryTransition(nextPrimitives, nextCustomModels, live.document, before);\n    physicsRuntimeSourceRef.current = {\n      ...live,\n      primitives: nextPrimitives,\n      customModels: nextCustomModels,\n    };\n    setPrimitives(nextPrimitives);\n    setCustomModels(nextCustomModels);\n    setSelectedIds(new Set(orderStudioBg3dHierarchySelectionRootsFirst(parts)));\n    setError(null);\n  };\n  h.addSceneTemplate = addSceneTemplate;'''
+          text = text[:start] + new_block + text[end:]
+          host.write_text(text, encoding='utf-8')
+
+          boundary = Path('apps/web/src/domains/creator/bg3d/studio-bg3d-template-organizer-integration-boundary.test.ts')
+          text = boundary.read_text(encoding='utf-8')
+          old = '''    expectInOrder(addTemplate, [\n      "instantiateSceneTemplate(template, live.primitives.length)",\n      "allocateStudioBg3dTemplateInstanceNodeIds({",\n      'sourceKind: "catalog"',\n      "const parts = rawParts.map",\n      "physicsRuntimeSourceRef.current =",\n      "setSelectedIds(new Set(allocation.nodeIds))",\n    ]);\n'''
+          new = '''    expectInOrder(addTemplate, [\n      "planStudioBg3dCatalogTemplateSwitch({",\n      "instantiateSceneTemplate(template, switchPlan.insertionOffset)",\n      "allocateStudioBg3dTemplateInstanceNodeIds({",\n      'sourceKind: "catalog"',\n      "const parts = rawParts.map",\n      "commitImmediateHistoryTransition(nextPrimitives, nextCustomModels, live.document, before)",\n      "physicsRuntimeSourceRef.current =",\n      "setPrimitives(nextPrimitives)",\n      "setCustomModels(nextCustomModels)",\n      "orderStudioBg3dHierarchySelectionRootsFirst(parts)",\n    ]);\n    expect(addTemplate).not.toContain("live.primitives.length)");\n'''
+          if text.count(old) != 1:
+            raise SystemExit('template boundary assertion anchor changed')
+          boundary.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Validate atomic template switching
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-template-switch-plan.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-template-organizer-integration-boundary.test.ts \
+            apps/web/src/domains/creator/studio-background-3d-scene-templates.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+      - name: Commit product change and remove bootstrap
+        shell: bash
+        run: |
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          git rm .github/workflows/bg3d-template-switch-atomic-bootstrap.yml
+          git add apps/web/src/domains/creator/bg3d/studio-bg3d-template-switch-plan.ts \
+                  apps/web/src/domains/creator/bg3d/studio-bg3d-template-switch-plan.test.ts \
+                  apps/web/src/domains/creator/bg3d/studio-bg3d-editor-scene-ops-host.ts \
+                  apps/web/src/domains/creator/bg3d/studio-bg3d-template-organizer-integration-boundary.test.ts
+          git diff --cached --check
+          git commit -m 'fix(bg3d): switch catalog templates atomically'
+          git push origin HEAD:fix/bg3d-template-switch-atomic-20260910
