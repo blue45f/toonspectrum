@@ -1,0 +1,85 @@
+name: Finish Studio 3D stability on ARM sparse runner
+
+on:
+  push:
+    branches: [fix/studio-3d-preview-insert-stability-20260910]
+    paths: [.github/workflows/materialize-studio-3d-preview-insert-stability-arm.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finish-studio-3d-stability-arm
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-3d-preview-insert-stability-20260910
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/materialize-studio-3d-preview-insert-stability.yml
+            .github/workflows/materialize-studio-3d-preview-insert-stability-v2.yml
+            .github/workflows/materialize-studio-3d-preview-insert-stability-v3.yml
+            .github/workflows/materialize-studio-3d-preview-insert-stability-arm.yml
+            apps/web/src/domains/creator/vrm/useStudioVrmPoserRuntimeD.ts
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx
+            apps/web/src/domains/creator/bg3d/studio-bg3d-editor-insert-host.ts
+          persist-credentials: true
+
+      - name: Reuse reviewed product materialization and boundary checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 - <<'PY'
+          import os
+          import subprocess
+          import yaml
+
+          data = yaml.safe_load(open(
+              '.github/workflows/materialize-studio-3d-preview-insert-stability-v2.yml',
+              encoding='utf-8',
+          ))
+          selected = {'Materialize product changes', 'Verify materialized boundaries'}
+          for step in data['jobs']['materialize']['steps']:
+              if step.get('name') not in selected:
+                  continue
+              subprocess.run(
+                  step['run'],
+                  shell=True,
+                  executable='/bin/bash',
+                  check=True,
+                  env=os.environ.copy(),
+              )
+          PY
+
+      - name: Commit product slice without repository hooks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/materialize-studio-3d-preview-insert-stability.yml \
+                .github/workflows/materialize-studio-3d-preview-insert-stability-v2.yml \
+                .github/workflows/materialize-studio-3d-preview-insert-stability-v3.yml \
+                .github/workflows/materialize-studio-3d-preview-insert-stability-arm.yml
+          git add --sparse \
+            apps/web/src/domains/creator/vrm/useStudioVrmPoserRuntimeD.ts \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx \
+            apps/web/src/domains/creator/vrm/studio-vrm-bundled-thumbnail-stability.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-editor-insert-host.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-resolution-boundary.test.ts \
+            .github/workflows/materialize-studio-3d-preview-insert-stability.yml \
+            .github/workflows/materialize-studio-3d-preview-insert-stability-v2.yml \
+            .github/workflows/materialize-studio-3d-preview-insert-stability-v3.yml \
+            .github/workflows/materialize-studio-3d-preview-insert-stability-arm.yml
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'fix(3d): stabilize previews and canvas insertion quality'
+          git push --no-verify origin HEAD:fix/studio-3d-preview-insert-stability-20260910
