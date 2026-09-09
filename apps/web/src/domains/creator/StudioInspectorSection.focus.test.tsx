@@ -25,6 +25,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function fontDetailHeader(): HTMLElement {
+  return screen.getByRole("button", { name: /글꼴, 세부 설정/u });
+}
+
 describe("StudioInspectorSection focus navigation", () => {
   it("opens, reveals and focuses a collapsed section requested by search", async () => {
     render(
@@ -36,7 +40,7 @@ describe("StudioInspectorSection focus navigation", () => {
       </StudioInspectorSection>,
     );
 
-    const header = screen.getByRole("button", { name: "글꼴" });
+    const header = fontDetailHeader();
     expect(header.getAttribute("aria-expanded")).toBe("false");
 
     act(() => requestStudioInspectorFocus("element.typography"));
@@ -65,7 +69,7 @@ describe("StudioInspectorSection focus navigation", () => {
       </StudioInspectorSection>,
     );
 
-    const header = screen.getByRole("button", { name: "글꼴" });
+    const header = fontDetailHeader();
     await waitFor(() => {
       expect(header.getAttribute("aria-expanded")).toBe("true");
       expect(document.activeElement).toBe(header);
@@ -81,7 +85,7 @@ describe("StudioInspectorSection focus navigation", () => {
     );
 
     act(() => requestStudioInspectorFocus("element.typography"));
-    const firstHeader = screen.getByRole("button", { name: "글꼴" });
+    const firstHeader = fontDetailHeader();
     await waitFor(() => expect(document.activeElement).toBe(firstHeader));
     expect(studioInspectorFocusTokenFor("element.typography")).toBe(0);
     firstMount.unmount();
@@ -97,7 +101,7 @@ describe("StudioInspectorSection focus navigation", () => {
       </StudioInspectorSection>,
     );
 
-    const remountedHeader = screen.getByRole("button", { name: "글꼴" });
+    const remountedHeader = fontDetailHeader();
     expect(remountedHeader.getAttribute("aria-expanded")).toBe("false");
     expect(
       remountedHeader.closest("section")?.getAttribute("data-inspector-section-highlighted"),

@@ -28,17 +28,84 @@ const MobileHeaderNavigation = lazy(() =>
   import("./site-header-mobile-nav").then((mod) => ({ default: mod.MobileHeaderNavigation }))
 );
 
-function useActive() {
+const DISCOVER_PURPOSE_PREFIXES = [
+  "/discover",
+  "/search",
+  "/explore",
+  "/ranking",
+  "/recommend",
+  "/calendar",
+  "/compare",
+  "/random",
+  "/tags",
+  "/authors",
+  "/author",
+  "/title",
+] as const;
+const CREATE_PURPOSE_PREFIXES = [
+  "/make",
+  "/studio",
+  "/shaper",
+  "/brush-lab",
+  "/music",
+  "/research",
+  "/story-lab",
+  "/publishing",
+  "/opportunities",
+  "/market",
+] as const;
+const COMMUNITY_PURPOSE_PREFIXES = [
+  "/community",
+  "/reviews",
+  "/create",
+  "/pencafe",
+] as const;
+const MY_PURPOSE_PREFIXES = [
+  "/my",
+  "/me",
+  "/library",
+  "/settings",
+  "/market/library",
+  "/market/wishlist",
+] as const;
+
+function matchesPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+function pathMatchesAny(pathname: string, prefixes: readonly string[]): boolean {
+  return prefixes.some((prefix) => matchesPrefix(pathname, prefix));
+}
+
+/** Exact destination state for drawer/utility items. A child page must not make
+ * both its purpose hub and the child destination announce aria-current="page". */
+function useDestinationActive() {
   const path = usePathname();
-  return (href: string, exact?: boolean) =>
-    exact ? path === href : path === href || path.startsWith(`${href}/`);
+  return (href: string, exact?: boolean) => {
+    if (exact) return path === href;
+    if (href === "/market" && pathMatchesAny(path, MY_PURPOSE_PREFIXES)) return false;
+    return path === href || path.startsWith(`${href}/`);
+  };
+}
+
+/** Broader state used only by the five top-level purpose choices. */
+function purposeActive(pathname: string, href: string, exact?: boolean): boolean {
+  if (exact || href === "/") return pathname === href;
+  if (href === "/discover") return pathMatchesAny(pathname, DISCOVER_PURPOSE_PREFIXES);
+  if (href === "/make") {
+    if (pathMatchesAny(pathname, MY_PURPOSE_PREFIXES)) return false;
+    return pathMatchesAny(pathname, CREATE_PURPOSE_PREFIXES);
+  }
+  if (href === "/community") return pathMatchesAny(pathname, COMMUNITY_PURPOSE_PREFIXES);
+  if (href === "/my") return pathMatchesAny(pathname, MY_PURPOSE_PREFIXES);
+  return matchesPrefix(pathname, href);
 }
 
 function matchesMobileNavigationViewport() {
   return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
 }
 
-const DESKTOP_NAVIGATION_QUERY = "(min-width: 1360px)";
+const DESKTOP_NAVIGATION_QUERY = "(min-width: 1180px)";
 
 function useMobileNavigationViewport() {
   const [isMobile, setIsMobile] = useState(matchesMobileNavigationViewport);
@@ -64,7 +131,7 @@ function MobileNavigationFallback() {
 }
 
 export function SiteHeader() {
-  const isActive = useActive();
+  const isActive = useDestinationActive();
   const pathname = usePathname();
   const language = useI18n((state) => state.lang);
   const locale = siteNavigationLocale(language);
@@ -78,7 +145,8 @@ export function SiteHeader() {
   const panelRef = useRef<HTMLDivElement>(null);
   const shouldRenderMobileNavigation = menuOpen || isMobileNavigationViewport;
   const hideBottomTabs = isImmersiveMobileRoute(pathname);
-  const studio = SITE_NAVIGATION_ITEMS.studio;
+  const create = SITE_NAVIGATION_ITEMS.make;
+  const isPurposeActive = (href: string, exact?: boolean) => purposeActive(pathname, href, exact);
 
   // 수동 닫기 뒤에는 모달 격리가 풀린 다음 호출 버튼으로 포커스를 되돌린다.
   // 라우트 이동과 데스크톱 전환은 새 화면/내비게이션이 포커스를 이어받으므로 복원하지 않는다.
@@ -138,10 +206,10 @@ export function SiteHeader() {
 
           <nav
             aria-label={locale === "ko" ? "주요 메뉴" : "Primary navigation"}
-            className="ml-2 hidden items-center gap-0.5 rounded-2xl border border-line/60 bg-panel/60 p-1 shadow-sm min-[1360px]:flex"
+            className="ml-2 hidden items-center gap-0.5 rounded-2xl border border-line/60 bg-panel/60 p-1 shadow-sm min-[1180px]:flex"
           >
             {PRIMARY_SITE_NAVIGATION.map((item) => {
-              const active = isActive(item.href, item.exact);
+              const active = isPurposeActive(item.href, item.exact);
               return (
                 <Link
                   key={item.id}
@@ -189,13 +257,13 @@ export function SiteHeader() {
             </button>
 
             <Link
-              href={studio.href}
-              aria-label={siteNavigationText(studio.label, locale)}
-              aria-current={isActive(studio.href) ? "page" : undefined}
-              title={siteNavigationText(studio.description, locale)}
+              href={create.href}
+              aria-label={siteNavigationText(create.label, locale)}
+              aria-current={isPurposeActive(create.href) ? "page" : undefined}
+              title={siteNavigationText(create.description, locale)}
               className={cx(
                 "group relative hidden h-11 shrink-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm transition-all duration-200 ease-out-expo sm:flex",
-                isActive(studio.href)
+                isPurposeActive(create.href)
                   ? "border-accent bg-accent text-on-accent"
                   : "border-line-strong bg-fg text-canvas hover:-translate-y-0.5 hover:border-fg"
               )}
@@ -203,7 +271,7 @@ export function SiteHeader() {
               <span aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-on-accent/40 to-transparent" />
               <Palette size={16} className="shrink-0 transition-transform duration-200 group-hover:-rotate-6 group-hover:scale-110" />
               <span className="hidden min-w-max whitespace-nowrap xl:inline-block">
-                {keepInlineText(siteNavigationText(studio.label, locale))}
+                {keepInlineText(siteNavigationText(create.label, locale))}
               </span>
             </Link>
 
@@ -217,7 +285,7 @@ export function SiteHeader() {
               aria-haspopup="dialog"
               aria-expanded={menuOpen}
               aria-controls={menuId}
-              className="grid size-11 place-items-center rounded-xl border border-line bg-card/80 text-fg-2 shadow-sm transition-colors hover:border-line-strong hover:bg-raised hover:text-fg min-[1360px]:hidden"
+              className="grid size-11 place-items-center rounded-xl border border-line bg-card/80 text-fg-2 shadow-sm transition-colors hover:border-line-strong hover:bg-raised hover:text-fg min-[1180px]:hidden"
             >
               {menuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
@@ -233,6 +301,7 @@ export function SiteHeader() {
             panelRef={panelRef}
             closeMenu={closeMenu}
             isActive={isActive}
+            isPurposeActive={isPurposeActive}
             hideBottomTabs={hideBottomTabs}
           />
         </Suspense>

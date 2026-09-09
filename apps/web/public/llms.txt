@@ -1,23 +1,32 @@
 # 툰스펙트럼
 
-> 네이버 웹툰·시리즈, 카카오웹툰·페이지, 리디 등 국내 18개 웹툰·웹소설 플랫폼을 가로지르는 통합 인덱스. 작품을 직접 서비스하지 않고, 무엇을·어디서·왜 볼지를 투명한 데이터로 답하는 큐레이터형 디스커버리 레이어입니다.
+> 네이버 웹툰·시리즈, 카카오웹툰·페이지, 리디 등 국내 웹툰·웹소설 플랫폼을 가로지르는 통합 인덱스와 브라우저 기반 창작 환경입니다. 작품 탐색과 창작은 목적별 시작점에서 연결됩니다.
 
 ## 핵심 페이지
 
+- [만들기](https://www.toonstudio.cloud/make): 빈 캔버스·세로 웹툰·컷툰·캐릭터·에셋·리서치에서 목적별로 창작 시작
+- [찾기](https://www.toonstudio.cloud/discover): 검색·취향 탐색·추천·랭킹·캘린더·랜덤·비교를 목적별로 선택
+- [내 공간](https://www.toonstudio.cloud/my): 프로젝트·공개 작품·서재·에셋·활동·프로필·설정 통합 진입점
 - [웹툰 창작 스튜디오](https://www.toonstudio.cloud/studio): 브라우저 기반 드로잉·편집·3D·협업 작업 공간
+- [프로젝트 센터](https://www.toonstudio.cloud/studio/projects): 최근 프로젝트·공유 작업·버전·복구 흐름
 - [캐릭터 셰이퍼](https://www.toonstudio.cloud/shaper): 프리셋·표면 드로잉·기기 내 AI 보조로 3D 웹툰 캐릭터를 만들어 투명 PNG·레이어 PSD로 내보내는 스튜디오 도구 안내
 - [통합 검색](https://www.toonstudio.cloud/search): 전 플랫폼 작품을 한 번에 검색
-- [통합 랭킹](https://www.toonstudio.cloud/ranking): 공개 산식 기반 8축 랭킹(인기·급상승·평점·숨은명작 등)
-- [랭킹 산정 방식](https://www.toonstudio.cloud/guide): 베이즈 평점·도달가중·신뢰계수 등 산식 전면 공개
+- [스펙트럼 탐색](https://www.toonstudio.cloud/explore): 장르와 취향으로 작품 탐색
+- [통합 랭킹](https://www.toonstudio.cloud/ranking): 공개 산식 기반 다축 랭킹
 - [맞춤 추천](https://www.toonstudio.cloud/recommend): 크로스플랫폼 취향 기반 추천
 - [연재 캘린더](https://www.toonstudio.cloud/calendar): 요일별 연재작
-- [스펙트럼 탐색](https://www.toonstudio.cloud/explore): 18색 장르 스펙트럼 탐색
+- [창작 리서치 데스크](https://www.toonstudio.cloud/research): 출처·이용조건을 보존하는 창작 자료 작업공간
+- [창작 마켓](https://www.toonstudio.cloud/market): Studio에서 사용할 브러시·팔레트·템플릿·3D 에셋 탐색과 배포
+- [커뮤니티](https://www.toonstudio.cloud/community): 작품·작가·창작 경험을 나누는 커뮤니티
+- [도움말 센터](https://www.toonstudio.cloud/help): 작업 목적과 문제에서 기능·가이드·복구 경로 검색
+- [접근성](https://www.toonstudio.cloud/accessibility): 키보드·터치·펜·확대·모션 감소 지원 원칙
+- [랭킹 산정 방식](https://www.toonstudio.cloud/guide): 랭킹 데이터와 산식 설명
 - [트렌드 인사이트](https://www.toonstudio.cloud/insights): 플랫폼·장르 트렌드 대시보드
-- [서비스 소개](https://www.toonstudio.cloud/about): 툰스펙트럼 소개와 사용법
+- [서비스 소개](https://www.toonstudio.cloud/about): 서비스 소개와 운영 원칙
 
 ## 데이터 정책
 
 - 작품 메타데이터·표지는 각 플랫폼 공개 카탈로그에서 수집한 실데이터입니다.
-- 네이버 웹툰 별점은 실수집값이며, 조회·관심 등 일부 보조 지표는 추정값(≈)으로 분명히 구분해 표기합니다.
+- 실수집값과 조회·관심 등 일부 추정 보조 지표는 화면에서 구분해 표기합니다.
 - 가격·조회수를 과장하지 않으며, 순위는 공개된 산식으로만 계산합니다.
-- 드라마·영화·애니 영상화와 OST는 공식 플랫폼으로 링크아웃만 하며, 음원·영상을 저장·재생하지 않습니다.
+- 드라마·영화·애니 영상화와 OST는 공식 플랫폼으로 링크아웃하며, 외부 유료 본문이나 회차 이미지를 호스팅하지 않습니다.

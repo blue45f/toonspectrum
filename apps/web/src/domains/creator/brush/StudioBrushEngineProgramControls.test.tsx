@@ -12,18 +12,31 @@ import {
 import { studioBrushPresetById } from "./studio-draw-ux";
 import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
 
+function openExpertGraph(): void {
+  fireEvent.click(screen.getByText("전문 엔진 그래프"));
+}
+
+function openOilFineTuning(): void {
+  fireEvent.click(screen.getByText("각 물리 효과를 직접 켜고 끄기"));
+}
+
 describe("StudioBrushEngineProgramControls", () => {
   afterEach(cleanup);
 
-  it("exposes the universal BrushGraph composer for non-oil brushes", () => {
+  it("explains the result before exposing the universal engine graph", () => {
     const onChange = vi.fn();
     render(
       <StudioBrushEngineProgramControls brushId="pen" programSet={null} onChange={onChange} />,
     );
-    expect(screen.getByText("범용 BrushGraph 컴포저")).toBeTruthy();
+    expect(screen.getByText("펜·잉크")).toBeTruthy();
+    expect(screen.getByText("목표 결과: 깨끗하고 예측 가능한 선")).toBeTruthy();
+    expect(screen.getByText("전문 엔진 그래프")).toBeTruthy();
+    openExpertGraph();
+    expect(screen.getByText("브러시 엔진 조합")).toBeTruthy();
+    expect(screen.getByText("추천 시작점")).toBeTruthy();
     expect((screen.getByLabelText("필기감 선택") as HTMLSelectElement).value).toBe("adaptive-ema");
     expect((screen.getByLabelText("물리 엔진 선택") as HTMLSelectElement).value).toBe("no-physics");
-    expect(screen.getByText("authority 충돌 없이 컴파일 가능한 조합입니다.")).toBeTruthy();
+    expect(screen.getByText("충돌 없이 저장 가능한 엔진 조합입니다.")).toBeTruthy();
   });
 
   it("persists a distinctive pattern selection instead of reducing it to a scalar", () => {
@@ -31,6 +44,7 @@ describe("StudioBrushEngineProgramControls", () => {
     render(
       <StudioBrushEngineProgramControls brushId="pen" programSet={null} onChange={onChange} />,
     );
+    openExpertGraph();
     fireEvent.change(screen.getByLabelText("패턴·문양 선택"), {
       target: { value: "kaleido-symmetry" },
     });
@@ -48,13 +62,15 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
+    expect(screen.getByText("수채")).toBeTruthy();
+    openExpertGraph();
     fireEvent.click(screen.getByRole("button", { name: /^리빙 크로마 잉크/u }));
     const next = onChange.mock.calls[0]![0];
     expect(next?.composition?.physics).toBe("inkwash-fluid");
     expect(next?.watercolor).toEqual({ livingInkBakeProgramId: "sumi-flow-bake" });
   });
 
-  it("resets composition and its connected family patch together", () => {
+  it("opens an existing customized composition so the change is never hidden", () => {
     const onChange = vi.fn();
     const initial = studioBrushEngineProgramSetFromComposition(
       createStudioBrushCompositionBaseline("pen", "pen"),
@@ -62,11 +78,12 @@ describe("StudioBrushEngineProgramControls", () => {
     render(
       <StudioBrushEngineProgramControls brushId="pen" programSet={initial} onChange={onChange} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "기본 조합" }));
+    expect(screen.getByText("브러시 엔진 조합")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "시작 상태로" }));
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it("shows the preset baseline and literal oil paint-order toggles", () => {
+  it("shows the preset baseline while keeping literal oil toggles behind fine tuning", () => {
     render(
       <StudioBrushEngineProgramControls
         brushId="oil--impasto-ribbon"
@@ -75,6 +92,8 @@ describe("StudioBrushEngineProgramControls", () => {
       />,
     );
     expect(screen.getByText("유화 · 임파스토(소모 없음)와 같은 조합")).toBeTruthy();
+    expect(screen.getByText("원하는 질감으로 고르기")).toBeTruthy();
+    openOilFineTuning();
     expect(screen.getByRole("button", { name: /붓털 물리/u }).getAttribute("aria-pressed"))
       .toBe("true");
     expect(screen.getByRole("button", { name: /임파스토 릴리프/u }).getAttribute("aria-pressed"))
@@ -83,7 +102,7 @@ describe("StudioBrushEngineProgramControls", () => {
       .toBe("false");
   });
 
-  it("exposes all eight connected oil combinations exactly once", () => {
+  it("exposes all eight connected oil outcomes exactly once", () => {
     render(
       <StudioBrushEngineProgramControls
         brushId="oil--filbert-ribbon"
@@ -103,7 +122,7 @@ describe("StudioBrushEngineProgramControls", () => {
     ]) {
       expect(screen.getByRole("button", { name: `유화 조합: ${name}` })).toBeTruthy();
     }
-    expect(screen.getByText("2³ 조합")).toBeTruthy();
+    expect(screen.getByText("8가지")).toBeTruthy();
   });
 
   it("applies a matrix recipe as a durable engine program set", () => {
@@ -136,6 +155,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
+    openOilFineTuning();
     fireEvent.click(screen.getByRole("button", { name: /물감 소모/u }));
     const next = onChange.mock.calls[0]![0];
     expect(next?.composition).toEqual(composition);
@@ -151,6 +171,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
+    openOilFineTuning();
     fireEvent.click(screen.getByRole("button", { name: /물감 소모/u }));
     expect(onChange).toHaveBeenCalledTimes(1);
     const next = onChange.mock.calls[0]![0];
@@ -168,7 +189,8 @@ describe("StudioBrushEngineProgramControls", () => {
       />,
     );
     expect(screen.getByText("유화 붓와 같은 조합")).toBeTruthy();
-    expect(screen.queryByText(/이 조합과 같은 프리셋은 없습니다/u)).toBeNull();
+    expect(screen.queryByText(/같은 기본 프리셋은 없습니다/u)).toBeNull();
+    openOilFineTuning();
     expect(screen.getAllByText("변경됨")).toHaveLength(1);
   });
 
@@ -181,6 +203,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
+    openOilFineTuning();
     fireEvent.click(screen.getByRole("button", { name: /물감 소모/u }));
     const next = onChange.mock.calls[0]![0];
     expect(next?.oil).toEqual({
@@ -197,7 +220,7 @@ describe("StudioBrushEngineProgramControls", () => {
       />,
     );
     expect(screen.getByText("커스텀 조합")).toBeTruthy();
-    expect(screen.getByText(/이 조합과 같은 프리셋은 없습니다/u)).toBeTruthy();
+    expect(screen.getByText(/같은 기본 프리셋은 없습니다/u)).toBeTruthy();
   });
 
   it("names fully enabled general-purpose paints by their own preset", () => {
@@ -225,7 +248,7 @@ describe("StudioBrushEngineProgramControls", () => {
     expect(checked).toBeGreaterThanOrEqual(7);
   });
 
-  it("emits null when a toggle or matrix recipe returns to the id baseline", () => {
+  it("emits null when a detailed toggle or outcome recipe returns to the id baseline", () => {
     const onChange = vi.fn();
     const { rerender } = render(
       <StudioBrushEngineProgramControls
@@ -238,6 +261,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
+    openOilFineTuning();
     fireEvent.click(screen.getByRole("button", { name: /임파스토 릴리프/u }));
     expect(onChange).toHaveBeenLastCalledWith(null);
 
@@ -257,7 +281,7 @@ describe("StudioBrushEngineProgramControls", () => {
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it("shows preset restore only for changed oil combinations", () => {
+  it("shows baseline restore only for changed oil combinations", () => {
     const onChange = vi.fn();
     const { rerender } = render(
       <StudioBrushEngineProgramControls
@@ -266,7 +290,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    expect(screen.queryByRole("button", { name: /프리셋으로/u })).toBeNull();
+    expect(screen.queryByRole("button", { name: "기본값" })).toBeNull();
 
     rerender(
       <StudioBrushEngineProgramControls
@@ -279,7 +303,7 @@ describe("StudioBrushEngineProgramControls", () => {
         onChange={onChange}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /프리셋으로/u }));
+    fireEvent.click(screen.getByRole("button", { name: "기본값" }));
     expect(onChange).toHaveBeenCalledWith(null);
   });
 });
