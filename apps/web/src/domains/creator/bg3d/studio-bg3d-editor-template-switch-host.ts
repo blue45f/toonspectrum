@@ -15,9 +15,12 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h) {
     STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
     allocateStudioBg3dTemplateInstanceNodeIds,
     commitImmediateHistoryTransition,
+    createStudioBg3dHistorySnapshot,
     generateId,
     instantiateSceneTemplate,
+    isStudioBg3dPhysicsTransientPhase,
     orderStudioBg3dHierarchySelectionRootsFirst,
+    physicsPhaseRef,
     physicsRuntimeSourceRef,
     setCustomModels,
     setError,
@@ -26,6 +29,8 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h) {
   } = h;
 
   h.addSceneTemplate = (templateId: string) => {
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
+
     const template = BG_SCENE_TEMPLATES.find((entry) => entry.id === templateId);
     if (!template) return;
 
@@ -73,8 +78,18 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h) {
     }));
     const nextPrimitives = [...switchPlan.retainedPrimitives, ...parts];
     const nextCustomModels = [...switchPlan.retainedCustomModels];
+    const before = createStudioBg3dHistorySnapshot({
+      primitives: live.primitives,
+      customModels: live.customModels,
+      document: live.document,
+    });
 
-    commitImmediateHistoryTransition(nextPrimitives, nextCustomModels, live.document);
+    commitImmediateHistoryTransition(
+      nextPrimitives,
+      nextCustomModels,
+      live.document,
+      before,
+    );
     physicsRuntimeSourceRef.current = {
       ...live,
       primitives: nextPrimitives,
