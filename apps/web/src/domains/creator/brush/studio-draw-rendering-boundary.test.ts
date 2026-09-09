@@ -213,18 +213,15 @@ describe("studio draw rendering ownership boundary", () => {
   });
 
   it("synchronizes retained DOM ink before admitting the next backdrop sample and bounds canvases", () => {
-    const page = moduleEdges("../StudioCuttoonEditorHost.tsx");
+    const drawStart = moduleEdges("../studio-cuttoon-editor/studio-cuttoon-stage-pointers-down-draw.ts");
     const viewport = moduleEdges("../canvas/StudioCanvasViewport.tsx");
     const stageHost = moduleEdges("../canvas/StudioCanvasViewportStageHost.tsx");
     const previewLayers = moduleEdges("../StudioDraftPreviewLayers.tsx");
-    const onStageDownStart = page.source.indexOf("function onStageDown(");
-    const drawBranchStart = page.source.indexOf('if (tool === "draw")', onStageDownStart);
-    const drawBranchEnd = page.source.indexOf("// 선택 모드:", drawBranchStart);
-    const drawBranch = page.source.slice(drawBranchStart, drawBranchEnd);
+    const drawBranch = drawStart.source;
 
     const boundaryPlanIndex = drawBranch.indexOf("planStudioDraftPreviewBackdropBoundary({");
     const boundaryExecutionIndex = drawBranch.indexOf("executeStudioDraftPreviewBackdropBoundary({");
-    const pointerSessionIndex = drawBranch.indexOf("beginStudioStrokePointerSession(pointerSample)");
+    const pointerSessionIndex = drawBranch.indexOf("beginStudioStrokePointerSession(pointerSample, penButtonPolicy)");
     const firstPositionIndex = drawBranch.indexOf("stageRef.current?.getRelativePointerPosition()");
     const crdtBeginIndex = drawBranch.indexOf("drawingCrdtPublisherRef.current.begin(");
 
