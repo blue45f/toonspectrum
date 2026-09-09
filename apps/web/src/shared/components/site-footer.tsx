@@ -1,144 +1,187 @@
+import { ArrowRight, Sparkles } from "lucide-react";
+
+import {
+  SITE_NAVIGATION_GROUPS,
+  SITE_NAVIGATION_ITEMS,
+  SITE_UTILITY_NAVIGATION,
+  siteNavigationLocale,
+  siteNavigationText,
+} from "./site-navigation";
 import { ToonSpectrumMark } from "./visual-marks";
 
-import { spectrumGradient } from "@/shared/lib/genre-color";
-import { useT } from "@/shared/lib/i18n";
 import Link from "@/compat/router-link";
+import { spectrumGradient } from "@/shared/lib/genre-color";
+import { useI18n, useT } from "@/shared/lib/i18n";
 
-// 약관·개인정보처리방침은 내부 페이지(/terms·/privacy)가 TermsDesk 게시 정본을 렌더한다.
-// 문의는 내부 /support(desk-platform 공개 게시판)로 통합 — 외부 지원 보드 링크는 제거했다.
+const META_LINKS = [
+  { key: "footer.link.about", href: "/about" },
+  { key: "footer.link.guide", href: "/guide" },
+  { key: "footer.link.sitemap", href: "/sitemap" },
+  { key: "footer.link.support", href: "/support" },
+] as const;
 
-const COLS: { titleKey: string; links: { key: string; href: string; label?: string }[] }[] = [
-  {
-    // 창작 표면(/create·/studio·/shaper·/market)은 사이트맵 색인과 같은 이유로 푸터에서도 빠지지 않는다.
-    titleKey: "footer.section.create",
-    links: [
-      { key: "footer.link.studio", href: "/studio" },
-      { key: "footer.link.create", href: "/create" },
-      { key: "footer.link.references", href: "/references" },
-      { key: "learn", href: "/learn", label: "웹툰 제작 강좌 (한국어)" },
-      { key: "glossary", href: "/learn/glossary", label: "웹툰 용어 사전 (한국어)" },
-      { key: "footer.link.shaper", href: "/shaper" },
-      { key: "footer.link.market", href: "/market" },
-    ],
-  },
-  {
-    titleKey: "footer.section.browse",
-    links: [
-      { key: "footer.link.search", href: "/search" },
-      { key: "footer.link.ranking", href: "/ranking" },
-      { key: "footer.link.calendar", href: "/calendar" },
-      { key: "footer.link.recommend", href: "/recommend" },
-      { key: "footer.link.explore", href: "/explore" },
-      { key: "footer.link.tags", href: "/tags" },
-    ],
-  },
-  {
-    titleKey: "footer.section.community",
-    links: [
-      { key: "footer.link.community", href: "/community" },
-      { key: "footer.link.pencafes", href: "/community/cafes" },
-      { key: "footer.link.reviews", href: "/reviews" },
-      { key: "footer.link.compare", href: "/compare" },
-      { key: "footer.link.dashboard", href: "/insights" },
-      { key: "footer.link.feedback", href: "/feedback" },
-      { key: "footer.link.library", href: "/library" },
-      { key: "footer.link.taste", href: "/library?tab=taste" },
-    ],
-  },
-  {
-    titleKey: "app.name",
-    links: [
-      { key: "footer.link.news", href: "/news" },
-      { key: "footer.link.about", href: "/about" },
-      { key: "footer.link.guide", href: "/guide" },
-      { key: "footer.link.sitemap", href: "/sitemap" },
-      { key: "footer.link.settings", href: "/settings" },
-    ],
-  },
-  {
-    titleKey: "footer.section.help",
-    links: [
-      { key: "footer.link.support", href: "/support" },
-      { key: "footer.link.terms", href: "/terms" },
-      { key: "footer.link.privacy", href: "/privacy" },
-      { key: "footer.link.copyright", href: "/copyright" },
-    ],
-  },
-];
+const POLICY_LINKS = [
+  { key: "footer.link.terms", href: "/terms" },
+  { key: "footer.link.privacy", href: "/privacy" },
+  { key: "footer.link.copyright", href: "/copyright" },
+] as const;
 
 export function SiteFooter() {
+  const language = useI18n((state) => state.lang);
+  const locale = siteNavigationLocale(language);
   const t = useT();
   const year = new Date().getFullYear();
   const siteBrand = t("app.name");
-  // Older translations embed a product name in labels such as "About ToonSpectrum".
-  // Resolve only navigation labels against the canonical brand, preserving the rest
-  // of each translation. User content and the authoritative policy text are untouched.
+  const studio = SITE_NAVIGATION_ITEMS.studio;
+  const research = SITE_NAVIGATION_ITEMS.research;
+
+  // Older translations can still include the former product name. Navigation labels
+  // always resolve to the canonical brand without touching user or policy content.
   const navigationLabel = (key: string) =>
     t(key).replaceAll(/ToonSpectrum|툰스펙트럼/g, () => siteBrand);
 
   return (
     <footer
       data-site-chrome="footer"
-      className="relative mt-24 border-t border-line/60 bg-gradient-to-b from-card/60 to-card/25 pb-[calc(3.75rem+env(safe-area-inset-bottom))] md:pb-0"
+      className="relative mt-24 overflow-hidden border-t border-line/60 bg-gradient-to-b from-card/55 via-panel/45 to-canvas pb-[calc(3.75rem+env(safe-area-inset-bottom))] md:pb-0"
     >
-      {/* 공통 브랜드 구분선 — 기존 사이트의 컬러 시스템을 유지한다. */}
       <span
-        aria-hidden
+        aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-px"
         style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF", "스릴러", "드라마"], 90) }}
       />
-      {/* 다섯 개 링크 칼럼 — md 에서는 3열(브랜드 + 2/3열), xl 부터 한 줄에 펼친다(칼럼당 ≥ 8rem 유지). */}
-      <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 md:grid-cols-3 xl:grid-cols-[1.6fr_1fr_1fr_1fr_1fr_1fr] xl:gap-8">
-        <div className="max-w-sm">
-          <Link href="/" className="group inline-flex items-center gap-2.5">
-            <ToonSpectrumMark className="size-7 rounded-[0.55rem] transition-transform duration-200 ease-out-expo group-hover:-rotate-6 group-hover:scale-105" />
-            <span className="font-display text-lg font-bold transition-colors group-hover:text-accent">
-              {siteBrand}
-            </span>
-          </Link>
-          <p className="mt-4 text-sm leading-relaxed text-fg-2">{t("footer.description.primary")}</p>
-          <p className="mt-4 text-xs leading-relaxed text-fg-3">
-            <span className="text-fg-2">{t("footer.description.secondary")}</span>
-          </p>
-        </div>
+      <span aria-hidden="true" className="pointer-events-none absolute -right-24 top-10 size-80 rounded-full border border-line/35 opacity-55" />
+      <span aria-hidden="true" className="pointer-events-none absolute -right-8 top-28 size-44 rounded-full border border-accent/20 opacity-60" />
 
-        {COLS.map((col) => (
-          <nav
-            key={col.titleKey}
-            className="flex flex-col gap-3 rounded-xl border border-line/60 bg-card/20 p-4"
-          >
-            <h2 className="eyebrow text-fg-3">{navigationLabel(col.titleKey)}</h2>
-            {col.links.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="group/link inline-flex w-fit items-center gap-1.5 text-sm text-fg-2 transition-colors hover:text-accent"
-              >
-                {/* hover 시 좌→우로 자라나는 accent 틱 — 미세 마이크로 인터랙션. */}
-                <span
-                  aria-hidden
-                  className="h-px w-0 origin-left rounded-full bg-accent/70 transition-all duration-200 ease-out-expo group-hover/link:w-3"
-                />
-                <span lang={l.label ? "ko" : undefined} className="transition-transform duration-200 ease-out-expo group-hover/link:translate-x-0.5">
-                  {l.label ?? navigationLabel(l.key)}
+      <div className="relative mx-auto max-w-[1320px] px-4 pt-10 sm:px-6 sm:pt-14">
+        <section className="grid gap-6 rounded-3xl border border-line/70 bg-panel/72 p-6 shadow-lg backdrop-blur-xl md:grid-cols-[1fr_auto] md:items-center md:p-8" aria-labelledby="footer-creative-title">
+          <div className="max-w-2xl">
+            <p className="flex items-center gap-2 font-display text-[0.65rem] font-bold uppercase tracking-[0.15em] text-accent">
+              <Sparkles size={14} aria-hidden="true" />
+              {locale === "ko" ? "YOUR NEXT SCENE" : "YOUR NEXT SCENE"}
+            </p>
+            <h2 id="footer-creative-title" className="mt-3 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
+              {locale === "ko" ? "떠올리고, 조사하고, 만드는 흐름을 한곳에서." : "Spark, research and make in one connected flow."}
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-7 text-fg-2">
+              {locale === "ko"
+                ? "빈 캔버스에서 막히지 않도록, 지금 필요한 다음 행동으로 바로 연결합니다."
+                : "Move directly to the next action you need, without getting stuck at a blank canvas."}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 md:justify-end">
+            <Link
+              href={research.href}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 py-2.5 text-sm font-bold text-fg-2 transition-all hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent"
+            >
+              {siteNavigationText(research.label, locale)}<ArrowRight size={16} aria-hidden="true" />
+            </Link>
+            <Link
+              href={studio.href}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-fg bg-fg px-4 py-2.5 text-sm font-bold text-canvas shadow-sm transition-all hover:-translate-y-0.5"
+            >
+              {siteNavigationText(studio.label, locale)}<ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
+
+        <div className="grid gap-8 py-12 sm:grid-cols-2 lg:grid-cols-[1.35fr_repeat(4,minmax(0,1fr))] lg:gap-6 lg:py-14">
+          <div className="max-w-sm sm:col-span-2 lg:col-span-1">
+            <Link href="/" className="group inline-flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-xl border border-line bg-card shadow-sm transition-transform duration-200 ease-out-expo group-hover:-rotate-3 group-hover:scale-105">
+                <ToonSpectrumMark className="size-7" />
+              </span>
+              <span>
+                <span className="block font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">
+                  {siteBrand}
                 </span>
-              </Link>
-            ))}
-          </nav>
-        ))}
+                <span className="block font-display text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-fg-3">
+                  Create · Share · Discover
+                </span>
+              </span>
+            </Link>
+            <p className="mt-5 text-sm leading-7 text-fg-2">{t("footer.description.primary")}</p>
+            <p className="mt-3 text-xs leading-6 text-fg-3">{t("footer.description.secondary")}</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {SITE_UTILITY_NAVIGATION.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card/65 px-3 py-2 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg"
+                  >
+                    <Icon size={14} className="text-fg-3" aria-hidden="true" />
+                    {siteNavigationText(item.label, locale)}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          {SITE_NAVIGATION_GROUPS.map((group, index) => (
+            <nav key={group.id} aria-labelledby={`footer-nav-${group.id}`} className="min-w-0">
+              <div className="mb-4 flex items-start gap-2.5">
+                <span aria-hidden="true" className="pt-0.5 font-display text-[0.6rem] font-bold tracking-[0.13em] text-accent">
+                  0{index + 1}
+                </span>
+                <div>
+                  <h2 id={`footer-nav-${group.id}`} className="font-display text-sm font-bold text-fg">
+                    {siteNavigationText(group.label, locale)}
+                  </h2>
+                  <p className="mt-1 hidden text-[0.68rem] leading-5 text-fg-3 xl:block">
+                    {siteNavigationText(group.description, locale)}
+                  </p>
+                </div>
+              </div>
+              <ul className="space-y-1">
+                {group.items.map((item) => (
+                  <li key={item.id}>
+                    <Link
+                      href={item.href}
+                      title={siteNavigationText(item.description, locale)}
+                      className="group/link flex min-h-9 items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-fg-2 transition-colors hover:bg-raised/65 hover:text-accent"
+                    >
+                      <span aria-hidden="true" className="h-px w-0 rounded-full bg-accent transition-all duration-200 group-hover/link:w-2.5" />
+                      <span className="truncate">{siteNavigationText(item.label, locale)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
+        </div>
       </div>
-      <div className="border-t border-line/60">
-        <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6 text-[11px] text-fg-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <span>{t("footer.copyrightLine").replace("{year}", String(year))}</span>
-            <span className="inline-flex items-center gap-2">
-              <span
-                aria-hidden
-                className="h-1.5 w-7 rounded-full"
-                style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF"], 90) }}
-              />
-              <span className="eyebrow text-[0.6rem] text-fg-3">{t("footer.logoTag")}</span>
-            </span>
+
+      <div className="relative border-t border-line/60 bg-canvas/35">
+        <div className="mx-auto max-w-[1320px] px-4 py-6 text-[0.7rem] text-fg-3 sm:px-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {META_LINKS.map((link) => (
+                <Link key={link.href} href={link.href} className="transition-colors hover:text-fg">
+                  {navigationLabel(link.key)}
+                </Link>
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {POLICY_LINKS.map((link) => (
+                  <Link key={link.href} href={link.href} className="transition-colors hover:text-fg">
+                    {navigationLabel(link.key)}
+                  </Link>
+                ))}
+              </div>
+              <span className="hidden h-3 w-px bg-line sm:block" aria-hidden="true" />
+              <span>{t("footer.copyrightLine").replace("{year}", String(year))}</span>
+            </div>
+          </div>
+          <div className="mt-5 flex items-center gap-2 border-t border-line/45 pt-4">
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-8 rounded-full"
+              style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF"], 90) }}
+            />
+            <span className="font-display text-[0.57rem] font-bold uppercase tracking-[0.15em] text-fg-3">{t("footer.logoTag")}</span>
           </div>
         </div>
       </div>

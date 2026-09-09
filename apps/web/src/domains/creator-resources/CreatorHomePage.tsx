@@ -1,12 +1,10 @@
-import { CreatorHomePage as MarketingCreatorHomePage } from "../marketing/CreatorHomePage";
-
-import { CreatorHubEntry } from "./CreatorHubEntry";
+import { CreatorHomeExperience } from "../marketing/CreatorHomeExperience";
 
 /**
- * The root route renders the creator-first marketing home (#799) followed by the
- * creator resources hub entry (#788). Load both with the home route, never with the
- * shared Studio shell.
+ * The root route owns one coherent creator journey. Research and inspiration
+ * destinations are integrated into the experience instead of being appended as
+ * a disconnected second homepage.
  */
 export function CreatorHomePage() {
-  return <><MarketingCreatorHomePage /><CreatorHubEntry /></>;
+  return <CreatorHomeExperience />;
 }

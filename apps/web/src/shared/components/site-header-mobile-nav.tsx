@@ -1,55 +1,17 @@
-import {
-  BarChart3,
-  CalendarDays,
-  Compass,
-  Gamepad2,
-  Home,
-  Library,
-  MessageCircle,
-  MessageSquareQuote,
-  Moon,
-  Palette,
-  Sparkles,
-  Store,
-  TrendingUp,
-  UserRound,
-  UserRoundPen,
-  X,
-} from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 
-import { cx } from "@/shared/lib/cx";
-import { useT } from "@/shared/lib/i18n";
+import {
+  MOBILE_SITE_TABS,
+  SITE_NAVIGATION_GROUPS,
+  SITE_UTILITY_NAVIGATION,
+  siteNavigationLocale,
+  siteNavigationText,
+} from "./site-navigation";
+
 import Link from "@/compat/router-link";
-
-const MOBILE_NAV = [
-  { i18n: "nav.home", href: "/", icon: Home, exact: true },
-  { i18n: "nav.studio", href: "/studio", icon: Palette },
-  { i18n: "nav.assets", href: "/market", icon: Store },
-  { i18n: "nav.creators", href: "/create", icon: Palette },
-  { i18n: "nav.discover", href: "/explore", icon: Compass },
-  { i18n: "nav.ranking", href: "/ranking", icon: TrendingUp },
-  { i18n: "nav.calendar", href: "/calendar", icon: CalendarDays },
-  { i18n: "nav.recommend", href: "/recommend", icon: Sparkles },
-  { i18n: "nav.fortune", href: "/fortune", icon: Moon },
-  { i18n: "nav.play", href: "/play", icon: Gamepad2 },
-  { i18n: "nav.reviews", href: "/reviews", icon: MessageSquareQuote },
-  { i18n: "nav.community", href: "/community", icon: MessageCircle },
-  { i18n: "footer.link.feedback", href: "/feedback", icon: MessageSquareQuote },
-  { i18n: "nav.shaper", href: "/shaper", icon: UserRoundPen },
-  { i18n: "nav.insights", href: "/insights", icon: BarChart3 },
-  { i18n: "route.me", href: "/me", icon: UserRound },
-];
-
-// 모바일 하단 탭바는 목적이 겹치지 않는 핵심 5개 진입점만 제공한다.
-// 전체 목적지와 읽기 서재는 상단 오버플로 메뉴에서 계속 접근할 수 있다.
-const MOBILE_TABS = [
-  { i18n: "nav.home", href: "/", icon: Home, exact: true },
-  { i18n: "nav.discover", href: "/explore", icon: Compass, exact: false },
-  { i18n: "nav.studio", href: "/studio", icon: Palette, exact: false },
-  { i18n: "nav.assets", href: "/market", icon: Store, exact: false },
-  { i18n: "route.me", href: "/me", icon: UserRound, exact: false },
-] as const;
+import { cx } from "@/shared/lib/cx";
+import { useI18n, useT } from "@/shared/lib/i18n";
 
 interface MobileHeaderNavigationProps {
   menuOpen: boolean;
@@ -127,6 +89,8 @@ export function MobileHeaderNavigation({
   isActive,
   hideBottomTabs = false,
 }: MobileHeaderNavigationProps) {
+  const language = useI18n((state) => state.lang);
+  const locale = siteNavigationLocale(language);
   const t = useT();
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -198,14 +162,13 @@ export function MobileHeaderNavigation({
 
   return (
     <>
-      {/* 오버플로 메뉴 (<1360px): 전체 목적지 + 읽기 서재 */}
       {menuOpen && (
         <div ref={overlayRef} className="fixed inset-0 z-[60] min-[1360px]:hidden">
           <div
             aria-hidden="true"
             data-mobile-menu-backdrop="true"
             onPointerDown={closeMenu}
-            className="absolute inset-0 bg-canvas/70 backdrop-blur-sm motion-safe:animate-fade-up"
+            className="absolute inset-0 bg-canvas/75 backdrop-blur-md motion-safe:animate-fade-up"
           />
           <div
             ref={panelRef}
@@ -214,119 +177,165 @@ export function MobileHeaderNavigation({
             aria-modal="true"
             aria-label={t("nav.allMenu")}
             tabIndex={-1}
-            className="absolute inset-x-0 top-0 max-h-[100dvh] overflow-y-auto border-b border-line-strong bg-gradient-to-b from-panel/95 to-card/90 shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)] backdrop-blur-xl motion-safe:animate-fade-up"
+            className="absolute inset-x-0 top-0 max-h-[100dvh] overflow-y-auto overscroll-contain border-b border-line-strong bg-canvas/95 shadow-2xl backdrop-blur-2xl motion-safe:animate-fade-up"
           >
-            <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-4 sm:px-6">
-              <span className="font-display text-sm font-semibold text-fg-2">{t("nav.menu")}</span>
-              <button
-                data-autofocus
-                onClick={closeMenu}
-                aria-label={`${t("nav.allMenu")} ${t("common.close")}`}
-                className="grid size-11 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
-              >
-                <X size={18} />
-              </button>
+            <div className="sticky top-0 z-10 border-b border-line/60 bg-canvas/92 backdrop-blur-2xl">
+              <div className="mx-auto flex min-h-[4.25rem] max-w-[1320px] items-center justify-between gap-4 px-4 sm:px-6">
+                <div>
+                  <span className="block font-display text-sm font-bold text-fg">{t("nav.menu")}</span>
+                  <span className="mt-0.5 block text-[0.68rem] text-fg-3">
+                    {locale === "ko" ? "하고 싶은 일에서 바로 시작하세요" : "Start with what you want to do"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  data-autofocus
+                  onClick={closeMenu}
+                  aria-label={`${t("nav.allMenu")} ${t("common.close")}`}
+                  className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 shadow-sm transition-colors hover:border-line-strong hover:bg-raised hover:text-fg"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
-            <nav className="mx-auto max-w-[1320px] px-3 pb-4 sm:px-5">
-              <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                {MOBILE_NAV.map((n) => {
-                  const active = isActive(n.href, n.exact);
-                  const Icon = n.icon;
-                  return (
-                    <li key={n.href}>
-                      <Link
-                        href={n.href}
-                        aria-current={active ? "page" : undefined}
-                        className={cx(
-                          "group flex min-h-11 items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-150",
-                          active
-                            ? "border-accent/35 bg-accent-soft text-accent"
-                            : "border-line bg-card/60 text-fg-2 hover:border-line-strong hover:bg-raised/70 hover:text-fg"
-                        )}
-                      >
-                        <span
-                          className={cx(
-                            "grid size-8 shrink-0 place-items-center rounded-lg border transition-colors duration-150",
-                            active
-                              ? "border-accent/35 bg-canvas/45"
-                              : "border-line bg-canvas/40 group-hover:border-line-strong"
-                          )}
-                        >
-                          <Icon
-                            size={16}
-                            className={cx(
-                              "transition-colors",
-                              active ? "text-accent" : "text-fg-3 group-hover:text-accent"
-                            )}
-                          />
-                        </span>
-                        {t(n.i18n)}
-                      </Link>
-                    </li>
-                  );
-                })}
-                <li className="col-span-2 sm:col-span-3">
-                  <Link
-                    href="/library"
-                    aria-current={isActive("/library") ? "page" : undefined}
-                    className={cx(
-                      "group flex min-h-11 items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-150",
-                      isActive("/library")
-                        ? "border-accent/35 bg-accent text-on-accent"
-                        : "border-line bg-card/60 text-fg-2 hover:border-line-strong hover:bg-raised/70 hover:text-fg"
-                    )}
+
+            <nav className="mx-auto max-w-[1320px] px-4 pb-6 pt-5 sm:px-6 sm:pb-8">
+              <div className="grid gap-4 lg:grid-cols-2">
+                {SITE_NAVIGATION_GROUPS.map((group, groupIndex) => (
+                  <section
+                    key={group.id}
+                    aria-labelledby={`${menuId}-${group.id}`}
+                    className="rounded-2xl border border-line/70 bg-panel/55 p-3 shadow-sm sm:p-4"
                   >
-                    <span
+                    <div className="mb-3 flex items-start gap-3 px-1 sm:px-2">
+                      <span aria-hidden="true" className="font-display text-[0.62rem] font-bold tracking-[0.14em] text-accent">
+                        0{groupIndex + 1}
+                      </span>
+                      <div>
+                        <h2 id={`${menuId}-${group.id}`} className="font-display text-sm font-bold text-fg">
+                          {siteNavigationText(group.label, locale)}
+                        </h2>
+                        <p className="mt-1 text-xs leading-5 text-fg-3">
+                          {siteNavigationText(group.description, locale)}
+                        </p>
+                      </div>
+                    </div>
+                    <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      {group.items.map((item) => {
+                        const active = isActive(item.href, item.exact);
+                        const Icon = item.icon;
+                        const label = siteNavigationText(item.label, locale);
+                        return (
+                          <li key={item.id}>
+                            <Link
+                              href={item.href}
+                              aria-label={label}
+                              aria-current={active ? "page" : undefined}
+                              className={cx(
+                                "group flex min-h-[4.5rem] items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-150",
+                                active
+                                  ? "border-accent/40 bg-accent-soft text-accent shadow-sm"
+                                  : "border-line/75 bg-card/70 text-fg-2 hover:border-line-strong hover:bg-raised/80 hover:text-fg"
+                              )}
+                            >
+                              <span
+                                className={cx(
+                                  "grid size-9 shrink-0 place-items-center rounded-xl border transition-colors",
+                                  active
+                                    ? "border-accent/35 bg-canvas/55"
+                                    : "border-line bg-canvas/45 group-hover:border-line-strong"
+                                )}
+                              >
+                                <Icon size={17} strokeWidth={1.8} className={active ? "text-accent" : "text-fg-3 group-hover:text-accent"} />
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold">{label}</span>
+                                <span aria-hidden="true" className="mt-0.5 line-clamp-1 block text-[0.68rem] leading-4 text-fg-3">
+                                  {siteNavigationText(item.description, locale)}
+                                </span>
+                              </span>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+
+              <div className="mt-4 grid gap-2 rounded-2xl border border-line/70 bg-panel/55 p-3 sm:grid-cols-2 sm:p-4">
+                {SITE_UTILITY_NAVIGATION.map((item) => {
+                  const active = isActive(item.href, item.exact);
+                  const Icon = item.icon;
+                  const label = siteNavigationText(item.label, locale);
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      aria-label={label}
+                      aria-current={active ? "page" : undefined}
                       className={cx(
-                        "grid size-8 shrink-0 place-items-center rounded-lg border transition-colors duration-150",
-                        isActive("/library")
-                          ? "border-on-accent/25 bg-on-accent/10"
-                          : "border-line bg-canvas/40 group-hover:border-line-strong"
+                        "group flex min-h-12 items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
+                        active
+                          ? "border-accent/40 bg-accent text-on-accent"
+                          : "border-line bg-card/70 text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg"
                       )}
                     >
-                      <Library
-                        size={16}
-                        className={cx(
-                          "transition-colors",
-                          isActive("/library") ? "text-on-accent" : "text-fg-3 group-hover:text-accent"
-                        )}
-                      />
-                    </span>
-                    {t("nav.library")}
-                  </Link>
-                </li>
-              </ul>
+                      <Icon size={17} className={active ? "text-on-accent" : "text-fg-3 group-hover:text-accent"} />
+                      <span>{label}</span>
+                      <span aria-hidden="true" className={cx("ml-auto text-xs", active ? "text-on-accent/75" : "text-fg-3")}>
+                        ↗
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
             </nav>
           </div>
         </div>
       )}
 
-      {/* 모바일 하단 탭바 (<768px): 핵심 5개 진입점만 제공한다.
-          /studio 등 자체 하단 도구막대를 쓰는 라우트에서는 겹치므로 hideBottomTabs로 뺀다. */}
       {!hideBottomTabs && (
         <nav
           aria-label={t("nav.quickAccess")}
-          className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden"
+          className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/92 shadow-[0_-12px_35px_-28px_var(--color-fg)] backdrop-blur-2xl md:hidden"
         >
           <div className="mx-auto grid max-w-md grid-cols-5 pb-[env(safe-area-inset-bottom)]">
-            {MOBILE_TABS.map((n) => {
-              const active = isActive(n.href, n.exact);
-              const Icon = n.icon;
+            {MOBILE_SITE_TABS.map((item) => {
+              const active = isActive(item.href, item.exact);
+              const Icon = item.icon;
+              const label = siteNavigationText(item.label, locale);
+              const isStudio = item.id === "studio";
               return (
                 <Link
-                  key={n.href}
-                  href={n.href}
+                  key={item.id}
+                  href={item.href}
+                  aria-label={label}
                   aria-current={active ? "page" : undefined}
                   className={cx(
-                    "relative flex min-h-11 flex-col items-center justify-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
-                    active ? "text-accent" : "text-fg-3"
+                    "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.62rem] font-semibold transition-colors",
+                    active ? "text-accent" : "text-fg-3 hover:text-fg",
+                    isStudio && "z-10"
                   )}
                 >
-                  {active && (
-                    <span className="absolute left-1/2 top-0 h-0.5 w-10 -translate-x-1/2 rounded-full bg-accent" />
+                  {isStudio ? (
+                    <span
+                      className={cx(
+                        "-mt-5 grid size-11 place-items-center rounded-2xl border shadow-lg transition-transform",
+                        active
+                          ? "border-accent bg-accent text-on-accent"
+                          : "border-line-strong bg-fg text-canvas"
+                      )}
+                    >
+                      <Icon size={20} strokeWidth={2.1} />
+                    </span>
+                  ) : (
+                    <span className="relative grid size-7 place-items-center">
+                      {active && <span aria-hidden="true" className="absolute -top-2 left-1/2 h-0.5 w-7 -translate-x-1/2 rounded-full bg-accent" />}
+                      <Icon size={19} strokeWidth={active ? 2.35 : 1.85} />
+                    </span>
                   )}
-                  <Icon size={19} strokeWidth={active ? 2.4 : 1.9} />
-                  {t(n.i18n)}
+                  <span className={isStudio ? "-mt-0.5" : undefined}>{label}</span>
                 </Link>
               );
             })}
