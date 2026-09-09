@@ -8,7 +8,7 @@ const source = (relativePath: string) =>
   readFileSync(join(repoRoot, relativePath), "utf8");
 
 describe("large Studio epic product wiring", () => {
-  it("connects the advanced AI surface to bridge-backed proposal review", () => {
+  it("connects the advanced AI surface to append-only reviewed proposals", () => {
     const advancedTools = source(
       "apps/web/src/domains/creator/ai/StudioAdvancedAiTools.tsx",
     );
@@ -23,8 +23,9 @@ describe("large Studio epic product wiring", () => {
     expect(connectedPanel).toContain("useStudioStrokeProposalBridgeSnapshot()");
     expect(connectedPanel).toContain("applyStudioStrokeProposalTransaction");
     expect(bridge).toContain("export function useStudioAiCanvasBridge");
+    expect(bridge).toContain("transaction.addedStrokes.forEach");
     expect(bridge).toContain("input.appendElement");
-    expect(bridge).toContain("input.replaceElement");
+    expect(bridge).toContain("cloneElementForProposal");
   });
 
   it("keeps 3D generation on the authenticated advanced AI surface", () => {
@@ -35,8 +36,12 @@ describe("large Studio epic product wiring", () => {
       "apps/web/src/domains/creator/ai/StudioAi3dGenerationPanel.tsx",
     );
 
-    expect(advancedTools).toContain("new Studio3dGenerationHttpClient({ userId");
-    expect(advancedTools).toContain("userId={userId}");
+    expect(advancedTools).toMatch(
+      /userId\s*\?\s*new\s+Studio3dGenerationHttpClient\(\{\s*userId,/u,
+    );
+    expect(advancedTools).toContain(
+      "providerApiKey: () => providerKeyRef.current || undefined",
+    );
     expect(advancedTools).toContain("onInsertArtifact={");
     expect(advancedTools).toContain("onSaveArtifact={");
     expect(panel).toContain("readonly client: Studio3dGenerationHttpClient");

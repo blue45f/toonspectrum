@@ -1,5 +1,5 @@
 import { dbPool } from "../../db";
-import { runSchemaPreflightToleratingDbUnavailability } from "../../db/schema-preflight";
+import { runSchemaPreflightToleratingDbUnavailability } from "../../common/database-availability";
 
 export const STUDIO_AI_COMIC_DIRECTOR_SCHEMA_PREFLIGHT = Symbol(
   "STUDIO_AI_COMIC_DIRECTOR_SCHEMA_PREFLIGHT",

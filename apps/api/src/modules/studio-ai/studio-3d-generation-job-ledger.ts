@@ -156,10 +156,10 @@ const TRANSITIONS: Readonly<Record<Studio3dGenerationJobState, ReadonlySet<Studi
     downloading: new Set(["validating", "cancelled", "failed", "expired"]),
     validating: new Set(["importing", "failed", "cancelled", "expired"]),
     importing: new Set(["ready", "failed", "cancelled", "expired"]),
-    ready: new Set(),
-    failed: new Set(),
-    cancelled: new Set(),
-    expired: new Set(),
+    ready: new Set<Studio3dGenerationJobState>(),
+    failed: new Set<Studio3dGenerationJobState>(),
+    cancelled: new Set<Studio3dGenerationJobState>(),
+    expired: new Set<Studio3dGenerationJobState>(),
   });
 
 function validateRequest(request: Studio3dGenerationJobRequestSummary): Studio3dGenerationJobRequestSummary {
