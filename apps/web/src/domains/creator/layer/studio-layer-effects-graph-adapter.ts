@@ -1,16 +1,22 @@
+import { studioDeterministicContentId } from "../studio-deterministic-serialization";
 import {
-  planStudioAdjustmentEffectGraph,
+  planStudioEffectGraphRender,
   validateStudioAdjustmentEffectGraph,
   type StudioAdjustmentEffectGraph,
-  type StudioAdjustmentEffectPlan,
+  type StudioEffectGraphEdge,
   type StudioEffectGraphNode,
+  type StudioEffectGraphRenderPlan,
 } from "../filter/studio-adjustment-effect-graph";
 import type {
   StudioLayerEffect,
   StudioLayerEffectsStack,
 } from "./studio-layer-effects-stack";
 
-function effectParameters(effect: StudioLayerEffect): Readonly<Record<string, unknown>> {
+type StudioLayerEffectParameter = number | string | boolean | readonly number[];
+
+function effectParameters(
+  effect: StudioLayerEffect,
+): Readonly<Record<string, StudioLayerEffectParameter>> {
   switch (effect.kind) {
     case "glow":
       return Object.freeze({
@@ -56,6 +62,11 @@ function liveEffectKind(effect: StudioLayerEffect): "glow" | "drop-shadow" | "in
   return "glow";
 }
 
+export interface StudioLayerEffectsRenderPlan extends StudioEffectGraphRenderPlan {
+  readonly backend: "cpu" | "webgpu";
+  readonly cacheKey: string;
+}
+
 export function studioLayerEffectsStackToGraph(
   stack: StudioLayerEffectsStack,
   sourceHash: string,
@@ -64,13 +75,14 @@ export function studioLayerEffectsStackToGraph(
     Object.freeze({
       id: "layer-source",
       kind: "source",
-      source: Object.freeze({
-        mode: "embedded",
-        contentHash: sourceHash,
-        colorSpace: "sRGB",
-      }),
+      sourceHash,
+      embedded: true,
+      enabled: true,
+      opacity: 1,
+      blendMode: "normal",
     }),
   ];
+  const edges: StudioEffectGraphEdge[] = [];
   let inputNodeId = "layer-source";
   stack.effects.forEach((effect, index) => {
     const nodeId = `layer-effect-${index}-${effect.id}`;
@@ -78,47 +90,62 @@ export function studioLayerEffectsStackToGraph(
       Object.freeze({
         id: nodeId,
         kind: "live-effect",
-        inputNodeId,
         effect: liveEffectKind(effect),
         enabled: effect.enabled,
         opacity: 1,
         blendMode: "normal",
         parameters: Object.freeze({
-          sourceKind: effect.kind,
-          ...effectParameters(effect),
+sourceKind: effect.kind,
+...effectParameters(effect),
         }),
+        preferredBackend: "auto",
       }),
     );
+    edges.push(Object.freeze({ from: inputNodeId, to: nodeId, input: "source" }));
     inputNodeId = nodeId;
   });
   nodes.push(
     Object.freeze({
       id: "layer-output",
       kind: "output",
-      inputNodeId,
+      enabled: true,
+      opacity: 1,
+      blendMode: "normal",
+      outputColorSpace: "srgb",
     }),
   );
-  return validateStudioAdjustmentEffectGraph({
-    schemaVersion: 1,
+  edges.push(Object.freeze({ from: inputNodeId, to: "layer-output", input: "source" }));
+
+  const graph: StudioAdjustmentEffectGraph = Object.freeze({
+    version: 1,
     id: "layer-effects-live-graph",
     revision: stack.effects.length,
-    nodes,
+    nodes: Object.freeze(nodes),
+    edges: Object.freeze(edges),
     outputNodeId: "layer-output",
   });
+  validateStudioAdjustmentEffectGraph(graph);
+  return graph;
 }
 
 export function planStudioLayerEffectsStack(
   stack: StudioLayerEffectsStack,
   sourceHash: string,
   backend: "cpu" | "webgpu" = "webgpu",
-): StudioAdjustmentEffectPlan {
-  return planStudioAdjustmentEffectGraph(
-    studioLayerEffectsStackToGraph(stack, sourceHash),
-    {
-      purpose: "preview",
+): StudioLayerEffectsRenderPlan {
+  const plan = planStudioEffectGraphRender({
+    graph: studioLayerEffectsStackToGraph(stack, sourceHash),
+    purpose: "preview",
+    webGpuAvailable: backend === "webgpu",
+    sourceColorSpace: "srgb",
+  });
+  return Object.freeze({
+    ...plan,
+    backend,
+    cacheKey: studioDeterministicContentId({
+      graphHash: plan.graphHash,
+      purpose: plan.purpose,
       backend,
-      colorSpace: "sRGB",
-      deviceProfile: backend === "webgpu" ? "studio-webgpu" : "studio-cpu",
-    },
-  );
+    }),
+  });
 }

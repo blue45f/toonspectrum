@@ -1,0 +1,142 @@
+name: Raster precision compatibility repair
+
+on:
+  push:
+    branches:
+      - feat/studio-pixel-pencil-pro-v2-20260909
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: raster-precision-compatibility-repair
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: ${{ !contains(github.event.head_commit.message, '[raster-precision-compat-fixed]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FEATURE_BRANCH: feat/studio-pixel-pencil-pro-v2-20260909
+    steps:
+      - name: Cancel active delivery coordinator before compatibility rewrite
+        run: |
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/runs" \
+            -F branch="${FEATURE_BRANCH}" \
+            -F per_page=100 \
+            --jq '.workflow_runs[] | select(.status == "queued" or .status == "in_progress") | select(.name == "Studio raster precision delivery" or .name == "Raster precision patch handoff") | .id' \
+          | while read -r run_id; do
+              if [ -n "${run_id}" ] && [ "${run_id}" != "${GITHUB_RUN_ID}" ]; then
+                gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel" || true
+              fi
+            done
+
+      - name: Sparse partial-clone compatibility surface
+        run: |
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git sparse-checkout init --cone
+          git sparse-checkout set .github apps/web/src/domains/creator docs scripts
+          git -c protocol.version=2 fetch \
+            --depth=1 \
+            --filter=blob:none \
+            origin \
+            "+refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}"
+          git checkout -B "${FEATURE_BRANCH}" "refs/remotes/origin/${FEATURE_BRANCH}"
+
+      - name: Ensure core and controls exist
+        run: |
+          if ! grep -Fq 'export function planStudioPixelPencilSampleUpdate' \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts; then
+            python3 scripts/prepare-studio-pixel-pencil-pro-core.py
+            python3 scripts/apply-studio-pixel-pencil-pro-core.py
+          fi
+          if ! grep -Fq 'data-studio-pixel-pencil-professional="true"' \
+            apps/web/src/domains/creator/brush/StudioDrawOptionsBar.tsx; then
+            python3 scripts/prepare-studio-pixel-pencil-pro-ui.py
+            python3 scripts/apply-studio-pixel-pencil-pro-ui.py
+          fi
+
+      - name: Repair strict TypeScript compatibility boundaries
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          pointer = Path(
+              "apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.ts"
+          )
+          source = pointer.read_text(encoding="utf-8")
+          source = source.replace(
+              '''symmetry: resolveStudioStrokeSymmetry(
+              symmetry,
+              drawMode === "pixel" ? STUDIO_PIXEL_PENCIL_RENDER_MODE : brush
+            ),''',
+              '''symmetry: resolveStudioStrokeSymmetry(symmetry, brush),''',
+          )
+          source = source.replace(
+              '''symmetry: resolveStudioStrokeSymmetry(
+    symmetry,
+    drawMode === "pixel" ? STUDIO_PIXEL_PENCIL_RENDER_MODE : brush
+  ),''',
+              '''symmetry: resolveStudioStrokeSymmetry(symmetry, brush),''',
+          )
+          pointer.write_text(source, encoding="utf-8")
+
+          controls = Path(
+              "apps/web/src/domains/creator/StudioInspectorDrawModeControls.tsx"
+          )
+          source = controls.read_text(encoding="utf-8")
+          if '  | "silk";' not in source:
+              source = source.replace(
+                  '  | "kaleidoscope";\n',
+                  '  | "kaleidoscope"\n  | "silk";\n',
+                  1,
+              )
+          if '  silk: "실크",' not in source:
+              source = source.replace(
+                  '  kaleidoscope: "만화경",\n',
+                  '  kaleidoscope: "만화경",\n  silk: "실크",\n',
+                  1,
+              )
+          controls.write_text(source, encoding="utf-8")
+
+          boundary = Path(
+              "apps/web/src/domains/creator/brush/"
+              "studio-pixel-pencil-professional-ui-boundary.test.ts"
+          )
+          source = boundary.read_text(encoding="utf-8")
+          source = source.replace(
+              '''    expect(canvasHud).toContain('? { mode: "pixel", widthPx: strokeWidth');
+''',
+              '''    expect(canvasHud).toContain('mode: "pixel"');
+    expect(canvasHud).toContain("widthPx: strokeWidth");
+''',
+          )
+          boundary.write_text(source, encoding="utf-8")
+          PY
+
+      - name: Verify repaired source contract
+        run: |
+          grep -F 'symmetry: resolveStudioStrokeSymmetry(symmetry, brush)' \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.ts
+          grep -F '| "silk";' \
+            apps/web/src/domains/creator/StudioInspectorDrawModeControls.tsx
+          grep -F 'silk: "실크"' \
+            apps/web/src/domains/creator/StudioInspectorDrawModeControls.tsx
+          grep -F 'widthPx: strokeWidth' \
+            apps/web/src/domains/creator/brush/studio-pixel-pencil-professional-ui-boundary.test.ts
+          git diff --check
+
+      - name: Commit compatibility repair and restart full validation
+        run: |
+          rm -f .github/workflows/raster-precision-compatibility-repair.yml
+          rm -f .github/workflows/raster-precision-patch-handoff.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git commit -m "fix(studio): harden raster precision compatibility [raster-precision-compat-fixed] [pixel-pencil-pro-core-applied] [pixel-pencil-pro-combined-applied] [pixel-pencil-pro-delivered]"
+          git fetch origin "${FEATURE_BRANCH}"
+          git push --force-with-lease origin HEAD:"${FEATURE_BRANCH}"
