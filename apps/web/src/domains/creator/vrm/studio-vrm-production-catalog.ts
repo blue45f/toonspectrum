@@ -44,8 +44,12 @@ export function isStudioVrmProductionCatalogEntry(id: string): boolean {
 
 export function filterStudioVrmProductionLibraryEntries<
   T extends { readonly id: string; readonly source: string },
->(entries: readonly T[]): readonly T[] {
+>(entries: readonly T[], preserveIds: readonly string[] = []): readonly T[] {
+  const preserved = new Set(preserveIds);
   return entries.filter(
-    (entry) => entry.source !== "sample" || isStudioVrmProductionCatalogEntry(entry.id),
+    (entry) =>
+      entry.source !== "sample"
+      || isStudioVrmProductionCatalogEntry(entry.id)
+      || preserved.has(entry.id),
   );
 }
