@@ -21,6 +21,18 @@ describe("BG3D built-in template switch runtime boundary", () => {
     expect(transform).toBeGreaterThan(templateSwitch);
   });
 
+  it("does not switch templates while physics owns transient runtime state", () => {
+    const physicsGuard = templateSwitchHostSource.indexOf(
+      "isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)",
+    );
+    const liveRuntime = templateSwitchHostSource.indexOf(
+      "const live = physicsRuntimeSourceRef.current",
+    );
+
+    expect(physicsGuard).toBeGreaterThan(-1);
+    expect(liveRuntime).toBeGreaterThan(physicsGuard);
+  });
+
   it("plans one catalog slot and refuses silent dependent-object deletion", () => {
     expect(templateSwitchHostSource).toContain("planStudioBg3dCatalogTemplateSwitch({");
     expect(templateSwitchHostSource).toContain("if (!switchPlan)");
@@ -29,16 +41,24 @@ describe("BG3D built-in template switch runtime boundary", () => {
     expect(templateSwitchHostSource).not.toContain("live.primitives.length");
   });
 
-  it("commits one history transition before publishing both runtime collections", () => {
+  it("captures the exact live state and commits one history transition before publication", () => {
+    const snapshot = templateSwitchHostSource.indexOf(
+      "const before = createStudioBg3dHistorySnapshot({",
+    );
     const history = templateSwitchHostSource.indexOf("commitImmediateHistoryTransition(");
     const runtime = templateSwitchHostSource.indexOf("physicsRuntimeSourceRef.current =");
     const primitives = templateSwitchHostSource.indexOf("setPrimitives(nextPrimitives)");
     const models = templateSwitchHostSource.indexOf("setCustomModels(nextCustomModels)");
 
-    expect(history).toBeGreaterThan(-1);
+    expect(snapshot).toBeGreaterThan(-1);
+    expect(history).toBeGreaterThan(snapshot);
     expect(runtime).toBeGreaterThan(history);
     expect(primitives).toBeGreaterThan(runtime);
     expect(models).toBeGreaterThan(runtime);
+    expect(templateSwitchHostSource).toContain("primitives: live.primitives");
+    expect(templateSwitchHostSource).toContain("customModels: live.customModels");
+    expect(templateSwitchHostSource).toContain("document: live.document");
+    expect(templateSwitchHostSource).toContain("live.document,\n      before,");
   });
 
   it("selects the replacement hierarchy and clears stale errors only after success", () => {
