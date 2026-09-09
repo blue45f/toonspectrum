@@ -1,0 +1,82 @@
+name: Finish mannequin anatomy on ARM sparse runner
+
+on:
+  push:
+    branches: [feat/mannequin-anatomy-controls-main-20260910]
+    paths: [.github/workflows/materialize-mannequin-anatomy-controls-arm.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finish-mannequin-anatomy-arm
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/mannequin-anatomy-controls-main-20260910
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/materialize-mannequin-anatomy-controls.yml
+            .github/workflows/materialize-mannequin-anatomy-controls-v2.yml
+            .github/workflows/materialize-mannequin-anatomy-controls-arm.yml
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts
+            apps/web/src/domains/creator/scene-3d/StudioMannequinPoserPanel.tsx
+          persist-credentials: true
+
+      - name: Reuse reviewed anatomy materialization and boundary checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 - <<'PY'
+          import os
+          import subprocess
+          import yaml
+
+          data = yaml.safe_load(open(
+              '.github/workflows/materialize-mannequin-anatomy-controls.yml',
+              encoding='utf-8',
+          ))
+          selected = {
+              'Add independent anatomy controls to model and panel',
+              'Verify anatomy product boundaries',
+          }
+          for step in data['jobs']['materialize']['steps']:
+              if step.get('name') not in selected:
+                  continue
+              subprocess.run(
+                  step['run'],
+                  shell=True,
+                  executable='/bin/bash',
+                  check=True,
+                  env=os.environ.copy(),
+              )
+          PY
+
+      - name: Commit product slice without repository hooks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/materialize-mannequin-anatomy-controls.yml \
+                .github/workflows/materialize-mannequin-anatomy-controls-v2.yml \
+                .github/workflows/materialize-mannequin-anatomy-controls-arm.yml
+          git add --sparse \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts \
+            apps/web/src/domains/creator/scene-3d/StudioMannequinPoserPanel.tsx \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-anatomy-controls.test.ts \
+            .github/workflows/materialize-mannequin-anatomy-controls.yml \
+            .github/workflows/materialize-mannequin-anatomy-controls-v2.yml \
+            .github/workflows/materialize-mannequin-anatomy-controls-arm.yml
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'feat(mannequin): add anatomical silhouette controls'
+          git push --no-verify origin HEAD:feat/mannequin-anatomy-controls-main-20260910
