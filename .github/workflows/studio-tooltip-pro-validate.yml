@@ -31,6 +31,64 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Apply final accessibility review patch
+        run: |
+          node <<'NODE'
+          const { readFileSync, writeFileSync } = require("node:fs");
+
+          const shellPath = "apps/web/src/domains/creator/StudioToolHint.tsx";
+          const shell = readFileSync(shellPath, "utf8");
+          const shellBefore = `    function suppressPassivePointerHints() {
+                interaction.suppressHover();
+                const activeHintId = coordinator.getActiveHintId();`;
+          const shellAfter = `    function suppressPassivePointerHints(event?: Event) {
+                const target = event?.target;
+                if (
+                  target instanceof Element &&
+                  target.closest('[data-studio-tool-hint="true"]')
+                ) {
+                  return;
+                }
+                interaction.suppressHover();
+                const activeHintId = coordinator.getActiveHintId();`;
+          if (!shell.includes(shellBefore)) {
+            throw new Error("Could not locate the passive pointer suppression hook");
+          }
+          writeFileSync(shellPath, shell.replace(shellBefore, shellAfter));
+
+          const testPath = "apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx";
+          const test = readFileSync(testPath, "utf8");
+          const marker = `  it("dismisses transient help when the editor window loses attention", () => {`;
+          const internalScrollTest = `  it("keeps hover help open while its own scroll region is being read", async () => {
+              renderPair();
+              const pen = screen.getByRole("button", { name: "펜" });
+
+              fireEvent.focus(pen);
+              await act(async () => {
+                await Promise.resolve();
+                await Promise.resolve();
+              });
+
+              const tooltip = screen.getByRole("tooltip");
+              const scrollRegion = tooltip.querySelector(
+                '[data-studio-tool-hint-scroll-region="true"]'
+              );
+              expect(scrollRegion).not.toBeNull();
+
+              fireEvent.wheel(scrollRegion as Element);
+              fireEvent.scroll(scrollRegion as Element);
+              expect(screen.getByRole("tooltip")).toBe(tooltip);
+
+              fireEvent.wheel(document.body);
+              expect(screen.queryByRole("tooltip")).toBeNull();
+            });
+
+            `;
+          if (!test.includes(marker)) {
+            throw new Error("Could not locate the tooltip attention regression test");
+          }
+          writeFileSync(testPath, test.replace(marker, internalScrollTest + marker));
+          NODE
       - name: Format tooltip sources
         run: |
           pnpm exec prettier --write \
