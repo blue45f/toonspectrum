@@ -1,0 +1,93 @@
+name: Cleanup remaining retired branches once
+
+'on':
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cleanup-remaining-branches-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cleanup-remaining-retired-branches-20260909
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete verified merged, superseded, and transfer-only branches
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Delete explicitly verified retired branches
+        shell: bash
+        run: |
+          set -u
+
+          # Classification was performed against main before this workflow was merged:
+          # - merged PR heads: #1119, #1120 and earlier merged PRs
+          # - superseded branches: product changes already present in newer main implementations
+          # - transfer-only branches: source snapshots, split payloads and one-shot workflows
+          branches=(
+            'ci/full-main-ai-comic-director-20260909'
+            'codex/source-snapshot-latest-20260909'
+            'codex/source-snapshot-main-20260909'
+            'codex/studio-epic-completion-20260909'
+            'feat/character-shot-production-suite-20260909'
+            'feat/character-shot-quality-foundation-20260909'
+            'feat/learn-experience-v2-20260909'
+            'feat/studio-3d-production-assets-20260909'
+            'feat/studio-application-settings-workbench-20260909'
+            'feat/studio-drawing-input-center-20260909'
+            'feat/studio-generated-2d-pack'
+            'feat/studio-selection-workbench'
+            'feat/studio-template-asset-smart-library'
+            'feat/studio-view-review-navigator-20260909'
+            'fix/brush-runtime-navigator-webgpu-types-20260909'
+            'fix/recover-character-pose-v3-foundations-20260909'
+            'fix/studio-final-compile-and-ci-20260909'
+            'fix/studio-layer-tab-accessibility-20260909'
+            'fix/studio-tooltip-ci-final-20260909'
+            'fix/vercel-api-build-contracts-20260909'
+            'ops/final-targeted-predecessor-cleanup-macos-20260909-pass15'
+            'work/character-shot-production-materialize-20260909'
+            'ops/cleanup-remaining-branches-20260909'
+          )
+
+          deleted=0
+          already_absent=0
+          failures=0
+
+          for branch in "${branches[@]}"; do
+            if git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1; then
+              echo "Deleting ${branch}"
+              if git push origin --delete "${branch}"; then
+                deleted=$((deleted + 1))
+              else
+                echo "Failed to delete ${branch}" >&2
+                failures=$((failures + 1))
+              fi
+            else
+              echo "Already absent: ${branch}"
+              already_absent=$((already_absent + 1))
+            fi
+          done
+
+          {
+            echo "### Retired branch cleanup"
+            echo
+            echo "- Deleted: ${deleted}"
+            echo "- Already absent: ${already_absent}"
+            echo "- Failed: ${failures}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          echo "deleted=${deleted} already_absent=${already_absent} failures=${failures}"
+          if [ "${failures}" -ne 0 ]; then
+            exit 1
+          fi
