@@ -482,16 +482,19 @@ export function attachStudioBg3dEditorInsertHost(h) {
       if (!captureFrame) {
         throw new Error("LT capture frame admission failed.");
       }
-      // Clamp DPR to 1..3; the size resolver enforces pixel and 4096-edge budgets.
-      const captureDensity = Math.min(3, Math.max(1, globalThis.devicePixelRatio || 1));
+      // Canvas insertion is a persisted output-pixel contract, not a display-density contract.
+      // Multiplying the historical 640px default by the monitor DPR made identical scenes render
+      // differently across displays and produced visibly soft images once placed on a webtoon canvas.
+      // Keep the result deterministic and never insert below a 2160px production source height.
+      const requestedCaptureHeight = Math.min(
+        4096,
+        Math.max(2160, Math.round(adapted.document.output.exportHeight)),
+      );
       const captureSize = resolveStudioBg3dLtCaptureSize({
         sourceWidth: sourceSize.width,
         sourceHeight: sourceSize.height,
         aspectRatio: captureFrame.aspectRatio,
-        requestedHeight: Math.min(
-          4096,
-          Math.round(adapted.document.output.exportHeight * captureDensity)
-        ),
+        requestedHeight: requestedCaptureHeight,
         maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
       });
       if (!captureSize) {
