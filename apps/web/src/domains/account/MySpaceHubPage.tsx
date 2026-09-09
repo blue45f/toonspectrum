@@ -13,6 +13,10 @@ import {
 import Link from "@/compat/router-link";
 import { useSession } from "@/compat/auth-session-store";
 import { Container } from "@/shared/components/section";
+import {
+  FriendlyQuickGuide,
+  PurposeExperienceStage,
+} from "@/shared/components/purpose-experience-stage";
 import { useI18n } from "@/shared/lib/i18n";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -27,6 +31,15 @@ const COPY = {
     open: "열기",
     section: "내 공간 바로가기",
     stats: ["읽기 상태", "평가", "컬렉션"],
+    visualLabel: "작업을 저장하고 다른 활동으로 이어가는 내 공간 흐름 미리보기",
+    visualSteps: ["작업 확인", "안전하게 저장", "다음 행동"],
+    guideTitle: "내 데이터가 어디에 있는지 헷갈린다면",
+    guideBody: "브라우저 기록, 계정 데이터, Studio 프로젝트는 역할이 다릅니다. 이 기준만 기억하면 됩니다.",
+    guideSteps: [
+      "Studio 프로젝트는 프로젝트 센터에서 저장·복구·공유 상태를 확인합니다.",
+      "작품 감상 기록과 컬렉션은 내 서재에서 관리합니다.",
+      "설치한 에셋과 관심 에셋은 마켓의 내 에셋에서 관리합니다.",
+    ],
     destinations: [
       ["프로젝트", "최근 프로젝트, 로컬 초안, 공유 작업, 버전과 복구", "/studio/projects"],
       ["내 작품", "공개한 창작물과 시리즈, 작성자 활동", "/me?tab=posts"],
@@ -47,6 +60,15 @@ const COPY = {
     open: "Open",
     section: "My Space destinations",
     stats: ["Reading states", "Ratings", "Collections"],
+    visualLabel: "Preview of checking work, saving safely and continuing to the next task",
+    visualSteps: ["Check work", "Save safely", "Continue"],
+    guideTitle: "If you are unsure where your data lives",
+    guideBody: "Browser history, account data and Studio projects have different roles. Remember these three rules.",
+    guideSteps: [
+      "Use Project Center to check save, recovery and sharing state for Studio projects.",
+      "Manage reading history and collections in My Library.",
+      "Manage installed and bookmarked assets in Market > My Assets.",
+    ],
     destinations: [
       ["Projects", "Recent projects, local drafts, shared work, versions and recovery", "/studio/projects"],
       ["My works", "Published creator works, series and author activity", "/me?tab=posts"],
@@ -83,24 +105,39 @@ export function MySpaceHubPage() {
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <header className="relative overflow-hidden rounded-3xl border border-line bg-panel/55 p-5 sm:p-8 lg:p-10">
         <div aria-hidden="true" className="absolute -right-24 -top-32 size-80 rounded-full bg-[radial-gradient(circle,_oklch(0.72_0.185_42/0.18),_transparent_70%)]" />
-        <div className="relative max-w-3xl">
-          <p className="eyebrow text-accent">{copy.eyebrow}</p>
-          <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,6vw,4.2rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">{copy.title}</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
-          <p className="mt-5 max-w-2xl rounded-xl border border-line bg-card/60 px-4 py-3 text-xs leading-5 text-fg-3" aria-live="polite">
-            {syncCopy}
-          </p>
-        </div>
+        <div className="relative grid gap-7 xl:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] xl:items-center">
+          <div className="max-w-3xl">
+            <p className="eyebrow text-accent">{copy.eyebrow}</p>
+            <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,6vw,4.2rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">{copy.title}</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
+            <p className="mt-5 max-w-2xl rounded-xl border border-line bg-card/60 px-4 py-3 text-xs leading-5 text-fg-3" aria-live="polite">
+              {syncCopy}
+            </p>
 
-        <dl className="relative mt-6 grid max-w-2xl grid-cols-3 gap-2">
-          {copy.stats.map((label, index) => (
-            <div key={label} className="rounded-xl border border-line bg-card/70 p-3">
-              <dd className="numeral text-xl font-bold text-fg sm:text-2xl">{hydrated ? stats[index] : "·"}</dd>
-              <dt className="mt-1 text-[0.68rem] text-fg-3 sm:text-xs">{label}</dt>
-            </div>
-          ))}
-        </dl>
+            <dl className="mt-6 grid max-w-2xl grid-cols-3 gap-2">
+              {copy.stats.map((label, index) => (
+                <div key={label} className="rounded-xl border border-line bg-card/70 p-3 transition-colors hover:border-accent/30 hover:bg-raised/70">
+                  <dd className="numeral text-xl font-bold text-fg sm:text-2xl">{hydrated ? stats[index] : "·"}</dd>
+                  <dt className="mt-1 text-[0.68rem] text-fg-3 sm:text-xs">{label}</dt>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <PurposeExperienceStage
+            variant="my"
+            ariaLabel={copy.visualLabel}
+            steps={copy.visualSteps}
+          />
+        </div>
       </header>
+
+      <FriendlyQuickGuide
+        className="mt-5"
+        title={copy.guideTitle}
+        description={copy.guideBody}
+        steps={copy.guideSteps}
+      />
 
       <section className="mt-10" aria-labelledby="my-space-destinations">
         <h2 id="my-space-destinations" className="text-2xl font-bold tracking-tight text-fg">{copy.section}</h2>
@@ -114,14 +151,15 @@ export function MySpaceHubPage() {
                 href={href}
                 className={
                   primary
-                    ? "group flex min-h-40 flex-col rounded-2xl border border-line bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-                    : "group flex min-h-32 flex-col rounded-2xl border border-line/80 bg-panel/45 p-4 transition-colors hover:border-accent/35 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                    ? "group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-card p-4 transition-all hover:-translate-y-1 hover:border-accent/40 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                    : "group flex min-h-32 flex-col rounded-2xl border border-line/80 bg-panel/45 p-4 transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 }
               >
-                <span className="grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-colors group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
-                <strong className="mt-4 text-sm text-fg">{title}</strong>
-                <span className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">{body}</span>
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} aria-hidden="true" /></span>
+                {primary ? <span aria-hidden="true" className="absolute -right-8 -top-8 size-24 rounded-full bg-accent/0 blur-2xl transition-colors group-hover:bg-accent/15" /> : null}
+                <span className="relative grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-all group-hover:-rotate-3 group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
+                <strong className="relative mt-4 text-sm text-fg">{title}</strong>
+                <span className="relative mt-1.5 flex-1 text-xs leading-5 text-fg-3">{body}</span>
+                <span className="relative mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
               </Link>
             );
           })}

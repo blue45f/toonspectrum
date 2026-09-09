@@ -1,4 +1,6 @@
 /** Authored native compositions, not flattened art or color-generated variants. */
+import { STUDIO_AUTHORED_SCENE_TEMPLATES_V2 } from "./studio-authored-scene-templates-v2";
+
 import type { SceneSeed, SceneSeedBubble, SceneSeedFrame, SceneSeedText, SceneTemplate } from "../studio-scene-templates";
 
 function frame(x: number, y: number, width: number, height: number, bgColor = "#ffffff"): SceneSeedFrame {
@@ -83,4 +85,5 @@ export const STUDIO_AUTHORED_SCENE_TEMPLATES: readonly SceneTemplate[] = [
     bubble("복귀 예정일을 입력하세요", 114, 190, 492, 90, "system", "none"),
     bubble("더 좋은 이야기로 돌아오겠습니다.\n기다려 주셔서 감사합니다.", 84, 342, 552, 158, "box", "none"),
   ]),
+  ...STUDIO_AUTHORED_SCENE_TEMPLATES_V2,
 ];

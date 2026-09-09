@@ -1,12 +1,19 @@
 import {
-  Compass,
+  Boxes,
+  ChevronDown,
   GitCompareArrows,
   Library,
   PackagePlus,
   Palette,
+  Search,
   ShieldCheck,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
+
+import {
+  MARKET_RESOURCE_FAMILIES,
+  marketResourceBrowseHref,
+} from "../models/market-resource-taxonomy";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -16,8 +23,20 @@ interface MarketNavHeaderProps {
   className?: string;
 }
 
+function familyIsActive(
+  familyId: (typeof MARKET_RESOURCE_FAMILIES)[number]["id"],
+  kind: string | null,
+): boolean {
+  if (familyId === "template") return kind === "template";
+  if (familyId === "2d") return kind === "asset";
+  if (familyId === "3d") return kind === "3d-asset" || kind === "3d-preset";
+  if (familyId === "brush") return kind === "brush";
+  return kind === "palette" || kind === "filter";
+}
+
 export function MarketNavHeader({ className }: MarketNavHeaderProps) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const kind = new URLSearchParams(search).get("kind");
   const findingAsset =
     pathname === "/market"
     || pathname === "/market/browse"
@@ -27,116 +46,130 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
   const myAssets = pathname === "/market/library" || pathname === "/market/wishlist";
   const distributing = pathname === "/market/manage" || pathname === "/market/publish";
 
-  const navItems = [
-    {
-      href: "/market",
-      label: "에셋 찾기",
-      icon: Compass,
-      active: findingAsset,
-      current: pathname === "/market",
-    },
-    {
-      href: "/market/library",
-      label: "내 에셋",
-      icon: Library,
-      active: myAssets,
-      current: myAssets,
-    },
-    {
-      href: "/market/manage",
-      label: "배포 관리",
-      icon: PackagePlus,
-      active: distributing,
-      current: distributing,
-    },
-  ] as const;
-
-  const secondaryItems = [
-    { href: "/market/browse", label: "상세 탐색", icon: Compass },
-    { href: "/market/fit", label: "제작 조건", icon: ShieldCheck },
-    { href: "/market/compare", label: "에셋 비교", icon: GitCompareArrows },
-  ] as const;
-
   return (
-    <nav
-      aria-label="마켓 주요 내비게이션"
-      className={cn(
-        "mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-line/70 pb-4 pt-1",
-        className,
-      )}
-    >
-      <div className="min-w-0">
+    <nav aria-label="마켓 주요 내비게이션" className={cn("mb-6 border-b border-line/70 pb-4 pt-1", className)}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={item.current ? "page" : undefined}
-                className={cn(
-                  "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors duration-150 pointer-coarse:min-h-11",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
-                  item.active
-                    ? "bg-accent text-on-accent shadow-sm"
-                    : "bg-raised/60 text-fg-2 hover:bg-raised hover:text-fg",
-                )}
-              >
-                <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-                {item.label}
-              </Link>
-            );
-          })}
+          <Link
+            href="/market"
+            aria-current={pathname === "/market" ? "page" : undefined}
+            className={cn(
+              "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors pointer-coarse:min-h-11",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+              findingAsset ? "bg-accent text-on-accent" : "bg-raised/60 text-fg-2 hover:bg-raised hover:text-fg",
+            )}
+          >
+            <Search className="size-3.5" aria-hidden="true" />
+            찾아보기
+          </Link>
+          <Link
+            href="/market/library"
+            aria-current={myAssets ? "page" : undefined}
+            className={cn(
+              "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors pointer-coarse:min-h-11",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+              myAssets ? "bg-accent text-on-accent" : "bg-raised/60 text-fg-2 hover:bg-raised hover:text-fg",
+            )}
+          >
+            <Library className="size-3.5" aria-hidden="true" />
+            내 리소스
+          </Link>
+          <Link
+            href="/market/manage"
+            aria-current={distributing ? "page" : undefined}
+            className={cn(
+              "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors pointer-coarse:min-h-11",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+              distributing ? "bg-accent text-on-accent" : "bg-raised/60 text-fg-2 hover:bg-raised hover:text-fg",
+            )}
+          >
+            <PackagePlus className="size-3.5" aria-hidden="true" />
+            배포하기
+          </Link>
         </div>
-        <div
-          className="mt-1 flex max-w-full items-center gap-1 overflow-x-auto"
-          role="group"
-          aria-label="마켓 보조 도구"
-        >
-          {secondaryItems.map((item) => {
-            const Icon = item.icon;
-            const active = pathname === item.href || (item.href === "/market/browse" && pathname.startsWith("/market/resource"));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
+
+        <div className="flex items-center gap-2">
+          {findingAsset ? (
+            <details className="group relative" open={pathname === "/market/fit" || pathname === "/market/compare" ? true : undefined}>
+              <summary
                 className={cn(
-                  "inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-[0.68rem] font-medium transition-colors pointer-coarse:min-h-11 pointer-coarse:px-3 pointer-coarse:text-xs",
-                  active ? "text-accent" : "text-fg-3 hover:text-fg",
+                  buttonClass({ variant: "ghost", size: "sm" }),
+                  "cursor-pointer list-none gap-1.5 [&::-webkit-details-marker]:hidden",
                 )}
               >
-                <Icon className="size-3" aria-hidden="true" />{item.label}
-              </Link>
-            );
-          })}
+                <Boxes className="size-3.5" aria-hidden="true" />
+                선택 도구
+                <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="absolute right-0 z-30 mt-1 w-64 rounded-2xl border border-line bg-panel p-2 shadow-xl">
+                <p className="px-2 pb-2 pt-1 text-[0.65rem] leading-5 text-fg-3">
+                  후보를 찾은 뒤 호환성을 점검하거나 여러 리소스를 비교할 때 사용하세요.
+                </p>
+                <Link
+                  href="/market/fit"
+                  aria-current={pathname === "/market/fit" ? "page" : undefined}
+                  className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg"
+                >
+                  <ShieldCheck className="size-4 text-accent" aria-hidden="true" />
+                  제작 조건으로 맞는 리소스 찾기
+                </Link>
+                <Link
+                  href="/market/compare"
+                  aria-current={pathname === "/market/compare" ? "page" : undefined}
+                  className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg"
+                >
+                  <GitCompareArrows className="size-4 text-accent" aria-hidden="true" />
+                  후보 리소스 비교하기
+                </Link>
+              </div>
+            </details>
+          ) : null}
+          <Link href="/studio" className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}>
+            <Palette className="size-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">Studio</span>
+          </Link>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Link
-          href="/market/publish"
-          className={buttonClass({
-            variant: "solid",
-            size: "sm",
-            className: "gap-1.5",
-          })}
-        >
-          <PackagePlus className="size-3.5" aria-hidden="true" />
-          <span>에셋 배포</span>
-        </Link>
-        <Link
-          href="/studio"
-          className={buttonClass({
-            variant: "outline",
-            size: "sm",
-            className: "gap-1.5 text-fg-2 hover:text-fg",
-          })}
-        >
-          <Palette className="size-3.5" aria-hidden="true" />
-          <span className="hidden sm:inline">Studio</span>
-        </Link>
-      </div>
+      {findingAsset ? (
+        <div className="mt-3 border-t border-line/50 pt-3">
+          <p className="mb-2 text-[0.65rem] font-semibold text-fg-3">무엇을 찾고 있나요?</p>
+          <div className="flex max-w-full items-stretch gap-1.5 overflow-x-auto pb-1">
+            <Link
+              href="/market/browse"
+              aria-current={!kind && pathname === "/market/browse" ? "page" : undefined}
+              className={cn(
+                "inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold transition-colors",
+                !kind && pathname === "/market/browse"
+                  ? "border-accent/50 bg-accent-soft text-accent"
+                  : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
+              )}
+            >
+              전체
+            </Link>
+            {MARKET_RESOURCE_FAMILIES.map((family) => {
+              const Icon = family.icon;
+              const active = familyIsActive(family.id, kind);
+              return (
+                <Link
+                  key={family.id}
+                  href={marketResourceBrowseHref(family.subcategories[0])}
+                  aria-current={active && pathname === "/market/browse" ? "location" : undefined}
+                  className={cn(
+                    "group inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
+                    active
+                      ? "border-accent/50 bg-accent-soft text-accent"
+                      : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
+                  )}
+                >
+                  <Icon className="size-4" style={active ? undefined : { color: `oklch(0.72 0.11 ${family.accentHue})` }} aria-hidden="true" />
+                  {family.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </nav>
   );
 }

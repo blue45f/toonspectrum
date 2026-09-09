@@ -1,10 +1,13 @@
 name: Creator homepage quality
+
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - 'apps/web/src/domains/marketing/**'
+      - 'apps/web/src/domains/creator-resources/CreatorHomePage.tsx'
+      - 'apps/web/src/domains/creator-resources/ProductIntentStart.tsx'
       - 'apps/web/src/shared/components/site-header*'
       - 'apps/web/src/shared/components/site-footer.tsx'
       - 'apps/web/src/shared/components/pwa-install-nudge*'
@@ -12,12 +15,13 @@ on:
       - 'apps/web/src/shared/lib/pwa-install-store*'
       - 'apps/web/src/app/AppShell.tsx'
       - 'apps/web/src/app/main.tsx'
-      - 'apps/web/src/app/routes/**'
+      - 'apps/web/src/app/routes/groups/catalog.routes.tsx'
       - 'apps/web/public/brand/**'
       - 'apps/web/public/i18n/app/**'
       - 'apps/web/public/manifest.webmanifest'
       - 'media/brand-film/**'
       - 'automation/n8n/**'
+      - 'scripts/verify-purpose-first-home.mjs'
       - 'scripts/verify-creator-home.mjs'
       - 'scripts/verify-creator-film-upgrades.mjs'
       - 'scripts/verify-creator-home-navigation.mjs'
@@ -28,6 +32,8 @@ on:
     branches: [main]
     paths:
       - 'apps/web/src/domains/marketing/**'
+      - 'apps/web/src/domains/creator-resources/CreatorHomePage.tsx'
+      - 'apps/web/src/domains/creator-resources/ProductIntentStart.tsx'
       - 'apps/web/src/shared/components/site-header*'
       - 'apps/web/src/shared/components/site-footer.tsx'
       - 'apps/web/src/shared/components/pwa-install-nudge*'
@@ -35,61 +41,112 @@ on:
       - 'apps/web/src/shared/lib/pwa-install-store*'
       - 'apps/web/src/app/AppShell.tsx'
       - 'apps/web/src/app/main.tsx'
-      - 'apps/web/src/app/routes/**'
+      - 'apps/web/src/app/routes/groups/catalog.routes.tsx'
       - 'apps/web/public/brand/**'
       - 'apps/web/public/i18n/app/**'
       - 'apps/web/public/manifest.webmanifest'
       - 'media/brand-film/**'
       - 'automation/n8n/**'
+      - 'scripts/verify-purpose-first-home.mjs'
       - 'scripts/verify-creator-home.mjs'
       - 'scripts/verify-creator-film-upgrades.mjs'
       - 'scripts/verify-creator-home-navigation.mjs'
       - 'scripts/verify-creator-continuity.mjs'
       - 'scripts/creator-film-automation.test.mjs'
       - '.github/workflows/creator-home-quality.yml'
+
 permissions:
   contents: read
+
 concurrency:
-  group: creator-home-quality-${{ github.event.pull_request.number || github.sha }}
+  group: creator-home-quality-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
 jobs:
   creator-home:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: |
-          pnpm exec eslint apps/web/src/domains/marketing apps/web/src/shared/components/site-header.tsx apps/web/src/shared/components/site-header-mobile-nav.tsx apps/web/src/shared/components/site-footer.tsx apps/web/src/shared/components/pwa-install-nudge.tsx apps/web/src/shared/components/pwa-install-nudge.test.tsx apps/web/src/shared/lib/creator-continuity.ts apps/web/src/shared/lib/creator-continuity-model.ts apps/web/src/shared/lib/creator-continuity-destinations.ts apps/web/src/shared/lib/creator-continuity-plan.ts apps/web/src/shared/lib/creator-continuity-reducer.ts apps/web/src/shared/lib/creator-continuity-codec.ts apps/web/src/shared/lib/creator-continuity-store.ts apps/web/src/shared/lib/creator-continuity.test.ts apps/web/src/shared/lib/pwa-install-store.ts apps/web/src/shared/lib/pwa-install-store.test.ts apps/web/src/app/AppShell.tsx apps/web/src/app/main.tsx scripts/verify-creator-home.mjs scripts/verify-creator-film-upgrades.mjs scripts/verify-creator-home-navigation.mjs scripts/verify-creator-continuity.mjs scripts/creator-film-automation.test.mjs media/brand-film/src media/brand-film/render.mjs --max-warnings=0
-          pnpm run typecheck
-          pnpm exec vitest run apps/web/src/domains/marketing apps/web/src/shared/components/pwa-install-nudge.test.tsx apps/web/src/shared/lib/creator-continuity.test.ts apps/web/src/shared/lib/pwa-install-store.test.ts scripts/creator-film-automation.test.mjs
-          node --test scripts/creator-film-automation.test.mjs
-          pnpm run build:bundle
-      - run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg
-          pnpm exec playwright install --with-deps chromium
-      - name: Verify production homepage, films, continuity and native section navigation
+      - name: Focused homepage lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/marketing
+          apps/web/src/domains/creator-resources/CreatorHomePage.tsx
+          apps/web/src/domains/creator-resources/ProductIntentStart.tsx
+          apps/web/src/shared/components/site-header.tsx
+          apps/web/src/shared/components/site-header-mobile-nav.tsx
+          apps/web/src/shared/components/site-footer.tsx
+          apps/web/src/shared/components/pwa-install-nudge.tsx
+          apps/web/src/shared/lib/creator-continuity.ts
+          apps/web/src/shared/lib/creator-continuity-model.ts
+          apps/web/src/shared/lib/creator-continuity-destinations.ts
+          apps/web/src/shared/lib/creator-continuity-plan.ts
+          apps/web/src/shared/lib/creator-continuity-reducer.ts
+          apps/web/src/shared/lib/creator-continuity-codec.ts
+          apps/web/src/shared/lib/creator-continuity-store.ts
+          apps/web/src/shared/lib/pwa-install-store.ts
+          apps/web/src/app/AppShell.tsx
+          apps/web/src/app/main.tsx
+          scripts/verify-purpose-first-home.mjs
+          scripts/verify-creator-film-upgrades.mjs
+          scripts/verify-creator-home-navigation.mjs
+          scripts/verify-creator-continuity.mjs
+          scripts/creator-film-automation.test.mjs
+          media/brand-film/src
+          media/brand-film/render.mjs
+      - name: Focused homepage unit contracts
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/marketing
+          apps/web/src/shared/components/pwa-install-nudge.test.tsx
+          apps/web/src/shared/lib/creator-continuity.test.ts
+          apps/web/src/shared/lib/pwa-install-store.test.ts
+          scripts/creator-film-automation.test.mjs
+      - run: node --test scripts/creator-film-automation.test.mjs
+      - name: Build production homepage assets
+        run: pnpm run build:bundle
+      - name: Ensure ffmpeg is available
+        run: command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y ffmpeg)
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install-deps chromium
+      - name: Verify purpose-first home, films, continuity and navigation
         run: |
           pnpm exec vite preview --host 127.0.0.1 --port 4173 > /tmp/creator-home-preview.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" || true' EXIT
-          node scripts/verify-creator-home.mjs
+          node scripts/verify-purpose-first-home.mjs
           node scripts/verify-creator-film-upgrades.mjs
           node scripts/verify-creator-home-navigation.mjs
           node scripts/verify-creator-continuity.mjs
       - uses: actions/upload-artifact@v6
-        if: always()
+        if: failure()
         with:
-          name: creator-home-${{ github.sha }}
+          name: creator-home-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             artifacts/creator-home/
             artifacts/creator-continuity/
+            /tmp/creator-home-preview.log
           if-no-files-found: ignore
+          retention-days: 7
+      - name: Explain global gate ownership
+        run: echo 'Repository-wide typecheck and release build remain owned once by required CI/core.'

@@ -42,18 +42,20 @@ const DISCOVER_PURPOSE_PREFIXES = [
   "/author",
   "/title",
 ] as const;
-const CREATE_PURPOSE_PREFIXES = [
-  "/make",
+const STUDIO_PURPOSE_PREFIXES = [
   "/studio",
   "/shaper",
   "/brush-lab",
   "/music",
+] as const;
+const CREATE_PURPOSE_PREFIXES = [
+  "/make",
   "/research",
   "/story-lab",
   "/publishing",
   "/opportunities",
-  "/market",
 ] as const;
+const MARKET_PURPOSE_PREFIXES = ["/market"] as const;
 const COMMUNITY_PURPOSE_PREFIXES = [
   "/community",
   "/reviews",
@@ -65,8 +67,6 @@ const MY_PURPOSE_PREFIXES = [
   "/me",
   "/library",
   "/settings",
-  "/market/library",
-  "/market/wishlist",
 ] as const;
 
 function matchesPrefix(pathname: string, prefix: string): boolean {
@@ -83,19 +83,18 @@ function useDestinationActive() {
   const path = usePathname();
   return (href: string, exact?: boolean) => {
     if (exact) return path === href;
-    if (href === "/market" && pathMatchesAny(path, MY_PURPOSE_PREFIXES)) return false;
+    if (href === "/studio/projects") return path === href;
     return path === href || path.startsWith(`${href}/`);
   };
 }
 
-/** Broader state used only by the five top-level purpose choices. */
+/** Broader state used only by the top-level purpose choices. */
 function purposeActive(pathname: string, href: string, exact?: boolean): boolean {
   if (exact || href === "/") return pathname === href;
   if (href === "/discover") return pathMatchesAny(pathname, DISCOVER_PURPOSE_PREFIXES);
-  if (href === "/make") {
-    if (pathMatchesAny(pathname, MY_PURPOSE_PREFIXES)) return false;
-    return pathMatchesAny(pathname, CREATE_PURPOSE_PREFIXES);
-  }
+  if (href === "/studio/projects") return pathMatchesAny(pathname, STUDIO_PURPOSE_PREFIXES);
+  if (href === "/make") return pathMatchesAny(pathname, CREATE_PURPOSE_PREFIXES);
+  if (href === "/market") return pathMatchesAny(pathname, MARKET_PURPOSE_PREFIXES);
   if (href === "/community") return pathMatchesAny(pathname, COMMUNITY_PURPOSE_PREFIXES);
   if (href === "/my") return pathMatchesAny(pathname, MY_PURPOSE_PREFIXES);
   return matchesPrefix(pathname, href);
@@ -148,8 +147,6 @@ export function SiteHeader() {
   const create = SITE_NAVIGATION_ITEMS.make;
   const isPurposeActive = (href: string, exact?: boolean) => purposeActive(pathname, href, exact);
 
-  // 수동 닫기 뒤에는 모달 격리가 풀린 다음 호출 버튼으로 포커스를 되돌린다.
-  // 라우트 이동과 데스크톱 전환은 새 화면/내비게이션이 포커스를 이어받으므로 복원하지 않는다.
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
     window.requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }));
@@ -159,7 +156,6 @@ export function SiteHeader() {
     setMenuOpen(false);
   }, [pathname]);
 
-  // CSS가 전체 메뉴를 데스크톱 내비게이션으로 교체하는 동일 경계에서 상태와 포커스 트랩도 정리한다.
   useEffect(() => {
     const desktopNavigation = window.matchMedia(DESKTOP_NAVIGATION_QUERY);
     const closeAtDesktop = () => {

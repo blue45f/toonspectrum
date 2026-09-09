@@ -27,21 +27,28 @@ describe("site navigation information architecture", () => {
     expect(new Set(groupedItems.map((item) => item.href)).size).toBe(groupedItems.length);
   });
 
-  it("keeps the desktop model small and the purpose-first Create hub as the center mobile action", () => {
+  it("uses the desktop Home logo space for Studio while keeping Market first-class", () => {
     expect(PRIMARY_SITE_NAVIGATION.map((item) => item.id)).toEqual([
-      "home",
       "explore",
+      "studio",
+      "market",
       "community",
       "me",
     ]);
+    expect(SITE_NAVIGATION_ITEMS.studio.href).toBe("/studio/projects");
+    expect(SITE_NAVIGATION_ITEMS.make.label.ko).toBe("새로 만들기");
+  });
+
+  it("uses stable places for all five mobile tabs", () => {
     expect(MOBILE_SITE_TABS.map((item) => item.id)).toEqual([
       "home",
       "explore",
-      "make",
-      "community",
+      "studio",
+      "market",
       "me",
     ]);
-    expect(MOBILE_SITE_TABS[2]).toBe(SITE_NAVIGATION_ITEMS.make);
+    expect(MOBILE_SITE_TABS[2]).toBe(SITE_NAVIGATION_ITEMS.studio);
+    expect(MOBILE_SITE_TABS[3]).toBe(SITE_NAVIGATION_ITEMS.market);
   });
 
   it("keeps Help discoverable while leaving My library as the final utility focus destination", () => {

@@ -1,15 +1,24 @@
 name: Main full QA · Studio exhaustive
 
+# Exhaustive browser/engine coverage is intentionally post-merge. Pull requests already run
+# `core` plus focused domain browser contracts; keeping this six-lane suite off PRs avoids
+# runner starvation while preserving broad integration evidence on main and on demand.
 on:
-  pull_request:
+  push:
     branches:
       - main
+    paths:
+      - "apps/web/src/domains/creator/**"
+      - "scripts/verify-studio-**"
+      - "scripts/qa/**"
+      - ".github/workflows/main-full-qa-studio.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: main-full-qa-studio-${{ github.head_ref || github.ref_name }}
+  group: main-full-qa-studio-${{ github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -140,6 +149,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Restore Playwright browser cache
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ matrix.browsers }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install browser engines and Linux dependencies
         shell: bash
         run: |
