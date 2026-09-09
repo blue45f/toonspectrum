@@ -42,12 +42,14 @@ const DISCOVER_PURPOSE_PREFIXES = [
   "/author",
   "/title",
 ] as const;
-const CREATE_PURPOSE_PREFIXES = [
-  "/make",
+const STUDIO_PURPOSE_PREFIXES = [
   "/studio",
   "/shaper",
   "/brush-lab",
   "/music",
+] as const;
+const CREATE_PURPOSE_PREFIXES = [
+  "/make",
   "/research",
   "/story-lab",
   "/publishing",
@@ -81,6 +83,7 @@ function useDestinationActive() {
   const path = usePathname();
   return (href: string, exact?: boolean) => {
     if (exact) return path === href;
+    if (href === "/studio/projects") return path === href;
     return path === href || path.startsWith(`${href}/`);
   };
 }
@@ -89,6 +92,7 @@ function useDestinationActive() {
 function purposeActive(pathname: string, href: string, exact?: boolean): boolean {
   if (exact || href === "/") return pathname === href;
   if (href === "/discover") return pathMatchesAny(pathname, DISCOVER_PURPOSE_PREFIXES);
+  if (href === "/studio/projects") return pathMatchesAny(pathname, STUDIO_PURPOSE_PREFIXES);
   if (href === "/make") return pathMatchesAny(pathname, CREATE_PURPOSE_PREFIXES);
   if (href === "/market") return pathMatchesAny(pathname, MARKET_PURPOSE_PREFIXES);
   if (href === "/community") return pathMatchesAny(pathname, COMMUNITY_PURPOSE_PREFIXES);
