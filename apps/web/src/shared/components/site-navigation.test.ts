@@ -18,25 +18,34 @@ describe("site navigation information architecture", () => {
       "grow",
       "connect",
     ]);
-    expect(SITE_NAVIGATION_GROUPS.every((group) => group.items.length === 4)).toBe(true);
+    expect(SITE_NAVIGATION_GROUPS.find((group) => group.id === "create")?.items[0]).toBe(
+      SITE_NAVIGATION_ITEMS.make,
+    );
 
     const groupedItems = SITE_NAVIGATION_GROUPS.flatMap((group) => group.items);
     expect(new Set(groupedItems.map((item) => item.id)).size).toBe(groupedItems.length);
     expect(new Set(groupedItems.map((item) => item.href)).size).toBe(groupedItems.length);
   });
 
-  it("keeps the primary navigation focused and the studio as the center mobile action", () => {
+  it("keeps the desktop model small and the purpose-first Create hub as the center mobile action", () => {
     expect(PRIMARY_SITE_NAVIGATION.map((item) => item.id)).toEqual([
       "home",
       "explore",
-      "research",
       "community",
+      "me",
     ]);
-    expect(MOBILE_SITE_TABS).toHaveLength(5);
-    expect(MOBILE_SITE_TABS[2]).toBe(SITE_NAVIGATION_ITEMS.studio);
+    expect(MOBILE_SITE_TABS.map((item) => item.id)).toEqual([
+      "home",
+      "explore",
+      "make",
+      "community",
+      "me",
+    ]);
+    expect(MOBILE_SITE_TABS[2]).toBe(SITE_NAVIGATION_ITEMS.make);
   });
 
-  it("leaves My library as the final dialog destination for predictable focus looping", () => {
+  it("keeps Help discoverable while leaving My library as the final utility focus destination", () => {
+    expect(SITE_UTILITY_NAVIGATION[0]).toBe(SITE_NAVIGATION_ITEMS.help);
     expect(SITE_UTILITY_NAVIGATION.at(-1)).toBe(SITE_NAVIGATION_ITEMS.library);
   });
 

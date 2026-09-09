@@ -44,25 +44,26 @@ function renderWorkspaceMenu(
   return { onStateChange, onApplyLayout };
 }
 
-describe("StudioWorkspaceMenu Clip Studio transition", () => {
-  it("switches through the normal persisted workspace path in one click", () => {
+describe("StudioWorkspaceMenu friendly recommendation", () => {
+  it("starts with the lowest-complexity workspace in one click", () => {
     const { onStateChange, onApplyLayout } = renderWorkspaceMenu();
 
     const action = screen.getByRole("button", {
-      name: "클립 스튜디오형 작업공간으로 전환",
+      name: "빠른 스케치 작업공간으로 전환",
     });
-    expect(action.getAttribute("data-workspace-id")).toBe("csp-migration");
+    expect(screen.getByText("처음이라면 추천")).toBeTruthy();
+    expect(action.getAttribute("data-workspace-id")).toBe("quick-sketch");
     fireEvent.click(action);
 
     expect(onStateChange).toHaveBeenCalledTimes(1);
-    expect(onStateChange.mock.calls[0]?.[0].activeWorkspaceId).toBe("csp-migration");
+    expect(onStateChange.mock.calls[0]?.[0].activeWorkspaceId).toBe("quick-sketch");
     expect(onApplyLayout).toHaveBeenCalledWith(
       expect.any(Object),
-      "csp-migration"
+      "quick-sketch"
     );
   });
 
-  it("finds the same built-in with a familiar shorthand alias", () => {
+  it("still finds the Clip Studio migration preset with a familiar shorthand alias", () => {
     renderWorkspaceMenu();
 
     fireEvent.change(screen.getByRole("searchbox", { name: "작업공간 검색" }), {
@@ -88,7 +89,7 @@ describe("StudioWorkspaceMenu Clip Studio transition", () => {
     const { onStateChange, onApplyLayout } = renderWorkspaceMenu(dirtyLayout);
 
     fireEvent.click(screen.getByRole("button", {
-      name: "클립 스튜디오형 작업공간으로 전환",
+      name: "빠른 스케치 작업공간으로 전환",
     }));
 
     expect(screen.getByRole("alertdialog")).toBeTruthy();

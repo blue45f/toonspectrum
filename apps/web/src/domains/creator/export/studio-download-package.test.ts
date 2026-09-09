@@ -4,7 +4,6 @@ import {
   buildStudioDownloadPackage,
   sanitizeStudioDownloadFileStem,
   STUDIO_DOWNLOAD_PACKAGE_MIME,
-  StudioDownloadPackageError,
   studioDownloadPackageFileName,
 } from "./studio-download-package";
 
@@ -120,7 +119,7 @@ describe("studio verified download package", () => {
           },
         ],
       }),
-    ).rejects.toMatchObject<Partial<StudioDownloadPackageError>>({
+    ).rejects.toMatchObject({
       code: "MIME_MISMATCH",
       pageIndex: 0,
     });
@@ -148,7 +147,7 @@ describe("studio verified download package", () => {
         },
         { signal: controller.signal, crc32ExecutionMode: "direct-headless" },
       ),
-    ).rejects.toMatchObject<Partial<StudioDownloadPackageError>>({
+    ).rejects.toMatchObject({
       code: "ABORTED",
     });
   });

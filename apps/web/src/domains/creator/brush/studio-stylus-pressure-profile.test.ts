@@ -5,17 +5,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE,
   fitStudioStylusPressureProfile,
-  getStudioStylusPressureProfileSnapshot,
   normalizeStudioStylusPressureProfile,
-  resetStudioStylusPressureProfile,
   resolveStudioStylusPressureInput,
-  setStudioStylusPressureProfile,
   STUDIO_STYLUS_PRESSURE_PROFILE_POINT_LIMIT,
-  STUDIO_STYLUS_PRESSURE_PROFILE_STORAGE_KEY,
   studioStylusPressureProfileMap,
   studioStylusPressurePreset,
-  subscribeStudioStylusPressureProfile,
 } from "./studio-stylus-pressure-profile";
+import {
+  getStudioStylusPressureProfileSnapshot,
+  resetStudioStylusPressureProfile,
+  setStudioStylusPressureProfile,
+  STUDIO_STYLUS_PRESSURE_PROFILE_STORAGE_KEY,
+  subscribeStudioStylusPressureProfile,
+} from "./studio-stylus-pressure-profile-store";
 
 beforeEach(() => {
   window.localStorage.clear();

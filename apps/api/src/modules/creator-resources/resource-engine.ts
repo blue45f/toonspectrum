@@ -92,10 +92,17 @@ function validUpstreamShape(url: URL, value: unknown): boolean {
   }
   return false;
 }
+function containsControlCharacter(value: string): boolean {
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
 function optionalInputText(input: Record<string, unknown>, key: string, maximumLength = 80): string {
   const value = input[key];
   if (value === undefined || value === "") return "";
-  if (typeof value !== "string" || value.length > maximumLength || /[\u0000-\u001f\u007f]/u.test(value)) {
+  if (typeof value !== "string" || value.length > maximumLength || containsControlCharacter(value)) {
     throw new ResourceInputError("검색 필터 형식이 올바르지 않습니다.");
   }
   const trimmed = value.trim();
