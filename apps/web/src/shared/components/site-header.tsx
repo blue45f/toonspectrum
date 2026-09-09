@@ -105,7 +105,7 @@ function matchesMobileNavigationViewport() {
   return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
 }
 
-const DESKTOP_NAVIGATION_QUERY = "(min-width: 1360px)";
+const DESKTOP_NAVIGATION_QUERY = "(min-width: 1180px)";
 
 function useMobileNavigationViewport() {
   const [isMobile, setIsMobile] = useState(matchesMobileNavigationViewport);
@@ -206,7 +206,7 @@ export function SiteHeader() {
 
           <nav
             aria-label={locale === "ko" ? "주요 메뉴" : "Primary navigation"}
-            className="ml-2 hidden items-center gap-0.5 rounded-2xl border border-line/60 bg-panel/60 p-1 shadow-sm min-[1360px]:flex"
+            className="ml-2 hidden items-center gap-0.5 rounded-2xl border border-line/60 bg-panel/60 p-1 shadow-sm min-[1180px]:flex"
           >
             {PRIMARY_SITE_NAVIGATION.map((item) => {
               const active = isPurposeActive(item.href, item.exact);
@@ -285,7 +285,7 @@ export function SiteHeader() {
               aria-haspopup="dialog"
               aria-expanded={menuOpen}
               aria-controls={menuId}
-              className="grid size-11 place-items-center rounded-xl border border-line bg-card/80 text-fg-2 shadow-sm transition-colors hover:border-line-strong hover:bg-raised hover:text-fg min-[1360px]:hidden"
+              className="grid size-11 place-items-center rounded-xl border border-line bg-card/80 text-fg-2 shadow-sm transition-colors hover:border-line-strong hover:bg-raised hover:text-fg min-[1180px]:hidden"
             >
               {menuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
