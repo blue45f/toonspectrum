@@ -18,10 +18,16 @@ import {
   Store,
   TrendingUp,
 } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
 
 import { CreatorBrandFilm } from "./CreatorHomePage";
 import { HOME_COPY, creatorHomeLocale } from "./creator-home-content";
+import {
+  bindCreatorSectionNavigation,
+  creatorWorkflowIndex,
+  focusCreatorSection,
+  isPlainCreatorJump,
+} from "./creator-home-navigation";
 import "./creator-home-experience.css";
 
 import { useI18n } from "@/shared/lib/i18n";
@@ -37,10 +43,10 @@ const EXPERIENCE_COPY = {
     heroAside: "DRAW · TELL · BUILD · DISCOVER",
     jumpLabel: "홈 주요 영역 바로가기",
     jumpLinks: [
-      ["creator-start", "바로 시작"],
-      ["creator-flow", "창작 흐름"],
-      ["creator-desk", "자료와 영감"],
+      ["creator-toolkit-title", "바로 시작"],
+      ["creator-process-title", "창작 흐름"],
       ["creator-film", "브랜드 필름"],
+      ["creator-faq-title", "궁금한 점"],
     ],
     previewLabel: "툰스튜디오 창작 흐름 미리보기",
     canvasLabel: "STORY CANVAS",
@@ -85,10 +91,10 @@ const EXPERIENCE_COPY = {
     heroAside: "DRAW · TELL · BUILD · DISCOVER",
     jumpLabel: "Jump to the main home sections",
     jumpLinks: [
-      ["creator-start", "Quick start"],
-      ["creator-flow", "Creative flow"],
-      ["creator-desk", "Resources"],
+      ["creator-toolkit-title", "Quick start"],
+      ["creator-process-title", "Creative flow"],
       ["creator-film", "Brand film"],
+      ["creator-faq-title", "Questions"],
     ],
     previewLabel: "Preview the ToonStudio creative flow",
     canvasLabel: "STORY CANVAS",
@@ -131,22 +137,29 @@ const EXPERIENCE_COPY = {
 } as const;
 
 function focusExperienceSection(event: MouseEvent<HTMLAnchorElement>) {
-  if (
-    event.defaultPrevented
-    || event.button !== 0
-    || event.metaKey
-    || event.ctrlKey
-    || event.shiftKey
-    || event.altKey
-  ) return;
+  const href = event.currentTarget.hash;
+  if (!isPlainCreatorJump(event) || window.location.hash !== href) return;
+  // Browsers do not emit hashchange for an already-active fragment. Keep the
+  // URL native, but restore the expected heading focus in that one case.
+  if (focusCreatorSection(href, (id) => document.getElementById(id), true)) {
+    event.preventDefault();
+  }
+}
 
-  const sectionId = event.currentTarget.hash.slice(1);
-  if (!sectionId) return;
-  window.requestAnimationFrame(() => {
-    const section = document.getElementById(sectionId);
-    const heading = section?.querySelector<HTMLElement>("h2[tabindex='-1']");
-    heading?.focus({ preventScroll: true });
-  });
+function moveStageSelection(
+  event: KeyboardEvent<HTMLButtonElement>,
+  current: number,
+  onSelect: (index: number) => void,
+) {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const next = creatorWorkflowIndex(event.key, current, HOME_COPY.ko.stages.length);
+  if (next === null) return;
+  event.preventDefault();
+  onSelect(next);
+  event.currentTarget.parentElement
+    ?.querySelectorAll<HTMLButtonElement>("button")
+    .item(next)
+    .focus({ preventScroll: true });
 }
 
 function ExperiencePreview({
@@ -188,8 +201,13 @@ function ExperiencePreview({
           <div><b /><b /><b /><b /></div>
         </div>
       </div>
-      <figcaption className="ce-preview-footer" aria-live="polite">
-        <span><i aria-hidden="true" />{selected.label}</span>
+      <figcaption
+        id="creator-stage-description"
+        className="ce-preview-footer"
+        data-creator-stage={selected.id}
+        aria-live="polite"
+      >
+        <span><i aria-hidden="true" />{selected.title}</span>
         <Link href={selected.href}>{selected.action}<ArrowRight size={15} aria-hidden="true" /></Link>
       </figcaption>
     </figure>
@@ -203,8 +221,24 @@ export function CreatorHomeExperience() {
   const experience = EXPERIENCE_COPY[locale];
   const [stage, setStage] = useState(0);
 
+  useEffect(() => bindCreatorSectionNavigation({
+    getHash: () => window.location.hash,
+    findTarget: (id) => document.getElementById(id),
+    requestFrame: (callback) => window.requestAnimationFrame(callback),
+    cancelFrame: (handle) => window.cancelAnimationFrame(handle),
+    subscribe: (callback) => {
+      window.addEventListener("hashchange", callback);
+      return () => window.removeEventListener("hashchange", callback);
+    },
+  }), []);
+
   return (
-    <div className="creator-home creator-experience" lang={locale} data-creator-home="experience-v2">
+    <div
+      className="creator-home creator-experience"
+      lang={locale}
+      data-creator-home="studio-first"
+      data-creator-experience="v3"
+    >
       <div className="ce-ambient ce-ambient--one" aria-hidden="true" />
       <div className="ce-ambient ce-ambient--two" aria-hidden="true" />
       <div className="ce-shell">
@@ -214,7 +248,7 @@ export function CreatorHomeExperience() {
             <p className="ce-overline">{copy.eyebrow}</p>
             <h1 id="creator-home-title">{copy.title[0]}<br /><span>{copy.title[1]}</span></h1>
             <p className="ce-lead">{copy.description}</p>
-            <div className="ce-actions">
+            <div className="ce-actions ch-actions">
               <Link href="/studio" className="ce-button ce-button--primary">{copy.start}<ArrowRight size={19} aria-hidden="true" /></Link>
               <a href="#creator-film" onClick={focusExperienceSection} className="ce-button ce-button--secondary"><Play size={16} fill="currentColor" aria-hidden="true" />{copy.watch}</a>
             </div>
@@ -227,13 +261,16 @@ export function CreatorHomeExperience() {
           <div className="ce-hero-visual">
             <p className="ce-visual-caption" aria-hidden="true">{experience.heroAside}</p>
             <ExperiencePreview copy={copy} experience={experience} stage={stage} />
-            <div className="ce-stage-switcher" aria-label={experience.stageLabel}>
+            <div className="ce-stage-switcher ch-preview-options" aria-label={experience.stageLabel}>
               {copy.stages.map((item, index) => (
                 <button
                   type="button"
                   key={item.id}
                   aria-pressed={stage === index}
+                  aria-controls="creator-stage-description"
+                  data-creator-stage={item.id}
                   onClick={() => setStage(index)}
+                  onKeyDown={(event) => moveStageSelection(event, index, setStage)}
                 >
                   <span>0{index + 1}</span>{item.label.replace(/^\d+\s*/, "")}
                 </button>
@@ -244,17 +281,17 @@ export function CreatorHomeExperience() {
 
         <nav className="ce-jump-nav" aria-label={experience.jumpLabel}>
           <span>EXPLORE THE FLOW</span>
-          <div>
+          <div className="ch-jump-links">
             {experience.jumpLinks.map(([href, label], index) => (
               <a key={href} href={`#${href}`} onClick={focusExperienceSection}><span>0{index + 1}</span>{label}<ArrowRight size={14} aria-hidden="true" /></a>
             ))}
           </div>
         </nav>
 
-        <section className="ce-quick-start" id="creator-start" aria-labelledby="creator-start-title">
+        <section className="ce-quick-start" id="creator-start" aria-labelledby="creator-toolkit-title">
           <div className="ce-section-intro">
             <p className="ce-overline">{experience.quickEyebrow}</p>
-            <h2 id="creator-start-title" tabIndex={-1}>{experience.quickTitle}</h2>
+            <h2 id="creator-toolkit-title" tabIndex={-1}>{experience.quickTitle}</h2>
             <p>{experience.quickBody}</p>
           </div>
           <div className="ce-quick-grid">
@@ -273,11 +310,26 @@ export function CreatorHomeExperience() {
           </div>
         </section>
 
-        <section className="ce-flow" id="creator-flow" aria-labelledby="creator-flow-title">
+        <section className="ce-flow" id="creator-flow" aria-labelledby="creator-process-title">
           <div className="ce-flow-copy">
             <p className="ce-overline">{experience.flowEyebrow}</p>
-            <h2 id="creator-flow-title" tabIndex={-1}>{experience.flowTitle}</h2>
+            <h2 id="creator-process-title" tabIndex={-1}>{experience.flowTitle}</h2>
             <p>{experience.flowBody}</p>
+            <div className="ce-flow-switcher ch-process-options" aria-label={experience.stageLabel}>
+              {copy.stages.map((item, index) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  aria-pressed={stage === index}
+                  aria-controls="creator-stage-description"
+                  data-creator-stage={item.id}
+                  onClick={() => setStage(index)}
+                  onKeyDown={(event) => moveStageSelection(event, index, setStage)}
+                >
+                  <span>0{index + 1}</span>{item.label.replace(/^\d+\s*/, "")}
+                </button>
+              ))}
+            </div>
           </div>
           <ol className="ce-flow-list">
             {experience.flowSteps.map((step, index) => {
@@ -333,11 +385,11 @@ export function CreatorHomeExperience() {
 
         <CreatorBrandFilm copy={copy} locale={locale} />
 
-        <section className="ce-faq" aria-labelledby="creator-faq-title">
+        <section className="ce-faq ch-faq" aria-labelledby="creator-faq-title">
           <div><p className="ce-overline">{experience.faqEyebrow}</p><h2 id="creator-faq-title" tabIndex={-1}>{copy.faqTitle}</h2></div>
           <div className="ce-faq-list">
             {copy.faqs.map((faq, index) => (
-              <details key={faq.q} defaultOpen={index === 0}>
+              <details key={faq.q}>
                 <summary><span>0{index + 1}</span>{faq.q}</summary>
                 <p>{faq.a}</p>
               </details>

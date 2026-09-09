@@ -18,6 +18,11 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('id="creator-start"');
     expect(source).toContain('id="creator-flow"');
     expect(source).toContain('id="creator-desk"');
+    expect(source).toContain('id="creator-toolkit-title"');
+    expect(source).toContain('id="creator-process-title"');
+    expect(source).toContain('data-creator-home="studio-first"');
+    expect(source).toContain("bindCreatorSectionNavigation");
+    expect(source).toContain("creatorWorkflowIndex");
     expect(source).toContain("<CreatorBrandFilm");
     expect(source).toContain('href="/studio"');
     expect(source).toContain('href="/research"');

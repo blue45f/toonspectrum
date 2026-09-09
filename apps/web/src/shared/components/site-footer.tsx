@@ -92,9 +92,9 @@ export function SiteFooter() {
                 <ToonSpectrumMark className="size-7" />
               </span>
               <span>
-                <span className="block font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">
+                <h2 className="font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">
                   {siteBrand}
-                </span>
+                </h2>
                 <span className="block font-display text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-fg-3">
                   Create · Share · Discover
                 </span>
