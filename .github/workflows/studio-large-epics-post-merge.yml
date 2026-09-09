@@ -1,0 +1,88 @@
+name: Close verified Studio large epics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/web/src/domains/creator/ai/studio-stroke-proposal.ts
+      - apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.ts
+      - apps/web/src/domains/creator/animation/studio-timeline-timebase.ts
+      - apps/web/src/domains/creator/studio-asset-family-revision.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-texture-dilation.ts
+      - apps/web/src/domains/creator/ai/studio-structured-edit-proposal.ts
+      - apps/web/src/domains/creator/studio-soft-proofing.ts
+      - apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts
+      - .github/workflows/studio-large-epics-post-merge.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  close:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Re-verify merged contracts and external receipt
+        run: |
+          pnpm exec tsx scripts/verify-studio-open-issues-wave.mts
+          node <<'NODE'
+          const fs = require('node:fs');
+          const files = [
+            'docs/automation/studio-large-epics-closure-status.json',
+            'docs/automation/studio-hyper3d-live-acceptance.json',
+          ];
+          for (const file of files) {
+            if (!fs.existsSync(file)) throw new Error(`missing merged acceptance receipt: ${file}`);
+            const receipt = JSON.parse(fs.readFileSync(file, 'utf8'));
+            if (receipt.passed !== true) throw new Error(`merged receipt is not green: ${file}`);
+          }
+          NODE
+
+      - name: Close completed child issues with merged evidence
+        run: |
+          for issue in 558 559 561 562 563 569 571 573 580; do
+            if gh issue view "$issue" --repo "$REPOSITORY" --json state --jq '.state' | grep -qx OPEN; then
+              gh issue comment "$issue" --repo "$REPOSITORY" --body "완료 검증: main 커밋 ${GITHUB_SHA}에 제품 계약·집중 테스트·타입 검사·프로덕션 빌드가 병합되었고, 저장된 acceptance receipt를 재검증했습니다. #573/#561의 외부 조건은 단일 live Rodin 생성과 생성 GLB의 Blender 텍스처 round-trip receipt까지 포함합니다."
+              gh issue close "$issue" --repo "$REPOSITORY" --reason completed
+            fi
+          done
+
+      - name: Close parent epic after every child is closed
+        run: |
+          for issue in 558 559 561 562 563 569 571 573 580; do
+            state="$(gh issue view "$issue" --repo "$REPOSITORY" --json state --jq '.state')"
+            test "$state" = CLOSED
+          done
+          if gh issue view 555 --repo "$REPOSITORY" --json state --jq '.state' | grep -qx OPEN; then
+            gh issue comment 555 --repo "$REPOSITORY" --body "상위 에픽 완료: 하위 대형 이슈 9건이 모두 main ${GITHUB_SHA} 및 live/Blender acceptance receipt로 검증되어 종료되었습니다."
+            gh issue close 555 --repo "$REPOSITORY" --reason completed
+          fi
+
+      - name: Clean any temporary orchestration issues
+        run: |
+          gh api --paginate "repos/${REPOSITORY}/issues?state=open&per_page=100" \
+            --jq '.[] | select(.pull_request == null) | select(.title | startswith("[temporary]")) | .number' \
+            | while read -r issue; do
+                test -n "$issue" || continue
+                gh issue close "$issue" --repo "$REPOSITORY" --reason "not planned" \
+                  --comment "Temporary orchestration record removed after verified main merge."
+              done

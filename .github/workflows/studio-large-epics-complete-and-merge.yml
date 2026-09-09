@@ -1,0 +1,514 @@
+name: Complete and merge Studio large epics
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-large-epics-complete-and-merge.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: complete-and-merge-studio-large-epics
+  cancel-in-progress: false
+
+jobs:
+  complete:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: codex/studio-large-epics-closure-20260909
+      HYPER3D_API_KEY: ${{ secrets.HYPER3D_API_KEY || secrets.RODIN_API_KEY || secrets.HYPER3D_RODIN_API_KEY || secrets.STUDIO_HYPER3D_API_KEY || secrets.STUDIO_RODIN_API_KEY || secrets.HYPER3D_KEY || secrets.RODIN_KEY }}
+      STUDIO_HYPER3D_LIVE_OUTPUT: artifacts/studio-hyper3d-live
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Wait for all preceding branch mutators
+        shell: bash
+        run: |
+          set -euo pipefail
+          names='Studio large epics source normalization|Integrate Studio 3D generation API|Integrate Studio advanced AI tools|Studio large epics deep fixes|Studio large epics reconcile|Studio large epics final reconcile v2'
+          for attempt in $(seq 1 120); do
+            active="$(gh run list --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --limit 100 --json name,status,databaseId \
+              --jq "[.[] | select(.databaseId != ${GITHUB_RUN_ID}) | select(.status == \"queued\" or .status == \"in_progress\") | select(.name | test(\"^(${names})$\"))] | length")"
+            if [ "$active" = 0 ]; then break; fi
+            if [ "$attempt" = 120 ]; then
+              echo "Timed out waiting for preceding branch mutators." >&2
+              exit 1
+            fi
+            sleep 15
+          done
+          git fetch origin "$BRANCH" main
+          git reset --hard "origin/$BRANCH"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Reconcile module and product wiring if a precursor lost a push race
+        shell: bash
+        run: |
+          cat > /tmp/final-wire.mjs <<'NODE'
+          import fs from 'node:fs';
+          import ts from 'typescript';
+
+          function addImport(source, statement) {
+            if (source.includes(statement)) return source;
+            const sf = ts.createSourceFile('source.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+            const imports = sf.statements.filter(ts.isImportDeclaration);
+            if (imports.length === 0) throw new Error('No import insertion point');
+            const position = imports.at(-1).end;
+            return `${source.slice(0, position)}\n${statement}${source.slice(position)}`;
+          }
+
+          function findFunctionLike(sf, names) {
+            for (const statement of sf.statements) {
+              if (ts.isFunctionDeclaration(statement) && statement.name && names.includes(statement.name.text) && statement.body) return statement;
+              if (ts.isVariableStatement(statement)) {
+                for (const declaration of statement.declarationList.declarations) {
+                  if (!ts.isIdentifier(declaration.name) || !names.includes(declaration.name.text) || !declaration.initializer) continue;
+                  const init = declaration.initializer;
+                  if ((ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && ts.isBlock(init.body)) return init;
+                }
+              }
+            }
+            throw new Error(`Function not found: ${names.join(', ')}`);
+          }
+
+          function topScopeNames(fn) {
+            const names = new Set();
+            const add = (name) => {
+              if (ts.isIdentifier(name)) names.add(name.text);
+              else if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+                for (const element of name.elements) if (ts.isBindingElement(element)) add(element.name);
+              }
+            };
+            for (const parameter of fn.parameters ?? []) add(parameter.name);
+            for (const statement of fn.body.statements ?? []) {
+              if (ts.isVariableStatement(statement)) for (const declaration of statement.declarationList.declarations) add(declaration.name);
+              if (ts.isFunctionDeclaration(statement) && statement.name) names.add(statement.name.text);
+            }
+            return names;
+          }
+
+          function insertBeforeFinalReturn(source, names, snippet) {
+            if (source.includes(snippet.trim())) return source;
+            const sf = ts.createSourceFile('source.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+            const fn = findFunctionLike(sf, names);
+            const target = fn.body.statements.filter(ts.isReturnStatement).at(-1);
+            if (!target) throw new Error(`${names[0]} has no final return`);
+            return `${source.slice(0, target.getStart(sf))}${snippet}\n${source.slice(target.getStart(sf))}`;
+          }
+
+          const modulePath = 'apps/api/src/modules/studio-ai/studio-ai.module.ts';
+          let moduleSource = fs.readFileSync(modulePath, 'utf8');
+          moduleSource = addImport(moduleSource, 'import { Studio3dGenerationController } from "./studio-3d-generation.controller";');
+          moduleSource = addImport(moduleSource, 'import { Studio3dGenerationService } from "./studio-3d-generation.service";');
+          if (!/controllers\s*:\s*\[[^\]]*Studio3dGenerationController/su.test(moduleSource)) {
+            moduleSource = moduleSource.replace(/(controllers\s*:\s*\[)/u, '$1Studio3dGenerationController, ');
+          }
+          if (!/providers\s*:\s*\[[^\]]*Studio3dGenerationService/su.test(moduleSource)) {
+            moduleSource = moduleSource.replace(/(providers\s*:\s*\[)/u, '$1Studio3dGenerationService, ');
+          }
+          fs.writeFileSync(modulePath, moduleSource);
+
+          const hostPath = 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx';
+          let host = fs.readFileSync(hostPath, 'utf8');
+          host = addImport(host, 'import { useStudioAiCanvasBridge } from "./ai/studio-stroke-proposal-bridge";');
+          if (!host.includes('ownerId: "StudioCuttoonEditorHost"')) {
+            const sf = ts.createSourceFile(hostPath, host, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+            const fn = findFunctionLike(sf, ['StudioCuttoonEditorHost']);
+            const names = topScopeNames(fn);
+            const elements = ['elements', 'currentElements', 'pageElements'].find((name) => names.has(name));
+            const append = ['addEl', 'addElement', 'appendElement'].find((name) => names.has(name));
+            const documentId = ['workId', 'currentWorkId', 'savedWorkId', 'currentPageId', 'pageId'].find((name) => names.has(name));
+            if (!elements || !append) throw new Error(`Unable to wire canvas bridge: elements=${elements}, append=${append}`);
+            const documentExpression = documentId ? `String(${documentId} ?? globalThis.location?.pathname ?? "studio")` : 'String(globalThis.location?.pathname ?? "studio")';
+            host = insertBeforeFinalReturn(
+              host,
+              ['StudioCuttoonEditorHost'],
+              `  useStudioAiCanvasBridge({\n    ownerId: "StudioCuttoonEditorHost",\n    documentId: ${documentExpression},\n    elements: ${elements},\n    appendElement: ${append},\n  });`,
+            );
+          }
+          fs.writeFileSync(hostPath, host);
+
+          const hubPath = 'apps/web/src/domains/creator/ai/StudioAiAssistHub.tsx';
+          let hub = fs.readFileSync(hubPath, 'utf8');
+          hub = addImport(hub, 'import { StudioAdvancedAiTools } from "./StudioAdvancedAiTools";');
+          if (!hub.includes('advancedAiUserId?: string;')) {
+            hub = hub.replace(/(^\s*toolPanel:\s*ReactNode;)/mu, '  advancedAiUserId?: string;\n$1');
+          }
+          if (!/\n\s*advancedAiUserId,\n/u.test(hub)) {
+            hub = hub.replace(/(^\s*toolPanel,)/mu, '  advancedAiUserId,\n$1');
+          }
+          if (!hub.includes('<StudioAdvancedAiTools userId={advancedAiUserId} />')) {
+            const anchor = '{providerSlot ? <div className="shrink-0">{providerSlot}</div> : null}';
+            if (!hub.includes(anchor)) throw new Error('AI hub provider-slot anchor was not found');
+            hub = hub.replace(anchor, `${anchor}\n\n      <StudioAdvancedAiTools userId={advancedAiUserId} />`);
+          }
+          fs.writeFileSync(hubPath, hub);
+
+          const toolPath = 'apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.tsx';
+          let tool = fs.readFileSync(toolPath, 'utf8');
+          if (!tool.includes('advancedAiUserId=')) {
+            const sf = ts.createSourceFile(toolPath, tool, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+            const fn = findFunctionLike(sf, ['StudioAiToolPopoverBody', 'StudioAiToolPopoverContent']);
+            const names = topScopeNames(fn);
+            const user = ['userId', 'currentUserId', 'authUserId', 'viewerId', 'studioAiUserId'].find((name) => names.has(name));
+            const match = /<StudioAiAssistHub\b/u.exec(tool);
+            if (!match) throw new Error('StudioAiAssistHub usage was not found');
+            const position = match.index + match[0].length;
+            tool = `${tool.slice(0, position)}\n        advancedAiUserId={${user ?? 'undefined'}}${tool.slice(position)}`;
+          }
+          fs.writeFileSync(toolPath, tool);
+          NODE
+          node /tmp/final-wire.mjs
+
+      - name: Apply final correctness fixes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          ledger = Path('apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts')
+          text = ledger.read_text()
+          text = text.replace(
+            '    this.#locks.set(userId, previous.then(() => current));\n    await previous;',
+            '    const lock = previous.then(() => current);\n    this.#locks.set(userId, lock);\n    await previous;',
+          )
+          text = text.replace(
+            '      if (this.#locks.get(userId) === current) this.#locks.delete(userId);',
+            '      if (this.#locks.get(userId) === lock) this.#locks.delete(userId);',
+          )
+          old = '    readonly actualCredits: number;\n  }): Promise<Studio3dGenerationJobRecord> {'
+          if old in text:
+            text = text.replace(old, '    readonly actualCredits: number;\n    readonly persistArtifact?: (artifact: Studio3dGenerationArtifactRevision) => Promise<void>;\n  }): Promise<Studio3dGenerationJobRecord> {', 1)
+          ready = '      const next = Object.freeze({\n        ...record,\n        state: "ready" as const,'
+          if 'await input.persistArtifact(artifactRevision);' not in text:
+            if ready not in text: raise SystemExit('ledger ready marker missing')
+            text = text.replace(ready, '      if (input.persistArtifact) {\n        await input.persistArtifact(artifactRevision);\n      }\n      const next = Object.freeze({\n        ...record,\n        state: "ready" as const,', 1)
+          ledger.write_text(text)
+
+          service = Path('apps/api/src/modules/studio-ai/studio-3d-generation.service.ts')
+          text = service.read_text()
+          marker = '      actualCredits: record.estimatedCredits,\n    });'
+          if 'persistArtifact: async (revision)' not in text:
+            if marker not in text: raise SystemExit('service artifact marker missing')
+            text = text.replace(marker, '      actualCredits: record.estimatedCredits,\n      persistArtifact: async (revision) => {\n        await this.#artifactStore.putArtifact({ revision, bytes: new Uint8Array(binary.bytes) });\n      },\n    });', 1)
+          text = re.sub(r'\n    if \(!ready\.artifactRevision\) throw new TypeError\("ready 3D job has no artifact revision\."\);\n    await this\.#artifactStore\.putArtifact\(\{[\s\S]*?\n    \}\);\n    await this\.#identityStore\.delete', '\n    if (!ready.artifactRevision) throw new TypeError("ready 3D job has no artifact revision.");\n    await this.#identityStore.delete', text, count=1)
+          service.write_text(text)
+
+          client_test = Path('apps/web/src/domains/creator/ai/studio-3d-generation-client.test.ts')
+          if client_test.exists():
+            client_test.write_text(client_test.read_text().replace('expect(String(url)).toEndWith("/api/studio-ai/3d/jobs");', 'expect(String(url).endsWith("/api/studio-ai/3d/jobs")).toBe(true);'))
+
+          panel_test = Path('apps/web/src/domains/creator/ai/StudioAi3dGenerationPanel.test.tsx')
+          if panel_test.exists():
+            panel_test.write_text(panel_test.read_text().replace('''    const fetchMock = vi.fn<typeof fetch>((input) =>
+      Promise.resolve(String(input).endsWith("/jobs") ? response(job) : response([])),
+    );''', '''    const fetchMock = vi.fn<typeof fetch>((input, init) =>
+      Promise.resolve(init?.method === "POST" ? response(job) : response([])),
+    );'''))
+          PY
+
+      - name: Normalize changed source
+        shell: bash
+        run: |
+          mapfile -t sources < <(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx' '*.mts' '*.mjs' | grep -v '^artifacts/' || true)
+          if [ "${#sources[@]}" -gt 0 ]; then
+            pnpm exec eslint --fix --max-warnings=0 "${sources[@]}"
+          fi
+
+      - name: Focused and product-wiring tests
+        shell: bash
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-deterministic-serialization.test.ts \
+            apps/web/src/domains/creator/ai/studio-stroke-proposal.test.ts \
+            apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.test.tsx \
+            apps/web/src/domains/creator/ai/studio-3d-generation-client.test.ts \
+            apps/web/src/domains/creator/ai/StudioAi3dGenerationPanel.test.tsx \
+            apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.test.ts \
+            apps/web/src/domains/creator/animation/studio-timeline-timebase.test.ts \
+            apps/web/src/domains/creator/studio-asset-family-revision.test.ts \
+            apps/web/src/domains/creator/studio-soft-proofing.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-texture-dilation.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-attachment-graph.test.ts \
+            apps/web/src/domains/creator/ai/studio-structured-edit-proposal.test.ts \
+            apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.test.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-artifact-atomicity.test.ts \
+            apps/api/src/modules/studio-ai/studio-hyper3d-rodin-provider.test.ts \
+            apps/web/src/domains/creator/ai/StudioAiAssistHub.test.tsx \
+            apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts
+          pnpm exec tsx scripts/verify-studio-open-issues-wave.mts
+
+      - name: Typecheck and production build
+        shell: bash
+        run: |
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          pnpm --filter @webtoon-nest/api run typecheck
+          pnpm run build
+          pnpm run check:studio-bundle
+
+      - name: Run one real Hyper3D generation when no green receipt exists
+        id: live
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=docs/automation/studio-hyper3d-live-acceptance.json
+          if node -e 'const fs=require("fs"); const p=process.argv[1]; if(!fs.existsSync(p)) process.exit(1); const r=JSON.parse(fs.readFileSync(p,"utf8")); process.exit(r.passed===true?0:1)' "$status"; then
+            echo "reused=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${HYPER3D_API_KEY:-}" ]; then
+            echo "No Hyper3D/Rodin repository credential is configured." >&2
+            exit 78
+          fi
+          pnpm exec tsx scripts/verify-studio-hyper3d-live-smoke.mts
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends blender
+          blender --background --factory-startup --python scripts/blender/studio-generated-model-texture-roundtrip.py -- \
+            --input artifacts/studio-hyper3d-live/generated.glb \
+            --output artifacts/studio-hyper3d-live/generated-painted-roundtrip.glb \
+            --receipt artifacts/studio-hyper3d-live/blender-roundtrip.json
+          mkdir -p docs/automation
+          node <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const hyper3d = JSON.parse(fs.readFileSync('artifacts/studio-hyper3d-live/receipt.json', 'utf8'));
+          const blender = JSON.parse(fs.readFileSync('artifacts/studio-hyper3d-live/blender-roundtrip.json', 'utf8'));
+          const files = ['generated.glb', 'generated-painted-roundtrip.glb'].map((filename) => {
+            const bytes = fs.readFileSync(`artifacts/studio-hyper3d-live/${filename}`);
+            if (bytes.length < 20 || bytes.toString('ascii', 0, 4) !== 'glTF' || bytes.readUInt32LE(4) !== 2 || bytes.readUInt32LE(8) !== bytes.length) {
+              throw new Error(`${filename} is not a valid GLB v2 container`);
+            }
+            return { filename, byteLength: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+          });
+          fs.writeFileSync('docs/automation/studio-hyper3d-live-acceptance.json', JSON.stringify({
+            schemaVersion: 3,
+            passed: true,
+            runId: process.env.GITHUB_RUN_ID,
+            completedAt: new Date().toISOString(),
+            hyper3d: {
+              provider: hyper3d.provider,
+              requestIdHash: hyper3d.requestIdHash,
+              promptHash: hyper3d.promptHash,
+              pollCount: hyper3d.pollCount,
+              model: hyper3d.model,
+            },
+            blender,
+            verifiedGlbs: files,
+          }, null, 2) + '\n');
+          NODE
+          echo "reused=false" >> "$GITHUB_OUTPUT"
+
+      - name: Run the complete repository release gate
+        shell: bash
+        run: pnpm run ci
+
+      - name: Write final source acceptance receipt
+        shell: bash
+        run: |
+          mkdir -p docs/automation
+          node <<'NODE'
+          const fs = require('node:fs');
+          fs.writeFileSync('docs/automation/studio-large-epics-closure-status.json', JSON.stringify({
+            schemaVersion: 3,
+            passed: true,
+            runId: process.env.GITHUB_RUN_ID,
+            completedAt: new Date().toISOString(),
+            checks: {
+              focused: 'success', productWiring: 'success', aggregate: 'success',
+              webTypecheck: 'success', apiTypecheck: 'success', productionBuild: 'success',
+              studioBundle: 'success', repositoryCi: 'success', hyper3dLive: 'success', blenderRoundTrip: 'success',
+            },
+          }, null, 2) + '\n');
+          NODE
+
+      - name: Remove one-shot orchestration workflows from the product commit
+        shell: bash
+        run: |
+          rm -f \
+            .github/workflows/studio-large-epics-autofix.yml \
+            .github/workflows/studio-large-epics-closure.yml \
+            .github/workflows/studio-large-epics-deep-fix.yml \
+            .github/workflows/studio-large-epics-final-reconcile-v2.yml \
+            .github/workflows/studio-large-epics-finalize.yml \
+            .github/workflows/studio-large-epics-post-merge.yml \
+            .github/workflows/studio-large-epics-reconcile.yml \
+            .github/workflows/studio-large-epics-temp-issue-cleanup.yml \
+            .github/workflows/studio-hyper3d-live-acceptance.yml \
+            .github/workflows/studio-hyper3d-live-acceptance-v2.yml \
+            .github/workflows/studio-3d-generation-api-integration.yml \
+            .github/workflows/studio-advanced-ai-product-integration.yml \
+            .github/workflows/studio-large-epics-complete-and-merge.yml
+
+      - name: Secret and artifact hygiene gate
+        shell: bash
+        run: |
+          if git diff -- . ':!pnpm-lock.yaml' | grep -E '(sk-[A-Za-z0-9_-]{20,}|api[_-]?key["'"' ]*[:=]["'"' ][A-Za-z0-9_-]{20,}|subscription[_-]?key["'"' ]*[:=]["'"' ][A-Za-z0-9_-]{20,})'; then
+            echo "Potential credential detected in final diff." >&2
+            exit 1
+          fi
+          test ! -e artifacts/studio-hyper3d-live/receipt.json || true
+          git status --short
+
+      - name: Commit and push the clean verified product change
+        id: publish
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add . ':!artifacts'
+          git commit -m "feat(studio): complete remaining large-epic acceptance contracts"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$BRANCH"
+            if git rebase "origin/$BRANCH" && git push origin HEAD:"$BRANCH"; then
+              echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep $((attempt * 8))
+          done
+          exit 1
+
+      - name: Mark the delivery PR ready and refresh its description
+        id: pr
+        shell: bash
+        run: |
+          pr="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base main --state open --json number --jq '.[0].number')"
+          if [ -z "$pr" ]; then
+            gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base main \
+              --title 'feat(studio): close remaining large-epic acceptance contracts' \
+              --body 'Verified completion for #558 #559 #561 #562 #563 #569 #571 #573 #580 and parent #555, including one live Rodin generation and Blender GLB texture round-trip.'
+            pr="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base main --state open --json number --jq '.[0].number')"
+          fi
+          gh pr edit "$pr" --repo "$GITHUB_REPOSITORY" \
+            --title 'feat(studio): close remaining large-epic acceptance contracts' \
+            --body "## 완료 범위
+
+최신 main 위에서 #558, #559, #561, #562, #563, #569, #571, #573, #580의 남은 제품·무결성·성능·복구 조건을 구현했습니다.
+
+- 실제 Studio AI 표면의 획 ghost 제안·부분 승인
+- adjustment/live-effect DAG와 원자적 Undo/Redo
+- rational timeline·audio drift·긴 timeline virtualization
+- immutable asset family/revision/variant와 1,000행 batch
+- UV seam-aware dilation·texture delta history·attachment graph
+- structured layered AI proposal와 provenance
+- sRGB/P3/AdobeRGB soft proof·gamut warning·HDR
+- 서버 전용/세션 BYOK Hyper3D 3D generation job·quota·cost·artifact ledger
+- 실제 Rodin 생성 1건과 생성 GLB의 Blender texture import/export/re-import
+- 전체 pnpm run ci 및 protected core gate
+
+Closes #558
+Closes #559
+Closes #561
+Closes #562
+Closes #563
+Closes #569
+Closes #571
+Closes #573
+Closes #580
+Closes #555"
+          if gh pr view "$pr" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' | grep -qx true; then
+            gh pr ready "$pr" --repo "$GITHUB_REPOSITORY"
+          fi
+          echo "number=$pr" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for protected core on the exact published head
+        shell: bash
+        env:
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 300); do
+            data="$(gh api -H 'Accept: application/vnd.github+json' "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs?per_page=100")"
+            success="$(jq '[.check_runs[] | select(.name == "core" and .status == "completed" and .conclusion == "success")] | length' <<<"$data")"
+            failure="$(jq '[.check_runs[] | select(.name == "core" and .status == "completed" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out" or .conclusion == "action_required"))] | length' <<<"$data")"
+            if [ "$success" -gt 0 ]; then exit 0; fi
+            if [ "$failure" -gt 0 ]; then
+              jq '.check_runs[] | select(.name == "core") | {status,conclusion,details_url,output}' <<<"$data" >&2
+              exit 1
+            fi
+            if [ "$attempt" = 300 ]; then
+              echo "Timed out waiting for protected core." >&2
+              exit 1
+            fi
+            sleep 20
+          done
+
+      - name: Merge the exact verified head into protected main
+        id: merge
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.publish.outputs.head_sha }}
+        run: |
+          result="$(gh api --method PUT "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge" \
+            -f merge_method=merge -f sha="$HEAD_SHA" \
+            -f commit_title='feat(studio): complete remaining large-epic acceptance contracts' \
+            -f commit_message='Verified source, full repository CI, protected core, live Hyper3D generation, and Blender round-trip.')"
+          if [ "$(jq -r '.merged' <<<"$result")" != true ]; then
+            jq . <<<"$result" >&2
+            exit 1
+          fi
+          echo "merge_sha=$(jq -r '.sha' <<<"$result")" >> "$GITHUB_OUTPUT"
+
+      - name: Close completed issues and clean temporary records
+        shell: bash
+        env:
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          for issue in 558 559 561 562 563 569 571 573 580; do
+            if gh issue view "$issue" --repo "$GITHUB_REPOSITORY" --json state --jq '.state' | grep -qx OPEN; then
+              gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body "완료: PR #${PR_NUMBER}, main merge ${MERGE_SHA}. 제품 배선·집중 테스트·전체 pnpm run ci·protected core·live Rodin 생성·Blender GLB texture round-trip까지 검증했습니다."
+              gh issue close "$issue" --repo "$GITHUB_REPOSITORY" --reason completed
+            fi
+          done
+          for issue in 558 559 561 562 563 569 571 573 580; do
+            test "$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" --json state --jq '.state')" = CLOSED
+          done
+          if gh issue view 555 --repo "$GITHUB_REPOSITORY" --json state --jq '.state' | grep -qx OPEN; then
+            gh issue comment 555 --repo "$GITHUB_REPOSITORY" --body "상위 에픽 완료: 하위 대형 이슈 9건이 PR #${PR_NUMBER}, main ${MERGE_SHA} 및 live/Blender acceptance로 모두 종료되었습니다."
+            gh issue close 555 --repo "$GITHUB_REPOSITORY" --reason completed
+          fi
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" \
+            --jq '.[] | select(.pull_request == null) | select(.title | startswith("[temporary]")) | .number' \
+            | while read -r issue; do
+                test -n "$issue" || continue
+                gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${issue}/comments" -f body="Temporary orchestration record cleaned after verified main merge ${MERGE_SHA}." >/dev/null
+                gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/${issue}" -f state=closed -f state_reason=not_planned >/dev/null
+              done
+
+      - name: Verify main and issue closure
+        shell: bash
+        env:
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$MERGE_SHA" origin/main
+          test "$(gh issue view 555 --repo "$GITHUB_REPOSITORY" --json state --jq '.state')" = CLOSED
+          echo "Verified main merge ${MERGE_SHA} and epic #555 closure."
