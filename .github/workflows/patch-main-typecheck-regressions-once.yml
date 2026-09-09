@@ -1,0 +1,256 @@
+name: Patch main typecheck regressions once
+
+on:
+  push:
+    branches: [ci/validate-ai-comic-director-main-20260909]
+    paths:
+      - ".github/workflows/patch-main-typecheck-regressions-once.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-main-typecheck-regressions-once
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ci/validate-ai-comic-director-main-20260909
+          fetch-depth: 0
+
+      - name: Apply exact typecheck repairs
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_exact(filename: str, old: str, new: str, expected: int = 1) -> None:
+              path = Path(filename)
+              source = path.read_text(encoding="utf-8")
+              count = source.count(old)
+              if count != expected:
+                  raise RuntimeError(
+                      f"{filename}: expected {expected} match(es) for {old!r}, found {count}"
+                  )
+              path.write_text(source.replace(old, new), encoding="utf-8")
+
+          replace_exact(
+              "apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.test.tsx",
+              'expect(screen.getByRole("button", { name: "선택 획 적용" })).toBeDisabled();',
+              'expect(screen.getByRole("button", { name: "선택 획 적용" }).hasAttribute("disabled")).toBe(true);',
+              2,
+          )
+          replace_exact(
+              "apps/web/src/domains/creator/ai/studio-3d-generation-client.test.ts",
+              'expect(String(url)).toEndWith("/api/studio-ai/3d/jobs");',
+              'expect(String(url).endsWith("/api/studio-ai/3d/jobs")).toBe(true);',
+          )
+          replace_exact(
+              "apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.ts",
+              '  if (node.kind === "mask" || node.kind === "blend" || node.kind === "output") return "preserved";\n  return node.effect === "drop-shadow" || node.effect === "glow" ? "editable" : "flattened";',
+              '  if (node.kind === "mask" || node.kind === "blend" || node.kind === "output") return "preserved";\n  if (node.kind === "live-effect") {\n    return node.effect === "drop-shadow" || node.effect === "glow" ? "editable" : "flattened";\n  }\n  return "unsupported";',
+          )
+          replace_exact(
+              "apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts",
+              '/controllers\\s*:\\s*\\[[^\\]]*Studio3dGenerationController/su',
+              '/controllers\\s*:\\s*\\[[^\\]]*Studio3dGenerationController/u',
+          )
+          replace_exact(
+              "apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts",
+              '/providers\\s*:\\s*\\[[^\\]]*Studio3dGenerationService/su',
+              '/providers\\s*:\\s*\\[[^\\]]*Studio3dGenerationService/u',
+          )
+
+          proof_path = Path("apps/web/src/domains/creator/studio-soft-proofing.ts")
+          proof_source = proof_path.read_text(encoding="utf-8")
+          prefix, marker, suffix = proof_source.partition("\nfunction clamp01")
+          if not marker:
+              raise RuntimeError("studio-soft-proofing.ts: clamp01 boundary not found")
+          matrix_closures = prefix.count("      ]),")
+          if matrix_closures != 6:
+              raise RuntimeError(
+                  f"studio-soft-proofing.ts: expected 6 profile matrices, found {matrix_closures}"
+              )
+          prefix = prefix.replace("      ]),", "      ] as const),")
+          proof_path.write_text(prefix + marker + suffix, encoding="utf-8")
+
+          adapter = '''import { studioDeterministicContentId } from "../studio-deterministic-serialization";
+          import {
+            planStudioEffectGraphRender,
+            validateStudioAdjustmentEffectGraph,
+            type StudioAdjustmentEffectGraph,
+            type StudioEffectGraphEdge,
+            type StudioEffectGraphNode,
+            type StudioEffectGraphRenderPlan,
+          } from "../filter/studio-adjustment-effect-graph";
+          import type {
+            StudioLayerEffect,
+            StudioLayerEffectsStack,
+          } from "./studio-layer-effects-stack";
+
+          type StudioLayerEffectParameter = number | string | boolean | readonly number[];
+
+          function effectParameters(
+            effect: StudioLayerEffect,
+          ): Readonly<Record<string, StudioLayerEffectParameter>> {
+            switch (effect.kind) {
+              case "glow":
+                return Object.freeze({
+                  type: effect.type,
+                  color: effect.color,
+                  blur: effect.blur,
+                  intensity: effect.intensity,
+                });
+              case "drop-shadow":
+                return Object.freeze({
+                  color: effect.color,
+                  blur: effect.blur,
+                  offsetX: effect.offsetX,
+                  offsetY: effect.offsetY,
+                  opacity: effect.opacity,
+                  angleDeg: effect.angleDeg,
+                  distance: effect.distance,
+                });
+              case "relief":
+                return Object.freeze({
+                  elevationDeg: effect.elevationDeg,
+                  azimuthDeg: effect.azimuthDeg,
+                  depth: effect.depth,
+                  smoothness: effect.smoothness,
+                  lightIntensity: effect.lightIntensity,
+                  ambient: effect.ambient,
+                  invert: effect.invert,
+                });
+              case "border":
+                return Object.freeze({
+                  thickness: effect.thickness,
+                  color: effect.color,
+                  type: effect.type,
+                  respectTransparency: effect.respectTransparency,
+                  antiAliased: effect.antiAliased,
+                });
+            }
+          }
+
+          function liveEffectKind(effect: StudioLayerEffect): "glow" | "drop-shadow" | "inflate" {
+            if (effect.kind === "drop-shadow") return "drop-shadow";
+            if (effect.kind === "relief") return "inflate";
+            return "glow";
+          }
+
+          export interface StudioLayerEffectsRenderPlan extends StudioEffectGraphRenderPlan {
+            readonly backend: "cpu" | "webgpu";
+            readonly cacheKey: string;
+          }
+
+          export function studioLayerEffectsStackToGraph(
+            stack: StudioLayerEffectsStack,
+            sourceHash: string,
+          ): StudioAdjustmentEffectGraph {
+            const nodes: StudioEffectGraphNode[] = [
+              Object.freeze({
+                id: "layer-source",
+                kind: "source",
+                sourceHash,
+                embedded: true,
+                enabled: true,
+                opacity: 1,
+                blendMode: "normal",
+              }),
+            ];
+            const edges: StudioEffectGraphEdge[] = [];
+            let inputNodeId = "layer-source";
+            stack.effects.forEach((effect, index) => {
+              const nodeId = `layer-effect-${index}-${effect.id}`;
+              nodes.push(
+                Object.freeze({
+                  id: nodeId,
+                  kind: "live-effect",
+                  effect: liveEffectKind(effect),
+                  enabled: effect.enabled,
+                  opacity: 1,
+                  blendMode: "normal",
+                  parameters: Object.freeze({
+                    sourceKind: effect.kind,
+                    ...effectParameters(effect),
+                  }),
+                  preferredBackend: "auto",
+                }),
+              );
+              edges.push(Object.freeze({ from: inputNodeId, to: nodeId, input: "source" }));
+              inputNodeId = nodeId;
+            });
+            nodes.push(
+              Object.freeze({
+                id: "layer-output",
+                kind: "output",
+                enabled: true,
+                opacity: 1,
+                blendMode: "normal",
+                outputColorSpace: "srgb",
+              }),
+            );
+            edges.push(Object.freeze({ from: inputNodeId, to: "layer-output", input: "source" }));
+
+            const graph: StudioAdjustmentEffectGraph = Object.freeze({
+              version: 1,
+              id: "layer-effects-live-graph",
+              revision: stack.effects.length,
+              nodes: Object.freeze(nodes),
+              edges: Object.freeze(edges),
+              outputNodeId: "layer-output",
+            });
+            validateStudioAdjustmentEffectGraph(graph);
+            return graph;
+          }
+
+          export function planStudioLayerEffectsStack(
+            stack: StudioLayerEffectsStack,
+            sourceHash: string,
+            backend: "cpu" | "webgpu" = "webgpu",
+          ): StudioLayerEffectsRenderPlan {
+            const plan = planStudioEffectGraphRender({
+              graph: studioLayerEffectsStackToGraph(stack, sourceHash),
+              purpose: "preview",
+              webGpuAvailable: backend === "webgpu",
+              sourceColorSpace: "srgb",
+            });
+            return Object.freeze({
+              ...plan,
+              backend,
+              cacheKey: studioDeterministicContentId({
+                graphHash: plan.graphHash,
+                purpose: plan.purpose,
+                backend,
+              }),
+            });
+          }
+          '''
+          adapter = "\n".join(line[10:] if line.startswith("          ") else line for line in adapter.splitlines()) + "\n"
+          Path(
+              "apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.ts"
+          ).write_text(adapter, encoding="utf-8")
+
+          Path(".github/workflows/patch-main-typecheck-regressions-once.yml").unlink()
+
+      - name: Verify patch integrity
+        run: |
+          git diff --check
+          grep -F 'hasAttribute("disabled")' apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.test.tsx
+          grep -F 'endsWith("/api/studio-ai/3d/jobs")' apps/web/src/domains/creator/ai/studio-3d-generation-client.test.ts
+          grep -F 'if (node.kind === "live-effect")' apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.ts
+          grep -F 'planStudioEffectGraphRender' apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.ts
+          grep -F 'Studio3dGenerationController/u' apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts
+          test "$(grep -c '] as const),' apps/web/src/domains/creator/studio-soft-proofing.ts)" -ge 6
+
+      - name: Commit repairs to validation branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix(ci): repair merged main typecheck regressions"
+          git push origin HEAD:ci/validate-ai-comic-director-main-20260909
