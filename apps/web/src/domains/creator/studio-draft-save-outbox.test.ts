@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   clearStudioDraftSaveOutbox,
+  consumeRecentlyClearedStudioDraftSaveOutbox,
   createStudioDraftSaveOutboxEntry,
   isStudioDraftSaveOutboxSatisfied,
   readStudioDraftSaveOutbox,
   STUDIO_DRAFT_SAVE_OUTBOX_TTL_MS,
   studioDraftSaveOutboxKey,
+  subscribeStudioDraftSaveOutbox,
   writeStudioDraftSaveOutbox,
   type StudioDraftSaveOutboxStorage,
 } from "./studio-draft-save-outbox";
@@ -21,7 +23,7 @@ function memoryStorage(): StudioDraftSaveOutboxStorage & { readonly values: Map<
   };
 }
 
-const NOW = Date.parse("2026-09-09T05:00:00.000Z");
+const NOW = Date.now();
 
 describe("studio draft save outbox", () => {
   it("persists only bounded intent metadata and restores it after reload", () => {
@@ -83,6 +85,37 @@ describe("studio draft save outbox", () => {
     expect(clearStudioDraftSaveOutbox({ storage: throwing, workId: "work-1" })).toBe(true);
   });
 
+  it("invalidates a receipt when removal is denied but overwrite is still available", () => {
+    const backing = memoryStorage();
+    const entry = createStudioDraftSaveOutboxEntry({ workId: "work-1", now: NOW })!;
+    expect(writeStudioDraftSaveOutbox({ storage: backing, entry })).toBe(true);
+    const constrained: StudioDraftSaveOutboxStorage = {
+      getItem: backing.getItem,
+      setItem: backing.setItem,
+      removeItem: () => { throw new Error("removal denied"); },
+    };
+
+    expect(clearStudioDraftSaveOutbox({ storage: constrained, workId: "work-1" })).toBe(true);
+    expect(readStudioDraftSaveOutbox({
+      storage: constrained,
+      workId: "work-1",
+      now: NOW + 1,
+    })).toBeNull();
+  });
+
+  it("reports cleanup failure when neither removal nor invalidation is available", () => {
+    const backing = memoryStorage();
+    const entry = createStudioDraftSaveOutboxEntry({ workId: "work-1", now: NOW })!;
+    expect(writeStudioDraftSaveOutbox({ storage: backing, entry })).toBe(true);
+    const locked: StudioDraftSaveOutboxStorage = {
+      getItem: backing.getItem,
+      setItem: () => { throw new Error("overwrite denied"); },
+      removeItem: () => { throw new Error("removal denied"); },
+    };
+
+    expect(clearStudioDraftSaveOutbox({ storage: locked, workId: "work-1" })).toBe(false);
+  });
+
   it("treats a newer server revision as satisfying the queued intent", () => {
     const entry = createStudioDraftSaveOutboxEntry({
       workId: "work-1",
@@ -108,5 +141,31 @@ describe("studio draft save outbox", () => {
     expect(isStudioDraftSaveOutboxSatisfied(firstSave, null)).toBe(false);
     expect(isStudioDraftSaveOutboxSatisfied(firstSave, 1)).toBe(true);
     expect(isStudioDraftSaveOutboxSatisfied(unknownRevision, 1)).toBe(false);
+  });
+
+  it("hands a cleared receipt to the save wrapper only in the same turn", async () => {
+    const storage = memoryStorage();
+    const entry = createStudioDraftSaveOutboxEntry({
+      workId: "work-1",
+      serverRevision: 7,
+      hasServerDocument: true,
+      now: NOW,
+    })!;
+    const changes: Array<boolean> = [];
+    const unsubscribe = subscribeStudioDraftSaveOutbox(({ entry: changedEntry }) => {
+      changes.push(changedEntry !== null);
+    });
+
+    expect(writeStudioDraftSaveOutbox({ storage, entry })).toBe(true);
+    expect(clearStudioDraftSaveOutbox({ storage, workId: "work-1" })).toBe(true);
+    expect(consumeRecentlyClearedStudioDraftSaveOutbox("work-1")).toEqual(entry);
+    expect(consumeRecentlyClearedStudioDraftSaveOutbox("work-1")).toBeNull();
+    expect(changes).toEqual([true, false]);
+
+    expect(writeStudioDraftSaveOutbox({ storage, entry })).toBe(true);
+    expect(clearStudioDraftSaveOutbox({ storage, workId: "work-1" })).toBe(true);
+    await Promise.resolve();
+    expect(consumeRecentlyClearedStudioDraftSaveOutbox("work-1")).toBeNull();
+    unsubscribe();
   });
 });
