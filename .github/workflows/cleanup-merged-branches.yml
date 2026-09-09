@@ -11,6 +11,7 @@ on:
       - .github/workflows/cleanup-merged-branches.yml
       - scripts/cleanup-merged-branches.mjs
       - scripts/cleanup-superseded-actions-runs.mjs
+      - scripts/publish-cleanup-summary.mjs
 
 permissions:
   actions: write
@@ -20,8 +21,8 @@ permissions:
 
 concurrency:
   # Preserve a cleanup that has acquired a runner; a later tick may replace only stale pending work.
-  # The v2 suffix detaches this lightweight runner generation from legacy queued ubuntu-latest runs.
-  group: merged-branch-cleanup-v2
+  # The v3 suffix detaches this generation from the failed summary runner while preserving active work.
+  group: merged-branch-cleanup-v3
   cancel-in-progress: false
 
 jobs:
@@ -36,7 +37,11 @@ jobs:
           SOURCE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          for script in cleanup-merged-branches.mjs cleanup-superseded-actions-runs.mjs; do
+          for script in \
+            cleanup-merged-branches.mjs \
+            cleanup-superseded-actions-runs.mjs \
+            publish-cleanup-summary.mjs
+          do
             script_url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${SOURCE_SHA}/scripts/${script}"
             curl --fail --silent --show-error --location \
               "$script_url" \
@@ -68,51 +73,4 @@ jobs:
       - name: Publish cleanup summary
         if: always()
         shell: bash
-        run: |
-          if [[ ! -s "$RUNNER_TEMP/cleanup-report.json" ]]; then
-            {
-              echo "### Merged branch cleanup"
-              echo
-              echo "No branch cleanup report was produced."
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            node <<'NODE'
-            const { appendFileSync, readFileSync } = require("node:fs");
-            const report = JSON.parse(
-              readFileSync(`${process.env.RUNNER_TEMP}/cleanup-report.json`, "utf8"),
-            );
-            const lines = [
-              "### Merged branch cleanup",
-              "",
-              `- Deleted: ${report.deleted.length}`,
-              `- Closed duplicate PRs: ${report.closedPullRequests.length}`,
-              `- Preserved or skipped: ${report.skipped.length}`,
-            ];
-            if (report.deleted.length > 0) {
-              lines.push("", "#### Deleted branches");
-              for (const item of report.deleted) {
-                lines.push(`- \`${item.branch}\` (${item.proof})`);
-              }
-            }
-            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
-            NODE
-          fi
-
-          if [[ -s "$RUNNER_TEMP/actions-queue-cleanup.json" ]]; then
-            node <<'NODE'
-            const { appendFileSync, readFileSync } = require("node:fs");
-            const report = JSON.parse(
-              readFileSync(`${process.env.RUNNER_TEMP}/actions-queue-cleanup.json`, "utf8"),
-            );
-            const lines = [
-              "",
-              "### Actions queue cleanup",
-              "",
-              `- Active push/PR runs scanned: ${report.activeRunsScanned}`,
-              `- Superseded/closed-PR candidates: ${report.candidateRuns}`,
-              `- Cancellation requests accepted: ${report.cancelled.length}`,
-              `- Already terminal while cleaning: ${report.skipped.length}`,
-            ];
-            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
-            NODE
-          fi
+        run: node "$RUNNER_TEMP/publish-cleanup-summary.mjs"
