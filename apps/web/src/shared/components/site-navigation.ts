@@ -59,13 +59,14 @@ const item = (
 });
 
 export const SITE_NAVIGATION_ITEMS = {
-  home: item("home", "/", Home, "홈", "Home", "모든 창작 흐름의 시작", "Start from the creative home", true),
+  home: item("home", "/", Home, "홈", "Home", "이어하기와 목적별 시작", "Continue work and start by goal", true),
+  make: item("make", "/make", Palette, "만들기", "Create", "프로젝트·캔버스·캐릭터·자료에서 시작", "Start from projects, canvases, characters or references"),
   studio: item("studio", "/studio", Palette, "스튜디오", "Studio", "드로잉·레이어·필터 작업", "Draw with brushes, layers and filters"),
   comic: item("comic", "/studio/comic", LayoutGrid, "컷툰 만들기", "Comic maker", "컷·말풍선·대사를 한 화면에서", "Arrange panels, dialogue and balloons"),
   shaper: item("shaper", "/shaper", UserRoundPen, "캐릭터 셰이퍼", "Character shaper", "캐릭터·포즈·구도를 입체적으로", "Shape characters, poses and composition"),
   market: item("market", "/market", Store, "에셋 마켓", "Asset market", "배경·소품·템플릿을 작업에 연결", "Find backgrounds, props and templates"),
   gallery: item("gallery", "/create", Images, "창작 갤러리", "Creator gallery", "다른 창작자의 작품과 제작 흐름", "Meet creators and their work"),
-  explore: item("explore", "/explore", Compass, "작품 탐색", "Explore stories", "장르와 취향으로 다음 작품 발견", "Discover stories by genre and taste"),
+  explore: item("explore", "/explore", Compass, "찾기", "Discover", "장르와 취향으로 다음 작품 발견", "Discover stories by genre and taste"),
   ranking: item("ranking", "/ranking", TrendingUp, "통합 랭킹", "Rankings", "기간과 지표별 인기 흐름", "See trends across periods and signals"),
   calendar: item("calendar", "/calendar", CalendarDays, "연재 캘린더", "Release calendar", "요일별 신작과 연재 일정", "Track releases by day"),
   recommend: item("recommend", "/recommend", Sparkles, "맞춤 추천", "Recommendations", "지금 취향에 맞는 작품", "Find stories matched to your taste"),
@@ -77,36 +78,42 @@ export const SITE_NAVIGATION_ITEMS = {
   community: item("community", "/community", MessageCircle, "커뮤니티", "Community", "창작과 감상을 함께 나누기", "Share creation and discovery"),
   play: item("play", "/play", Gamepad2, "놀이터", "Playground", "가볍게 즐기는 인터랙티브 콘텐츠", "Enjoy playful interactive content"),
   library: item("library", "/library", Library, "내 서재", "My library", "저장한 작품과 취향을 한곳에서", "Keep saved stories and taste in one place"),
-  me: item("me", "/me", UserRound, "내 공간", "My space", "프로필과 나의 활동", "Open your profile and activity"),
-  settings: item("settings", "/settings", Settings, "설정", "Settings", "테마·언어·서비스 환경", "Theme, language and preferences"),
+  me: item("me", "/me", UserRound, "내 공간", "My space", "프로젝트·작품·활동·프로필로 이동", "Open projects, works, activity and profile"),
+  settings: item("settings", "/settings", Settings, "설정", "Settings", "언어·데이터·서비스 환경", "Language, data and service preferences"),
+  help: item("help", "/help", BookOpen, "도움말", "Help", "작업과 문제에서 바로 해결 경로 찾기", "Find help from the task or problem"),
 } as const satisfies Record<string, SiteNavigationItem>;
 
 const I = SITE_NAVIGATION_ITEMS;
 
+/**
+ * Desktop keeps four conventional destinations; the purpose-first Create action
+ * is rendered as the visually distinct header CTA so the top-level model stays
+ * at five choices rather than turning into another feature strip.
+ */
 export const PRIMARY_SITE_NAVIGATION = [
   I.home,
   I.explore,
-  I.research,
   I.community,
+  I.me,
 ] as const;
 
 export const SITE_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
   {
     id: "create",
     label: { ko: "만들기", en: "Create" },
-    description: { ko: "아이디어를 장면과 이야기로", en: "Turn ideas into scenes and stories" },
-    items: [I.studio, I.comic, I.shaper, I.market],
+    description: { ko: "결과를 고르고 필요한 작업공간으로", en: "Choose an outcome and open the right workspace" },
+    items: [I.make, I.studio, I.comic, I.shaper, I.market],
   },
   {
     id: "discover",
-    label: { ko: "발견하기", en: "Discover" },
+    label: { ko: "찾기", en: "Discover" },
     description: { ko: "취향과 흐름에서 다음 작품을", en: "Find the next story for your taste" },
     items: [I.explore, I.ranking, I.calendar, I.recommend],
   },
   {
     id: "grow",
-    label: { ko: "성장하기", en: "Grow" },
-    description: { ko: "영감·자료·기회를 작업으로", en: "Connect inspiration, research and opportunity" },
+    label: { ko: "자료·성장", en: "Research & grow" },
+    description: { ko: "영감·자료·기회를 실제 작업으로", en: "Connect inspiration, research and opportunity" },
     items: [I.now, I.research, I.opportunities, I.insights],
   },
   {
@@ -120,12 +127,12 @@ export const SITE_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
 export const MOBILE_SITE_TABS = [
   I.home,
   I.explore,
-  I.studio,
-  I.market,
+  I.make,
+  I.community,
   I.me,
 ] as const;
 
-export const SITE_UTILITY_NAVIGATION = [I.settings, I.library] as const;
+export const SITE_UTILITY_NAVIGATION = [I.help, I.settings, I.library] as const;
 
 export function siteNavigationLocale(locale: string): SiteNavigationLocale {
   return locale.toLowerCase().split(/[-_]/)[0] === "ko" ? "ko" : "en";
