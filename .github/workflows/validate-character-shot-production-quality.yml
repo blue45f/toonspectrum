@@ -1,0 +1,64 @@
+name: Validate Character Shot Production Quality
+
+on:
+  push:
+    branches:
+      - work/character-shot-production-materialize-20260909
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-character-shot-production-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate staged diff and architecture
+        run: |
+          git diff --check
+          pnpm run validate:architecture
+      - name: Lint Character and Shot foundation
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/character-platform/apply
+          apps/web/src/domains/creator/character-platform/compatibility/character-capability-evidence.ts
+          apps/web/src/domains/creator/character-platform/compatibility/character-capability-evidence.test.ts
+          apps/web/src/domains/creator/character-platform/pose-v3
+      - name: Test Character and Shot foundation
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/character-platform/apply/character-purpose-apply-plan.test.ts
+          apps/web/src/domains/creator/character-platform/compatibility/character-capability-evidence.test.ts
+          apps/web/src/domains/creator/character-platform/pose-v3/character-pose-v3.test.ts
+
+  typecheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
