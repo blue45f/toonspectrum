@@ -1,4 +1,4 @@
-name: Recover Brush Studio goal entry on ARM
+name: Recover Brush Studio goal entry
 
 on:
   push:
@@ -9,18 +9,19 @@ permissions:
   contents: write
 
 concurrency:
-  group: recover-brush-goal-entry-arm-v2
+  group: recover-brush-goal-entry-v3
   cancel-in-progress: true
 
 jobs:
   materialize:
-    runs-on: ubuntu-24.04-arm
+    runs-on: macos-15
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
         with:
           ref: feat/brush-goal-guided-entry-main-20260910
           fetch-depth: 0
+          filter: blob:none
           persist-credentials: true
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
@@ -28,7 +29,7 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Materialize reviewed goal chooser
+      - name: Restore reviewed component and tests
         shell: bash
         run: |
           set -euo pipefail
@@ -53,6 +54,8 @@ jobs:
                   env=os.environ.copy(),
               )
           PY
+          git show 447f5f8aeabedd7179c64b202c9fcad92a184ebe:apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx \
+            > apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx
           python3 scripts/materialize-brush-goal-entry.py
 
       - name: Validate goal-driven entry
