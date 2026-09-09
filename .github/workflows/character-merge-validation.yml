@@ -35,10 +35,6 @@ on:
 permissions:
   contents: read
 
-# main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
-# cancel-in-progress 가 취소할 대상을 갖지 못한다 (ref 로 묶어야 같은 그룹이 된다). 이 게이트는
-# 브랜치 보호의 필수 체크가 아니므로 최신 main 상태만 검증하면 되고, 커밋별 신호가 필요한
-# ci.yml 은 그대로 SHA 로 묶어 둔다.
 concurrency:
   group: character-merge-validation-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -49,9 +45,6 @@ jobs:
     timeout-minutes: 25
     env:
       NODE_OPTIONS: --max-old-space-size=8192
-    # This lane deliberately has no CI_CORE_BYPASS conditions. The main CI
-    # currently skips its core steps; a green aggregator is not evidence that
-    # this character code was linted, typechecked, tested or built.
     steps:
       - uses: actions/checkout@v6
         with:
@@ -78,6 +71,8 @@ jobs:
             apps/web/src/domains/creator/vrm/studio-vrm-portrait-framing.test.ts \
             apps/web/src/domains/creator/vrm/studio-vrm-prop-rig.test.ts \
             apps/web/src/domains/creator/vrm/studio-vrm-prop-grip-contact.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-grip-contact-targets.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts \
             apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
             apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx \
             apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
