@@ -13,8 +13,81 @@ permissions:
   contents: read
   security-events: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  inspect:
+  alerts:
+    name: Read GitHub Dependabot alert state
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Read every open Dependabot alert
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { writeFileSync } = require("node:fs");
+
+          async function main() {
+            const alerts = [];
+            for (let page = 1; ; page += 1) {
+              const url = new URL(
+                `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/dependabot/alerts`,
+              );
+              url.searchParams.set("state", "open");
+              url.searchParams.set("per_page", "100");
+              url.searchParams.set("page", String(page));
+              const response = await fetch(url, {
+                headers: {
+                  Accept: "application/vnd.github+json",
+                  Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "toonspectrum-dependabot-reconcile",
+                },
+              });
+              if (!response.ok) {
+                const body = await response.text();
+                throw new Error(`Dependabot API ${response.status}: ${body}`);
+              }
+              const pageAlerts = await response.json();
+              alerts.push(...pageAlerts);
+              if (pageAlerts.length < 100) break;
+            }
+
+            writeFileSync(
+              `${process.env.RUNNER_TEMP}/dependabot-open-alerts.json`,
+              `${JSON.stringify(alerts, null, 2)}\n`,
+            );
+            console.log(`OPEN_DEPENDABOT_ALERT_COUNT=${alerts.length}`);
+            for (const alert of alerts) {
+              const row = [
+                alert.number,
+                alert.dependency?.package?.ecosystem ?? "unknown",
+                alert.dependency?.package?.name ?? "unknown",
+                alert.dependency?.manifest_path ?? "unknown",
+                alert.dependency?.scope ?? "unknown",
+                alert.security_advisory?.ghsa_id ?? "unknown",
+                alert.security_advisory?.severity ?? "unknown",
+                alert.security_vulnerability?.vulnerable_version_range ?? "unknown",
+                alert.security_vulnerability?.first_patched_version?.identifier ?? "unavailable",
+              ];
+              console.log(row.join("\t"));
+            }
+            if (alerts.length > 0) process.exitCode = 1;
+          }
+
+          main().catch((error) => {
+            console.error(error instanceof Error ? error.message : error);
+            process.exitCode = 1;
+          });
+          NODE
+
+  audit:
+    name: Audit the exact pnpm dependency graph
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -28,39 +101,3 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Run the repository all-severity security audit
         run: pnpm run audit:security
-      - name: Read open Dependabot alerts
-        id: alerts
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api \
-            --method GET \
-            --paginate \
-            --slurp \
-            -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "repos/${GITHUB_REPOSITORY}/dependabot/alerts" \
-            -f state=open \
-            -f per_page=100 > /tmp/dependabot-alert-pages.json
-          jq 'add // []' /tmp/dependabot-alert-pages.json > /tmp/dependabot-open-alerts.json
-          count="$(jq 'length' /tmp/dependabot-open-alerts.json)"
-          echo "count=${count}" >> "${GITHUB_OUTPUT}"
-          echo "OPEN_DEPENDABOT_ALERT_COUNT=${count}"
-          jq -r '.[] | [
-            (.number | tostring),
-            (.dependency.package.ecosystem // "unknown"),
-            (.dependency.package.name // "unknown"),
-            (.dependency.manifest_path // "unknown"),
-            (.dependency.scope // "unknown"),
-            (.security_advisory.ghsa_id // "unknown"),
-            (.security_advisory.severity // "unknown"),
-            (.security_vulnerability.vulnerable_version_range // "unknown"),
-            (.security_vulnerability.first_patched_version.identifier // "unavailable")
-          ] | @tsv' /tmp/dependabot-open-alerts.json
-      - name: Require the GitHub alert view to be clear
-        if: steps.alerts.outputs.count != '0'
-        run: |
-          echo "Dependabot still reports ${{ steps.alerts.outputs.count }} open alert(s)."
-          exit 1
