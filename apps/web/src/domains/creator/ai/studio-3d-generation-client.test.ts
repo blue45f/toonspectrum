@@ -32,7 +32,9 @@ function jsonResponse(payload: unknown, status = 200): Response {
 
 describe("Studio3dGenerationHttpClient", () => {
   it("uses authenticated idempotent endpoints without placing provider keys in JSON", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(job));
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => jsonResponse(job));
     const client = new Studio3dGenerationHttpClient({
       userId: "user-1",
       fetchImpl: fetchMock,
@@ -57,9 +59,9 @@ describe("Studio3dGenerationHttpClient", () => {
   });
 
   it("advances, cancels and restores jobs through stable URLs", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockImplementation(
-      async () => jsonResponse(job),
-    );
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => jsonResponse(job));
     const client = new Studio3dGenerationHttpClient({ userId: "user-1", fetchImpl: fetchMock });
     await client.advance("job/1");
     await client.cancel("job/1");
@@ -74,9 +76,11 @@ describe("Studio3dGenerationHttpClient", () => {
   it("surfaces bounded server error messages", async () => {
     const client = new Studio3dGenerationHttpClient({
       userId: "user-1",
-      fetchImpl: vi.fn<typeof fetch>().mockResolvedValue(
-        jsonResponse({ message: "credit budget exceeded" }, 429),
-      ),
+      fetchImpl: vi
+        .fn<typeof fetch>()
+        .mockImplementation(async () =>
+          jsonResponse({ message: "credit budget exceeded" }, 429),
+        ),
     });
     await expect(client.list()).rejects.toThrow("credit budget exceeded");
   });
