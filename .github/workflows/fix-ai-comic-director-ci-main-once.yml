@@ -1,0 +1,81 @@
+name: Apply AI Comic Director CI fixes once
+
+on:
+  push:
+    branches: [fix/ai-comic-director-ci-main-20260909]
+    paths:
+      - ".github/workflows/fix-ai-comic-director-ci-main-once.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-ai-comic-director-ci-main-once
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/ai-comic-director-ci-main-20260909
+          fetch-depth: 0
+
+      - name: Apply exact regression fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          replacements = {
+              "apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts": [
+                  (
+                      'expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(7);',
+                      'expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(8);',
+                  ),
+              ],
+              "apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts": [
+                  ('imageGeneratePath: "/images/generations",', 'imageGenerationPath: "/images/generations",'),
+              ],
+              "apps/web/src/domains/creator/studio-generated-2d-backgrounds.ts": [
+                  (
+                      'import { STUDIO_GENERATED_GENRE_BG_SCENES } from "./studio-generated-2d-backgrounds-genre";',
+                      'import { STUDIO_GENERATED_INTERIOR_BG_SCENES } from "./studio-generated-2d-backgrounds-genre";',
+                  ),
+                  (
+                      'import { STUDIO_GENERATED_INTERIOR_BG_SCENES } from "./studio-generated-2d-backgrounds-interiors";',
+                      'import { STUDIO_GENERATED_GENRE_BG_SCENES } from "./studio-generated-2d-backgrounds-interiors";',
+                  ),
+              ],
+          }
+
+          for filename, edits in replacements.items():
+              path = Path(filename)
+              source = path.read_text(encoding="utf-8")
+              for old, new in edits:
+                  matches = source.count(old)
+                  if matches != 1:
+                      raise RuntimeError(
+                          f"{filename}: expected one exact match for {old!r}, found {matches}"
+                      )
+                  source = source.replace(old, new, 1)
+              path.write_text(source, encoding="utf-8")
+
+          Path(".github/workflows/fix-ai-comic-director-ci-main-once.yml").unlink()
+
+      - name: Verify patch integrity
+        run: |
+          git diff --check
+          grep -F 'route.kind)).size).toBe(8)' apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
+          grep -F 'imageGenerationPath: "/images/generations"' apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts
+          grep -F 'STUDIO_GENERATED_INTERIOR_BG_SCENES } from "./studio-generated-2d-backgrounds-genre"' apps/web/src/domains/creator/studio-generated-2d-backgrounds.ts
+          grep -F 'STUDIO_GENERATED_GENRE_BG_SCENES } from "./studio-generated-2d-backgrounds-interiors"' apps/web/src/domains/creator/studio-generated-2d-backgrounds.ts
+
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "fix(ci): repair AI comic director integration regressions"
+          git push origin HEAD:fix/ai-comic-director-ci-main-20260909
