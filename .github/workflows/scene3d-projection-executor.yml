@@ -18,9 +18,11 @@ jobs:
           ref: feat/scene3d-runtime-projection-20260910
           fetch-depth: 0
           persist-credentials: true
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+          cache: pnpm
       - name: Materialize projection product code
         shell: bash
         run: |
@@ -70,7 +72,6 @@ jobs:
       - name: Validate projection scope
         shell: bash
         run: |
-          corepack enable
           pnpm install --frozen-lockfile
           pnpm exec vitest run \
             apps/web/src/domains/creator/scene3d/studio-scene3d-document.test.ts \
