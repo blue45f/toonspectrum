@@ -11,13 +11,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: cleanup-remaining-retired-branches-20260909
+  group: cleanup-remaining-retired-branches-20260909-pass2
   cancel-in-progress: false
 
 jobs:
   cleanup:
     name: Delete verified merged, superseded, and transfer-only branches
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -31,9 +31,9 @@ jobs:
           set -u
 
           # Classification was performed against main before this workflow was merged:
-          # - merged PR heads: #1119, #1120 and earlier merged PRs
+          # - merged PR heads: #1119, #1120, #1121 and earlier merged PRs
           # - superseded branches: product changes already present in newer main implementations
-          # - transfer-only branches: source snapshots, split payloads and one-shot workflows
+          # - transfer-only branches: source snapshots, split payloads, archive audits and one-shot workflows
           branches=(
             'ci/full-main-ai-comic-director-20260909'
             'codex/source-snapshot-latest-20260909'
@@ -55,9 +55,11 @@ jobs:
             'fix/studio-layer-tab-accessibility-20260909'
             'fix/studio-tooltip-ci-final-20260909'
             'fix/vercel-api-build-contracts-20260909'
+            'ops/audit-view-navigator-archive-20260909-pass17'
             'ops/final-targeted-predecessor-cleanup-macos-20260909-pass15'
             'work/character-shot-production-materialize-20260909'
             'ops/cleanup-remaining-branches-20260909'
+            'ops/cleanup-remaining-branches-pass2-20260909'
           )
 
           deleted=0
