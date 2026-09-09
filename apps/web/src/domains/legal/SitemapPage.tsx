@@ -84,6 +84,7 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
       destination("/market/library", "내 에셋", "My assets", "획득한 리소스 관리", "Manage acquired resources"),
       destination("/market/wishlist", "찜한 에셋", "Saved assets", "나중에 사용할 리소스", "Keep resources for later"),
       destination("/references", "작품 레퍼런스", "Story references", "공식 자료 탐색과 연구 노트", "Explore official sources and notes"),
+      destination("/research/assets", "레퍼런스 아틀라스", "Reference atlas", "복식·소품·미술 자료를 장면별로", "Browse costume, prop and art references by scene"),
       destination("/research/books", "글로벌 판본 탐색", "Global editions", "Open Library·openBD 메타데이터 검색", "Search Open Library and openBD metadata"),
     ],
   },
