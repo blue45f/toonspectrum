@@ -1,0 +1,108 @@
+name: Finalize studio pixel pencil pro
+
+on:
+  push:
+    branches:
+      - feat/studio-pixel-pencil-pro-v2-20260909
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: read
+
+concurrency:
+  group: finalize-studio-pixel-pencil-pro
+  cancel-in-progress: true
+
+jobs:
+  merge:
+    if: ${{ contains(github.event.head_commit.message, '[pixel-pencil-pro-core-applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FEATURE_BRANCH: feat/studio-pixel-pencil-pro-v2-20260909
+    steps:
+      - name: Sparse checkout finalization files
+        run: |
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git sparse-checkout init --cone
+          git sparse-checkout set .github
+          git -c protocol.version=2 fetch \
+            --depth=1 \
+            --filter=blob:none \
+            origin \
+            "+refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}"
+          git checkout -B "${FEATURE_BRANCH}" "refs/remotes/origin/${FEATURE_BRANCH}"
+
+      - name: Resolve or create the MR
+        id: pr
+        run: |
+          PR_NUMBER=$(gh pr list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --head "${FEATURE_BRANCH}" \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          if [ -z "${PR_NUMBER}" ]; then
+            PR_URL=$(gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
+              --head "${FEATURE_BRANCH}" \
+              --base main \
+              --title "feat(studio): 픽셀펜 전문 드로잉 코어 고도화" \
+              --body "정수 픽셀 팁, pixel-perfect 코너 보정, 픽셀 대칭, 안전한 입력 예산 및 회귀 테스트를 추가합니다.")
+            PR_NUMBER=$(gh pr view "${PR_URL}" --repo "${GITHUB_REPOSITORY}" --json number --jq .number)
+          fi
+          echo "number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
+          gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json url --jq .url
+
+      - name: Remove temporary delivery automation
+        run: |
+          rm -f .github/workflows/finalize-studio-pixel-pencil-pro.yml
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core.yml
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core-v2.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No temporary automation remains"
+          else
+            git commit -m "chore(studio): remove pixel pencil delivery automation"
+            git push origin HEAD:"${FEATURE_BRANCH}"
+          fi
+
+      - name: Enable guarded squash auto-merge
+        run: |
+          gh pr merge "${{ steps.pr.outputs.number }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --squash \
+            --auto \
+            --delete-branch
+
+      - name: Confirm merged state
+        run: |
+          for attempt in $(seq 1 180); do
+            STATE=$(gh pr view "${{ steps.pr.outputs.number }}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json state \
+              --jq .state)
+            if [ "${STATE}" = "MERGED" ]; then
+              gh pr view "${{ steps.pr.outputs.number }}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --json number,url,mergedAt,mergeCommit \
+                --jq '{number,url,mergedAt,mergeCommit}'
+              exit 0
+            fi
+            if [ "${STATE}" = "CLOSED" ]; then
+              echo "MR closed without merge" >&2
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "Timed out before required checks allowed merge" >&2
+          gh pr checks "${{ steps.pr.outputs.number }}" --repo "${GITHUB_REPOSITORY}" || true
+          exit 1
