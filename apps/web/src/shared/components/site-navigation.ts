@@ -60,8 +60,8 @@ const item = (
 
 export const SITE_NAVIGATION_ITEMS = {
   home: item("home", "/", Home, "홈", "Home", "이어하기와 목적별 시작", "Continue work and start by goal", true),
-  make: item("make", "/make", Palette, "만들기", "Create", "프로젝트·캔버스·캐릭터·자료에서 시작", "Start from projects, canvases, characters or references"),
-  studio: item("studio", "/studio", Palette, "스튜디오", "Studio", "드로잉·레이어·필터 작업", "Draw with brushes, layers and filters"),
+  make: item("make", "/make", Palette, "새로 만들기", "New", "결과를 고르면 가장 알맞은 작업공간으로 안내", "Choose an outcome and open the right workspace"),
+  studio: item("studio", "/studio/projects", Palette, "Studio", "Studio", "프로젝트를 열고 드로잉·레이어·3D·검수까지 제작", "Open projects and create with drawing, layers, 3D and review"),
   comic: item("comic", "/studio/comic", LayoutGrid, "컷툰 만들기", "Comic maker", "컷·말풍선·대사를 한 화면에서", "Arrange panels, dialogue and balloons"),
   shaper: item("shaper", "/shaper", UserRoundPen, "캐릭터 셰이퍼", "Character shaper", "캐릭터·포즈·구도를 입체적으로", "Shape characters, poses and composition"),
   market: item("market", "/market", Store, "에셋 마켓", "Asset market", "찾기·설치·배포까지 창작 에셋을 한곳에서", "Find, install and publish creative assets"),
@@ -86,13 +86,13 @@ export const SITE_NAVIGATION_ITEMS = {
 const I = SITE_NAVIGATION_ITEMS;
 
 /**
- * Desktop gives the asset ecosystem its own first-class destination. Create remains
- * the visually distinct CTA, so the header communicates six stable product pillars
- * without expanding into a feature-by-feature strip.
+ * The logo already provides the conventional Home destination on desktop. That space is better
+ * spent exposing Studio, the core product, while Market remains a first-class ecosystem pillar.
+ * Create is a distinct action CTA rather than a second name for the Studio section.
  */
 export const PRIMARY_SITE_NAVIGATION = [
-  I.home,
   I.explore,
+  I.studio,
   I.market,
   I.community,
   I.me,
