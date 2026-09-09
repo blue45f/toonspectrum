@@ -6,6 +6,10 @@ const HomePage = lazyRetry(
   () => import("@/domains/creator-resources/CreatorHomePage").then((module) => ({ default: module.CreatorHomePage })),
   "HomePage",
 );
+const DiscoverHubPage = lazyRetry(
+  () => import("@/domains/catalog/DiscoverHubPage").then((module) => ({ default: module.DiscoverHubPage })),
+  "DiscoverHubPage",
+);
 const RankingPage = lazyRetry(
   () => import("@/domains/catalog/RankingPage").then((module) => ({ default: module.RankingPage })),
   "RankingPage",
@@ -69,6 +73,7 @@ const GuidePage = lazyRetry(
 
 export const catalogRoutes = defineAppRoutes([
   { id: "catalog-home", path: "/", element: <HomePage /> },
+  { id: "catalog-discover", path: "/discover", element: <DiscoverHubPage /> },
   { id: "catalog-ranking", path: "/ranking", element: <RankingPage /> },
   { id: "catalog-search", path: "/search", element: <SearchPage /> },
   { id: "catalog-recommend", path: "/recommend", element: <RecommendPage /> },
