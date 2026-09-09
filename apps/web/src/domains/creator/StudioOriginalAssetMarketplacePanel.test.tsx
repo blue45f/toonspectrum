@@ -23,7 +23,7 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
 
     expect(html).toContain('data-studio-original-marketplace="local-phase-1"');
     expect(html).toContain("독자 무료 스타터 마켓");
-    expect(html).toContain("24 FREE");
+    expect(html).toContain("72 FREE");
     expect(html).toContain("LOCAL PHASE 1");
     expect(html).toContain("결제·클라우드 동기화 없이");
     expect(html).toContain("결제 기능도 비활성");
@@ -33,29 +33,36 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
     expect(html).not.toContain("클라우드 저장 완료");
   });
 
-  it("shows package provenance, license, version, compatibility and update boundaries", () => {
+  it("shows legacy and expanded package provenance, license and compatibility", () => {
     const html = renderPanel();
 
     expect(html).not.toContain("일상 공간 블록아웃");
     expect(html).toContain("매일 쓰는 생활 소품");
     expect(html).toContain("날씨와 감정 오버레이");
     expect(html).toContain("판타지·SF 장르 소품");
+    expect(html).toContain("웹툰 UI·메신저 키트");
+    expect(html).toContain("감정·코믹 효과 키트");
+    expect(html).toContain("도시 생활 소품 키트");
+    expect(html).toContain("음식·카페 소품 키트");
+    expect(html).toContain("판타지 모험 소품 키트");
+    expect(html).toContain("자연·계절 장식 키트");
     expect(html).toContain("ToonSpectrum Lab");
     expect(html).toContain("original-procedural · CC0");
     expect(html).toContain("Canvas 2D · SVG · 모든 기기");
     expect(html).toContain("기기 로컬 · 클라우드 미지원");
-    expect(html).toContain("v1.0.0 변경 사항");
     expect(html).toContain("메타데이터 전용 로컬 명세 내보내기");
   });
 
-  it("renders all 24 selectable, draggable starter assets with real placement actions", () => {
+  it("renders all 72 selectable, draggable starter assets with real placement actions", () => {
     const html = renderPanel();
 
-    expect(html.match(/data-studio-original-asset=/g)).toHaveLength(24);
+    expect(html.match(/data-studio-original-asset=/g)).toHaveLength(72);
     expect(html).not.toContain('data-studio-original-asset="original-compact-studio-room"');
     expect(html).toContain('data-studio-original-asset="original-city-bicycle"');
+    expect(html).toContain('data-studio-original-asset="original-city-commuter-bike"');
     expect(html).toContain('data-studio-original-asset="original-night-bokeh"');
-    expect(html).toContain('data-studio-original-asset="original-sci-fi-airlock"');
+    expect(html).toContain('data-studio-original-asset="original-ui-system-window"');
+    expect(html).toContain('data-studio-original-asset="original-fantasy-magic-book"');
     expect(html).toContain("선택한 컷 또는 현재 보이는 위치에 추가");
     expect(html).toContain("캔버스로 끌어 배치할 수 있습니다.");
     expect(html).toContain('draggable="true"');
@@ -70,7 +77,7 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
     expect(html).toContain('aria-controls="studio-original-marketplace-filters"');
     expect(html).toContain("카테고리 · 복수 선택");
     expect(html).toContain("<option");
-    expect(html).toContain("무료 (3)");
+    expect(html).toContain("무료 (9)");
     expect(html).toContain("유료 (0)");
     expect(html).toContain("구독 (0)");
     expect(html).toContain("내 라이브러리");
