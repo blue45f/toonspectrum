@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import { StudioBrushV5RuntimeWorkbench } from "./StudioBrushV5RuntimeWorkbench";
 import { StudioBrushV6Workbench } from "./StudioBrushV6Workbench";
 
 export function StudioBrushLabPage() {
@@ -59,7 +60,10 @@ export function StudioBrushLabPage() {
         </div>
       </header>
 
-      <StudioBrushV6Workbench scope={scope} />
+      <div className="space-y-5">
+        <StudioBrushV6Workbench scope={scope} />
+        <StudioBrushV5RuntimeWorkbench scope={scope} />
+      </div>
     </main>
   );
 }

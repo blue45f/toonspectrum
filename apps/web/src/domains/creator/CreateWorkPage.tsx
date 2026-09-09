@@ -14,16 +14,18 @@ import {
   Trophy,
   WandSparkles,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { resolveCreatorPublicationReaderPolicy } from "./creator-publication-reader";
+import { useCreatorPublicationPageMeta } from "./creator-publication-page-meta";
+import { PublishedWorkReader } from "./PublishedWorkReader";
 import { STUDIO_RASTER_ASSETS } from "./render/studio-raster-assets";
 import { BUBBLE_VARIANTS } from "./studio-assets";
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
 import { studioDeleteWorkRequest } from "./studio-destructive-command-catalog";
 import { readWorkFx } from "./studio-motion-fx";
 import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
-import { WebtoonFxPlayer } from "./WebtoonFxPlayer";
 import { WorkFxPanel } from "./WorkFxPanel";
 
 import { CoverImage } from "@/shared/components/cover-image";
@@ -34,7 +36,6 @@ import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
 import { NotFoundPage } from "@/components/NotFoundPage";
-import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   deleteWork,
   getWork,
@@ -514,8 +515,21 @@ export function CreateWorkPage() {
   const [liking, setLiking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const publicationPolicy = useMemo(
+    () => resolveCreatorPublicationReaderPolicy(work?.doc),
+    [work?.doc],
+  );
 
-  useDocumentTitle(work?.title);
+  useCreatorPublicationPageMeta({
+    workId: work?.id ?? id ?? null,
+    title: work?.title ?? null,
+    description: work?.description ?? null,
+    cover: work?.cover ?? null,
+    authorName: work?.author.name ?? null,
+    createdAt: work?.createdAt ?? null,
+    status: work?.status ?? null,
+    directive: work ? publicationPolicy.directive : null,
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -743,17 +757,24 @@ export function CreateWorkPage() {
             <span className="numeral">{formatCount(work.views)}</span> 조회
           </span>
 
-          <Link
-            href={`/studio?remix=${encodeURIComponent(work.id)}`}
-            className={buttonClass({
-              size: "sm",
-              variant: "outline",
-              className: "gap-1.5 border-accent/40 bg-accent-soft/20 text-accent hover:bg-accent-soft/30 ml-2 border-solid",
-            })}
-          >
-            <WandSparkles size={14} />
-            <span>이어서 편집 (Remix)</span>
-          </Link>
+          {publicationPolicy.remixAllowed ? (
+            <Link
+              href={`/studio?remix=${encodeURIComponent(work.id)}`}
+              className={buttonClass({
+                size: "sm",
+                variant: "outline",
+                className: "gap-1.5 border-accent/40 bg-accent-soft/20 text-accent hover:bg-accent-soft/30 ml-2 border-solid",
+              })}
+            >
+              <WandSparkles size={14} />
+              <span>이어서 편집 (Remix)</span>
+            </Link>
+          ) : work.isOwner ? (
+            <span className="ml-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-3">
+              <WandSparkles size={14} aria-hidden />
+              리믹스 비허용
+            </span>
+          ) : null}
 
           {work.isOwner && (
             <div className="ml-auto flex items-center gap-2">
@@ -812,8 +833,16 @@ export function CreateWorkPage() {
         )}
       </header>
 
-      {/* 세로 웹툰 스크롤 — 효과툰 리더(스크롤 모션·분위기·BGM, doc.fx 기반) */}
-      <WebtoonFxPlayer pages={work.pages} fx={readWorkFx(work.doc)} title={work.title} />
+      {/* 게시 계약을 소비하는 독자 보기 — 세로 효과툰 또는 LTR/RTL 페이지 모드 */}
+      <PublishedWorkReader
+        key={work.id}
+        workId={work.id}
+        pages={work.pages}
+        fx={readWorkFx(work.doc)}
+        title={work.title}
+        policy={publicationPolicy}
+        isOwner={work.isOwner}
+      />
 
       {/* 개체/레이어 탐색기 (Inspector) */}
       <WorkInspector doc={work.doc} />
@@ -909,7 +938,17 @@ export function CreateWorkPage() {
         </nav>
       )}
 
-      <WorkComments workId={work.id} />
+      {publicationPolicy.commentsAllowed ? (
+        <WorkComments workId={work.id} />
+      ) : (
+        <section className="rounded-2xl border border-line bg-panel/30 p-5 text-center">
+          <MessageCircle size={18} className="mx-auto text-fg-3" aria-hidden />
+          <h2 className="mt-2 text-sm font-bold text-fg">댓글이 닫혀 있습니다</h2>
+          <p className="mt-1 text-xs leading-relaxed text-fg-3">
+            작가가 이 작품의 댓글을 받지 않도록 게시했습니다.
+          </p>
+        </section>
+      )}
     </Container>
   );
 }

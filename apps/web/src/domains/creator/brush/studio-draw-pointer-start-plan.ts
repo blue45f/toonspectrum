@@ -42,6 +42,11 @@ import {
 } from "./studio-brush-stamp-engine";
 import { resolveStudioCalligraphyAuthoringTip } from "./studio-calligraphy-nib-profile";
 import { captureStudioDrawPointerPressureContract } from "./studio-draw-pointer-pressure-contract";
+import {
+  DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE,
+  resolveStudioStylusPressureInput,
+  type StudioStylusPressureProfile,
+} from "./studio-stylus-pressure-profile";
 import { captureStudioPointerStartInkChannels } from "./studio-draw-pointer-start-ink-channels";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
@@ -100,6 +105,8 @@ export interface StudioDrawPointerStartInput {
   readonly pressureCurve: number;
   /** CSP min size ratio (0..1) for residual pen/marker pressure floor. */
   readonly pressureMinSize?: number;
+  /** Immutable browser-device response captured by the pointer-down coordinator. */
+  readonly stylusPressureProfile?: StudioStylusPressureProfile;
   readonly positionScale: number;
   readonly brushTip: Readonly<{
     tiltEnabled: boolean;
@@ -215,10 +222,17 @@ const resolvedStrokeWidth = drawMode === "pixel"
   const contactToothSubstrateEligible =
     drawMode === "pen"
     && resolveStudioPaperBrushMedium(brush) !== null;
+  const stylusPressureProfile = input.stylusPressureProfile
+    ?? DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE;
+  const profiledPointerPressure = resolveStudioStylusPressureInput(
+    pointer.pointerType,
+    pointer.pressure,
+    stylusPressureProfile,
+  );
   const hybridPressure = (drawMode === "pen" || lowDensityEraser) && brush !== "pen"
     ? resolveStudioHybridPressureSample(brush, {
         pointerType: pointer.pointerType,
-        rawPressure: pointer.pressure,
+        rawPressure: profiledPointerPressure,
         distance: 0,
         pressureCurve: input.pressureCurve,
         velocitySensitivityScale: input.velocitySensitivity,
@@ -229,7 +243,7 @@ const resolvedStrokeWidth = drawMode === "pixel"
     : null;
   const resolvedPressure = hybridPressure?.pressure ?? resolveBrushPressureSample({
       pointerType: pointer.pointerType,
-      rawPressure: pointer.pressure,
+      rawPressure: profiledPointerPressure,
       distance: 0,
       // The first sample has no velocity. Real pen pressure still takes precedence.
       velocityFallbackEnabled: false,

@@ -6,6 +6,7 @@
 
 import { StudioPressureCalibrationPanel } from "./StudioPressureCalibrationPanel";
 import { StudioPressureCurveEditor } from "./StudioPressureCurveEditor";
+import { StudioStylusPressurePanel } from "./StudioStylusPressurePanel";
 
 import type { ReactElement } from "react";
 
@@ -45,6 +46,7 @@ export function StudioPressureCurveGraph({
         pressureMinSize={pressureMinSize}
         density={density}
       />
+      <StudioStylusPressurePanel density={density} />
       <p className="mt-1.5 text-[0.58rem] leading-relaxed text-fg-3">
         가로=입력 필압 · 세로=획 굵기/농도. 시험선은 실제 작품에 기록되지 않으며 현재 설정만 미리 봅니다.
       </p>

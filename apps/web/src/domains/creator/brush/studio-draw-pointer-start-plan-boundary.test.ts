@@ -86,7 +86,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 페이지가 다음에 열릴 때 조용히 다시 칠해진다. `pressureModel`·`paintModel`과 정확히
     // 같은 이유·같은 모양의 capture 정책이며, 렌더러·브라우저 소유권은 여전히 밖에 있다.
     // 의도적 변경(2026-09-01): InkWash pen/water는 dab dynamics를 건너뛰고 wet/fluid로 시작한다.
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(342);
+    // 의도적 변경(2026-09-09): 순수 장치 필압 프로필을 명시 입력으로 받아 브라우저 저장소를
+    // 읽지 않고 첫 샘플을 보정한다. 프로필 수학은 별도 leaf 모듈에 남는다(342 → 370).
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(370);
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {
@@ -129,7 +131,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-07-29): 시작 플랜의 계열별 필압 설정 전달을 명시(1_120 → 1_130).
     // 의도적 변경(2026-08-03): specialist/native/GPU 표면 admission과 presentation을
     // beginStudioDrawLiveSurfaces로 추출해 onStageDown은 입력·CRDT 순서만 소유한다.
-    expect(drawDown.split("\n").length).toBeLessThanOrEqual(750);
+    // 의도적 변경(2026-09-09): pointerdown에서 장치 프로필과 pen-button policy를 한 번
+    // 스냅샷하고 순간 지우개 유효 모드를 모든 후속 표면에 전달한다(750 → 810).
+    expect(drawDown.split("\n").length).toBeLessThanOrEqual(810);
     expect(onStageDown.split("\n").length).toBeLessThanOrEqual(3_200);
     expect(liveSurfaceStart).toBeGreaterThan(-1);
     expect(liveSurface).toContain("const livingInkAdmitted =");
@@ -152,7 +156,7 @@ describe("studio draw pointer-start planning ownership boundary", () => {
 
     expectTokenOrder(onStageDown, [
       "if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit()) return",
-      "beginStudioStrokePointerSession(pointerSample)",
+      "beginStudioStrokePointerSession(pointerSample, penButtonPolicy)",
       "drawingInputSettingsRef.current = {",
       "planStudioDrawPointerStart({",
       "scheduleLiveDrawPressure(pressure)",
