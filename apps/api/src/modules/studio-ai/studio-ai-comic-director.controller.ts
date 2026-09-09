@@ -27,7 +27,6 @@ function authenticatedUserId(value: string | undefined): string {
 }
 
 @Controller("studio-ai/comic-director")
-@Header("Cache-Control", "no-store, max-age=0")
 export class StudioAiComicDirectorController {
   constructor(
     @Inject(StudioAiComicDirectorService)
@@ -35,6 +34,7 @@ export class StudioAiComicDirectorController {
   ) {}
 
   @Get("sessions")
+  @Header("Cache-Control", "no-store, max-age=0")
   listSessions(
     @Headers("x-user-id") rawUserId: string | undefined,
     @Query("limit") limit: string | undefined,
@@ -43,6 +43,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Post("sessions")
+  @Header("Cache-Control", "no-store, max-age=0")
   @HttpCode(HttpStatus.CREATED)
   createSession(
     @Headers("x-user-id") rawUserId: string | undefined,
@@ -52,6 +53,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Get("sessions/:sessionId")
+  @Header("Cache-Control", "no-store, max-age=0")
   getSession(
     @Headers("x-user-id") rawUserId: string | undefined,
     @Param("sessionId") sessionId: string,
@@ -63,6 +65,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Patch("sessions/:sessionId")
+  @Header("Cache-Control", "no-store, max-age=0")
   updateSession(
     @Headers("x-user-id") rawUserId: string | undefined,
     @Param("sessionId") sessionId: string,
@@ -76,6 +79,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Get("sessions/:sessionId/visual-bible")
+  @Header("Cache-Control", "no-store, max-age=0")
   listVisualBibleRevisions(
     @Headers("x-user-id") rawUserId: string | undefined,
     @Param("sessionId") sessionId: string,
@@ -87,6 +91,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Post("sessions/:sessionId/visual-bible")
+  @Header("Cache-Control", "no-store, max-age=0")
   @HttpCode(HttpStatus.CREATED)
   appendVisualBibleRevision(
     @Headers("x-user-id") rawUserId: string | undefined,
@@ -101,6 +106,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Get("sessions/:sessionId/jobs")
+  @Header("Cache-Control", "no-store, max-age=0")
   listJobs(
     @Headers("x-user-id") rawUserId: string | undefined,
     @Param("sessionId") sessionId: string,
@@ -109,6 +115,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Post("sessions/:sessionId/jobs")
+  @Header("Cache-Control", "no-store, max-age=0")
   @HttpCode(HttpStatus.CREATED)
   createJob(
     @Headers("x-user-id") rawUserId: string | undefined,
@@ -123,6 +130,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Patch("sessions/:sessionId/jobs/:jobId")
+  @Header("Cache-Control", "no-store, max-age=0")
   updateJob(
     @Headers("x-user-id") rawUserId: string | undefined,
     @Param("sessionId") sessionId: string,
@@ -138,6 +146,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Get("sessions/:sessionId/job-events")
+  @Header("Cache-Control", "no-store, max-age=0")
   listJobEvents(
     @Headers("x-user-id") rawUserId: string | undefined,
     @Param("sessionId") sessionId: string,
@@ -151,6 +160,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Get("sessions/:sessionId/artifacts")
+  @Header("Cache-Control", "no-store, max-age=0")
   listArtifacts(
     @Headers("x-user-id") rawUserId: string | undefined,
     @Param("sessionId") sessionId: string,
@@ -162,6 +172,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Post("sessions/:sessionId/artifacts")
+  @Header("Cache-Control", "no-store, max-age=0")
   @HttpCode(HttpStatus.CREATED)
   createArtifact(
     @Headers("x-user-id") rawUserId: string | undefined,
@@ -176,6 +187,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Get("sessions/:sessionId/approval")
+  @Header("Cache-Control", "no-store, max-age=0")
   currentApproval(
     @Headers("x-user-id") rawUserId: string | undefined,
     @Param("sessionId") sessionId: string,
@@ -187,6 +199,7 @@ export class StudioAiComicDirectorController {
   }
 
   @Post("sessions/:sessionId/approval")
+  @Header("Cache-Control", "no-store, max-age=0")
   @HttpCode(HttpStatus.CREATED)
   createApproval(
     @Headers("x-user-id") rawUserId: string | undefined,

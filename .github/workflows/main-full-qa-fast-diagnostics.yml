@@ -102,25 +102,39 @@ jobs:
   engine-core:
     name: Engine · ${{ matrix.gate }}
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 35
+    timeout-minutes: 70
     strategy:
       fail-fast: false
       matrix:
         include:
           - gate: engine
             command: pnpm run verify:studio-engine
+            browser: false
+            production_bundle: false
           - gate: brushes
             command: pnpm run verify:studio-brushes
+            browser: true
+            production_bundle: true
           - gate: brush-media
             command: pnpm run verify:studio-brush-media
+            browser: true
+            production_bundle: true
           - gate: brush-planner
             command: pnpm run verify:studio-brush-planner-quality
+            browser: false
+            production_bundle: false
           - gate: engine-selection
             command: pnpm run verify:studio-brush-engine-selection
+            browser: false
+            production_bundle: false
           - gate: native-raster
             command: pnpm run verify:studio-native-raster-tools
+            browser: true
+            production_bundle: true
           - gate: gpu-filters
             command: pnpm run verify:studio-gpu-filters
+            browser: true
+            production_bundle: true
     steps:
       - uses: actions/checkout@v6
         with:
@@ -131,13 +145,19 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install Chromium for browser-backed engine gates
+        if: ${{ matrix.browser }}
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build exact production Studio bundle for browser-backed gates
+        if: ${{ matrix.production_bundle }}
+        run: pnpm run build:bundle
       - name: Run one engine option gate
         run: ${{ matrix.command }}
 
   engine-extended:
     name: Engine extended contracts
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 70
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
         with:
@@ -148,6 +168,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install Chromium for natural-media and integration probes
+        run: pnpm exec playwright install --with-deps chromium
       - name: Hokusai, living ink and hybrid DCC
         run: |
           pnpm run verify:studio-hokusai-wasm
