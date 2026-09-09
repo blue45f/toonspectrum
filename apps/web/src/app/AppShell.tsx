@@ -5,6 +5,7 @@ import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
+import { PwaInstallNudge } from "@/shared/components/pwa-install-nudge";
 import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
 import { pingVisit } from "@/shared/lib/visits-api";
 import {
@@ -150,6 +151,7 @@ export function AppShell({
         </a>
       ) : null}
       {header}
+      <PwaInstallNudge />
       <main id="main-content" tabIndex={-1} className={mainClassName}>
         <AppRouter />
       </main>
