@@ -15,7 +15,7 @@ beforeEach(() => localStorage.clear());
 afterEach(cleanup);
 
 describe("MarketNavHeader", () => {
-  it("opens the comparison route from the public navigation and marks it current", () => {
+  it("opens the comparison route from the public navigation and marks only the precise destination current", () => {
     render(
       <MemoryRouter initialEntries={["/market/browse"]}>
         <MarketNavHeader />
@@ -32,11 +32,13 @@ describe("MarketNavHeader", () => {
     fireEvent.click(compare);
     expect(screen.getByRole("heading", { name: "비교 목록" })).toBeTruthy();
     expect(compare.getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("link", { name: "탐색" }).getAttribute("aria-current"))
+    expect(screen.getByRole("link", { name: "에셋 찾기" }).getAttribute("aria-current"))
+      .toBeNull();
+    expect(screen.getByRole("link", { name: "상세 탐색" }).getAttribute("aria-current"))
       .toBeNull();
   });
 
-  it("opens the production-fit lab and preserves its current navigation state", () => {
+  it("opens the production-fit lab and preserves its precise current navigation state", () => {
     render(
       <MemoryRouter initialEntries={["/market/browse"]}>
         <MarketNavHeader />
@@ -52,14 +54,16 @@ describe("MarketNavHeader", () => {
     fireEvent.click(fit);
     expect(screen.getByRole("heading", { name: "제작 적합성 랩" })).toBeTruthy();
     expect(fit.getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("link", { name: "탐색" }).getAttribute("aria-current"))
+    expect(screen.getByRole("link", { name: "에셋 찾기" }).getAttribute("aria-current"))
+      .toBeNull();
+    expect(screen.getByRole("link", { name: "상세 탐색" }).getAttribute("aria-current"))
       .toBeNull();
   });
 
   it.each([
-    ["/market/resource/example", "탐색"],
+    ["/market/resource/example", "상세 탐색"],
     ["/market/fit", "제작 조건"],
-    ["/market/publish", "판매자 센터"],
+    ["/market/publish", "배포 관리"],
   ])("preserves the current navigation for %s", (route, label) => {
     render(<MemoryRouter initialEntries={[route]}><MarketNavHeader /></MemoryRouter>);
     expect(screen.getByRole("link", { name: label }).getAttribute("aria-current"))
