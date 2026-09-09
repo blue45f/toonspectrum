@@ -41,6 +41,14 @@ export interface StudioAiProductionLaunchpadProps {
   readonly scenarioDisabledReason?: string;
 }
 
+function comicDirectorWorkspaceHref(pathname: string): string {
+  const work = /^\/studio\/work\/([^/]+)/u.exec(pathname);
+  if (work?.[1]) return `/studio/work/${work[1]}/compose/new`;
+  const remix = /^\/studio\/remix\/([^/]+)/u.exec(pathname);
+  if (remix?.[1]) return `/studio/remix/${remix[1]}/compose/new`;
+  return "/studio/compose/new";
+}
+
 function ActionCard({
   action,
   descriptionId,
@@ -112,6 +120,8 @@ export function StudioAiProductionLaunchpad({
   scenarioDisabledReason,
 }: StudioAiProductionLaunchpadProps): ReactElement | null {
   const rawId = useId().replace(/:/gu, "");
+  const pathname = typeof window === "undefined" ? "/studio" : window.location.pathname;
+  const workspaceHref = comicDirectorWorkspaceHref(pathname);
 
   if (!onOpenScenario && !onOpenSuperSuite) return null;
 
@@ -173,6 +183,17 @@ export function StudioAiProductionLaunchpad({
           />
         ))}
       </div>
+      <a
+        href={workspaceHref}
+        className={cn(
+          "mt-2 flex min-h-11 items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-xs font-bold text-fg hover:bg-accent-soft/80",
+          STUDIO_EASE,
+          STUDIO_FOCUS_RING,
+        )}
+      >
+        세션·작품 바이블·작업 복원을 갖춘 전용 작업공간 열기
+        <ArrowRight size={14} className="text-accent" aria-hidden />
+      </a>
       <a
         href="/create/promo"
         target="_blank"
