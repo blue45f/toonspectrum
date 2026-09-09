@@ -27,10 +27,11 @@ describe("site navigation information architecture", () => {
     expect(new Set(groupedItems.map((item) => item.href)).size).toBe(groupedItems.length);
   });
 
-  it("keeps the desktop model small and the purpose-first Create hub as the center mobile action", () => {
+  it("keeps Market first-class while preserving Create as the center mobile action", () => {
     expect(PRIMARY_SITE_NAVIGATION.map((item) => item.id)).toEqual([
       "home",
       "explore",
+      "market",
       "community",
       "me",
     ]);
@@ -38,10 +39,11 @@ describe("site navigation information architecture", () => {
       "home",
       "explore",
       "make",
-      "community",
+      "market",
       "me",
     ]);
     expect(MOBILE_SITE_TABS[2]).toBe(SITE_NAVIGATION_ITEMS.make);
+    expect(MOBILE_SITE_TABS[3]).toBe(SITE_NAVIGATION_ITEMS.market);
   });
 
   it("keeps Help discoverable while leaving My library as the final utility focus destination", () => {
