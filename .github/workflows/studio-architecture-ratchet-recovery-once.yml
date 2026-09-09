@@ -27,6 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import re
           from pathlib import Path
 
           path = Path('apps/web/src/domains/creator/StudioHelpCenterDialog.tsx')
@@ -38,15 +39,17 @@ jobs:
                   raise SystemExit('unexpected GPU import anchor count')
               source = source.replace(import_anchor, import_anchor + import_line, 1)
 
-          old = '''module.estimateStudioOpfsQuota(
-              typeof navigator !== "undefined" && navigator.storage?.estimate
-                ? { estimate: () => navigator.storage.estimate() }
-                : null,
-            )'''
-          new = 'module.estimateStudioOpfsQuota(studioBrowserStorageEstimator())'
-          if old not in source and new not in source:
-              raise SystemExit('storage estimator call site not found')
-          source = source.replace(old, new, 1)
+          pattern = re.compile(
+              r'module\.estimateStudioOpfsQuota\(\s*'
+              r'typeof navigator !== "undefined" && navigator\.storage\?\.estimate\s*'
+              r'\? \{ estimate: \(\) => navigator\.storage\.estimate\(\) \}\s*'
+              r': null,\s*\)'
+          )
+          replacement = 'module.estimateStudioOpfsQuota(studioBrowserStorageEstimator())'
+          if replacement not in source:
+              source, count = pattern.subn(replacement, source, count=1)
+              if count != 1:
+                  raise SystemExit(f'storage estimator call site match count={count}')
           if 'navigator.storage' in source:
               raise SystemExit('Help Center still owns navigator.storage')
           path.write_text(source, encoding='utf-8')
