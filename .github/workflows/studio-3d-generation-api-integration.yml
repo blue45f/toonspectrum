@@ -1,0 +1,101 @@
+name: Integrate Studio 3D generation API
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-3d-generation-api-integration.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Register the controller and service without replacing module policy
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          module = Path('apps/api/src/modules/studio-ai/studio-ai.module.ts')
+          text = module.read_text()
+          imports = (
+              'import { Studio3dGenerationController } from "./studio-3d-generation.controller";\n'
+              'import { Studio3dGenerationService } from "./studio-3d-generation.service";\n'
+          )
+          if 'Studio3dGenerationController' not in text:
+              matches = list(re.finditer(r'^import .*?;\n', text, flags=re.M))
+              if not matches:
+                  raise SystemExit('studio-ai.module.ts has no import insertion point')
+              position = matches[-1].end()
+              text = text[:position] + imports + text[position:]
+
+          if not re.search(r'controllers\s*:\s*\[[^\]]*Studio3dGenerationController', text, flags=re.S):
+              text, count = re.subn(
+                  r'(controllers\s*:\s*\[)',
+                  r'\1Studio3dGenerationController, ',
+                  text,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit('studio-ai.module.ts has no controllers array')
+
+          if not re.search(r'providers\s*:\s*\[[^\]]*Studio3dGenerationService', text, flags=re.S):
+              text, count = re.subn(
+                  r'(providers\s*:\s*\[)',
+                  r'\1Studio3dGenerationService, ',
+                  text,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit('studio-ai.module.ts has no providers array')
+
+          module.write_text(text)
+          PY
+
+      - name: Verify API integration
+        run: |
+          pnpm exec eslint --fix --max-warnings=0 \
+            apps/api/src/modules/studio-ai/studio-ai.module.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation.controller.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation.service.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-postgres-store.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.ts
+          pnpm exec vitest run \
+            apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.test.ts \
+            apps/api/src/modules/studio-ai/studio-hyper3d-rodin-provider.test.ts
+          pnpm --filter @webtoon-nest/api run typecheck
+
+      - name: Commit verified module wiring
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/api/src/modules/studio-ai
+          if ! git diff --cached --quiet; then
+            git commit -m "feat(api): wire resumable 3D generation into Studio AI"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
