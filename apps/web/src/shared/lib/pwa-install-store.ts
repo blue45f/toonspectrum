@@ -32,6 +32,7 @@ interface BeforeInstallPromptEvent extends Event {
   readonly userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
+const DISPLAY_MODE_QUERY = "(display-mode: standalone)";
 const SERVER_SNAPSHOT: PwaInstallSnapshot = Object.freeze({
   status: "unavailable",
   platform: "unknown",
@@ -52,27 +53,35 @@ function detectPlatform(userAgent: string): PwaInstallPlatform {
   return "unknown";
 }
 
+function displayModeStandalone(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  try {
+    return window.matchMedia(DISPLAY_MODE_QUERY).matches;
+  } catch {
+    return false;
+  }
+}
+
 function detectStandalone(): boolean {
   if (typeof window === "undefined") return false;
   const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
-  return Boolean(navigatorWithStandalone.standalone)
-    || window.matchMedia("(display-mode: standalone)").matches;
+  return Boolean(navigatorWithStandalone.standalone) || displayModeStandalone();
+}
+
+function isServiceWorkerStatus(value: unknown): value is PwaServiceWorkerStatus {
+  return value === "unknown"
+    || value === "unsupported"
+    || value === "registering"
+    || value === "active"
+    || value === "update-waiting"
+    || value === "reset"
+    || value === "failed";
 }
 
 function serviceWorkerStatusFromDocument(): PwaServiceWorkerStatus {
   if (typeof document === "undefined") return "unknown";
   const value = document.documentElement.getAttribute("data-studio-sw-update");
-  switch (value) {
-    case "unsupported":
-    case "registering":
-    case "active":
-    case "update-waiting":
-    case "reset":
-    case "failed":
-      return value;
-    default:
-      return "unknown";
-  }
+  return isServiceWorkerStatus(value) ? value : "unknown";
 }
 
 function update(patch: Partial<PwaInstallSnapshot>): void {
@@ -113,16 +122,27 @@ export function initializePwaInstallCapture(): void {
   window.addEventListener("online", () => update({ online: true }));
   window.addEventListener("offline", () => update({ online: false }));
   window.addEventListener("toonspectrum:service-worker", (event) => {
-    const detail = (event as CustomEvent<{ status?: PwaServiceWorkerStatus }>).detail;
-    if (detail?.status) update({ serviceWorkerStatus: detail.status });
+    const detail = (event as CustomEvent<{ status?: unknown }>).detail;
+    if (isServiceWorkerStatus(detail?.status)) {
+      update({ serviceWorkerStatus: detail.status });
+    }
   });
-  window.matchMedia("(display-mode: standalone)").addEventListener("change", () => {
-    const nextStandalone = detectStandalone();
-    update({
-      standalone: nextStandalone,
-      status: nextStandalone ? "installed" : snapshot.status,
-    });
-  });
+
+  if (typeof window.matchMedia === "function") {
+    const displayMode = window.matchMedia(DISPLAY_MODE_QUERY);
+    const onDisplayModeChange = () => {
+      const nextStandalone = detectStandalone();
+      update({
+        standalone: nextStandalone,
+        status: nextStandalone ? "installed" : snapshot.status,
+      });
+    };
+    if (typeof displayMode.addEventListener === "function") {
+      displayMode.addEventListener("change", onDisplayModeChange);
+    } else {
+      displayMode.addListener(onDisplayModeChange);
+    }
+  }
 }
 
 export function getPwaInstallSnapshot(): PwaInstallSnapshot {
