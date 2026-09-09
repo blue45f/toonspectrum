@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          fetch-depth: 1
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -31,7 +31,7 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Apply final accessibility review patch
+      - name: Apply final accessibility and hook review patch
         run: |
           node <<'NODE'
           const { readFileSync, writeFileSync } = require("node:fs");
@@ -54,7 +54,29 @@ jobs:
           if (!shellPattern.test(shell)) {
             throw new Error("Could not locate the passive pointer suppression hook");
           }
-          writeFileSync(shellPath, shell.replace(shellPattern, shellAfter));
+          let patchedShell = shell.replace(shellPattern, shellAfter);
+
+          const detachedHideBefore = [
+            "      hideRenderedTooltipImmediately();",
+            "      coordinator.release(tipId);",
+          ].join("\n");
+          const detachedHideAfter = [
+            "      hideRenderedToolHintElement(tipId);",
+            "      coordinator.release(tipId);",
+          ].join("\n");
+          if (!patchedShell.includes(detachedHideBefore)) {
+            throw new Error("Could not locate detached tooltip hiding logic");
+          }
+          patchedShell = patchedShell.replace(detachedHideBefore, detachedHideAfter);
+
+          const effectDepsBefore = "  }, [open]);\n\n  if (!hint)";
+          const effectDepsAfter =
+            "  }, [coordinator, interaction, open, tipId]);\n\n  if (!hint)";
+          if (!patchedShell.includes(effectDepsBefore)) {
+            throw new Error("Could not locate tooltip reposition effect dependencies");
+          }
+          patchedShell = patchedShell.replace(effectDepsBefore, effectDepsAfter);
+          writeFileSync(shellPath, patchedShell);
 
           const testPath = "apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx";
           const test = readFileSync(testPath, "utf8");
