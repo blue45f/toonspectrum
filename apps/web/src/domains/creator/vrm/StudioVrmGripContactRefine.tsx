@@ -22,11 +22,21 @@ const STUDIO_VRM_GRIP_CONTACT_PRIORITY = -1.5;
 const FINGERS = ["Index", "Middle", "Ring", "Little"] as const;
 const SEGMENTS = ["Proximal", "Intermediate", "Distal"] as const;
 const LIMITS = [80, 100, 65].map(THREE.MathUtils.degToRad);
-type ContactPass = { run(): void; release(): boolean };
 
-function createContactPasses(vrm: VRM, items: readonly PropInstance[], metrics: VrmPropRigMetrics, locked: readonly string[]) {
+export type StudioVrmGripContactPass = { run(): void; release(): boolean };
+
+/**
+ * Product-authoritative grip passes. The browser visual harness imports this exact factory so
+ * screenshots cannot silently drift to a legacy hand solver.
+ */
+export function createStudioVrmGripContactPasses(
+  vrm: VRM,
+  items: readonly PropInstance[],
+  metrics: VrmPropRigMetrics,
+  locked: readonly string[],
+): StudioVrmGripContactPass[] {
   const authority = createAutoGripFingerOverrides(items, propDefById, metrics);
-  const passes: ContactPass[] = [];
+  const passes: StudioVrmGripContactPass[] = [];
   for (const item of items) {
     const def = propDefById(item.propId);
     // Flat, precision-pinch and support poses keep their own authored profiles.
@@ -68,9 +78,14 @@ function createContactPasses(vrm: VRM, items: readonly PropInstance[], metrics: 
       const handSize = side === "left" ? metrics.leftHand : metrics.rightHand;
       if (![radius, handSize].every((value) => Number.isFinite(value) && value > 0)) continue;
       const gripCenter = new THREE.Vector3();
-      const localTarget = new THREE.Vector3();
+      const localCenter = new THREE.Vector3();
+      const gripAxis = new THREE.Vector3();
+      const fallbackRadial = new THREE.Vector3();
+      const localAxis = new THREE.Vector3();
+      const localRadial = new THREE.Vector3();
       const scratch = new THREE.Vector3();
       const rotation = new THREE.Quaternion();
+      const inverseHandRotation = new THREE.Quaternion();
       const offset = new THREE.Vector3(...anchor.position).sub(new THREE.Vector3(...resolved.anchor.position)).multiplyScalar(resolved.scale);
       const localRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
         THREE.MathUtils.degToRad(resolved.rotationDeg[0]),
@@ -116,18 +131,31 @@ function createContactPasses(vrm: VRM, items: readonly PropInstance[], metrics: 
             sourceHand.localToWorld(gripCenter);
             sourceHand.getWorldQuaternion(rotation).multiply(localRotation).normalize();
             gripCenter.add(scratch.copy(offset).applyQuaternion(rotation));
+            gripAxis.set(...anchor.up).applyQuaternion(rotation).normalize();
+            fallbackRadial.set(...anchor.forward).applyQuaternion(rotation).normalize();
             hand.updateWorldMatrix(true, true);
             const determinant = hand.matrixWorld.determinant();
             if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-12
               || !gripCenter.toArray().every(Number.isFinite)
+              || !gripAxis.toArray().every(Number.isFinite)
+              || !fallbackRadial.toArray().every(Number.isFinite)
               || gripCenter.distanceTo(hand.getWorldPosition(scratch)) > handSize * 1.8) {
               release(); // Do not leave a previous correction on an unreachable contact.
               return;
             }
-            localTarget.copy(gripCenter);
-            hand.worldToLocal(localTarget);
+
+            localCenter.copy(gripCenter);
+            hand.worldToLocal(localCenter);
+            hand.getWorldQuaternion(inverseHandRotation).invert();
+            localAxis.copy(gripAxis).applyQuaternion(inverseHandRotation).normalize();
+            localRadial.copy(fallbackRadial).applyQuaternion(inverseHandRotation).normalize();
             const m = hand.matrixWorld.elements;
-            const context = [localTarget.x, localTarget.y, localTarget.z];
+            const context = [
+              localCenter.x, localCenter.y, localCenter.z,
+              localAxis.x, localAxis.y, localAxis.z,
+              localRadial.x, localRadial.y, localRadial.z,
+              radius, handSize, ...fingerIndices,
+            ];
             // Scale/shear Gram matrix is invariant under common rigid movement.
             for (let a = 0; a < 3; a += 1) {
               for (let b = a; b < 3; b += 1) context.push(m[a * 4] * m[b * 4] + m[a * 4 + 1] * m[b * 4 + 1] + m[a * 4 + 2] * m[b * 4 + 2]);
@@ -144,8 +172,8 @@ function createContactPasses(vrm: VRM, items: readonly PropInstance[], metrics: 
             endpoints.forEach((node, index) => node.getWorldPosition(endpointWorldPositions[index]!));
             const contactPlan = createStudioVrmGripContactTargets({
               center: gripCenter,
-              axis: new THREE.Vector3(...anchor.up).applyQuaternion(rotation),
-              fallbackRadial: new THREE.Vector3(...anchor.forward).applyQuaternion(rotation),
+              axis: gripAxis,
+              fallbackRadial,
               fingertipWorldPositions: endpointWorldPositions,
               fingerIndices,
               gripRadius: radius,
@@ -204,7 +232,7 @@ export function StudioVrmGripContactRefine({ vrm, items, metrics, rigRevision, l
   const invalidate = useThree((state) => state.invalidate);
   const passes = useMemo(() => {
     void rigRevision;
-    return disabled ? [] : createContactPasses(vrm, items, metrics, lockedBones);
+    return disabled ? [] : createStudioVrmGripContactPasses(vrm, items, metrics, lockedBones);
   }, [disabled, items, lockedBones, metrics, rigRevision, vrm]);
   // Release old passes before the new frame callbacks run, including StrictMode replay.
   useLayoutEffect(() => {
