@@ -23,6 +23,7 @@ describe("site directory experience contracts", () => {
       "/publishing",
       "/create/challenges",
       "/market/library",
+      "/research/assets",
       "/research/books",
       "/compare",
       "/random",
