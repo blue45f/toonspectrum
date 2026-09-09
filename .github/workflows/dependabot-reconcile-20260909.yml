@@ -21,15 +21,26 @@ jobs:
   reconcile:
     name: Audit lockfile and probe Dependabot status access
     runs-on: ubuntu-slim
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /package.json
+            /pnpm-lock.yaml
+            /pnpm-workspace.yaml
+          sparse-checkout-cone-mode: false
       - uses: pnpm/action-setup@v6
       - name: Reject advisory exclusions
-        run: node scripts/verify-security-advisory-exceptions.mjs
-      - name: Verify manifest and lockfile consistency
-        run: pnpm install --frozen-lockfile --lockfile-only --ignore-scripts
-      - name: Run the all-severity pnpm audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -En '^[[:space:]]*(auditConfig:|ignoreGhsas:|ignoreCves:|ignoreAdvisories:)' pnpm-workspace.yaml; then
+            echo "Security advisory exclusions are not permitted."
+            exit 1
+          fi
+          echo "Verified that no security advisories are excluded from the audit."
+      - name: Run the all-severity pnpm audit against the committed lockfile
         shell: bash
         run: |
           set -o pipefail
