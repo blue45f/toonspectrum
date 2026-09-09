@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const ROOT_HOME = "apps/web/src/domains/creator-resources/CreatorHomePage.tsx";
+const PRODUCT_INTENT = "apps/web/src/domains/creator-resources/ProductIntentStart.tsx";
 const MAKE_HUB = "apps/web/src/domains/creator-resources/MakeHubPage.tsx";
 const CREATOR_ROUTES = "apps/web/src/app/routes/groups/creator-resources.routes.tsx";
 const CATALOG_ROUTES = "apps/web/src/app/routes/groups/catalog.routes.tsx";
@@ -20,6 +21,14 @@ describe("purpose-first product UX foundation", () => {
     const source = readFileSync(ROOT_HOME, "utf8");
     expect(source).toContain("<ProductIntentStart />");
     expect(source.indexOf("<ProductIntentStart />")).toBeLessThan(source.indexOf("<CreatorHomeExperience />"));
+  });
+
+  it("opens the true global command palette from the home search launcher", () => {
+    const source = readFileSync(PRODUCT_INTENT, "utf8");
+    expect(source).toContain("state.openCommandPalette");
+    expect(source).toContain("onClick={openSearch}");
+    expect(source).toContain("작품·도구·에셋·도움말 검색");
+    expect(source).not.toContain('href="/search"\n              className="mt-6');
   });
 
   it("routes the unified Create hub without replacing direct Studio routes", () => {
