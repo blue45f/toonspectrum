@@ -137,7 +137,11 @@ export function useCharacterCanonicalParts(input: {
         }
       }
       if (!active || generation !== generationRef.current) return;
-      setSelections(session.selections);
+      const restored = session.selections;
+      setSelections(restored);
+      // Persist the authoritative runtime result so deleted, incompatible, or corrupt old IDs
+      // cannot keep retrying on every Studio launch.
+      await writeSelections(modelId, restored);
     }).catch((restoreError: unknown) => {
       if (!active || generation !== generationRef.current) return;
       setError(restoreError instanceof Error ? restoreError.message : "캐릭터 파츠 선택을 복원하지 못했습니다.");
