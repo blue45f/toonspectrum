@@ -1,16 +1,9 @@
 name: Studio 5h stability soak
 
+# A five-hour browser session is a drift/soak proof, not a useful per-commit merge gate.
+# Fast PR browser contracts cover the same interaction surfaces; this workflow keeps the
+# expensive full-duration evidence on the overnight schedule and explicit manual runs.
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "apps/web/src/domains/creator/**"
-      - "scripts/verify-studio-five-hour-soak.mts"
-      - "scripts/analyze-studio-five-hour-visual.mts"
-      - "scripts/lib/studio-inapp-sweep-harness.mts"
-      - "scripts/lib/studio-verify-preview-harness.mts"
-      - ".github/workflows/studio-five-hour-soak.yml"
   schedule:
     # 02:30 Asia/Seoul — five-hour run finishes before the Korean workday for overnight evidence.
     - cron: "30 17 * * *"
@@ -25,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: studio-five-hour-soak-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  group: studio-five-hour-soak-${{ github.event_name }}-${{ github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -59,61 +52,8 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  pull-request-critical-soak:
-    name: 5h critical · ${{ matrix.id }}
-    if: github.event_name == 'pull_request'
-    needs: production-build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 345
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - id: desktop
-            profile: desktop
-            webgpu: "0"
-          - id: kakaotalk-android
-            profile: kakaotalk-android-360
-            webgpu: "0"
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - uses: actions/download-artifact@v6
-        with:
-          name: studio-five-hour-dist-${{ github.sha }}
-          path: dist
-      - name: Keep one real Studio session active for at least five hours
-        env:
-          TOONSPECTRUM_SOAK_MINUTES: ${{ env.SOAK_MINUTES }}
-          TOONSPECTRUM_SOAK_PROFILE: ${{ matrix.profile }}
-          TOONSPECTRUM_SOAK_WEBGPU: ${{ matrix.webgpu }}
-          TOONSPECTRUM_SOAK_OUT: artifacts/studio-five-hour-soak/${{ matrix.id }}
-        run: pnpm exec tsx scripts/verify-studio-five-hour-soak.mts
-      - name: Analyze every 10-minute visual checkpoint
-        if: always()
-        env:
-          TOONSPECTRUM_SOAK_OUT: artifacts/studio-five-hour-soak/${{ matrix.id }}
-        run: pnpm exec tsx scripts/analyze-studio-five-hour-visual.mts
-      - name: Preserve 10-minute checkpoints, screenshots and report
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: studio-five-hour-${{ matrix.id }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/studio-five-hour-soak/${{ matrix.id }}/
-          if-no-files-found: warn
-          retention-days: 14
-
   overnight-full-soak:
     name: overnight 5h · ${{ matrix.id }}
-    if: github.event_name != 'pull_request'
     needs: production-build
     runs-on: ubuntu-24.04
     timeout-minutes: 345
@@ -146,6 +86,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Restore Playwright Chromium cache
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm exec playwright install --with-deps chromium
       - uses: actions/download-artifact@v6
         with:
