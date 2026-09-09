@@ -12,6 +12,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import shutil
+import sys
 from typing import Any
 
 import bpy
@@ -28,7 +29,8 @@ def _args() -> argparse.Namespace:
     parser.add_argument("--thumbnail", required=True)
     parser.add_argument("--accepted-at", default="2026-09-09T00:00:00Z")
     parser.add_argument("--public-prefix", required=True)
-    return parser.parse_args()
+    argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
+    return parser.parse_args(argv)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
