@@ -36,7 +36,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec tsc -p tsconfig.learning.json
-      - run: pnpm exec eslint apps/web/src/domains/learn e2e/learn.spec.ts e2e/learn-resilience.spec.ts apps/web/src/domains/creator/studio-impasto-relief-shading-v1.ts apps/web/src/domains/creator/studio-impasto-relief-shading-v1.light-constants.test.ts --max-warnings=0
+      - run: pnpm exec eslint apps/web/src/domains/learn e2e/learn.spec.ts e2e/learn-resilience.spec.ts e2e/learn-guided-lessons.spec.ts apps/web/src/domains/creator/studio-impasto-relief-shading-v1.ts apps/web/src/domains/creator/studio-impasto-relief-shading-v1.light-constants.test.ts --max-warnings=0
       # Directory discovery includes the accessibility suite instead of silently omitting it.
       - name: Learning and shading output regressions
         run: pnpm exec vitest run apps/web/src/domains/learn apps/web/src/domains/creator/studio-impasto-relief-shading-v1.light-constants.test.ts
@@ -45,7 +45,7 @@ jobs:
       - name: Existing full performance budgets
         run: pnpm run test:perf
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm exec playwright test e2e/learn.spec.ts e2e/learn-resilience.spec.ts
+      - run: pnpm exec playwright test e2e/learn.spec.ts e2e/learn-resilience.spec.ts e2e/learn-guided-lessons.spec.ts
       - uses: actions/upload-artifact@v6
         if: always()
         with:

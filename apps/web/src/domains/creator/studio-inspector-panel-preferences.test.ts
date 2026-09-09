@@ -6,6 +6,7 @@ import {
   DEFAULT_STUDIO_INSPECTOR_PANEL_PREFERENCES,
   DEFAULT_STUDIO_INSPECTOR_PANEL_STATE,
   STUDIO_INSPECTOR_PANEL_PREFERENCES_STORAGE_KEY,
+  STUDIO_INSPECTOR_PANEL_RAW_MAX_CHARS,
   STUDIO_INSPECTOR_PANEL_SESSION_STORAGE_KEY,
   ensureStudioInspectorPanelPrimaryTabVisible,
   getStudioInspectorPanelState,
@@ -100,6 +101,30 @@ describe("studio inspector panel preferences", () => {
       DEFAULT_STUDIO_INSPECTOR_PANEL_PREFERENCES,
     );
     expect(saveStudioInspectorPanelPreferences(blocked, preferences)).toBe(false);
+  });
+
+  it("rejects oversized persisted payloads before parsing", () => {
+    const oversizedStorage = {
+      getItem: () => " ".repeat(STUDIO_INSPECTOR_PANEL_RAW_MAX_CHARS + 1),
+      setItem: () => undefined,
+    };
+
+    expect(loadStudioInspectorPanelPreferences(oversizedStorage)).toEqual(
+      DEFAULT_STUDIO_INSPECTOR_PANEL_PREFERENCES,
+    );
+    expect(
+      loadStudioInspectorPanelSessionState(oversizedStorage).contextPinned,
+    ).toBe(false);
+  });
+
+  it("resets durable chrome when another tab clears local storage", () => {
+    setStudioInspectorPanelCompactPrimaryTabs(true);
+    expect(getStudioInspectorPanelState().compactPrimaryTabs).toBe(true);
+
+    localStorage.clear();
+    window.dispatchEvent(new StorageEvent("storage", { key: null }));
+
+    expect(getStudioInspectorPanelState().compactPrimaryTabs).toBe(false);
   });
 
   it("keeps the context pin in session storage, separate from durable chrome preferences", () => {

@@ -34,9 +34,10 @@
  * 옮겼다(`studio-view-controls.ts`, `studio-main-menu-items-document.ts`).
  * 도달 조건 자체는 아래 `disabled` + 사유가 화면에 적는다.
  *
- * Rows §15.3 asks for that the product genuinely lacks — Semantic/Object Select,
- * Expand/Shrink/Feather/Smooth as commands, Save Selection, Selection HUD — stay
- * recorded as gaps in `studio-main-menu-group-spec.ts` rather than faked.
+ * The workbench and contextual HUD deliver Semantic/Object Select,
+ * Expand/Shrink/Feather/Smooth, Save Selection and Selection HUD outside the menubar.
+ * Their §15.3 rows therefore remain absent until direct menu commands exist; the
+ * audit must not mistake inspector or on-canvas reachability for menubar coverage.
  */
 
 import { Circle, Contrast, Lasso, Pipette, Spline, SquareDashed, Wand2 } from "lucide-react";

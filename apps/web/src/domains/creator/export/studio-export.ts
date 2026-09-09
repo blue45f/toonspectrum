@@ -4,6 +4,11 @@
 
 import { tagStudioRasterBlobResolution } from "../render/studio-raster-resolution-metadata";
 
+import {
+  createStudioDownloadFileName,
+  sanitizeStudioDownloadFileName,
+} from "./studio-download-file-name";
+
 export const EXPORT_SCALES = [1, 2, 3] as const;
 export type ExportScale = (typeof EXPORT_SCALES)[number];
 
@@ -17,6 +22,9 @@ export const WEBP_QUALITY = 0.92;
 
 // 주요 브라우저 공통으로 안전한 캔버스 한 변 상한(px) — Safari/Chrome 보수값.
 export const MAX_CANVAS_DIM = 16384;
+
+// Safari/WebKit가 anchor click 직후 Blob URL을 아직 읽는 동안 revoke하면 빈 파일이 될 수 있다.
+export const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 30_000;
 
 export type StudioCanvasRasterMime = "image/png" | "image/jpeg" | "image/webp";
 
@@ -98,19 +106,31 @@ export function exportQuality(format: ExportFormat): number | undefined {
   return undefined;
 }
 
-// 단일 페이지 파일명 — 기존 규칙 유지: `<제목>[-transparent].<확장자>`.
+// 단일 페이지 파일명 — `<제목>[-transparent].<확장자>` 규칙을 안전한 휴대용 이름으로 만든다.
 export function pageExportFileName(title: string, format: ExportFormat, transparent: boolean): string {
-  return `${title.trim() || "toonspectrum-comic"}${transparent ? "-transparent" : ""}.${format}`;
+  return createStudioDownloadFileName({
+    title,
+    fallbackTitle: "toonspectrum-comic",
+    suffix: transparent ? "transparent" : "",
+    extension: format,
+  });
 }
 
-// 스트립 파일명 — 기존 규칙 유지: `<제목>-strip.<확장자>`, 분할 시 `-strip-1of3` 식 접미사.
+// 스트립 파일명 — `<제목>-strip.<확장자>`, 분할 시 `-strip-1of3` 식 접미사.
 export function stripExportFileName(
   title: string,
   format: ExportFormat,
   part?: { index: number; total: number }
 ): string {
-  const suffix = part && part.total > 1 ? `-${part.index + 1}of${part.total}` : "";
-  return `${title.trim() || "toonspectrum-webtoon"}-strip${suffix}.${format}`;
+  const suffix = part && part.total > 1
+    ? `strip-${part.index + 1}of${part.total}`
+    : "strip";
+  return createStudioDownloadFileName({
+    title,
+    fallbackTitle: "toonspectrum-webtoon",
+    suffix,
+    extension: format,
+  });
 }
 
 // 페이지 높이 합 + 페이지 사이 간격으로 스트립 총 높이(px)를 구한다.
@@ -202,15 +222,32 @@ export async function canvasToBlob(
   return tagStudioRasterBlobResolution(blob, requestedMime);
 }
 
+/**
+ * Starts one browser download with a portable file name. Blob URLs stay alive for a grace period:
+ * revoking synchronously after click can race WebKit/Safari and produce a zero-byte download.
+ */
 export function downloadBlob(blob: Blob, filename: string): void {
+  if (
+    typeof document === "undefined"
+    || !document.body
+    || typeof URL === "undefined"
+    || typeof URL.createObjectURL !== "function"
+  ) {
+    throw new Error("이 환경에서는 브라우저 파일 다운로드를 시작할 수 없습니다.");
+  }
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = filename;
+  link.download = sanitizeStudioDownloadFileName(filename);
+  link.rel = "noopener";
+  link.style.display = "none";
   document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  try {
+    link.click();
+  } finally {
+    link.remove();
+    globalThis.setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS);
+  }
 }
 
 // 이미지 클립보드 복사 지원 여부 — navigator.clipboard + ClipboardItem 둘 다 필요(Firefox 등은 미지원).

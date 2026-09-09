@@ -96,6 +96,29 @@ export interface ResearchNextAction {
   reloadDocument?: boolean;
 }
 
+export interface ResearchCoverageItem {
+  id: "visual" | "edition" | "diversity" | "governance" | "story" | "production";
+  eyebrow: string;
+  label: string;
+  evidence: string;
+  description: string;
+  status: "covered" | "attention" | "missing";
+  href: string;
+  action: string;
+}
+
+export interface ResearchBriefContext {
+  title?: string;
+  question?: string;
+  context?: string;
+  intentLabel?: string;
+  recentSearches?: ReadonlyArray<{
+    mode: ResearchSearchMode;
+    query: string;
+    searchedAt: string;
+  }>;
+}
+
 export function normalizeResearchQuery(value: string): string {
   return value.normalize("NFKC").trim().replace(/\s+/gu, " ");
 }
@@ -240,6 +263,98 @@ export function summarizeResearchWorkspace(workspace: CreatorWorkspace, now = ne
   };
 }
 
+export function buildResearchCoverage(summary: ResearchWorkspaceSummary): ResearchCoverageItem[] {
+  const providerCount = (provider: ResourceProvider) => (
+    summary.providerBreakdown.find((entry) => entry.provider === provider)?.count ?? 0
+  );
+  const visualCount = providerCount("met");
+  const editionCount = providerCount("openlibrary") + providerCount("openbd") + providerCount("kakao");
+  const governanceIssues = summary.rightsReviewCount + summary.staleCount;
+
+  return [
+    {
+      id: "visual",
+      eyebrow: "화면 근거",
+      label: "시각 레퍼런스",
+      evidence: visualCount ? `공개 미술 자료 ${visualCount}개` : "확인된 시각 자료 없음",
+      description: visualCount
+        ? "형태·재료·복식·공간을 화면으로 확인할 근거가 있습니다. 실제 사용 범위는 각 원문 조건을 따릅니다."
+        : "장면의 형태와 시대성을 추측만으로 결정하기 전에 공개 이용이 확인된 시각 자료를 저장하세요.",
+      status: visualCount ? "covered" : "missing",
+      href: "/research/assets",
+      action: visualCount ? "시각 자료 보강" : "첫 시각 자료 찾기",
+    },
+    {
+      id: "edition",
+      eyebrow: "문헌 근거",
+      label: "작품·판본 맥락",
+      evidence: editionCount ? `도서·판본 자료 ${editionCount}개` : "확인된 판본 자료 없음",
+      description: editionCount
+        ? "작품명·작가·ISBN과 출판 메타데이터를 통해 시각 자료와 다른 종류의 맥락을 확보했습니다."
+        : "원작·판본·출판 정보를 함께 보면 시대와 설정을 한 이미지에만 의존하는 위험을 줄일 수 있습니다.",
+      status: editionCount ? "covered" : "missing",
+      href: "/research/books",
+      action: editionCount ? "판본 더 비교" : "판본 근거 찾기",
+    },
+    {
+      id: "diversity",
+      eyebrow: "교차 확인",
+      label: "제공처 다양성",
+      evidence: `${summary.providerCount}개 제공처 · 저장 ${summary.savedCount}개`,
+      description: summary.providerCount >= 2
+        ? "서로 다른 유형의 제공처를 비교할 수 있습니다. 제목과 설명이 비슷해도 원문 범위와 이용조건은 각각 확인하세요."
+        : summary.savedCount
+          ? "현재 자료가 한 제공처에 치우쳐 있습니다. 다른 유형의 근거를 추가해 과도한 추정을 줄이세요."
+          : "첫 자료를 저장한 뒤 다른 제공처의 근거를 하나 더해 비교할 수 있습니다.",
+      status: summary.providerCount >= 2 ? "covered" : summary.savedCount ? "attention" : "missing",
+      href: visualCount ? "/research/books" : "/research/assets",
+      action: summary.providerCount >= 2 ? "근거 더 넓히기" : "다른 제공처 찾기",
+    },
+    {
+      id: "governance",
+      eyebrow: "출처 관리",
+      label: "이용조건·조회일",
+      evidence: summary.savedCount
+        ? `원문 조건 확인 ${summary.rightsReviewCount}개 · 재확인 ${summary.staleCount}개`
+        : "점검할 저장 자료 없음",
+      description: !summary.savedCount
+        ? "자료를 저장하면 이용조건 분류와 제공처별 조회일 재확인 신호를 함께 보여줍니다."
+        : governanceIssues
+          ? "메타데이터 이용과 이미지·본문 재사용은 다릅니다. 제작 또는 제출 전에 표시된 원문과 조회일을 다시 확인하세요."
+          : "현재 저장 자료는 표시된 재확인 기준 안에 있습니다. 이 상태가 권리 허가나 링크 생존을 보증하지는 않습니다.",
+      status: !summary.savedCount ? "missing" : governanceIssues ? "attention" : "covered",
+      href: summary.savedCount ? "#saved-board" : "/research/assets",
+      action: summary.savedCount ? "저장 자료 점검" : "자료 저장하기",
+    },
+    {
+      id: "story",
+      eyebrow: "의사결정",
+      label: "이야기 전환",
+      evidence: `기획 항목 ${summary.storyCompleted}/${summary.storyTotal}`,
+      description: summary.storyCompleted >= 4
+        ? "조사 결과가 인물과 갈등의 선택으로 일부 전환되었습니다. 빈 항목을 채우며 첫 화 구조를 다듬으세요."
+        : summary.storyCompleted
+          ? "자료를 모으는 것에서 멈추지 말고 주인공·욕망·장애물·전환점 중 빈 항목을 구체화하세요."
+          : "근거를 이야기의 선택으로 바꾸는 기록이 아직 없습니다. 핵심 네 항목부터 시작하세요.",
+      status: summary.storyCompleted >= 4 ? "covered" : summary.storyCompleted ? "attention" : "missing",
+      href: "/story-lab",
+      action: summary.storyCompleted ? "이야기 계속 설계" : "Story Lab 시작",
+    },
+    {
+      id: "production",
+      eyebrow: "실행 준비",
+      label: "제작·제출 점검",
+      evidence: `출판 준비 체크 ${summary.publishingCompleted}개`,
+      description: summary.publishingCompleted
+        ? "권리·원고·소개 자료 중 실제 확인한 항목이 있습니다. 남은 조건은 제출 직전에 원문과 대조하세요."
+        : "제작을 시작하기 전에 권리, 원고 규격, 소개 자료 중 한 항목이라도 확인하면 막판 재작업을 줄일 수 있습니다.",
+      status: summary.publishingCompleted ? "covered" : "missing",
+      href: "/publishing",
+      action: summary.publishingCompleted ? "준비 상태 계속 점검" : "제출 조건 확인",
+    },
+  ];
+}
+
 export function researchNextAction(summary: ResearchWorkspaceSummary): ResearchNextAction {
   if (summary.savedCount === 0) {
     return {
@@ -297,7 +412,52 @@ export function researchNextAction(summary: ResearchWorkspaceSummary): ResearchN
   };
 }
 
-export function buildResearchBriefMarkdown(workspace: CreatorWorkspace, now = new Date()): string {
+function cleanBriefText(value: string | undefined, maximum = 240): string {
+  return (value ?? "").normalize("NFKC").trim().replace(/\s+/gu, " ").slice(0, maximum);
+}
+
+function researchContextMarkdown(context: ResearchBriefContext | undefined): string {
+  if (!context) return "";
+  const title = cleanBriefText(context.title, 80);
+  const question = cleanBriefText(context.question, 180);
+  const constraints = cleanBriefText(context.context, 240);
+  const intent = cleanBriefText(context.intentLabel, 40);
+  const searches = (context.recentSearches ?? []).slice(0, 8).map((entry) => {
+    const mode = RESEARCH_SEARCH_MODES.find((candidate) => candidate.id === entry.mode)?.label ?? "리서치";
+    const query = cleanBriefText(entry.query, 80);
+    const date = new Date(entry.searchedAt);
+    const searchedAt = Number.isFinite(date.getTime())
+      ? new Intl.DateTimeFormat("ko-KR", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date)
+      : "시간 확인 필요";
+    return query ? `- ${mode}: ${query} · ${searchedAt}` : "";
+  }).filter(Boolean);
+  if (!title && !question && !constraints && !searches.length) return "";
+
+  const focus = [
+    title ? `- 리서치 이름: ${title}` : "",
+    intent ? `- 조사 렌즈: ${intent}` : "",
+    question ? `- 핵심 질문: ${question}` : "",
+    constraints ? `- 시대·장소·제약: ${constraints}` : "",
+  ].filter(Boolean);
+  return [
+    "## 이번 리서치 초점",
+    focus.join("\n"),
+    searches.length ? `### 최근 검색 경로\n\n${searches.join("\n")}` : "",
+  ].filter(Boolean).join("\n\n");
+}
+
+export function buildResearchBriefMarkdown(
+  workspace: CreatorWorkspace,
+  now = new Date(),
+  context?: ResearchBriefContext,
+): string {
   const summary = summarizeResearchWorkspace(workspace, now);
   const generatedAt = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -312,13 +472,15 @@ export function buildResearchBriefMarkdown(workspace: CreatorWorkspace, now = ne
   const deadline = summary.nearestDeadline
     ? `${summary.nearestDeadline.title} · ${deadlineLabel(summary.nearestDeadline.deadline, now)}`
     : "확인된 예정 마감 없음";
+  const focus = researchContextMarkdown(context);
 
   return [
     "# ToonStudio 창작 리서치 브리프",
     "이 문서는 현재 브라우저의 창작 보드와 직접 작성한 기획을 묶은 작업용 기록입니다. 권리 허가서나 법률 검토를 대신하지 않습니다.",
     `- 생성일: ${generatedAt}\n- 저장 자료: ${summary.savedCount}개\n- 제공처: ${summary.providerCount}곳\n- 작성한 기획 항목: ${summary.storyCompleted}/${summary.storyTotal}\n- 다가오는 마감: ${deadline}`,
+    focus,
     story,
     sources,
     "## 제작 전 최종 확인\n\n- 메타데이터와 도서 소개 자료는 이미지·본문 재사용 허가가 아닙니다.\n- 지원사업 일정과 접수 조건은 제출 직전에 공식 원문에서 다시 확인하세요.\n- 출처 표기와 이용조건은 실제 사용 범위에 맞게 별도로 검토하세요.",
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 }

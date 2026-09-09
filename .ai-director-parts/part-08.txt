@@ -1,0 +1,114 @@
+                    </section>
+                    <button
+                      type="button"
+                      onClick={onApply}
+                      disabled={editingLocked}
+                      className={cn(PRIMARY_BUTTON, "w-full")}
+                    >
+                      <CheckCircle2 size={14} aria-hidden />
+                      {applyTarget === "new-page"
+                        ? `${items.length}컷을 새 페이지에 추가`
+                        : `${items.length}컷을 현재 페이지에 추가`}
+                    </button>
+                  </aside>
+                </section>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <footer className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 sm:px-4">
+          {busy ? (
+            <>
+              <Loader2
+                size={14}
+                className="animate-spin text-accent motion-reduce:animate-none"
+                aria-hidden
+              />
+              <span
+                className="text-xs font-semibold text-fg-2"
+                role="status"
+                aria-live="polite"
+              >
+                {stageLabel ?? "AI 작업 진행 중"}
+                {progress ? ` (${progress.done}/${progress.total})` : ""}
+              </span>
+              <button type="button" onClick={onCancel} className={SECONDARY_BUTTON}>
+                취소
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="size-2 rounded-full bg-good" aria-hidden />
+              <span className="text-[0.68rem] text-fg-3">
+                입력·후보·완료 결과는 부모 제작 세션에 유지됩니다.
+              </span>
+            </>
+          )}
+          {error ? <span className="text-[0.66rem] text-bad">{error}</span> : null}
+          {textProvenance ? (
+            <span className="hidden text-[0.6rem] text-fg-3 xl:inline">
+              텍스트 생성 · {textProvenance.provider} / {textProvenance.model}
+            </span>
+          ) : null}
+          {hasPreview ? (
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onDiscard}
+                disabled={editingLocked}
+                className={SECONDARY_BUTTON}
+              >
+                <RotateCcw size={13} aria-hidden /> 다시 만들기
+              </button>
+              {missingImageCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => onGenerateImages()}
+                  disabled={!imageGenerationReady || editingLocked}
+                  title={imageGenerationDisabledReason}
+                  className={SECONDARY_BUTTON}
+                >
+                  <ImagePlus size={13} aria-hidden /> 빈 장면 이미지 {missingImageCount}개 생성
+                </button>
+              ) : null}
+              <label className="inline-flex items-center gap-1.5 text-[0.68rem] font-semibold text-fg-2">
+                적용 위치
+                <select
+                  value={applyTarget}
+                  onChange={(event) =>
+                    onApplyTargetChange(
+                      event.target.value === "new-page" ? "new-page" : "current-page",
+                    )
+                  }
+                  disabled={editingLocked}
+                  className={cn(FIELD_CLASS, "w-auto min-w-32")}
+                >
+                  <option value="current-page">현재 페이지 아래</option>
+                  <option value="new-page">다음 새 페이지</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={onApply}
+                disabled={editingLocked}
+                className={SECONDARY_BUTTON}
+              >
+                {applyTarget === "new-page" ? "새 페이지로 적용" : "현재 페이지에 적용"}
+              </button>
+            </div>
+          ) : null}
+        </footer>
+      </section>
+
+      <CandidateCompareDialog
+        open={compareOpen}
+        item={selectedItem}
+        onClose={() => setCompareOpen(false)}
+        onSelect={(candidateId) => selectCandidate(selectedPanelIndex, candidateId)}
+      />
+    </div>
+  );
+
+  return createPortal(modal, document.body);
+}

@@ -1,0 +1,46 @@
+name: Studio large epics deep fixes
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-large-epics-deep-fix-v8.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  rebase:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: codex/studio-large-epics-closure-20260909
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Wait for the other deep-fix runs
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 120); do
+            count="$(gh run list --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --limit 100 --json databaseId,name,status \
+              --jq "[.[] | select(.databaseId != ${GITHUB_RUN_ID}) | select(.name == \"Studio large epics deep fixes\") | select(.status == \"queued\" or .status == \"in_progress\")] | length")"
+            if [ "$count" = 0 ]; then break; fi
+            test "$attempt" != 120 || { echo "Timed out waiting for deep fixes" >&2; exit 1; }
+            sleep 15
+          done
+
+      - name: Rebase the integrated branch onto the latest main
+        run: |
+          git fetch origin main "$BRANCH"
+          git reset --hard "origin/$BRANCH"
+          rm -f .github/workflows/studio-large-epics-deep-fix-v8.yml
+          git add .github/workflows/studio-large-epics-deep-fix-v8.yml
+          git commit -m "chore(studio): remove final rebase helper [skip ci]"
+          git rebase origin/main
+          git push --force-with-lease=refs/heads/$BRANCH:$(git rev-parse "origin/$BRANCH") origin HEAD:$BRANCH

@@ -1,24 +1,31 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+
+import type { ChangeEvent, SyntheticEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import type { FormEvent } from "react";
-
-import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
+import { RESOURCE_BUTTON } from "./navigation";
 import { ProviderStatus } from "./ProviderStatus";
+import { ResearchCoverageMap } from "./ResearchCoverageMap";
+import { ResearchMissionPanel } from "./ResearchMissionPanel";
+import { ResearchSynthesisBoard } from "./ResearchSynthesisBoard";
 import {
   buildResearchBriefMarkdown,
-  isResearchQueryValid,
-  normalizeResearchQuery,
-  RESEARCH_SEARCH_MODES,
   researchNextAction,
   researchSearchHref,
   resourceLicenseLabel,
   sourceFreshness,
   summarizeResearchWorkspace,
 } from "./research-dashboard";
-import type { ResearchNextAction } from "./research-dashboard";
+import type { ResearchSearchMode } from "./research-dashboard";
+import {
+  recordResearchSearch,
+  researchDeskBriefContext,
+} from "./research-desk-session";
+import { buildResearchNotebookMarkdown } from "./research-notebook";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { SavedBoard } from "./SavedBoard";
+import { useResearchDeskSession } from "./useResearchDeskSession";
+import { useResearchNotebook } from "./useResearchNotebook";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
 import { attributionMarkdown, deadlineLabel, parseWorkspace } from "@/shared/lib/creator-resources";
@@ -68,37 +75,63 @@ const RESEARCH_TOOLS = [
   },
 ] as const;
 
-function NextActionLink({ action }: { action: ResearchNextAction }) {
-  const className = `${RESOURCE_BUTTON} mt-5 w-full border-accent bg-accent-soft text-accent`;
-  if (action.href.startsWith("#")) return <a className={className} href={action.href}>{action.label}</a>;
-  return <Link className={className} to={action.href} reloadDocument={action.reloadDocument}>{action.label}</Link>;
-}
+const DESK_SECTIONS = [
+  ["#research-command", "질문·검색"],
+  ["#workspace-overview", "작업 상태"],
+  ["#research-coverage", "근거 공백"],
+  ["#research-synthesis", "판단 노트"],
+  ["#research-tools", "목적별 도구"],
+  ["#saved-board", "저장 보드"],
+  ["#research-export", "내보내기"],
+] as const;
 
 export function CreatorHubPage() {
   const navigate = useNavigate();
-  const { workspace, update, restore, readSnapshot, ready, writable, saving, error } = useCreatorWorkspace();
-  const [searchMode, setSearchMode] = useState<(typeof RESEARCH_SEARCH_MODES)[number]["id"]>("assets");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchError, setSearchError] = useState("");
+  const {
+    workspace,
+    update: updateWorkspace,
+    restore,
+    readSnapshot,
+    ready,
+    writable,
+    saving,
+    error,
+  } = useCreatorWorkspace();
+  const {
+    session: researchSession,
+    update: updateResearchSession,
+    reset: resetResearchSession,
+    ready: researchSessionReady,
+    writable: researchSessionWritable,
+    error: researchSessionError,
+  } = useResearchDeskSession();
+  const {
+    notebook: researchNotebook,
+    update: updateResearchNotebook,
+    restore: restoreResearchNotebook,
+    reset: resetResearchNotebook,
+    ready: researchNotebookReady,
+    writable: researchNotebookWritable,
+    error: researchNotebookError,
+  } = useResearchNotebook();
   const [providerStatusOpen, setProviderStatusOpen] = useState(false);
   const [restoreMode, setRestoreMode] = useState<"merge" | "replace">("merge");
   const [restoring, setRestoring] = useState(false);
   const [importNotice, setImportNotice] = useState("");
   const summary = useMemo(() => summarizeResearchWorkspace(workspace), [workspace]);
   const nextAction = useMemo(() => researchNextAction(summary), [summary]);
-  const currentSearchMode = RESEARCH_SEARCH_MODES.find((entry) => entry.id === searchMode) ?? RESEARCH_SEARCH_MODES[0];
+  const briefContext = useMemo(() => researchDeskBriefContext(researchSession), [researchSession]);
   const recentItems = workspace.saved.slice(-3).reverse();
-  const progress = Math.round((summary.completedStages / summary.stages.length) * 100);
 
-  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const query = normalizeResearchQuery(searchQuery);
-    if (!isResearchQueryValid(query)) {
-      setSearchError("검색어를 2~80자로 입력하세요.");
-      return;
-    }
-    setSearchError("");
-    navigate(researchSearchHref(searchMode, query));
+  const launchSearch = useCallback((mode: ResearchSearchMode, query: string) => {
+    updateResearchSession((session) => recordResearchSearch(session, mode, query));
+    navigate(researchSearchHref(mode, query));
+  }, [navigate, updateResearchSession]);
+
+  const exportResearchBrief = () => {
+    const brief = buildResearchBriefMarkdown(workspace, new Date(), briefContext);
+    const synthesis = buildResearchNotebookMarkdown(researchNotebook, workspace.saved);
+    downloadText("toonstudio-research-brief.md", [brief, synthesis].filter(Boolean).join("\n\n"));
   };
 
   const importBackup = async (file: File | undefined) => {
@@ -127,92 +160,36 @@ export function CreatorHubPage() {
   return <ResourceLayout
     title="창작 리서치 데스크"
     intro="한 질문에서 자료 탐색을 시작하고, 출처·이용조건·기획 진행도를 점검한 뒤 Story Lab과 Studio 작업으로 연결하세요. 외부 데이터는 제공처·조회일·이용조건을 함께 보존합니다."
+    width="wide"
   >
-    <section className="grid overflow-hidden rounded-3xl border border-line bg-panel lg:grid-cols-5" aria-labelledby="research-command-title">
-      <div className="space-y-6 p-5 sm:p-8 lg:col-span-3">
-        <header className="space-y-3">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Research command</p>
-          <h2 id="research-command-title" className="font-display text-2xl font-bold tracking-tight sm:text-3xl">무엇을 확인해야 다음 장면을 더 잘 그릴 수 있나요?</h2>
-          <p className="max-w-2xl leading-7 text-fg-2">검색 유형을 고르면 각 제공처의 실제 검색 화면으로 이동합니다. 저장한 결과는 다시 이 데스크에서 비교하고 내보낼 수 있습니다.</p>
-        </header>
-        <form className="space-y-4" onSubmit={submitSearch} noValidate>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="리서치 검색 유형">
-            {RESEARCH_SEARCH_MODES.map((mode) => <button
-              key={mode.id}
-              type="button"
-              aria-pressed={searchMode === mode.id}
-              className={`${RESOURCE_BUTTON} ${searchMode === mode.id ? "border-accent bg-accent-soft text-accent" : "bg-canvas"}`}
-              onClick={() => {
-                setSearchMode(mode.id);
-                setSearchError("");
-              }}
-            >
-              <span className="text-left"><span className="block">{mode.label}</span><span className="block text-xs font-normal text-fg-2">{mode.description}</span></span>
-            </button>)}
-          </div>
-          <label htmlFor="research-command-query" className="block text-sm font-semibold">{currentSearchMode.label} 검색</label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              id="research-command-query"
-              type="search"
-              maxLength={80}
-              autoComplete="off"
-              value={searchQuery}
-              placeholder={currentSearchMode.placeholder}
-              className={RESOURCE_INPUT}
-              aria-describedby={searchError ? "research-command-error" : "research-command-help"}
-              onChange={(event) => {
-                setSearchQuery(event.target.value);
-                if (searchError) setSearchError("");
-              }}
-            />
-            <button className={`${RESOURCE_BUTTON} shrink-0 border-accent bg-accent-soft text-accent`} type="submit">검색 시작</button>
-          </div>
-          {searchError
-            ? <p id="research-command-error" role="alert" className="text-sm font-semibold text-fg">{searchError}</p>
-            : <p id="research-command-help" className="text-sm text-fg-2">추천 검색어를 선택한 뒤 표현을 더 구체적으로 다듬어도 됩니다.</p>}
-          <div className="flex flex-wrap items-center gap-2" aria-label={`${currentSearchMode.label} 추천 검색어`}>
-            <span className="text-xs font-semibold text-fg-2">추천</span>
-            {currentSearchMode.suggestions.map((suggestion) => <button
-              key={suggestion}
-              type="button"
-              className="min-h-9 rounded-full border border-line bg-canvas px-3 text-sm text-fg hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              onClick={() => {
-                setSearchQuery(suggestion);
-                setSearchError("");
-              }}
-            >{suggestion}</button>)}
-          </div>
-        </form>
-      </div>
-      <aside className="border-t border-line bg-card/40 p-5 sm:p-8 lg:col-span-2 lg:border-l lg:border-t-0" aria-labelledby="next-research-action-title">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">{nextAction.eyebrow}</p>
-        <h2 id="next-research-action-title" className="mt-3 text-xl font-bold">{nextAction.title}</h2>
-        <p className="mt-3 text-sm leading-6 text-fg-2">{nextAction.description}</p>
-        <NextActionLink action={nextAction} />
-        <div className="mt-6 border-t border-line pt-5">
-          <div className="flex items-end justify-between gap-4">
-            <p className="text-sm font-semibold">리서치 흐름</p>
-            <p className="text-sm text-fg-2">{summary.completedStages}/4 단계</p>
-          </div>
-          <progress className="mt-3 h-2 w-full" max={100} value={progress} aria-label={`리서치 흐름 ${progress}%`} />
-          <p className="mt-2 text-xs leading-5 text-fg-2">진행도는 자료 수·제공처·기획·준비 체크를 바탕으로 한 작업 안내이며, 작품 품질이나 권리 확보를 보증하지 않습니다.</p>
-        </div>
-      </aside>
-    </section>
+    <ResearchMissionPanel
+      summary={summary}
+      nextAction={nextAction}
+      session={researchSession}
+      sessionReady={researchSessionReady}
+      sessionWritable={researchSessionWritable}
+      sessionError={researchSessionError}
+      onSessionChange={updateResearchSession}
+      onSessionReset={resetResearchSession}
+      onSearch={launchSearch}
+    />
 
-    <section className="space-y-5" aria-labelledby="workspace-overview-title">
+    <nav aria-label="리서치 데스크 빠른 이동" className="flex gap-2 overflow-x-auto rounded-2xl border border-line bg-panel p-2">
+      {DESK_SECTIONS.map(([href, label]) => <a key={href} href={href} className={`${RESOURCE_BUTTON} shrink-0 bg-canvas`}>{label}</a>)}
+    </nav>
+
+    <section id="workspace-overview" className="scroll-mt-24 space-y-5" aria-labelledby="workspace-overview-title">
       <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div><p className="text-sm font-semibold text-accent">현재 브라우저 작업공간</p><h2 id="workspace-overview-title" className="mt-1 text-2xl font-bold">한눈에 보는 리서치 상태</h2></div>
         <p className="text-sm text-fg-2">자동 평점이 아니라 다음 행동을 고르기 위한 사실 요약입니다.</p>
       </header>
-      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-line bg-panel p-5"><dt className="text-sm text-fg-2">저장한 자료</dt><dd className="mt-2 text-3xl font-bold">{summary.savedCount}<span className="ml-1 text-base font-semibold">개</span></dd><dd className="mt-2 text-xs text-fg-2">최대 200개까지 검증된 형식으로 보존</dd></div>
         <div className="rounded-2xl border border-line bg-panel p-5"><dt className="text-sm text-fg-2">자료 제공처</dt><dd className="mt-2 text-3xl font-bold">{summary.providerCount}<span className="ml-1 text-base font-semibold">곳</span></dd><dd className="mt-2 text-xs text-fg-2">서로 다른 유형의 근거를 비교</dd></div>
         <div className="rounded-2xl border border-line bg-panel p-5"><dt className="text-sm text-fg-2">작성한 기획</dt><dd className="mt-2 text-3xl font-bold">{summary.storyCompleted}<span className="mx-1 text-base font-semibold">/</span><span className="text-xl">{summary.storyTotal}</span></dd><dd className="mt-2 text-xs text-fg-2">직접 작성한 Story Lab 항목</dd></div>
         <div className="rounded-2xl border border-line bg-panel p-5"><dt className="text-sm text-fg-2">다가오는 마감</dt><dd className="mt-2 text-3xl font-bold">{summary.upcomingDeadlineCount}<span className="ml-1 text-base font-semibold">개</span></dd><dd className="mt-2 truncate text-xs text-fg-2">{summary.nearestDeadline ? `${deadlineLabel(summary.nearestDeadline.deadline)} · ${summary.nearestDeadline.title}` : "확인된 예정 마감 없음"}</dd></div>
       </dl>
-      <ol className="grid gap-3 md:grid-cols-2 lg:grid-cols-4" aria-label="리서치 권장 흐름">
+      <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="리서치 권장 흐름">
         {summary.stages.map((stage, index) => <li key={stage.id} className={`rounded-2xl border p-5 ${stage.status === "current" ? "border-accent bg-accent-soft" : "border-line bg-panel"}`}>
           <div className="flex items-center justify-between gap-3"><span className="text-xs font-bold text-accent">0{index + 1}</span><span className="text-xs font-semibold text-fg-2">{stage.status === "complete" ? "완료" : stage.status === "current" ? "지금 단계" : "다음 단계"}</span></div>
           <h3 className="mt-3 font-bold">{stage.label}</h3>
@@ -223,17 +200,31 @@ export function CreatorHubPage() {
       </ol>
     </section>
 
-    <section className="space-y-5" aria-labelledby="research-tools-title">
+    <div id="research-coverage" className="scroll-mt-24"><ResearchCoverageMap summary={summary} /></div>
+
+    <ResearchSynthesisBoard
+      notebook={researchNotebook}
+      resources={workspace.saved}
+      ready={researchNotebookReady}
+      writable={researchNotebookWritable}
+      error={researchNotebookError}
+      onChange={updateResearchNotebook}
+      onReset={resetResearchNotebook}
+      onRestore={restoreResearchNotebook}
+      onInvestigate={(query) => launchSearch(researchSession.lastMode, query)}
+    />
+
+    <section id="research-tools" className="scroll-mt-24 space-y-5" aria-labelledby="research-tools-title">
       <header><p className="text-sm font-semibold text-accent">목적별 도구</p><h2 id="research-tools-title" className="mt-1 text-2xl font-bold">찾는 데서 끝나지 않는 작업 경로</h2><p className="mt-2 max-w-3xl leading-7 text-fg-2">필요한 도구만 열고, 결과는 같은 브라우저 작업공간에서 이어서 사용하세요.</p></header>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {RESEARCH_TOOLS.map((tool) => <Link key={tool.path} to={tool.path} className="group rounded-2xl border border-line bg-panel p-5 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
           <p className="text-xs font-bold text-accent">{tool.eyebrow}</p><h3 className="mt-2 text-lg font-bold">{tool.title} →</h3><p className="mt-2 text-sm leading-6 text-fg-2">{tool.description}</p><p className="mt-4 border-t border-line pt-3 text-xs font-semibold text-fg">결과 · {tool.output}</p>
         </Link>)}
       </div>
     </section>
 
-    <section className="grid gap-4 lg:grid-cols-5" aria-label="저장 자료 요약">
-      <article className="space-y-5 rounded-2xl border border-line bg-panel p-5 sm:p-6 lg:col-span-2">
+    <section className="grid gap-4 xl:grid-cols-5" aria-label="저장 자료 요약">
+      <article className="space-y-5 rounded-2xl border border-line bg-panel p-5 sm:p-6 xl:col-span-2">
         <header><p className="text-sm font-semibold text-accent">출처·이용조건</p><h2 className="mt-1 text-xl font-bold">보드 점검</h2></header>
         <dl className="space-y-3">
           <div className="flex items-start justify-between gap-4 rounded-xl bg-canvas p-4"><dt className="text-sm text-fg-2">CC0로 확인된 자료</dt><dd className="font-bold">{summary.publicDomainCount}개</dd></div>
@@ -247,7 +238,7 @@ export function CreatorHubPage() {
         </div>
         <a className={RESOURCE_BUTTON} href="#saved-board">전체 보드 점검</a>
       </article>
-      <section className="space-y-4 rounded-2xl border border-line bg-panel p-5 sm:p-6 lg:col-span-3" aria-labelledby="recent-research-title">
+      <section className="space-y-4 rounded-2xl border border-line bg-panel p-5 sm:p-6 xl:col-span-3" aria-labelledby="recent-research-title">
         <header className="flex items-end justify-between gap-4"><div><p className="text-sm font-semibold text-accent">최근 저장</p><h2 id="recent-research-title" className="mt-1 text-xl font-bold">다시 볼 자료</h2></div><span className="text-sm text-fg-2">최대 3개</span></header>
         {recentItems.length ? <div className="grid gap-3 sm:grid-cols-3">{recentItems.map((item) => {
           const freshness = sourceFreshness(item);
@@ -259,23 +250,24 @@ export function CreatorHubPage() {
       </section>
     </section>
 
-    <section className="space-y-4 rounded-2xl border border-line bg-panel p-5 sm:p-6" aria-labelledby="research-export-title">
-      <header><p className="text-sm font-semibold text-accent">휴대·복구 가능한 기록</p><h2 id="research-export-title" className="mt-1 text-xl font-bold">내보내기와 백업</h2><p className="mt-2 leading-7 text-fg-2">기획과 출처를 읽기 쉬운 문서로 내보내거나, 전체 작업공간을 JSON으로 백업하세요.</p></header>
+    <section id="research-export" className="scroll-mt-24 space-y-4 rounded-2xl border border-line bg-panel p-5 sm:p-6" aria-labelledby="research-export-title">
+      <header><p className="text-sm font-semibold text-accent">휴대·복구 가능한 기록</p><h2 id="research-export-title" className="mt-1 text-xl font-bold">내보내기와 백업</h2><p className="mt-2 leading-7 text-fg-2">리서치 초점·검색 기록·판단 노트·기획·출처를 읽기 쉬운 문서로 내보내거나, 자료·기획서 작업공간을 JSON으로 백업하세요.</p></header>
       <div className="flex flex-wrap gap-3">
-        <button className={RESOURCE_BUTTON} disabled={!workspace.saved.length && summary.storyCompleted === 0} onClick={() => downloadText("toonstudio-research-brief.md", buildResearchBriefMarkdown(workspace))}>리서치 브리프 내보내기</button>
+        <button className={RESOURCE_BUTTON} disabled={!workspace.saved.length && summary.storyCompleted === 0 && !researchSession.title && !researchSession.question && !researchSession.context && !researchSession.history.length && !researchNotebook.entries.length} onClick={exportResearchBrief}>리서치 브리프 내보내기</button>
         <button className={RESOURCE_BUTTON} disabled={!workspace.saved.length} onClick={() => downloadText("toonstudio-sources.md", attributionMarkdown(workspace.saved))}>출처 목록 내보내기</button>
         <button className={RESOURCE_BUTTON} onClick={() => downloadText("toonstudio-creator-board.json", JSON.stringify(workspace, null, 2), "application/json")}>자료·기획서 백업</button>
       </div>
+      <p className="text-xs leading-5 text-fg-2">리서치 브리프에는 현재 초점, 최근 검색, 관찰·질문·결정과 연결 근거가 포함됩니다. 자료·기획서 JSON과 판단 노트 JSON은 스키마 경계를 분리해 각각 복구합니다.</p>
       <details className="rounded-xl border border-line bg-canvas p-4">
         <summary className="cursor-pointer font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">백업 가져오기 · 합치기 또는 완전 대체</summary>
         <div className="mt-4 space-y-4 border-t border-line pt-4">
           <p className="text-sm leading-6 text-fg-2">기본값은 현재 자료와 작성한 기획을 유지하는 안전한 합치기입니다. 완전 대체는 확인 후에만 실행됩니다.</p>
           <label htmlFor="creator-board-replace" className="flex min-h-11 items-center gap-3 text-sm">
-            <input id="creator-board-replace" type="checkbox" disabled={!ready || !writable || restoring || saving} className="size-5" checked={restoreMode === "replace"} onChange={(event) => setRestoreMode(event.target.checked ? "replace" : "merge")} />
+            <input id="creator-board-replace" type="checkbox" disabled={!ready || !writable || restoring || saving} className="size-5" checked={restoreMode === "replace"} onChange={(event: ChangeEvent<HTMLInputElement>) => setRestoreMode(event.target.checked ? "replace" : "merge")} />
             현재 보드를 유지하지 않고 백업으로 완전히 대체
           </label>
           <label htmlFor="creator-board-import" className="block text-sm font-semibold">{restoreMode === "merge" ? "백업 합치기 · 현재 자료와 작성한 기획서 유지" : "백업 대체 · 현재 작업이 변경됩니다"}
-            <input id="creator-board-import" className="mt-2 block max-w-full text-sm" type="file" disabled={!ready || !writable || restoring || saving} accept="application/json,.json" onChange={(event) => {
+            <input id="creator-board-import" className="mt-2 block max-w-full text-sm" type="file" disabled={!ready || !writable || restoring || saving} accept="application/json,.json" onChange={(event: ChangeEvent<HTMLInputElement>) => {
               void importBackup(event.target.files?.[0]);
               event.target.value = "";
             }} />
@@ -286,10 +278,10 @@ export function CreatorHubPage() {
     </section>
 
     <SavedBoard items={workspace.saved} disabled={!ready || !writable || saving} onRemove={(id) => {
-      void update((value) => ({ ...value, saved: value.saved.filter((item) => item.id !== id) }));
+      void updateWorkspace((value) => ({ ...value, saved: value.saved.filter((item) => item.id !== id) }));
     }} />
 
-    <details className="rounded-2xl border border-line bg-panel p-5" onToggle={(event) => setProviderStatusOpen(event.currentTarget.open)}>
+    <details className="rounded-2xl border border-line bg-panel p-5" onToggle={(event: SyntheticEvent<HTMLDetailsElement>) => setProviderStatusOpen(event.currentTarget.open)}>
       <summary className="cursor-pointer font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">데이터 제공처 연결 상태와 한계 확인</summary>
       <p className="mt-2 text-sm leading-6 text-fg-2">검색 전에 인증키 설정 여부를 확인할 수 있습니다. 실제 연결 성공·이용권한·잔여 쿼터는 각 검색 결과와 원문에서 판단해야 합니다.</p>
       {providerStatusOpen && <div className="mt-4"><ProviderStatus /></div>}

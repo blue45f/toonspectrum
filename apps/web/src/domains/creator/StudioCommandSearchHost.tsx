@@ -1,10 +1,10 @@
 /**
- * 통합 Command Search 진입점 — 버튼 하나와 **F1** 바인딩.
+ * 통합 Command Search 진입점 — 버튼과 **⌘K / Ctrl+K / F1** 바인딩.
  *
- * 감사 §2.8 이 "F1 바인딩 없음(`?` 뿐)"을 도움말 결함으로 따로 적었다. 레포
- * 전체에서 `F1` 을 잡는 코드가 0건이었으므로 충돌 없이 새로 잡을 수 있다.
- * 이 호스트는 인스펙터 안에 마운트되지만 리스너는 `window` 에 걸어서, 캔버스에
- * 포커스가 있어도 F1 이 통한다.
+ * F1 은 Studio 호스트가 직접 처리한다. 앱 전역 ⌘K / Ctrl+K 는 공유 AppShell의
+ * CommandPaletteHost가 받은 뒤 `studio-command-search-bridge`로 전달한다. 따라서
+ * 편집 중에는 정적 전역 팔레트가 아니라 실제 CommandRegistry 색인을 검색하고,
+ * Studio 호스트가 아직 준비되지 않았을 때만 기존 전역 팔레트로 폴백한다.
  *
  * 다이얼로그 본체는 lazy 로 가져온다 — 검색을 한 번도 열지 않은 세션이 색인과
  * 다이얼로그 코드를 지불하지 않게 하기 위해서다.
@@ -12,6 +12,10 @@
 
 import { Search } from "lucide-react";
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
+
+import {
+  subscribeStudioCommandSearchFromAppShell,
+} from "@/shared/lib/studio-command-search-bridge";
 
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
 import {
@@ -36,7 +40,7 @@ export type StudioCommandSearchHostProps = Omit<
   StudioCommandSearchDialogProps,
   "open" | "onClose" | "initialScope"
 > & {
-  /** 트리거 버튼을 숨기고 F1 만 남긴다(모바일 등). */
+  /** 트리거 버튼을 숨기고 전역 단축키만 남긴다(모바일 등). */
   hideTrigger?: boolean;
   /** Make the owning surface visible before the global search dialog opens. */
   onRequestOpen?: () => void;
@@ -76,7 +80,7 @@ export function StudioCommandSearchHost({
 }: StudioCommandSearchHostProps) {
   const [open, setOpen] = useState(false);
   // 어느 진입점이 열었는지에 따라 첫 범위가 다르다 — 인스펙터의 찾기는 '현재 패널',
-  // F1·메뉴·모바일 도크는 '전체'. 다이얼로그 안에서는 언제든 칩으로 바꿀 수 있다.
+  // F1·⌘K·메뉴·모바일 도크는 '전체'. 다이얼로그 안에서는 언제든 칩으로 바꿀 수 있다.
   const [scope, setScope] = useState<StudioCommandSearchScope>("all");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
@@ -121,14 +125,18 @@ export function StudioCommandSearchHost({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [close, open, openSearch]);
 
-  // 메뉴 › 도움말 › 기능·설정 찾기, 인스펙터 찾기, 모바일 도크 찾기. 그 진입점들은 순수
-  // 데이터거나 다른 트리에 있어 이 상태를 직접 만질 수 없으므로 채널로 요청만 받는다
-  // (§15.3 Help ▸ Command Search). 요청이 범위를 실어 보내면 그 범위로 연다.
+  // 메뉴·인스펙터·모바일 도크는 도메인 채널, 전역 ⌘K / Ctrl+K 는 AppShell 브리지를
+  // 사용한다. 둘 다 같은 `openSearch`로 수렴해 색인·범위·포커스 복귀 계약이 갈라지지 않는다.
   useEffect(() => {
-    const unsubscribe = subscribeStudioCommandSearchRequests((request) => openSearch(request.scope ?? "all"));
+    const openRequest = (request: StudioCommandSearchRequest) => {
+      openSearch(request.scope ?? "all");
+    };
+    const unsubscribeStudio = subscribeStudioCommandSearchRequests(openRequest);
+    const unsubscribeAppShell = subscribeStudioCommandSearchFromAppShell(openRequest);
     onReadyChange?.(true);
     return () => {
-      unsubscribe();
+      unsubscribeStudio();
+      unsubscribeAppShell();
       onReadyChange?.(false);
     };
   }, [openSearch, onReadyChange]);
@@ -153,7 +161,7 @@ export function StudioCommandSearchHost({
               onClick={() => openSearch("all")}
               data-testid="studio-command-search-trigger"
               data-inspector-priority="chrome"
-              title="기능·설정 찾기 (F1)"
+              title="기능·설정 찾기 (⌘K / Ctrl+K / F1)"
               className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-xs text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Search
@@ -165,9 +173,17 @@ export function StudioCommandSearchHost({
               <span className="min-w-0 flex-1 truncate">
                 기능·설정 찾기 · CSP·Photoshop 용어
               </span>
-              <kbd className="shrink-0 rounded border border-line bg-card px-1.5 py-px text-[0.6875rem]">
-                F1
-              </kbd>
+              <span
+                className="flex shrink-0 items-center gap-1"
+                aria-label="단축키 Command K, Control K 또는 F1"
+              >
+                <kbd className="rounded border border-line bg-card px-1.5 py-px text-[0.6875rem]">
+                  ⌘K
+                </kbd>
+                <kbd className="rounded border border-line bg-card px-1.5 py-px text-[0.6875rem]">
+                  F1
+                </kbd>
+              </span>
             </button>
           )}
           {trailing}

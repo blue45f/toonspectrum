@@ -81,6 +81,16 @@ Blender의 객체 pin을 그대로 복제하면 캔버스에서 새 대상을 �
 - 저장 상태는 문서의 저장 완료로 오인될 문구를 사용하지 않는다.
 - 여러 패널 컴포넌트는 하나의 `useSyncExternalStore` 스냅샷을 구독해 pin UI와 자동 라우팅이 어긋나지 않는다.
 
+### 3.5 구성 팝오버와 영속 상태 방어
+
+- 패널 구성은 본문 높이를 계속 밀어내는 인라인 블록이 아니라 현재 Inspector 위에 뜨는 bounded 비모달 팝오버로 표시한다.
+- 팝오버는 화면 높이의 65%에서 내부 스크롤하며 모바일 bottom sheet에서도 하단 설정을 끝까지 탐색할 수 있다.
+- 명시적 닫기, 바깥 포인터 입력, `Esc`를 모두 지원하고 `Esc`와 닫기 버튼은 구성 트리거로 포커스를 복원한다.
+- 트리거는 `aria-haspopup="dialog"`, 표면은 `role="dialog"`와 `aria-modal="false"`를 사용해 실제 상호작용 모델을 보조기기에 전달한다.
+- 저장 데이터는 8 KiB 상한을 넘으면 JSON 파싱 전에 기본값으로 복구한다.
+- 다른 탭에서 `localStorage.clear()`가 실행된 경우에도 현재 탭의 표시 탭·컴팩트 상태가 즉시 기본값과 수렴한다.
+- 테스트/HMR 격리 시 설치한 storage listener를 제거해 오래된 Window에 구독이 남지 않게 한다.
+
 ## 4. 의도적으로 하지 않은 것
 
 - 선택 객체 자체를 pin하지 않는다. 잘못된 대상 편집 가능성이 이득보다 크다.
@@ -92,9 +102,10 @@ Blender의 객체 pin을 그대로 복제하면 캔버스에서 새 대상을 �
 ## 5. 검증 계약
 
 - 정규화: 알 수 없는 값 제거, 정본 순서, 최소 1개 탭
-- 저장소: local/session 분리, 차단 시 fail closed
+- 저장소: local/session 분리, 8 KiB 읽기 상한, 손상 JSON·차단 시 fail closed
 - 반응성: Navigator와 ContextRouteSync가 동일 스냅샷 구독
+- 다중 탭: 개별 key 변경과 전체 `localStorage.clear()` 모두 현재 스냅샷으로 수렴
 - 라우팅: pin 상태에서도 명시적 도구 실행 우선
-- 접근성: `aria-pressed`, `aria-expanded`, `aria-controls`, `role=region`, 활성 탭 숨김 사유
-- 밀도: 옵션을 닫았을 때 기존 DOM 감사의 최대 chrome 12개 예산 유지
+- 접근성: `aria-pressed`, `aria-expanded`, `aria-controls`, 비모달 `role=dialog`, 명시적 닫기와 바깥 입력 dismiss, 활성 탭 숨김 사유
+- 밀도: 옵션은 65vh 내부 스크롤 팝오버이며, 닫았을 때 기존 DOM 감사의 최대 chrome 12개 예산 유지
 - 터치: 상단 액션과 구성 옵션은 최소 44px

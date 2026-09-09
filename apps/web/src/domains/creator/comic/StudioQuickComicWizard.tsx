@@ -1,7 +1,10 @@
 import {
+  AlertTriangle,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Info,
   LayoutPanelTop,
   MessageSquareText,
   Sparkles,
@@ -17,6 +20,13 @@ import {
   SCENE_TEMPLATES,
 } from "../studio-scene-templates";
 
+import {
+  normalizeQuickComicDialogueScript,
+  splitLongQuickComicDialogueScript,
+  type QuickComicPreflightIssue,
+  type QuickComicPreflightReport,
+  type QuickComicPreflightSeverity,
+} from "./studio-quick-comic-preflight";
 import {
   clampQuickComicStep,
   createQuickComicDraft,
@@ -66,12 +76,219 @@ function LayoutThumbnail({
   );
 }
 
+function severityLabel(severity: QuickComicPreflightSeverity): string {
+  if (severity === "blocker") return "수정 필요";
+  if (severity === "warning") return "검토";
+  return "참고";
+}
+
+function PreflightIssueIcon({ issue }: { issue: QuickComicPreflightIssue }) {
+  if (issue.severity === "blocker" || issue.severity === "warning") {
+    return <AlertTriangle size={16} aria-hidden="true" />;
+  }
+  return <Info size={16} aria-hidden="true" />;
+}
+
+function QuickComicPreflightPanel({
+  report,
+  currentLayoutId,
+  compact = false,
+  onApplyRecommendation,
+  onNormalizeDialogue,
+  onSplitDialogue,
+}: {
+  report: QuickComicPreflightReport;
+  currentLayoutId: string;
+  compact?: boolean;
+  onApplyRecommendation: () => void;
+  onNormalizeDialogue: () => void;
+  onSplitDialogue: () => void;
+}) {
+  const recommendationDiffers = report.recommendation.layoutId !== currentLayoutId;
+  const visibleIssues = compact ? report.issues.slice(0, 3) : report.issues;
+  const hiddenIssueCount = report.issues.length - visibleIssues.length;
+  const statusIcon = report.status === "ready"
+    ? <CheckCircle2 size={19} aria-hidden="true" />
+    : <AlertTriangle size={19} aria-hidden="true" />;
+
+  return (
+    <section
+      aria-labelledby={compact ? "quick-comic-live-preflight" : "quick-comic-review-preflight"}
+      data-studio-comic-preflight="true"
+      className={cn(
+        "rounded-2xl border p-3.5",
+        report.status === "blocked"
+          ? "border-danger/45 bg-danger/10"
+          : report.status === "review"
+            ? "border-warning/45 bg-warning/10"
+            : "border-accent/40 bg-accent-soft"
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span
+            className={cn(
+              "mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl",
+              report.status === "blocked"
+                ? "bg-danger/15 text-danger"
+                : report.status === "review"
+                  ? "bg-warning/15 text-fg"
+                  : "bg-panel text-accent"
+            )}
+          >
+            {statusIcon}
+          </span>
+          <div className="min-w-0">
+            <h4
+              id={compact ? "quick-comic-live-preflight" : "quick-comic-review-preflight"}
+              className="text-sm font-bold text-fg"
+            >
+              제작 프리플라이트 · {report.statusLabel}
+            </h4>
+            <p className="mt-0.5 text-xs leading-relaxed text-fg-2">{report.summary}</p>
+          </div>
+        </div>
+        <div className="rounded-xl border border-line bg-panel px-3 py-2 text-right shadow-sm">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-fg-3">
+            가독성
+          </p>
+          <p className="text-lg font-black tabular-nums text-fg">
+            {report.score}<span className="text-xs font-semibold text-fg-3">/100</span>
+          </p>
+        </div>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded-xl border border-line bg-panel px-2.5 py-2">
+          <dt className="text-[0.68rem] text-fg-3">컷</dt>
+          <dd className="mt-0.5 text-sm font-bold tabular-nums text-fg">
+            {report.metrics.panelCount}개
+          </dd>
+        </div>
+        <div className="rounded-xl border border-line bg-panel px-2.5 py-2">
+          <dt className="text-[0.68rem] text-fg-3">대사</dt>
+          <dd className="mt-0.5 text-sm font-bold tabular-nums text-fg">
+            {report.metrics.total}개
+          </dd>
+        </div>
+        <div className="rounded-xl border border-line bg-panel px-2.5 py-2">
+          <dt className="text-[0.68rem] text-fg-3">컷당 최대</dt>
+          <dd className="mt-0.5 text-sm font-bold tabular-nums text-fg">
+            {report.metrics.maxDialogueInPanel}개
+          </dd>
+        </div>
+        <div className="rounded-xl border border-line bg-panel px-2.5 py-2">
+          <dt className="text-[0.68rem] text-fg-3">가장 긴 대사</dt>
+          <dd className="mt-0.5 text-sm font-bold tabular-nums text-fg">
+            {report.metrics.maxCharacters}자
+          </dd>
+        </div>
+      </dl>
+
+      <div className="mt-3 rounded-xl border border-line bg-panel p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-fg">
+              추천 · {report.recommendation.label} ({report.recommendation.frameCount}컷)
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-fg-3">
+              {report.recommendation.reason}
+            </p>
+          </div>
+          {recommendationDiffers ? (
+            <button
+              type="button"
+              onClick={onApplyRecommendation}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <Sparkles size={15} aria-hidden="true" />
+              추천 레이아웃 적용
+            </button>
+          ) : (
+            <span className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-accent-soft px-2.5 text-[0.68rem] font-bold text-accent">
+              <Check size={14} aria-hidden="true" />
+              추천 구성 사용 중
+            </span>
+          )}
+        </div>
+      </div>
+
+      {visibleIssues.length > 0 ? (
+        <ul className="mt-3 grid gap-2" aria-label="만화 제작 검수 결과">
+          {visibleIssues.map((issue) => (
+            <li
+              key={issue.id}
+              className="flex items-start gap-2.5 rounded-xl border border-line bg-panel px-3 py-2.5"
+            >
+              <span
+                className={cn(
+                  "mt-0.5 shrink-0",
+                  issue.severity === "blocker"
+                    ? "text-danger"
+                    : issue.severity === "warning"
+                      ? "text-warning"
+                      : "text-accent"
+                )}
+              >
+                <PreflightIssueIcon issue={issue} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-bold text-fg">{issue.title}</span>
+                  <span className="rounded-full border border-line px-1.5 py-0.5 text-[0.62rem] font-semibold text-fg-3">
+                    {severityLabel(issue.severity)}
+                  </span>
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-fg-3">
+                  {issue.detail}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 flex items-center gap-2 rounded-xl border border-line bg-panel px-3 py-2.5 text-xs font-semibold text-fg-2">
+          <CheckCircle2 size={16} className="text-accent" aria-hidden="true" />
+          추가로 확인할 가독성 문제가 없습니다.
+        </p>
+      )}
+      {hiddenIssueCount > 0 ? (
+        <p className="mt-2 text-right text-[0.68rem] text-fg-3">
+          미리보기 단계에서 검수 항목 {hiddenIssueCount}개를 더 보여 줍니다.
+        </p>
+      ) : null}
+
+      {report.metrics.total > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onNormalizeDialogue}
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            대사 형식 정리
+          </button>
+          {report.metrics.longDialogueCount > 0 ? (
+            <button
+              type="button"
+              onClick={onSplitDialogue}
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              긴 대사 자동 나누기
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function StudioQuickComicWizard({
   onApply,
   onCancel,
 }: StudioQuickComicWizardProps) {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<QuickComicDraft>(createQuickComicDraft);
+  const [assistantMessage, setAssistantMessage] = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -81,15 +298,17 @@ export function StudioQuickComicWizard({
   const currentStep = QUICK_COMIC_STEPS[step]!;
   const selectedLayout =
     PANEL_LAYOUTS.find((layout) => layout.id === draft.layoutId) ?? PANEL_LAYOUTS[0]!;
-  const selectedScene =
-    draft.sceneTemplateId
-      ? SCENE_TEMPLATES.find((scene) => scene.id === draft.sceneTemplateId) ?? null
-      : null;
-  const canApply = Boolean(preview?.assembly.composable);
+  const selectedScene = draft.sceneTemplateId
+    ? SCENE_TEMPLATES.find((scene) => scene.id === draft.sceneTemplateId) ?? null
+    : null;
+  const preflight = preview?.preflight ?? null;
+  const canApply = Boolean(
+    preview?.assembly.composable && preflight && preflight.status !== "blocked"
+  );
 
   const cancelFromEffect = useEffectEvent(onCancel);
   const applyFromEffect = useEffectEvent(() => {
-    if (step === QUICK_COMIC_STEPS.length - 1 && preview?.assembly.composable) {
+    if (step === QUICK_COMIC_STEPS.length - 1 && canApply && preview) {
       onApply(preview.input);
     }
   });
@@ -181,6 +400,30 @@ export function StudioQuickComicWizard({
     }));
   }
 
+  function applyRecommendedLayout(): void {
+    if (!preflight) return;
+    const layout = PANEL_LAYOUTS.find(
+      (candidate) => candidate.id === preflight.recommendation.layoutId
+    );
+    if (!layout) return;
+    selectLayout(layout);
+    setAssistantMessage(
+      `추천 레이아웃 ‘${layout.label}’을 적용했습니다. ${preflight.recommendation.reason}`
+    );
+  }
+
+  function normalizeDialogue(): void {
+    const dialogueScript = normalizeQuickComicDialogueScript(draft.dialogueScript);
+    setDraft((current) => ({ ...current, dialogueScript }));
+    setAssistantMessage("빈 줄과 공백, 화자 표기 형식을 정리했습니다.");
+  }
+
+  function splitLongDialogue(): void {
+    const dialogueScript = splitLongQuickComicDialogueScript(draft.dialogueScript);
+    setDraft((current) => ({ ...current, dialogueScript }));
+    setAssistantMessage("긴 대사를 말풍선 가독성 기준으로 나눴습니다.");
+  }
+
   function goBack(): void {
     setStep((current) => clampQuickComicStep(current - 1));
   }
@@ -190,7 +433,7 @@ export function StudioQuickComicWizard({
   }
 
   function applyPlan(): void {
-    if (preview?.assembly.composable) onApply(preview.input);
+    if (canApply && preview) onApply(preview.input);
   }
 
   const content = (
@@ -208,8 +451,11 @@ export function StudioQuickComicWizard({
         data-studio-modal-owner="quick-comic"
         data-studio-shortcut-boundary="true"
         tabIndex={-1}
-        className="relative flex max-h-[calc(100dvh-env(safe-area-inset-top))] min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-line bg-panel text-fg shadow-2xl sm:max-h-[min(46rem,calc(100dvh-2.5rem))] sm:rounded-2xl"
+        className="relative flex max-h-[calc(100dvh-env(safe-area-inset-top))] min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl border border-line bg-panel text-fg shadow-2xl sm:max-h-[min(50rem,calc(100dvh-2.5rem))] sm:rounded-2xl"
       >
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {assistantMessage}
+        </p>
         <header className="shrink-0 border-b border-line bg-panel px-4 pb-3 pt-3 sm:px-5 sm:pt-4">
           <div className="flex items-start gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
@@ -221,10 +467,10 @@ export function StudioQuickComicWizard({
               </h2>
               <p
                 id="studio-quick-comic-description"
-                className="mt-0.5 max-w-[65ch] text-xs leading-relaxed text-fg-3"
+                className="mt-0.5 max-w-[70ch] text-xs leading-relaxed text-fg-3"
               >
                 컷·장면 연출·대사를 순서대로 골라 한 페이지를 만듭니다. 캐릭터 생성은
-                포함하지 않아요.
+                포함하지 않으며, 적용 전에 대사 밀도와 가독성을 자동 검수합니다.
               </p>
             </div>
             <button
@@ -265,23 +511,53 @@ export function StudioQuickComicWizard({
         >
           {step === 0 ? (
             <section aria-labelledby="quick-comic-layout-heading">
-              <div className="mb-4">
-                <h3 id="quick-comic-layout-heading" className="text-sm font-bold text-fg">
-                  컷 흐름을 고르세요
-                </h3>
-                <p className="mt-1 text-xs leading-relaxed text-fg-3">
-                  적용하면 현재 페이지 크기와 컷 구성이 선택한 레이아웃으로 바뀝니다.
-                </p>
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 id="quick-comic-layout-heading" className="text-sm font-bold text-fg">
+                    컷 흐름을 고르세요
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-fg-3">
+                    적용하면 현재 페이지 크기와 컷 구성이 선택한 레이아웃으로 바뀝니다.
+                  </p>
+                </div>
+                {preflight ? (
+                  <span className="rounded-full border border-line bg-card px-3 py-1.5 text-xs font-semibold text-fg-2">
+                    현재 적합도 {preflight.layoutFitScore}/100
+                  </span>
+                ) : null}
               </div>
+              {preflight ? (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-card p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-fg">
+                      자동 추천 · {preflight.recommendation.label}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
+                      {preflight.recommendation.reason} 대사를 입력하면 추천이 실시간으로 바뀝니다.
+                    </p>
+                  </div>
+                  {preflight.recommendation.layoutId !== draft.layoutId ? (
+                    <button
+                      type="button"
+                      onClick={applyRecommendedLayout}
+                      className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
+                      <Sparkles size={15} aria-hidden="true" />
+                      추천 적용
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               <fieldset className="grid gap-2 sm:grid-cols-2">
                 <legend className="sr-only">컷 레이아웃</legend>
                 {PANEL_LAYOUTS.map((layout) => {
                   const selected = layout.id === draft.layoutId;
+                  const recommended = layout.id === preflight?.recommendation.layoutId;
                   return (
                     <label
                       key={layout.id}
                       className={cn(
-                        "flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
+                        "relative flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
                         selected
                           ? "border-accent bg-accent-soft"
                           : "border-line bg-card hover:border-line-strong hover:bg-raised"
@@ -297,9 +573,16 @@ export function StudioQuickComicWizard({
                       />
                       <LayoutThumbnail layout={layout} />
                       <span className="min-w-0">
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-fg">
+                        <span className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-fg">
                           {layout.label}
-                          {selected ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
+                          {selected ? (
+                            <Check size={15} className="text-accent" aria-hidden="true" />
+                          ) : null}
+                          {recommended ? (
+                            <span className="rounded-full bg-panel px-1.5 py-0.5 text-[0.62rem] font-bold text-accent">
+                              추천
+                            </span>
+                          ) : null}
                         </span>
                         <span className="mt-1 block text-xs leading-relaxed text-fg-3">
                           {layout.hint} · {layout.frames.length}컷
@@ -426,10 +709,7 @@ export function StudioQuickComicWizard({
                     value={draft.sceneFrameIndex}
                     onChange={(event) => {
                       const sceneFrameIndex = Number(event.currentTarget.value);
-                      setDraft((current) => ({
-                        ...current,
-                        sceneFrameIndex,
-                      }));
+                      setDraft((current) => ({ ...current, sceneFrameIndex }));
                     }}
                     className="mt-2 min-h-11 w-full rounded-xl border border-line-strong bg-panel px-3 text-sm font-semibold text-fg outline-none focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
@@ -466,10 +746,7 @@ export function StudioQuickComicWizard({
                   value={draft.dialogueScript}
                   onChange={(event) => {
                     const dialogueScript = event.currentTarget.value;
-                    setDraft((current) => ({
-                      ...current,
-                      dialogueScript,
-                    }));
+                    setDraft((current) => ({ ...current, dialogueScript }));
                   }}
                   rows={11}
                   spellCheck={false}
@@ -489,6 +766,18 @@ export function StudioQuickComicWizard({
                   순서대로 배치됩니다.
                 </p>
               ) : null}
+              {preflight ? (
+                <div className="mt-4">
+                  <QuickComicPreflightPanel
+                    compact
+                    report={preflight}
+                    currentLayoutId={draft.layoutId}
+                    onApplyRecommendation={applyRecommendedLayout}
+                    onNormalizeDialogue={normalizeDialogue}
+                    onSplitDialogue={splitLongDialogue}
+                  />
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -503,8 +792,18 @@ export function StudioQuickComicWizard({
                 </p>
               </div>
 
+              {preflight ? (
+                <QuickComicPreflightPanel
+                  report={preflight}
+                  currentLayoutId={draft.layoutId}
+                  onApplyRecommendation={applyRecommendedLayout}
+                  onNormalizeDialogue={normalizeDialogue}
+                  onSplitDialogue={splitLongDialogue}
+                />
+              ) : null}
+
               {preview ? (
-                <div className="grid gap-4 sm:grid-cols-[11rem_minmax(0,1fr)]">
+                <div className="mt-4 grid gap-4 sm:grid-cols-[11rem_minmax(0,1fr)]">
                   <div className="flex min-h-56 items-center justify-center rounded-xl border border-line bg-canvas p-4">
                     <LayoutThumbnail
                       layout={preview.layout}
@@ -553,17 +852,13 @@ export function StudioQuickComicWizard({
                   </dl>
                 </div>
               ) : (
-                <p role="alert" className="rounded-xl border border-danger/45 bg-danger/10 p-3 text-sm text-danger">
+                <p
+                  role="alert"
+                  className="rounded-xl border border-danger/45 bg-danger/10 p-3 text-sm text-danger"
+                >
                   선택한 구성을 읽지 못했습니다. 이전 단계에서 레이아웃을 다시 골라 주세요.
                 </p>
               )}
-
-              {preview && !preview.assembly.composable ? (
-                <p role="alert" className="mt-4 rounded-xl border border-warning/45 bg-warning/10 p-3 text-xs leading-relaxed text-fg">
-                  현재 대사와 장면이 컷 안에서 겹칠 수 있습니다. 대사를 줄이거나 더 여유 있는
-                  레이아웃을 골라 주세요.
-                </p>
-              ) : null}
             </section>
           ) : null}
         </main>
