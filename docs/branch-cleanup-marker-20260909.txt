@@ -1,0 +1,3 @@
+Temporary repository branch-cleanup marker.
+
+This file exists only to create an auditable pull request that retires the transfer-only branch `ops/audit-view-navigator-archive-20260909-pass17` through GitHub's automatic head-branch deletion. It is removed by the immediately following cleanup pull request.
