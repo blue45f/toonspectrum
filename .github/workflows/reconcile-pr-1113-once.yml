@@ -1,0 +1,56 @@
+name: Reconcile PR 1113 with latest main once
+
+on:
+  push:
+    branches:
+      - feat/studio-generated-2d-pack
+    paths:
+      - .github/workflows/reconcile-pr-1113-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reconcile-pr-1113-once
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/studio-generated-2d-pack
+          fetch-depth: 0
+      - name: Merge latest main and resolve branch-owned conflicts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git fetch origin main
+          set +e
+          git merge --no-commit --no-ff -X ours origin/main
+          merge_status=$?
+          set -e
+          if [ "$merge_status" -ne 0 ]; then
+            unresolved="$(git diff --name-only --diff-filter=U)"
+            if [ -n "$unresolved" ]; then
+              while IFS= read -r path; do
+                [ -n "$path" ] || continue
+                git checkout --ours -- "$path" 2>/dev/null || git rm -f --ignore-unmatch -- "$path"
+                git add -A -- "$path"
+              done <<< "$unresolved"
+            fi
+          fi
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "Unresolved merge conflicts remain" >&2
+            git diff --name-only --diff-filter=U >&2
+            exit 1
+          fi
+          git rm .github/workflows/reconcile-pr-1113-once.yml
+          git add -A
+          git diff --cached --check
+          git commit -m "chore: reconcile PR #1113 with latest main"
+          git push origin HEAD:feat/studio-generated-2d-pack
