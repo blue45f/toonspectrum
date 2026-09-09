@@ -8,9 +8,7 @@ import {
   type StudioOriginalFreeAssetPackage,
 } from "./studio-original-free-asset-packs-base";
 import {
-  STUDIO_ORIGINAL_2D_EXPANSION_ASSETS,
   STUDIO_ORIGINAL_2D_EXPANSION_PACKAGES,
-  findStudioOriginal2dExpansionPackage,
 } from "./catalog/studio-original-2d-asset-expansion";
 
 export {
@@ -23,6 +21,39 @@ export {
   type StudioOriginalFreeAssetPackage,
 } from "./studio-original-free-asset-packs-base";
 
+const BASE_ASSET_IDS = new Set(BASE_ASSETS.map((asset) => asset.id));
+
+function normalizeExpansionAsset(asset: StudioOriginalFreeAsset): StudioOriginalFreeAsset {
+  if (!BASE_ASSET_IDS.has(asset.id)) return asset;
+
+  // Existing ids are project/runtime contracts. New authored material never replaces an
+  // older visual just because a catalog author picked the same descriptive slug.
+  const replacementId = asset.id === "original-city-bicycle"
+    ? "original-city-commuter-bike"
+    : `${asset.id}-v2`;
+
+  return Object.freeze({
+    ...asset,
+    id: replacementId,
+    contentFingerprint: `original-svg:v2:${replacementId}`,
+  });
+}
+
+const EXPANSION_PACKAGES: readonly StudioOriginalFreeAssetPackage[] = Object.freeze(
+  STUDIO_ORIGINAL_2D_EXPANSION_PACKAGES.map((pkg) => {
+    const includedItems = Object.freeze(pkg.includedItems.map(normalizeExpansionAsset));
+    return Object.freeze({
+      ...pkg,
+      includedItems,
+      packageFingerprint: `${pkg.packageFingerprint}:normalized`,
+    });
+  }),
+);
+
+const EXPANSION_ASSETS: readonly StudioOriginalFreeAsset[] = Object.freeze(
+  EXPANSION_PACKAGES.flatMap((pkg) => pkg.includedItems),
+);
+
 /**
  * Canonical authored 2D catalog.
  *
@@ -34,24 +65,27 @@ export {
 export const STUDIO_ORIGINAL_FREE_ASSET_PACKAGES: readonly StudioOriginalFreeAssetPackage[] =
   Object.freeze([
     ...BASE_PACKAGES,
-    ...STUDIO_ORIGINAL_2D_EXPANSION_PACKAGES,
+    ...EXPANSION_PACKAGES,
   ]);
 
 export const STUDIO_ORIGINAL_FREE_ASSETS: readonly StudioOriginalFreeAsset[] = Object.freeze([
   ...BASE_ASSETS,
-  ...STUDIO_ORIGINAL_2D_EXPANSION_ASSETS,
+  ...EXPANSION_ASSETS,
 ]);
 
 export function findStudioOriginalFreeAsset(assetId: unknown): StudioOriginalFreeAsset | null {
   if (typeof assetId !== "string") return null;
-  return STUDIO_ORIGINAL_2D_EXPANSION_ASSETS.find((asset) => asset.id === assetId)
-    ?? findBaseAsset(assetId);
+  return findBaseAsset(assetId)
+    ?? EXPANSION_ASSETS.find((asset) => asset.id === assetId)
+    ?? null;
 }
 
 export function findStudioOriginalFreeAssetPackage(
   packageId: unknown,
 ): StudioOriginalFreeAssetPackage | null {
-  return findStudioOriginal2dExpansionPackage(packageId) ?? findBasePackage(packageId);
+  return findBasePackage(packageId)
+    ?? EXPANSION_PACKAGES.find((pkg) => pkg.id === packageId)
+    ?? null;
 }
 
 export function filterStudioOriginalFreeAssets(input: {
