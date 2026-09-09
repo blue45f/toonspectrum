@@ -1,0 +1,58 @@
+name: Execute mannequin anatomy v1
+
+on:
+  push:
+    branches: [feat/mannequin-anatomy-v1-20260910]
+    paths: [.github/workflows/mannequin-anatomy-v1-executor.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  execute:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/mannequin-anatomy-v1-20260910
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Execute product and validation steps from bootstrap
+        shell: bash
+        run: |
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 - <<'PY'
+          import os, subprocess, yaml
+          source = '.github/workflows/mannequin-anatomy-v1-bootstrap.yml'
+          data = yaml.safe_load(open(source, encoding='utf-8'))
+          for job in data.get('jobs', {}).values():
+              for step in job.get('steps', []):
+                  script = step.get('run')
+                  if not script:
+                      continue
+                  name = str(step.get('name', ''))
+                  if 'Commit product change' in name or 'git push origin' in script:
+                      continue
+                  env = os.environ.copy()
+                  env.update({str(k): str(v) for k, v in (step.get('env') or {}).items()})
+                  print(f'::group::{name or "bootstrap step"}')
+                  subprocess.run(script, shell=True, executable='/bin/bash', check=True, env=env)
+                  print('::endgroup::')
+          PY
+      - name: Commit materialized product slice
+        shell: bash
+        run: |
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/mannequin-anatomy-v1-bootstrap.yml \
+                .github/workflows/mannequin-anatomy-v1-executor.yml
+          git add -A
+          git diff --cached --check
+          git commit -m 'feat(mannequin): add anatomical silhouette controls'
+          git push origin HEAD:feat/mannequin-anatomy-v1-20260910
