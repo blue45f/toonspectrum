@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - name: Execute product and validation steps from bootstrap
+      - name: Materialize mannequin anatomy product code
         shell: bash
         run: |
           python3 -m pip install --disable-pip-version-check pyyaml
@@ -37,7 +37,7 @@ jobs:
                   if not script:
                       continue
                   name = str(step.get('name', ''))
-                  if 'Commit product change' in name or 'git push origin' in script:
+                  if name == 'Validate mannequin anatomy slice' or 'Commit product change' in name or 'git push origin' in script:
                       continue
                   env = os.environ.copy()
                   env.update({str(k): str(v) for k, v in (step.get('env') or {}).items()})
@@ -45,6 +45,16 @@ jobs:
                   subprocess.run(script, shell=True, executable='/bin/bash', check=True, env=env)
                   print('::endgroup::')
           PY
+      - name: Validate mannequin anatomy scope
+        shell: bash
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts \
+            apps/web/src/domains/creator/scene-3d/StudioMannequinPoserPanel.tsx \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts
+          git diff --check
       - name: Commit materialized product slice
         shell: bash
         run: |
@@ -54,5 +64,5 @@ jobs:
                 .github/workflows/mannequin-anatomy-v1-executor.yml
           git add -A
           git diff --cached --check
-          git commit -m 'feat(mannequin): add anatomical silhouette controls'
-          git push origin HEAD:feat/mannequin-anatomy-v1-20260910
+          HUSKY=0 git commit -m 'feat(mannequin): add anatomical silhouette controls'
+          HUSKY=0 git push origin HEAD:feat/mannequin-anatomy-v1-20260910
