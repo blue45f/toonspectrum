@@ -317,29 +317,57 @@ export async function acquireStudioGpuFilterRuntimeOnFabric(
 ): Promise<StudioGpuFilterRuntime | null> {
   if (fabricFilterRuntime && !fabricFilterRuntime.lost) return fabricFilterRuntime;
   if (fabricFilterAcquisition) return fabricFilterAcquisition;
+
   const generation = fabricGeneration;
-  fabricFilterAcquisition = (async () => {
+  const acquisition = (async (): Promise<StudioGpuFilterRuntime | null> => {
     // 이전 런타임이 loss 로 죽었다면 잔여 lease 를 반납한다(멱등).
     fabricFilterLease?.release();
     fabricFilterRuntime = null;
     fabricFilterLease = null;
-    const lease = await acquireStudioGpuDevice(options);
-    if (!lease) return null;
-    const runtime = await acquireStudioGpuFilterRuntime({
-      gpu: gpuForFacade(createLeaseDeviceFacade(lease)),
-    });
-    if (!runtime || generation !== fabricGeneration) {
+
+    let lease: StudioGpuDeviceLease | null = null;
+    let runtime: StudioGpuFilterRuntime | null = null;
+    try {
+      lease = await acquireStudioGpuDevice(options);
+      if (!lease || lease.lost || generation !== fabricGeneration) {
+        lease?.release();
+        return null;
+      }
+
+      runtime = await acquireStudioGpuFilterRuntime({
+        gpu: gpuForFacade(createLeaseDeviceFacade(lease)),
+      });
+      if (
+        !runtime
+        || runtime.lost
+        || lease.lost
+        || generation !== fabricGeneration
+      ) {
+        runtime?.dispose();
+        lease.release();
+        return null;
+      }
+
+      fabricFilterRuntime = runtime;
+      fabricFilterLease = lease;
+      return runtime;
+    } catch {
+      // 예상하지 못한 provider/브라우저 예외도 실패로 캐시하지 않고 lease 를 회수한다.
       runtime?.dispose();
-      lease.release();
+      lease?.release();
       return null;
     }
-    fabricFilterRuntime = runtime;
-    fabricFilterLease = lease;
-    return runtime;
   })();
-  const runtime = await fabricFilterAcquisition;
-  fabricFilterAcquisition = null;
-  return runtime;
+
+  fabricFilterAcquisition = acquisition;
+  try {
+    return await acquisition;
+  } finally {
+    // dispose 뒤 시작된 새 세대의 acquisition 을 이전 호출의 완료가 지우지 않게 한다.
+    if (fabricFilterAcquisition === acquisition) {
+      fabricFilterAcquisition = null;
+    }
+  }
 }
 
 /**
