@@ -1,10 +1,10 @@
 import {
-  Brush,
   Box,
+  Brush,
   Cuboid,
+  Images,
   LayoutTemplate,
   Palette,
-  Shapes,
   SlidersHorizontal,
 } from "lucide-react";
 
@@ -14,89 +14,85 @@ import type {
 } from "@/shared/lib/creator-marketplace-resource-contract";
 import type { LucideIcon } from "lucide-react";
 
-
 export interface MarketKindMeta {
   readonly kind: CreatorMarketplaceResourceKind;
   readonly label: string;
   readonly english: string;
   readonly description: string;
   readonly icon: LucideIcon;
-  /** 데이터 맥락(커버 그라디언트·칩 틴트) 전용 hue. 악센트(persimmon, hue 42)와 충돌하지 않게 우회 배치. */
   readonly hue: number;
 }
 
 export const MARKET_KINDS: readonly MarketKindMeta[] = Object.freeze([
   {
-    kind: "brush",
-    label: "브러시",
-    english: "BRUSH",
-    description: "펜·붓 질감을 그대로 공유하는 portable JSON 브러시",
-    icon: Brush,
-    hue: 150,
-  },
-  {
-    kind: "filter",
-    label: "필터",
-    english: "FILTER",
-    description: "색보정·효과 프리셋을 한 번에 적용",
-    icon: SlidersHorizontal,
-    hue: 280,
-  },
-  {
-    kind: "palette",
-    label: "팔레트",
-    english: "PALETTE",
-    description: "작가의 컬러 무드를 통째로 가져오기",
-    icon: Palette,
-    hue: 330,
-  },
-  {
     kind: "template",
     label: "템플릿",
     english: "TEMPLATE",
-    description: "장면 구도와 캔버스 세팅이 담긴 시작판",
+    description: "컷 구성·대사·연출이 준비된 웹툰 장면 시작점",
     icon: LayoutTemplate,
     hue: 232,
   },
   {
-    kind: "3d-preset",
-    label: "3D 프리셋",
-    english: "3D PRESET",
-    description: "절차형 3D 배경 프리셋으로 스크린 잡기",
-    icon: Box,
-    hue: 200,
+    kind: "asset",
+    label: "2D 에셋",
+    english: "2D ASSET",
+    description: "캔버스에 바로 배치하는 배경·소품·효과·그래픽",
+    icon: Images,
+    hue: 95,
   },
   {
     kind: "3d-asset",
     label: "3D 에셋",
     english: "3D ASSET",
-    description: "3D 모델·소품·캐릭터 파츠를 공유하고 Studio에서 바로 배치",
+    description: "배경·소품·인체·자연물을 카메라로 돌려 바로 배치",
     icon: Cuboid,
     hue: 170,
   },
   {
-    kind: "asset",
-    label: "에셋",
-    english: "ASSET",
-    description: "절차형 2D 오브제와 소품 레시피",
-    icon: Shapes,
-    hue: 95,
+    kind: "3d-preset",
+    label: "3D 프리셋",
+    english: "3D PRESET",
+    description: "카메라·조명·공간 구도를 빠르게 시작하는 3D 설정",
+    icon: Box,
+    hue: 200,
+  },
+  {
+    kind: "brush",
+    label: "브러시",
+    english: "BRUSH",
+    description: "선화·스케치·채색·질감·이펙트용 드로잉 도구",
+    icon: Brush,
+    hue: 150,
+  },
+  {
+    kind: "palette",
+    label: "팔레트",
+    english: "PALETTE",
+    description: "장르·인물·환경의 색 조합을 프로젝트에 바로 적용",
+    icon: Palette,
+    hue: 330,
+  },
+  {
+    kind: "filter",
+    label: "보정·효과",
+    english: "FILTER",
+    description: "색보정·분위기·마감 효과를 비파괴적으로 적용",
+    icon: SlidersHorizontal,
+    hue: 280,
   },
 ]);
 
 const MARKET_KIND_BY_KIND = new Map(MARKET_KINDS.map((meta) => [meta.kind, meta]));
 
 export function marketKindMeta(kind: CreatorMarketplaceResourceKind): MarketKindMeta {
-  return (
-    MARKET_KIND_BY_KIND.get(kind) ?? {
-      kind,
-      label: kind,
-      english: kind.toUpperCase(),
-      description: "",
-      icon: Shapes,
-      hue: 70,
-    }
-  );
+  return MARKET_KIND_BY_KIND.get(kind) ?? {
+    kind,
+    label: kind,
+    english: kind.toUpperCase(),
+    description: "",
+    icon: Images,
+    hue: 70,
+  };
 }
 
 export interface MarketLicenseMeta {
@@ -109,8 +105,8 @@ export interface MarketLicenseMeta {
 export const MARKET_LICENSES: readonly MarketLicenseMeta[] = Object.freeze([
   {
     license: "toonspectrum-standard",
-    label: "ToonSpectrum 표준 사용권",
-    summary: "작품 사용은 자유, 리소스 파일 재배포는 불가",
+    label: "ToonStudio 표준 사용권",
+    summary: "작품에는 사용할 수 있고 리소스 파일 자체의 재배포는 허용하지 않음",
     url: null,
   },
   {
@@ -122,24 +118,20 @@ export const MARKET_LICENSES: readonly MarketLicenseMeta[] = Object.freeze([
   {
     license: "cc-by-4.0",
     label: "CC BY 4.0",
-    summary: "저작자 표시 조건 하에 상업 이용·수정·재배포 가능",
+    summary: "저작자 표시 조건으로 상업 이용·수정·재배포 가능",
     url: "https://creativecommons.org/licenses/by/4.0/",
   },
   {
     license: "cc-by-nc-4.0",
     label: "CC BY-NC 4.0",
-    summary: "저작자 표시 필요, 비상업 작품에만 사용 가능",
+    summary: "저작자 표시가 필요하며 비상업 작품에만 사용 가능",
     url: "https://creativecommons.org/licenses/by-nc/4.0/",
   },
 ]);
 
-const MARKET_LICENSE_BY_LICENSE = new Map(
-  MARKET_LICENSES.map((meta) => [meta.license, meta])
-);
+const MARKET_LICENSE_BY_LICENSE = new Map(MARKET_LICENSES.map((meta) => [meta.license, meta]));
 
-export function marketLicenseMeta(
-  license: CreatorMarketplaceResourceLicense
-): MarketLicenseMeta {
+export function marketLicenseMeta(license: CreatorMarketplaceResourceLicense): MarketLicenseMeta {
   return MARKET_LICENSE_BY_LICENSE.get(license) ?? MARKET_LICENSES[0]!;
 }
 
