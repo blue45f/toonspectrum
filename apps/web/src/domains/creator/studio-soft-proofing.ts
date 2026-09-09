@@ -49,12 +49,12 @@ export const STUDIO_COLOR_PROFILES: Readonly<Record<StudioColorProfileId, Studio
         0.4124564, 0.3575761, 0.1804375,
         0.2126729, 0.7151522, 0.072175,
         0.0193339, 0.119192, 0.9503041,
-      ]),
+      ] as const),
       xyzToRgb: Object.freeze([
         3.2404542, -1.5371385, -0.4985314,
         -0.969266, 1.8760108, 0.041556,
         0.0556434, -0.2040259, 1.0572252,
-      ]),
+      ] as const),
     }),
     "display-p3": Object.freeze({
       id: "display-p3",
@@ -64,12 +64,12 @@ export const STUDIO_COLOR_PROFILES: Readonly<Record<StudioColorProfileId, Studio
         0.4865709, 0.2656677, 0.1982173,
         0.2289746, 0.6917385, 0.0792869,
         0, 0.0451134, 1.0439444,
-      ]),
+      ] as const),
       xyzToRgb: Object.freeze([
         2.4934969, -0.9313836, -0.4027108,
         -0.829489, 1.762664, 0.0236247,
         0.0358458, -0.0761724, 0.9568845,
-      ]),
+      ] as const),
     }),
     "adobe-rgb-1998": Object.freeze({
       id: "adobe-rgb-1998",
@@ -79,12 +79,12 @@ export const STUDIO_COLOR_PROFILES: Readonly<Record<StudioColorProfileId, Studio
         0.5767309, 0.185554, 0.1881852,
         0.2973769, 0.6273491, 0.0752741,
         0.0270343, 0.0706872, 0.9911085,
-      ]),
+      ] as const),
       xyzToRgb: Object.freeze([
         2.041369, -0.5649464, -0.3446944,
         -0.969266, 1.8760108, 0.041556,
         0.0134474, -0.1183897, 1.0154096,
-      ]),
+      ] as const),
     }),
   });
 

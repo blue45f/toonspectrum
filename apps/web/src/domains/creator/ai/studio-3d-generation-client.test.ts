@@ -48,7 +48,7 @@ describe("Studio3dGenerationHttpClient", () => {
       "idempotent-1",
     );
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(String(url)).toEndWith("/api/studio-ai/3d/jobs");
+    expect(String(url).endsWith("/api/studio-ai/3d/jobs")).toBe(true);
     const headers = new Headers(init?.headers);
     expect(headers.get("X-User-Id")).toBe("user-1");
     expect(headers.get("Idempotency-Key")).toBe("idempotent-1");
@@ -57,7 +57,9 @@ describe("Studio3dGenerationHttpClient", () => {
   });
 
   it("advances, cancels and restores jobs through stable URLs", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(job));
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(
+      async () => jsonResponse(job),
+    );
     const client = new Studio3dGenerationHttpClient({ userId: "user-1", fetchImpl: fetchMock });
     await client.advance("job/1");
     await client.cancel("job/1");
