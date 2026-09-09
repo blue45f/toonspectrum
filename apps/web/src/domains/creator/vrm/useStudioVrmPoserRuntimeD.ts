@@ -527,13 +527,14 @@ export function useStudioVrmPoserRuntimeD(h: StudioVrmPoserHost): void {
         setLibraryEntries((current: VrmLibraryEntry[]) => current.map((entry: VrmLibraryEntry) => {
           const visible = hydratedById.get(entry.id);
           if (visible) return visible;
-          const isBundledStaticThumbnail = entry.source === "sample"
-            && entry.thumbnail?.startsWith("/vrm/thumbnails/");
+          // Bundled sample thumbnails are immutable same-origin product assets. Never evict
+          // them when the uploaded-thumbnail hydration window moves; only uploaded data URLs
+          // participate in the bounded thumbnail window.
           if (
+            entry.source === "sample" ||
             entry.source === "memory" ||
             entry.id === activeModelIdRef.current ||
-            entry.thumbnail === null ||
-            isBundledStaticThumbnail
+            entry.thumbnail === null
           ) return entry;
           return { ...entry, thumbnail: null };
         }));
