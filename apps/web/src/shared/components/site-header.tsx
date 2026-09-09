@@ -85,7 +85,7 @@ export function SiteHeader() {
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
     window.requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }));
-  }, []);
+  }, [setMenuOpen]);
 
   useEffect(() => {
     setMenuOpen(false);

@@ -21,6 +21,7 @@ import {
 import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
 
 import { CreatorBrandFilm } from "./CreatorHomePage";
+import { CreatorLaunchpad } from "./CreatorLaunchpad";
 import { HOME_COPY, creatorHomeLocale } from "./creator-home-content";
 import {
   bindCreatorSectionNavigation,
@@ -287,6 +288,8 @@ export function CreatorHomeExperience() {
             ))}
           </div>
         </nav>
+
+        <CreatorLaunchpad locale={locale} />
 
         <section className="ce-quick-start" id="creator-start" aria-labelledby="creator-toolkit-title">
           <div className="ce-section-intro">
