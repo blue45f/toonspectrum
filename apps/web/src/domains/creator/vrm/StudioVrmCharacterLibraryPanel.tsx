@@ -94,7 +94,7 @@ export function StudioVrmCharacterLibraryPanel({
   const loadMorePendingRef = useRef(false);
   const loadMoreActionRef = useRef<() => void>(() => undefined);
 
-  const catalogEntries = filterStudioVrmProductionLibraryEntries(entries);
+  const catalogEntries = filterStudioVrmProductionLibraryEntries(entries, [activeModelId]);
   const entryById = new Map(catalogEntries.map((entry) => [entry.id, entry] as const));
   const recentEntries = recentCharacterIds
     .map((id) => entryById.get(id))
