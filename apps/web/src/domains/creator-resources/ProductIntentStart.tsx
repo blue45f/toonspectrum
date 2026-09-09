@@ -36,7 +36,7 @@ const COPY = {
     secondary: "자주 찾는 곳",
     intents: [
       ["만들고 싶어요", "빈 캔버스, 컷툰, 캐릭터와 프로젝트 시작점을 한곳에서 고릅니다."],
-      ["볼 작품을 찾고 싶어요", "장르·취향·랭킹·연재 일정에서 다음 작품을 찾습니다."],
+      ["볼 작품을 찾고 싶어요", "검색·장르·취향·랭킹·연재 일정 중 원하는 방식으로 찾습니다."],
       ["자료와 에셋이 필요해요", "출처가 있는 레퍼런스와 Studio에서 쓸 창작 에셋을 찾습니다."],
       ["사람들과 나누고 싶어요", "작품, 리뷰, 창작 경험과 커뮤니티 대화를 이어갑니다."],
     ],
@@ -55,7 +55,7 @@ const COPY = {
     secondary: "Frequent destinations",
     intents: [
       ["I want to create", "Choose a blank canvas, comic, character or project starting point."],
-      ["I want to find a story", "Discover the next story through taste, rankings and release schedules."],
+      ["I want to find a story", "Choose search, taste, rankings or release schedules from one hub."],
       ["I need references or assets", "Find sourced references and creative assets that work in Studio."],
       ["I want to share with people", "Continue through works, reviews, creative discussions and community."],
     ],
@@ -66,7 +66,7 @@ const COPY = {
 
 const INTENTS = [
   { href: "/make", icon: Palette },
-  { href: "/explore", icon: Compass },
+  { href: "/discover", icon: Compass },
   { href: "/research", icon: BookOpen },
   { href: "/community", icon: MessageCircle },
 ] as const;
