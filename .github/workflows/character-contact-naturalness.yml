@@ -13,6 +13,8 @@ on:
       - apps/web/tools/browser-harnesses/props-compare-main.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-contact-refinement.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-grip-contact-targets.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-grip-contact-targets.test.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-prop-rig.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-poser-utils.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-portrait-framing.ts
@@ -29,6 +31,8 @@ on:
       - apps/web/tools/browser-harnesses/props-compare-main.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-contact-refinement.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-grip-contact-targets.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-grip-contact-targets.test.ts
+      - apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-prop-rig.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-poser-utils.ts
       - apps/web/src/domains/creator/vrm/studio-vrm-portrait-framing.ts
@@ -76,6 +80,11 @@ jobs:
         run: corepack enable
       - name: Install workspace
         run: pnpm install --frozen-lockfile
+      - name: Verify real bundled hand geometry before screenshot review
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/vrm/studio-vrm-grip-contact-targets.test.ts
+          apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts
       - name: Install Chromium runtime
         run: pnpm exec playwright install --with-deps chromium
       - name: Render enlarged idle-hand and prop-contact evidence
