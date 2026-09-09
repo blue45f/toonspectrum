@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: recover-brush-goal-entry-arm
+  group: recover-brush-goal-entry-arm-v2
   cancel-in-progress: true
 
 jobs:
@@ -42,12 +42,8 @@ jobs:
               '.github/workflows/brush-goal-guided-entry-retry-once.yml',
               encoding='utf-8',
           ))
-          selected = {
-              'Reuse the reviewed component and test definitions',
-              'Wire the chooser with the current JSX indentation',
-          }
           for step in data['jobs']['materialize']['steps']:
-              if step.get('name') not in selected:
+              if step.get('name') != 'Reuse the reviewed component and test definitions':
                   continue
               subprocess.run(
                   step['run'],
@@ -57,6 +53,7 @@ jobs:
                   env=os.environ.copy(),
               )
           PY
+          python3 scripts/materialize-brush-goal-entry.py
 
       - name: Validate goal-driven entry
         shell: bash
@@ -81,7 +78,8 @@ jobs:
           git config user.email actions@users.noreply.github.com
           rm -f .github/workflows/brush-goal-guided-entry-once.yml \
                 .github/workflows/brush-goal-guided-entry-retry-once.yml \
-                .github/workflows/brush-goal-guided-entry-arm.yml
+                .github/workflows/brush-goal-guided-entry-arm.yml \
+                scripts/materialize-brush-goal-entry.py
           git add -A
           git diff --cached --check
           git -c core.hooksPath=/dev/null commit -m 'feat(brush): start Brush Studio from the desired result'
