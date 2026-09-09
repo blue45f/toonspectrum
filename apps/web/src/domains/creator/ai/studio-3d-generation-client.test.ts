@@ -48,7 +48,7 @@ describe("Studio3dGenerationHttpClient", () => {
       "idempotent-1",
     );
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(String(url)).toEndWith("/api/studio-ai/3d/jobs");
+    expect(String(url).endsWith("/api/studio-ai/3d/jobs")).toBe(true);
     const headers = new Headers(init?.headers);
     expect(headers.get("X-User-Id")).toBe("user-1");
     expect(headers.get("Idempotency-Key")).toBe("idempotent-1");

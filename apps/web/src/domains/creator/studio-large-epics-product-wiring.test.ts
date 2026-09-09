@@ -21,8 +21,8 @@ describe("Studio large-epic production wiring", () => {
     const moduleSource = source("apps/api/src/modules/studio-ai/studio-ai.module.ts");
     expect(moduleSource).toContain("Studio3dGenerationController");
     expect(moduleSource).toContain("Studio3dGenerationService");
-    expect(moduleSource).toMatch(/controllers\s*:\s*\[[^\]]*Studio3dGenerationController/su);
-    expect(moduleSource).toMatch(/providers\s*:\s*\[[^\]]*Studio3dGenerationService/su);
+    expect(moduleSource).toMatch(/controllers\s*:\s*\[[^\]]*Studio3dGenerationController/u);
+    expect(moduleSource).toMatch(/providers\s*:\s*\[[^\]]*Studio3dGenerationService/u);
   });
 
   it("keeps structured AI candidates connected to the existing comic composer review desk", () => {
