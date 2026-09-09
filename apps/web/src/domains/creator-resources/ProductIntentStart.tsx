@@ -22,6 +22,7 @@ import {
   type CreatorContinuityLocale,
 } from "@/shared/lib/creator-continuity";
 import { useI18n } from "@/shared/lib/i18n";
+import { useUi } from "@/shared/lib/ui-store";
 
 const COPY = {
   ko: {
@@ -86,6 +87,7 @@ export function ProductIntentStart() {
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
   const copy = COPY[locale];
+  const openSearch = useUi((state) => state.openCommandPalette);
   const continuity = useSyncExternalStore(
     subscribeCreatorContinuity,
     getCreatorContinuitySnapshot,
@@ -121,14 +123,16 @@ export function ProductIntentStart() {
             <p className="mt-4 max-w-2xl text-pretty text-sm leading-7 text-fg-2 sm:text-base">
               {copy.body}
             </p>
-            <Link
-              href="/search"
-              className="mt-6 flex min-h-12 max-w-2xl items-center gap-3 rounded-2xl border border-line-strong bg-card/85 px-4 text-sm text-fg-2 shadow-sm transition-colors hover:border-accent/50 hover:bg-raised/80 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+            <button
+              type="button"
+              onClick={openSearch}
+              aria-label={copy.search}
+              className="mt-6 flex min-h-12 w-full max-w-2xl items-center gap-3 rounded-2xl border border-line-strong bg-card/85 px-4 text-left text-sm text-fg-2 shadow-sm transition-colors hover:border-accent/50 hover:bg-raised/80 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
             >
               <Search size={18} className="shrink-0 text-accent" aria-hidden="true" />
               <span className="min-w-0 flex-1 truncate">{copy.search}</span>
-              <kbd className="hidden rounded-md border border-line bg-panel px-1.5 py-0.5 font-display text-[0.62rem] text-fg-3 sm:inline">⌘K</kbd>
-            </Link>
+              <kbd aria-hidden="true" className="hidden rounded-md border border-line bg-panel px-1.5 py-0.5 font-display text-[0.62rem] text-fg-3 sm:inline">⌘K</kbd>
+            </button>
           </div>
 
           <aside className="rounded-3xl border border-line/80 bg-panel/75 p-4 shadow-sm sm:p-5">
