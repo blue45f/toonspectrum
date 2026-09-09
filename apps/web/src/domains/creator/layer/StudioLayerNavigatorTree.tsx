@@ -1,13 +1,15 @@
-import { ChevronDown, ChevronRight, Eye, EyeOff, Folder, Lock, LockOpen, MoreHorizontal, Search, Layers3, Check, Minus } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, EyeOff, Folder, GripVertical, Lock, LockOpen, MoreHorizontal, Search, Layers3, Check, Minus } from "lucide-react";
 
 import {
   STUDIO_LAYER_NAVIGATOR_COARSE_TARGET as coarseTarget,
   STUDIO_LAYER_NAVIGATOR_FOCUS_RING as focusRing,
 } from "./studio-layer-navigator-row-ui";
 
+import type { LayerGroup } from "../studio-layers";
+import type { StudioLayerDropIntent } from "./studio-layer-drag";
 import type { StudioLayerNavigatorNode, StudioLayerNavigatorResult } from "./studio-layer-navigator";
 import type { FocusTarget, StudioLayerNavigatorAction } from "./StudioLayerNavigator";
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
+import type { DragEvent as ReactDragEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 
 
 
@@ -20,6 +22,24 @@ export interface StudioLayerNavigatorTreeProps {
   tabStopKey: string | null;
   mutationDisabled: boolean;
   mobileMultiSelect: boolean;
+  dragEnabled?: boolean;
+  dragHelpId?: string;
+  dropIntent?: StudioLayerDropIntent | null;
+  isGroupDragBlocked?: (itemIds: readonly string[]) => boolean;
+  onGroupDragStart?: (
+    event: ReactDragEvent<HTMLElement>,
+    group: LayerGroup,
+    itemIds: readonly string[]
+  ) => void;
+  onGroupDragEnd?: () => void;
+  onGroupDragOver?: (
+    event: ReactDragEvent<HTMLElement>,
+    group: LayerGroup,
+    key: string,
+    itemIds: readonly string[]
+  ) => void;
+  onGroupDragLeave?: (event: ReactDragEvent<HTMLElement>, key: string) => void;
+  onGroupDrop?: (event: ReactDragEvent<HTMLElement>) => void;
   getGroupItemIds: (groupId: string) => readonly string[];
   rowRefs: React.MutableRefObject<Map<string, HTMLElement>>;
   renameTarget: { kind: "item" | "group"; id: string; value: string } | null;
@@ -52,6 +72,15 @@ export function StudioLayerNavigatorTree({
   tabStopKey,
   mutationDisabled,
   mobileMultiSelect,
+  dragEnabled = false,
+  dragHelpId,
+  dropIntent = null,
+  isGroupDragBlocked,
+  onGroupDragStart,
+  onGroupDragEnd,
+  onGroupDragOver,
+  onGroupDragLeave,
+  onGroupDrop,
   getGroupItemIds,
   rowRefs,
   renameTarget,
@@ -138,6 +167,13 @@ export function StudioLayerNavigatorTree({
           expanded: node.expanded,
         };
         const selectedChildCount = target.itemIds.filter((id) => selectedIdSet.has(id)).length;
+        const groupDropIntent = dropIntent?.targetKey === key ? dropIntent : null;
+        const groupDropPosition =
+          groupDropIntent?.kind === "into-group" ? "inside" : groupDropIntent?.side ?? null;
+        const canDragGroup =
+          dragEnabled &&
+          !node.empty &&
+          !(isGroupDragBlocked?.(target.itemIds) ?? false);
         const allChildrenSelected =
           target.itemIds.length > 0 && selectedChildCount === target.itemIds.length;
         const partiallySelected = selectedChildCount > 0 && !allChildrenSelected;
@@ -173,7 +209,7 @@ export function StudioLayerNavigatorTree({
               aria-level={1}
               aria-selected={allChildrenSelected}
               aria-expanded={node.empty ? undefined : node.expanded}
-              aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G"
+              aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"
               aria-label={`${node.group.name}, 그룹, ${node.entries.length}개 레이어${
                 groupStatus ? `, ${groupStatus}` : ""
               }`}
@@ -192,16 +228,31 @@ export function StudioLayerNavigatorTree({
                 if (isLayerRowControl(event.target)) return;
                 beginRename("group", node.group.id, node.group.name);
               }}
+              onDragOver={(event) => onGroupDragOver?.(event, node.group, key, target.itemIds)}
+              onDragLeave={(event) => onGroupDragLeave?.(event, key)}
+              onDrop={(event) => onGroupDrop?.(event)}
+              data-studio-layer-group-drop={groupDropPosition ?? undefined}
               className={cn(
-                "flex min-h-9 items-center gap-1 rounded-lg px-1 py-0.5 [contain-intrinsic-size:44px] [content-visibility:auto] max-lg:min-h-11 pointer-coarse:min-h-11",
+                "relative flex min-h-9 items-center gap-1 rounded-lg px-1 py-0.5 [contain-intrinsic-size:44px] [content-visibility:auto] max-lg:min-h-11 pointer-coarse:min-h-11",
                 allChildrenSelected
                   ? "bg-accent-soft/25 hover:bg-accent-soft/40"
                   : partiallySelected
                     ? "bg-cool/5 hover:bg-cool/10"
                     : "hover:bg-raised/60",
+                groupDropPosition === "inside" && "ring-2 ring-accent/80 bg-accent-soft/35",
                 focusRing
               )}
             >
+              {groupDropPosition === "front" || groupDropPosition === "back" ? (
+                <span
+                  aria-hidden
+                  data-studio-layer-drop-indicator={groupDropPosition}
+                  className={cn(
+                    "pointer-events-none absolute inset-x-1 z-20 h-0.5 rounded-full bg-accent shadow-[0_0_0_1px_oklch(0.2_0.02_60),0_0_8px_oklch(0.72_0.18_42/0.75)]",
+                    groupDropPosition === "front" ? "-top-0.5" : "-bottom-0.5"
+                  )}
+                />
+              ) : null}
               {node.empty ? (
                 <span className="grid size-7 shrink-0 place-items-center text-fg-3" aria-hidden>
                   <ChevronRight size={14} />
@@ -229,6 +280,28 @@ export function StudioLayerNavigatorTree({
                   {node.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </button>
               )}
+              <button
+                type="button"
+                tabIndex={-1}
+                draggable={canDragGroup}
+                disabled={!canDragGroup}
+                data-layer-row-control
+                data-studio-layer-drag-handle="group"
+                onClick={(event) => event.stopPropagation()}
+                onDragStart={(event) =>
+                  onGroupDragStart?.(event, node.group, target.itemIds)
+                }
+                onDragEnd={() => onGroupDragEnd?.()}
+                aria-label={`${node.group.name} 그룹 끌어 순서 변경`}
+                aria-describedby={dragHelpId}
+                title={canDragGroup ? "끌어서 그룹 블록 순서 변경" : undefined}
+                className={cn(
+                  "hidden size-6 shrink-0 cursor-grab place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25 [@media(pointer:fine)]:grid",
+                  focusRing
+                )}
+              >
+                <GripVertical size={13} aria-hidden />
+              </button>
               <span
                 aria-hidden
                 className={cn(

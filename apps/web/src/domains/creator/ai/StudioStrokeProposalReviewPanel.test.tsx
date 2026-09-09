@@ -89,7 +89,7 @@ describe("StudioStrokeProposalReviewPanel", () => {
       />,
     );
     expect(screen.getByText(/문서가 변경/u)).not.toBeNull();
-    expect(screen.getByRole("button", { name: "선택 획 적용" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "선택 획 적용" }).hasAttribute("disabled")).toBe(true);
     rerender(
       <StudioStrokeProposalReviewPanel
         proposal={proposal}
@@ -103,6 +103,6 @@ describe("StudioStrokeProposalReviewPanel", () => {
       />,
     );
     expect(screen.getByText(/진행 중인 획/u)).not.toBeNull();
-    expect(screen.getByRole("button", { name: "선택 획 적용" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "선택 획 적용" }).hasAttribute("disabled")).toBe(true);
   });
 });

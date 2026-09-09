@@ -1,0 +1,66 @@
+name: Apply studio pixel pencil pro core v3
+
+on:
+  push:
+    branches:
+      - feat/studio-pixel-pencil-pro-v2-20260909
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-studio-pixel-pencil-pro-core-v3
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[pixel-pencil-pro-core-applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FEATURE_BRANCH: feat/studio-pixel-pencil-pro-v2-20260909
+    steps:
+      - name: Sparse partial-clone patch surface
+        run: |
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git sparse-checkout init --cone
+          git sparse-checkout set .github apps/web/src/domains/creator docs scripts
+          git -c protocol.version=2 fetch \
+            --depth=1 \
+            --filter=blob:none \
+            origin \
+            "+refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}"
+          git checkout -B "${FEATURE_BRANCH}" "refs/remotes/origin/${FEATURE_BRANCH}"
+
+      - name: Apply indentation-safe focused patch
+        run: |
+          python3 scripts/prepare-studio-pixel-pencil-pro-core.py
+          python3 scripts/apply-studio-pixel-pencil-pro-core.py
+
+      - name: Verify patch contract
+        run: |
+          grep -F 'export function planStudioPixelPencilSampleUpdate' \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts
+          grep -F 'STUDIO_PIXEL_PENCIL_MAX_STROKE_WIDTH = 64' \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts
+          grep -F 'pixelSampleUpdate === "replace-tail"' \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers-freehand.ts
+          grep -F 'strokeWidth: resolvedStrokeWidth' \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.ts
+          test -s docs/studio-pixel-pencil-pro-benchmark-2026-09-09.md
+          git diff --check
+
+      - name: Commit implementation for PR CI
+        run: |
+          rm -f scripts/apply-studio-pixel-pencil-pro-core.py
+          rm -f scripts/prepare-studio-pixel-pencil-pro-core.py
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core.yml
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core-v2.yml
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core-v3.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git commit -m "feat(studio): upgrade pixel pencil core [pixel-pencil-pro-core-applied]"
+          git push origin HEAD:"${FEATURE_BRANCH}"

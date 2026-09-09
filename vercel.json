@@ -3,11 +3,11 @@
   "framework": null,
   "git": {
     "deploymentEnabled": {
-      "*": true,
+      "*": false,
       "main": true
     }
   },
-  "buildCommand": "bash scripts/vercel-layer-drag-export.sh",
+  "buildCommand": "pnpm --filter @webtoon-nest/api build && pnpm run build",
   "installCommand": "pnpm install --frozen-lockfile",
   "outputDirectory": "dist",
   "functions": {
