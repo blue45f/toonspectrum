@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll, beforeEach } from "vitest";
+import { afterAll, beforeEach, expect } from "vitest";
 import { APP_I18N_NAMESPACES, STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
 import { registerI18nLocaleEntries, setAppI18nAssetSource } from "@/shared/lib/i18n";
 import { parseStudioI18nDictionary, STUDIO_I18N_ASSET_LOCALES } from "@/domains/creator/studio-i18n-loader";
@@ -34,14 +34,25 @@ setAppI18nAssetSource(async (assetLocale) => {
 // never restores them would otherwise leave this hook awaiting a `setTimeout` that never fires —
 // which is exactly how the first attempt at this hung StudioCompanionReferenceDisplay for 30s.
 const scheduleRealMacrotask = globalThis.setTimeout;
+const PROJECT_CENTER_TEST_STORAGE_KEYS = Object.freeze([
+  "toonspectrum-studio-project-center:favorites:v1",
+  "toonspectrum-studio-project-center:recent-actions:v1",
+]);
+
+function isStudioMenubarContentTest(testPath: unknown): testPath is string {
+  return typeof testPath === "string"
+    && testPath.replaceAll("\\", "/").endsWith("/StudioMenubarContent.test.tsx");
+}
 
 if (typeof document !== "undefined") {
   beforeEach(() => {
-    // Project Center intentionally persists recent/favorite proxy actions in the browser. A jsdom
-    // file shares localStorage across its tests, so one test's delegated action can otherwise add a
-    // second same-named proxy button to later tests and make role/name queries nondeterministic.
-    window.localStorage.removeItem("toonspectrum-studio-project-center:favorites:v1");
-    window.localStorage.removeItem("toonspectrum-studio-project-center:recent-actions:v1");
+    // Project Center persistence is product behaviour and must remain visible to its own tests.
+    // Only the broad Menubar fixture needs isolation because delegated actions in that same file
+    // intentionally create recent/favourite proxy buttons with duplicate accessible names.
+    if (!isStudioMenubarContentTest(expect.getState().testPath)) return;
+    for (const key of PROJECT_CENTER_TEST_STORAGE_KEYS) {
+      window.localStorage.removeItem(key);
+    }
   });
 
   afterAll(async () => {
