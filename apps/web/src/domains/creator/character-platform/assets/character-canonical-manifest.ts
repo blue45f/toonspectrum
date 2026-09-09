@@ -222,12 +222,12 @@ function isSha256(value: unknown): value is string {
 }
 
 function isSameOriginAssetPath(value: unknown): value is string {
-  return typeof value === "string"
-    && value.length > 0
-    && value.length <= 1024
-    && !/^(?:https?:)?\/\//iu.test(value)
-    && !value.startsWith("data:")
-    && !value.startsWith("blob:");
+  if (typeof value !== "string" || value.length === 0 || value.length > 1024) return false;
+  if (/[\\\u0000-\u001f\u007f]/u.test(value)) return false;
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/iu.test(value)) return false;
+  const path = value.split(/[?#]/u, 1)[0] ?? "";
+  if (path.length === 0) return false;
+  return !path.split("/").some((segment) => segment === "." || segment === "..");
 }
 
 function isStringArray(value: unknown, maximum = 256): value is readonly string[] {
@@ -350,7 +350,7 @@ function isPartDescriptor(value: unknown): value is CharacterCanonicalPartDescri
 
   const quality = value.quality;
   if (!isRecord(quality) || !isFiniteNumber(quality.minimumScore) || Number(quality.minimumScore) < 0 || Number(quality.minimumScore) > 100) return false;
-  if (typeof quality.accepted !== "boolean" || !isString(quality.reportFile)) return false;
+  if (typeof quality.accepted !== "boolean" || !isSameOriginAssetPath(quality.reportFile)) return false;
   if (!isStringArray(quality.goldenPoseIds, 256) || !isStringArray(quality.goldenCameraIds, 64)) return false;
 
   const provenance = value.provenance;
