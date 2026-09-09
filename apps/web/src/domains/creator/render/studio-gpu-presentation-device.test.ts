@@ -70,11 +70,9 @@ describe("acquireStudioGpuPresentationDevice", () => {
       canvasFormat: "bgra8unorm",
       ownership: "fabric-lease",
     });
-    // GPUCanvasContext.configure accepts the native object, not a Proxy of GPUDevice.
     expect(acquired?.device).toBe(physicalDevice);
     expect(fabricHarness.acquireStudioGpuDevice).toHaveBeenCalledWith({ gpu });
     expect(requestAdapter).not.toHaveBeenCalled();
-    // WebIDL dictionary conversion in GPUCanvasContext.configure requires this identity.
     expect(acquired?.device).toBe(physicalDevice);
     expect(acquired?.device.createBuffer({} as GPUBufferDescriptor)).toBe(
       physicalDevice,
@@ -114,6 +112,23 @@ describe("acquireStudioGpuPresentationDevice", () => {
 
     acquired?.release();
     acquired?.release();
+    expect(destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not throw when a dedicated device rejects destroy during loss teardown", async () => {
+    const destroy = vi.fn(() => {
+      throw new Error("device already lost");
+    });
+    const physicalDevice = { destroy } as unknown as GPUDevice;
+    const { gpu } = fakeGpu({ device: physicalDevice });
+
+    const acquired = await acquireStudioGpuPresentationDevice({
+      gpu,
+      strategy: "dedicated",
+    });
+
+    expect(() => acquired?.release()).not.toThrow();
+    expect(() => acquired?.release()).not.toThrow();
     expect(destroy).toHaveBeenCalledTimes(1);
   });
 
