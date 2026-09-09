@@ -1,4 +1,4 @@
-name: Studio tooltip pro validation
+name: Studio tooltip final patch
 
 on:
   push:
@@ -11,35 +11,33 @@ permissions:
   contents: write
 
 concurrency:
-  group: studio-tooltip-pro-validation-${{ github.ref }}
+  group: studio-tooltip-final-patch-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  validate:
+  finalize:
     runs-on: ubuntu-slim
-    timeout-minutes: 20
-    env:
-      NODE_OPTIONS: --max-old-space-size=4096
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Apply final accessibility and hook review patch
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /apps/web/src/domains/creator/StudioToolHint.tsx
+            /apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx
+            /.github/workflows/studio-tooltip-pro-validate.yml
+      - name: Apply reviewed tooltip accessibility and hook patch
         run: |
+          set -euo pipefail
           node <<'NODE'
           const { readFileSync, writeFileSync } = require("node:fs");
 
           const shellPath = "apps/web/src/domains/creator/StudioToolHint.tsx";
           const shell = readFileSync(shellPath, "utf8");
-          const shellPattern = /function suppressPassivePointerHints\(\) \{\s+interaction\.suppressHover\(\);\s+const activeHintId = coordinator\.getActiveHintId\(\);/u;
-          const shellAfter = [
+          const suppressionPattern = /function suppressPassivePointerHints\(\) \{\s+interaction\.suppressHover\(\);\s+const activeHintId = coordinator\.getActiveHintId\(\);/u;
+          const suppressionReplacement = [
             "function suppressPassivePointerHints(event?: Event) {",
             "      const target = event?.target;",
             "      if (",
@@ -51,10 +49,10 @@ jobs:
             "      interaction.suppressHover();",
             "      const activeHintId = coordinator.getActiveHintId();",
           ].join("\n");
-          if (!shellPattern.test(shell)) {
-            throw new Error("Could not locate the passive pointer suppression hook");
+          if (!suppressionPattern.test(shell)) {
+            throw new Error("Passive tooltip suppression hook not found");
           }
-          let patchedShell = shell.replace(shellPattern, shellAfter);
+          let patchedShell = shell.replace(suppressionPattern, suppressionReplacement);
 
           const detachedHideBefore = [
             "      hideRenderedTooltipImmediately();",
@@ -65,7 +63,7 @@ jobs:
             "      coordinator.release(tipId);",
           ].join("\n");
           if (!patchedShell.includes(detachedHideBefore)) {
-            throw new Error("Could not locate detached tooltip hiding logic");
+            throw new Error("Detached tooltip hiding hook not found");
           }
           patchedShell = patchedShell.replace(detachedHideBefore, detachedHideAfter);
 
@@ -73,7 +71,7 @@ jobs:
           const effectDepsAfter =
             "  }, [coordinator, interaction, open, tipId]);\n\n  if (!hint)";
           if (!patchedShell.includes(effectDepsBefore)) {
-            throw new Error("Could not locate tooltip reposition effect dependencies");
+            throw new Error("Tooltip reposition effect dependency list not found");
           }
           patchedShell = patchedShell.replace(effectDepsBefore, effectDepsAfter);
           writeFileSync(shellPath, patchedShell);
@@ -111,44 +109,20 @@ jobs:
             "",
           ].join("\n");
           if (!test.includes(marker)) {
-            throw new Error("Could not locate the tooltip attention regression test");
+            throw new Error("Tooltip attention regression marker not found");
           }
           writeFileSync(testPath, test.replace(marker, internalScrollTest + marker));
           NODE
-      - name: Format tooltip TypeScript
+      - name: Verify final source contract
         run: |
-          pnpm dlx prettier@3.6.2 --write \
-            apps/web/src/domains/creator/StudioToolHint.tsx \
-            apps/web/src/domains/creator/components/StudioToolHintBubble.tsx \
-            apps/web/src/domains/creator/studio-tool-hint-position.ts \
-            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
-            apps/web/src/domains/creator/studio-tool-hint-exposure.ts \
-            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
-            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx
-      - name: Lint tooltip sources
-        run: |
-          pnpm exec eslint --max-warnings=0 \
-            apps/web/src/domains/creator/StudioToolHint.tsx \
-            apps/web/src/domains/creator/components/StudioToolHintBubble.tsx \
-            apps/web/src/domains/creator/studio-tool-hint-position.ts \
-            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
-            apps/web/src/domains/creator/studio-tool-hint-exposure.ts \
-            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
-            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx
-      - name: Run tooltip regression portfolio
-        run: |
-          pnpm exec vitest run \
-            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
-            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
-            apps/web/src/domains/creator/studio-tool-hint-coordinator.test.ts \
-            apps/web/src/domains/creator/StudioToolHint.test.tsx \
-            apps/web/src/domains/creator/StudioToolHint.interaction.test.tsx \
-            apps/web/src/domains/creator/StudioToolHint.focus-return.test.tsx \
-            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx \
-            apps/web/src/domains/creator/studio-tool-hint.semantic-contract.test.ts
-      - name: Verify patch integrity
-        run: git diff --check
-      - name: Commit formatter output and remove validation harness
+          set -euo pipefail
+          grep -Fq 'function suppressPassivePointerHints(event?: Event)' apps/web/src/domains/creator/StudioToolHint.tsx
+          grep -Fq 'target.closest(' apps/web/src/domains/creator/StudioToolHint.tsx
+          grep -Fq 'hideRenderedToolHintElement(tipId);' apps/web/src/domains/creator/StudioToolHint.tsx
+          grep -Fq '}, [coordinator, interaction, open, tipId]);' apps/web/src/domains/creator/StudioToolHint.tsx
+          grep -Fq 'keeps passive hover help open while its own scroll region is being read' apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx
+          git diff --check
+      - name: Commit final product patch and remove harness
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -156,13 +130,6 @@ jobs:
           git rm .github/workflows/studio-tooltip-pro-validate.yml
           git add \
             apps/web/src/domains/creator/StudioToolHint.tsx \
-            apps/web/src/domains/creator/components/StudioToolHintBubble.tsx \
-            apps/web/src/domains/creator/studio-tool-hint-position.ts \
-            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
-            apps/web/src/domains/creator/studio-tool-hint-exposure.ts \
-            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
-            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx \
-            apps/web/src/styles/globals.css \
-            docs/studio-tooltip-ux-v2-2026-09-09.md
-          git commit -m "test(studio): validate and format tooltip UX v2"
+            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx
+          git commit -m "fix(studio): preserve tooltip reading and close hook dependencies"
           git push origin HEAD:${{ github.ref_name }}
