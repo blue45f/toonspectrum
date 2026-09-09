@@ -391,6 +391,115 @@ export function reorderLayerSelection<T extends LayerItemLike>(
   return changed ? units.flat() : items;
 }
 
+
+export type LayerSelectionDropSide = "front" | "back";
+
+export type LayerSelectionDropScope =
+  | { kind: "units" }
+  | { kind: "siblings"; groupId: string | undefined };
+
+/**
+ * 선택 레이어를 임의의 대상 앞/뒤로 옮기는 드롭 플래너.
+ *
+ * - `units`: 그룹 자식 하나라도 선택되면 그룹 전체를 하나의 시각 단위로 이동한다.
+ * - `siblings`: 같은 그룹의 자식 또는 그룹 밖 레이어만 정확히 이동한다. 그룹 밖 형제는
+ *   다른 그룹 블록을 안전하게 건널 수 있지만 그 블록을 절대 찢지 않는다.
+ * - `side=front`: 패널에서 대상 위, z-order 배열에서는 대상 뒤(더 큰 인덱스).
+ * - `side=back`: 패널에서 대상 아래, z-order 배열에서는 대상 앞(더 작은 인덱스).
+ *
+ * 입력 배열과 객체는 변형하지 않으며, 결과가 같거나 불변식을 확인할 수 없으면 원본 참조를
+ * 반환한다. 그래서 UI의 반복 dragover 표본이 문서 히스토리를 오염시키지 않는다.
+ */
+export function reorderLayerSelectionToTarget<T extends LayerItemLike>(
+  items: T[],
+  selectedIds: readonly string[],
+  targetId: string,
+  side: LayerSelectionDropSide,
+  scope: LayerSelectionDropScope = { kind: "units" }
+): T[] {
+  const requestedIds = new Set(selectedIds);
+  if (requestedIds.size === 0 || !items.some((item) => item.id === targetId)) return items;
+
+  if (scope.kind === "siblings" && scope.groupId !== undefined) {
+    const run = groupRun(items, scope.groupId);
+    if (!run.contiguous || run.count === 0) return items;
+    const block = items.slice(run.first, run.last + 1);
+    if (!block.some((item) => item.id === targetId)) return items;
+    const moving = block.filter((item) => requestedIds.has(item.id));
+    if (moving.length === 0 || moving.some((item) => item.id === targetId)) return items;
+    const rest = block.filter((item) => !requestedIds.has(item.id));
+    const targetIndex = rest.findIndex((item) => item.id === targetId);
+    if (targetIndex < 0) return items;
+    const insertIndex = targetIndex + (side === "front" ? 1 : 0);
+    const nextBlock = [
+      ...rest.slice(0, insertIndex),
+      ...moving,
+      ...rest.slice(insertIndex),
+    ];
+    const next = [
+      ...items.slice(0, run.first),
+      ...nextBlock,
+      ...items.slice(run.last + 1),
+    ];
+    return next.every((item, index) => item === items[index]) ? items : next;
+  }
+
+  if (scope.kind === "siblings") {
+    const target = items.find((item) => item.id === targetId);
+    if (!target || target.groupId !== undefined) return items;
+    for (const item of items) {
+      if (requestedIds.has(item.id) && item.groupId !== undefined) return items;
+    }
+  }
+
+  const units: T[][] = [];
+  for (let index = 0; index < items.length;) {
+    const item = items[index]!;
+    if (item.groupId === undefined) {
+      units.push([item]);
+      index += 1;
+      continue;
+    }
+    const run = groupRun(items, item.groupId);
+    if (!run.contiguous || run.first !== index) return items;
+    units.push(items.slice(run.first, run.last + 1));
+    index = run.last + 1;
+  }
+
+  const selectedGroupIds = scope.kind === "units"
+    ? new Set(
+        items
+          .filter((item) => requestedIds.has(item.id) && item.groupId !== undefined)
+          .map((item) => item.groupId!)
+      )
+    : new Set<string>();
+  const unitSelected = (unit: readonly T[]) =>
+    scope.kind === "units"
+      ? unit.some(
+          (item) =>
+            requestedIds.has(item.id) ||
+            (item.groupId !== undefined && selectedGroupIds.has(item.groupId))
+        )
+      : unit.length === 1 &&
+        unit[0]!.groupId === undefined &&
+        requestedIds.has(unit[0]!.id);
+
+  const movingUnits = units.filter(unitSelected);
+  if (movingUnits.length === 0 || movingUnits.length === units.length) return items;
+  const remainingUnits = units.filter((unit) => !unitSelected(unit));
+  const targetUnitIndex = remainingUnits.findIndex((unit) =>
+    unit.some((item) => item.id === targetId)
+  );
+  if (targetUnitIndex < 0) return items;
+  const insertIndex = targetUnitIndex + (side === "front" ? 1 : 0);
+  const next = [
+    ...remainingUnits.slice(0, insertIndex),
+    ...movingUnits,
+    ...remainingUnits.slice(insertIndex),
+  ].flat();
+  return next.every((item, index) => item === items[index]) ? items : next;
+}
+
 /**
  * 단일 레이어의 모든 순서 명령을 그룹 블록 불변식에 맞춰 처리한다.
  * - 그룹 자식: 자기 그룹 안에서만 이동(front/back은 그룹 내부 양 끝).

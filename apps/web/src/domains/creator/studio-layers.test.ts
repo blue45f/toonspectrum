@@ -19,6 +19,7 @@ import {
   removeLayerItems,
   reorderLayerItem,
   reorderLayerSelection,
+  reorderLayerSelectionToTarget,
   setItemGroup,
   ungroupItems,
   type LayerGroup,
@@ -668,6 +669,131 @@ describe("reorderLayerSelection", () => {
     expect(reorderLayerSelection(input, ["back", "front"], "back")).toBe(input);
     expect(reorderLayerSelection(input, ["front"], "forward")).toBe(input);
     expect(reorderLayerSelection(input, ["back"], "backward")).toBe(input);
+  });
+});
+
+
+describe("reorderLayerSelectionToTarget", () => {
+  it("moves a scattered root selection around an arbitrary target as one stable block", () => {
+    const input = makeItems(["back", "a", "middle", "b", "front"]);
+
+    expect(ids(reorderLayerSelectionToTarget(input, ["a", "b"], "middle", "front"))).toEqual([
+      "back",
+      "middle",
+      "a",
+      "b",
+      "front",
+    ]);
+    expect(ids(reorderLayerSelectionToTarget(input, ["a", "b"], "middle", "back"))).toEqual([
+      "back",
+      "a",
+      "b",
+      "middle",
+      "front",
+    ]);
+  });
+
+  it("expands a selected group child and moves the complete contiguous group unit", () => {
+    const input = makeItems([
+      "back",
+      { id: "g1", groupId: "g" },
+      { id: "g2", groupId: "g" },
+      "middle",
+      "front",
+    ]);
+
+    const next = reorderLayerSelectionToTarget(input, ["g1"], "front", "front");
+    expect(ids(next)).toEqual(["back", "middle", "front", "g1", "g2"]);
+    expect(hasContiguousLayerGroups(next)).toBe(true);
+  });
+
+  it("reorders exact children inside one group without moving the group block", () => {
+    const input = makeItems([
+      "back",
+      { id: "g1", groupId: "g" },
+      { id: "g2", groupId: "g" },
+      { id: "g3", groupId: "g" },
+      "front",
+    ]);
+
+    const next = reorderLayerSelectionToTarget(
+      input,
+      ["g1", "g3"],
+      "g2",
+      "front",
+      { kind: "siblings", groupId: "g" }
+    );
+    expect(ids(next)).toEqual(["back", "g2", "g1", "g3", "front"]);
+    expect(hasContiguousLayerGroups(next)).toBe(true);
+  });
+
+  it("moves root siblings across complete group units without splitting them", () => {
+    const input = makeItems([
+      "root-a",
+      { id: "g1", groupId: "g" },
+      { id: "g2", groupId: "g" },
+      "root-b",
+      "root-c",
+    ]);
+
+    const next = reorderLayerSelectionToTarget(
+      input,
+      ["root-a"],
+      "root-b",
+      "front",
+      { kind: "siblings", groupId: undefined }
+    );
+    expect(ids(next)).toEqual(["g1", "g2", "root-b", "root-a", "root-c"]);
+    expect(hasContiguousLayerGroups(next)).toBe(true);
+  });
+
+  it("places detached children around an arbitrary group unit without splitting either group", () => {
+    const input = makeItems([
+      { id: "source-a", groupId: "source" },
+      { id: "source-b", groupId: "source" },
+      "root",
+      { id: "target-a", groupId: "target" },
+      { id: "target-b", groupId: "target" },
+    ]);
+
+    const detached = removeItemsFromGroups(input, ["source-a"]);
+    const next = reorderLayerSelectionToTarget(
+      detached,
+      ["source-a"],
+      "target-b",
+      "front",
+    );
+
+    expect(ids(next)).toEqual([
+      "source-b",
+      "root",
+      "target-a",
+      "target-b",
+      "source-a",
+    ]);
+    expect(hasContiguousLayerGroups(next)).toBe(true);
+    expect(groupIdOf(next, "source-a")).toBeUndefined();
+  });
+
+  it("fails closed for self drops, cross-scope targets, and damaged groups", () => {
+    const input = makeItems(["back", "front"]);
+    expect(reorderLayerSelectionToTarget(input, ["front"], "front", "back")).toBe(input);
+
+    const grouped = makeItems([{ id: "a", groupId: "g" }, { id: "b", groupId: "g" }]);
+    expect(
+      reorderLayerSelectionToTarget(grouped, ["a"], "b", "front", {
+        kind: "siblings",
+        groupId: undefined,
+      })
+    ).toBe(grouped);
+
+    const damaged = makeItems([
+      { id: "a", groupId: "g" },
+      "gap",
+      { id: "b", groupId: "g" },
+      "front",
+    ]);
+    expect(reorderLayerSelectionToTarget(damaged, ["a"], "front", "front")).toBe(damaged);
   });
 });
 
