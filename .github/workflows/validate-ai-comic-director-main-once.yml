@@ -38,6 +38,11 @@ jobs:
           pnpm exec vitest run
           apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts
           apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
+          apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.test.tsx
+          apps/web/src/domains/creator/ai/studio-3d-generation-client.test.ts
+          apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.test.ts
+          apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts
+          apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts
 
       - name: Lint corrected integration files
         run: >-
@@ -45,6 +50,12 @@ jobs:
           apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts
           apps/web/src/domains/creator/studio-generated-2d-backgrounds.ts
           apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
+          apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.test.tsx
+          apps/web/src/domains/creator/ai/studio-3d-generation-client.test.ts
+          apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.ts
+          apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.ts
+          apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts
+          apps/web/src/domains/creator/studio-soft-proofing.ts
 
       - name: Typecheck complete frontend
         run: pnpm exec tsc -p tsconfig.json
