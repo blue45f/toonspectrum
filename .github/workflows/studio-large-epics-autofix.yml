@@ -1,0 +1,145 @@
+name: Studio large epics source normalization
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-large-epics-autofix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply deterministic source fixes
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          ledger = Path('apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts')
+          text = ledger.read_text()
+          text = text.replace(
+              '    this.#locks.set(userId, previous.then(() => current));\n    await previous;',
+              '    const lock = previous.then(() => current);\n    this.#locks.set(userId, lock);\n    await previous;',
+          )
+          text = text.replace(
+              '      if (this.#locks.get(userId) === current) this.#locks.delete(userId);',
+              '      if (this.#locks.get(userId) === lock) this.#locks.delete(userId);',
+          )
+          marker = 'const TRANSITIONS:'
+          if marker in text:
+              before, after = text.split(marker, 1)
+              after = re.sub(r'new Set\(\[', 'new Set<Studio3dGenerationJobState>([', after)
+              text = before + marker + after
+          ledger.write_text(text)
+
+          stroke = Path('apps/web/src/domains/creator/ai/studio-stroke-proposal.ts')
+          text = stroke.read_text()
+          old = '''  const timeMs = point.timeMs === undefined ? undefined : integer(point.timeMs, "point.timeMs");
+  return Object.freeze({
+    x,
+    y,
+    pressure,
+    ...(optionalAngle("tiltX", -90, 90) !== undefined
+      ? { tiltX: optionalAngle("tiltX", -90, 90) }
+      : {}),
+    ...(optionalAngle("tiltY", -90, 90) !== undefined
+      ? { tiltY: optionalAngle("tiltY", -90, 90) }
+      : {}),
+    ...(optionalAngle("twist", 0, 359.999) !== undefined
+      ? { twist: optionalAngle("twist", 0, 359.999) }
+      : {}),
+    ...(timeMs !== undefined ? { timeMs } : {}),
+  });'''
+          new = '''  const tiltX = optionalAngle("tiltX", -90, 90);
+  const tiltY = optionalAngle("tiltY", -90, 90);
+  const twist = optionalAngle("twist", 0, 359.999);
+  const timeMs = point.timeMs === undefined ? undefined : integer(point.timeMs, "point.timeMs");
+  return Object.freeze({
+    x,
+    y,
+    pressure,
+    ...(tiltX !== undefined ? { tiltX } : {}),
+    ...(tiltY !== undefined ? { tiltY } : {}),
+    ...(twist !== undefined ? { twist } : {}),
+    ...(timeMs !== undefined ? { timeMs } : {}),
+  });'''
+          text = text.replace(old, new)
+          stroke.write_text(text)
+          PY
+
+      - name: Apply repository lint fixes
+        run: |
+          pnpm exec eslint --fix \
+            apps/web/src/domains/creator/studio-deterministic-serialization.ts \
+            apps/web/src/domains/creator/studio-deterministic-serialization.test.ts \
+            apps/web/src/domains/creator/ai/studio-stroke-proposal.ts \
+            apps/web/src/domains/creator/ai/studio-stroke-proposal.test.ts \
+            apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.tsx \
+            apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.test.tsx \
+            apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.ts \
+            apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.test.ts \
+            apps/web/src/domains/creator/animation/studio-timeline-timebase.ts \
+            apps/web/src/domains/creator/animation/studio-timeline-timebase.test.ts \
+            apps/web/src/domains/creator/studio-asset-family-revision.ts \
+            apps/web/src/domains/creator/studio-asset-family-revision.test.ts \
+            apps/web/src/domains/creator/studio-soft-proofing.ts \
+            apps/web/src/domains/creator/studio-soft-proofing.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-texture-dilation.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-texture-dilation.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-attachment-graph.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-attachment-graph.test.ts \
+            apps/web/src/domains/creator/ai/studio-structured-edit-proposal.ts \
+            apps/web/src/domains/creator/ai/studio-structured-edit-proposal.test.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.test.ts \
+            scripts/verify-studio-open-issues-wave.mts
+
+      - name: Verify normalized sources
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-deterministic-serialization.test.ts \
+            apps/web/src/domains/creator/ai/studio-stroke-proposal.test.ts \
+            apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.test.tsx \
+            apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.test.ts \
+            apps/web/src/domains/creator/animation/studio-timeline-timebase.test.ts \
+            apps/web/src/domains/creator/studio-asset-family-revision.test.ts \
+            apps/web/src/domains/creator/studio-soft-proofing.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-texture-dilation.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-attachment-graph.test.ts \
+            apps/web/src/domains/creator/ai/studio-structured-edit-proposal.test.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.test.ts
+
+      - name: Commit normalized sources
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/domains/creator apps/api/src/modules/studio-ai scripts/verify-studio-open-issues-wave.mts
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(studio): normalize large-epic contract implementation [skip ci]"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi

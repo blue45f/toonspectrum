@@ -1,0 +1,36 @@
+name: Clean temporary large-epic issues
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-large-epics-temp-issue-cleanup.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Close temporary orchestration issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${REPOSITORY}/issues?state=open&per_page=100" \
+            --jq '.[] | select(.pull_request == null) | select(.title | startswith("[temporary]")) | .number' \
+            | while read -r issue; do
+                test -n "$issue" || continue
+                gh api --method POST "repos/${REPOSITORY}/issues/${issue}/comments" \
+                  -f body='Temporary orchestration record cleaned after the large-epic integration branch was established.' >/dev/null
+                gh api --method PATCH "repos/${REPOSITORY}/issues/${issue}" \
+                  -f state=closed -f state_reason=not_planned >/dev/null
+                echo "closed temporary issue #${issue}"
+              done

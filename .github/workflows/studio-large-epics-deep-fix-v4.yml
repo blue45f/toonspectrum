@@ -1,0 +1,156 @@
+name: Studio large epics deep fixes
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-large-epics-deep-fix-v4.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      BRANCH: codex/studio-large-epics-closure-20260909
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Connect generated artifact intents to existing importer owner
+        run: |
+          cat > /tmp/wire-generated-3d.mjs <<'NODE'
+          import fs from 'node:fs';
+          import ts from 'typescript';
+
+          function addImport(source, statement) {
+            if (source.includes(statement)) return source;
+            const sf = ts.createSourceFile('source.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+            const imports = sf.statements.filter(ts.isImportDeclaration);
+            if (!imports.length) throw new Error('No import anchor');
+            const at = imports.at(-1).end;
+            return `${source.slice(0, at)}\n${statement}${source.slice(at)}`;
+          }
+
+          function functionNode(sf, name) {
+            for (const statement of sf.statements) {
+              if (ts.isFunctionDeclaration(statement) && statement.name?.text === name && statement.body) return statement;
+              if (ts.isVariableStatement(statement)) {
+                for (const declaration of statement.declarationList.declarations) {
+                  if (ts.isIdentifier(declaration.name) && declaration.name.text === name && declaration.initializer) {
+                    const init = declaration.initializer;
+                    if ((ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && ts.isBlock(init.body)) return init;
+                  }
+                }
+              }
+            }
+            throw new Error(`Function ${name} not found`);
+          }
+
+          function insertBeforeReturn(source, functionName, snippet) {
+            if (source.includes(snippet.trim())) return source;
+            const sf = ts.createSourceFile('source.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+            const fn = functionNode(sf, functionName);
+            const result = fn.body.statements.filter(ts.isReturnStatement).at(-1);
+            if (!result) throw new Error(`${functionName} final return not found`);
+            const at = result.getStart(sf);
+            return `${source.slice(0, at)}${snippet}\n${source.slice(at)}`;
+          }
+
+          const hostPath = 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx';
+          let host = fs.readFileSync(hostPath, 'utf8');
+          host = addImport(host, 'import { useStudioGenerated3dHostBridge } from "./ai/studio-generated-3d-product-bridge";');
+          if (!host.includes('ownerId: "StudioGenerated3dHost"')) {
+            if (!/\bopenStudioObjectInsert\b/u.test(host)) throw new Error('Existing openStudioObjectInsert owner was not found');
+            host = insertBeforeReturn(
+              host,
+              'StudioCuttoonEditorHost',
+              '  useStudioGenerated3dHostBridge({\n    ownerId: "StudioGenerated3dHost",\n    openObjectInsert: openStudioObjectInsert,\n  });',
+            );
+          }
+          fs.writeFileSync(hostPath, host);
+
+          const toolsPath = 'apps/web/src/domains/creator/ai/StudioAdvancedAiTools.tsx';
+          let tools = fs.readFileSync(toolsPath, 'utf8');
+          tools = addImport(tools, 'import { requestStudioGenerated3dArtifact } from "./studio-generated-3d-product-bridge";');
+          const anchor = '  return (\n';
+          if (!tools.includes('const insertGenerated3d =')) {
+            const position = tools.indexOf(anchor);
+            if (position < 0) throw new Error('StudioAdvancedAiTools return anchor not found');
+            const handlers = `  const insertGenerated3d = onInsertGenerated3d ?? ((blob: Blob, revisionId: string) => {\n    requestStudioGenerated3dArtifact({ intent: "insert", blob, revisionId });\n  });\n  const saveGenerated3d = onSaveGenerated3d ?? ((blob: Blob, revisionId: string) => {\n    requestStudioGenerated3dArtifact({ intent: "save", blob, revisionId });\n  });\n  const editGenerated3dTexture = onEditGenerated3dTexture ?? ((blob: Blob, revisionId: string) => {\n    requestStudioGenerated3dArtifact({ intent: "texture-edit", blob, revisionId });\n  });\n\n`;
+            tools = tools.slice(0, position) + handlers + tools.slice(position);
+          }
+          tools = tools.replace(
+            /onInsertGenerated3d\n\s*\? \(job, blob\) => onInsertGenerated3d\(blob, job\.artifactRevision!\.id\)\n\s*: undefined/u,
+            '(job, blob) => insertGenerated3d(blob, job.artifactRevision!.id)',
+          );
+          tools = tools.replace(
+            /onSaveGenerated3d\n\s*\? \(job, blob\) => onSaveGenerated3d\(blob, job\.artifactRevision!\.id\)\n\s*: undefined/u,
+            '(job, blob) => saveGenerated3d(blob, job.artifactRevision!.id)',
+          );
+          tools = tools.replace(
+            /onEditGenerated3dTexture\n\s*\? \(job, blob\) => onEditGenerated3dTexture\(blob, job\.artifactRevision!\.id\)\n\s*: undefined/u,
+            '(job, blob) => editGenerated3dTexture(blob, job.artifactRevision!.id)',
+          );
+          if (!tools.includes('onInsertArtifact={(job, blob) => insertGenerated3d')) {
+            tools = tools.replace(
+              /<StudioAi3dGenerationPanel\n\s*client=\{client\}[\s\S]*?\n\s*\/>/u,
+              `<StudioAi3dGenerationPanel\n                client={client}\n                onInsertArtifact={(job, blob) => insertGenerated3d(blob, job.artifactRevision!.id)}\n                onSaveArtifact={(job, blob) => saveGenerated3d(blob, job.artifactRevision!.id)}\n                onOpenTextureEditor={(job, blob) => editGenerated3dTexture(blob, job.artifactRevision!.id)}\n              />`,
+            );
+          }
+          fs.writeFileSync(toolsPath, tools);
+
+          const wiringTest = 'apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts';
+          let test = fs.readFileSync(wiringTest, 'utf8');
+          if (!test.includes('useStudioGenerated3dHostBridge')) {
+            test = test.replace(
+              '    expect(host).toContain("useStudioAiCanvasBridge");',
+              '    expect(host).toContain("useStudioAiCanvasBridge");\n    expect(host).toContain("useStudioGenerated3dHostBridge");',
+            );
+          }
+          fs.writeFileSync(wiringTest, test);
+          NODE
+          node /tmp/wire-generated-3d.mjs
+
+      - name: Verify importer reuse and self-remove
+        run: |
+          pnpm exec eslint --fix --max-warnings=0 \
+            apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx \
+            apps/web/src/domains/creator/ai/StudioAdvancedAiTools.tsx \
+            apps/web/src/domains/creator/ai/studio-generated-3d-product-bridge.ts \
+            apps/web/src/domains/creator/ai/studio-generated-3d-product-bridge.test.tsx \
+            apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/ai/studio-generated-3d-product-bridge.test.tsx \
+            apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          rm -f .github/workflows/studio-large-epics-deep-fix-v4.yml
+
+      - name: Publish with retries
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps .github/workflows/studio-large-epics-deep-fix-v4.yml
+          git commit -m "feat(studio): route generated GLB through existing import owner"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$BRANCH"
+            if git rebase "origin/$BRANCH" && git push origin HEAD:"$BRANCH"; then exit 0; fi
+            git rebase --abort || true
+            sleep $((attempt * 7))
+          done
+          exit 1

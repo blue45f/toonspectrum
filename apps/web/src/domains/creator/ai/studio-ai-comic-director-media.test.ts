@@ -11,7 +11,7 @@ import type { StudioAiSettings } from "./studio-ai-client";
 const SETTINGS: StudioAiSettings = {
   apiKey: "test-key",
   baseUrl: "https://provider.example/v1",
-  imageGeneratePath: "/images/generations",
+  imageGenerationPath: "/images/generations",
   imageEditPath: "/images/edits",
   imageModel: "image-model",
   textModel: "text-model",
