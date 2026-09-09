@@ -91,6 +91,50 @@ describe("studio-mannequin-model 비례 수학", () => {
     );
   });
 
+  it("해부학 세부 파라미터가 신장을 바꾸지 않고 각 실루엣 축에 독립적으로 반영된다", () => {
+    const base = buildStudioMannequinSpec(params());
+    const tuned = buildStudioMannequinSpec(params({
+      torsoDepth: 1.3, waistWidth: 1.2, limbThickness: 1.25,
+      handScale: 1.2, footScale: 1.2, neckThickness: 1.2,
+    }));
+    expect(studioMannequinRestStature(tuned)).toBeCloseTo(base.heightM, 12);
+
+    const sphere = (spec: ReturnType<typeof buildStudioMannequinSpec>, jointId: string) =>
+      spec.primitives.find((p) => p.kind === "sphere" && p.jointId === jointId && p.center[1] !== 0);
+    const capsule = (spec: ReturnType<typeof buildStudioMannequinSpec>, jointId: string) =>
+      spec.primitives.find((p) => p.kind === "capsule" && p.jointId === jointId);
+    const baseChest = sphere(base, "chest");
+    const tunedChest = sphere(tuned, "chest");
+    expect(baseChest?.kind).toBe("sphere");
+    expect(tunedChest?.kind).toBe("sphere");
+    if (baseChest?.kind === "sphere" && tunedChest?.kind === "sphere") {
+      expect(tunedChest.scale?.[2]).toBeGreaterThan(baseChest.scale?.[2] ?? 0);
+    }
+    const baseSpine = capsule(base, "spine");
+    const tunedSpine = capsule(tuned, "spine");
+    if (baseSpine?.kind === "capsule" && tunedSpine?.kind === "capsule") {
+      expect(tunedSpine.radius).toBeGreaterThan(baseSpine.radius);
+    }
+    const baseArm = capsule(base, "leftUpperArm");
+    const tunedArm = capsule(tuned, "leftUpperArm");
+    if (baseArm?.kind === "capsule" && tunedArm?.kind === "capsule") {
+      expect(tunedArm.radius).toBeGreaterThan(baseArm.radius);
+    }
+    const baseDigits = base.primitives.filter((p) => p.kind === "capsule" && p.jointId === "leftHand");
+    const tunedDigits = tuned.primitives.filter((p) => p.kind === "capsule" && p.jointId === "leftHand");
+    expect(Math.abs(tunedDigits[0]!.to[1])).toBeGreaterThan(Math.abs(baseDigits[0]!.to[1]));
+    const baseFoot = sphere(base, "leftFoot");
+    const tunedFoot = sphere(tuned, "leftFoot");
+    if (baseFoot?.kind === "sphere" && tunedFoot?.kind === "sphere") {
+      expect(tunedFoot.radius).toBeGreaterThan(baseFoot.radius);
+    }
+    const baseNeck = capsule(base, "neck");
+    const tunedNeck = capsule(tuned, "neck");
+    if (baseNeck?.kind === "capsule" && tunedNeck?.kind === "capsule") {
+      expect(tunedNeck.radius).toBeGreaterThan(baseNeck.radius);
+    }
+  });
+
   it("체인 길이는 관절 오프셋과 정합한다", () => {
     const spec = buildStudioMannequinSpec(params());
     const lowerArm = spec.joints.find((joint) => joint.id === "leftLowerArm");

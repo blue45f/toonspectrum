@@ -183,7 +183,7 @@ const ANATOMY_SLIDERS: readonly {
   step: number;
 }[] = Object.freeze([
   { key: "torsoDepth", label: "몸통 깊이", step: 0.02 },
-  { key: "waistWidth", label: "허리 볼륨", step: 0.02 },
+  { key: "waistWidth", label: "허리 너비", step: 0.02 },
   { key: "limbThickness", label: "팔다리 굵기", step: 0.02 },
   { key: "handScale", label: "손 크기", step: 0.02 },
   { key: "footScale", label: "발 크기", step: 0.02 },
@@ -283,10 +283,10 @@ export function StudioMannequinBodySection({
         })}
       </div>
 
-      <div className="space-y-3 border-t border-line/60 pt-3">
+      <div className="space-y-3 pt-3 border-t border-line/60">
         <StudioSectionHeader
           title="해부학 비례"
-          description="신장·등신은 유지한 채 흉곽 깊이, 허리 질량, 사지와 말단 크기를 독립 조절합니다."
+          description="몸통 깊이와 말단 크기를 독립 조절해 같은 등신에서도 실루엣과 질량감을 바꿉니다."
         />
         <div className="space-y-2">
           {ANATOMY_SLIDERS.map(({ key, label, step }) => {
