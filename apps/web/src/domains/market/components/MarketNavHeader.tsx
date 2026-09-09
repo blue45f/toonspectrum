@@ -47,10 +47,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
   const distributing = pathname === "/market/manage" || pathname === "/market/publish";
 
   return (
-    <nav
-      aria-label="마켓 주요 내비게이션"
-      className={cn("mb-6 border-b border-line/70 pb-4 pt-1", className)}
-    >
+    <nav aria-label="마켓 주요 내비게이션" className={cn("mb-6 border-b border-line/70 pb-4 pt-1", className)}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-1">
           <Link
@@ -93,7 +90,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
 
         <div className="flex items-center gap-2">
           {findingAsset ? (
-            <details className="group relative">
+            <details className="group relative" open={pathname === "/market/fit" || pathname === "/market/compare" ? true : undefined}>
               <summary
                 className={cn(
                   buttonClass({ variant: "ghost", size: "sm" }),
@@ -108,21 +105,26 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
                 <p className="px-2 pb-2 pt-1 text-[0.65rem] leading-5 text-fg-3">
                   후보를 찾은 뒤 호환성을 점검하거나 여러 리소스를 비교할 때 사용하세요.
                 </p>
-                <Link href="/market/fit" className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg">
+                <Link
+                  href="/market/fit"
+                  aria-current={pathname === "/market/fit" ? "page" : undefined}
+                  className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg"
+                >
                   <ShieldCheck className="size-4 text-accent" aria-hidden="true" />
                   제작 조건으로 맞는 리소스 찾기
                 </Link>
-                <Link href="/market/compare" className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg">
+                <Link
+                  href="/market/compare"
+                  aria-current={pathname === "/market/compare" ? "page" : undefined}
+                  className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg"
+                >
                   <GitCompareArrows className="size-4 text-accent" aria-hidden="true" />
                   후보 리소스 비교하기
                 </Link>
               </div>
             </details>
           ) : null}
-          <Link
-            href="/studio"
-            className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
-          >
+          <Link href="/studio" className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}>
             <Palette className="size-3.5" aria-hidden="true" />
             <span className="hidden sm:inline">Studio</span>
           </Link>
@@ -135,6 +137,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
           <div className="flex max-w-full items-stretch gap-1.5 overflow-x-auto pb-1">
             <Link
               href="/market/browse"
+              aria-current={!kind && pathname === "/market/browse" ? "page" : undefined}
               className={cn(
                 "inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold transition-colors",
                 !kind && pathname === "/market/browse"
@@ -151,6 +154,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
                 <Link
                   key={family.id}
                   href={marketResourceBrowseHref(family.subcategories[0])}
+                  aria-current={active && pathname === "/market/browse" ? "location" : undefined}
                   className={cn(
                     "group inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
                     active
@@ -158,11 +162,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
                       : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
                   )}
                 >
-                  <Icon
-                    className="size-4"
-                    style={active ? undefined : { color: `oklch(0.72 0.11 ${family.accentHue})` }}
-                    aria-hidden="true"
-                  />
+                  <Icon className="size-4" style={active ? undefined : { color: `oklch(0.72 0.11 ${family.accentHue})` }} aria-hidden="true" />
                   {family.label}
                 </Link>
               );
