@@ -1,0 +1,112 @@
+name: Retry Brush Studio goal entry once
+
+on:
+  push:
+    branches: [feat/brush-goal-guided-entry-main-20260910]
+    paths: [.github/workflows/brush-goal-guided-entry-retry-once.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-slim
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/brush-goal-guided-entry-main-20260910
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Reuse the reviewed component and test definitions
+        shell: bash
+        run: |
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 - <<'PY'
+          import os, subprocess, yaml
+          source = '.github/workflows/brush-goal-guided-entry-once.yml'
+          data = yaml.safe_load(open(source, encoding='utf-8'))
+          step = next(
+              item for item in data['jobs']['materialize']['steps']
+              if item.get('name') == 'Add outcome-first goal chooser'
+          )
+          subprocess.run(
+              step['run'],
+              shell=True,
+              executable='/bin/bash',
+              check=True,
+              env=os.environ.copy(),
+          )
+          PY
+      - name: Wire the chooser with the current JSX indentation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/src/domains/creator/brush/StudioBrushStudio.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          import_anchor = 'import { StudioBrushInputControls } from "./StudioBrushInputControls";\n'
+          import_line = 'import { StudioBrushGoalStart } from "./StudioBrushGoalStart";\n'
+          if import_line not in text:
+              if text.count(import_anchor) != 1:
+                  raise SystemExit('Brush Studio import anchor changed')
+              text = text.replace(import_anchor, import_line + import_anchor, 1)
+
+          render_anchor = '''        {restoreAction}
+
+          <div className="shrink-0 border-b border-line p-2 sm:hidden">
+          '''
+          render_block = '''        {restoreAction}
+
+          <StudioBrushGoalStart
+            activePresetId={matchedPreset}
+            activeSection={category}
+            onSelectPreset={(presetId) =>
+              onSelectDynamicsPreset(
+                presetId,
+                studioBrushDynamicsPresetSelectionSettings(presetId),
+              )
+            }
+            onOpenSection={(section) => setCategory(section)}
+          />
+
+          <div className="shrink-0 border-b border-line p-2 sm:hidden">
+          '''
+          if '<StudioBrushGoalStart' not in text:
+              if text.count(render_anchor) != 1:
+                  raise SystemExit(f'Brush Studio render anchor changed: {text.count(render_anchor)}')
+              text = text.replace(render_anchor, render_block, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Validate goal-driven entry
+        shell: bash
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
+            apps/web/src/domains/creator/brush/studio-brush-goal-start-integration-boundary.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
+            apps/web/src/domains/creator/brush/studio-brush-goal-start-integration-boundary.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushStudio.tsx
+          git diff --check
+      - name: Commit product code and remove one-shot workflows
+        shell: bash
+        run: |
+          git config user.name toonstudio-brush-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/brush-goal-guided-entry-once.yml \
+                .github/workflows/brush-goal-guided-entry-retry-once.yml
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'feat(brush): start Brush Studio from the desired result'
+          git -c core.hooksPath=/dev/null push origin HEAD:feat/brush-goal-guided-entry-main-20260910
