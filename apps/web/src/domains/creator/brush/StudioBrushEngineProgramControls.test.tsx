@@ -32,10 +32,11 @@ describe("StudioBrushEngineProgramControls", () => {
     expect(screen.getByText("목표 결과: 깨끗하고 예측 가능한 선")).toBeTruthy();
     expect(screen.getByText("전문 엔진 그래프")).toBeTruthy();
     openExpertGraph();
-    expect(screen.getByText("범용 BrushGraph 컴포저")).toBeTruthy();
+    expect(screen.getByText("브러시 엔진 조합")).toBeTruthy();
+    expect(screen.getByText("추천 시작점")).toBeTruthy();
     expect((screen.getByLabelText("필기감 선택") as HTMLSelectElement).value).toBe("adaptive-ema");
     expect((screen.getByLabelText("물리 엔진 선택") as HTMLSelectElement).value).toBe("no-physics");
-    expect(screen.getByText("authority 충돌 없이 컴파일 가능한 조합입니다.")).toBeTruthy();
+    expect(screen.getByText("충돌 없이 저장 가능한 엔진 조합입니다.")).toBeTruthy();
   });
 
   it("persists a distinctive pattern selection instead of reducing it to a scalar", () => {
@@ -77,8 +78,8 @@ describe("StudioBrushEngineProgramControls", () => {
     render(
       <StudioBrushEngineProgramControls brushId="pen" programSet={initial} onChange={onChange} />,
     );
-    expect(screen.getByText("범용 BrushGraph 컴포저")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "기본 조합" }));
+    expect(screen.getByText("브러시 엔진 조합")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "시작 상태로" }));
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
