@@ -9,18 +9,19 @@ permissions:
   contents: write
 
 concurrency:
-  group: scene3d-projection-hardening-v4
+  group: scene3d-projection-hardening-v5
   cancel-in-progress: true
 
 jobs:
   harden:
-    runs-on: ubuntu-slim
+    runs-on: macos-15
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
         with:
           ref: feat/scene3d-runtime-projection-20260910
           fetch-depth: 0
+          filter: blob:none
           persist-credentials: true
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
