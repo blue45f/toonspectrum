@@ -7,6 +7,8 @@ const logger = new Logger("SchemaPreflight");
  * 스키마 불일치는 기존대로 fail-closed(부팅 거부)지만, Neon 컴퓨트 쿼터 소진(53000)·연결
  * 장애 같은 가용성 오류로 프로세스가 죽으면 파일 기반 카탈로그까지 전면 중단되므로,
  * 가용성 오류는 경고 후 부팅을 계속해 요청 단위로만 실패하게 한다.
+ * 운영 runtime role이 의도적으로 public 스키마 DDL 권한을 갖지 않는 경우(42501)도 동일하게
+ * 해당 선택 기능만 degrade하고 무관한 API 전체를 중단하지 않는다.
  */
 const PG_AVAILABILITY_SQLSTATES: ReadonlySet<string> = new Set([
   // Class 08 — Connection Exception
@@ -16,6 +18,8 @@ const PG_AVAILABILITY_SQLSTATES: ReadonlySet<string> = new Set([
   "08004",
   "08006",
   "08007",
+  // Class 42 — runtime role may intentionally be DML-only for optional boot-time provisioning.
+  "42501",
   // Class 53 — Insufficient Resources (Neon compute quota 포함)
   "53000",
   "53100",
