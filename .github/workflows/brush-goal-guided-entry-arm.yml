@@ -14,8 +14,11 @@ concurrency:
 
 jobs:
   materialize:
-    runs-on: macos-15
+    runs-on: windows-2025
     timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v6
         with:
@@ -30,11 +33,10 @@ jobs:
           cache: pnpm
 
       - name: Restore reviewed component and tests
-        shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --disable-pip-version-check pyyaml
-          python3 - <<'PY'
+          python -m pip install --disable-pip-version-check pyyaml
+          python - <<'PY'
           import os
           import subprocess
           import yaml
@@ -47,19 +49,16 @@ jobs:
               if step.get('name') != 'Reuse the reviewed component and test definitions':
                   continue
               subprocess.run(
-                  step['run'],
-                  shell=True,
-                  executable='/bin/bash',
+                  ['bash', '-lc', step['run']],
                   check=True,
                   env=os.environ.copy(),
               )
           PY
           git show 447f5f8aeabedd7179c64b202c9fcad92a184ebe:apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx \
             > apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx
-          python3 scripts/materialize-brush-goal-entry.py
+          python scripts/materialize-brush-goal-entry.py
 
       - name: Validate goal-driven entry
-        shell: bash
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile
@@ -74,7 +73,6 @@ jobs:
           git diff --check
 
       - name: Commit product slice
-        shell: bash
         run: |
           set -euo pipefail
           git config user.name toonstudio-brush-ci
