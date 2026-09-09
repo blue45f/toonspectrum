@@ -65,6 +65,32 @@ describe("StudioToolHint optimized interaction", () => {
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
+  it("keeps passive hover help open while its own scroll region is being read", async () => {
+    vi.useFakeTimers();
+    renderPair();
+    const pen = screen.getByRole("button", { name: "펜" });
+
+    fireEvent.mouseEnter(pen);
+    await act(async () => {
+      vi.advanceTimersByTime(280);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const tooltip = screen.getByRole("tooltip");
+    const scrollRegion = tooltip.querySelector(
+      '[data-studio-tool-hint-scroll-region="true"]'
+    );
+    expect(scrollRegion).not.toBeNull();
+
+    fireEvent.wheel(scrollRegion as Element);
+    fireEvent.scroll(scrollRegion as Element);
+    expect(screen.getByRole("tooltip")).toBe(tooltip);
+
+    fireEvent.wheel(document.body);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
   it("dismisses transient help when the editor window loses attention", () => {
     renderPair();
     fireEvent.focus(screen.getByRole("button", { name: "펜" }));

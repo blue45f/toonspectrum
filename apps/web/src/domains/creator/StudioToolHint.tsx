@@ -200,7 +200,14 @@ export function StudioToolHintPreferencesProvider({
       dismissToolHintsImmediately(coordinator, interaction);
     }
 
-    function suppressPassivePointerHints() {
+    function suppressPassivePointerHints(event?: Event) {
+      const target = event?.target;
+      if (
+        target instanceof Element &&
+        target.closest('[data-studio-tool-hint="true"]')
+      ) {
+        return;
+      }
       interaction.suppressHover();
       const activeHintId = coordinator.getActiveHintId();
       if (
@@ -1078,7 +1085,7 @@ export function StudioToolHintTarget({
 
     function closeDetachedHint() {
       if (coordinator.getActiveHintId() !== tipId) return;
-      hideRenderedTooltipImmediately();
+      hideRenderedToolHintElement(tipId);
       coordinator.release(tipId);
       interaction.clearReveal(tipId);
       activeRevealIntent.current = null;
@@ -1124,7 +1131,7 @@ export function StudioToolHintTarget({
       visualViewport?.removeEventListener("scroll", updatePosition);
       anchorObserver?.disconnect();
     };
-  }, [open]);
+  }, [coordinator, interaction, open, tipId]);
 
   if (!hint) {
     return <span className={cn("inline-flex", className)}>{children}</span>;
