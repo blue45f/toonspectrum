@@ -112,6 +112,7 @@ describe("BG3D → Scene3D projection", () => {
     const projected = projectStudioBg3dDocumentToScene3d({
       documentId: "scene:legacy-shadow",
       source,
+      viewportAspectRatio: 1,
     });
 
     expect(projected.activeCameraId).toBe("camera:main");
