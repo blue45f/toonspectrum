@@ -86,7 +86,6 @@ export function StudioDualColorWell({
       if (dispatchRef.current === normalized) dispatchRef.current = null;
     });
   };
-  const catalogBrushId = undefined;
   return (
     <div
       data-studio-dual-color-well="true"
