@@ -45,4 +45,13 @@ describe("deployment VRM visual admission", () => {
       entries[3],
     ]);
   });
+
+  it("keeps a rejected bundled card visible while an existing document actively uses it", () => {
+    const entries = [
+      { id: "sample-vrm", source: "sample" },
+      { id: "weird-cat", source: "sample" },
+    ] as const;
+
+    expect(filterStudioVrmProductionLibraryEntries(entries, ["weird-cat"])).toEqual(entries);
+  });
 });
