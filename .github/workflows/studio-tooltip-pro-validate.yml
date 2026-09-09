@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   finalize:
-    runs-on: ubuntu-slim
+    runs-on: macos-15
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
