@@ -78,7 +78,7 @@ export const SITE_NAVIGATION_ITEMS = {
   community: item("community", "/community", MessageCircle, "커뮤니티", "Community", "창작과 감상을 함께 나누기", "Share creation and discovery"),
   play: item("play", "/play", Gamepad2, "놀이터", "Playground", "가볍게 즐기는 인터랙티브 콘텐츠", "Enjoy playful interactive content"),
   library: item("library", "/library", Library, "내 서재", "My library", "저장한 작품과 취향을 한곳에서", "Keep saved stories and taste in one place"),
-  me: item("me", "/me", UserRound, "내 공간", "My space", "프로젝트·작품·활동·프로필로 이동", "Open projects, works, activity and profile"),
+  me: item("me", "/my", UserRound, "내 공간", "My space", "프로젝트·작품·활동·프로필로 이동", "Open projects, works, activity and profile"),
   settings: item("settings", "/settings", Settings, "설정", "Settings", "언어·데이터·서비스 환경", "Language, data and service preferences"),
   help: item("help", "/help", BookOpen, "도움말", "Help", "작업과 문제에서 바로 해결 경로 찾기", "Find help from the task or problem"),
 } as const satisfies Record<string, SiteNavigationItem>;
