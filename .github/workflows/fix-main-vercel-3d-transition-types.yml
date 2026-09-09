@@ -1,0 +1,104 @@
+name: Fix main Vercel 3D transition type error
+
+on:
+  push:
+    branches:
+      - fix/main-vercel-3d-transition-types-20260909
+    paths:
+      - .github/workflows/fix-main-vercel-3d-transition-types.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-main-vercel-3d-transition-types-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repair-and-verify:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/main-vercel-3d-transition-types-20260909
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Type every 3D generation transition explicitly
+        run: |
+          node <<'NODE'
+          const { readFileSync, writeFileSync } = require("node:fs");
+          const path = "apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts";
+          const source = readFileSync(path, "utf8");
+          const start = source.indexOf(
+            "const TRANSITIONS: Readonly<Record<Studio3dGenerationJobState, ReadonlySet<Studio3dGenerationJobState>>> ="
+          );
+          const endMarker = "\n\nfunction validateRequest";
+          const end = source.indexOf(endMarker, start);
+          if (start < 0 || end < 0) {
+            throw new Error("Expected Studio 3D transition map was not found");
+          }
+          const replacement = `function transitionSet(
+            ...states: Studio3dGenerationJobState[]
+          ): ReadonlySet<Studio3dGenerationJobState> {
+            return new Set(states);
+          }
+
+          const TRANSITIONS: Readonly<
+            Record<Studio3dGenerationJobState, ReadonlySet<Studio3dGenerationJobState>>
+          > = Object.freeze({
+            queued: transitionSet("uploading", "cancelled", "failed", "expired"),
+            uploading: transitionSet(
+              "generating-geometry",
+              "cancelled",
+              "failed",
+              "expired",
+            ),
+            "generating-geometry": transitionSet(
+              "generating-texture",
+              "downloading",
+              "cancelled",
+              "failed",
+              "expired",
+            ),
+            "generating-texture": transitionSet(
+              "downloading",
+              "cancelled",
+              "failed",
+              "expired",
+            ),
+            downloading: transitionSet("validating", "cancelled", "failed", "expired"),
+            validating: transitionSet("importing", "failed", "cancelled", "expired"),
+            importing: transitionSet("ready", "failed", "cancelled", "expired"),
+            ready: transitionSet(),
+            failed: transitionSet(),
+            cancelled: transitionSet(),
+            expired: transitionSet(),
+          });`;
+          writeFileSync(path, source.slice(0, start) + replacement + source.slice(end));
+          NODE
+          pnpm exec prettier --write apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts
+      - name: Verify focused API contract
+        run: |
+          pnpm exec eslint --max-warnings=0 apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts
+          pnpm exec vitest run apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.test.ts
+          pnpm --filter @webtoon-nest/api build
+      - name: Verify exact Vercel production build path
+        run: pnpm run build
+      - name: Commit verified fix and remove one-shot workflow
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-main-vercel-3d-transition-types.yml
+          git add apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts
+          git diff --cached --check
+          git commit -m "fix(api): type 3D generation transitions for Vercel build"
+          git push origin HEAD:fix/main-vercel-3d-transition-types-20260909
