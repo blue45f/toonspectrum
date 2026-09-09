@@ -383,7 +383,10 @@ export function classifyStudioPsdEffectNode(node: StudioEffectGraphNode): Studio
       : "flattened";
   }
   if (node.kind === "mask" || node.kind === "blend" || node.kind === "output") return "preserved";
-  return node.effect === "drop-shadow" || node.effect === "glow" ? "editable" : "flattened";
+  if (node.kind === "live-effect") {
+    return node.effect === "drop-shadow" || node.effect === "glow" ? "editable" : "flattened";
+  }
+  return "unsupported";
 }
 
 export function serializeStudioAdjustmentEffectGraph(graph: StudioAdjustmentEffectGraph): string {

@@ -13,6 +13,7 @@ const SETTINGS: StudioAiSettings = {
   baseUrl: "https://provider.example/v1",
   imageGenerationPath: "/images/generations",
   imageEditPath: "/images/edits",
+  chatCompletionsPath: "/chat/completions",
   imageModel: "image-model",
   textModel: "text-model",
 };
