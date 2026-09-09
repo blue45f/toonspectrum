@@ -26,6 +26,7 @@ const COPY = {
     projects: "프로젝트 센터",
     projectsBody: "최근 프로젝트, 로컬 초안, 공유받은 작업, 버전과 복구 항목을 확인합니다.",
     continue: "프로젝트 이어가기",
+    open: "열기",
     quickTitle: "바로 만들기",
     quickBody: "형식을 고르면 필요한 작업공간으로 바로 연결됩니다.",
     flowTitle: "창작 흐름",
@@ -36,7 +37,7 @@ const COPY = {
       ["빈 캔버스", "일러스트와 자유 드로잉", "/studio?preset=illustration"],
       ["세로 웹툰", "모바일 스크롤 원고", "/studio?preset=webtoon"],
       ["4컷·컷툰", "컷과 대사를 빠르게 구성", "/studio?preset=4cut"],
-      ["캐릭터", "캐릭터·표정·포즈 조형", "/shaper"],
+      ["캐릭터", "캐릭터·표정·포즈 조형", "/studio/character"],
       ["배경·소품", "에셋을 찾고 Studio에 연결", "/market"],
     ],
     flow: [
@@ -60,6 +61,7 @@ const COPY = {
     projects: "Project Center",
     projectsBody: "Review recent projects, local drafts, shared work, versions and recovery items.",
     continue: "Continue a project",
+    open: "Open",
     quickTitle: "Quick start",
     quickBody: "Choose a format and jump directly into the right workspace.",
     flowTitle: "Creative flow",
@@ -70,7 +72,7 @@ const COPY = {
       ["Blank canvas", "Illustration and free drawing", "/studio?preset=illustration"],
       ["Vertical webtoon", "Mobile scrolling manuscript", "/studio?preset=webtoon"],
       ["Four-panel comic", "Arrange panels and dialogue quickly", "/studio?preset=4cut"],
-      ["Character", "Shape characters, expressions and poses", "/shaper"],
+      ["Character", "Shape characters, expressions and poses", "/studio/character"],
       ["Backgrounds & props", "Find assets and connect them to Studio", "/market"],
     ],
     flow: [
@@ -111,7 +113,7 @@ export function MakeHubPage() {
 
         <Link
           href="/studio/projects"
-          className="relative mt-7 flex max-w-3xl items-center gap-4 rounded-2xl border border-accent/35 bg-accent-soft/35 p-4 transition-colors hover:border-accent/60 hover:bg-accent-soft/55"
+          className="relative mt-7 flex max-w-3xl items-center gap-4 rounded-2xl border border-accent/35 bg-accent-soft/35 p-4 transition-colors hover:border-accent/60 hover:bg-accent-soft/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
         >
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent text-on-accent"><Palette size={20} aria-hidden="true" /></span>
           <span className="min-w-0 flex-1">
@@ -154,11 +156,11 @@ export function MakeHubPage() {
             const Icon = FLOW_ICONS[index];
             return (
               <li key={href}>
-                <Link href={href} className="group flex h-full min-h-44 flex-col rounded-2xl border border-line bg-panel/45 p-4 transition-colors hover:border-accent/40 hover:bg-card">
+                <Link href={href} className="group flex h-full min-h-44 flex-col rounded-2xl border border-line bg-panel/45 p-4 transition-colors hover:border-accent/40 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
                   <div className="flex items-center justify-between gap-3"><span className="font-display text-xs font-bold text-accent">0{index + 1}</span><Icon size={17} className="text-fg-3 group-hover:text-accent" aria-hidden="true" /></div>
                   <strong className="mt-4 text-sm text-fg">{title}</strong>
                   <span className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">{body}</span>
-                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">Open<ArrowRight size={13} aria-hidden="true" /></span>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} aria-hidden="true" /></span>
                 </Link>
               </li>
             );
@@ -174,7 +176,7 @@ export function MakeHubPage() {
           {copy.tools.map(([title, body, href], index) => {
             const Icon = TOOL_ICONS[index];
             return (
-              <Link key={href} href={href} className="group flex min-h-24 items-center gap-4 rounded-2xl border border-line bg-card/70 p-4 transition-colors hover:border-accent/40 hover:bg-raised">
+              <Link key={href} href={href} className="group flex min-h-24 items-center gap-4 rounded-2xl border border-line bg-card/70 p-4 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
                 <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-line bg-panel text-fg-3 group-hover:text-accent"><Icon size={19} aria-hidden="true" /></span>
                 <span className="min-w-0 flex-1"><strong className="block text-sm text-fg">{title}</strong><span className="mt-1 block text-xs leading-5 text-fg-3">{body}</span></span>
                 <ArrowRight size={16} className="shrink-0 text-fg-3 group-hover:text-accent" aria-hidden="true" />
