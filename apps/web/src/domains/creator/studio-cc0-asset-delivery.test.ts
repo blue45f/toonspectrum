@@ -117,20 +117,22 @@ describe("CC0 delivery catalog boundary", () => {
 });
 
 describe("blockout-only starter retirement", () => {
-  it("removes eight draft backgrounds from new selection without deleting their identities", () => {
+  it("keeps eight draft backgrounds retired while the selectable catalog grows", () => {
     expect(STUDIO_RETIRED_ORIGINAL_FREE_ASSETS).toHaveLength(8);
-    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(24);
-    expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(3);
+    expect(STUDIO_ORIGINAL_FREE_ASSETS).toHaveLength(72);
+    expect(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES).toHaveLength(9);
     expect(filterStudioOriginalFreeAssets({categories: ["modern-background"]})).toHaveLength(0);
     for (const asset of STUDIO_RETIRED_ORIGINAL_FREE_ASSETS) {
       expect(findStudioOriginalFreeAsset(asset.id)).toBe(asset);
       expect(findStudioOriginalFreeAssetPackage(asset.packageId)?.includedItems).toContain(asset);
     }
   });
-  it("keeps other starter categories and unknown-ID semantics unchanged", () => {
-    expect(filterStudioOriginalFreeAssets({categories: ["daily-prop"]})).toHaveLength(8);
-    expect(filterStudioOriginalFreeAssets({categories: ["atmosphere-fx"]})).toHaveLength(8);
-    expect(filterStudioOriginalFreeAssets({categories: ["genre-prop"]})).toHaveLength(8);
+  it("keeps legacy categories searchable while adding richer webtoon material", () => {
+    expect(filterStudioOriginalFreeAssets({categories: ["daily-prop"]}).length).toBeGreaterThan(8);
+    expect(filterStudioOriginalFreeAssets({categories: ["atmosphere-fx"]}).length).toBeGreaterThan(8);
+    expect(filterStudioOriginalFreeAssets({categories: ["genre-prop"]}).length).toBeGreaterThan(8);
+    expect(filterStudioOriginalFreeAssets({query: "GUI"}).length).toBeGreaterThanOrEqual(8);
+    expect(filterStudioOriginalFreeAssets({query: "음식"}).length).toBeGreaterThanOrEqual(8);
     expect(findStudioOriginalFreeAsset("missing")).toBeNull();
     expect(findStudioOriginalFreeAssetPackage(undefined)).toBeNull();
   });
