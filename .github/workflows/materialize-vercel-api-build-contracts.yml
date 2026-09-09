@@ -1,0 +1,86 @@
+name: Materialize Vercel API build contracts
+
+on:
+  push:
+    branches:
+      - fix/vercel-api-build-contracts-20260909
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-vercel-api-build-contracts
+  cancel-in-progress: false
+
+jobs:
+  materialize-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[api-build-contracts-applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+        with:
+          ref: fix/vercel-api-build-contracts-20260909
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply artifact atomicity fix
+        run: python3 scripts/fix-studio-3d-artifact-atomicity.py
+
+      - name: Lint changed API contracts
+        run: |
+          pnpm exec eslint --fix \
+            apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation.service.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-artifact-atomicity.test.ts \
+            apps/api/src/modules/studio-ai/studio-ai-comic-director-schema-preflight.ts \
+            apps/api/src/modules/studio-ai/studio-ai-comic-director.controller.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation.service.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-artifact-atomicity.test.ts \
+            apps/api/src/modules/studio-ai/studio-ai-comic-director-schema-preflight.ts \
+            apps/api/src/modules/studio-ai/studio-ai-comic-director.controller.ts
+
+      - name: Run focused API regression tests
+        run: |
+          pnpm exec vitest run \
+            apps/api/src/modules/studio-ai/studio-3d-generation-job-ledger.test.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-artifact-atomicity.test.ts
+
+      - name: Build API workspace
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm --filter @webtoon-nest/api build
+
+      - name: Build production web bundle
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm run build
+
+      - name: Verify patch hygiene
+        run: git diff --check
+
+      - name: Commit verified product fixes
+        run: |
+          rm -f scripts/fix-studio-3d-artifact-atomicity.py
+          rm -f .github/workflows/materialize-vercel-api-build-contracts.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git commit -m "fix(ci): restore Vercel API build contracts [api-build-contracts-applied]"
+          git push origin HEAD:fix/vercel-api-build-contracts-20260909
