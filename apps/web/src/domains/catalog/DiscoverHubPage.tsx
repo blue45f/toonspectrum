@@ -14,6 +14,10 @@ import { useNavigate } from "react-router-dom";
 
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
+import {
+  FriendlyQuickGuide,
+  PurposeExperienceStage,
+} from "@/shared/components/purpose-experience-stage";
 import { useI18n } from "@/shared/lib/i18n";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
@@ -26,6 +30,15 @@ const COPY = {
     search: "검색",
     open: "열기",
     section: "어떻게 찾을까요?",
+    visualLabel: "취향과 조건을 거쳐 작품을 발견하는 흐름 미리보기",
+    visualSteps: ["원하는 느낌", "조건 좁히기", "작품 발견"],
+    guideTitle: "처음이라면 30초만 보고 시작하세요",
+    guideBody: "기능 이름을 외우지 않아도 됩니다. 지금 상황에 맞는 방법만 고르면 됩니다.",
+    guideSteps: [
+      "찾는 제목이 있으면 위 검색창에 바로 입력합니다.",
+      "제목이 없으면 취향 탐색 또는 맞춤 추천을 선택합니다.",
+      "결정이 어렵다면 랭킹·랜덤·비교로 후보를 줄입니다.",
+    ],
     destinations: [
       ["정확히 검색", "찾고 있는 작품·작가·태그가 있을 때", "/search"],
       ["취향으로 탐색", "장르·태그·상태·플랫폼 조건을 좁혀 발견", "/explore"],
@@ -45,6 +58,15 @@ const COPY = {
     search: "Search",
     open: "Open",
     section: "How would you like to find it?",
+    visualLabel: "Preview of moving from taste and filters to a story discovery",
+    visualSteps: ["Your mood", "Narrow it down", "Find a story"],
+    guideTitle: "New here? Start with this 30-second guide",
+    guideBody: "You do not need to memorize feature names. Pick the route that matches your situation.",
+    guideSteps: [
+      "If you know the title, type it directly into the search field above.",
+      "If you only know your taste, choose Explore or Recommendations.",
+      "If choosing is hard, use Rankings, Random or Compare to narrow candidates.",
+    ],
     destinations: [
       ["Exact search", "When you know a story, creator or tag", "/search"],
       ["Explore by taste", "Narrow by genre, tag, status and platform", "/explore"],
@@ -79,29 +101,44 @@ export function DiscoverHubPage() {
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <header className="relative overflow-hidden rounded-3xl border border-line bg-panel/55 p-5 sm:p-8 lg:p-10">
         <div aria-hidden="true" className="absolute -right-28 -top-36 size-96 rounded-full bg-[radial-gradient(circle,_oklch(0.72_0.185_42/0.17),_transparent_70%)]" />
-        <div className="relative max-w-3xl">
-          <p className="eyebrow flex items-center gap-2 text-accent"><Compass size={14} aria-hidden="true" />{copy.eyebrow}</p>
-          <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,6vw,4.2rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">{copy.title}</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
+        <div className="relative grid gap-7 xl:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] xl:items-center">
+          <div className="max-w-3xl">
+            <p className="eyebrow flex items-center gap-2 text-accent"><Compass size={14} aria-hidden="true" />{copy.eyebrow}</p>
+            <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,6vw,4.2rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">{copy.title}</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
 
-          <form onSubmit={submit} role="search" className="mt-6 grid max-w-2xl gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <label className="flex min-h-12 min-w-0 items-center gap-3 rounded-2xl border border-line-strong bg-card/90 px-4 focus-within:border-accent/55 focus-within:ring-2 focus-within:ring-accent/25">
-              <Search size={18} className="shrink-0 text-accent" aria-hidden="true" />
-              <span className="sr-only">{copy.placeholder}</span>
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={copy.placeholder}
-                className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
-              />
-            </label>
-            <button type="submit" className="min-h-12 rounded-2xl bg-accent px-5 text-sm font-bold text-on-accent transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-              {copy.search}
-            </button>
-          </form>
+            <form onSubmit={submit} role="search" className="mt-6 grid max-w-2xl gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <label className="flex min-h-12 min-w-0 items-center gap-3 rounded-2xl border border-line-strong bg-card/90 px-4 focus-within:border-accent/55 focus-within:ring-2 focus-within:ring-accent/25">
+                <Search size={18} className="shrink-0 text-accent" aria-hidden="true" />
+                <span className="sr-only">{copy.placeholder}</span>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={copy.placeholder}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
+                />
+              </label>
+              <button type="submit" className="min-h-12 rounded-2xl bg-accent px-5 text-sm font-bold text-on-accent transition-all hover:-translate-y-0.5 hover:opacity-95 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
+                {copy.search}
+              </button>
+            </form>
+          </div>
+
+          <PurposeExperienceStage
+            variant="discover"
+            ariaLabel={copy.visualLabel}
+            steps={copy.visualSteps}
+          />
         </div>
       </header>
+
+      <FriendlyQuickGuide
+        className="mt-5"
+        title={copy.guideTitle}
+        description={copy.guideBody}
+        steps={copy.guideSteps}
+      />
 
       <section className="mt-10" aria-labelledby="discover-paths-title">
         <h2 id="discover-paths-title" className="text-2xl font-bold tracking-tight text-fg">{copy.section}</h2>
@@ -112,12 +149,13 @@ export function DiscoverHubPage() {
               <Link
                 key={href}
                 href={href}
-                className="group flex min-h-40 flex-col rounded-2xl border border-line bg-card/75 p-4 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                className="group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-card/75 p-4 transition-all hover:-translate-y-1 hover:border-accent/40 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
               >
-                <span className="grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
-                <strong className="mt-4 text-sm text-fg">{title}</strong>
-                <span className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">{body}</span>
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} aria-hidden="true" /></span>
+                <span aria-hidden="true" className="absolute -right-7 -top-7 size-20 rounded-full bg-accent/0 blur-2xl transition-colors duration-300 group-hover:bg-accent/15" />
+                <span className="relative grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-all group-hover:-rotate-3 group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
+                <strong className="relative mt-4 text-sm text-fg">{title}</strong>
+                <span className="relative mt-1.5 flex-1 text-xs leading-5 text-fg-3">{body}</span>
+                <span className="relative mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
               </Link>
             );
           })}
