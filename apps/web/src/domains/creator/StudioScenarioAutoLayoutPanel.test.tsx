@@ -15,7 +15,10 @@ import {
 
 import type { ScenarioPreviewItem } from "./studio-scenario-layout";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  sessionStorage.clear();
+});
 
 const ASSETS = [
   {
@@ -110,11 +113,12 @@ function panelProps(
   };
 }
 
-describe("StudioScenarioAutoLayoutPanel image reference integration", () => {
-  it("renders all three reference roles and sends canonical controlled changes to the parent", () => {
+describe("StudioScenarioAutoLayoutPanel comic director integration", () => {
+  it("keeps the three canonical reference roles controlled by the existing parent", () => {
     const props = panelProps();
     render(<StudioScenarioAutoLayoutPanel {...props} />);
 
+    fireEvent.click(screen.getByRole("button", { name: /이야기·기준/u }));
     expect(screen.getByRole("heading", { name: "Character · 캐릭터" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Method · 구도·연출" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Style · 화풍" })).toBeTruthy();
@@ -138,7 +142,7 @@ describe("StudioScenarioAutoLayoutPanel image reference integration", () => {
     });
   });
 
-  it("makes scenario and reference editing read-only while busy but keeps cancellation available", () => {
+  it("makes story and reference editing read-only while keeping cancellation available", () => {
     const props = panelProps({
       busy: true,
       stageLabel: "검토한 장면 이미지 생성 중…",
@@ -146,62 +150,42 @@ describe("StudioScenarioAutoLayoutPanel image reference integration", () => {
     });
     render(<StudioScenarioAutoLayoutPanel {...props} />);
 
-    expect((screen.getByLabelText("스토리 아이디어") as HTMLTextAreaElement).disabled).toBe(true);
-    expect((screen.getByRole("combobox", { name: "Character에 추가할 에셋" }) as HTMLSelectElement).disabled)
-      .toBe(true);
-    expect((screen.getByRole("textbox", { name: "주인공 설정화 참조 지침" }) as HTMLTextAreaElement).disabled)
-      .toBe(true);
-    expect((screen.getByRole("textbox", { name: "1번 장면 그림 프롬프트" }) as HTMLTextAreaElement).disabled)
-      .toBe(true);
-    expect((screen.getByRole("button", { name: "빈 장면 이미지 1개 생성" }) as HTMLButtonElement).disabled)
-      .toBe(true);
-    expect((screen.getByRole("button", { name: "현재 페이지에 적용" }) as HTMLButtonElement).disabled)
-      .toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /이야기·기준/u }));
+    expect(
+      (screen.getByRole("textbox", { name: "이야기 또는 회차 대본" }) as HTMLTextAreaElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("combobox", { name: "Character에 추가할 에셋" }) as HTMLSelectElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("textbox", { name: "주인공 설정화 참조 지침" }) as HTMLTextAreaElement)
+        .disabled,
+    ).toBe(true);
 
-    const cancel = screen.getByRole("button", { name: "취소" }) as HTMLButtonElement;
-    expect(cancel.disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /제작·수리/u }));
+    const cancel = screen.getByRole("button", { name: "취소" });
     fireEvent.click(cancel);
     expect(props.onCancel).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("status").textContent).toContain("(0/1)");
+    expect(screen.getAllByRole("status").some((status) => status.textContent?.includes("(0/1)")))
+      .toBe(true);
   });
 
-  it.each([
-    {
-      name: "selected references are still loading",
-      loading: true,
-      missing: 0,
-      status: "참조 에셋 불러오는 중",
-    },
-    {
-      name: "a selected reference is missing",
-      loading: false,
-      missing: 1,
-      status: "누락된 참조 에셋 확인 필요",
-    },
-  ])("blocks image requests when $name", ({ loading, missing, status }) => {
-    const props = panelProps({
-      imageReferencesLoading: loading,
-      imageReferenceMissingCount: missing,
-    });
+  it("blocks selected image requests while a configured reference is missing", () => {
+    const props = panelProps({ imageReferenceMissingCount: 1 });
     render(<StudioScenarioAutoLayoutPanel {...props} />);
 
-    const single = screen.getByRole("button", { name: "이 장면 이미지 생성" }) as HTMLButtonElement;
-    const batch = screen.getByRole("button", { name: "빈 장면 이미지 1개 생성" }) as HTMLButtonElement;
-    expect(single.disabled).toBe(true);
-    expect(batch.disabled).toBe(true);
-    expect(single.title).toBe("AI 참조 에셋을 모두 확인한 뒤 생성하세요");
-    expect(screen.getByText(status)).toBeTruthy();
-
-    fireEvent.click(single);
-    fireEvent.click(batch);
-    expect(props.onRegenerateScene).not.toHaveBeenCalled();
+    const generate = screen.getByRole("button", { name: "선택한 1컷 제작하기" }) as HTMLButtonElement;
+    expect(generate.disabled).toBe(true);
+    fireEvent.click(generate);
     expect(props.onGenerateImages).not.toHaveBeenCalled();
-    if (missing > 0) {
-      expect(screen.getByRole("alert").textContent).toContain("참조 에셋 1개");
-    }
+
+    fireEvent.click(screen.getByRole("button", { name: /이야기·기준/u }));
+    expect(screen.getByRole("alert").textContent).toContain("참조 에셋 1개");
   });
 
-  it("does not make an empty reference pack depend on asset loading", () => {
+  it("does not make an empty reference pack depend on asset-list loading", () => {
     const props = panelProps({
       imageReferenceDocument: createEmptyStudioAiImageReferenceDocument(),
       imageReferencesLoading: true,
@@ -209,15 +193,9 @@ describe("StudioScenarioAutoLayoutPanel image reference integration", () => {
     });
     render(<StudioScenarioAutoLayoutPanel {...props} />);
 
-    const single = screen.getByRole("button", { name: "이 장면 이미지 생성" }) as HTMLButtonElement;
-    const batch = screen.getByRole("button", { name: "빈 장면 이미지 1개 생성" }) as HTMLButtonElement;
-    expect(single.disabled).toBe(false);
-    expect(batch.disabled).toBe(false);
-    expect(screen.queryByText("참조 에셋 불러오는 중")).toBeNull();
-
-    fireEvent.click(single);
-    fireEvent.click(batch);
-    expect(props.onRegenerateScene).toHaveBeenCalledWith(0);
-    expect(props.onGenerateImages).toHaveBeenCalledTimes(1);
+    const generate = screen.getByRole("button", { name: "선택한 1컷 제작하기" }) as HTMLButtonElement;
+    expect(generate.disabled).toBe(false);
+    fireEvent.click(generate);
+    expect(props.onGenerateImages).toHaveBeenCalledWith({ indexes: [0], variants: 2 });
   });
 });

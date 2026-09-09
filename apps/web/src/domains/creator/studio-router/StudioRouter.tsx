@@ -27,6 +27,13 @@ const StudioToolsCompanionPage = lazyRetry(
   "StudioToolsCompanionPage",
 );
 
+const StudioAiComicDirectorRoute = lazyRetry(
+  () => import("./routes/StudioAiComicDirectorRoute").then((module) => ({
+    default: module.StudioAiComicDirectorRoute,
+  })),
+  "StudioAiComicDirectorRoute",
+);
+
 export function StudioRouter() {
   useStudioI18nPriorityLoading();
   const location = useLocation();
@@ -48,13 +55,21 @@ export function StudioRouter() {
 
   const currentHref = `${location.pathname}${location.search}`;
   if (currentHref !== resolution.canonicalHref) {
-    // Canonicalize before a stale alias mounts. State carries recovery and workspace-return receipts.
     return <Navigate replace state={location.state} to={resolution.canonicalHref} />;
   }
 
   switch (resolution.kind) {
     case "editor":
       return <StudioEditorRoute resolution={resolution} />;
+    case "composition":
+      return (
+        <Suspense fallback={<StudioRouteLoading label="AI 코믹 디렉터 세션을 여는 중..." />}>
+          <StudioAiComicDirectorRoute
+            key={resolution.lifecycleKey}
+            resolution={resolution}
+          />
+        </Suspense>
+      );
     case "publish":
       return <StudioPublishRoute resolution={resolution} />;
     case "lift3d":
