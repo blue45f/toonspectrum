@@ -5,9 +5,9 @@ import {
   type CreatorLaunchPace,
 } from "./creator-continuity-model";
 import {
+  addCreatorDestinationInState,
   clearCreatorPlanInState,
   clearCreatorRecentInState,
-  addCreatorDestinationInState,
   setCreatorLaunchPlanInState,
 } from "./creator-continuity-reducer";
 import {
@@ -76,11 +76,23 @@ export function initializeCreatorContinuity(
   if (initialized) return;
   initialized = true;
   activeStorage = storage;
-  currentSnapshot = readCreatorContinuity(activeStorage);
+  if (activeStorage) {
+    try {
+      const raw = activeStorage.getItem(CREATOR_CONTINUITY_STORAGE_KEY);
+      currentSnapshot = parseCreatorContinuity(raw);
+      const normalized = serializeCreatorContinuity(currentSnapshot);
+      if (raw !== null && raw !== normalized) {
+        activeStorage.setItem(CREATOR_CONTINUITY_STORAGE_KEY, normalized);
+      }
+    } catch {
+      currentSnapshot = EMPTY_CREATOR_CONTINUITY;
+    }
+  }
   if (typeof window === "undefined") return;
   window.addEventListener("storage", (event) => {
     if (event.key !== CREATOR_CONTINUITY_STORAGE_KEY) return;
-    publish(parseCreatorContinuity(event.newValue));
+    const next = parseCreatorContinuity(event.newValue);
+    publish(next);
   });
 }
 
