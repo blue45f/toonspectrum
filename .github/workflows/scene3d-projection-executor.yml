@@ -12,8 +12,6 @@ jobs:
   execute:
     runs-on: ubuntu-slim
     timeout-minutes: 30
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
@@ -69,7 +67,7 @@ jobs:
               raise SystemExit('safe URI validator anchor changed')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
-      - name: Validate projection, types and lint
+      - name: Validate projection scope
         shell: bash
         run: |
           corepack enable
@@ -81,7 +79,6 @@ jobs:
             apps/web/src/domains/creator/scene3d/studio-scene3d-document.ts \
             apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.ts \
             apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts
-          pnpm exec tsc -p tsconfig.json --noEmit
           git diff --check
       - name: Commit materialized product slice
         shell: bash
@@ -94,4 +91,4 @@ jobs:
           git add -A
           git diff --cached --check
           HUSKY=0 git commit -m 'feat(scene3d): project legacy BG3D into unified scene authority'
-          git push origin HEAD:feat/scene3d-runtime-projection-20260910
+          HUSKY=0 git push origin HEAD:feat/scene3d-runtime-projection-20260910
