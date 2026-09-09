@@ -162,7 +162,7 @@ export function MobileHeaderNavigation({
   return (
     <>
       {menuOpen && (
-        <div ref={overlayRef} className="fixed inset-0 z-[60] min-[1360px]:hidden">
+        <div ref={overlayRef} className="fixed inset-0 z-[60] min-[1180px]:hidden">
           <div
             aria-hidden="true"
             data-mobile-menu-backdrop="true"
@@ -302,7 +302,6 @@ export function MobileHeaderNavigation({
               const active = isPurposeActive(item.href, item.exact);
               const Icon = item.icon;
               const label = siteNavigationText(item.label, locale);
-              const isPrimaryCreate = item.id === "make";
               return (
                 <Link
                   key={item.id}
@@ -310,29 +309,20 @@ export function MobileHeaderNavigation({
                   aria-label={label}
                   aria-current={active ? "page" : undefined}
                   className={cx(
-                    "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.62rem] font-semibold transition-colors",
+                    "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.62rem] font-semibold transition-all duration-150 active:bg-raised/55",
                     active ? "text-accent" : "text-fg-3 hover:text-fg",
-                    isPrimaryCreate && "z-10"
                   )}
                 >
-                  {isPrimaryCreate ? (
-                    <span
-                      className={cx(
-                        "-mt-5 grid size-11 place-items-center rounded-2xl border shadow-lg transition-transform",
-                        active
-                          ? "border-accent bg-accent text-on-accent"
-                          : "border-line-strong bg-fg text-canvas"
-                      )}
-                    >
-                      <Icon size={20} strokeWidth={2.1} />
-                    </span>
-                  ) : (
-                    <span className="relative grid size-7 place-items-center">
-                      {active && <span aria-hidden="true" className="absolute -top-2 left-1/2 h-0.5 w-7 -translate-x-1/2 rounded-full bg-accent" />}
-                      <Icon size={19} strokeWidth={active ? 2.35 : 1.85} />
-                    </span>
-                  )}
-                  <span className={isPrimaryCreate ? "-mt-0.5" : undefined}>{label}</span>
+                  <span className="relative grid size-8 place-items-center rounded-xl transition-colors">
+                    {active && (
+                      <>
+                        <span aria-hidden="true" className="absolute -top-2 left-1/2 h-0.5 w-7 -translate-x-1/2 rounded-full bg-accent" />
+                        <span aria-hidden="true" className="absolute inset-0 rounded-xl bg-accent-soft" />
+                      </>
+                    )}
+                    <Icon size={19} strokeWidth={active ? 2.35 : 1.85} className="relative" />
+                  </span>
+                  <span>{label}</span>
                 </Link>
               );
             })}
