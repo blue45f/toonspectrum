@@ -402,12 +402,9 @@ export class Studio3dGenerationService {
       validationVersion: "glb-v2-header-v1",
       modelId: `model_${sha256(binary.bytes).slice(0, 24)}`,
       actualCredits: record.estimatedCredits,
+      persistArtifact: (artifact) => this.#artifactStore.putArtifact(artifact),
     });
     if (!ready.artifactRevision) throw new TypeError("ready 3D job has no artifact revision.");
-    await this.#artifactStore.putArtifact({
-      revision: ready.artifactRevision,
-      bytes: new Uint8Array(binary.bytes),
-    });
     await this.#identityStore.delete(record.id);
     return ready;
   }
