@@ -141,26 +141,43 @@ const NON_TERMINAL = new Set<Studio3dGenerationJobState>([
   "importing",
 ]);
 
-const TRANSITIONS: Readonly<Record<Studio3dGenerationJobState, ReadonlySet<Studio3dGenerationJobState>>> =
-  Object.freeze({
-    queued: new Set(["uploading", "cancelled", "failed", "expired"]),
-    uploading: new Set(["generating-geometry", "cancelled", "failed", "expired"]),
-    "generating-geometry": new Set([
-      "generating-texture",
-      "downloading",
-      "cancelled",
-      "failed",
-      "expired",
-    ]),
-    "generating-texture": new Set(["downloading", "cancelled", "failed", "expired"]),
-    downloading: new Set(["validating", "cancelled", "failed", "expired"]),
-    validating: new Set(["importing", "failed", "cancelled", "expired"]),
-    importing: new Set(["ready", "failed", "cancelled", "expired"]),
-    ready: new Set(),
-    failed: new Set(),
-    cancelled: new Set(),
-    expired: new Set(),
-  });
+function transitionSet(
+  ...states: Studio3dGenerationJobState[]
+): ReadonlySet<Studio3dGenerationJobState> {
+  return new Set(states);
+}
+
+const TRANSITIONS: Readonly<
+  Record<Studio3dGenerationJobState, ReadonlySet<Studio3dGenerationJobState>>
+> = Object.freeze({
+  queued: transitionSet("uploading", "cancelled", "failed", "expired"),
+  uploading: transitionSet(
+    "generating-geometry",
+    "cancelled",
+    "failed",
+    "expired",
+  ),
+  "generating-geometry": transitionSet(
+    "generating-texture",
+    "downloading",
+    "cancelled",
+    "failed",
+    "expired",
+  ),
+  "generating-texture": transitionSet(
+    "downloading",
+    "cancelled",
+    "failed",
+    "expired",
+  ),
+  downloading: transitionSet("validating", "cancelled", "failed", "expired"),
+  validating: transitionSet("importing", "failed", "cancelled", "expired"),
+  importing: transitionSet("ready", "failed", "cancelled", "expired"),
+  ready: transitionSet(),
+  failed: transitionSet(),
+  cancelled: transitionSet(),
+  expired: transitionSet(),
+});
 
 function validateRequest(request: Studio3dGenerationJobRequestSummary): Studio3dGenerationJobRequestSummary {
   if (!request.inputContentHashes.every((hash) => /^[a-f0-9]{16,128}$/u.test(hash))) {
