@@ -1,0 +1,111 @@
+name: Verify studio pixel pencil pro
+
+on:
+  push:
+    branches:
+      - feat/studio-pixel-pencil-pro-v2-20260909
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-studio-pixel-pencil-pro
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: ${{ contains(github.event.head_commit.message, '[pixel-pencil-pro-core-applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FEATURE_BRANCH: feat/studio-pixel-pencil-pro-v2-20260909
+    steps:
+      - name: Sparse partial-clone verified workspace
+        run: |
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git sparse-checkout init --cone
+          git sparse-checkout set .github .husky apps docs packages patches scripts
+          git -c protocol.version=2 fetch \
+            --depth=1 \
+            --filter=blob:none \
+            origin \
+            "+refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}"
+          git checkout -B "${FEATURE_BRANCH}" "refs/remotes/origin/${FEATURE_BRANCH}"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format and autofix focused sources
+        run: |
+          pnpm exec prettier --write \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts \
+            apps/web/src/domains/creator/studio-pixel-pencil.test.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.test.ts \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers-freehand.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.test.ts \
+            docs/studio-pixel-pencil-pro-benchmark-2026-09-09.md
+          pnpm exec eslint --fix \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts \
+            apps/web/src/domains/creator/studio-pixel-pencil.test.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.test.ts \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers-freehand.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.test.ts
+
+      - name: Run focused regression suite
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-pixel-pencil.test.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.test.ts
+
+      - name: Typecheck web workspace
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Build production web bundle
+        run: pnpm run build:bundle
+
+      - name: Recheck focused lint and whitespace
+        run: |
+          pnpm exec eslint \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts \
+            apps/web/src/domains/creator/studio-pixel-pencil.test.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.ts \
+            apps/web/src/domains/creator/brush/studio-draw-pointer-start-plan.test.ts \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers-freehand.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.ts \
+            apps/web/src/domains/creator/brush/studio-brush-mode-width.test.ts
+          git diff --check
+
+      - name: Publish verified source commit
+        run: |
+          rm -f .github/workflows/verify-studio-pixel-pencil-pro.yml
+          rm -f .github/workflows/finalize-studio-pixel-pencil-pro.yml
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core.yml
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core-v2.yml
+          rm -f .github/workflows/apply-studio-pixel-pencil-pro-core-v3.yml
+          rm -f scripts/apply-studio-pixel-pencil-pro-core.py
+          rm -f scripts/prepare-studio-pixel-pencil-pro-core.py
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git commit -m "feat(studio): verify pixel pencil professional core [pixel-pencil-pro-ready]"
+          git fetch origin "${FEATURE_BRANCH}"
+          git rebase "origin/${FEATURE_BRANCH}"
+          git push origin HEAD:"${FEATURE_BRANCH}"

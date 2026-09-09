@@ -1,0 +1,104 @@
+name: Finalize verified studio pixel pencil pro
+
+on:
+  push:
+    branches:
+      - feat/studio-pixel-pencil-pro-v2-20260909
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: read
+
+concurrency:
+  group: finalize-verified-studio-pixel-pencil-pro
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: ${{ contains(github.event.head_commit.message, '[pixel-pencil-pro-ready]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FEATURE_BRANCH: feat/studio-pixel-pencil-pro-v2-20260909
+    steps:
+      - name: Resolve or create the MR
+        id: pr
+        run: |
+          PR_NUMBER=$(gh pr list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --head "${FEATURE_BRANCH}" \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          if [ -z "${PR_NUMBER}" ]; then
+            PR_URL=$(gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
+              --head "${FEATURE_BRANCH}" \
+              --base main \
+              --title "feat(studio): 픽셀펜 전문 드로잉 코어 고도화" \
+              --body "정수 픽셀 팁, pixel-perfect 코너 보정, 픽셀 대칭, 안전한 입력 예산 및 회귀 테스트를 추가합니다.")
+            PR_NUMBER=$(gh pr view "${PR_URL}" --repo "${GITHUB_REPOSITORY}" --json number --jq .number)
+          fi
+          echo "number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
+          gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json number,url,headRefOid --jq .
+
+      - name: Bring the MR branch up to date
+        run: |
+          gh pr update-branch "${{ steps.pr.outputs.number }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --rebase || {
+              echo "Automatic branch update was not required or could not be applied; mergeability will be checked below."
+              gh pr view "${{ steps.pr.outputs.number }}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --json mergeStateStatus,mergeable --jq .
+            }
+
+      - name: Remove final temporary automation
+        run: |
+          PATH_IN_REPO=.github/workflows/finalize-studio-pixel-pencil-pro-ready.yml
+          FILE_SHA=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/contents/${PATH_IN_REPO}?ref=${FEATURE_BRANCH}" \
+            --jq .sha)
+          gh api \
+            --method DELETE \
+            "repos/${GITHUB_REPOSITORY}/contents/${PATH_IN_REPO}" \
+            -f message='chore(studio): remove verified pixel pencil merge automation' \
+            -f sha="${FILE_SHA}" \
+            -f branch="${FEATURE_BRANCH}"
+
+      - name: Enable guarded squash auto-merge
+        run: |
+          gh pr merge "${{ steps.pr.outputs.number }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --squash \
+            --auto \
+            --delete-branch
+
+      - name: Confirm merged state
+        run: |
+          for attempt in $(seq 1 180); do
+            STATE=$(gh pr view "${{ steps.pr.outputs.number }}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json state \
+              --jq .state)
+            if [ "${STATE}" = "MERGED" ]; then
+              gh pr view "${{ steps.pr.outputs.number }}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --json number,url,mergedAt,mergeCommit \
+                --jq '{number,url,mergedAt,mergeCommit}'
+              exit 0
+            fi
+            if [ "${STATE}" = "CLOSED" ]; then
+              echo "MR closed without merge" >&2
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "Timed out before required checks allowed merge" >&2
+          gh pr checks "${{ steps.pr.outputs.number }}" --repo "${GITHUB_REPOSITORY}" || true
+          exit 1
