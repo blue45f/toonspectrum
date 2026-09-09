@@ -9,6 +9,17 @@ import {
 } from "@/shared/lib/pwa-install-store";
 import { useI18n } from "@/shared/lib/i18n";
 
+const INSTALL_NUDGE_SESSION_KEY = "toonstudio:pwa-install-nudge-dismissed";
+
+function readInstallNudgeDismissal(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(INSTALL_NUDGE_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function PwaInstallNudge() {
   const language = useI18n((state) => state.lang);
   const locale = language.toLowerCase().startsWith("ko") ? "ko" : "en";
@@ -17,7 +28,7 @@ export function PwaInstallNudge() {
     getPwaInstallSnapshot,
     getPwaInstallServerSnapshot,
   );
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(readInstallNudgeDismissal);
 
   if (pwa.status !== "available" || dismissed) return null;
 
@@ -27,6 +38,15 @@ export function PwaInstallNudge() {
     : "Launch your creative workspace faster from the home screen or app list.";
   const action = locale === "ko" ? "설치" : "Install";
   const close = locale === "ko" ? "설치 안내 닫기" : "Dismiss install prompt";
+
+  const dismiss = () => {
+    setDismissed(true);
+    try {
+      window.sessionStorage.setItem(INSTALL_NUDGE_SESSION_KEY, "1");
+    } catch {
+      // A failed convenience preference must never block the install flow.
+    }
+  };
 
   return (
     <aside
@@ -52,7 +72,7 @@ export function PwaInstallNudge() {
         <button
           type="button"
           aria-label={close}
-          onClick={() => setDismissed(true)}
+          onClick={dismiss}
           className="grid size-10 shrink-0 place-items-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <X size={17} aria-hidden="true" />
