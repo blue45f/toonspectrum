@@ -54,6 +54,30 @@ interface StudioScene3dEntityBase {
   readonly parentId: string | null;
 }
 
+export const STUDIO_SCENE3D_PRIMITIVE_KINDS = Object.freeze([
+  "box",
+  "cylinder",
+  "plane",
+  "sphere",
+  "hemisphere",
+  "cone",
+  "pyramid",
+  "triangularPrism",
+  "hexPrism",
+  "torus",
+  "tube",
+  "ring",
+  "capsule",
+] as const);
+
+export type StudioScene3dPrimitiveKind = (typeof STUDIO_SCENE3D_PRIMITIVE_KINDS)[number];
+
+export interface StudioScene3dPrimitiveEntity extends StudioScene3dEntityBase {
+  readonly kind: "primitive";
+  readonly primitiveKind: StudioScene3dPrimitiveKind;
+  readonly color: string;
+}
+
 export interface StudioScene3dCharacterEntity extends StudioScene3dEntityBase {
   readonly kind: "character";
   readonly assetId: string;
@@ -75,6 +99,7 @@ export interface StudioScene3dSplatEntity extends StudioScene3dEntityBase {
 }
 
 export type StudioScene3dEntity =
+  | StudioScene3dPrimitiveEntity
   | StudioScene3dCharacterEntity
   | StudioScene3dModelEntity
   | StudioScene3dSplatEntity;
@@ -224,7 +249,10 @@ function isSha256(value: unknown): value is string {
 
 function isSafeAssetUri(value: unknown): value is string {
   if (typeof value !== "string" || value.length === 0 || value.length > 1024) return false;
-  if (/[\\\u0000-\u001f\u007f]/u.test(value)) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code === 92 || code <= 31 || code === 127) return false;
+  }
   if (/^(?:javascript|data|blob):/iu.test(value)) return false;
   const path = value.split(/[?#]/u, 1)[0] ?? "";
   return !path.split("/").some((segment) => segment === "." || segment === "..");
@@ -256,6 +284,10 @@ function isEntity(value: unknown): value is StudioScene3dEntity {
   if (!isRecord(value) || !isString(value.id) || !isString(value.name) || !isTransform(value.transform)) return false;
   if (![value.visible, value.locked, value.castShadow, value.receiveShadow].every((item) => typeof item === "boolean")) return false;
   if (value.parentId !== null && !isString(value.parentId)) return false;
+  if (value.kind === "primitive") {
+    return STUDIO_SCENE3D_PRIMITIVE_KINDS.includes(value.primitiveKind as StudioScene3dPrimitiveKind)
+      && isString(value.color, 32);
+  }
   if (value.kind === "character") {
     return isString(value.assetId)
       && isString(value.characterDocumentId)
@@ -370,7 +402,7 @@ export function assertStudioScene3dDocument(value: unknown): asserts value is St
 
   const assetIds = new Set(value.assets.map((asset) => asset.id));
   for (const entity of value.entities) {
-    if (!assetIds.has(entity.assetId)) {
+    if (entity.kind !== "primitive" && !assetIds.has(entity.assetId)) {
       throw new StudioScene3dDocumentError("MISSING_ENTITY_ASSET", `${entity.id}가 참조하는 asset이 없습니다.`);
     }
     if (entity.parentId !== null && !value.entities.some((parent) => parent.id === entity.parentId)) {
