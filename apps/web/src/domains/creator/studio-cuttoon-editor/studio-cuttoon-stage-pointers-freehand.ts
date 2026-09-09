@@ -134,7 +134,7 @@ import { normalizeStudioPersistedPointerChannels } from "../studio-persisted-poi
 import { resolvePerspectiveRay, snapStrokePointToPerspective } from "../studio-perspective-guide";
 import {
   isStudioPixelPencilRenderMode,
-  shouldAppendStudioPixelPencilSample,
+  planStudioPixelPencilSampleUpdate,
 } from "../studio-pixel-pencil";
 import {
   beginStudioStrokePointerSession,
@@ -662,13 +662,16 @@ export function bindStudioCuttoonStagePointersFreehand(
     // Repeated browser samples that collapse to the same 1/32 coordinate and 10-bit pressure add
     // no information. A pressure-only change is retained so the incremental dab walker can update
     // interpolation state without repainting the stationary prefix.
-    const shouldAppend = isStudioPixelPencilRenderMode(current.brush)
-      ? shouldAppendStudioPixelPencilSample({
-          lastX,
-          lastY,
+    const pixelSampleUpdate = isStudioPixelPencilRenderMode(current.brush)
+      ? planStudioPixelPencilSampleUpdate({
+          points: current.points,
           nextX: targetX,
           nextY: targetY,
+          strokeWidth: current.strokeWidth,
         })
+      : null;
+    const shouldAppend = pixelSampleUpdate !== null
+      ? pixelSampleUpdate !== "ignore"
       : shouldAppendStudioCausalInkSample({
           lastX,
           lastY,
@@ -681,6 +684,23 @@ export function bindStudioCuttoonStagePointersFreehand(
           pressureModel: current.pressureModel,
         });
     if (!shouldAppend) return;
+    if (pixelSampleUpdate === "replace-tail") {
+      const points = current.points.slice();
+      points[points.length - 2] = targetX;
+      points[points.length - 1] = targetY;
+      const pressures = current.pressures?.slice() ?? [1];
+      pressures[pressures.length - 1] = 1;
+      const nextPixelPerfect: DrawEl = { ...current, points, pressures };
+      // Direct retained surfaces can append but cannot erase B from A→B→C. Hand the one
+      // corrected corner back to the replaceable draft layer, exactly like Shift-line replacement.
+      if (
+        (liveDraftDirectRef.current || liveStampDraftDirectRef.current)
+        && !drawingPredictionPreviewRef.current
+      ) exitDirectLiveDraft();
+      drawingRef.current = nextPixelPerfect;
+      if (!drawingPredictionPreviewRef.current) scheduleDraft(nextPixelPerfect);
+      return;
+    }
     const capturePointerDynamics = current.mode === "pen"
       && resolveStudioCapturedBrushDynamicsPresetId(current) !== null;
     const captureInkSensorChannels =
