@@ -1,6 +1,6 @@
 name: Validate AI Comic Director main
 
-# Manual rerun after applying all typecheck regression repairs.
+# Branch-only integration gate. Removed after the complete repair set passes.
 on:
   push:
     branches: [ci/validate-ai-comic-director-main-20260909]
@@ -48,6 +48,7 @@ jobs:
       - name: Lint corrected integration files
         run: >-
           pnpm exec eslint --max-warnings=0
+          apps/api/src/modules/studio-ai/studio-ai.module.ts
           apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts
           apps/web/src/domains/creator/studio-generated-2d-backgrounds.ts
           apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
@@ -58,8 +59,8 @@ jobs:
           apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts
           apps/web/src/domains/creator/studio-soft-proofing.ts
 
-      - name: Typecheck complete frontend
-        run: pnpm exec tsc -p tsconfig.json
+      - name: Typecheck web and API
+        run: pnpm run typecheck
 
       - name: Validate architecture
         run: pnpm run validate:architecture
