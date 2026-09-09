@@ -1,0 +1,342 @@
+name: Materialize Brush Studio goal entry once
+
+on:
+  push:
+    branches: [feat/brush-goal-guided-entry-main-20260910]
+    paths: [.github/workflows/brush-goal-guided-entry-once.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-slim
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/brush-goal-guided-entry-main-20260910
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Add outcome-first goal chooser
+        shell: bash
+        run: |
+          cat > apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx <<'EOF'
+          import {
+            Droplets,
+            Feather,
+            Grid3X3,
+            PenLine,
+            Sparkles,
+          } from "lucide-react";
+
+          import type { StudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
+
+          export type StudioBrushGoalSection = "response" | "tip" | "engines";
+
+          export interface StudioBrushGoalStartProps {
+            readonly activePresetId: StudioBrushDynamicsPresetId | null;
+            readonly activeSection: string;
+            readonly onSelectPreset: (presetId: StudioBrushDynamicsPresetId) => void;
+            readonly onOpenSection: (section: StudioBrushGoalSection) => void;
+          }
+
+          const GOALS = Object.freeze([
+            {
+              id: "clean-line",
+              label: "깔끔한 선화",
+              description: "필압과 보정을 먼저 맞춰 흔들림 없는 선을 만듭니다.",
+              presetId: "clean",
+              section: "response",
+              Icon: Sparkles,
+            },
+            {
+              id: "ink-pencil",
+              label: "잉크 · 연필 질감",
+              description: "펜촉 형상과 각도를 열어 마른 재료의 결을 다듬습니다.",
+              presetId: "pencil",
+              section: "tip",
+              Icon: Feather,
+            },
+            {
+              id: "soft-painting",
+              label: "부드러운 채색",
+              description: "도포량과 속도 반응을 조절해 매끄러운 면을 쌓습니다.",
+              presetId: "soft",
+              section: "response",
+              Icon: Droplets,
+            },
+            {
+              id: "pattern-scatter",
+              label: "패턴 · 산포 효과",
+              description: "전문 엔진 조합으로 반복 무늬와 입자감을 설계합니다.",
+              presetId: "wet",
+              section: "engines",
+              Icon: Grid3X3,
+            },
+            {
+              id: "graphic-outline",
+              label: "그래픽 외곽선",
+              description: "단단한 기본 획에서 펜촉 비율을 조절해 또렷한 윤곽을 만듭니다.",
+              presetId: "clean",
+              section: "tip",
+              Icon: PenLine,
+            },
+          ] as const satisfies readonly {
+            readonly id: string;
+            readonly label: string;
+            readonly description: string;
+            readonly presetId: StudioBrushDynamicsPresetId;
+            readonly section: StudioBrushGoalSection;
+            readonly Icon: typeof Sparkles;
+          }[]);
+
+          export function StudioBrushGoalStart({
+            activePresetId,
+            activeSection,
+            onSelectPreset,
+            onOpenSection,
+          }: StudioBrushGoalStartProps) {
+            return (
+              <section
+                aria-labelledby="studio-brush-goal-start-title"
+                data-studio-brush-goal-start="true"
+                className="shrink-0 border-b border-line bg-card/35 px-3 py-3 sm:px-4"
+              >
+                <div className="mb-2 flex items-end justify-between gap-3">
+                  <div>
+                    <h3
+                      id="studio-brush-goal-start-title"
+                      className="text-xs font-bold text-fg"
+                    >
+                      어떤 결과를 만들고 싶나요?
+                    </h3>
+                    <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">
+                      결과를 고르면 시작 프리셋과 가장 관련 있는 세부 설정을 함께 엽니다.
+                    </p>
+                  </div>
+                  <span className="hidden shrink-0 text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-accent sm:inline">
+                    Goal start
+                  </span>
+                </div>
+
+                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
+                  {GOALS.map(({ id, label, description, presetId, section, Icon }) => {
+                    const active = activePresetId === presetId && activeSection === section;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={active}
+                        data-brush-goal={id}
+                        onClick={() => {
+                          onSelectPreset(presetId);
+                          onOpenSection(section);
+                        }}
+                        className={[
+                          "group min-h-[5.25rem] min-w-[10.25rem] rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-w-0",
+                          active
+                            ? "border-accent/65 bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(var(--accent)/0.12)]"
+                            : "border-line bg-panel/75 text-fg-2 hover:border-accent/40 hover:bg-raised",
+                        ].join(" ")}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span
+                            className={[
+                              "grid size-7 shrink-0 place-items-center rounded-lg",
+                              active
+                                ? "bg-accent text-on-accent"
+                                : "bg-card text-fg-3 group-hover:text-accent",
+                            ].join(" ")}
+                          >
+                            <Icon size={14} aria-hidden />
+                          </span>
+                          <span className="text-[0.7rem] font-bold leading-tight">{label}</span>
+                        </span>
+                        <span className="mt-1.5 block text-[0.61rem] leading-relaxed text-fg-3">
+                          {description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          }
+          EOF
+
+          cat > apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx <<'EOF'
+          import { fireEvent, render, screen } from "@testing-library/react";
+          import { describe, expect, it, vi } from "vitest";
+
+          import { StudioBrushGoalStart } from "./StudioBrushGoalStart";
+
+          describe("StudioBrushGoalStart", () => {
+            it("uses preset and destination together to identify one active goal", () => {
+              render(
+                <StudioBrushGoalStart
+                  activePresetId="clean"
+                  activeSection="response"
+                  onSelectPreset={vi.fn()}
+                  onOpenSection={vi.fn()}
+                />,
+              );
+
+              expect(screen.getByRole("button", { name: /깔끔한 선화/u })).toHaveAttribute(
+                "aria-pressed",
+                "true",
+              );
+              expect(screen.getByRole("button", { name: /그래픽 외곽선/u })).toHaveAttribute(
+                "aria-pressed",
+                "false",
+              );
+            });
+
+            it("opens the pencil tip controls from the ink and pencil goal", () => {
+              const onSelectPreset = vi.fn();
+              const onOpenSection = vi.fn();
+              render(
+                <StudioBrushGoalStart
+                  activePresetId={null}
+                  activeSection="presets"
+                  onSelectPreset={onSelectPreset}
+                  onOpenSection={onOpenSection}
+                />,
+              );
+
+              fireEvent.click(screen.getByRole("button", { name: /잉크 · 연필 질감/u }));
+
+              expect(onSelectPreset).toHaveBeenCalledWith("pencil");
+              expect(onOpenSection).toHaveBeenCalledWith("tip");
+              expect(onSelectPreset.mock.invocationCallOrder[0]).toBeLessThan(
+                onOpenSection.mock.invocationCallOrder[0]!,
+              );
+            });
+
+            it("opens the expert engine stack from the pattern goal", () => {
+              const onSelectPreset = vi.fn();
+              const onOpenSection = vi.fn();
+              render(
+                <StudioBrushGoalStart
+                  activePresetId={null}
+                  activeSection="presets"
+                  onSelectPreset={onSelectPreset}
+                  onOpenSection={onOpenSection}
+                />,
+              );
+
+              fireEvent.click(screen.getByRole("button", { name: /패턴 · 산포 효과/u }));
+
+              expect(onSelectPreset).toHaveBeenCalledWith("wet");
+              expect(onOpenSection).toHaveBeenCalledWith("engines");
+            });
+          });
+          EOF
+
+          cat > apps/web/src/domains/creator/brush/studio-brush-goal-start-integration-boundary.test.ts <<'EOF'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+
+          const source = readFileSync(
+            new URL("./StudioBrushStudio.tsx", import.meta.url),
+            "utf8",
+          );
+
+          describe("Brush Studio goal-start integration boundary", () => {
+            it("renders the goal chooser between restore status and the mobile preview", () => {
+              const restore = source.indexOf("{restoreAction}");
+              const goals = source.indexOf("<StudioBrushGoalStart");
+              const mobilePreview = source.indexOf(
+                '<div className="shrink-0 border-b border-line p-2 sm:hidden">',
+              );
+
+              expect(restore).toBeGreaterThan(-1);
+              expect(goals).toBeGreaterThan(restore);
+              expect(mobilePreview).toBeGreaterThan(goals);
+            });
+
+            it("applies the selected preset through the canonical variant seam before opening its section", () => {
+              const goals = source.slice(
+                source.indexOf("<StudioBrushGoalStart"),
+                source.indexOf("<StudioBrushGoalStart") + 700,
+              );
+
+              expect(goals).toContain("activePresetId={matchedPreset}");
+              expect(goals).toContain("activeSection={category}");
+              expect(goals).toContain("studioBrushDynamicsPresetSelectionSettings(presetId)");
+              expect(goals).toContain("onOpenSection={(section) => setCategory(section)}");
+            });
+          });
+          EOF
+
+      - name: Wire goal chooser into Brush Studio
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/src/domains/creator/brush/StudioBrushStudio.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          import_anchor = 'import { StudioBrushInputControls } from "./StudioBrushInputControls";\n'
+          import_line = 'import { StudioBrushGoalStart } from "./StudioBrushGoalStart";\n'
+          if import_line not in text:
+              if text.count(import_anchor) != 1:
+                  raise SystemExit('Brush Studio import anchor changed')
+              text = text.replace(import_anchor, import_line + import_anchor, 1)
+
+          render_anchor = '''        {restoreAction}
+
+            <div className="shrink-0 border-b border-line p-2 sm:hidden">
+          '''
+          render_block = '''        {restoreAction}
+
+            <StudioBrushGoalStart
+              activePresetId={matchedPreset}
+              activeSection={category}
+              onSelectPreset={(presetId) =>
+                onSelectDynamicsPreset(
+                  presetId,
+                  studioBrushDynamicsPresetSelectionSettings(presetId),
+                )
+              }
+              onOpenSection={(section) => setCategory(section)}
+            />
+
+            <div className="shrink-0 border-b border-line p-2 sm:hidden">
+          '''
+          if '<StudioBrushGoalStart' not in text:
+              if text.count(render_anchor) != 1:
+                  raise SystemExit(f'Brush Studio render anchor changed: {text.count(render_anchor)}')
+              text = text.replace(render_anchor, render_block, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Validate goal-driven entry
+        shell: bash
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
+            apps/web/src/domains/creator/brush/studio-brush-goal-start-integration-boundary.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
+            apps/web/src/domains/creator/brush/studio-brush-goal-start-integration-boundary.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushStudio.tsx
+          git diff --check
+      - name: Commit product code and remove one-shot workflow
+        shell: bash
+        run: |
+          git config user.name toonstudio-brush-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/brush-goal-guided-entry-once.yml
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'feat(brush): start Brush Studio from the desired result'
+          git -c core.hooksPath=/dev/null push origin HEAD:feat/brush-goal-guided-entry-main-20260910
