@@ -5,6 +5,8 @@
 ## 핵심 페이지
 
 - [만들기](https://www.toonstudio.cloud/make): 빈 캔버스·세로 웹툰·컷툰·캐릭터·에셋·리서치에서 목적별로 창작 시작
+- [찾기](https://www.toonstudio.cloud/discover): 검색·취향 탐색·추천·랭킹·캘린더·랜덤·비교를 목적별로 선택
+- [내 공간](https://www.toonstudio.cloud/my): 프로젝트·공개 작품·서재·에셋·활동·프로필·설정 통합 진입점
 - [웹툰 창작 스튜디오](https://www.toonstudio.cloud/studio): 브라우저 기반 드로잉·편집·3D·협업 작업 공간
 - [프로젝트 센터](https://www.toonstudio.cloud/studio/projects): 최근 프로젝트·공유 작업·버전·복구 흐름
 - [캐릭터 셰이퍼](https://www.toonstudio.cloud/shaper): 프리셋·표면 드로잉·기기 내 AI 보조로 3D 웹툰 캐릭터를 만들어 투명 PNG·레이어 PSD로 내보내는 스튜디오 도구 안내
