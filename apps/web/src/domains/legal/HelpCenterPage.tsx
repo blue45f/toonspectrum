@@ -76,6 +76,7 @@ const COPY = {
     body: "메뉴 이름을 몰라도 괜찮습니다. 하고 싶은 일이나 문제를 검색하면 관련 기능과 안내로 연결합니다.",
     placeholder: "예: 저장이 안 돼요, 말풍선, 에셋 라이선스",
     results: "도움말 주제",
+    open: "관련 화면 열기",
     empty: "일치하는 주제를 찾지 못했습니다.",
     emptyBody: "다른 표현으로 검색하거나 제보·제안에서 상황을 알려주세요.",
     feedback: "제보·제안 보내기",
@@ -88,6 +89,7 @@ const COPY = {
     body: "You do not need to know the menu name. Search for a task or problem and jump to the right feature or guide.",
     placeholder: "e.g. save failed, speech balloon, asset license",
     results: "Help topics",
+    open: "Open related screen",
     empty: "No matching help topic found.",
     emptyBody: "Try another phrase or tell us what happened through Feedback.",
     feedback: "Send feedback",
@@ -158,7 +160,7 @@ export function HelpCenterPage() {
                   <span className="grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
                   <strong className="mt-4 text-sm text-fg">{title}</strong>
                   <span className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">{description}</span>
-                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">Open<ArrowRight size={13} aria-hidden="true" /></span>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} aria-hidden="true" /></span>
                 </Link>
               );
             })}
@@ -173,9 +175,9 @@ export function HelpCenterPage() {
       </section>
 
       <footer className="mt-10 flex flex-wrap gap-2 border-t border-line pt-6">
-        <Link href="/feedback" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">{copy.feedback}<ArrowRight size={14} aria-hidden="true" /></Link>
-        <Link href="/support" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-card px-4 text-sm font-semibold text-fg-2 hover:border-line-strong hover:text-fg">{copy.support}</Link>
-        <Link href="/accessibility" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-card px-4 text-sm font-semibold text-fg-2 hover:border-line-strong hover:text-fg">{copy.accessibility}</Link>
+        <Link href="/feedback" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">{copy.feedback}<ArrowRight size={14} aria-hidden="true" /></Link>
+        <Link href="/support" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-card px-4 text-sm font-semibold text-fg-2 hover:border-line-strong hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">{copy.support}</Link>
+        <Link href="/accessibility" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-card px-4 text-sm font-semibold text-fg-2 hover:border-line-strong hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">{copy.accessibility}</Link>
       </footer>
     </Container>
   );
