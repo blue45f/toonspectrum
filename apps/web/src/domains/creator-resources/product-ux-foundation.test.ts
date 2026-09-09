@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const ROOT_HOME = "apps/web/src/domains/creator-resources/CreatorHomePage.tsx";
 const MAKE_HUB = "apps/web/src/domains/creator-resources/MakeHubPage.tsx";
 const CREATOR_ROUTES = "apps/web/src/app/routes/groups/creator-resources.routes.tsx";
+const CATALOG_ROUTES = "apps/web/src/app/routes/groups/catalog.routes.tsx";
 const ACCOUNT_ROUTES = "apps/web/src/app/routes/groups/account.routes.tsx";
 const SITE_NAVIGATION = "apps/web/src/shared/components/site-navigation.ts";
 const LEGAL_ROUTES = "apps/web/src/app/routes/groups/legal.routes.tsx";
@@ -26,6 +27,16 @@ describe("purpose-first product UX foundation", () => {
     expect(hub).toContain('/studio?preset=webtoon');
     expect(hub).toContain('/studio?preset=4cut');
     expect(hub).toContain('/studio?preset=illustration');
+  });
+
+  it("routes Discover as the global find destination while preserving specialist discovery pages", () => {
+    const routes = readFileSync(CATALOG_ROUTES, "utf8");
+    const navigation = readFileSync(SITE_NAVIGATION, "utf8");
+    expect(routes).toContain('path: "/discover"');
+    for (const path of ["/search", "/explore", "/ranking", "/recommend", "/calendar", "/random", "/compare"]) {
+      expect(routes).toContain(`path: "${path}"`);
+    }
+    expect(navigation).toContain('item("explore", "/discover"');
   });
 
   it("routes My Space as the global account destination while preserving detailed account pages", () => {
