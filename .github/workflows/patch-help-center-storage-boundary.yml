@@ -1,0 +1,60 @@
+name: Patch Help Center storage boundary
+
+on:
+  push:
+    branches: [fix/help-center-storage-boundary-main-20260910]
+    paths: [.github/workflows/patch-help-center-storage-boundary.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-help-center-storage-boundary
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/help-center-storage-boundary-main-20260910
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Patch shared storage ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch-help-center-storage-boundary.py
+
+      - name: Validate focused boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-help-center-storage-boundary.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/StudioHelpCenterDialog.tsx \
+            apps/web/src/domains/creator/studio-help-center-storage-boundary.test.ts
+          git diff --check
+
+      - name: Commit source-only repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/patch-help-center-storage-boundary.yml \
+                scripts/patch-help-center-storage-boundary.py
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'fix(studio): complete Help Center storage boundary'
+          git push --no-verify origin HEAD:fix/help-center-storage-boundary-main-20260910
