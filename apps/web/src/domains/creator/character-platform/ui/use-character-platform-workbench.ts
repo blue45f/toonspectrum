@@ -16,6 +16,7 @@ import {
 } from "../pose/character-pose-v2";
 import { useCharacterSurfaceInkRuntime } from "../surface-ink/use-character-surface-ink-runtime";
 import { projectCharacterShaperDocument } from "../../character-shaper/character-shaper-document-projection";
+import { useCharacterCanonicalParts } from "./use-character-canonical-parts";
 
 import type { CharacterCanonicalManifestV2 } from "../assets/character-canonical-manifest";
 import type { CharacterPartPresetV1 } from "../presets/character-part-preset";
@@ -49,6 +50,7 @@ export interface CharacterPlatformWorkbenchState {
   readonly modelId: string;
   readonly canonicalManifest: CharacterCanonicalManifestV2 | null;
   readonly canonicalError: string | null;
+  readonly canonicalParts: ReturnType<typeof useCharacterCanonicalParts>;
   readonly compatibility: ReturnType<typeof createCharacterCompatibilityReport>;
   readonly document: ReturnType<typeof projectCharacterShaperDocument>;
   readonly renderGraph: ReturnType<typeof createCharacterRenderGraphPlan>;
@@ -333,6 +335,12 @@ export function useCharacterPlatformWorkbench(
       surfaceInk.strokeCount,
     ],
   );
+  const canonicalParts = useCharacterCanonicalParts({
+    h,
+    manifest: canonicalManifest,
+    modelId,
+    onNotice: setNotice,
+  });
 
   const importCanonicalManifest = useCallback(
     async (json: string): Promise<boolean> => {
@@ -541,6 +549,7 @@ export function useCharacterPlatformWorkbench(
     modelId,
     canonicalManifest,
     canonicalError,
+    canonicalParts,
     compatibility,
     document,
     renderGraph,
