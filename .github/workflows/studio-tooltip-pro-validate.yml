@@ -16,10 +16,10 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 25
+    runs-on: ubuntu-slim
+    timeout-minutes: 20
     env:
-      NODE_OPTIONS: --max-old-space-size=8192
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v6
         with:
