@@ -1,4 +1,5 @@
 import { CreatorHomeExperience } from "../marketing/CreatorHomeExperience";
+import "../marketing/creator-home-experience-interactions.css";
 
 /**
  * The root route owns one coherent creator journey. Research and inspiration
