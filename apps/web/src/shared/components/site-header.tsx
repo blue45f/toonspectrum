@@ -28,10 +28,72 @@ const MobileHeaderNavigation = lazy(() =>
   import("./site-header-mobile-nav").then((mod) => ({ default: mod.MobileHeaderNavigation }))
 );
 
+const DISCOVER_PURPOSE_PREFIXES = [
+  "/discover",
+  "/search",
+  "/explore",
+  "/ranking",
+  "/recommend",
+  "/calendar",
+  "/compare",
+  "/random",
+  "/tags",
+  "/authors",
+  "/author",
+  "/title",
+] as const;
+const CREATE_PURPOSE_PREFIXES = [
+  "/make",
+  "/studio",
+  "/shaper",
+  "/brush-lab",
+  "/music",
+  "/research",
+  "/story-lab",
+  "/publishing",
+  "/opportunities",
+  "/market",
+] as const;
+const COMMUNITY_PURPOSE_PREFIXES = [
+  "/community",
+  "/reviews",
+  "/create",
+  "/pencafe",
+] as const;
+const MY_PURPOSE_PREFIXES = [
+  "/my",
+  "/me",
+  "/library",
+  "/settings",
+  "/market/library",
+  "/market/wishlist",
+] as const;
+
+function matchesPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 function useActive() {
   const path = usePathname();
-  return (href: string, exact?: boolean) =>
-    exact ? path === href : path === href || path.startsWith(`${href}/`);
+  return (href: string, exact?: boolean) => {
+    if (exact) return path === href;
+    if (href === "/discover") {
+      return DISCOVER_PURPOSE_PREFIXES.some((prefix) => matchesPrefix(path, prefix));
+    }
+    if (href === "/make") {
+      // Asset library/wishlist are personal collection surfaces even though the
+      // marketplace itself belongs to the creation journey.
+      if (MY_PURPOSE_PREFIXES.some((prefix) => matchesPrefix(path, prefix))) return false;
+      return CREATE_PURPOSE_PREFIXES.some((prefix) => matchesPrefix(path, prefix));
+    }
+    if (href === "/community") {
+      return COMMUNITY_PURPOSE_PREFIXES.some((prefix) => matchesPrefix(path, prefix));
+    }
+    if (href === "/my") {
+      return MY_PURPOSE_PREFIXES.some((prefix) => matchesPrefix(path, prefix));
+    }
+    return path === href || path.startsWith(`${href}/`);
+  };
 }
 
 function matchesMobileNavigationViewport() {
