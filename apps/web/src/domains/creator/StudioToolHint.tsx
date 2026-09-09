@@ -42,12 +42,18 @@ import {
 } from "./studio-tool-hint-preferences";
 
 import type { StudioToolHintBubbleProps } from "./components/StudioToolHintBubble";
-import type { StudioToolHintSide } from "./studio-tool-hint-position";
+import {
+  isStudioToolHintRectVisible,
+  readStudioToolHintViewport,
+  type StudioToolHintSide,
+} from "./studio-tool-hint-position";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 
 import { cn } from "@/shared/lib/utils";
 
 const SHOW_DELAY_MS = 280;
+export const STUDIO_TOOL_HINT_WARM_SWITCH_DELAY_MS = 90;
+const STUDIO_TOOL_HINT_WARM_SWITCH_WINDOW_MS = 720;
 const EXPAND_DELAY_MS = 620;
 // Long enough to cross the visual gap from the target into the portal bubble.
 // Entering the bubble cancels this timer, satisfying hoverable-content accessibility.
@@ -86,6 +92,7 @@ type StudioToolHintInteractionManager = {
   suppressHover: (now?: number) => void;
   isHoverSuppressed: (now?: number) => boolean;
   getHoverSuppressionUntil: () => number;
+  getHoverRevealDelay: (hintId: string, now?: number) => number;
   markReveal: (hintId: string, intent: StudioToolHintRevealIntent) => void;
   getRevealIntent: (hintId: string) => StudioToolHintRevealIntent | null;
   clearReveal: (hintId?: string) => void;
@@ -98,6 +105,7 @@ function createStudioToolHintInteractionManager(): StudioToolHintInteractionMana
     hintId: string;
     intent: StudioToolHintRevealIntent;
   }> | null = null;
+  let lastPassiveRevealAt = Number.NEGATIVE_INFINITY;
 
   return {
     suppressHover(now = Date.now()) {
@@ -112,8 +120,18 @@ function createStudioToolHintInteractionManager(): StudioToolHintInteractionMana
     getHoverSuppressionUntil() {
       return hoverSuppressedUntil;
     },
+    getHoverRevealDelay(hintId, now = Date.now()) {
+      const switchingBetweenVisibleTools =
+        activeReveal?.intent === "hover" && activeReveal.hintId !== hintId;
+      const passiveLaneStillWarm =
+        now - lastPassiveRevealAt <= STUDIO_TOOL_HINT_WARM_SWITCH_WINDOW_MS;
+      return switchingBetweenVisibleTools || passiveLaneStillWarm
+        ? STUDIO_TOOL_HINT_WARM_SWITCH_DELAY_MS
+        : SHOW_DELAY_MS;
+    },
     markReveal(hintId, intent) {
       activeReveal = { hintId, intent };
+      if (intent === "hover") lastPassiveRevealAt = Date.now();
     },
     getRevealIntent(hintId) {
       return activeReveal?.hintId === hintId ? activeReveal.intent : null;
@@ -125,6 +143,7 @@ function createStudioToolHintInteractionManager(): StudioToolHintInteractionMana
     reset() {
       hoverSuppressedUntil = 0;
       activeReveal = null;
+      lastPassiveRevealAt = Number.NEGATIVE_INFINITY;
     },
   };
 }
@@ -181,7 +200,14 @@ export function StudioToolHintPreferencesProvider({
       dismissToolHintsImmediately(coordinator, interaction);
     }
 
-    function suppressPassivePointerHints() {
+    function suppressPassivePointerHints(event?: Event) {
+      const target = event?.target;
+      if (
+        target instanceof Element &&
+        target.closest('[data-studio-tool-hint="true"]')
+      ) {
+        return;
+      }
       interaction.suppressHover();
       const activeHintId = coordinator.getActiveHintId();
       if (
@@ -255,6 +281,15 @@ export function StudioToolHintPreferencesProvider({
       }
       dismissAll();
     }
+    function onWindowBlur() {
+      dismissAll();
+    }
+    function onVisibilityChange() {
+      if (globalThis.document?.visibilityState !== "visible") dismissAll();
+    }
+    function onDragStart() {
+      suppressPassivePointerHints();
+    }
 
     const passiveCapture = { capture: true, passive: true } as const;
     globalThis.addEventListener("keydown", onKeyDown);
@@ -266,6 +301,9 @@ export function StudioToolHintPreferencesProvider({
     globalThis.addEventListener("focusin", onFocusIn, passiveCapture);
     globalThis.addEventListener("wheel", suppressPassivePointerHints, passiveCapture);
     globalThis.addEventListener("scroll", suppressPassivePointerHints, passiveCapture);
+    globalThis.addEventListener("dragstart", onDragStart, passiveCapture);
+    globalThis.addEventListener("blur", onWindowBlur);
+    globalThis.document?.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       globalThis.removeEventListener("keydown", onKeyDown);
       globalThis.removeEventListener("pointerdown", onPointerDown, passiveCapture);
@@ -276,6 +314,9 @@ export function StudioToolHintPreferencesProvider({
       globalThis.removeEventListener("focusin", onFocusIn, passiveCapture);
       globalThis.removeEventListener("wheel", suppressPassivePointerHints, passiveCapture);
       globalThis.removeEventListener("scroll", suppressPassivePointerHints, passiveCapture);
+      globalThis.removeEventListener("dragstart", onDragStart, passiveCapture);
+      globalThis.removeEventListener("blur", onWindowBlur);
+      globalThis.document?.removeEventListener("visibilitychange", onVisibilityChange);
       interaction.reset();
       clearPointerSuppression();
     };
@@ -436,22 +477,39 @@ function compactFallbackStyle(
   preferredSide: StudioToolHintSide | undefined,
   hasUnavailableReason: boolean
 ): CSSProperties {
-  const viewportWidth = typeof globalThis.innerWidth === "number" ? globalThis.innerWidth : 1280;
-  const viewportHeight = typeof globalThis.innerHeight === "number" ? globalThis.innerHeight : 800;
+  const viewport = readStudioToolHintViewport();
+  const viewportWidth = viewport.width;
+  const viewportHeight = viewport.height;
+  const fallbackWidth = Math.min(
+    FALLBACK_WIDTH,
+    Math.max(1, viewportWidth - VIEWPORT_PADDING * 2)
+  );
   const fallbackHeight = hasUnavailableReason ? 124 : FALLBACK_HEIGHT;
-  const side = preferredSide ?? (anchor.bottom > viewportHeight * 0.72 ? "top" : "right");
+  const side =
+    preferredSide ??
+    (anchor.bottom > viewport.top + viewportHeight * 0.72 ? "top" : "right");
   let left = anchor.right + FALLBACK_GAP;
   let top = anchor.top + anchor.height / 2 - fallbackHeight / 2;
-  if (side === "left") left = anchor.left - FALLBACK_GAP - FALLBACK_WIDTH;
+  if (side === "left") left = anchor.left - FALLBACK_GAP - fallbackWidth;
   if (side === "bottom" || side === "top") {
-    left = anchor.left + anchor.width / 2 - FALLBACK_WIDTH / 2;
-    top = side === "bottom"
-      ? anchor.bottom + FALLBACK_GAP
-      : anchor.top - FALLBACK_GAP - fallbackHeight;
+    left = anchor.left + anchor.width / 2 - fallbackWidth / 2;
+    top =
+      side === "bottom"
+        ? anchor.bottom + FALLBACK_GAP
+        : anchor.top - FALLBACK_GAP - fallbackHeight;
   }
   return {
-    left: clamp(left, VIEWPORT_PADDING, viewportWidth - FALLBACK_WIDTH - VIEWPORT_PADDING),
-    top: clamp(top, VIEWPORT_PADDING, viewportHeight - fallbackHeight - VIEWPORT_PADDING),
+    left: clamp(
+      left,
+      viewport.left + VIEWPORT_PADDING,
+      viewport.right - fallbackWidth - VIEWPORT_PADDING
+    ),
+    top: clamp(
+      top,
+      viewport.top + VIEWPORT_PADDING,
+      viewport.bottom - fallbackHeight - VIEWPORT_PADDING
+    ),
+    width: fallbackWidth,
   };
 }
 
@@ -481,6 +539,8 @@ function StudioToolHintCompactFallback({
       data-studio-tool-hint="true"
       data-studio-tool-hint-expanded="false"
       data-studio-tool-hint-loading="true"
+      data-studio-tool-hint-reduced-motion={reducedMotion ? "true" : undefined}
+      data-studio-tool-hint-viewport={readStudioToolHintViewport().source}
       className="studio-tool-hint-compact"
       style={{
         ...compactFallbackStyle(anchor as DOMRect, preferredSide, Boolean(unavailableReason)),
@@ -729,8 +789,13 @@ export function StudioToolHintTarget({
     }, EXPAND_DELAY_MS) as unknown as number;
   }
 
-  function scheduleShow() {
+  function scheduleShow(event?: ReactMouseEvent<HTMLSpanElement>) {
     if (!hint || preferences.mode === "off") return;
+    if (event && event.buttons !== 0) {
+      interaction.suppressHover();
+      dismissCoordinatedHintsImmediately();
+      return;
+    }
     if (open) {
       reveal(false, "hover");
       return;
@@ -739,19 +804,20 @@ export function StudioToolHintTarget({
     clearHideTimer();
 
     const now = Date.now();
+    const revealDelay = interaction.getHoverRevealDelay(tipId, now);
     const pointerSuppressionRemaining = getPointerSuppressionRemainingForTip(tipId, now);
     if (pointerSuppressionRemaining !== null) {
-      scheduleHintRevealWithDelay(pointerSuppressionRemaining + SHOW_DELAY_MS);
+      scheduleHintRevealWithDelay(pointerSuppressionRemaining + revealDelay);
       return;
     }
     if (interaction.isHoverSuppressed(now)) {
       const hoverRemaining = Math.max(interaction.getHoverSuppressionUntil() - now, 0);
-      scheduleHintRevealWithDelay(hoverRemaining + SHOW_DELAY_MS);
+      scheduleHintRevealWithDelay(hoverRemaining + revealDelay);
       return;
     }
     if (!open && !unavailableReason && !exposure.canReveal(hint.id, "hover")) return;
     preloadStudioToolHintBubbleModule();
-    scheduleHintRevealWithDelay(SHOW_DELAY_MS);
+    scheduleHintRevealWithDelay(revealDelay);
   }
 
   function scheduleHide() {
@@ -1015,26 +1081,57 @@ export function StudioToolHintTarget({
   useEffect(() => {
     if (!open) return;
     let frame = 0;
+    const visualViewport = globalThis.visualViewport;
+
+    function closeDetachedHint() {
+      if (coordinator.getActiveHintId() !== tipId) return;
+      hideRenderedToolHintElement(tipId);
+      coordinator.release(tipId);
+      interaction.clearReveal(tipId);
+      activeRevealIntent.current = null;
+      setExpanded(false);
+      setAnchor(null);
+    }
+
     function updatePosition() {
       globalThis.cancelAnimationFrame?.(frame);
       frame = globalThis.requestAnimationFrame?.(() => {
         const nextAnchor = readAnchor();
-        if (nextAnchor) {
+        const viewport = readStudioToolHintViewport();
+        if (
+          nextAnchor &&
+          wrapRef.current?.isConnected &&
+          (!hasUsableArea(nextAnchor) || isStudioToolHintRectVisible(nextAnchor, viewport))
+        ) {
           lastValidAnchor.current = nextAnchor;
           setAnchor(nextAnchor);
-        } else if (lastValidAnchor.current) {
-          setAnchor(lastValidAnchor.current);
+          return;
         }
+        closeDetachedHint();
       }) ?? 0;
     }
+
     globalThis.addEventListener("resize", updatePosition);
+    globalThis.addEventListener("orientationchange", updatePosition);
     globalThis.addEventListener("scroll", updatePosition, true);
+    visualViewport?.addEventListener("resize", updatePosition);
+    visualViewport?.addEventListener("scroll", updatePosition);
+    const anchorObserver =
+      typeof globalThis.ResizeObserver === "function" && wrapRef.current
+        ? new globalThis.ResizeObserver(updatePosition)
+        : null;
+    if (wrapRef.current) anchorObserver?.observe(wrapRef.current);
+
     return () => {
       globalThis.cancelAnimationFrame?.(frame);
       globalThis.removeEventListener("resize", updatePosition);
+      globalThis.removeEventListener("orientationchange", updatePosition);
       globalThis.removeEventListener("scroll", updatePosition, true);
+      visualViewport?.removeEventListener("resize", updatePosition);
+      visualViewport?.removeEventListener("scroll", updatePosition);
+      anchorObserver?.disconnect();
     };
-  }, [open]);
+  }, [coordinator, interaction, open, tipId]);
 
   if (!hint) {
     return <span className={cn("inline-flex", className)}>{children}</span>;

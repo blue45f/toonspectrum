@@ -280,31 +280,43 @@ describe("studio edit event guard", () => {
     expect(shouldHandleStudioEditEvent({ [key]: true })).toBe(false);
   });
 
-  // Two independent audits measured ⌘Z doing literally nothing — once with focus in the layer
-  // navigator, once right after the filter dialog handed focus back to its menu trigger. Both
-  // surfaces claim a shortcut boundary so that `B`/`E`/`Delete` cannot reach the document; undo
-  // is the one command that must reach it anyway.
-  it("lets undo through a panel's shortcut boundary", () => {
+  // Studio panels own shortcut boundaries so B/E/Delete cannot reach the document. History is
+  // different: every undo/redo chord the dispatcher supports must still work while panel chrome
+  // has focus, including the Windows-style Ctrl+Y alternative.
+  it("lets undo and redo through a panel's shortcut boundary", () => {
     expect(shouldHandleStudioEditEvent({ insideShortcutBoundary: true })).toBe(false);
-    expect(
-      shouldHandleStudioEditEvent({ insideShortcutBoundary: true, undoRedoIntent: true }),
-    ).toBe(true);
+    for (const event of [
+      { key: "z", metaKey: true },
+      { key: "Z", ctrlKey: true },
+      { key: "y", ctrlKey: true },
+      { key: "Y", metaKey: true },
+    ] as const) {
+      expect(
+        shouldHandleStudioEditEvent({
+          insideShortcutBoundary: true,
+          undoRedoIntent: isStudioUndoRedoChord(event),
+        }),
+      ).toBe(true);
+    }
   });
 
   it.each(["typing", "editing", "composing", "modalOpen", "timelapseCapturing"] as const)(
-    "still blocks undo when %s",
+    "still blocks document history when %s",
     (key) => {
-      // Inside a text field ⌘Z means "undo my typing"; behind a modal it must not reach the
-      // document underneath. The exemption is for panel scopes only.
+      // Inside a text field the chord belongs to text; behind a modal it must not reach the
+      // document underneath. The exemption is for non-modal panel scopes only.
       expect(shouldHandleStudioEditEvent({ [key]: true, undoRedoIntent: true })).toBe(false);
     },
   );
 
-  it("recognises the history chord on either platform modifier and nothing else", () => {
+  it("recognises every dispatcher history chord on either platform modifier and nothing else", () => {
     expect(isStudioUndoRedoChord({ key: "z", metaKey: true })).toBe(true);
     expect(isStudioUndoRedoChord({ key: "Z", ctrlKey: true })).toBe(true);
+    expect(isStudioUndoRedoChord({ key: "y", ctrlKey: true })).toBe(true);
+    expect(isStudioUndoRedoChord({ key: "Y", metaKey: true })).toBe(true);
     expect(isStudioUndoRedoChord({ key: "z" })).toBe(false);
-    expect(isStudioUndoRedoChord({ key: "y", metaKey: true })).toBe(false);
+    expect(isStudioUndoRedoChord({ key: "y" })).toBe(false);
+    expect(isStudioUndoRedoChord({ key: "x", metaKey: true })).toBe(false);
     expect(isStudioUndoRedoChord({ metaKey: true })).toBe(false);
   });
 });

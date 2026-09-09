@@ -1,6 +1,7 @@
 import { memo, Suspense } from "react";
 
 import { DRAW_COLOR_SWATCHES } from "./brush/studio-draw-color-swatches";
+import { StudioDrawingInputDeck } from "./brush/StudioDrawingInputDeck";
 import {
   StudioDrawOptionsBar,
   StudioSelectOptionsBar,
@@ -133,7 +134,9 @@ export interface StudioOptionsBarsHandlers {
   setLivingInkScope: (scope: "all" | "selection") => void;
   applyLivingInkFix: () => void;
   applyLivingInkClear: () => void;
-  patchLivingInkMaterial: (patch: Partial<StudioLivingInkMaterialControls>) => void;
+  patchLivingInkMaterial: (
+    patch: Partial<StudioLivingInkMaterialControls>
+  ) => void;
 }
 
 export interface StudioOptionsBarsProps {
@@ -148,6 +151,9 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
   stableHandlers,
 }: StudioOptionsBarsProps) {
   const isMobile = useIsMobile();
+  const drawingInputDeckVisible =
+    draw.drawMode === "pen" || draw.drawMode === "eraser";
+
   return (
     <>
       {draw.visible ? (
@@ -217,18 +223,39 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             favoriteBrushIds={draw.favoriteBrushIds}
             onToggleFavoriteBrush={stableHandlers.toggleFavoriteBrush}
             onCycleStabilizer={stableHandlers.cycleStabilizer}
-            livingInk={isMobile
-              ? undefined
-              : {
-                  ...draw.livingInk,
-                  onPhysicalModeEnabledChange: stableHandlers.setLivingInkPhysicalModeEnabled,
-                  onModeChange: stableHandlers.setLivingInkMode,
-                  onScopeChange: stableHandlers.setLivingInkScope,
-                  onFix: stableHandlers.applyLivingInkFix,
-                  onClear: stableHandlers.applyLivingInkClear,
-                  onMaterialChange: stableHandlers.patchLivingInkMaterial,
-                }}
+            livingInk={
+              isMobile
+                ? undefined
+                : {
+                    ...draw.livingInk,
+                    onPhysicalModeEnabledChange:
+                      stableHandlers.setLivingInkPhysicalModeEnabled,
+                    onModeChange: stableHandlers.setLivingInkMode,
+                    onScopeChange: stableHandlers.setLivingInkScope,
+                    onFix: stableHandlers.applyLivingInkFix,
+                    onClear: stableHandlers.applyLivingInkClear,
+                    onMaterialChange: stableHandlers.patchLivingInkMaterial,
+                  }
+            }
           />
+          {drawingInputDeckVisible ? (
+            <StudioDrawingInputDeck
+              brushLabel={draw.activeCatalogBrushName ?? draw.brushId}
+              mobile={isMobile}
+              dockInsets={draw.dockInsets}
+              stabilizer={draw.stabilizer}
+              stabilizerMode={draw.stabilizerMode}
+              postCorrection={draw.postCorrection}
+              pressureCurveId={draw.pressureCurveId}
+              stampTuning={draw.stampTuning}
+              onStabilizerChange={stableHandlers.setStabilizer}
+              onStabilizerModeChange={stableHandlers.setStabilizerMode}
+              onPostCorrectionChange={stableHandlers.setPostCorrection}
+              onPressureCurveChange={stableHandlers.setPressureCurvePreset}
+              onStampTuningChange={stableHandlers.setStampTuning}
+              onOpenBrushStudio={stableHandlers.openBrushStudio}
+            />
+          ) : null}
         </Suspense>
       ) : null}
 

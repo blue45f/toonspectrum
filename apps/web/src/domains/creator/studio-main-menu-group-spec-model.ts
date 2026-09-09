@@ -55,8 +55,16 @@ export interface StudioMenuGroupSpec {
 export const has = (spec: string, ...items: string[]): StudioMenuSpecRow =>
   ({ spec, coverage: "present", items });
 
+/**
+ * A partial menu row must be backed by at least one real, qualified menu item.
+ * Capabilities that exist only in an inspector or on-canvas HUD are useful
+ * product features, but they do not close a menubar coverage row. Normalizing an
+ * itemless `part(...)` to `absent` keeps the audit honest and fail-safe.
+ */
 export const part = (spec: string, note: string, ...items: string[]): StudioMenuSpecRow =>
-  ({ spec, coverage: "partial", items, note });
+  items.length === 0
+    ? { spec, coverage: "absent", items: [], note }
+    : { spec, coverage: "partial", items, note };
 
 export const gap = (spec: string, note?: string): StudioMenuSpecRow =>
   note === undefined

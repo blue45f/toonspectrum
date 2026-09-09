@@ -6,9 +6,11 @@ import {
   requestStudioCommandSearch,
   subscribeStudioHelpCenter,
 } from "./studio-help-center-channel";
+import { subscribeStudioHelpHub } from "./studio-help-hub-channel";
 import { resolveStudioHelpSurface } from "./studio-help-surface-routing";
 
 import type { StudioHelpCenterSection } from "./studio-help-center-channel";
+import type { StudioHelpHubActions, StudioHelpHubTab } from "./studio-help-hub-channel";
 
 const StudioHelpCenterDialog = lazy(() =>
   import("./StudioHelpCenterDialog").then((module) => ({
@@ -28,13 +30,22 @@ const StudioGuidedHelpDialog = lazy(() =>
   })),
 );
 
-type StudioHelpSurface = "center" | "context" | "guided";
+const StudioHelpHubDialog = lazy(() =>
+  import("./StudioHelpHubDialog").then((module) => ({
+    default: module.StudioHelpHubDialog,
+  })),
+);
+
+type StudioHelpSurface = "center" | "context" | "guided" | "hub";
 
 interface StudioHelpCenterState {
   readonly open: boolean;
   readonly surface: StudioHelpSurface;
   readonly section: StudioHelpCenterSection;
   readonly toolCommandId: string | null;
+  readonly hubTab: StudioHelpHubTab;
+  readonly hubQuery: string;
+  readonly hubActions: StudioHelpHubActions;
 }
 
 const CLOSED_STATE: StudioHelpCenterState = {
@@ -42,6 +53,9 @@ const CLOSED_STATE: StudioHelpCenterState = {
   surface: "center",
   section: "diagnostics",
   toolCommandId: null,
+  hubTab: "home",
+  hubQuery: "",
+  hubActions: {},
 };
 
 function currentToolSurface(toolCommandId: string | null): StudioHelpSurface {
@@ -64,20 +78,43 @@ export function StudioHelpCenterHost() {
             : null;
         const route = resolveStudioHelpSurface(request);
         if (route.surface === "guided") {
-          setState({
+          setState((current) => ({
+            ...current,
             open: true,
             surface: currentToolSurface(route.toolCommandId),
             section: "current-tool",
             toolCommandId: route.toolCommandId,
-          });
+          }));
           return;
         }
-        setState({
+        setState((current) => ({
+          ...current,
           open: true,
           surface: "center",
           section: route.section,
           toolCommandId: route.toolCommandId,
-        });
+        }));
+      }),
+    [],
+  );
+
+  useEffect(
+    () =>
+      subscribeStudioHelpHub((request) => {
+        openerRef.current =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+        setState((current) => ({
+          ...current,
+          open: true,
+          surface: "hub",
+          section: "current-tool",
+          toolCommandId: request.toolCommandId ?? null,
+          hubTab: request.initialTab ?? "home",
+          hubQuery: request.initialQuery ?? "",
+          hubActions: request.actions ?? {},
+        }));
       }),
     [],
   );
@@ -123,7 +160,17 @@ export function StudioHelpCenterHost() {
 
   return (
     <Suspense fallback={null}>
-      {state.surface === "guided" ? (
+      {state.surface === "hub" ? (
+        <StudioHelpHubDialog
+          open
+          initialTab={state.hubTab}
+          initialQuery={state.hubQuery}
+          toolCommandId={state.toolCommandId}
+          actions={state.hubActions}
+          onOpenLegacySection={changeSection}
+          onClose={close}
+        />
+      ) : state.surface === "guided" ? (
         <StudioGuidedHelpDialog
           open
           initialToolCommandId={state.toolCommandId}

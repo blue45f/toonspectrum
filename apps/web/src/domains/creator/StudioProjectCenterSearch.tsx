@@ -911,8 +911,9 @@ export function StudioProjectCenterSearch(): ReactElement {
                       type="button"
                       data-project-keep-open
                       data-project-center-control="true"
+                      disabled={action.disabled}
                       onClick={() => invokeAction(action)}
-                      className="min-h-8 shrink-0 rounded-lg bg-card px-2 text-[0.61rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      className="min-h-8 shrink-0 rounded-lg bg-card px-2 text-[0.61rem] font-bold text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
                       {action.label}
                     </button>
@@ -932,8 +933,9 @@ export function StudioProjectCenterSearch(): ReactElement {
                       type="button"
                       data-project-keep-open
                       data-project-center-control="true"
+                      disabled={action.disabled}
                       onClick={() => invokeAction(action)}
-                      className="min-h-8 shrink-0 rounded-lg bg-card px-2 text-[0.61rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      className="min-h-8 shrink-0 rounded-lg bg-card px-2 text-[0.61rem] font-bold text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
                       {action.label}
                     </button>

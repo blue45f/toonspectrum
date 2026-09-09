@@ -33,13 +33,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: studio-ink-live-commit-${{ github.workflow }}-${{ github.ref }}
+  # The v2 generation avoids legacy queued x64 runs while preserving per-ref cancellation.
+  group: studio-ink-live-commit-v2-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   fidelity:
     name: ink-live-commit-fidelity
-    runs-on: ubuntu-latest
+    # This is a standard 4-core/16-GB runner. It avoids the saturated ubuntu-latest queue while
+    # retaining a full VM for Playwright, browser dependencies, the production build and WASM.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -61,8 +64,19 @@ jobs:
           mkdir -p "$RUNNER_TEMP/toonspectrum-verification"
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
+      - name: Validate the fidelity harness
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            scripts/verify-studio-long-stroke.mts \
+            scripts/verify-inkwash-dippen-live-commit-fidelity.mts \
+            scripts/studio-ink-fidelity-cases.ts \
+            scripts/studio-ink-fidelity-cases.test.ts
+          pnpm exec vitest run scripts/studio-ink-fidelity-cases.test.ts
       - name: Build production Studio assets
-        run: pnpm run build
+        # The browser proof needs deployable assets, not the repository-wide TypeScript gate.
+        # `core` owns global typecheck; coupling it here previously hid fidelity results behind
+        # unrelated baseline diagnostics in AI, effects and soft-proofing modules.
+        run: pnpm run build:bundle
       - name: Verify ink-wash and dip-pen live/commit fidelity
         run: pnpm exec tsx scripts/verify-inkwash-dippen-live-commit-fidelity.mts
       - name: Upload fidelity evidence

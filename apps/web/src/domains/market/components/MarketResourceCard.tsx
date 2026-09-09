@@ -8,6 +8,7 @@ import {
 } from "../models/market-preview";
 
 import { MarketCompareToggle } from "./MarketCompareToggle";
+import { MarketProductionFitBadge } from "./MarketProductionFitBadge";
 
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
@@ -186,6 +187,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
             v{record.resourceVersion}
           </span>
         </div>
+        <MarketProductionFitBadge record={record} showCounts />
         <div className="mt-auto flex items-center gap-1.5 pt-1.5 text-[0.68rem] text-fg-3">
           <span className="inline-flex min-h-6 items-center rounded bg-accent px-2 font-semibold text-on-accent">
             {kind.label}

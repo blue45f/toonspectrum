@@ -17,6 +17,7 @@ import {
   removeItemsFromGroups,
   removeLayerItems,
   reorderLayerSelection,
+  reorderLayerSelectionToTarget,
   setItemGroup,
   ungroupItems,
   type LayerGroup,
@@ -760,6 +761,76 @@ export function createStudioLayerOperations(
       case "set-items-color":
         patchLayerItems(action.ids, () => ({ layerColor: action.color }));
         return;
+      case "reorder-items": {
+        const requestedIds = [...new Set(action.ids)].filter((id) => elementById.has(id));
+        if (requestedIds.length === 0) return;
+        const next = reorderLayerSelection(elements, requestedIds, action.direction) as El[];
+        if (next === elements || !commit(next)) return;
+        announceDrawingShortcut(
+          `${requestedIds.length}개 레이어 ${
+            action.direction === "front"
+              ? "맨 앞으로"
+              : action.direction === "back"
+                ? "맨 뒤로"
+                : action.direction === "forward"
+                  ? "한 단계 앞으로"
+                  : "한 단계 뒤로"
+          }`
+        );
+        return;
+      }
+      case "drop-items": {
+        const requestedIds = [...new Set(action.ids)].filter((id) => elementById.has(id));
+        if (requestedIds.length === 0 || !elementById.has(action.targetId)) return;
+        let next = elements;
+        if (action.mode === "to-root") {
+          next = removeItemsFromGroups(next, requestedIds) as El[];
+          next = reorderLayerSelectionToTarget(
+            next,
+            requestedIds,
+            action.targetId,
+            action.side
+          ) as El[];
+        } else if (action.mode === "within-group") {
+          if (!groups.some((group) => group.id === action.groupId)) return;
+          next = reorderLayerSelectionToTarget(
+            next,
+            requestedIds,
+            action.targetId,
+            action.side,
+            { kind: "siblings", groupId: action.groupId }
+          ) as El[];
+        } else if (action.mode === "into-group") {
+          if (!groups.some((group) => group.id === action.groupId)) return;
+          next = groupItems(next, requestedIds, action.groupId) as El[];
+          next = reorderLayerSelectionToTarget(
+            next,
+            requestedIds,
+            action.targetId,
+            action.side,
+            { kind: "siblings", groupId: action.groupId }
+          ) as El[];
+        } else {
+          next = reorderLayerSelectionToTarget(
+            next,
+            requestedIds,
+            action.targetId,
+            action.side
+          ) as El[];
+        }
+        const changed =
+          next.length !== elements.length ||
+          next.some((item, index) => item !== elements[index]);
+        if (!changed || !commit(next)) return;
+        announceDrawingShortcut(
+          action.mode === "into-group"
+            ? `${requestedIds.length}개 레이어 그룹 이동`
+            : action.mode === "to-root"
+              ? `${requestedIds.length}개 레이어 그룹 밖으로 이동`
+              : `${requestedIds.length}개 레이어 순서 변경`
+        );
+        return;
+      }
       case "move-item":
         moveLayer(action.id, action.direction);
         return;

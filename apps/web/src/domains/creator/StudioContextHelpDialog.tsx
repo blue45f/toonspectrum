@@ -97,7 +97,10 @@ function HomePanel({
   onOpenManual,
   onOpenRecipe,
 }: HomePanelProps) {
-  const toolHelp = useMemo(() => buildStudioToolHelp(toolCommandId), [toolCommandId]);
+  const toolHelp = useMemo(
+    () => (toolCommandId ? buildStudioToolHelp(toolCommandId) : null),
+    [toolCommandId],
+  );
   const guide = getStudioContextHelpGuide(toolHelp?.commandId);
 
   return (
@@ -274,7 +277,10 @@ function ToolPanel({
   onOpenCommandSearch,
   onOpenDiagnostics,
 }: ToolPanelProps) {
-  const help = useMemo(() => buildStudioToolHelp(toolCommandId), [toolCommandId]);
+  const help = useMemo(
+    () => (toolCommandId ? buildStudioToolHelp(toolCommandId) : null),
+    [toolCommandId],
+  );
   const guide = getStudioContextHelpGuide(help?.commandId);
 
   if (!help) {
@@ -408,7 +414,12 @@ function ToolPanel({
           {help.aliases.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-2">
               {help.aliases.map((alias) => (
-                <span key={alias} className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground">{alias}</span>
+                <span
+                  key={`${alias.vendor}:${alias.term}`}
+                  className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground"
+                >
+                  {alias.term}
+                </span>
               ))}
             </div>
           ) : null}
