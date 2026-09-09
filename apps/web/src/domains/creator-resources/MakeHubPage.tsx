@@ -15,6 +15,10 @@ import {
 
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
+import {
+  FriendlyQuickGuide,
+  PurposeExperienceStage,
+} from "@/shared/components/purpose-experience-stage";
 import { useI18n } from "@/shared/lib/i18n";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
@@ -33,6 +37,15 @@ const COPY = {
     flowBody: "영감과 자료를 모으는 단계부터 게시 준비까지 이어집니다.",
     toolsTitle: "전문 도구",
     toolsBody: "필요한 순간에만 열어 쓰는 전문 제작 도구입니다.",
+    visualLabel: "아이디어에서 실제 결과물까지 이어지는 제작 흐름 미리보기",
+    visualSteps: ["결과 선택", "작업공간 열기", "완성하기"],
+    guideTitle: "처음 만드는 중이라면 이 순서만 기억하세요",
+    guideBody: "툴 이름보다 결과를 먼저 고르면 필요한 기능이 자연스럽게 이어집니다.",
+    guideSteps: [
+      "빈 캔버스·웹툰·컷툰·캐릭터 중 만들 결과를 고릅니다.",
+      "Studio 프로젝트 센터에서 자동 저장 위치와 최근 작업을 확인합니다.",
+      "완성한 결과는 공개·마켓·출판 준비 단계로 바로 이어갑니다.",
+    ],
     quick: [
       ["빈 캔버스", "일러스트와 자유 드로잉", "/studio?preset=illustration"],
       ["세로 웹툰", "모바일 스크롤 원고", "/studio?preset=webtoon"],
@@ -68,6 +81,15 @@ const COPY = {
     flowBody: "Move from inspiration and research all the way to release preparation.",
     toolsTitle: "Specialist tools",
     toolsBody: "Open advanced production tools only when you need them.",
+    visualLabel: "Preview of the path from an idea to a finished creative result",
+    visualSteps: ["Choose result", "Open workspace", "Finish"],
+    guideTitle: "If this is your first project, remember only this sequence",
+    guideBody: "Choose the outcome first. The product will lead you to the tools that matter next.",
+    guideSteps: [
+      "Choose a blank canvas, webtoon, comic or character based on the result you want.",
+      "Use Project Center to confirm recent work, autosave and storage before editing.",
+      "Move finished work directly into publishing, Market or release preparation.",
+    ],
     quick: [
       ["Blank canvas", "Illustration and free drawing", "/studio?preset=illustration"],
       ["Vertical webtoon", "Mobile scrolling manuscript", "/studio?preset=webtoon"],
@@ -99,30 +121,45 @@ export function MakeHubPage() {
   const language = useI18n((state) => state.lang);
   const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
   const copy = COPY[locale];
-  useDocumentTitle(locale === "ko" ? "만들기" : "Create");
+  useDocumentTitle(locale === "ko" ? "새로 만들기" : "New");
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <header className="relative overflow-hidden rounded-3xl border border-line bg-panel/55 p-5 sm:p-8 lg:p-10">
         <div aria-hidden="true" className="absolute -right-24 -top-32 size-80 rounded-full bg-[radial-gradient(circle,_oklch(0.72_0.185_42/0.2),_transparent_70%)]" />
-        <div className="relative max-w-3xl">
-          <p className="eyebrow flex items-center gap-2 text-accent"><Sparkles size={14} aria-hidden="true" />{copy.eyebrow}</p>
-          <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,6vw,4.4rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">{copy.title}</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
-        </div>
+        <div className="relative grid gap-7 xl:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] xl:items-center">
+          <div className="max-w-3xl">
+            <p className="eyebrow flex items-center gap-2 text-accent"><Sparkles size={14} aria-hidden="true" />{copy.eyebrow}</p>
+            <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,6vw,4.4rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">{copy.title}</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
 
-        <Link
-          href="/studio/projects"
-          className="relative mt-7 flex max-w-3xl items-center gap-4 rounded-2xl border border-accent/35 bg-accent-soft/35 p-4 transition-colors hover:border-accent/60 hover:bg-accent-soft/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-        >
-          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent text-on-accent"><Palette size={20} aria-hidden="true" /></span>
-          <span className="min-w-0 flex-1">
-            <strong className="block text-sm text-fg">{copy.projects}</strong>
-            <span className="mt-1 block text-xs leading-5 text-fg-3">{copy.projectsBody}</span>
-          </span>
-          <span className="hidden items-center gap-1.5 text-xs font-bold text-accent sm:inline-flex">{copy.continue}<ArrowRight size={14} aria-hidden="true" /></span>
-        </Link>
+            <Link
+              href="/studio/projects"
+              className="mt-7 flex max-w-3xl items-center gap-4 rounded-2xl border border-accent/35 bg-accent-soft/35 p-4 transition-all hover:-translate-y-0.5 hover:border-accent/60 hover:bg-accent-soft/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+            >
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent text-on-accent"><Palette size={20} aria-hidden="true" /></span>
+              <span className="min-w-0 flex-1">
+                <strong className="block text-sm text-fg">{copy.projects}</strong>
+                <span className="mt-1 block text-xs leading-5 text-fg-3">{copy.projectsBody}</span>
+              </span>
+              <span className="hidden items-center gap-1.5 text-xs font-bold text-accent sm:inline-flex">{copy.continue}<ArrowRight size={14} aria-hidden="true" /></span>
+            </Link>
+          </div>
+
+          <PurposeExperienceStage
+            variant="create"
+            ariaLabel={copy.visualLabel}
+            steps={copy.visualSteps}
+          />
+        </div>
       </header>
+
+      <FriendlyQuickGuide
+        className="mt-5"
+        title={copy.guideTitle}
+        description={copy.guideBody}
+        steps={copy.guideSteps}
+      />
 
       <section className="mt-10" aria-labelledby="make-quick-title">
         <p className="eyebrow text-accent">01 · QUICK START</p>
@@ -136,11 +173,12 @@ export function MakeHubPage() {
           {copy.quick.map(([title, body, href], index) => {
             const Icon = QUICK_ICONS[index];
             return (
-              <Link key={href} href={href} className="group flex min-h-40 flex-col rounded-2xl border border-line bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-                <span className="grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
-                <strong className="mt-4 text-sm text-fg">{title}</strong>
-                <span className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">{body}</span>
-                <ArrowRight size={15} className="mt-3 text-accent transition-transform group-hover:translate-x-1" aria-hidden="true" />
+              <Link key={href} href={href} className="group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-card p-4 transition-all hover:-translate-y-1 hover:border-accent/40 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
+                <span aria-hidden="true" className="absolute -right-8 -top-8 size-24 rounded-full bg-accent/0 blur-2xl transition-colors group-hover:bg-accent/15" />
+                <span className="relative grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-all group-hover:-rotate-3 group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
+                <strong className="relative mt-4 text-sm text-fg">{title}</strong>
+                <span className="relative mt-1.5 flex-1 text-xs leading-5 text-fg-3">{body}</span>
+                <ArrowRight size={15} className="relative mt-3 text-accent transition-transform group-hover:translate-x-1" aria-hidden="true" />
               </Link>
             );
           })}
@@ -156,11 +194,11 @@ export function MakeHubPage() {
             const Icon = FLOW_ICONS[index];
             return (
               <li key={href}>
-                <Link href={href} className="group flex h-full min-h-44 flex-col rounded-2xl border border-line bg-panel/45 p-4 transition-colors hover:border-accent/40 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-                  <div className="flex items-center justify-between gap-3"><span className="font-display text-xs font-bold text-accent">0{index + 1}</span><Icon size={17} className="text-fg-3 group-hover:text-accent" aria-hidden="true" /></div>
+                <Link href={href} className="group flex h-full min-h-44 flex-col rounded-2xl border border-line bg-panel/45 p-4 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
+                  <div className="flex items-center justify-between gap-3"><span className="font-display text-xs font-bold text-accent">0{index + 1}</span><Icon size={17} className="text-fg-3 transition-transform group-hover:scale-110 group-hover:text-accent" aria-hidden="true" /></div>
                   <strong className="mt-4 text-sm text-fg">{title}</strong>
                   <span className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">{body}</span>
-                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} aria-hidden="true" /></span>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
                 </Link>
               </li>
             );
@@ -176,10 +214,10 @@ export function MakeHubPage() {
           {copy.tools.map(([title, body, href], index) => {
             const Icon = TOOL_ICONS[index];
             return (
-              <Link key={href} href={href} className="group flex min-h-24 items-center gap-4 rounded-2xl border border-line bg-card/70 p-4 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-                <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-line bg-panel text-fg-3 group-hover:text-accent"><Icon size={19} aria-hidden="true" /></span>
+              <Link key={href} href={href} className="group flex min-h-24 items-center gap-4 rounded-2xl border border-line bg-card/70 p-4 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
+                <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-line bg-panel text-fg-3 transition-transform group-hover:-rotate-3 group-hover:text-accent"><Icon size={19} aria-hidden="true" /></span>
                 <span className="min-w-0 flex-1"><strong className="block text-sm text-fg">{title}</strong><span className="mt-1 block text-xs leading-5 text-fg-3">{body}</span></span>
-                <ArrowRight size={16} className="shrink-0 text-fg-3 group-hover:text-accent" aria-hidden="true" />
+                <ArrowRight size={16} className="shrink-0 text-fg-3 transition-transform group-hover:translate-x-1 group-hover:text-accent" aria-hidden="true" />
               </Link>
             );
           })}
