@@ -1,0 +1,86 @@
+name: Studio tooltip pro validation
+
+on:
+  push:
+    branches:
+      - feat/studio-tooltip-pro-v2-20260909
+    paths:
+      - .github/workflows/studio-tooltip-pro-validate.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-tooltip-pro-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Format tooltip sources
+        run: |
+          pnpm exec prettier --write \
+            apps/web/src/domains/creator/StudioToolHint.tsx \
+            apps/web/src/domains/creator/components/StudioToolHintBubble.tsx \
+            apps/web/src/domains/creator/studio-tool-hint-position.ts \
+            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
+            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx \
+            apps/web/src/styles/globals.css \
+            docs/studio-tooltip-ux-v2-2026-09-09.md
+      - name: Lint tooltip sources
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/StudioToolHint.tsx \
+            apps/web/src/domains/creator/components/StudioToolHintBubble.tsx \
+            apps/web/src/domains/creator/studio-tool-hint-position.ts \
+            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
+            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx
+      - name: Run tooltip regression portfolio
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
+            apps/web/src/domains/creator/studio-tool-hint-coordinator.test.ts \
+            apps/web/src/domains/creator/StudioToolHint.test.tsx \
+            apps/web/src/domains/creator/StudioToolHint.interaction.test.tsx \
+            apps/web/src/domains/creator/StudioToolHint.focus-return.test.tsx \
+            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx \
+            apps/web/src/domains/creator/studio-tool-hint.semantic-contract.test.ts
+      - name: Verify patch integrity
+        run: git diff --check
+      - name: Commit formatter output and remove validation harness
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/studio-tooltip-pro-validate.yml
+          git add \
+            apps/web/src/domains/creator/StudioToolHint.tsx \
+            apps/web/src/domains/creator/components/StudioToolHintBubble.tsx \
+            apps/web/src/domains/creator/studio-tool-hint-position.ts \
+            apps/web/src/domains/creator/studio-tool-hint-position.test.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.ts \
+            apps/web/src/domains/creator/studio-tool-hint-exposure.test.ts \
+            apps/web/src/domains/creator/StudioToolHint.optimization.test.tsx \
+            apps/web/src/styles/globals.css \
+            docs/studio-tooltip-ux-v2-2026-09-09.md
+          git commit -m "test(studio): validate and format tooltip UX v2"
+          git push origin HEAD:${{ github.ref_name }}
