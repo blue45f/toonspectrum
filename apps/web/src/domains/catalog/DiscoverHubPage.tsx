@@ -24,6 +24,7 @@ const COPY = {
     body: "제목을 알고 있으면 검색하고, 취향만 있다면 탐색하거나 추천받고, 결정하기 어렵다면 랭킹·랜덤·비교를 이용하세요.",
     placeholder: "작품명·작가·태그 검색",
     search: "검색",
+    open: "열기",
     section: "어떻게 찾을까요?",
     destinations: [
       ["정확히 검색", "찾고 있는 작품·작가·태그가 있을 때", "/search"],
@@ -42,6 +43,7 @@ const COPY = {
     body: "Search when you know the title, explore or get recommendations when you only know your taste, and use rankings, random picks or comparison when choosing is hard.",
     placeholder: "Search stories, creators or tags",
     search: "Search",
+    open: "Open",
     section: "How would you like to find it?",
     destinations: [
       ["Exact search", "When you know a story, creator or tag", "/search"],
@@ -82,8 +84,8 @@ export function DiscoverHubPage() {
           <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,6vw,4.2rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">{copy.title}</h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
 
-          <form onSubmit={submit} role="search" className="mt-6 flex max-w-2xl gap-2">
-            <label className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-2xl border border-line-strong bg-card/90 px-4 focus-within:border-accent/55 focus-within:ring-2 focus-within:ring-accent/25">
+          <form onSubmit={submit} role="search" className="mt-6 grid max-w-2xl gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <label className="flex min-h-12 min-w-0 items-center gap-3 rounded-2xl border border-line-strong bg-card/90 px-4 focus-within:border-accent/55 focus-within:ring-2 focus-within:ring-accent/25">
               <Search size={18} className="shrink-0 text-accent" aria-hidden="true" />
               <span className="sr-only">{copy.placeholder}</span>
               <input
@@ -94,7 +96,7 @@ export function DiscoverHubPage() {
                 className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
               />
             </label>
-            <button type="submit" className="min-h-12 shrink-0 rounded-2xl bg-accent px-5 text-sm font-bold text-on-accent transition-opacity hover:opacity-90">
+            <button type="submit" className="min-h-12 rounded-2xl bg-accent px-5 text-sm font-bold text-on-accent transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
               {copy.search}
             </button>
           </form>
@@ -115,7 +117,7 @@ export function DiscoverHubPage() {
                 <span className="grid size-10 place-items-center rounded-xl border border-line bg-panel text-fg-3 group-hover:border-accent/35 group-hover:text-accent"><Icon size={18} aria-hidden="true" /></span>
                 <strong className="mt-4 text-sm text-fg">{title}</strong>
                 <span className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">{body}</span>
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">Open<ArrowRight size={13} aria-hidden="true" /></span>
+                <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">{copy.open}<ArrowRight size={13} aria-hidden="true" /></span>
               </Link>
             );
           })}
