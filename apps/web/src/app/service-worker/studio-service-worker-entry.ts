@@ -340,9 +340,15 @@ scope.addEventListener("message", (event) => {
 
   switch (data.type) {
     case STUDIO_SERVICE_WORKER_MESSAGE.applyUpdate:
-      // Only ever reached because an artist clicked "reload" in the update
-      // prompt, at which point the page is about to be reloaded anyway.
-      void scope.skipWaiting();
+      // The page waits for this acknowledgement before reloading so the click
+      // has an immediate, deterministic completion signal instead of silently
+      // sitting on the client's MessageChannel timeout.
+      event.waitUntil(
+        scope.skipWaiting().then(
+          () => reply({ ok: true }),
+          (error: unknown) => reply({ ok: false, error: String(error) }),
+        ),
+      );
       break;
     case STUDIO_SERVICE_WORKER_MESSAGE.kill:
       event.waitUntil(
