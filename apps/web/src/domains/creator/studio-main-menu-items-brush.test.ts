@@ -93,6 +93,8 @@ describe("buildStudioBrushMenuItems", () => {
     expect(silk?.commandId).toBe("brush.silk-flow");
     expect(studio?.commandId).toBe("brush.studio");
     expect(studio?.label).toBe("현재 브러시 세부 설정…");
+    expect(lab?.commandId).toBe("brush.lab");
+    expect(lab?.searchActivation).toBe("execute");
     expect(lab?.label).toBe("목적별 브러시 제작실…");
 
     pixel?.onSelect();
