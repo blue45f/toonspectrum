@@ -1,0 +1,76 @@
+name: VRM palm and grip visual bootstrap
+
+on:
+  push:
+    branches: [fix/vrm-palm-grip-visual-20260910]
+    paths: [.github/workflows/vrm-palm-grip-visual-bootstrap.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/vrm-palm-grip-visual-20260910
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Recover only the remaining product and visual-QA slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin fix/recover-vrm-grip-contact-v2-20260910 --depth=1
+          for path in \
+            apps/web/src/domains/creator/vrm/StudioVrmGripContactRefine.tsx \
+            apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts \
+            apps/web/tools/browser-harnesses/props-compare-main.ts \
+            apps/web/tools/browser-harnesses/props-compare.html \
+            scripts/verify-vrm-hand-visual-audit.mts; do
+            git show FETCH_HEAD:"$path" > "$path"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/src/domains/creator/vrm/StudioVrmGripContactRefine.tsx')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace(
+            'import { createStudioVrmGripContactTargets } from "./studio-vrm-grip-contact-targets";',
+            'import { createStudioVrmGripContactTargets, type StudioVrmGripFingerOrdinal } from "./studio-vrm-grip-contact-targets";',
+          )
+          text = text.replace('const fingerIndices: number[] = [];', 'const fingerOrdinals: StudioVrmGripFingerOrdinal[] = [];')
+          text = text.replace('fingerIndices.push(fingerIndex);', 'fingerOrdinals.push(fingerIndex as StudioVrmGripFingerOrdinal);')
+          text = text.replace('...fingerIndices,', '...fingerOrdinals,')
+          text = text.replace('fingerIndices,\n              gripRadius:', 'fingerOrdinals,\n              gripRadius:')
+          if 'fingerIndices' in text:
+            raise SystemExit('legacy fingerIndices API remains')
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Validate real hand geometry and product solver
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/vrm/studio-vrm-grip-contact-targets.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-prop-grip-contact.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+      - name: Commit clean feature slice
+        shell: bash
+        run: |
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          git rm .github/workflows/vrm-palm-grip-visual-bootstrap.yml
+          git add \
+            apps/web/src/domains/creator/vrm/StudioVrmGripContactRefine.tsx \
+            apps/web/src/domains/creator/vrm/studio-vrm-hand-palm-orientation.test.ts \
+            apps/web/tools/browser-harnesses/props-compare-main.ts \
+            apps/web/tools/browser-harnesses/props-compare.html \
+            scripts/verify-vrm-hand-visual-audit.mts
+          git commit -m 'fix(vrm): align palms wrists and prop grip runtime'
+          git push origin HEAD:fix/vrm-palm-grip-visual-20260910
