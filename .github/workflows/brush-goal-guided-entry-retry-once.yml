@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: brush-goal-guided-entry-v2
+  cancel-in-progress: true
+
 jobs:
   materialize:
     runs-on: ubuntu-slim
@@ -43,7 +47,7 @@ jobs:
               env=os.environ.copy(),
           )
           PY
-      - name: Wire the chooser with the current JSX indentation
+      - name: Wire the chooser with the current Brush Studio structure
         shell: bash
         run: |
           python3 - <<'PY'
@@ -83,8 +87,52 @@ jobs:
               if text.count(render_anchor) != 1:
                   raise SystemExit(f'Brush Studio render anchor changed: {text.count(render_anchor)}')
               text = text.replace(render_anchor, render_block, 1)
-
           path.write_text(text, encoding='utf-8')
+
+          goal = Path('apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx')
+          goal_text = goal.read_text(encoding='utf-8')
+          goal_text = goal_text.replace(
+              'group min-h-[5.25rem] min-w-[10.25rem]',
+              'group min-w-[10.25rem] min-h-[5.25rem]',
+          )
+          goal.write_text(goal_text, encoding='utf-8')
+
+          boundary = Path(
+              'apps/web/src/domains/creator/brush/'
+              'studio-brush-goal-start-integration-boundary.test.ts'
+          )
+          boundary_text = boundary.read_text(encoding='utf-8')
+          old = '''    const goals = source.slice(
+              source.indexOf("<StudioBrushGoalStart"),
+              source.indexOf("<StudioBrushGoalStart") + 700,
+            );
+
+            expect(goals).toContain("activePresetId={matchedPreset}");
+            expect(goals).toContain("activeSection={category}");
+            expect(goals).toContain("studioBrushDynamicsPresetSelectionSettings(presetId)");
+            expect(goals).toContain("onOpenSection={(section) => setCategory(section)}");
+          '''
+          new = '''    const goalStart = source.indexOf("<StudioBrushGoalStart");
+            const preset = source.indexOf(
+              "studioBrushDynamicsPresetSelectionSettings(presetId)",
+              goalStart,
+            );
+            const section = source.indexOf(
+              "onOpenSection={(section) => setCategory(section)}",
+              goalStart,
+            );
+
+            expect(goalStart).toBeGreaterThan(-1);
+            expect(source.indexOf("activePresetId={matchedPreset}", goalStart)).toBeGreaterThan(goalStart);
+            expect(source.indexOf("activeSection={category}", goalStart)).toBeGreaterThan(goalStart);
+            expect(preset).toBeGreaterThan(goalStart);
+            expect(section).toBeGreaterThan(preset);
+          '''
+          if boundary_text.count(old) != 1:
+              raise SystemExit(
+                  f'Brush goal boundary test anchor changed: {boundary_text.count(old)}'
+              )
+          boundary.write_text(boundary_text.replace(old, new, 1), encoding='utf-8')
           PY
       - name: Validate goal-driven entry
         shell: bash
