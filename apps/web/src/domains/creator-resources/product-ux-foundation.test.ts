@@ -8,6 +8,9 @@ const CREATOR_ROUTES = "apps/web/src/app/routes/groups/creator-resources.routes.
 const CATALOG_ROUTES = "apps/web/src/app/routes/groups/catalog.routes.tsx";
 const ACCOUNT_ROUTES = "apps/web/src/app/routes/groups/account.routes.tsx";
 const SITE_NAVIGATION = "apps/web/src/shared/components/site-navigation.ts";
+const SITE_HEADER = "apps/web/src/shared/components/site-header.tsx";
+const MOBILE_NAV = "apps/web/src/shared/components/site-header-mobile-nav.tsx";
+const COMMAND_PALETTE = "apps/web/src/shared/components/command-palette-data.ts";
 const LEGAL_ROUTES = "apps/web/src/app/routes/groups/legal.routes.tsx";
 const MARKET_NAV = "apps/web/src/domains/market/components/MarketNavHeader.tsx";
 const RANDOM_PAGE = "apps/web/src/domains/catalog/RandomPage.tsx";
@@ -45,6 +48,23 @@ describe("purpose-first product UX foundation", () => {
     expect(routes).toContain('path: "/my"');
     expect(routes).toContain('path: "/me"');
     expect(navigation).toContain('item("me", "/my"');
+  });
+
+  it("keeps purpose-level active state separate from exact drawer destinations", () => {
+    const header = readFileSync(SITE_HEADER, "utf8");
+    const mobile = readFileSync(MOBILE_NAV, "utf8");
+    expect(header).toContain("function purposeActive(");
+    expect(header).toContain("function useDestinationActive()");
+    expect(header).toContain("isPurposeActive={isPurposeActive}");
+    expect(mobile).toContain("isPurposeActive: (href: string, exact?: boolean) => boolean;");
+    expect(mobile).toContain("const active = isPurposeActive(item.href, item.exact);");
+  });
+
+  it("indexes the new purpose hubs in the global command palette", () => {
+    const palette = readFileSync(COMMAND_PALETTE, "utf8");
+    for (const href of ["/discover", "/make", "/my", "/help"]) {
+      expect(palette).toContain(`href: "${href}"`);
+    }
   });
 
   it("exposes searchable help and accessibility destinations", () => {
