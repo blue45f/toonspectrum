@@ -90,6 +90,18 @@ export interface StudioMannequinBodyParams {
   readonly eyeScale?: number;
   /** 코 높이 배율. 0.8–1.3. 기본 1. */
   readonly noseHeight?: number;
+  /** 몸통 앞뒤 깊이. 얇은 실루엣↔입체 흉곽. 0.75–1.35. */
+  readonly torsoDepth?: number;
+  /** 허리 중심부 폭/질량. 0.7–1.3. */
+  readonly waistWidth?: number;
+  /** 팔·다리 전체 굵기 배율. 0.7–1.35. */
+  readonly limbThickness?: number;
+  /** 손바닥·손가락 크기 배율. 0.75–1.3. */
+  readonly handScale?: number;
+  /** 발 길이·발볼 크기 배율. 0.75–1.3. */
+  readonly footScale?: number;
+  /** 목 굵기 배율. 0.75–1.3. */
+  readonly neckThickness?: number;
 }
 
 export type StudioMannequinCoreParamKey =
@@ -106,6 +118,14 @@ export type StudioMannequinHeadParamKey =
   | "chinLength"
   | "eyeScale"
   | "noseHeight";
+
+export type StudioMannequinAnatomyParamKey =
+  | "torsoDepth"
+  | "waistWidth"
+  | "limbThickness"
+  | "handScale"
+  | "footScale"
+  | "neckThickness";
 
 export const STUDIO_MANNEQUIN_PARAM_RANGES = Object.freeze({
   heightCm: [120, 200],
@@ -124,6 +144,15 @@ export const STUDIO_MANNEQUIN_HEAD_PARAM_RANGES = Object.freeze({
   noseHeight: [0.8, 1.3],
 } as const satisfies Record<StudioMannequinHeadParamKey, readonly [number, number]>);
 
+export const STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES = Object.freeze({
+  torsoDepth: [0.75, 1.35],
+  waistWidth: [0.7, 1.3],
+  limbThickness: [0.7, 1.35],
+  handScale: [0.75, 1.3],
+  footScale: [0.75, 1.3],
+  neckThickness: [0.75, 1.3],
+} as const satisfies Record<StudioMannequinAnatomyParamKey, readonly [number, number]>);
+
 export const STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS: StudioMannequinBodyParams = Object.freeze({
   heightCm: 170,
   headCount: 7,
@@ -132,6 +161,12 @@ export const STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS: StudioMannequinBodyParams = O
   armLength: 1,
   legLength: 1,
   build: 1,
+  torsoDepth: 1,
+  waistWidth: 1,
+  limbThickness: 1,
+  handScale: 1,
+  footScale: 1,
+  neckThickness: 1,
 });
 
 export const STUDIO_MANNEQUIN_DEFAULT_HEAD_PARAMS = Object.freeze({
@@ -451,7 +486,8 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
 
 /** 알 수 없는 입력을 항상 유효한 파라미터로 정규화한다(방어적 파싱 공용 진입점). */
 export function clampStudioMannequinBodyParams(input: unknown): StudioMannequinBodyParams {
-  const source = (typeof input === "object" && input !== null
+  const hasObjectInput = typeof input === "object" && input !== null;
+  const source = (hasObjectInput
     ? input
     : {}) as Partial<Record<keyof StudioMannequinBodyParams, unknown>>;
   const result = {} as Record<keyof StudioMannequinBodyParams, number>;
@@ -463,6 +499,12 @@ export function clampStudioMannequinBodyParams(input: unknown): StudioMannequinB
     if (source[key] !== undefined) {
       const [min, max] = STUDIO_MANNEQUIN_HEAD_PARAM_RANGES[key];
       result[key] = clampNumber(source[key], min, max, STUDIO_MANNEQUIN_DEFAULT_HEAD_PARAMS[key]);
+    }
+  }
+  for (const key of Object.keys(STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES) as StudioMannequinAnatomyParamKey[]) {
+    if (!hasObjectInput || source[key] !== undefined) {
+      const [min, max] = STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES[key];
+      result[key] = clampNumber(source[key], min, max, STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS[key] ?? 1);
     }
   }
   return result as StudioMannequinBodyParams;
@@ -732,16 +774,23 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
   const upperLegLen = legSpan * 0.52;
   const lowerLegLen = legSpan * 0.48;
 
+  const torsoDepth = params.torsoDepth ?? 1;
+  const waistWidth = params.waistWidth ?? 1;
+  const limbThickness = params.limbThickness ?? 1;
+  const handScale = params.handScale ?? 1;
+  const footScale = params.footScale ?? 1;
+  const neckThickness = params.neckThickness ?? 1;
+
   const upperArmLen = 1.34 * hu * params.armLength;
   const foreArmLen = 1.06 * hu * params.armLength;
-  const handLen = 0.58 * hu * params.armLength;
+  const handLen = 0.58 * hu * params.armLength * handScale;
 
   const halfShoulder = 0.78 * hu * params.shoulderWidth * build.shoulder;
   const clavicleRoot = 0.16 * hu;
   const hipHalf = 0.33 * hu * params.pelvisWidth;
 
-  const limbR = build.limbRadius;
-  const footLen = 0.95 * hu;
+  const limbR = build.limbRadius * limbThickness;
+  const footLen = 0.95 * hu * footScale;
   const pelvisRadius = 0.3 * hu * build.torsoLower;
   const chestRadius = 0.34 * hu * build.torsoUpper;
 
@@ -778,14 +827,14 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       jointId: "pelvis",
       center: vec3(0, 0.04 * hu, 0),
       radius: pelvisRadius,
-      scale: vec3(1.5 * params.pelvisWidth, 0.8, 0.92),
+      scale: vec3(1.5 * params.pelvisWidth, 0.8, 0.92 * torsoDepth),
     },
     {
       kind: "capsule",
       jointId: "spine",
       from: vec3(0, 0, 0),
       to: vec3(0, 0.34 * torsoLen, 0),
-      radius: 0.24 * hu * build.torsoLower,
+      radius: 0.24 * hu * build.torsoLower * waistWidth,
     },
     {
       kind: "sphere",
@@ -795,7 +844,7 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       scale: vec3(
         1.32 * params.shoulderWidth,
         (0.31 * torsoLen) / (2 * chestRadius),
-        0.72,
+        0.72 * torsoDepth,
       ),
     },
     // 쇄골
@@ -814,7 +863,7 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       radius: 0.1 * hu * limbR,
     },
     // 목·머리 — 머리 타원체의 정수리가 정확히 신장과 일치한다(스테이처 불변식).
-    { kind: "capsule", jointId: "neck", from: vec3(0, 0, 0), to: vec3(0, neckLen, 0), radius: 0.11 * hu },
+    { kind: "capsule", jointId: "neck", from: vec3(0, 0, 0), to: vec3(0, neckLen, 0), radius: 0.11 * hu * neckThickness },
     {
       kind: "sphere",
       jointId: "head",
@@ -864,14 +913,14 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
     { kind: "capsule", jointId: "leftUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.115 * hu * limbR },
     { kind: "sphere", jointId: "leftLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * limbR },
     { kind: "capsule", jointId: "leftLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.095 * hu * limbR },
-    { kind: "sphere", jointId: "leftHand", center: vec3(0, 0, 0), radius: 0.095 * hu },
+    { kind: "sphere", jointId: "leftHand", center: vec3(0, 0, 0), radius: 0.095 * hu * handScale },
     { kind: "sphere", jointId: "leftHand", center: vec3(0, -handLen * 0.5, 0), radius: handLen * 0.5, scale: vec3(0.45, 1, 0.28) },
     ...buildHandDigitPrimitives("leftHand", handLen, 1),
     { kind: "sphere", jointId: "rightUpperArm", center: vec3(0, 0, 0), radius: 0.14 * hu * limbR },
     { kind: "capsule", jointId: "rightUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.115 * hu * limbR },
     { kind: "sphere", jointId: "rightLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * limbR },
     { kind: "capsule", jointId: "rightLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.095 * hu * limbR },
-    { kind: "sphere", jointId: "rightHand", center: vec3(0, 0, 0), radius: 0.095 * hu },
+    { kind: "sphere", jointId: "rightHand", center: vec3(0, 0, 0), radius: 0.095 * hu * handScale },
     { kind: "sphere", jointId: "rightHand", center: vec3(0, -handLen * 0.5, 0), radius: handLen * 0.5, scale: vec3(0.45, 1, 0.28) },
     ...buildHandDigitPrimitives("rightHand", handLen, -1),
     // 다리 — 고관절·무릎·발목 관절구와 둥근 발 볼륨.
@@ -886,7 +935,7 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       radius: footLen * 0.5,
       scale: vec3((0.26 * hu) / footLen, ankleHeight / footLen, 1),
     },
-    { kind: "sphere", jointId: "leftFoot", center: vec3(0, 0, 0), radius: 0.105 * hu * limbR },
+    { kind: "sphere", jointId: "leftFoot", center: vec3(0, 0, 0), radius: 0.105 * hu * limbR * footScale },
     { kind: "sphere", jointId: "rightUpperLeg", center: vec3(0, 0, 0), radius: 0.18 * hu * limbR },
     { kind: "capsule", jointId: "rightUpperLeg", from: vec3(0, 0, 0), to: vec3(0, -upperLegLen, 0), radius: 0.155 * hu * limbR },
     { kind: "sphere", jointId: "rightLowerLeg", center: vec3(0, 0, 0), radius: 0.15 * hu * limbR },
@@ -898,7 +947,7 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       radius: footLen * 0.5,
       scale: vec3((0.26 * hu) / footLen, ankleHeight / footLen, 1),
     },
-    { kind: "sphere", jointId: "rightFoot", center: vec3(0, 0, 0), radius: 0.105 * hu * limbR },
+    { kind: "sphere", jointId: "rightFoot", center: vec3(0, 0, 0), radius: 0.105 * hu * limbR * footScale },
   ];
 
   const chains: Record<StudioMannequinChainId, StudioMannequinChainSpec> = {
