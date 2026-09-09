@@ -30,6 +30,7 @@ export type {
 } from "./studio-command-catalog-base";
 
 const MANUAL_MENU_ID = "help/user-manual";
+const BRUSH_LAB_MENU_ID = "brush/brush-lab";
 const TRANSPARENT_COLOR_COMMAND_ID: CommandId = "color.toggle-transparent";
 const TRANSPARENT_COLOR_SHORTCUT = "Shift+C";
 
@@ -71,18 +72,37 @@ const MANUAL_COMMAND: StudioCommandCatalogEntry = {
   origins: [{ source: "menu", nativeId: MANUAL_MENU_ID, status: "wired" }],
 };
 
-export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
-  Object.freeze([...NORMALIZED_BASE_CATALOG, MANUAL_COMMAND]);
+const BRUSH_LAB_COMMAND: StudioCommandCatalogEntry = {
+  id: "brush.lab",
+  category: "brush",
+  labels: [
+    { locale: "ko", label: "목적별 브러시 제작실", description: "원하는 획을 먼저 고르고 실제로 시험한 뒤 재질·물리·패턴·전문 엔진까지 조정합니다." },
+    { locale: "en", label: "Guided Brush Studio", description: "Start from the desired stroke, test it live, then refine material, physics, pattern, and expert engines." },
+  ],
+  aliases: [
+    { vendor: "toonstudio", locale: "ko", term: "브러시 연구실" },
+    { vendor: "toonstudio", locale: "ko", term: "브러시 제작실" },
+    { vendor: "toonstudio", locale: "en", term: "Brush Studio V6" },
+    { vendor: "procreate", locale: "en", term: "Brush Studio" },
+  ],
+  helpNodeId: "help/brush/lab",
+  origins: [{ source: "menu", nativeId: BRUSH_LAB_MENU_ID, status: "wired" }],
+  note: "Navigation command to the dedicated Brush Studio V6 workspace while preserving work/remix context.",
+};
 
-export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze(
-  BASE_MENU_INVENTORY.flatMap((id) => id === "help/current-tool" ? [id, MANUAL_MENU_ID] : [id]),
-);
+export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
+  Object.freeze([...NORMALIZED_BASE_CATALOG, MANUAL_COMMAND, BRUSH_LAB_COMMAND]);
+
+export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
+  ...BASE_MENU_INVENTORY.flatMap((id) => id === "help/current-tool" ? [id, MANUAL_MENU_ID] : [id]),
+  BRUSH_LAB_MENU_ID,
+]);
 
 export const STUDIO_COMMAND_SOURCES = Object.freeze({
   ...BASE_SOURCES,
   menu: {
     ...BASE_SOURCES.menu,
-    measuredCount: BASE_SOURCES.menu.measuredCount + 1,
+    measuredCount: BASE_SOURCES.menu.measuredCount + 2,
   },
 });
 
@@ -105,10 +125,13 @@ export function findCatalogEntriesBySource(
   const entries = findBaseEntries(source, nativeId).map((entry) =>
     STUDIO_COMMAND_CATALOG.find((candidate) => candidate.id === entry.id) ?? entry,
   );
-  return source === "menu" && nativeId === MANUAL_MENU_ID ? [...entries, MANUAL_COMMAND] : entries;
+  if (source !== "menu") return entries;
+  if (nativeId === MANUAL_MENU_ID) return [...entries, MANUAL_COMMAND];
+  if (nativeId === BRUSH_LAB_MENU_ID) return [...entries, BRUSH_LAB_COMMAND];
+  return entries;
 }
 
 export function catalogNativeIds(source: StudioCommandSource): string[] {
   const ids = baseNativeIds(source);
-  return source === "menu" ? [...ids, MANUAL_MENU_ID] : ids;
+  return source === "menu" ? [...ids, MANUAL_MENU_ID, BRUSH_LAB_MENU_ID] : ids;
 }
