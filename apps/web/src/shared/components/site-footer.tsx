@@ -17,7 +17,7 @@ const META_LINKS = [
   { key: "footer.link.about", href: "/about" },
   { key: "footer.link.guide", href: "/guide" },
   { key: "footer.link.sitemap", href: "/sitemap" },
-  { key: "footer.link.support", href: "/support" },
+  { key: "footer.link.support", href: "/help" },
 ] as const;
 
 const POLICY_LINKS = [
@@ -32,7 +32,7 @@ export function SiteFooter() {
   const t = useT();
   const year = new Date().getFullYear();
   const siteBrand = t("app.name");
-  const studio = SITE_NAVIGATION_ITEMS.studio;
+  const make = SITE_NAVIGATION_ITEMS.make;
   const research = SITE_NAVIGATION_ITEMS.research;
 
   // Older translations can still include the former product name. Navigation labels
@@ -58,7 +58,7 @@ export function SiteFooter() {
           <div className="max-w-2xl">
             <p className="flex items-center gap-2 font-display text-[0.65rem] font-bold uppercase tracking-[0.15em] text-accent">
               <Sparkles size={14} aria-hidden="true" />
-              {locale === "ko" ? "YOUR NEXT SCENE" : "YOUR NEXT SCENE"}
+              YOUR NEXT SCENE
             </p>
             <h2 id="footer-creative-title" className="mt-3 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
               {locale === "ko" ? "떠올리고, 조사하고, 만드는 흐름을 한곳에서." : "Spark, research and make in one connected flow."}
@@ -77,10 +77,10 @@ export function SiteFooter() {
               {siteNavigationText(research.label, locale)}<ArrowRight size={16} aria-hidden="true" />
             </Link>
             <Link
-              href={studio.href}
+              href={make.href}
               className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-fg bg-fg px-4 py-2.5 text-sm font-bold text-canvas shadow-sm transition-all hover:-translate-y-0.5"
             >
-              {siteNavigationText(studio.label, locale)}<ArrowRight size={16} aria-hidden="true" />
+              {siteNavigationText(make.label, locale)}<ArrowRight size={16} aria-hidden="true" />
             </Link>
           </div>
         </section>
