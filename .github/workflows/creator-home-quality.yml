@@ -1,7 +1,29 @@
 name: Creator homepage quality
 on:
+  workflow_dispatch:
   push:
-    branches: [feat/creator-home-navigation-20260906]
+    branches: [main]
+    paths:
+      - 'apps/web/src/domains/marketing/**'
+      - 'apps/web/src/shared/components/site-header*'
+      - 'apps/web/src/shared/components/site-footer.tsx'
+      - 'apps/web/src/shared/components/pwa-install-nudge.tsx'
+      - 'apps/web/src/shared/lib/creator-continuity*'
+      - 'apps/web/src/shared/lib/pwa-install-store*'
+      - 'apps/web/src/app/AppShell.tsx'
+      - 'apps/web/src/app/main.tsx'
+      - 'apps/web/src/app/routes/**'
+      - 'apps/web/public/brand/**'
+      - 'apps/web/public/i18n/app/**'
+      - 'apps/web/public/manifest.webmanifest'
+      - 'media/brand-film/**'
+      - 'automation/n8n/**'
+      - 'scripts/verify-creator-home.mjs'
+      - 'scripts/verify-creator-film-upgrades.mjs'
+      - 'scripts/verify-creator-home-navigation.mjs'
+      - 'scripts/verify-creator-continuity.mjs'
+      - 'scripts/creator-film-automation.test.mjs'
+      - '.github/workflows/creator-home-quality.yml'
   pull_request:
     branches: [main]
     paths:
