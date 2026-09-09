@@ -1,5 +1,8 @@
 /** Shell metadata only. Do not import page/navigation modules into this table. */
 export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
+  "/make": "만들기",
+  "/help": "도움말 센터",
+  "/accessibility": "접근성",
   "/now": "오늘의 영감",
   "/research": "창작 리서치 데스크",
   "/research/assets": "창작 레퍼런스 아틀라스",
