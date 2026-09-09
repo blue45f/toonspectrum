@@ -4,6 +4,21 @@ import type {
   StudioWorkspaceId,
 } from "./studio-workspaces";
 
+export const STUDIO_SIMPLE_WORKSPACE_RECOMMENDATION = Object.freeze({
+  id: "simple-start-layout",
+  workspaceId: "quick-sketch",
+  description:
+    "처음이라면 가장 단순한 화면으로 시작하세요. 캔버스와 핵심 그리기 동작에 집중하고, 레이어·세부 설정은 필요할 때 다시 열 수 있습니다.",
+  detail: "캔버스 우선 · 되돌리기 · 펜 · 지우개 중심",
+  actionLabel: "간편 화면으로 시작",
+} as const satisfies {
+  readonly id: string;
+  readonly workspaceId: StudioDefaultWorkspaceId;
+  readonly description: string;
+  readonly detail: string;
+  readonly actionLabel: string;
+});
+
 export const STUDIO_CLIP_WORKSPACE_RECOMMENDATION = Object.freeze({
   id: "clip-studio-layout",
   workspaceId: "csp-migration",
@@ -30,38 +45,40 @@ export const STUDIO_CLIP_WORKSPACE_RECOMMENDATION = Object.freeze({
 });
 
 export interface ResolvedStudioWorkspaceRecommendation {
-  readonly id: typeof STUDIO_CLIP_WORKSPACE_RECOMMENDATION.id;
-  readonly workspaceId: typeof STUDIO_CLIP_WORKSPACE_RECOMMENDATION.workspaceId;
+  readonly id: typeof STUDIO_SIMPLE_WORKSPACE_RECOMMENDATION.id;
+  readonly workspaceId: typeof STUDIO_SIMPLE_WORKSPACE_RECOMMENDATION.workspaceId;
   readonly workspace: StudioDefaultWorkspace;
   readonly description: string;
   readonly detail: string;
   readonly actionLabel: string;
-  readonly searchAliases: readonly string[];
 }
 
 /** Search vocabulary stays presentation-only; persisted workspace records remain unchanged. */
 export function studioWorkspaceSearchAliases(workspaceId: string): readonly string[] {
   return workspaceId === STUDIO_CLIP_WORKSPACE_RECOMMENDATION.workspaceId
     ? STUDIO_CLIP_WORKSPACE_RECOMMENDATION.searchAliases
-    : [];
+    : workspaceId === STUDIO_SIMPLE_WORKSPACE_RECOMMENDATION.workspaceId
+      ? ["간편", "간단", "초보", "처음", "스케치", "집중", "simple", "quick"]
+      : [];
 }
 
 /**
- * Resolves the recommendation by the stable built-in id. It disappears once selected, leaving the
- * current-workspace summary as the single active-state authority.
+ * First-time discovery should recommend the lowest-complexity workspace rather than a migration
+ * preset whose product name only makes sense to users coming from another editor. All specialist
+ * layouts remain searchable in the same built-in catalogue.
  */
 export function resolveStudioWorkspaceRecommendation(
   workspaces: readonly StudioDefaultWorkspace[],
   activeWorkspaceId: StudioWorkspaceId,
 ): ResolvedStudioWorkspaceRecommendation | null {
-  if (activeWorkspaceId === STUDIO_CLIP_WORKSPACE_RECOMMENDATION.workspaceId) return null;
+  if (activeWorkspaceId === STUDIO_SIMPLE_WORKSPACE_RECOMMENDATION.workspaceId) return null;
   const workspace = workspaces.find(
-    (candidate) => candidate.id === STUDIO_CLIP_WORKSPACE_RECOMMENDATION.workspaceId
+    (candidate) => candidate.id === STUDIO_SIMPLE_WORKSPACE_RECOMMENDATION.workspaceId
   );
   if (!workspace) return null;
 
   return {
-    ...STUDIO_CLIP_WORKSPACE_RECOMMENDATION,
+    ...STUDIO_SIMPLE_WORKSPACE_RECOMMENDATION,
     workspace,
   };
 }
