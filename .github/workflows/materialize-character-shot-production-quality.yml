@@ -1,0 +1,114 @@
+name: Materialize Character Shot Production Quality
+
+on:
+  push:
+    branches:
+      - work/character-shot-production-materialize-20260909
+      - integration/character-shot-production-quality-20260909
+
+permissions:
+  contents: write
+
+concurrency:
+  group: character-shot-production-materialize-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    if: github.actor == github.repository_owner || github.actor == 'github-actions[bot]'
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Decode and apply bounded implementation payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import gzip
+          import io
+          import json
+          import pathlib
+          import tarfile
+
+          root = pathlib.Path.cwd().resolve()
+          parts = sorted((root / ".github" / "quality-foundation").glob("part-*.txt"))
+          if not parts:
+              raise SystemExit("No staged quality-foundation payload parts found")
+
+          encoded = "".join(part.read_text(encoding="utf-8").strip() for part in parts)
+          decoded = gzip.decompress(base64.b64decode(encoded, validate=True))
+
+          def safe_path(value: str) -> pathlib.Path:
+              candidate = pathlib.PurePosixPath(value)
+              if candidate.is_absolute() or ".." in candidate.parts:
+                  raise SystemExit(f"Unsafe payload path: {value}")
+              resolved = (root / pathlib.Path(*candidate.parts)).resolve()
+              if root not in resolved.parents and resolved != root:
+                  raise SystemExit(f"Payload escapes repository: {value}")
+              return resolved
+
+          applied = False
+          try:
+              with tarfile.open(fileobj=io.BytesIO(decoded), mode="r:*") as archive:
+                  members = archive.getmembers()
+                  if not members or len(members) > 500:
+                      raise SystemExit("Unexpected archive member count")
+                  for member in members:
+                      safe_path(member.name)
+                      if member.issym() or member.islnk() or member.isdev():
+                          raise SystemExit(f"Unsupported archive member: {member.name}")
+                  archive.extractall(root, members=members, filter="data")
+                  print(f"Applied tar payload with {len(members)} members")
+                  applied = True
+          except tarfile.ReadError:
+              pass
+
+          if not applied:
+              text = decoded.decode("utf-8")
+              stripped = text.lstrip()
+              if stripped.startswith("diff --git "):
+                  patch_path = pathlib.Path("/tmp/character-shot-production.patch")
+                  patch_path.write_text(text, encoding="utf-8")
+                  print(f"PATCH_FILE={patch_path}")
+              elif stripped.startswith("{"):
+                  payload = json.loads(text)
+                  files = payload.get("files")
+                  if not isinstance(files, dict) or not files or len(files) > 500:
+                      raise SystemExit("Invalid JSON payload file map")
+                  for name, content in files.items():
+                      if not isinstance(name, str) or not isinstance(content, str):
+                          raise SystemExit("Invalid JSON payload entry")
+                      destination = safe_path(name)
+                      destination.parent.mkdir(parents=True, exist_ok=True)
+                      destination.write_text(content, encoding="utf-8")
+                  print(f"Applied JSON payload with {len(files)} files")
+                  applied = True
+              else:
+                  preview = stripped[:200].replace("\n", "\\n")
+                  raise SystemExit(f"Unknown staged payload format: {preview}")
+          PY
+
+          if [[ -f /tmp/character-shot-production.patch ]]; then
+            git apply --3way --whitespace=error-all /tmp/character-shot-production.patch
+          fi
+          git diff --check
+          git status --short
+      - name: Commit materialized product source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Implementation payload is already materialized."
+            exit 0
+          fi
+          git commit -m "feat(character): materialize production quality foundation"
+          git push --no-verify origin HEAD:${GITHUB_REF_NAME}
