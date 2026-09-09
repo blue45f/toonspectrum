@@ -3,19 +3,20 @@ import {
   ArrowRight,
   Cuboid,
   PackageSearch,
+  Plus,
   RefreshCw,
   Sparkles,
   Store,
   Upload,
-  Plus,
 } from "lucide-react";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import { MarketResourceCard } from "../components/MarketResourceCard";
+import { MarketResourceFamilyExplorer } from "../components/MarketResourceFamilyExplorer";
 import { StaleNoticeBar } from "../components/StaleNoticeBar";
 import { useMarketResources } from "../hooks/use-market-resources";
 import { marketHomeJsonLd } from "../models/market-jsonld";
-import { MARKET_KINDS, MARKET_LICENSES } from "../models/market-kind";
+import { MARKET_LICENSES } from "../models/market-kind";
 import { MARKET_CURATED_THEMES } from "../models/market-theme";
 
 import { Container } from "@/shared/components/section";
@@ -33,18 +34,18 @@ import {
 } from "@/hooks/use-document-title";
 
 const MARKET_HOME_DESCRIPTION =
-  "브러시, 팔레트, 필터, 장면 템플릿, 3D 프리셋과 소품을 찾고 시험한 뒤 ToonStudio 프로젝트에 바로 연결하세요.";
+  "웹툰 템플릿, 2D·3D 에셋, 브러시, 팔레트와 필터를 찾고 미리 본 뒤 ToonStudio 프로젝트에 바로 연결하세요.";
 
 export function MarketHomePage() {
   const latest = useMarketResources({ limit: 12, sort: "newest" });
   const hasLatestItems = latest.items.length > 0;
   const hasFatalLatestError = Boolean(latest.error) && !hasLatestItems;
 
-  useDocumentTitle("에셋 마켓");
+  useDocumentTitle("리소스 마켓");
   useMetaDescription(MARKET_HOME_DESCRIPTION);
   usePageSocialMeta({
     canonicalPath: "/market",
-    title: "에셋 마켓 · 툰스튜디오",
+    title: "리소스 마켓 · 툰스튜디오",
     description: MARKET_HOME_DESCRIPTION,
   });
   useJsonLd(marketHomeJsonLd(latest.items));
@@ -71,20 +72,20 @@ export function MarketHomePage() {
           <MarketNavHeader />
           <div className="mt-6 grid gap-7 xl:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] xl:items-center">
             <div>
-              <p className="eyebrow text-accent">Creator Asset Market</p>
+              <p className="eyebrow text-accent">Creator Resource Market</p>
               <h1 className="mt-2 text-pretty font-display text-[clamp(2.2rem,6vw,4.6rem)] font-bold leading-[1] tracking-[-0.05em] text-fg">
-                에셋 마켓
+                리소스 마켓
               </h1>
               <p className="mt-3 max-w-xl text-pretty font-serif text-base italic leading-relaxed text-fg-2 sm:text-lg">
-                스튜디오에서 태어난 창작 리소스가 다음 작가의 도구가 되는 곳.
+                장면을 만드는 모든 재료가 Studio와 바로 이어지는 곳.
               </p>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-3">
-                마음에 드는 에셋을 찾고, 상세 화면에서 제작 조건과 사용권을 확인한 뒤 내 에셋에 추가해 Studio에서 바로 시험해 보세요.
+                템플릿으로 장면을 시작하고, 2D·3D 에셋을 배치하고, 브러시와 색·보정 리소스로 마무리하세요. 파일 형식보다 지금 만들고 싶은 결과에서 시작합니다.
               </p>
               <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-line pt-4 sm:mt-7 sm:pt-5">
                 <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "md" })}>
                   <Store className="h-4 w-4" aria-hidden="true" />
-                  에셋 찾기
+                  리소스 찾기
                 </Link>
                 <Link
                   href="/market/publish"
@@ -95,7 +96,7 @@ export function MarketHomePage() {
                   })}
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />
-                  에셋 배포하기
+                  리소스 배포하기
                 </Link>
                 <Link
                   href="/studio?assetMarket=community&communityView=share"
@@ -105,46 +106,50 @@ export function MarketHomePage() {
                   Studio에서 공유
                 </Link>
                 <span className="rounded-full bg-good/15 px-2.5 py-1 text-xs font-medium text-good">
-                  현재 모든 에셋 무료
+                  현재 모든 리소스 무료
                 </span>
               </div>
             </div>
 
             <PurposeExperienceStage
               variant="market"
-              ariaLabel="에셋을 찾고 시험한 뒤 Studio에서 사용하는 흐름 미리보기"
-              steps={["에셋 찾기", "조건·미리보기", "Studio에서 사용"]}
+              ariaLabel="리소스를 찾아 미리 보고 Studio에서 사용하는 흐름 미리보기"
+              steps={["필요한 결과 선택", "미리보기·조건 확인", "Studio에서 바로 사용"]}
             />
           </div>
 
           <FriendlyQuickGuide
             className="mt-5"
-            title="마켓이 처음이라면 이 3단계만 확인하세요"
-            description="무료 에셋이어도 사용권과 호환성은 꼭 확인해야 합니다. 설치와 계정 보관도 서로 다른 단계입니다."
+            title="처음이라면 종류보다 하고 싶은 작업부터 고르세요"
+            description="템플릿·에셋·브러시는 적용 방식이 서로 다릅니다. 상세 화면에서 실제 사용 위치와 호환성을 먼저 보여드립니다."
             steps={[
-              "탐색에서 종류·라이선스·Studio 호환 조건으로 후보를 좁힙니다.",
-              "상세 화면에서 실제 미리보기, 버전, 사용권과 제작 적합성을 확인합니다.",
-              "내 에셋에 추가한 뒤 Studio에서 설치·시험하고 프로젝트에 적용합니다.",
+              "장면을 통째로 시작하려면 템플릿, 캔버스에 놓을 재료가 필요하면 2D·3D를 고릅니다.",
+              "선화·채색 도구는 브러시, 작품의 색감과 마감은 색·보정에서 찾습니다.",
+              "미리보기에서 결과와 사용권을 확인한 뒤 Studio에서 시험하거나 내 리소스에 저장합니다.",
             ]}
-            actionLabel="상세 탐색 시작"
+            actionLabel="전체 리소스 둘러보기"
             actionHref="/market/browse"
           />
         </Container>
       </section>
 
-      <section className="border-b border-line bg-card/40 py-8 sm:py-10">
+      <Container size="wide" className="py-9 sm:py-11 lg:py-14">
+        <MarketResourceFamilyExplorer />
+      </Container>
+
+      <section className="border-y border-line bg-card/40 py-8 sm:py-10">
         <Container size="wide">
           <div className="flex items-baseline justify-between gap-3">
             <div>
-              <p className="eyebrow text-accent">Theme Exhibition</p>
-              <h2 className="mt-1 text-lg font-bold text-fg sm:text-xl">장르별 웹툰 기획전</h2>
-              <p className="mt-1 text-xs leading-5 text-fg-3">장면 분위기와 제작 목적이 비슷한 에셋을 묶어 빠르게 비교할 수 있습니다.</p>
+              <p className="eyebrow text-accent">Webtoon Collections</p>
+              <h2 className="mt-1 text-lg font-bold text-fg sm:text-xl">장르·제작 목적 컬렉션</h2>
+              <p className="mt-1 text-xs leading-5 text-fg-3">템플릿부터 브러시·배경·효과까지 같은 장면에 함께 쓰기 좋은 리소스를 묶었습니다.</p>
             </div>
             <Link
               href="/market/browse"
-              className="inline-flex min-h-6 items-center text-xs font-semibold text-accent hover:text-accent-2 pointer-coarse:min-h-11"
+              className="inline-flex min-h-11 items-center text-xs font-semibold text-accent hover:text-accent-2"
             >
-              모든 기획전 보기 →
+              전체 보기 →
             </Link>
           </div>
           <div className="mt-4 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
@@ -165,15 +170,11 @@ export function MarketHomePage() {
                       </span>
                       <ThemeIcon className="size-4 text-fg-3 transition-all group-hover:-rotate-6 group-hover:scale-110 group-hover:text-accent" aria-hidden="true" />
                     </div>
-                    <h3 className="mt-2.5 text-sm font-bold text-fg transition-colors group-hover:text-accent">
-                      {theme.title}
-                    </h3>
-                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-3">
-                      {theme.subtitle}
-                    </p>
+                    <h3 className="mt-2.5 text-sm font-bold text-fg transition-colors group-hover:text-accent">{theme.title}</h3>
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-3">{theme.subtitle}</p>
                   </div>
                   <div className="mt-4 flex items-center justify-between border-t border-line/60 pt-2.5 text-[0.7rem] font-medium text-fg-2">
-                    <span className="font-semibold text-accent">#{theme.tag} 모음</span>
+                    <span className="font-semibold text-accent">#{theme.tag} 세트</span>
                     <span className="flex items-center gap-1 text-fg-3 transition-transform group-hover:translate-x-1">
                       보러가기 <ArrowRight className="size-3" aria-hidden="true" />
                     </span>
@@ -185,51 +186,18 @@ export function MarketHomePage() {
         </Container>
       </section>
 
-      <Container size="wide" className="py-8 sm:py-10 lg:py-12">
-        <div>
-          <h2 className="eyebrow text-fg-3">리소스 종류</h2>
-          <p className="mt-1 text-xs leading-5 text-fg-3">무엇을 찾는지 알고 있다면 종류에서 바로 시작하는 것이 가장 빠릅니다.</p>
-        </div>
-        <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-7">
-          {MARKET_KINDS.map((kind) => {
-            const KindIcon = kind.icon;
-            return (
-              <li key={kind.kind}>
-                <Link
-                  href={`/market/browse?kind=${kind.kind}`}
-                  className="group relative flex h-full flex-col gap-2 overflow-hidden rounded-xl border border-line bg-card p-3.5 transition-all duration-200 ease-out-expo hover:-translate-y-1 hover:border-line-strong hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-                >
-                  <span aria-hidden="true" className="absolute -right-6 -top-6 size-16 rounded-full bg-accent/0 blur-xl transition-colors group-hover:bg-accent/10" />
-                  <KindIcon
-                    strokeWidth={1.5}
-                    className="relative h-6 w-6 transition-transform duration-200 group-hover:-rotate-3 group-hover:scale-110"
-                    style={{ color: `oklch(0.78 0.11 ${kind.hue})` }}
-                    aria-hidden="true"
-                  />
-                  <span className="relative text-sm font-semibold text-fg">{kind.label}</span>
-                  <span className="relative line-clamp-2 text-xs leading-snug text-fg-3">{kind.description}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </Container>
-
       {materials3D.length > 0 ? (
-        <Container size="wide" className="pb-10 sm:pb-12">
+        <Container size="wide" className="py-10 sm:py-12">
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
                 <Cuboid className="size-4 text-accent" aria-hidden="true" />
-                <h2 className="text-base font-bold text-fg sm:text-lg">3D 데생 소체 & 배경 특별관</h2>
+                <h2 className="text-base font-bold text-fg sm:text-lg">3D 배경·데생 추천</h2>
               </div>
-              <p className="mt-1 text-xs leading-5 text-fg-3">구도·카메라·배경 작업을 빠르게 시작할 수 있는 3D 자원을 모았습니다.</p>
+              <p className="mt-1 text-xs leading-5 text-fg-3">카메라를 돌려 구도를 잡고 캔버스로 가져올 수 있는 3D 리소스입니다.</p>
             </div>
-            <Link
-              href="/market/browse?kind=3d-asset"
-              className="inline-flex min-h-6 items-center text-xs font-semibold text-accent hover:text-accent-2 pointer-coarse:min-h-11"
-            >
-              3D 소재 전체 보기 →
+            <Link href="/market/browse?kind=3d-asset" className="inline-flex min-h-11 items-center text-xs font-semibold text-accent hover:text-accent-2">
+              3D 전체 보기 →
             </Link>
           </div>
           <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
@@ -244,13 +212,13 @@ export function MarketHomePage() {
 
       {popularTags.length >= 3 ? (
         <Container size="wide" className="pb-10 sm:pb-12">
-          <h2 className="eyebrow text-fg-3">최신 리소스 태그</h2>
+          <h2 className="eyebrow text-fg-3">지금 많이 쓰는 키워드</h2>
           <ul className="mt-3 flex flex-wrap gap-1.5">
             {popularTags.map((tag) => (
               <li key={tag}>
                 <Link
                   href={`/market/browse?tag=${encodeURIComponent(tag)}`}
-                  className="inline-flex min-h-11 items-center rounded bg-raised px-3 py-2 text-xs text-fg-2 transition-all duration-150 hover:-translate-y-0.5 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                  className="inline-flex min-h-11 items-center rounded-xl bg-raised px-3 py-2 text-xs text-fg-2 transition-all duration-150 hover:-translate-y-0.5 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 >
                   #{tag}
                 </Link>
@@ -264,34 +232,20 @@ export function MarketHomePage() {
         <div className="flex items-baseline justify-between gap-3">
           <div>
             <h2 className="eyebrow text-fg-3">최근 공유</h2>
-            <p className="mt-1 text-xs leading-5 text-fg-3">최근 공개된 에셋을 실제 미리보기와 함께 확인합니다.</p>
+            <p className="mt-1 text-xs leading-5 text-fg-3">최근 공개된 리소스를 실제 미리보기와 함께 확인합니다.</p>
           </div>
-          <Link
-            href="/market/browse"
-            className="inline-flex min-h-6 items-center text-sm text-accent hover:text-accent-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:min-h-11"
-          >
+          <Link href="/market/browse" className="inline-flex min-h-11 items-center text-sm text-accent hover:text-accent-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
             전체 보기 →
           </Link>
         </div>
         {hasFatalLatestError ? (
-          <div
-            role="alert"
-            className="mt-6 rounded-2xl border border-warn/30 bg-warn/5 p-8 text-center sm:p-10"
-          >
+          <div role="alert" className="mt-6 rounded-2xl border border-warn/30 bg-warn/5 p-8 text-center sm:p-10">
             <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-warn/10 text-warn">
               <AlertTriangle className="size-6" aria-hidden="true" />
             </div>
-            <h3 className="mt-3 text-base font-bold text-fg">
-              최근 공유 리소스를 불러올 수 없어요
-            </h3>
-            <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">
-              일시적인 네트워크 문제이거나 서버 장애일 수 있어요. 현재 페이지에서 다시 시도해도 다른 작업에는 영향을 주지 않습니다.
-            </p>
-            <button
-              type="button"
-              onClick={latest.reload}
-              className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}
-            >
+            <h3 className="mt-3 text-base font-bold text-fg">최근 공유 리소스를 불러올 수 없어요</h3>
+            <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">일시적인 네트워크 문제이거나 서버 장애일 수 있어요. 다시 시도해도 다른 작업에는 영향을 주지 않습니다.</p>
+            <button type="button" onClick={latest.reload} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}>
               <RefreshCw className="mr-1.5 size-3.5" aria-hidden="true" />
               다시 시도
             </button>
@@ -306,15 +260,8 @@ export function MarketHomePage() {
         ) : null}
         {hasFatalLatestError ? null : (
           <>
-            {latest.loading ? (
-              <p role="status" className="sr-only">
-                최근 공유된 마켓 리소스를 불러오는 중입니다.
-              </p>
-            ) : null}
-            <ul
-              aria-busy={latest.loading || undefined}
-              className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4"
-            >
+            {latest.loading ? <p role="status" className="sr-only">최근 공유된 마켓 리소스를 불러오는 중입니다.</p> : null}
+            <ul aria-busy={latest.loading || undefined} className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
               {latest.loading && latest.items.length === 0
                 ? Array.from({ length: 8 }, (_, index) => (
                     <li key={index} aria-hidden="true">
@@ -336,17 +283,10 @@ export function MarketHomePage() {
                 <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
                   <PackageSearch className="size-6" aria-hidden="true" />
                 </div>
-                <h3 className="mt-3 text-base font-bold text-fg">
-                  아직 공유된 리소스가 없어요
-                </h3>
-                <p className="mx-auto mt-1.5 max-w-md text-sm text-fg-2">
-                  Studio에서 창작한 3D 에셋, 브러시, 팔레트를 마켓 커뮤니티에 가장 먼저 공유해 보세요.
-                </p>
+                <h3 className="mt-3 text-base font-bold text-fg">아직 공유된 리소스가 없어요</h3>
+                <p className="mx-auto mt-1.5 max-w-md text-sm text-fg-2">Studio에서 만든 템플릿, 브러시, 팔레트와 에셋을 가장 먼저 공유해 보세요.</p>
                 <div className="mt-5 flex justify-center">
-                  <Link
-                    href="/studio?assetMarket=community&communityView=share"
-                    className={buttonClass({ variant: "solid", size: "sm" })}
-                  >
+                  <Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "solid", size: "sm" })}>
                     <Upload className="mr-1.5 size-3.5" aria-hidden="true" />
                     Studio에서 첫 리소스 공유하기
                   </Link>
