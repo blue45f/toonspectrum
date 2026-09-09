@@ -39,15 +39,15 @@ describe("site navigation information architecture", () => {
     expect(SITE_NAVIGATION_ITEMS.make.label.ko).toBe("새로 만들기");
   });
 
-  it("preserves Home and the center New action on mobile while exposing Market", () => {
+  it("uses stable places for all five mobile tabs", () => {
     expect(MOBILE_SITE_TABS.map((item) => item.id)).toEqual([
       "home",
       "explore",
-      "make",
+      "studio",
       "market",
       "me",
     ]);
-    expect(MOBILE_SITE_TABS[2]).toBe(SITE_NAVIGATION_ITEMS.make);
+    expect(MOBILE_SITE_TABS[2]).toBe(SITE_NAVIGATION_ITEMS.studio);
     expect(MOBILE_SITE_TABS[3]).toBe(SITE_NAVIGATION_ITEMS.market);
   });
 
