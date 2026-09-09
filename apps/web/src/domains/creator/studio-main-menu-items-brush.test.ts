@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildStudioBrushMenuItems } from "./studio-main-menu-items-brush";
+import {
+  buildStudioBrushMenuItems,
+  studioBrushLabHref,
+} from "./studio-main-menu-items-brush";
 
 import type {
   StudioMainMenuBuilderState,
@@ -67,7 +70,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
 };
 
 describe("buildStudioBrushMenuItems", () => {
-  it("exposes pixel-art and silk rows that call the shipped host actions", () => {
+  it("exposes pixel-art, silk and both simple/expert brush studio entries", () => {
     const ui = {
       togglePixelArtMode: vi.fn(),
       enableSilkSymmetry: vi.fn(),
@@ -83,11 +86,16 @@ describe("buildStudioBrushMenuItems", () => {
     const pixel = items.find((item) => item.id === "pixel-art");
     const silk = items.find((item) => item.id === "silk-flow");
     const studio = items.find((item) => item.id === "brush-studio");
+    const lab = items.find((item) => item.id === "brush-lab");
     expect(pixel?.commandId).toBe("brush.pixel-art");
     expect(pixel?.label).toBe("픽셀 아트");
     expect(pixel?.selectionRole).toBe("checkbox");
     expect(silk?.commandId).toBe("brush.silk-flow");
     expect(studio?.commandId).toBe("brush.studio");
+    expect(studio?.label).toBe("현재 브러시 세부 설정…");
+    expect(lab?.commandId).toBe("brush.lab");
+    expect(lab?.searchActivation).toBe("execute");
+    expect(lab?.label).toBe("목적별 브러시 제작실…");
 
     pixel?.onSelect();
     silk?.onSelect();
@@ -95,6 +103,17 @@ describe("buildStudioBrushMenuItems", () => {
     expect(ui.togglePixelArtMode).toHaveBeenCalledTimes(1);
     expect(ui.enableSilkSymmetry).toHaveBeenCalledTimes(1);
     expect(ui.openBrushStudio).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps work and remix context when opening the dedicated Brush Studio", () => {
+    expect(studioBrushLabHref("/studio")).toBe("/studio/brush-lab");
+    expect(studioBrushLabHref("/studio/canvas")).toBe("/studio/brush-lab");
+    expect(studioBrushLabHref("/studio/work/work-42/canvas")).toBe(
+      "/studio/work/work-42/brush-lab",
+    );
+    expect(studioBrushLabHref("/studio/remix/source-7/canvas")).toBe(
+      "/studio/remix/source-7/brush-lab",
+    );
   });
 
   it("checks the pixel-art row when the host has the mode on", () => {
