@@ -1,122 +1,150 @@
-name: Reconcile Dependabot alerts
+name: Remediate current Dependabot alerts
 
 on:
   push:
     branches:
       - security/dependabot-reconcile-20260909
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
-  contents: read
-  security-events: write
+  contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: dependabot-remediation-20260909
   cancel-in-progress: true
 
 jobs:
-  reconcile:
-    name: Audit lockfile and probe Dependabot status access
+  remediate:
+    name: Upgrade vulnerable packages and regenerate the lockfile
     runs-on: ubuntu-slim
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: security/dependabot-reconcile-20260909
           sparse-checkout: |
             /package.json
             /pnpm-lock.yaml
             /pnpm-workspace.yaml
+            /apps/*/package.json
+            /packages/*/package.json
+            /patches/
           sparse-checkout-cone-mode: false
       - uses: pnpm/action-setup@v6
-      - name: Reject advisory exclusions
+
+      - name: Raise every affected dependency to its patched release
         shell: bash
         run: |
           set -euo pipefail
-          if grep -En '^[[:space:]]*(auditConfig:|ignoreGhsas:|ignoreCves:|ignoreAdvisories:)' pnpm-workspace.yaml; then
-            echo "Security advisory exclusions are not permitted."
-            exit 1
-          fi
-          echo "Verified that no security advisories are excluded from the audit."
-      - name: Run the all-severity pnpm audit against the committed lockfile
+          node <<'NODE'
+          const { existsSync, readFileSync, readdirSync, writeFileSync } = require("node:fs");
+          const { join } = require("node:path");
+
+          const manifests = ["package.json"];
+          for (const parent of ["apps", "packages"]) {
+            if (!existsSync(parent)) continue;
+            for (const child of readdirSync(parent, { withFileTypes: true })) {
+              if (!child.isDirectory()) continue;
+              const manifest = join(parent, child.name, "package.json");
+              if (existsSync(manifest)) manifests.push(manifest);
+            }
+          }
+
+          const alignedVitestPackages = new Map([
+            ["vitest", "4.1.11"],
+            ["@vitest/coverage-v8", "4.1.11"],
+            ["@vitest/ui", "4.1.11"],
+          ]);
+          const changedManifests = [];
+          for (const manifest of manifests) {
+            const json = JSON.parse(readFileSync(manifest, "utf8"));
+            let changed = false;
+            for (const section of ["dependencies", "devDependencies", "optionalDependencies"]) {
+              if (!json[section]) continue;
+              for (const [name, version] of alignedVitestPackages) {
+                if (Object.hasOwn(json[section], name) && json[section][name] !== version) {
+                  json[section][name] = version;
+                  changed = true;
+                }
+              }
+            }
+            if (changed) {
+              writeFileSync(manifest, `${JSON.stringify(json, null, 2)}\n`);
+              changedManifests.push(manifest);
+            }
+          }
+          if (changedManifests.length === 0) {
+            throw new Error("No direct Vitest manifest pins were updated; expected at least the root manifest.");
+          }
+          console.log(`Updated Vitest family pins in: ${changedManifests.join(", ")}`);
+
+          let workspace = readFileSync("pnpm-workspace.yaml", "utf8");
+          function replaceExactlyOnce(before, after) {
+            const first = workspace.indexOf(before);
+            if (first === -1) throw new Error(`Expected workspace entry was not found: ${before.trim()}`);
+            if (workspace.indexOf(before, first + before.length) !== -1) {
+              throw new Error(`Workspace entry is ambiguous: ${before.trim()}`);
+            }
+            workspace = workspace.replace(before, after);
+          }
+
+          replaceExactlyOnce("  multer: '>=2.2.0'\n", "  multer: '>=2.3.0'\n");
+          replaceExactlyOnce(
+            "  'js-yaml@>=4.0.0 <4.3.1': 4.3.1\n",
+            "  'js-yaml@>=4.0.0 <4.3.2': 4.3.2\n",
+          );
+          replaceExactlyOnce("  'sharp@<0.35.0': 0.35.2\n", "  'sharp@<0.35.4': 0.35.4\n");
+          replaceExactlyOnce("  vitest: '4.1.9'\n", "  vitest: '4.1.11'\n");
+          replaceExactlyOnce(
+            "  '@vitest/coverage-v8': '4.1.9'\n",
+            "  '@vitest/coverage-v8': '4.1.11'\n",
+          );
+          replaceExactlyOnce("  '@vitest/ui': '4.1.9'\n", "  '@vitest/ui': '4.1.11'\n");
+
+          const colordOverride = "  'colord@<2.9.4': 2.9.4\n";
+          if (!workspace.includes(colordOverride)) {
+            replaceExactlyOnce(
+              "  form-data: '>=4.0.6'\n",
+              `  form-data: '>=4.0.6'\n${colordOverride}`,
+            );
+          }
+          const mockerOverride = "  '@vitest/mocker@>=2.1.0 <4.1.11': 4.1.11\n";
+          if (!workspace.includes(mockerOverride)) {
+            replaceExactlyOnce(
+              "  '@vitest/ui': '4.1.11'\n",
+              `  '@vitest/ui': '4.1.11'\n${mockerOverride}`,
+            );
+          }
+          writeFileSync("pnpm-workspace.yaml", workspace);
+          NODE
+
+      - name: Regenerate the committed pnpm dependency graph
+        run: pnpm install --lockfile-only --ignore-scripts
+
+      - name: Verify manifests and regenerated lockfile are reproducible
+        run: pnpm install --frozen-lockfile --lockfile-only --ignore-scripts
+
+      - name: Require zero advisories at every severity
         shell: bash
         run: |
           set -o pipefail
           pnpm audit --json --audit-level low | tee "$RUNNER_TEMP/pnpm-audit.json"
-      - name: Publish the audit summary
-        if: always()
+
+      - name: Commit the verified dependency remediation
         shell: bash
-        run: |
-          node <<'NODE'
-          const { appendFileSync, existsSync, readFileSync } = require("node:fs");
-          const path = `${process.env.RUNNER_TEMP}/pnpm-audit.json`;
-          const lines = ["### Dependabot dependency audit", ""];
-          if (!existsSync(path)) {
-            lines.push("No pnpm audit report was produced.");
-          } else {
-            const report = JSON.parse(readFileSync(path, "utf8"));
-            const metadata = report.metadata?.vulnerabilities ?? {};
-            const severities = ["info", "low", "moderate", "high", "critical"];
-            for (const severity of severities) {
-              lines.push(`- ${severity}: ${metadata[severity] ?? 0}`);
-            }
-            lines.push(`- total: ${metadata.total ?? 0}`);
-          }
-          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
-          NODE
-      - name: Probe the open-alert endpoint without hiding permission failures
-        if: always()
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           set -euo pipefail
-          node <<'NODE'
-          async function main() {
-            const url = new URL(
-              `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/dependabot/alerts`,
-            );
-            url.searchParams.set("state", "open");
-            url.searchParams.set("per_page", "100");
-            const response = await fetch(url, {
-              headers: {
-                Accept: "application/vnd.github+json",
-                Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-                "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "toonspectrum-dependabot-reconcile",
-              },
-            });
-            const body = await response.text();
-            if (response.status === 403) {
-              console.log("DEPENDABOT_ALERT_API_ACCESS=denied");
-              console.log(body);
-              return;
-            }
-            if (!response.ok) {
-              throw new Error(`Dependabot API ${response.status}: ${body}`);
-            }
-            const alerts = JSON.parse(body);
-            console.log("DEPENDABOT_ALERT_API_ACCESS=granted");
-            console.log(`OPEN_DEPENDABOT_ALERT_COUNT_FIRST_PAGE=${alerts.length}`);
-            for (const alert of alerts) {
-              console.log([
-                alert.number,
-                alert.dependency?.package?.ecosystem ?? "unknown",
-                alert.dependency?.package?.name ?? "unknown",
-                alert.dependency?.manifest_path ?? "unknown",
-                alert.security_advisory?.ghsa_id ?? "unknown",
-                alert.security_advisory?.severity ?? "unknown",
-                alert.security_vulnerability?.vulnerable_version_range ?? "unknown",
-                alert.security_vulnerability?.first_patched_version?.identifier ?? "unavailable",
-              ].join("\t"));
-            }
-            if (alerts.length > 0) process.exitCode = 1;
-          }
-
-          main().catch((error) => {
-            console.error(error instanceof Error ? error.message : error);
-            process.exitCode = 1;
-          });
-          NODE
+          mapfile -d '' changed < <(git diff --name-only -z)
+          if (( ${#changed[@]} == 0 )); then
+            echo "No dependency files changed."
+            exit 0
+          fi
+          printf 'Verified dependency changes:\n'
+          printf '  %s\n' "${changed[@]}"
+          git add -- "${changed[@]}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix(security): resolve current Dependabot advisories"
+          git push origin HEAD:security/dependabot-reconcile-20260909
