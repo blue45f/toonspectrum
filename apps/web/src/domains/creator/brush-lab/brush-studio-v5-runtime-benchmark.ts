@@ -56,9 +56,16 @@ interface BrowserGpu {
   requestAdapter(options?: Readonly<{ powerPreference?: "high-performance" | "low-power" }>): Promise<BrowserGpuAdapter | null>;
 }
 
-interface NavigatorWithGpu extends Navigator {
+interface BrowserNavigatorRuntime {
   readonly gpu?: BrowserGpu;
   readonly deviceMemory?: number;
+  readonly hardwareConcurrency?: number;
+}
+
+function browserNavigatorRuntime(): BrowserNavigatorRuntime | null {
+  if (typeof navigator === "undefined") return null;
+  // Keep the benchmark's minimal WebGPU facade separate from the evolving DOM Navigator contract.
+  return navigator as unknown as BrowserNavigatorRuntime;
 }
 
 function now(): number {
@@ -101,7 +108,7 @@ function detectHover(): boolean {
 }
 
 function baseCapabilitySnapshot(): Omit<BrushRuntimeCapabilities, "webgpuAdapter" | "webgpuTimestampQuery"> {
-  const navigatorValue = typeof navigator === "undefined" ? null : navigator as NavigatorWithGpu;
+  const navigatorValue = browserNavigatorRuntime();
   return Object.freeze({
     scannedAt: new Date().toISOString(),
     secureContext: globalThis.isSecureContext === true,
@@ -129,7 +136,7 @@ export function detectSynchronousBrushRuntimeCapabilities(): BrushRuntimeCapabil
 
 export async function scanBrushRuntimeCapabilities(): Promise<BrushRuntimeCapabilities> {
   const base = baseCapabilitySnapshot();
-  const gpu = typeof navigator === "undefined" ? undefined : (navigator as NavigatorWithGpu).gpu;
+  const gpu = browserNavigatorRuntime()?.gpu;
   if (!gpu) return Object.freeze({ ...base, webgpuAdapter: false, webgpuTimestampQuery: false });
   try {
     const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
@@ -209,7 +216,7 @@ async function benchmarkWebGpu(iterations: number): Promise<Readonly<{
   p95Ms: number;
   workItems: number;
 }> | null> {
-  const gpu = typeof navigator === "undefined" ? undefined : (navigator as NavigatorWithGpu).gpu;
+  const gpu = browserNavigatorRuntime()?.gpu;
   const usage = gpuBufferUsage();
   if (!gpu || usage === null) return null;
   const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
