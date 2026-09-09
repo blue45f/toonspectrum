@@ -1,0 +1,102 @@
+name: VRM preview thumbnail stability bootstrap
+
+on:
+  push:
+    branches: [fix/vrm-preview-thumbnail-stability-20260910]
+    paths: [.github/workflows/vrm-preview-thumbnail-stability-bootstrap.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/vrm-preview-thumbnail-stability-20260910
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Keep bundled character previews resident
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          runtime = Path('apps/web/src/domains/creator/vrm/useStudioVrmPoserRuntimeD.ts')
+          text = runtime.read_text(encoding='utf-8')
+          old = '''          const isBundledStaticThumbnail = entry.source === "sample"\n            && entry.thumbnail?.startsWith("/vrm/thumbnails/");\n          if (\n            entry.source === "memory" ||\n            entry.id === activeModelIdRef.current ||\n            entry.thumbnail === null ||\n            isBundledStaticThumbnail\n          ) return entry;\n'''
+          new = '''          // Bundled samples already point at immutable same-origin art under\n          // /assets/3d/characters/thumbnails/**. Never evict those URLs when the uploaded\n          // thumbnail hydration window moves, or cards fall back to name/initial SVGs.\n          if (\n            entry.source === "sample" ||\n            entry.source === "memory" ||\n            entry.id === activeModelIdRef.current ||\n            entry.thumbnail === null\n          ) return entry;\n'''
+          if text.count(old) != 1:
+            raise SystemExit(f'preview eviction anchor changed: {text.count(old)}')
+          runtime.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          panel = Path('apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx')
+          text = panel.read_text(encoding='utf-8')
+          old_img = '''                  <img\n                    alt=""\n                    className="h-full w-full object-contain"\n                    src={entry.thumbnail ?? buildFallbackVrmLibraryThumbnail(entry.name, entry.id)}\n'''
+          new_img = '''                  <img\n                    alt=""\n                    decoding="async"\n                    loading="eager"\n                    className="h-full w-full object-contain"\n                    src={entry.thumbnail ?? buildFallbackVrmLibraryThumbnail(entry.name, entry.id)}\n'''
+          if text.count(old_img) != 1:
+            raise SystemExit(f'preview image anchor changed: {text.count(old_img)}')
+          panel.write_text(text.replace(old_img, new_img, 1), encoding='utf-8')
+          PY
+      - name: Add focused regression
+        shell: bash
+        run: |
+          cat > apps/web/src/domains/creator/vrm/studio-vrm-bundled-thumbnail-stability.test.ts <<'EOF'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+          import { SAMPLE_VRM_ENTRIES } from "./vrm-library";
+
+          const runtime = readFileSync(new URL("./useStudioVrmPoserRuntimeD.ts", import.meta.url), "utf8");
+          const panel = readFileSync(new URL("./StudioVrmCharacterLibraryPanel.tsx", import.meta.url), "utf8");
+
+          describe("bundled VRM thumbnail stability", () => {
+            it("ships real same-origin thumbnails for every bundled card", () => {
+              expect(SAMPLE_VRM_ENTRIES.length).toBeGreaterThan(0);
+              for (const entry of SAMPLE_VRM_ENTRIES) {
+                expect(entry.source).toBe("sample");
+                expect(entry.thumbnail).toMatch(/^\/assets\/3d\/characters\/thumbnails\//u);
+              }
+            });
+
+            it("never evicts bundled sample preview URLs when the visible window changes", () => {
+              const start = runtime.indexOf("const handleVisibleVrmThumbnailWindow");
+              const end = runtime.indexOf("useEffect(() => {", start);
+              const handler = runtime.slice(start, end);
+              expect(start).toBeGreaterThanOrEqual(0);
+              expect(handler).toContain('entry.source === "sample"');
+              expect(handler).not.toContain('startsWith("/vrm/thumbnails/")');
+              expect(handler).toContain('return { ...entry, thumbnail: null }');
+            });
+
+            it("keeps stable image decoding instead of flashing the name fallback", () => {
+              expect(panel).toContain('decoding="async"');
+              expect(panel).toContain('loading="eager"');
+              expect(panel).toContain('entry.thumbnail ?? buildFallbackVrmLibraryThumbnail');
+            });
+          });
+          EOF
+      - name: Validate preview slice
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/vrm/studio-vrm-bundled-thumbnail-stability.test.ts \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.test.tsx
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+      - name: Commit product change and remove bootstrap
+        shell: bash
+        run: |
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          git rm .github/workflows/vrm-preview-thumbnail-stability-bootstrap.yml
+          git add \
+            apps/web/src/domains/creator/vrm/useStudioVrmPoserRuntimeD.ts \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx \
+            apps/web/src/domains/creator/vrm/studio-vrm-bundled-thumbnail-stability.test.ts
+          git commit -m 'fix(vrm): keep bundled character previews stable'
+          git push origin HEAD:fix/vrm-preview-thumbnail-stability-20260910
