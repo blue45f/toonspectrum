@@ -7,7 +7,7 @@ on:
       - 'apps/web/src/domains/marketing/**'
       - 'apps/web/src/shared/components/site-header*'
       - 'apps/web/src/shared/components/site-footer.tsx'
-      - 'apps/web/src/shared/components/pwa-install-nudge.tsx'
+      - 'apps/web/src/shared/components/pwa-install-nudge*'
       - 'apps/web/src/shared/lib/creator-continuity*'
       - 'apps/web/src/shared/lib/pwa-install-store*'
       - 'apps/web/src/app/AppShell.tsx'
@@ -30,7 +30,7 @@ on:
       - 'apps/web/src/domains/marketing/**'
       - 'apps/web/src/shared/components/site-header*'
       - 'apps/web/src/shared/components/site-footer.tsx'
-      - 'apps/web/src/shared/components/pwa-install-nudge.tsx'
+      - 'apps/web/src/shared/components/pwa-install-nudge*'
       - 'apps/web/src/shared/lib/creator-continuity*'
       - 'apps/web/src/shared/lib/pwa-install-store*'
       - 'apps/web/src/app/AppShell.tsx'
@@ -67,9 +67,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: |
-          pnpm exec eslint apps/web/src/domains/marketing apps/web/src/shared/components/site-header.tsx apps/web/src/shared/components/site-header-mobile-nav.tsx apps/web/src/shared/components/site-footer.tsx apps/web/src/shared/components/pwa-install-nudge.tsx apps/web/src/shared/lib/creator-continuity.ts apps/web/src/shared/lib/creator-continuity-model.ts apps/web/src/shared/lib/creator-continuity-destinations.ts apps/web/src/shared/lib/creator-continuity-plan.ts apps/web/src/shared/lib/creator-continuity-reducer.ts apps/web/src/shared/lib/creator-continuity-codec.ts apps/web/src/shared/lib/creator-continuity-store.ts apps/web/src/shared/lib/creator-continuity.test.ts apps/web/src/shared/lib/pwa-install-store.ts apps/web/src/shared/lib/pwa-install-store.test.ts apps/web/src/app/AppShell.tsx apps/web/src/app/main.tsx scripts/verify-creator-home.mjs scripts/verify-creator-film-upgrades.mjs scripts/verify-creator-home-navigation.mjs scripts/verify-creator-continuity.mjs scripts/creator-film-automation.test.mjs media/brand-film/src media/brand-film/render.mjs --max-warnings=0
+          pnpm exec eslint apps/web/src/domains/marketing apps/web/src/shared/components/site-header.tsx apps/web/src/shared/components/site-header-mobile-nav.tsx apps/web/src/shared/components/site-footer.tsx apps/web/src/shared/components/pwa-install-nudge.tsx apps/web/src/shared/components/pwa-install-nudge.test.tsx apps/web/src/shared/lib/creator-continuity.ts apps/web/src/shared/lib/creator-continuity-model.ts apps/web/src/shared/lib/creator-continuity-destinations.ts apps/web/src/shared/lib/creator-continuity-plan.ts apps/web/src/shared/lib/creator-continuity-reducer.ts apps/web/src/shared/lib/creator-continuity-codec.ts apps/web/src/shared/lib/creator-continuity-store.ts apps/web/src/shared/lib/creator-continuity.test.ts apps/web/src/shared/lib/pwa-install-store.ts apps/web/src/shared/lib/pwa-install-store.test.ts apps/web/src/app/AppShell.tsx apps/web/src/app/main.tsx scripts/verify-creator-home.mjs scripts/verify-creator-film-upgrades.mjs scripts/verify-creator-home-navigation.mjs scripts/verify-creator-continuity.mjs scripts/creator-film-automation.test.mjs media/brand-film/src media/brand-film/render.mjs --max-warnings=0
           pnpm run typecheck
-          pnpm exec vitest run apps/web/src/domains/marketing apps/web/src/shared/lib/creator-continuity.test.ts apps/web/src/shared/lib/pwa-install-store.test.ts scripts/creator-film-automation.test.mjs
+          pnpm exec vitest run apps/web/src/domains/marketing apps/web/src/shared/components/pwa-install-nudge.test.tsx apps/web/src/shared/lib/creator-continuity.test.ts apps/web/src/shared/lib/pwa-install-store.test.ts scripts/creator-film-automation.test.mjs
           node --test scripts/creator-film-automation.test.mjs
           pnpm run build:bundle
       - run: |
