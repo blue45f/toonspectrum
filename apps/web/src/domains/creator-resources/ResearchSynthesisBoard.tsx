@@ -237,6 +237,7 @@ export function ResearchSynthesisBoard({
           </label>
           <div className="max-h-64 space-y-2 overflow-y-auto pr-1" aria-label="연결 가능한 저장 자료">
             {sourceCandidates.map((resource) => <label key={resource.id} className="flex min-h-12 cursor-pointer items-start gap-3 rounded-xl border border-line bg-panel p-3 text-sm hover:bg-raised">
+              <span className="sr-only">연결 자료 선택</span>
               <input
                 type="checkbox"
                 className="mt-0.5 size-5 shrink-0"

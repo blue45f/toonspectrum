@@ -81,10 +81,18 @@ function recordOf(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function containsControlCharacter(value: string): boolean {
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 function cleanIdentifier(value: unknown, maximum = 160): string {
   if (typeof value !== "string" || value.length > maximum) return "";
   const result = value.normalize("NFKC").trim();
-  if (!result || /[\u0000-\u001f\u007f]/u.test(result)) return "";
+  if (!result || containsControlCharacter(result)) return "";
   return result;
 }
 

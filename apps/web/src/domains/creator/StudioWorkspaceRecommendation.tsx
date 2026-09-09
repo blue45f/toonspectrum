@@ -1,4 +1,4 @@
-import { ArrowRight, PanelLeft } from "lucide-react";
+import { ArrowRight, PencilLine } from "lucide-react";
 import { useId, type MouseEventHandler, type ReactElement } from "react";
 
 import type { ResolvedStudioWorkspaceRecommendation } from "./studio-workspace-recommendation";
@@ -25,11 +25,15 @@ export function StudioWorkspaceRecommendation({
       aria-describedby={descriptionId}
       data-testid="studio-workspace-recommendation"
       data-workspace-recommendation={recommendation.id}
-      className="rounded-lg border border-accent/35 bg-accent-soft/25 p-3"
+      className="rounded-xl border border-accent/35 bg-accent-soft/25 p-3"
     >
+      <div className="mb-2 flex items-center gap-1.5 text-[0.65rem] font-bold text-accent">
+        <span className="rounded-full bg-accent px-2 py-0.5 text-on-accent">처음이라면 추천</span>
+        <span>언제든 다른 작업공간으로 바꿀 수 있어요</span>
+      </div>
       <div className="flex min-w-0 items-start gap-2.5">
         <span className="grid size-9 shrink-0 place-items-center rounded-md border border-accent/25 bg-panel text-accent">
-          <PanelLeft size={17} aria-hidden />
+          <PencilLine size={17} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
           <span id={titleId} className="block text-sm font-bold text-fg">
@@ -41,7 +45,7 @@ export function StudioWorkspaceRecommendation({
           >
             {recommendation.description}
           </span>
-          <span className="mt-1 block text-[0.6875rem] text-fg-3">
+          <span className="mt-1.5 block rounded-lg border border-line bg-card/55 px-2 py-1.5 text-[0.6875rem] text-fg-3">
             {recommendation.detail}
           </span>
         </span>

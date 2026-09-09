@@ -4,7 +4,6 @@ import {
   buildStudioDownloadPackage,
   sanitizeStudioDownloadFileStem,
   STUDIO_DOWNLOAD_PACKAGE_MIME,
-  StudioDownloadPackageError,
   studioDownloadPackageFileName,
 } from "./studio-download-package";
 

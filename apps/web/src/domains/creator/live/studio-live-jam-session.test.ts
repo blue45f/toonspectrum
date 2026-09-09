@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createStudioLiveInstantWorkId,
+  isStudioJoinedLiveJamRoom,
   isStudioLiveJamWorkId,
   openStudioLiveCompanionTab,
   readStudioLiveRoomQuery,
@@ -51,6 +52,16 @@ describe("studio live jam session", () => {
     expect(shouldRequireStudioLiveServer({
       expectsSharedDocument: true,
       draftCollaborationReady: false,
+    })).toBe(true);
+  });
+
+  it("distinguishes the instant room owner from a tab that joined the published room", () => {
+    const instant = createStudioLiveInstantWorkId(() => 1, () => 0.5);
+    expect(isStudioJoinedLiveJamRoom({ roomId: null, instantWorkId: instant })).toBe(false);
+    expect(isStudioJoinedLiveJamRoom({ roomId: instant, instantWorkId: instant })).toBe(false);
+    expect(isStudioJoinedLiveJamRoom({
+      roomId: instant,
+      instantWorkId: "work-instant-other-tab",
     })).toBe(true);
   });
 

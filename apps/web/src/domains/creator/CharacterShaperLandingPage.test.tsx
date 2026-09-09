@@ -152,7 +152,7 @@ describe("CharacterShaperLandingPage", () => {
 });
 
 describe("/shaper registration", () => {
-  it("is wired into the router, titles, manifest, sitemap, footer and mobile navigation", () => {
+  it("is wired into the router, titles, manifest, sitemap and centralized site navigation", () => {
     // AppRouter now renders one <Route> per entry of the grouped route table, so the /shaper
     // registration lives in the creator group rather than in the router JSX.
     expect(readRepoFile("apps/web/src/app/routes/groups/creator.routes.tsx")).toContain(
@@ -163,10 +163,18 @@ describe("/shaper registration", () => {
       '{ path: "/shaper", label: "route.shaper" }',
     );
     expect(readRepoFile("scripts/build-static-catalog.ts")).toContain('"/shaper"');
+
+    const navigation = readRepoFile("apps/web/src/shared/components/site-navigation.ts");
+    expect(navigation).toContain('shaper: item("shaper", "/shaper"');
+    expect(navigation).toContain("items: [I.make, I.studio, I.comic, I.shaper, I.market]");
+    // Footer and mobile menu both render from the same navigation groups rather than
+    // maintaining duplicate hard-coded destination lists.
     expect(readRepoFile("apps/web/src/shared/components/site-footer.tsx")).toContain(
-      '{ key: "footer.link.shaper", href: "/shaper" }',
+      "SITE_NAVIGATION_GROUPS.map",
     );
-    expect(readRepoFile("apps/web/src/shared/components/site-header-mobile-nav.tsx")).toContain('href: "/shaper"');
+    expect(readRepoFile("apps/web/src/shared/components/site-header-mobile-nav.tsx")).toContain(
+      "SITE_NAVIGATION_GROUPS.map",
+    );
   });
 
   it("publishes the new app-shell keys in the built-in locales", () => {

@@ -4,6 +4,7 @@ import { defineAppRoutes } from "../app-route-definition";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
+const MakeHubPage = lazyRetry(() => import("@/domains/creator-resources/MakeHubPage").then((module) => ({ default: module.MakeHubPage })), "MakeHubPage");
 const CreatorHubPage = lazyRetry(() => import("@/domains/creator-resources/CreatorHubPage").then((module) => ({ default: module.CreatorHubPage })), "CreatorHubPage");
 const NowPage = lazyRetry(() => import("@/domains/creator-resources/NowPage").then((module) => ({ default: module.NowPage })), "NowPage");
 const OpportunitiesPage = lazyRetry(() => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.OpportunitiesPage })), "OpportunitiesPage");
@@ -16,6 +17,7 @@ const PublishingPage = lazyRetry(() => import("@/domains/creator-resources/Publi
 const SourcesPage = lazyRetry(() => import("@/domains/creator-resources/SourcesPage").then((module) => ({ default: module.SourcesPage })), "SourcesPage");
 
 export const creatorResourcesRoutes = defineAppRoutes([
+  { id: "resources-make", path: "/make", element: <MakeHubPage /> },
   { id: "resources-now", path: "/now", element: <NowPage /> },
   { id: "research-home", path: "/research", element: <CreatorHubPage /> },
   { id: "research-assets", path: "/research/assets", element: <ReferenceAssetsPage /> },
