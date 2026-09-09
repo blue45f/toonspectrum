@@ -30,11 +30,12 @@ jobs:
           from __future__ import annotations
 
           import base64
-          import gzip
+          import hashlib
           import io
           import json
           import pathlib
           import tarfile
+          import zlib
 
           root = pathlib.Path.cwd().resolve()
           parts = sorted((root / ".github" / "quality-foundation").glob("part-*.txt"))
@@ -42,7 +43,25 @@ jobs:
               raise SystemExit("No staged quality-foundation payload parts found")
 
           encoded = "".join(part.read_text(encoding="utf-8").strip() for part in parts)
-          decoded = gzip.decompress(base64.b64decode(encoded, validate=True))
+          compressed = base64.b64decode(encoded, validate=True)
+          decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+          decoded = decoder.decompress(compressed)
+          try:
+              decoded += decoder.flush()
+          except zlib.error as error:
+              print(f"gzip flush warning: {error}")
+
+          print(
+              "payload diagnostics:",
+              f"parts={len(parts)}",
+              f"encoded={len(encoded)}",
+              f"compressed={len(compressed)}",
+              f"decoded={len(decoded)}",
+              f"gzip_eof={decoder.eof}",
+              f"sha256={hashlib.sha256(decoded).hexdigest()}",
+          )
+          if not decoded:
+              raise SystemExit("Decoded payload is empty")
 
           def safe_path(value: str) -> pathlib.Path:
               candidate = pathlib.PurePosixPath(value)
@@ -55,7 +74,7 @@ jobs:
 
           applied = False
           try:
-              with tarfile.open(fileobj=io.BytesIO(decoded), mode="r:*") as archive:
+              with tarfile.open(fileobj=io.BytesIO(decoded), mode="r:") as archive:
                   members = archive.getmembers()
                   if not members or len(members) > 500:
                       raise SystemExit("Unexpected archive member count")
@@ -66,18 +85,33 @@ jobs:
                   archive.extractall(root, members=members, filter="data")
                   print(f"Applied tar payload with {len(members)} members")
                   applied = True
-          except tarfile.ReadError:
+          except (tarfile.ReadError, EOFError):
               pass
 
           if not applied:
               text = decoded.decode("utf-8")
               stripped = text.lstrip()
-              if stripped.startswith("diff --git "):
+              if stripped.startswith("diff --git ") or stripped.startswith("*** Begin Patch"):
+                  if stripped.startswith("*** Begin Patch"):
+                      start = text.find("*** Begin Patch")
+                      end = text.rfind("*** End Patch")
+                      if end < 0:
+                          raise SystemExit(
+                              "Recovered payload is an incomplete apply_patch envelope; "
+                              f"decoded tail={text[-240:]!r}"
+                          )
+                      text = text[start + len("*** Begin Patch"):end].strip() + "\n"
                   patch_path = pathlib.Path("/tmp/character-shot-production.patch")
                   patch_path.write_text(text, encoding="utf-8")
                   print(f"PATCH_FILE={patch_path}")
               elif stripped.startswith("{"):
-                  payload = json.loads(text)
+                  try:
+                      payload = json.loads(text)
+                  except json.JSONDecodeError as error:
+                      raise SystemExit(
+                          "Recovered payload is incomplete JSON: "
+                          f"{error}; tail={text[-240:]!r}"
+                      ) from error
                   files = payload.get("files")
                   if not isinstance(files, dict) or not files or len(files) > 500:
                       raise SystemExit("Invalid JSON payload file map")
@@ -90,8 +124,11 @@ jobs:
                   print(f"Applied JSON payload with {len(files)} files")
                   applied = True
               else:
-                  preview = stripped[:200].replace("\n", "\\n")
-                  raise SystemExit(f"Unknown staged payload format: {preview}")
+                  preview = stripped[:240].replace("\n", "\\n")
+                  tail = stripped[-240:].replace("\n", "\\n")
+                  raise SystemExit(
+                      f"Unknown staged payload format: head={preview}; tail={tail}"
+                  )
           PY
 
           if [[ -f /tmp/character-shot-production.patch ]]; then
