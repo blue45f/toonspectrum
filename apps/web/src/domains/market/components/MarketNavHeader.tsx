@@ -33,18 +33,21 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
       label: "에셋 찾기",
       icon: Compass,
       active: findingAsset,
+      current: pathname === "/market",
     },
     {
       href: "/market/library",
       label: "내 에셋",
       icon: Library,
       active: myAssets,
+      current: myAssets,
     },
     {
       href: "/market/manage",
       label: "배포 관리",
       icon: PackagePlus,
       active: distributing,
+      current: distributing,
     },
   ] as const;
 
@@ -70,7 +73,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                aria-current={item.active ? "page" : undefined}
+                aria-current={item.current ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors duration-150 pointer-coarse:min-h-11",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
@@ -85,7 +88,11 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
             );
           })}
         </div>
-        <div className="mt-1 flex max-w-full items-center gap-1 overflow-x-auto" aria-label="마켓 보조 도구">
+        <div
+          className="mt-1 flex max-w-full items-center gap-1 overflow-x-auto"
+          role="group"
+          aria-label="마켓 보조 도구"
+        >
           {secondaryItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href === "/market/browse" && pathname.startsWith("/market/resource"));
@@ -93,6 +100,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-[0.68rem] font-medium transition-colors pointer-coarse:min-h-11 pointer-coarse:px-3 pointer-coarse:text-xs",
                   active ? "text-accent" : "text-fg-3 hover:text-fg",
