@@ -1,0 +1,20 @@
+name: Retired studio pixel pencil pro core macOS verifier
+
+on:
+  push:
+    branches:
+      - feat/studio-pixel-pencil-pro-v2-20260909
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apply-studio-pixel-pencil-pro-core-macos-sparse-v1
+  cancel-in-progress: true
+
+jobs:
+  retired:
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "Replaced by the memory-safe Ubuntu verifier."
