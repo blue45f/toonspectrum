@@ -1,0 +1,28 @@
+name: Unblock VRM grip contact v2 once
+
+on:
+  push:
+    branches: [feat/vrm-grip-contact-v2-20260910]
+    paths: [.github/workflows/unblock-vrm-grip-contact-v2-once.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  unblock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/vrm-grip-contact-v2-20260910
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's/runs-on: ubuntu-24.04-arm/runs-on: ubuntu-latest/' .github/workflows/vrm-grip-contact-v2-bootstrap.yml
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          git rm .github/workflows/unblock-vrm-grip-contact-v2-once.yml
+          git add .github/workflows/vrm-grip-contact-v2-bootstrap.yml
+          git commit -m 'ci: move VRM grip v2 bootstrap to standard runner'
+          git push origin HEAD:feat/vrm-grip-contact-v2-20260910
