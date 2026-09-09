@@ -26,6 +26,7 @@ describe("site directory experience contracts", () => {
       "/research/books",
       "/compare",
       "/random",
+      "/community/cafes",
       "/about/data",
       "/privacy",
       "/feedback",
