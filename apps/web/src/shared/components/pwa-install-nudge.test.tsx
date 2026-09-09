@@ -62,7 +62,7 @@ describe("PwaInstallNudge", () => {
       name: "툰스튜디오를 앱처럼 열어보세요",
     });
     fireEvent.click(screen.getByRole("button", { name: "설치 안내 닫기" }));
-    expect(nudge).not.toBeInTheDocument();
+    expect(nudge.isConnected).toBe(false);
     expect(sessionStorage.getItem(SESSION_KEY)).toBe("1");
 
     cleanup();
