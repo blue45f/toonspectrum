@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Headers,
   HttpCode,
   HttpStatus,
@@ -12,9 +11,24 @@ import {
   Post,
   Query,
   UnauthorizedException,
+  UseInterceptors,
+  type CallHandler,
+  type ExecutionContext,
+  type NestInterceptor,
 } from "@nestjs/common";
+import type { Observable } from "rxjs";
 
 import { StudioAiComicDirectorService } from "./studio-ai-comic-director.service";
+
+class NoStoreInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const response = context
+      .switchToHttp()
+      .getResponse<{ setHeader(name: string, value: string): void }>();
+    response.setHeader("Cache-Control", "no-store, max-age=0");
+    return next.handle();
+  }
+}
 
 function authenticatedUserId(value: string | undefined): string {
   const userId = value?.trim();
@@ -27,7 +41,7 @@ function authenticatedUserId(value: string | undefined): string {
 }
 
 @Controller("studio-ai/comic-director")
-@Header("Cache-Control", "no-store, max-age=0")
+@UseInterceptors(new NoStoreInterceptor())
 export class StudioAiComicDirectorController {
   constructor(
     @Inject(StudioAiComicDirectorService)
