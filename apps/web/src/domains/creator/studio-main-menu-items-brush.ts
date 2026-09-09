@@ -141,6 +141,8 @@ export function buildStudioBrushMenuItems({
     },
     {
       id: "brush-lab",
+      commandId: "brush.lab",
+      searchActivation: "execute",
       label: "목적별 브러시 제작실…",
       icon: Sparkles,
       onSelect: openGuidedBrushLab,
