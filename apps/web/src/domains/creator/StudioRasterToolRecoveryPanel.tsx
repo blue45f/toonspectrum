@@ -95,6 +95,14 @@ function prewarmStudioRasterRecoveryIntent(
   }
 }
 
+function recoveryIntentProps(request: StudioRasterRecoveryRequest) {
+  return {
+    onPointerEnter: () => prewarmStudioRasterRecoveryIntent(request),
+    onPointerDown: () => prewarmStudioRasterRecoveryIntent(request),
+    onFocus: () => prewarmStudioRasterRecoveryIntent(request),
+  };
+}
+
 /**
  * 픽셀 도구의 숨은 전제조건을 한곳에서 보여 주고, 가능한 복구는 같은 자리에서 실행한다.
  * 원본을 파괴하는 자동 변환은 하지 않으며 canonical availability의 문구와 액션만 표시한다.
@@ -191,24 +199,7 @@ export function StudioRasterToolRecoveryPanel({
                   disabled={busy}
                   aria-describedby={entry.entry.reason ? reasonId : undefined}
                   title={policy.unavailableReason ?? undefined}
-                  onPointerEnter={() =>
-                    prewarmStudioRasterRecoveryIntent({
-                      toolId: entry.tool.id,
-                      action: recovery,
-                    })
-                  }
-                  onPointerDown={() =>
-                    prewarmStudioRasterRecoveryIntent({
-                      toolId: entry.tool.id,
-                      action: recovery,
-                    })
-                  }
-                  onFocus={() =>
-                    prewarmStudioRasterRecoveryIntent({
-                      toolId: entry.tool.id,
-                      action: recovery,
-                    })
-                  }
+                  {...recoveryIntentProps({ toolId: entry.tool.id, action: recovery })}
                   onClick={() => onRecover({ toolId: entry.tool.id, action: recovery })}
                   className={buttonClass({
                     size: "sm",
@@ -224,29 +215,16 @@ export function StudioRasterToolRecoveryPanel({
           );
         })}
       </div>
+
       {sharedRecovery ? (
         <footer className="border-t border-line/60 p-2.5">
           <button
             type="button"
             disabled={busy}
-            onPointerEnter={() =>
-              prewarmStudioRasterRecoveryIntent({
-                toolId: entries[0]!.tool.id,
-                action: sharedRecovery,
-              })
-            }
-            onPointerDown={() =>
-              prewarmStudioRasterRecoveryIntent({
-                toolId: entries[0]!.tool.id,
-                action: sharedRecovery,
-              })
-            }
-            onFocus={() =>
-              prewarmStudioRasterRecoveryIntent({
-                toolId: entries[0]!.tool.id,
-                action: sharedRecovery,
-              })
-            }
+            {...recoveryIntentProps({
+              toolId: entries[0]!.tool.id,
+              action: sharedRecovery,
+            })}
             onClick={() =>
               onRecover({
                 toolId: entries[0]!.tool.id,
@@ -522,7 +500,7 @@ export interface StudioInspectorFilterLauncherProps {
 
 /**
  * 이미지가 선택되지 않아도 페이지 합성본으로 필터를 시작할 수 있는 Inspector 진입점.
- * native select는 긴 필터 목록과 모바일 키보드/스크린리더를 동시에 안정적으로 지원한다.
+ * 벡터/선 선택에서는 자동 준비와 명시적 복사본 준비를 함께 보여 주어 숨은 래스터 전환을 없앤다.
  */
 export function StudioInspectorFilterLauncher({
   availability,
@@ -537,11 +515,23 @@ export function StudioInspectorFilterLauncher({
   const disabled = busy || !policy.selectable;
   const recovery = gate.action;
   const targetLabel = policy.targetLabel;
+  const preparesEffectCopy =
+    policy.state === "prepare-page-composite" &&
+    recovery?.id === "create-editable-raster-copy";
+  const description = busy
+    ? preparesEffectCopy
+      ? "효과용 이미지 복사본을 만드는 중입니다. 완료되면 선택한 효과가 자동으로 열립니다. Esc를 누르면 취소할 수 있어요."
+      : "원본을 보존한 필터 미리보기를 준비하고 있습니다."
+    : preparesEffectCopy
+      ? "효과를 고르면 현재 보이는 결과를 새 이미지 복사본으로 준비하고 바로 미리보기를 엽니다."
+      : policy.description;
 
   return (
     <section
       aria-labelledby={`${descriptionId}-title`}
+      aria-busy={busy}
       data-studio-inspector-filter-launcher="true"
+      data-studio-raster-entry-state={policy.state}
       className="space-y-2.5 rounded-xl border border-line bg-card/50 p-2.5"
     >
       <header className="flex items-start justify-between gap-2">
@@ -554,9 +544,7 @@ export function StudioInspectorFilterLauncher({
             필터 갤러리
           </h3>
           <p id={descriptionId} className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-            {busy
-              ? "원본을 보존한 필터 미리보기를 준비하고 있습니다."
-              : policy.description}
+            {description}
           </p>
         </div>
         <StudioContextPill
@@ -570,12 +558,53 @@ export function StudioInspectorFilterLauncher({
                   : "neutral"
           }
         >
-          {policy.statusLabel}
+          {preparesEffectCopy ? "자동 준비" : policy.statusLabel}
         </StudioContextPill>
       </header>
 
+      {preparesEffectCopy ? (
+        <div
+          role="note"
+          aria-label="효과 적용 안내"
+          className="space-y-2 rounded-xl border border-accent/30 bg-accent-soft/45 px-2.5 py-2.5"
+        >
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-good" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-[0.72rem] font-semibold text-fg">
+                선·도형 원본은 그대로 유지됩니다
+              </p>
+              <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
+                필요한 경우 현재 화면을 새 이미지(래스터) 레이어로 준비합니다. 원본을 덮어쓰거나
+                삭제하지 않아 나중에 선을 다시 수정할 수 있어요.
+              </p>
+            </div>
+          </div>
+          <ol
+            aria-label="효과 적용 단계"
+            className="grid grid-cols-3 gap-1.5 text-center text-[0.58rem] font-semibold text-fg-2"
+          >
+            <li className="rounded-md border border-line/70 bg-canvas/65 px-1.5 py-1.5">
+              <span className="mr-1 text-accent">1</span>효과 선택
+            </li>
+            <li className="rounded-md border border-line/70 bg-canvas/65 px-1.5 py-1.5">
+              <span className="mr-1 text-accent">2</span>복사본 준비
+            </li>
+            <li className="rounded-md border border-line/70 bg-canvas/65 px-1.5 py-1.5">
+              <span className="mr-1 text-accent">3</span>미리보기 조절
+            </li>
+          </ol>
+        </div>
+      ) : null}
+
       <label
-        title={policy.selectable ? policy.actionLabel : policy.unavailableReason ?? undefined}
+        title={
+          policy.selectable
+            ? preparesEffectCopy
+              ? "효과를 고르면 이미지 복사본을 자동으로 준비하고 미리보기를 엽니다."
+              : policy.actionLabel
+            : policy.unavailableReason ?? undefined
+        }
         className={cn(
           "flex min-h-10 items-center gap-2 rounded-lg border border-line bg-canvas/65 px-2.5",
           STUDIO_EASE,
@@ -608,7 +637,11 @@ export function StudioInspectorFilterLauncher({
           )}
         >
           <option value="" disabled>
-            {busy ? "미리보기 준비 중…" : "필터 선택…"}
+            {busy
+              ? "미리보기 준비 중…"
+              : preparesEffectCopy
+                ? "효과 선택 — 복사본은 자동으로 준비돼요"
+                : "필터 선택…"}
           </option>
           {STUDIO_FILTER_ALL_KINDS.map((kind) => (
             <option key={kind} value={kind}>
@@ -619,7 +652,7 @@ export function StudioInspectorFilterLauncher({
         <ChevronRight className="size-3.5 shrink-0 rotate-90 text-fg-3" aria-hidden />
       </label>
 
-      {gate.reason ? (
+      {gate.reason && !preparesEffectCopy ? (
         <p
           role="status"
           className="rounded-lg border border-line/70 bg-canvas/45 px-2.5 py-2 text-[0.68rem] leading-relaxed text-fg-3"
@@ -628,7 +661,41 @@ export function StudioInspectorFilterLauncher({
         </p>
       ) : null}
 
-      {!policy.selectable && recovery ? (
+      {preparesEffectCopy && recovery ? (
+        <div className="space-y-1.5">
+          <button
+            type="button"
+            disabled={busy}
+            aria-describedby={descriptionId}
+            title="효과를 고르기 전에 이미지(래스터) 복사본을 직접 준비합니다."
+            {...recoveryIntentProps({ toolId: availability.tool.id, action: recovery })}
+            onClick={() => onRecover({ toolId: availability.tool.id, action: recovery })}
+            className={cn(
+              buttonClass({
+                size: "sm",
+                variant: "solid",
+                className: "min-h-10 w-full justify-between gap-2 pointer-coarse:min-h-11",
+              }),
+              STUDIO_FOCUS_RING,
+            )}
+          >
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              {busy ? (
+                <Loader2 className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <ImagePlus className="size-3.5 shrink-0" aria-hidden />
+              )}
+              <span className="truncate">
+                {busy ? "효과용 이미지 복사본 준비 중…" : "효과용 이미지 복사본 먼저 만들기"}
+              </span>
+            </span>
+            <ChevronRight className="size-3.5 shrink-0" aria-hidden />
+          </button>
+          <p className="px-1 text-[0.62rem] leading-relaxed text-fg-3">
+            ‘래스터 변환’이 필요한 경우 사용하는 안전한 방식입니다. 새 레이어만 만들고 원본은 유지합니다.
+          </p>
+        </div>
+      ) : !policy.selectable && recovery ? (
         <button
           type="button"
           disabled={busy}
