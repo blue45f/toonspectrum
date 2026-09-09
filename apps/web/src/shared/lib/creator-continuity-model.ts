@@ -84,36 +84,3 @@ export function freezeCreatorContinuity(
     plan: state.plan ? Object.freeze({ ...state.plan }) : null,
   });
 }
-
-export function setCreatorLaunchPlanInState(
-  state: CreatorContinuityState,
-  goal: CreatorLaunchGoal,
-  pace: CreatorLaunchPace,
-  now = Date.now(),
-): CreatorContinuityState {
-  return freezeCreatorContinuity({
-    version: CREATOR_CONTINUITY_VERSION,
-    recent: state.recent,
-    plan: { goal, pace, updatedAt: now },
-  });
-}
-
-export function clearCreatorRecentInState(
-  state: CreatorContinuityState,
-): CreatorContinuityState {
-  return freezeCreatorContinuity({
-    version: CREATOR_CONTINUITY_VERSION,
-    recent: [],
-    plan: state.plan,
-  });
-}
-
-export function clearCreatorPlanInState(
-  state: CreatorContinuityState,
-): CreatorContinuityState {
-  return freezeCreatorContinuity({
-    version: CREATOR_CONTINUITY_VERSION,
-    recent: state.recent,
-    plan: null,
-  });
-}
