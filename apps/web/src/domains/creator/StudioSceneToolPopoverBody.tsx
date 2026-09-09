@@ -3,7 +3,6 @@ import {
   Droplets,
   Grid2x2,
   Image as ImageIcon,
-  Mountain,
   PersonStanding,
   Search,
   Sparkles,
@@ -32,9 +31,9 @@ export interface StudioSceneToolPopoverBodyProps {
   readonly toolBelt: StudioToolBeltContentProps;
 }
 
-const FLOW_CARD = cn(
-  "min-h-24 rounded-xl border border-line bg-card p-3 text-left transition-colors",
-  "hover:border-accent/45 hover:bg-accent-soft/20",
+const QUICK_CARD = cn(
+  "min-h-16 rounded-xl border border-line bg-card p-2 text-left transition-colors",
+  "hover:border-accent/45 hover:bg-raised",
   STUDIO_FOCUS_RING,
 );
 
@@ -93,53 +92,47 @@ export function StudioSceneToolPopoverBody({
     <>
       <StudioMenuPopoverHeader
         icon={Boxes}
-        title="3D 스튜디오"
-        description="캐릭터 제작부터 포즈·손·소품, 배경 합성, 카메라·캔버스 출력까지 한 흐름으로 진행하세요."
+        title="3D 장면"
+        description="도구를 고르는 대신 장면에서 시작하세요. 캐릭터·배경·소품·포즈·카메라·조명을 한 흐름으로 완성합니다."
       />
 
-      <section aria-label="3D 제작 순서" className="mb-3 rounded-2xl border border-accent/20 bg-accent-soft/10 p-2.5">
-        <div className="mb-2 flex items-start justify-between gap-2 px-0.5">
-          <div>
-            <p className="text-[0.7rem] font-bold text-fg">3D 작업은 여기서 시작하세요</p>
-            <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
-              기존 3D 캐릭터·셰이퍼·데생 인형·3D 배경은 서로 다른 제품이 아니라 아래 제작 단계의 전문 편집기입니다.
-            </p>
-          </div>
-          <span className="shrink-0 rounded-full bg-accent px-2 py-1 text-[0.56rem] font-bold text-white">1 → 4</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" className={FLOW_CARD} onClick={() => closeAnd(() => setCharacterShaperOpen(true))}>
-            <Sparkles size={17} aria-hidden className="text-accent" />
-            <span className="mt-2 block text-[0.68rem] font-bold text-fg">1. 캐릭터 만들기</span>
-            <span className="mt-1 block text-[0.59rem] leading-relaxed text-fg-3">얼굴·눈·헤어·체형·의상·색을 만들고 수정합니다.</span>
-          </button>
-          <button type="button" className={FLOW_CARD} onClick={() => closeAnd(() => setPoserVrmOpen(true))}>
-            <UsersRound size={17} aria-hidden className="text-accent" />
-            <span className="mt-2 block text-[0.68rem] font-bold text-fg">2. 포즈·손·소품</span>
-            <span className="mt-1 block text-[0.59rem] leading-relaxed text-fg-3">전신 포즈와 손 모양, 표정, 소품 잡기를 한 캐릭터에서 조정합니다.</span>
-          </button>
-          <button type="button" className={FLOW_CARD} onClick={openSharedStage}>
-            <Mountain size={17} aria-hidden className="text-accent" />
-            <span className="mt-2 block text-[0.68rem] font-bold text-fg">3. 배경·장면 합성</span>
-            <span className="mt-1 block text-[0.59rem] leading-relaxed text-fg-3">3D 배경과 캐릭터를 같은 카메라·조명·바닥 좌표에서 배치합니다.</span>
-          </button>
-          <button type="button" className={FLOW_CARD} onClick={openSharedStage}>
-            <Boxes size={17} aria-hidden className="text-accent" />
-            <span className="mt-2 block text-[0.68rem] font-bold text-fg">4. 카메라·컷 출력</span>
-            <span className="mt-1 block text-[0.59rem] leading-relaxed text-fg-3">구도·조명·투명 배경을 확인하고 고해상도로 현재 컷에 넣습니다.</span>
-          </button>
-        </div>
+      <section aria-label="3D 장면 시작" className="mb-3 rounded-2xl border border-accent/25 bg-accent-soft/10 p-2.5">
         <button
           type="button"
-          onClick={() => closeAnd(() => setMannequinPoserOpen(true))}
+          onClick={openSharedStage}
           className={cn(
-            "mt-2 flex min-h-11 w-full items-center gap-2 rounded-xl border border-dashed border-line px-3 text-left text-[0.63rem] text-fg-2 hover:bg-raised",
+            "min-h-20 w-full rounded-xl border border-accent/35 bg-card px-3 py-3 text-left transition-colors",
+            "hover:border-accent hover:bg-accent-soft/20",
             STUDIO_FOCUS_RING,
           )}
         >
-          <PersonStanding size={15} aria-hidden />
-          <span><strong>빠른 인체 참고</strong> · 캐릭터 제작 없이 데생 인형으로 포즈만 잡기</span>
+          <span className="flex items-center gap-2 text-[0.72rem] font-bold text-fg">
+            <Boxes size={17} aria-hidden className="text-accent" />
+            3D 장면 만들기
+          </span>
+          <span className="mt-1.5 block text-[0.61rem] leading-relaxed text-fg-3">
+            배경과 캐릭터를 같은 카메라·조명·바닥에 놓고 포즈와 소품을 조정한 뒤 고해상도로 현재 컷에 넣습니다.
+          </span>
         </button>
+
+        <p className="mb-1.5 mt-3 px-0.5 text-[0.59rem] font-semibold text-fg-3">빠른 전문 편집</p>
+        <div className="grid grid-cols-3 gap-1.5">
+          <button type="button" className={QUICK_CARD} onClick={() => closeAnd(() => setCharacterShaperOpen(true))}>
+            <Sparkles size={14} aria-hidden className="text-accent" />
+            <span className="mt-1.5 block text-[0.61rem] font-bold text-fg">캐릭터 제작</span>
+            <span className="mt-0.5 block text-[0.54rem] leading-snug text-fg-3">얼굴·헤어·체형·의상</span>
+          </button>
+          <button type="button" className={QUICK_CARD} onClick={() => closeAnd(() => setPoserVrmOpen(true))}>
+            <UsersRound size={14} aria-hidden className="text-accent" />
+            <span className="mt-1.5 block text-[0.61rem] font-bold text-fg">포즈·손</span>
+            <span className="mt-0.5 block text-[0.54rem] leading-snug text-fg-3">표정·그립·소품 접촉</span>
+          </button>
+          <button type="button" className={QUICK_CARD} onClick={() => closeAnd(() => setMannequinPoserOpen(true))}>
+            <PersonStanding size={14} aria-hidden className="text-accent" />
+            <span className="mt-1.5 block text-[0.61rem] font-bold text-fg">인체 참고</span>
+            <span className="mt-0.5 block text-[0.54rem] leading-snug text-fg-3">빠른 데생 포즈</span>
+          </button>
+        </div>
       </section>
 
       <div className="mb-2 border-t border-line pt-2">
