@@ -60,12 +60,14 @@ jobs:
           const test = readFileSync(testPath, "utf8");
           const marker = '  it("dismisses transient help when the editor window loses attention", () => {';
           const internalScrollTest = [
-            '  it("keeps hover help open while its own scroll region is being read", async () => {',
+            '  it("keeps passive hover help open while its own scroll region is being read", async () => {',
+            "    vi.useFakeTimers();",
             "    renderPair();",
             '    const pen = screen.getByRole("button", { name: "펜" });',
             "",
-            "    fireEvent.focus(pen);",
+            "    fireEvent.mouseEnter(pen);",
             "    await act(async () => {",
+            "      vi.advanceTimersByTime(280);",
             "      await Promise.resolve();",
             "      await Promise.resolve();",
             "    });",
