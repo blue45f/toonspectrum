@@ -1,16 +1,22 @@
 {
   "name": "툰스튜디오 · ToonStudio",
   "short_name": "툰스튜디오",
-  "description": "아이디어를 첫 장면으로. 드로잉·컷툰·3D 창작 공간.",
+  "description": "아이디어를 첫 장면으로. 드로잉·컷툰·3D·리서치를 잇는 브라우저 창작 공간.",
   "lang": "ko-KR",
   "categories": [
-    "entertainment",
-    "books"
+    "productivity",
+    "graphics_design",
+    "entertainment"
   ],
   "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
   "theme_color": "#1a1410",
   "background_color": "#1a1410",
   "icons": [
@@ -47,22 +53,28 @@
   ],
   "shortcuts": [
     {
-      "name": "통합 검색",
-      "short_name": "검색",
-      "description": "질의 + 패싯 필터로 웹툰·웹소설 통합 검색",
-      "url": "/search"
+      "name": "창작 스튜디오",
+      "short_name": "스튜디오",
+      "description": "브러시·레이어·필터가 있는 창작 작업 공간",
+      "url": "/studio"
     },
     {
-      "name": "통합 랭킹",
-      "short_name": "랭킹",
-      "description": "인기·급상승·평점 등 6개 축 통합 랭킹",
-      "url": "/ranking"
+      "name": "컷툰 만들기",
+      "short_name": "컷툰",
+      "description": "컷과 말풍선으로 이야기를 구성하는 작업 공간",
+      "url": "/studio/comic"
     },
     {
-      "name": "연재 캘린더",
-      "short_name": "연재",
-      "description": "연재요일 기준 요일별 보드",
-      "url": "/calendar"
+      "name": "캐릭터 셰이퍼",
+      "short_name": "캐릭터",
+      "description": "캐릭터 비율·표정·포즈와 구도를 준비하는 도구",
+      "url": "/shaper"
+    },
+    {
+      "name": "창작 리서치 데스크",
+      "short_name": "리서치",
+      "description": "작품·판본·공개 자료와 출처를 한곳에 정리",
+      "url": "/research"
     }
   ],
   "screenshots": [
@@ -71,14 +83,14 @@
       "sizes": "1280x820",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "홈 — 웹툰·웹소설 통합 인덱스 (데스크톱)"
+      "label": "툰스튜디오 창작 홈 — 아이디어에서 작업까지 (데스크톱)"
     },
     {
       "src": "/screenshot-narrow.png",
       "sizes": "585x1266",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "홈 — 웹툰·웹소설 통합 인덱스 (모바일)"
+      "label": "툰스튜디오 창작 홈 — 빠른 시작과 최근 흐름 (모바일)"
     }
   ]
 }
