@@ -125,10 +125,11 @@ export const SITE_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
   },
 ] as const;
 
+/** Mobile tabs are stable places, not one-off commands. New creation starts from Project Center. */
 export const MOBILE_SITE_TABS = [
   I.home,
   I.explore,
-  I.make,
+  I.studio,
   I.market,
   I.me,
 ] as const;
