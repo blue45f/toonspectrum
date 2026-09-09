@@ -166,6 +166,25 @@ describe("canonical production parts", () => {
     }, part).status).toBe("unavailable");
   });
 
+  it("rejects traversal and non-path schemes before any asset fetch can happen", () => {
+    const manifest = fixture();
+    const part = manifest.parts![0]!;
+    expect(() => parseCharacterCanonicalManifestV2({
+      ...manifest,
+      parts: [{
+        ...part,
+        source: { ...part.source, file: "/assets/parts/../private.glb" },
+      }],
+    })).toThrow();
+    expect(() => parseCharacterCanonicalManifestV2({
+      ...manifest,
+      parts: [{
+        ...part,
+        quality: { ...part.quality, reportFile: "javascript:alert(1)" },
+      }],
+    })).toThrow();
+  });
+
   it("creates one immutable application plan with semantic fit data", () => {
     const manifest = fixture();
     const plan = createCharacterCanonicalPartPlan({
