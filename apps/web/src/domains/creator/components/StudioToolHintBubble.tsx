@@ -14,6 +14,7 @@ import {
 
 import {
   planStudioToolHintPosition,
+  readStudioToolHintViewport,
   type StudioToolHintSide,
 } from "../studio-tool-hint-position";
 import { studioToolHintPreviewSpecFromRuntime } from "../studio-tool-hint-preview-kind";
@@ -160,8 +161,10 @@ export function StudioToolHintBubble({
   onMouseLeave,
 }: StudioToolHintBubbleProps): ReactElement {
   const bubbleRef = useRef<HTMLDivElement>(null);
-  const viewportWidth = typeof globalThis.innerWidth === "number" ? globalThis.innerWidth : 1280;
-  const viewportHeight = typeof globalThis.innerHeight === "number" ? globalThis.innerHeight : 800;
+  const lastSideRef = useRef<StudioToolHintSide | null>(null);
+  const viewport = readStudioToolHintViewport();
+  const viewportWidth = viewport.width;
+  const viewportHeight = viewport.height;
   const richCoachAvailable =
     richPreviewEnabled && viewportHeight >= MIN_RICH_COACH_VIEWPORT_HEIGHT;
   const coachExpanded = richCoachAvailable && expanded;
@@ -174,19 +177,39 @@ export function StudioToolHintBubble({
       ? COACH_HEIGHT + (unavailableReason ? 40 : 0)
       : COMPACT_HEIGHT + (unavailableReason ? 40 : 0)
   );
-  const resolvedPreferredSide = preferredSide ?? (anchor.bottom > viewportHeight * 0.72 ? "top" : "right");
+  const resolvedPreferredSide =
+    preferredSide ??
+    (anchor.bottom > viewport.top + viewportHeight * 0.72 ? "top" : "right");
+  const reservedWidth = richCoachAvailable
+    ? Math.min(COACH_WIDTH, Math.max(1, viewportWidth - 20))
+    : expectedWidth;
+  const reservedHeight = richCoachAvailable
+    ? Math.min(
+        COACH_HEIGHT + (unavailableReason ? 40 : 0),
+        Math.max(1, viewportHeight - 20)
+      )
+    : measuredHeight;
   const position = planStudioToolHintPosition({
     anchor,
     viewportWidth,
     viewportHeight,
+    viewportLeft: viewport.left,
+    viewportTop: viewport.top,
     // Width is a deterministic state value. Using the previous measured width
     // for this render leaves the 304px coach at the compact 240px coordinate
     // until its CSS transition ends, clipping exactly 54px at the right edge.
     popupWidth: expectedWidth,
     popupHeight: measuredHeight,
+    selectionPopupWidth: reservedWidth,
+    selectionPopupHeight: reservedHeight,
+    ...(lastSideRef.current ? { previousSide: lastSideRef.current } : {}),
     preferredSide: resolvedPreferredSide,
     viewportPadding: 10,
   });
+  useLayoutEffect(() => {
+    lastSideRef.current = position.side;
+  }, [position.side]);
+
   const preview = studioToolHintPreview(hint);
   const previewSpec = studioToolHintPreviewSpecFromRuntime(
     preview,
@@ -227,11 +250,13 @@ export function StudioToolHintBubble({
         richPreviewEnabled && expanded && !richCoachAvailable ? "true" : undefined
       }
       data-studio-tool-hint-reduced-motion={reducedMotion ? "true" : undefined}
+      data-studio-tool-hint-viewport={viewport.source}
+      data-studio-tool-hint-layout={coachExpanded ? "expanded" : "compact"}
       data-side={position.side}
       id={id ?? defaultHintId(hint)}
       className={cn(
-        "pointer-events-auto fixed z-[200] max-h-[calc(100vh-1.25rem)] overflow-hidden rounded-lg border border-line/80",
-        "bg-panel/98 p-2.5 text-left shadow-[0_20px_56px_oklch(0.06_0.01_70/0.66)] backdrop-blur-xl",
+        "pointer-events-auto fixed z-[200] max-h-[calc(100vh-1.25rem)] overflow-visible rounded-lg border border-line/80",
+        "bg-panel/98 text-left shadow-[0_20px_56px_oklch(0.06_0.01_70/0.66)] backdrop-blur-xl",
         reducedMotion
           ? "transition-none"
           : "transition-[width] duration-150 ease-out motion-reduce:transition-none",
@@ -243,6 +268,7 @@ export function StudioToolHintBubble({
       style={{
         left: position.left,
         top: position.top,
+        width: expectedWidth,
         animation: reducedMotion ? "none" : undefined,
       }}
       onMouseEnter={onMouseEnter}
@@ -258,7 +284,12 @@ export function StudioToolHintBubble({
         style={arrowStyle(position.side, position.arrowOffset)}
       />
 
-      <div className="flex items-start justify-between gap-2">
+      <div
+        data-studio-tool-hint-scroll-region="true"
+        className="overflow-x-hidden overflow-y-auto overscroll-contain p-2.5"
+        style={{ maxHeight: Math.max(1, viewportHeight - 20) }}
+      >
+        <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[0.8125rem] font-bold leading-tight text-fg">{hint.title}</p>
           {richCoachAvailable ? (
@@ -316,14 +347,15 @@ export function StudioToolHintBubble({
       ) : null}
 
       {coachExpanded && hint.tip ? (
-        <div
-          data-studio-tool-hint-tip="true"
-          className="mt-2 flex items-start gap-1.5 rounded-md border border-accent/20 bg-accent-soft/50 px-2 py-1.5 text-[0.7rem] leading-relaxed text-fg-2"
-        >
-          <Lightbulb size={12} strokeWidth={1.8} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-          <span>{hint.tip}</span>
-        </div>
-      ) : null}
+          <div
+            data-studio-tool-hint-tip="true"
+            className="mt-2 flex items-start gap-1.5 rounded-md border border-accent/20 bg-accent-soft/50 px-2 py-1.5 text-[0.7rem] leading-relaxed text-fg-2"
+          >
+            <Lightbulb size={12} strokeWidth={1.8} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+            <span>{hint.tip}</span>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
