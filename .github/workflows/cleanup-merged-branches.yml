@@ -1,4 +1,4 @@
-name: Cleanup merged branches
+name: Cleanup merged branches and stale Actions runs
 
 on:
   schedule:
@@ -15,20 +15,20 @@ on:
 
 permissions:
   actions: write
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
+  issues: read
+  pull-requests: read
 
 concurrency:
-  # Preserve a cleanup that has acquired a runner; a later tick may replace only stale pending work.
-  # The v3 suffix detaches this generation from the failed summary runner while preserving active work.
-  group: merged-branch-cleanup-v3
-  cancel-in-progress: false
+  # Cleanup is observational for branches and destructive only for superseded Actions runs.
+  # Keep only the latest lightweight cleanup generation so it never becomes queue debt itself.
+  group: merged-branch-cleanup-v4
+  cancel-in-progress: true
 
 jobs:
   cleanup:
-    name: Delete integrated branches and stale Actions runs
-    runs-on: ubuntu-slim
+    name: Audit integrated branches and drain stale Actions runs
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 8
     steps:
       - name: Fetch cleanup scripts from the triggering main commit
@@ -49,13 +49,13 @@ jobs:
             node --check "$RUNNER_TEMP/${script}"
           done
 
-      - name: Remove only branches proven to be integrated
+      - name: Audit integrated branches without deleting them
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          node "$RUNNER_TEMP/cleanup-merged-branches.mjs" --all --apply \
+          node "$RUNNER_TEMP/cleanup-merged-branches.mjs" --all \
             | tee "$RUNNER_TEMP/cleanup-report.json"
 
       - name: Cancel superseded queued and running workflow runs
