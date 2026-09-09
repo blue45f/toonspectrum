@@ -57,7 +57,9 @@ describe("Studio3dGenerationHttpClient", () => {
   });
 
   it("advances, cancels and restores jobs through stable URLs", async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(job));
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(
+      async () => jsonResponse(job),
+    );
     const client = new Studio3dGenerationHttpClient({ userId: "user-1", fetchImpl: fetchMock });
     await client.advance("job/1");
     await client.cancel("job/1");
