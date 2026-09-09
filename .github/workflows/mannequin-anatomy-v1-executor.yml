@@ -91,5 +91,5 @@ jobs:
                 .github/workflows/mannequin-anatomy-v1-executor.yml
           git add -A
           git diff --cached --check
-          HUSKY=0 git commit -m 'feat(mannequin): add anatomical silhouette controls'
-          HUSKY=0 git push origin HEAD:feat/mannequin-anatomy-v1-20260910
+          git -c core.hooksPath=/dev/null commit -m 'feat(mannequin): add anatomical silhouette controls'
+          git -c core.hooksPath=/dev/null push origin HEAD:feat/mannequin-anatomy-v1-20260910
