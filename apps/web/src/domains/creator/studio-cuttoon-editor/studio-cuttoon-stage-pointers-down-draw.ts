@@ -18,6 +18,13 @@ import { studioLiveRetainedMediaOverlaySupportsElement } from "../live/studio-li
 import { planStudioDrawPointerRelease } from "../brush/studio-draw-pointer-release-plan";
 import { planStudioDrawPointerStart } from "../brush/studio-draw-pointer-start-plan";
 import {
+  resolveStudioPenContactDrawMode,
+  resolveStudioPenContactStrokeWidth,
+} from "../brush/studio-pen-button-policy";
+import { getStudioPenButtonPolicySnapshot } from "../brush/studio-pen-button-policy-store";
+import { beginStudioStrokePointerSession } from "../brush/studio-pen-pointer-session";
+import { getStudioStylusPressureProfileSnapshot } from "../brush/studio-stylus-pressure-profile-store";
+import {
   executeStudioDraftPreviewBackdropBoundary,
   planStudioDraftPreviewBackdropBoundary,
   studioLiveBrushEffectiveDiameter,
@@ -137,7 +144,6 @@ import {
   shouldAppendStudioPixelPencilSample,
 } from "../studio-pixel-pencil";
 import {
-  beginStudioStrokePointerSession,
   collectStudioStrokePointerBatch,
   isStudioStrokePointerEvent,
   shouldCommitStudioStrokeOnPointerCancel,
@@ -347,6 +353,22 @@ export function bindStudioCuttoonStagePointersDownDraw(
         return;
       }
       const pointerSample = e.evt as PointerEvent;
+      const penButtonPolicy = getStudioPenButtonPolicySnapshot();
+      const strokeDrawMode = resolveStudioPenContactDrawMode(
+        drawMode,
+        pointerSample,
+        penButtonPolicy,
+      );
+      const momentaryPenEraser = drawMode === "pen" && strokeDrawMode === "eraser";
+      const strokeInputWidth = resolveStudioPenContactStrokeWidth(
+        strokeWidth,
+        drawMode,
+        pointerSample,
+        penButtonPolicy,
+      );
+      const strokeInputOpacity = momentaryPenEraser ? 1 : brushOpacity;
+      const stylusPressureProfile = getStudioStylusPressureProfileSnapshot();
+      if (momentaryPenEraser) pointerSample.preventDefault();
       // Capture the frame-clock anchor alongside pointerdown, before CRDT/render setup can add
       // device-dependent latency. The pump later maps this elapsed time back to the event clock.
       const pointerDownFrameTimeStamp = globalThis.performance?.now?.() ?? pointerSample.timeStamp;
@@ -388,15 +410,15 @@ export function bindStudioCuttoonStagePointersDownDraw(
       const backdropPendingBatch = pendingStrokeCommitsRef.current;
       const backdropBoundary = planStudioDraftPreviewBackdropBoundary({
         incoming: {
-          brush: drawMode === "pen" ? brush : undefined,
+          brush: strokeDrawMode === "pen" ? brush : undefined,
           fill:
-            drawMode === "lasso-fill"
+            strokeDrawMode === "lasso-fill"
               ? color
-              : drawMode === "shape" && shapeFill && drawShape !== "line"
+              : strokeDrawMode === "shape" && shapeFill && drawShape !== "line"
                 ? color
                 : undefined,
-          kind: drawMode === "shape" ? drawShape : "freehand",
-          mode: drawMode === "eraser" ? "eraser" : "pen",
+          kind: strokeDrawMode === "shape" ? drawShape : "freehand",
+          mode: strokeDrawMode === "eraser" ? "eraser" : "pen",
         },
         pending: backdropPendingBatch?.pageId === activePage.id
           ? backdropPendingBatch.strokes
@@ -413,11 +435,11 @@ export function bindStudioCuttoonStagePointersDownDraw(
           backdropPendingBatch
           && backdropPendingBatch.pageId === activePage.id
           && liveRetainedMediaOverlayRendererRef.current.hasSettledStrokes
-          && (drawMode === "eraser" || studioLiveRetainedMediaOverlaySupportsElement({
+          && (strokeDrawMode === "eraser" || studioLiveRetainedMediaOverlaySupportsElement({
             id: "incoming-retained-probe", type: "draw",
-            kind: drawMode === "shape" ? drawShape : "freehand",
-            mode: drawMode === "eraser" ? "eraser" : "pen",
-            brush: drawMode === "pen" ? brush : undefined,
+            kind: strokeDrawMode === "shape" ? drawShape : "freehand",
+            mode: strokeDrawMode === "eraser" ? "eraser" : "pen",
+            brush: strokeDrawMode === "pen" ? brush : undefined,
             points: [0, 0], stroke: color, strokeWidth: 1, opacity: 1,
           }))
           && backdropPendingBatch.strokes.every((stroke) => (
@@ -441,9 +463,9 @@ export function bindStudioCuttoonStagePointersDownDraw(
       // page-wide lease that prevented two artists from drawing at once. Keep the lease fallback
       // only while the durable document is not connected.
       if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit()) return;
-      const pointerSession = beginStudioStrokePointerSession(pointerSample);
-      // A second contact cannot replace a live pen stroke. Right-click/barrel-button presses also
-      // remain available to the context menu instead of leaving a one-point draft behind.
+      const pointerSession = beginStudioStrokePointerSession(pointerSample, penButtonPolicy);
+      // A second contact cannot replace a live pen stroke. Barrel input remains a context action
+      // unless the captured local policy explicitly routes it to momentary erase.
       if (!pointerSession) {
         endLiveResourceEdit();
         return;
@@ -471,6 +493,8 @@ export function bindStudioCuttoonStagePointersDownDraw(
         preserveCorners,
         pressureCurve,
         pressureMinSize,
+        stylusPressureProfile,
+        drawMode: strokeDrawMode,
         useVelocityPressure,
         velocitySensitivity,
         coordinateScale: effScale,
@@ -486,12 +510,12 @@ export function bindStudioCuttoonStagePointersDownDraw(
         id: uid(),
         position: pos,
         pointer: pointerSample,
-        drawMode,
+        drawMode: strokeDrawMode,
         drawShape,
         shapeFill,
         color,
-        strokeWidth,
-        brushOpacity,
+        strokeWidth: strokeInputWidth,
+        brushOpacity: strokeInputOpacity,
         brush,
         brushCatalogId: activeCatalogBrush.id, brushCatalogName: activeCatalogBrush.name,
         stampTuning, brushDynamics,
@@ -501,6 +525,7 @@ export function bindStudioCuttoonStagePointersDownDraw(
         velocitySensitivity,
         pressureCurve,
         pressureMinSize,
+        stylusPressureProfile,
         positionScale: effScale,
         brushTip: { tiltEnabled, angleDeg: tipAngle, roundness: tipRoundness },
         symmetry: {
@@ -517,7 +542,7 @@ export function bindStudioCuttoonStagePointersDownDraw(
         stylus,
       } = drawStartPlan;
       let { element: next, strokeOrigin } = drawStartPlan;
-      const linked3dCorrection = !isRealtimeTeamSession && drawMode === "pen"
+      const linked3dCorrection = !isRealtimeTeamSession && strokeDrawMode === "pen"
         ? createStudioLinked3dCorrectionProvenance(
             activePage.linked3dRender,
             selected?.id,
@@ -572,7 +597,7 @@ export function bindStudioCuttoonStagePointersDownDraw(
           }
         }
       }
-      if (drawMode === "pen") scheduleLiveDrawPressure(pressure);
+      if (strokeDrawMode === "pen") scheduleLiveDrawPressure(pressure);
       // Pointer-up is a lifecycle signal, not a new freehand coordinate. Retain pointer-down now
       // so a tap and a stroke with no delivered move still have authoritative release metadata.
       drawingLastAuthoritativePointerRef.current = pointerSample;
@@ -610,7 +635,7 @@ export function bindStudioCuttoonStagePointersDownDraw(
           }, stabilizer).state
         : null;
       drawingStabilizerRef.current =
-        drawMode === "shape" || drawMode === "pixel" || causalInputPlan.sampleSpacing === 0
+        strokeDrawMode === "shape" || strokeDrawMode === "pixel" || causalInputPlan.sampleSpacing === 0
           ? null
           : createStudioStrokeStabilizerState({
               x: strokeOrigin.x,
@@ -651,11 +676,11 @@ export function bindStudioCuttoonStagePointersDownDraw(
         drawingPrecisionStabilizerBridgeRef.current = bridge;
       }
       drawingVelocityRef.current =
-        drawMode === "shape" || drawMode === "pixel"
+        strokeDrawMode === "shape" || strokeDrawMode === "pixel"
           ? null
           : createStudioPointerVelocityState(pointerSample);
       drawingVelocityPressureRef.current = initializeStudioBrushVelocityPressure(
-        drawMode, pointerSample, next, drawingInputSettingsRef.current
+        strokeDrawMode, pointerSample, next, drawingInputSettingsRef.current
       );
       drawingInkTimeOriginRef.current = studioInkGestureTimeOrigin(next.inkInput, pointerSample.timeStamp);
       drawingRef.current = next;
@@ -697,7 +722,7 @@ export function bindStudioCuttoonStagePointersDownDraw(
         }
       }
       startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp);
-      if (drawMode === "pen" && quickShapeActive) startQuickShapeTracking(strokeOrigin);
+      if (strokeDrawMode === "pen" && quickShapeActive) startQuickShapeTracking(strokeOrigin);
       else stopQuickShapeTracking(); // 방어적 — 이전 스트로크 타이머 잔존 방지
       return;
     }

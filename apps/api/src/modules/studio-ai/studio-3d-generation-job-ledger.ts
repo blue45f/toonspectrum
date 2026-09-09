@@ -403,6 +403,10 @@ export class Studio3dGenerationJobLedger {
     readonly validationVersion: string;
     readonly modelId: string;
     readonly actualCredits: number;
+    readonly persistArtifact?: (artifact: {
+      readonly revision: Studio3dGenerationArtifactRevision;
+      readonly bytes: Uint8Array;
+    }) => Promise<void>;
   }): Promise<Studio3dGenerationJobRecord> {
     const current = await this.require(input.jobId);
     return this.store.withUserLock(current.userId, async () => {
@@ -432,6 +436,11 @@ export class Studio3dGenerationJobLedger {
         createdAtMs,
         sourceJobId: record.id,
       });
+      const storedArtifact = Object.freeze({
+        revision: artifactRevision,
+        bytes: new Uint8Array(input.bytes),
+      });
+      await input.persistArtifact?.(storedArtifact);
       const next = Object.freeze({
         ...record,
         state: "ready" as const,
