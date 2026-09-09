@@ -24,273 +24,52 @@ on:
       - "scripts/lib/studio-verify-preview-harness.mts"
       - "apps/web/src/domains/creator/**"
   schedule:
+    # 03:23 KST. The scheduled run catches renderer drift even when a dependency or generated
+    # artifact changes outside the obvious brush paths.
     - cron: "23 18 * * *"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  # Keep this tiny source-delivery generation separate from the stale ubuntu-latest queue.
-  group: studio-ink-live-commit-patch-v3-${{ github.workflow }}-${{ github.ref }}
+  group: studio-ink-live-commit-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apply-fidelity-patch:
-    name: apply-fidelity-patch
-    if: github.event_name == 'pull_request' && github.head_ref == 'fix/studio-ink-live-commit-fidelity-20260909'
-    runs-on: ubuntu-slim
-    timeout-minutes: 5
+  fidelity:
+    name: ink-live-commit-fidelity
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      TOONSPECTRUM_INK_FIDELITY_SPAWN_PREVIEW: "1"
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-      - name: Patch the long-stroke verifier from checked-out source
-        shell: bash
+          # Browser code comes from the pull request and never needs a repository write token.
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Resolve the verification directory after runner allocation
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          path = Path("scripts/verify-studio-long-stroke.mts")
-          source = path.read_text(encoding="utf-8")
-          marker = 'const EVIDENCE_STROKE_COLOR = "#0b9b6d";'
-          if marker in source:
-              print("fidelity verifier is already patched")
-              raise SystemExit(0)
-
-          def replace_once(old: str, new: str, label: str) -> None:
-              global source
-              count = source.count(old)
-              if count != 1:
-                  raise SystemExit(f"{label}: expected one anchor, found {count}")
-              source = source.replace(old, new, 1)
-
-          replace_once(
-              'import { chromium, type Browser, type CDPSession, type Page } from "playwright";',
-              'import { chromium, type Browser, type CDPSession, type Locator, type Page } from "playwright";',
-              "playwright Locator import",
-          )
-
-          replace_once(
-              'const VIEWPORT = { width: 1600, height: 1000 } as const;\n\n// ── 임계값',
-              '''const VIEWPORT = { width: 1600, height: 1000 } as const;
-          /** High-contrast evidence colour, deliberately distinct from white paper and editor chrome. */
-          const EVIDENCE_STROKE_COLOR = "#0b9b6d";
-          /** Transient editor chrome is not raster evidence and must never satisfy an ink assertion. */
-          const EVIDENCE_CHROME_SELECTOR = [
-            '[data-studio-tool-hint="true"]',
-            '[data-studio-brush-hud="true"]',
-          ].join(",");
-
-          // ── 임계값''',
-              "evidence constants",
-          )
-
-          dismiss_anchor = '''async function dismissChrome(page: Page): Promise<void> {
-            let quiet = 0;
-            for (let index = 0; index < 16 && quiet < 3; index += 1) {
-              const dialog = page.locator('[role="dialog"], [role="alertdialog"]').first();
-              if (await dialog.isVisible().catch(() => false)) {
-                quiet = 0;
-                const close = dialog.getByRole("button", { name: /^(?:Close|닫기)$/u }).first();
-                if (await close.isVisible().catch(() => false)) await close.click({ timeout: 2_000 }).catch(() => undefined);
-                else await page.keyboard.press("Escape").catch(() => undefined);
-              } else {
-                quiet += 1;
-              }
-              await page.waitForTimeout(250);
-            }
-          }
-          '''
-          helper_block = dismiss_anchor + '''
-          async function firstVisible(locator: Locator): Promise<Locator> {
-            const count = await locator.count();
-            for (let index = 0; index < count; index += 1) {
-              const candidate = locator.nth(index);
-              if (await candidate.isVisible().catch(() => false)) return candidate;
-            }
-            throw new Error(`no visible locator matched ${String(locator)}`);
-          }
-
-          /**
-           * Evidence screenshots intentionally exclude transient tooltip/HUD chrome and use a
-           * deterministic, high-contrast paint colour. The previous gate captured a rich tooltip in
-           * 00-blank and then counted its disappearance as committed ink while all three ink frames
-           * were actually white.
-           */
-          async function prepareEvidenceFixture(page: Page): Promise<Readonly<{
-            strokeColor: string;
-            transparentColorDisabled: boolean;
-            hiddenChromeSelector: string;
-          }>> {
-            await page.addStyleTag({
-              content: `${EVIDENCE_CHROME_SELECTOR} { display: none !important; }`,
-            });
-            await page.keyboard.press("Escape").catch(() => undefined);
-
-            const pressedTransparent = page.locator(
-              '[data-studio-transparent-color-well="true"][aria-pressed="true"]',
-            );
-            for (let index = 0; index < await pressedTransparent.count(); index += 1) {
-              const toggle = pressedTransparent.nth(index);
-              if (await toggle.isVisible().catch(() => false)) await toggle.click();
-            }
-
-            const colorInput = await firstVisible(
-              page.locator('input[type="color"][aria-label^="주 색 선택"]'),
-            );
-            await colorInput.fill(EVIDENCE_STROKE_COLOR);
-            await page.waitForFunction(
-              ({ color, selector }) => {
-                const visibleInputs = Array.from(
-                  document.querySelectorAll<HTMLInputElement>(selector),
-                ).filter((input) => input.getBoundingClientRect().width > 0);
-                return visibleInputs.some((input) => input.value.toLowerCase() === color);
-              },
-              {
-                color: EVIDENCE_STROKE_COLOR,
-                selector: 'input[type="color"][aria-label^="주 색 선택"]',
-              },
-              { timeout: 5_000 },
-            );
-            const state = await page.evaluate(({ chromeSelector, color }) => {
-              const chromeVisible = Array.from(document.querySelectorAll(chromeSelector)).some((node) => {
-                const style = getComputedStyle(node);
-                const rect = node.getBoundingClientRect();
-                return style.display !== "none" && style.visibility !== "hidden"
-                  && rect.width > 0 && rect.height > 0;
-              });
-              const transparentColorEnabled = Array.from(document.querySelectorAll(
-                '[data-studio-transparent-color-well="true"]',
-              )).some((node) => node.getAttribute("aria-pressed") === "true");
-              const visibleColorMatches = Array.from(document.querySelectorAll<HTMLInputElement>(
-                'input[type="color"][aria-label^="주 색 선택"]',
-              )).some((input) => input.getBoundingClientRect().width > 0
-                && input.value.toLowerCase() === color);
-              return { chromeVisible, transparentColorEnabled, visibleColorMatches };
-            }, { chromeSelector: EVIDENCE_CHROME_SELECTOR, color: EVIDENCE_STROKE_COLOR });
-            invariant(!state.chromeVisible, "transient tooltip/HUD chrome remained in raster evidence");
-            invariant(!state.transparentColorEnabled, "transparent-colour drawing stayed enabled");
-            invariant(state.visibleColorMatches,
-              `evidence stroke colour did not settle to ${EVIDENCE_STROKE_COLOR}`);
-            return Object.freeze({
-              strokeColor: EVIDENCE_STROKE_COLOR,
-              transparentColorDisabled: true,
-              hiddenChromeSelector: EVIDENCE_CHROME_SELECTOR,
-            });
-          }
-
-          /** Fail before drawing when any sampled gesture point is covered by editor chrome. */
-          async function assertGesturePathReachesCanvas(page: Page, box: Box): Promise<readonly unknown[]> {
-            const points = [0, 0.25, 0.5, 0.75, 1].map((amount) => ({
-              amount,
-              ...gesturePoint(box, amount),
-            }));
-            const hits = await page.evaluate((samples) => samples.map((sample) => {
-              const target = document.elementFromPoint(sample.x, sample.y);
-              const canvas = target?.closest(".konvajs-content") ?? null;
-              return {
-                ...sample,
-                reachesCanvas: canvas !== null,
-                target: target
-                  ? `${target.tagName.toLowerCase()}${target.id ? `#${target.id}` : ""}`
-                  : null,
-              };
-            }), points);
-            const misses = hits.filter((hit) => !hit.reachesCanvas);
-            invariant(misses.length === 0,
-              `gesture path is covered before drawing: ${JSON.stringify(misses)}`);
-            return Object.freeze(hits);
-          }
-          '''
-          replace_once(dismiss_anchor, helper_block, "evidence helpers")
-
-          replace_once(
-              '''    if (brush.name) await selectBrush(page, brush.name, brush.operation, brush.id);
-              log(`brush: ${brush.name ?? "(active pen)"} width ${brush.width} (${brush.source}) · webgpu flag ${WEBGPU}`);
-              report.brush = brush;
-          ''',
-              '''    if (brush.name) await selectBrush(page, brush.name, brush.operation, brush.id);
-              const evidenceFixture = await prepareEvidenceFixture(page);
-              log(`brush: ${brush.name ?? "(active pen)"} width ${brush.width} (${brush.source}) · webgpu flag ${WEBGPU}`);
-              report.brush = brush;
-              report.evidenceFixture = evidenceFixture;
-          ''',
-              "fixture setup call",
-          )
-
-          replace_once(
-              '''    report.paper = {
-                full, visible: box, clip, padCss, regions, localPathPoints,
-                pathMode: SCREEN_FILL_PATH ? "screen-fill-serpentine" : "diagonal",
-              };
-              check("stage-present", true,
-          ''',
-              '''    report.paper = {
-                full, visible: box, clip, padCss, regions, localPathPoints,
-                pathMode: SCREEN_FILL_PATH ? "screen-fill-serpentine" : "diagonal",
-              };
-              report.gestureHitTest = await assertGesturePathReachesCanvas(page, box);
-              check("stage-present", true,
-          ''',
-              "gesture hit test call",
-          )
-
-          replace_once(
-              '''    const inkDiff = await diffShots(page, blankShot, committedShot, {});
-              const liveDiff = await diffShots(page, liveShot, committedShot, regions);
-          ''',
-              '''    const blankVsLiveDiff = await diffShots(page, blankShot, liveShot, regions);
-              const inkDiff = await diffShots(page, blankShot, committedShot, regions);
-              const liveDiff = await diffShots(page, liveShot, committedShot, regions);
-          ''',
-              "blank/live diff",
-          )
-
-          replace_once(
-              '''      diffs: { blankVsCommitted: inkDiff, liveVsCommitted: liveDiff, committed300VsSettled900: settleDiff },
-              };
-              const gpuNote = gpuValidationWarnings > 0 ? ` · ${gpuValidationWarnings} WebGPU validation warnings` : "";
-              check("ink-committed", inkDiff.changedPixels >= INK_MIN_CHANGED_PIXELS,
-                `blank→committed changedPixels=${inkDiff.changedPixels} (min ${INK_MIN_CHANGED_PIXELS})${gpuNote}`);
-          ''',
-              '''      diffs: {
-                blankVsLive: blankVsLiveDiff,
-                blankVsCommitted: inkDiff,
-                liveVsCommitted: liveDiff,
-                committed300VsSettled900: settleDiff,
-              },
-              };
-              const gpuNote = gpuValidationWarnings > 0 ? ` · ${gpuValidationWarnings} WebGPU validation warnings` : "";
-              const liveFirstHalf = blankVsLiveDiff.regions.firstHalf!;
-              const committedFirstHalf = inkDiff.regions.firstHalf!;
-              const committedSecondHalf = inkDiff.regions.secondHalf!;
-              const committedPathChanged = committedFirstHalf.changed + committedSecondHalf.changed;
-              check("live-first-half-ink", liveFirstHalf.changed >= INK_MIN_CHANGED_PIXELS,
-                `blank→live first-half changed=${liveFirstHalf.changed}/${liveFirstHalf.pixels}`
-                + ` (min ${INK_MIN_CHANGED_PIXELS})`);
-              check("committed-second-half-ink", committedSecondHalf.changed >= INK_MIN_CHANGED_PIXELS,
-                `blank→committed second-half changed=${committedSecondHalf.changed}/${committedSecondHalf.pixels}`
-                + ` (min ${INK_MIN_CHANGED_PIXELS})${gpuNote}`);
-              check("ink-committed", committedPathChanged >= INK_MIN_CHANGED_PIXELS,
-                `blank→committed path regions changed=${committedPathChanged}`
-                + ` (first=${committedFirstHalf.changed}, second=${committedSecondHalf.changed},`
-                + ` min ${INK_MIN_CHANGED_PIXELS})${gpuNote}`);
-          ''',
-              "honest ink assertions",
-          )
-
-          path.write_text(source, encoding="utf-8")
-          print(f"patched {path}")
-          PY
-          git diff --check
-          if git diff --quiet -- scripts/verify-studio-long-stroke.mts; then
-            echo "No verifier changes to commit"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scripts/verify-studio-long-stroke.mts
-          git commit -m "fix(ci): make ink fidelity evidence deterministic"
-          git push origin "HEAD:${{ github.head_ref }}"
+          echo "TOONSPECTRUM_VERIFY_DIR=$RUNNER_TEMP/toonspectrum-verification" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/toonspectrum-verification"
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build production Studio assets
+        run: pnpm run build
+      - name: Verify ink-wash and dip-pen live/commit fidelity
+        run: pnpm exec tsx scripts/verify-inkwash-dippen-live-commit-fidelity.mts
+      - name: Upload fidelity evidence
+        if: always()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
+        with:
+          name: studio-ink-live-commit-${{ github.run_id }}
+          path: ${{ runner.temp }}/toonspectrum-verification/studio-ink-live-commit
+          if-no-files-found: warn
+          retention-days: 14
