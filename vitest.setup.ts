@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll } from "vitest";
+import { afterAll, beforeEach } from "vitest";
 import { APP_I18N_NAMESPACES, STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
 import { registerI18nLocaleEntries, setAppI18nAssetSource } from "@/shared/lib/i18n";
 import { parseStudioI18nDictionary, STUDIO_I18N_ASSET_LOCALES } from "@/domains/creator/studio-i18n-loader";
@@ -36,6 +36,14 @@ setAppI18nAssetSource(async (assetLocale) => {
 const scheduleRealMacrotask = globalThis.setTimeout;
 
 if (typeof document !== "undefined") {
+  beforeEach(() => {
+    // Project Center intentionally persists recent/favorite proxy actions in the browser. A jsdom
+    // file shares localStorage across its tests, so one test's delegated action can otherwise add a
+    // second same-named proxy button to later tests and make role/name queries nondeterministic.
+    window.localStorage.removeItem("toonspectrum-studio-project-center:favorites:v1");
+    window.localStorage.removeItem("toonspectrum-studio-project-center:recent-actions:v1");
+  });
+
   afterAll(async () => {
     await new Promise((resolve) => { scheduleRealMacrotask(resolve, 0); });
   });
