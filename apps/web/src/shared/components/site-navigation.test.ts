@@ -27,14 +27,19 @@ describe("site navigation information architecture", () => {
     expect(new Set(groupedItems.map((item) => item.href)).size).toBe(groupedItems.length);
   });
 
-  it("keeps Market first-class while preserving Create as the center mobile action", () => {
+  it("uses the desktop Home logo space for Studio while keeping Market first-class", () => {
     expect(PRIMARY_SITE_NAVIGATION.map((item) => item.id)).toEqual([
-      "home",
       "explore",
+      "studio",
       "market",
       "community",
       "me",
     ]);
+    expect(SITE_NAVIGATION_ITEMS.studio.href).toBe("/studio/projects");
+    expect(SITE_NAVIGATION_ITEMS.make.label.ko).toBe("새로 만들기");
+  });
+
+  it("preserves Home and the center New action on mobile while exposing Market", () => {
     expect(MOBILE_SITE_TABS.map((item) => item.id)).toEqual([
       "home",
       "explore",
