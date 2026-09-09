@@ -104,3 +104,27 @@ test("reset is explicit and does not erase records on cancel", async ({ page }) 
   await page.getByRole("button", { name: "모두 지우기", exact: true }).click();
   await expect(page.getByLabel("나의 실습 메모", { exact: true })).toHaveValue("");
 });
+
+test("personal plan persists, opens its guided path, and combines library filters", async ({ page }) => {
+  await page.goto("/learn");
+  await page.getByLabel("지금 가장 중요한 목표", { exact: true }).selectOption("publish");
+  await page.getByLabel("현재 경험", { exact: true }).selectOption("advanced");
+  await page.getByLabel("한 번에 집중할 시간", { exact: true }).selectOption("45");
+  await expect(page.locator(".learn-plan-result").getByRole("heading", { level: 3 })).toHaveText("첫 회차 게시 준비");
+
+  await page.reload();
+  await expect(page.getByLabel("지금 가장 중요한 목표", { exact: true })).toHaveValue("publish");
+  await expect(page.getByLabel("현재 경험", { exact: true })).toHaveValue("advanced");
+  await expect(page.getByLabel("한 번에 집중할 시간", { exact: true })).toHaveValue("45");
+  await page.getByRole("link", { name: /추천 경로 자세히 보기/u }).click();
+  await expect(page).toHaveURL(/\/learn\/paths\/publish-ready$/u);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("첫 회차 게시 준비");
+  await expect(page.locator(".learn-path-course-list li")).toHaveCount(4);
+
+  await page.goto("/learn");
+  await page.getByLabel("진행 상태", { exact: true }).selectOption("not-started");
+  await expect(page.locator(".learn-card")).toHaveCount(LESSONS.length);
+  await page.getByLabel("강좌 검색", { exact: true }).fill("클리핑");
+  await expect(page.locator(".learn-card")).toHaveCount(1);
+  await expect(page.locator(".learn-card h3")).toHaveText("밑색·음영·클리핑을 분리해서 이해하기");
+});

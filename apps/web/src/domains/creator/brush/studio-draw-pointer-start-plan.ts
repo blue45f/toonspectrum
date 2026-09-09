@@ -27,7 +27,11 @@ import {
   type FixedRateStrokeQuantizedSample,
 } from "../studio-fixed-rate-stroke-filter";
 import { captureStudioOutlineStrokeContractV1 } from "../studio-outline-stroke-contract";
-import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "../studio-pixel-pencil";
+import {
+  normalizeStudioPixelPencilStrokeWidth,
+  STUDIO_PIXEL_PENCIL_MIN_STROKE_WIDTH,
+  STUDIO_PIXEL_PENCIL_RENDER_MODE,
+} from "../studio-pixel-pencil";
 
 import { isStudioBrushEraserAliasId } from "./studio-brush-alias-profile";
 import { resolveStudioBrushDynamicsSelectionPresetId } from "./studio-brush-dynamics";
@@ -38,6 +42,11 @@ import {
 } from "./studio-brush-stamp-engine";
 import { resolveStudioCalligraphyAuthoringTip } from "./studio-calligraphy-nib-profile";
 import { captureStudioDrawPointerPressureContract } from "./studio-draw-pointer-pressure-contract";
+import {
+  DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE,
+  resolveStudioStylusPressureInput,
+  type StudioStylusPressureProfile,
+} from "./studio-stylus-pressure-profile";
 import { captureStudioPointerStartInkChannels } from "./studio-draw-pointer-start-ink-channels";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
@@ -96,6 +105,8 @@ export interface StudioDrawPointerStartInput {
   readonly pressureCurve: number;
   /** CSP min size ratio (0..1) for residual pen/marker pressure floor. */
   readonly pressureMinSize?: number;
+  /** Immutable browser-device response captured by the pointer-down coordinator. */
+  readonly stylusPressureProfile?: StudioStylusPressureProfile;
   readonly positionScale: number;
   readonly brushTip: Readonly<{
     tiltEnabled: boolean;
@@ -140,7 +151,11 @@ export function planStudioDrawPointerStart(
     strokeWidth,
     symmetry,
   } = input;
-  const brushFamily = resolveStudioBrushRenderFamily(brush);
+const brushFamily = resolveStudioBrushRenderFamily(brush);
+const resolvedStrokeWidth = drawMode === "pixel"
+  ? normalizeStudioPixelPencilStrokeWidth(strokeWidth)
+    ?? STUDIO_PIXEL_PENCIL_MIN_STROKE_WIDTH
+  : strokeWidth;
   const namedEraser =
     drawMode === "eraser" && resolveStudioBrushPresetOperation(brush) === "erase";
   const lowDensityEraser = namedEraser && isStudioBrushEraserAliasId(brush);
@@ -207,10 +222,17 @@ export function planStudioDrawPointerStart(
   const contactToothSubstrateEligible =
     drawMode === "pen"
     && resolveStudioPaperBrushMedium(brush) !== null;
+  const stylusPressureProfile = input.stylusPressureProfile
+    ?? DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE;
+  const profiledPointerPressure = resolveStudioStylusPressureInput(
+    pointer.pointerType,
+    pointer.pressure,
+    stylusPressureProfile,
+  );
   const hybridPressure = (drawMode === "pen" || lowDensityEraser) && brush !== "pen"
     ? resolveStudioHybridPressureSample(brush, {
         pointerType: pointer.pointerType,
-        rawPressure: pointer.pressure,
+        rawPressure: profiledPointerPressure,
         distance: 0,
         pressureCurve: input.pressureCurve,
         velocitySensitivityScale: input.velocitySensitivity,
@@ -221,7 +243,7 @@ export function planStudioDrawPointerStart(
     : null;
   const resolvedPressure = hybridPressure?.pressure ?? resolveBrushPressureSample({
       pointerType: pointer.pointerType,
-      rawPressure: pointer.pressure,
+      rawPressure: profiledPointerPressure,
       distance: 0,
       // The first sample has no velocity. Real pen pressure still takes precedence.
       velocityFallbackEnabled: false,
@@ -266,7 +288,7 @@ export function planStudioDrawPointerStart(
     id: input.id,
     type: "draw" as const,
     stroke: color,
-    strokeWidth,
+    strokeWidth: resolvedStrokeWidth,
     opacity: brushOpacity,
     brush: drawMode === "pen"
       ? (brush === STUDIO_PIXEL_PENCIL_RENDER_MODE ? "pen" : brush)
@@ -286,7 +308,10 @@ export function planStudioDrawPointerStart(
     stamp: drawMode === "pen" && stampTuning && stampKind && !hasBrushDynamics ? { ...stampTuning } : undefined,
     stampPipeline: drawMode === "pen" && stampKind && !hasBrushDynamics ? "causal-walker-v2" as const : undefined,
     watercolorPipeline: causalWatercolor ? "causal-walker-v2" as const : undefined,
-    symmetry: drawMode === "pixel" ? undefined : resolveStudioStrokeSymmetry(symmetry, brush),
+symmetry: resolveStudioStrokeSymmetry(
+  symmetry,
+  drawMode === "pixel" ? STUDIO_PIXEL_PENCIL_RENDER_MODE : brush
+),
   };
   const element: DrawEl = drawMode === "shape"
     ? {
@@ -302,7 +327,7 @@ export function planStudioDrawPointerStart(
         kind: "freehand",
         mode: drawMode === "eraser" ? "eraser" : "pen",
         points: [strokeOrigin.x, strokeOrigin.y],
-        strokeWidth: drawMode === "pixel" ? 1 : strokeWidth,
+        strokeWidth: resolvedStrokeWidth,
         fill: drawMode === "lasso-fill" ? color : undefined,
         pressures: [drawMode === "pixel" ? 1 : pressure],
         pressureModel,

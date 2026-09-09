@@ -10,6 +10,8 @@ import type {
   BgPrimitive,
   BgPrimitiveKind,
 } from "../studio-background-3d-metadata";
+
+import { STUDIO_BG3D_CINEMATIC_ASSET_BLUEPRINTS } from "./studio-bg3d-cinematic-asset-blueprints";
 import type { StudioBg3dComplexityBudget } from "./studio-bg3d-scene-document";
 
 export const STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID =
@@ -33,6 +35,9 @@ export const STUDIO_BG3D_PRIMITIVE_TRIANGLE_COUNTS = Object.freeze({
 } satisfies Record<BgPrimitiveKind, number>);
 
 export type StudioBg3dProceduralStarterCategory =
+  | "character"
+  | "scene"
+  | "prop"
   | "architecture"
   | "opening"
   | "furniture"
@@ -40,6 +45,9 @@ export type StudioBg3dProceduralStarterCategory =
   | "nature";
 
 export const STUDIO_BG3D_PROCEDURAL_STARTER_CATEGORY_LABELS = Object.freeze({
+  character: "캐릭터 포즈",
+  scene: "완성 배경",
+  prop: "상세 소품",
   architecture: "건축 모듈",
   opening: "문·창호",
   furniture: "가구",
@@ -86,11 +94,8 @@ export interface StudioBg3dProceduralStarterPart {
   readonly name: string;
   readonly kind: BgPrimitiveKind;
   readonly offset: readonly [number, number, number];
-  /**
-   * All starter parts are authored with X/Z rotation at zero. This lets the lightweight runtime
-   * apply an asset yaw by adding it to Euler Y without importing Three.js for quaternion math.
-   */
-  readonly rotation: readonly [0, number, 0];
+  /** Euler XYZ radians. Character poses may use every axis; insertion composes whole-asset yaw. */
+  readonly rotation: readonly [number, number, number];
   readonly scale: readonly [number, number, number];
   readonly color: string;
 }
@@ -159,7 +164,7 @@ function starterPart(
     name,
     kind,
     offset: Object.freeze([...offset]) as readonly [number, number, number],
-    rotation: Object.freeze([0, yaw, 0]) as readonly [0, number, 0],
+    rotation: Object.freeze([0, yaw, 0]) as readonly [number, number, number],
     scale: Object.freeze([...scale]) as readonly [number, number, number],
     color,
   });
@@ -194,6 +199,50 @@ function defineStarterAsset(input: StarterAssetInput): StudioBg3dProceduralStart
     parts,
   });
 }
+
+function starterPosedPart(
+  id: string,
+  name: string,
+  kind: BgPrimitiveKind,
+  offset: readonly [number, number, number],
+  scale: readonly [number, number, number],
+  color: string,
+  rotation: readonly [number, number, number],
+): StudioBg3dProceduralStarterPart {
+  return Object.freeze({
+    id,
+    name,
+    kind,
+    offset: Object.freeze([...offset]) as readonly [number, number, number],
+    rotation: Object.freeze([...rotation]) as readonly [number, number, number],
+    scale: Object.freeze([...scale]) as readonly [number, number, number],
+    color,
+  });
+}
+
+const STUDIO_BG3D_CINEMATIC_ASSETS = Object.freeze(
+  STUDIO_BG3D_CINEMATIC_ASSET_BLUEPRINTS.map((blueprint) =>
+    defineStarterAsset({
+      id: blueprint.id,
+      category: blueprint.category,
+      label: blueprint.label,
+      description: blueprint.description,
+      tags: blueprint.tags,
+      bounds: blueprint.bounds,
+      parts: blueprint.parts.map((item) =>
+        starterPosedPart(
+          item.id,
+          item.name,
+          item.kind,
+          item.offset,
+          item.scale,
+          item.color,
+          item.rotation,
+        ),
+      ),
+    }),
+  ),
+);
 
 function buildStraightStairParts(): readonly StudioBg3dProceduralStarterPart[] {
   return Array.from({ length: 8 }, (_, index) => {
@@ -482,6 +531,7 @@ export const STUDIO_BG3D_PROCEDURAL_STARTER_ASSETS = Object.freeze([
       starterPart("rock-front", "앞쪽 자갈", "hexPrism", [0.32, 0.18, 0.72], [0.5, 0.36, 0.55], "#96968f", 0.11),
     ],
   }),
+  ...STUDIO_BG3D_CINEMATIC_ASSETS,
 ] satisfies readonly StudioBg3dProceduralStarterAsset[]);
 
 const ASSET_BY_ID = new Map(
@@ -502,8 +552,8 @@ const PACK_BUDGET = STUDIO_BG3D_PROCEDURAL_STARTER_ASSETS.reduce(
 export const STUDIO_BG3D_PROCEDURAL_STARTER_PACK = Object.freeze({
   id: STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID,
   version: STUDIO_BG3D_PROCEDURAL_STARTER_PACK_VERSION,
-  label: "절차형 3D 무료 스타터",
-  description: "외부 파일 없이 BG3D 기본 도형만으로 생성되는 오리지널 CC0 모듈",
+  label: "절차형 3D 캐릭터·배경·소품",
+  description: "외부 파일 없이 BG3D 기본 도형으로 생성되는 41종 오리지널 CC0 에셋",
   provenance: PROVENANCE,
   compatibility: COMPATIBILITY,
   budget: Object.freeze(PACK_BUDGET),
@@ -534,6 +584,48 @@ function normalizedYaw(value: number): number {
   const twoPi = Math.PI * 2;
   const wrapped = ((value + Math.PI) % twoPi + twoPi) % twoPi - Math.PI;
   return Object.is(wrapped, -0) ? 0 : wrapped;
+}
+
+/** Premultiplies a local XYZ Euler rotation by world-space yaw without importing a renderer. */
+function rotateStudioBg3dEulerByYaw(
+  rotation: readonly [number, number, number],
+  yaw: number,
+): [number, number, number] {
+  const halfX = rotation[0] / 2;
+  const halfY = rotation[1] / 2;
+  const halfZ = rotation[2] / 2;
+  const cx = Math.cos(halfX);
+  const cy = Math.cos(halfY);
+  const cz = Math.cos(halfZ);
+  const sx = Math.sin(halfX);
+  const sy = Math.sin(halfY);
+  const sz = Math.sin(halfZ);
+
+  const localX = sx * cy * cz + cx * sy * sz;
+  const localY = cx * sy * cz - sx * cy * sz;
+  const localZ = cx * cy * sz + sx * sy * cz;
+  const localW = cx * cy * cz - sx * sy * sz;
+
+  const yawSin = Math.sin(yaw / 2);
+  const yawCos = Math.cos(yaw / 2);
+  const qx = yawCos * localX + yawSin * localZ;
+  const qy = yawCos * localY + yawSin * localW;
+  const qz = yawCos * localZ - yawSin * localX;
+  const qw = yawCos * localW - yawSin * localY;
+
+  const m11 = 1 - 2 * (qy * qy + qz * qz);
+  const m12 = 2 * (qx * qy - qz * qw);
+  const m13 = 2 * (qx * qz + qy * qw);
+  const m22 = 1 - 2 * (qx * qx + qz * qz);
+  const m23 = 2 * (qy * qz - qx * qw);
+  const m32 = 2 * (qy * qz + qx * qw);
+  const m33 = 1 - 2 * (qx * qx + qy * qy);
+  const nextY = Math.asin(Math.max(-1, Math.min(1, m13)));
+  const nearGimbalLock = Math.abs(m13) >= 0.9999999;
+  const nextX = nearGimbalLock ? Math.atan2(m32, m22) : Math.atan2(-m23, m33);
+  const nextZ = nearGimbalLock ? 0 : Math.atan2(-m12, m11);
+
+  return [normalizedYaw(nextX), normalizedYaw(nextY), normalizedYaw(nextZ)];
 }
 
 function instanceNodeIds(
@@ -691,7 +783,7 @@ export function planStudioBg3dProceduralStarterInsertion(
         origin[1] + part.offset[1],
         origin[2] - sin * localX + cos * localZ,
       ],
-      rotation: [0, normalizedYaw(part.rotation[1] + yaw), 0],
+      rotation: rotateStudioBg3dEulerByYaw(part.rotation, yaw),
       scale: [...part.scale],
       color: part.color,
       name: `${asset.label} · ${part.name}`,

@@ -24,6 +24,8 @@ import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 import { pushStudioAiRecentPrompt } from "./studio-ai-assist-ux";
 import { isStudioAiConfigured } from "./studio-ai-client";
+import { createStudioAiComicComposerHandoff } from "./studio-ai-comic-composer-handoff";
+import { requestStudioAiComicComposerOpen } from "./studio-ai-comic-composer-intent";
 import { requestStudioAiEpisodeProductionOpen } from "./studio-ai-episode-production-intent";
 import { preloadStudioAiEpisodeProductionModal } from "./studio-ai-episode-production-loader";
 import { requestStudioAiSuperSuiteOpen } from "./studio-ai-super-suite-intent";
@@ -33,6 +35,7 @@ import { StudioAiSuperSuiteGateway } from "./StudioAiSuperSuiteGateway";
 
 import type { StudioMenu } from "../studio-editor-tool-model";
 import type { StudioServerAiProviderPreference } from "../studio-server-ai-client";
+import type { StudioAiEpisodeProductionPlan } from "./studio-ai-episode-production-director";
 import type { StudioToolBeltContentProps } from "../StudioToolBeltContent";
 
 import { useT } from "@/shared/lib/i18n";
@@ -117,17 +120,16 @@ export function StudioAiToolPopoverBody({
     updateServerAiProvider,
   } = toolBelt.stableHandlers;
 
-  const applyEpisodeBatchPrompt = (prompt: string) => {
-    const trimmed = prompt.trim();
-    if (!trimmed) return;
-    setAiAssistTool("composition");
-    setAiCompositionDraft(trimmed);
-    setAiRecentPrompts(
-      pushStudioAiRecentPrompt(globalThis.sessionStorage, "composition", trimmed)
-    );
-    setMenu("aiAssist");
+  const applyEpisodeProductionPlan = (plan: StudioAiEpisodeProductionPlan) => {
+    if (masterEditMode) {
+      announceDrawingShortcut("마스터 편집 중에는 회차 AI 컷 제작을 사용할 수 없어요.");
+      return;
+    }
+    const handoff = createStudioAiComicComposerHandoff(plan);
+    requestStudioAiComicComposerOpen(handoff);
+    setMenu(null);
     announceDrawingShortcut(
-      "회차 프로덕션의 첫 배치 프롬프트를 구도 제안 도구에 적용했어요."
+      `${handoff.totalCuts}컷 전체 제작 계획을 편집 가능한 후보 보드로 넘겼어요.`
     );
   };
 
@@ -452,7 +454,7 @@ export function StudioAiToolPopoverBody({
         </div>
       )}
 
-      <StudioAiEpisodeProductionGateway onApplyPrompt={applyEpisodeBatchPrompt} />
+      <StudioAiEpisodeProductionGateway onApplyPlan={applyEpisodeProductionPlan} />
 
       <StudioAiSuperSuiteGateway onApplyPrompt={applySuperSuitePrompt} />
     </>

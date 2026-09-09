@@ -1,5 +1,31 @@
+import {
+  STUDIO_LAYER_SMART_VIEWS,
+  matchesStudioLayerQuery,
+  matchesStudioLayerSmartView,
+  parseStudioLayerQuery,
+} from "./studio-layer-intelligence";
+
+import type { StudioLayerSmartView } from "./studio-layer-intelligence";
 import type { StudioLayerSemanticKind } from "./studio-layer-palette-visual";
 import type { LayerGroup } from "../studio-layers";
+
+export {
+  STUDIO_LAYER_QUALITY_ISSUES,
+  STUDIO_LAYER_QUALITY_ISSUE_LABELS,
+  STUDIO_LAYER_SMART_VIEWS,
+  STUDIO_LAYER_SMART_VIEW_DESCRIPTIONS,
+  STUDIO_LAYER_SMART_VIEW_LABELS,
+  inspectStudioLayerQuality,
+  parseStudioLayerQuery,
+} from "./studio-layer-intelligence";
+export type {
+  StudioLayerQualityIssue,
+  StudioLayerQueryDiagnostic,
+  StudioLayerQueryPlan,
+  StudioLayerQueryState,
+  StudioLayerQueryTerm,
+  StudioLayerSmartView,
+} from "./studio-layer-intelligence";
 
 export const STUDIO_LAYER_KINDS = [
   "all",
@@ -34,7 +60,6 @@ export const STUDIO_LAYER_ROLES = [
   "reference",
 ] as const;
 export const STUDIO_LAYER_COLORS = ["red", "orange", "yellow", "green", "blue", "violet"] as const;
-
 export type StudioLayerKind = (typeof STUDIO_LAYER_KINDS)[number];
 export type StudioLayerVisibilityFilter = (typeof STUDIO_LAYER_VISIBILITY_FILTERS)[number];
 export type StudioLayerLockFilter = (typeof STUDIO_LAYER_LOCK_FILTERS)[number];
@@ -51,6 +76,11 @@ export interface StudioLayerNavigatorFilters {
   role: StudioLayerRoleFilter;
   color: StudioLayerColorFilter;
   flags: readonly StudioLayerFlag[];
+  /**
+   * Optional so filter payloads persisted before the smart-view upgrade remain structurally valid.
+   * `undefined` and `"all"` are equivalent.
+   */
+  smart?: StudioLayerSmartView;
 }
 
 export interface StudioLayerNavigatorItem {
@@ -140,32 +170,6 @@ export const DEFAULT_STUDIO_LAYER_NAVIGATOR_FILTERS: StudioLayerNavigatorFilters
   flags: [],
 };
 
-const KIND_KEYWORDS: Record<Exclude<StudioLayerKind, "all">, readonly string[]> = {
-  image: ["image", "raster", "이미지", "래스터", "사진"],
-  text: ["text", "type", "텍스트", "글자", "대사"],
-  bubble: ["bubble", "speech", "balloon", "말풍선", "대사"],
-  draw: ["draw", "pen", "line", "stroke", "선화", "펜", "그리기", "도형"],
-  frame: ["frame", "panel", "컷", "패널", "프레임"],
-  sticker: ["sticker", "emoji", "스티커", "장식"],
-  effect: ["effect", "focus", "speed", "효과", "집중선", "속도선"],
-  other: ["other", "unknown", "기타", "알 수 없음"],
-};
-
-type StudioLayerSearchCacheEntry = {
-  label: string;
-  textContent: string | undefined;
-  id: string;
-  groupName: string | undefined;
-  kind: Exclude<StudioLayerKind, "all">;
-  role: StudioLayerRole | undefined;
-  color: StudioLayerColor | undefined;
-  haystack: string;
-};
-
-// 검색어만 바뀌는 동안 동일한 불변 레이어 객체의 최대 4KB NFKC 정규화를 반복하지 않는다.
-// WeakMap이라 문서 교체로 객체가 사라지면 캐시도 함께 수거된다.
-const STUDIO_LAYER_SEARCH_CACHE = new WeakMap<StudioLayerNavigatorItem, StudioLayerSearchCacheEntry>();
-
 export const STUDIO_LAYER_KIND_LABELS: Record<StudioLayerKind, string> = {
   all: "전체",
   image: "이미지",
@@ -233,6 +237,7 @@ export function normalizeStudioLayerNavigatorFilters(value: unknown): StudioLaye
     candidate.color === "all" || candidate.color === "none" || includesValue(STUDIO_LAYER_COLORS, candidate.color)
       ? candidate.color
       : "all";
+  const smart = includesValue(STUDIO_LAYER_SMART_VIEWS, candidate.smart) ? candidate.smart : "all";
   return {
     kind: includesValue(STUDIO_LAYER_KINDS, candidate.kind) ? candidate.kind : "all",
     visibility: includesValue(STUDIO_LAYER_VISIBILITY_FILTERS, candidate.visibility)
@@ -242,6 +247,7 @@ export function normalizeStudioLayerNavigatorFilters(value: unknown): StudioLaye
     role,
     color,
     flags,
+    ...(smart === "all" ? {} : { smart }),
   };
 }
 
@@ -254,15 +260,6 @@ export function studioLayerKindForType(type: string | null | undefined): Exclude
   if (type === "sticker") return "sticker";
   if (type === "focusLines" || type === "speedLines") return "effect";
   return "other";
-}
-
-function normalizeSearchText(value: string): string {
-  return value.normalize("NFKC").trim().toLocaleLowerCase("ko-KR").replace(/\s+/g, " ");
-}
-
-function boundedSearchPart(value: string | null | undefined, maximum = 4_096): string {
-  if (!value) return "";
-  return value.slice(0, maximum);
 }
 
 function createGroupIndex(groups: readonly LayerGroup[]): Map<string, LayerGroup> {
@@ -303,45 +300,6 @@ function matchesColor(item: StudioLayerNavigatorItem, color: StudioLayerColorFil
   return item.color === color;
 }
 
-function searchHaystack(
-  item: StudioLayerNavigatorItem,
-  kind: Exclude<StudioLayerKind, "all">,
-  group: LayerGroup | null
-): string {
-  const cached = STUDIO_LAYER_SEARCH_CACHE.get(item);
-  if (
-    cached?.label === item.label &&
-    cached.textContent === item.textContent &&
-    cached.id === item.id &&
-    cached.groupName === group?.name &&
-    cached.kind === kind &&
-    cached.role === item.role &&
-    cached.color === item.color
-  ) return cached.haystack;
-  const haystack = normalizeSearchText(
-    [
-      boundedSearchPart(item.label, 512),
-      boundedSearchPart(item.textContent),
-      boundedSearchPart(item.id, 256),
-      boundedSearchPart(group?.name, 256),
-      ...KIND_KEYWORDS[kind],
-      item.role ? `${item.role} ${STUDIO_LAYER_ROLE_LABELS[item.role]}` : "",
-      item.color ? `${item.color} ${STUDIO_LAYER_COLOR_LABELS[item.color]}` : "",
-    ].join(" ")
-  );
-  STUDIO_LAYER_SEARCH_CACHE.set(item, {
-    label: item.label,
-    textContent: item.textContent,
-    id: item.id,
-    groupName: group?.name,
-    kind,
-    role: item.role,
-    color: item.color,
-    haystack,
-  });
-  return haystack;
-}
-
 export function filterStudioLayerNavigatorItems(
   items: readonly StudioLayerNavigatorItem[],
   groups: readonly LayerGroup[],
@@ -349,7 +307,7 @@ export function filterStudioLayerNavigatorItems(
   filters: StudioLayerNavigatorFilters
 ): readonly StudioLayerNavigatorResult[] {
   const normalized = normalizeStudioLayerNavigatorFilters(filters);
-  const terms = normalizeSearchText(query.slice(0, 512)).split(" ").filter(Boolean);
+  const queryPlan = parseStudioLayerQuery(query);
   const groupIndex = createGroupIndex(groups);
 
   const result: StudioLayerNavigatorResult[] = [];
@@ -365,14 +323,12 @@ export function filterStudioLayerNavigatorItems(
     if (normalized.lock === "locked" && !effectivelyLocked) continue;
     if (normalized.lock === "unlocked" && effectivelyLocked) continue;
     if (!matchesRole(item, normalized.role) || !matchesColor(item, normalized.color)) continue;
+    if (!matchesStudioLayerSmartView(normalized.smart ?? "all", item, kind, group, effectivelyHidden, effectivelyLocked)) continue;
     if (normalized.flags.length > 0) {
       const flags = itemFlags(item);
       if (!normalized.flags.every((flag) => flags.has(flag))) continue;
     }
-    if (terms.length > 0) {
-      const haystack = searchHaystack(item, kind, group);
-      if (!terms.every((term) => haystack.includes(term))) continue;
-    }
+    if (!matchesStudioLayerQuery(queryPlan, item, kind, group, effectivelyHidden, effectivelyLocked)) continue;
     result.push({ item, kind, group, effectivelyHidden, effectivelyLocked });
   }
   return result;
@@ -386,6 +342,7 @@ export function countActiveStudioLayerFilters(filters: StudioLayerNavigatorFilte
     Number(normalized.lock !== "all") +
     Number(normalized.role !== "all") +
     Number(normalized.color !== "all") +
+    Number((normalized.smart ?? "all") !== "all") +
     normalized.flags.length
   );
 }
@@ -459,7 +416,7 @@ export function buildStudioLayerNavigatorNodes(
   for (let index = 0; index < entriesInDisplayOrder.length; index += 1) {
     const entry = entriesInDisplayOrder[index]!;
     if (entry.group) {
-      if (current?.group.id === entry.group.id) current.entries.push(entry);
+      if (current && current.group.id === entry.group.id) current.entries.push(entry);
       else {
         flush();
         current = { group: entry.group, entries: [entry] };

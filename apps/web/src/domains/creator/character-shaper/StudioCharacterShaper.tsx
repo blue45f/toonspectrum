@@ -42,13 +42,17 @@ export function StudioCharacterShaper(props: StudioVrmPoserProps) {
   const { open } = props;
   const h = useStudioVrmPoserController(props);
   const binding = useCharacterShaperBinding(h);
+  const cancelPreview = binding.cancelPreview;
   const [advanced, setAdvanced] = useState(false);
   const [advancedRoot, setAdvancedRoot] = useState<HTMLElement | null>(null);
   const dialogRef = h.dialogRef as RefObject<HTMLElement | null> | undefined;
 
   useEffect(() => {
-    if (!open) setAdvanced(false);
-  }, [open]);
+    if (!open) {
+      cancelPreview?.();
+      setAdvanced(false);
+    }
+  }, [cancelPreview, open]);
 
   // The legacy dialog owns the element; read it after its commit so the return button can be
   // portaled inside the poser's focus trap.

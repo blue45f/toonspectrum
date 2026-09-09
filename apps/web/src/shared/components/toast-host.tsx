@@ -1,4 +1,4 @@
-import { Check, Info, X } from "lucide-react";
+import { AlertTriangle, Check, Info, X } from "lucide-react";
 
 import { useToastStore, type ToastTone } from "@/shared/lib/toast-store";
 import { useUi } from "@/shared/lib/ui-store";
@@ -7,12 +7,14 @@ import { cn } from "@/shared/lib/utils";
 const toneIcon: Record<ToastTone, typeof Check> = {
   success: Check,
   info: Info,
+  error: AlertTriangle,
   default: Info,
 };
 
 const toneClass: Record<ToastTone, string> = {
   success: "text-good",
   info: "text-cool",
+  error: "text-bad",
   default: "text-accent",
 };
 

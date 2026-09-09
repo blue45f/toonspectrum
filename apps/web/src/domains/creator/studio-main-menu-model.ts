@@ -38,10 +38,11 @@ export interface StudioMainMenuItem {
   danger?: boolean;
   separatorAfter?: boolean;
   /**
-   * Explicit opt-in for unified-search direct activation. The default stays help-only:
-   * save, publish, delete and other consequential commands must never become executable
-   * merely because they gained a menu row. Opted-in rows reuse this item's `onSelect`
-   * closure, so menu and search cannot drift into two implementations.
+   * Explicit opt-in for a reviewed command outside the execution registry's reversible
+   * tool/view/navigation policy. Save, publish, delete and other consequential commands
+   * must never become executable merely because they gained a menu row. Both automatic
+   * safe rows and opted-in rows reuse this item's `onSelect` closure, so menu and search
+   * cannot drift into two implementations.
    */
   searchActivation?: "execute";
   /**

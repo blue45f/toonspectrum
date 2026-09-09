@@ -13,21 +13,18 @@ import {
   shouldExpectStudioSharedDocument,
   shouldRequireStudioLiveServer,
 } from "../../live/studio-live-jam-session";
-import {
-  isStudioEditorCollaborationLocked,
-  isStudioSourceHydrationPending,
-} from "../../studio-editor-scope";
+import { isStudioSourceHydrationPending } from "../../studio-editor-scope";
 import { StudioWorkAssetHydrator } from "../../studio-work-asset-hydrator";
 import {
   resolveStudioWorkAssetHydrationScope,
   type StudioWorkAssetSceneReference,
 } from "../../studio-work-asset-render-projection";
+import { projectStudioCollaborationAccessPolicy } from "./studio-collaboration-access-policy";
 
 import type { StudioCrdtDocument } from "../../live/studio-crdt-document";
 import type { StudioCrdtSceneGraphRuntime } from "../../live/StudioLiveCollaborationProvider";
 import type { StudioDraftCollaborationReadiness } from "../../studio-draft-collaboration";
 import type { StudioSharedDocument } from "../../studio-shared-document-client";
-
 
 interface UseStudioCollaborationAccessRuntimeOptions {
   readonly draftCollaboration: StudioDraftCollaborationReadiness | null;
@@ -164,25 +161,23 @@ export function useStudioCollaborationAccessRuntime({
     liveJam: studioLiveJam,
   });
   const isRealtimeTeamSession = requiresStudioLiveServer;
-  const collaborationOperationSyncRequired = Boolean(
-    expectsSharedDocument
-    && isRealtimeTeamSession
-    && studioLiveParticipant
-    && !collaborationReadOnly,
-  );
-  const studioCrdtOperationSyncReady = studioCrdtDocumentReady && (
-    !collaborationOperationSyncRequired || studioLiveEditsDurablyProtected
-  );
-  const collaborationOperationSyncPending =
-    collaborationOperationSyncRequired && !studioCrdtOperationSyncReady;
-  const collaborationDocumentLocked = expectsSharedDocument && isStudioEditorCollaborationLocked({
+  const {
+    documentLocked: collaborationDocumentLocked,
+    operationSyncPending: collaborationOperationSyncPending,
+    operationSyncReady: studioCrdtOperationSyncReady,
+    operationSyncRequired: collaborationOperationSyncRequired,
+  } = projectStudioCollaborationAccessPolicy({
+    expectsSharedDocument,
+    liveJam: studioLiveJam,
+    realtimeSession: isRealtimeTeamSession,
+    participantCanEdit: Boolean(studioLiveParticipant && !collaborationReadOnly),
+    documentReady: studioCrdtDocumentReady,
+    editsDurablyProtected: studioLiveEditsDurablyProtected,
     documentAccessLocked:
       documentReloadRequired
       || sourceHydrationPending
       || collaborationDocumentUnavailable
       || collaborationReadOnly,
-    operationSyncRequired: collaborationOperationSyncRequired,
-    operationSyncReady: studioCrdtOperationSyncReady,
   });
 
   return {

@@ -1,0 +1,84 @@
+name: Cleanup merged branches
+
+on:
+  schedule:
+    - cron: "7,17,27,37,47,57 * * * *"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cleanup-merged-branches.yml
+      - scripts/cleanup-merged-branches.mjs
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  # Preserve a cleanup that has acquired a runner; a later tick may replace only stale pending work.
+  # The v2 suffix detaches this lightweight runner generation from legacy queued ubuntu-latest runs.
+  group: merged-branch-cleanup-v2
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete branches already integrated into main
+    runs-on: ubuntu-slim
+    timeout-minutes: 8
+    steps:
+      - name: Fetch cleanup script from the triggering main commit
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          script_url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${SOURCE_SHA}/scripts/cleanup-merged-branches.mjs"
+          curl --fail --silent --show-error --location \
+            "$script_url" \
+            --output "$RUNNER_TEMP/cleanup-merged-branches.mjs"
+          node --check "$RUNNER_TEMP/cleanup-merged-branches.mjs"
+
+      - name: Remove only branches proven to be integrated
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node "$RUNNER_TEMP/cleanup-merged-branches.mjs" --all --apply \
+            | tee "$RUNNER_TEMP/cleanup-report.json"
+
+      - name: Publish cleanup summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ ! -s "$RUNNER_TEMP/cleanup-report.json" ]]; then
+            {
+              echo "### Merged branch cleanup"
+              echo
+              echo "No cleanup report was produced."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          node <<'NODE'
+          const { appendFileSync, readFileSync } = require("node:fs");
+          const report = JSON.parse(
+            readFileSync(`${process.env.RUNNER_TEMP}/cleanup-report.json`, "utf8"),
+          );
+          const lines = [
+            "### Merged branch cleanup",
+            "",
+            `- Deleted: ${report.deleted.length}`,
+            `- Closed duplicate PRs: ${report.closedPullRequests.length}`,
+            `- Preserved or skipped: ${report.skipped.length}`,
+          ];
+          if (report.deleted.length > 0) {
+            lines.push("", "#### Deleted branches");
+            for (const item of report.deleted) {
+              lines.push(`- \`${item.branch}\` (${item.proof})`);
+            }
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
+          NODE

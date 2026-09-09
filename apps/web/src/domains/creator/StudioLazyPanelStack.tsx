@@ -38,6 +38,8 @@ import {
 } from "./StudioThreeDPreviewPanelStack";
 
 import type { StudioAiSettings, StudioTextAiProvenance } from "./ai/studio-ai-client";
+import type { StudioAiComicComposerHandoff } from "./ai/studio-ai-comic-composer-handoff";
+import type { StudioScenarioImageGenerationRequest } from "./ai/studio-scenario-candidate-workflow";
 import type { StudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import type { StudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import type { StudioAiImageReferenceAssetOption } from "./ai/StudioAiImageReferencePackEditor";
@@ -100,7 +102,6 @@ import type { StudioReferenceBoardDocument } from "./studio-reference-board";
 import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { ScenarioPreviewItem } from "./studio-scenario-layout";
 import type { StudioSharedDocument } from "./studio-shared-document-client";
-import type { ScenarioBeatType } from "./studio-story-beats";
 import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client";
 import type {
   StudioWriterRoomDocument,
@@ -125,7 +126,7 @@ interface StudioLazyScenarioResult {
   items: ScenarioPreviewItem[];
   nextCanvasH: number;
   characterDescription: string;
-  textAiProvenance: StudioTextAiProvenance;
+  textAiProvenance: StudioTextAiProvenance | null;
 }
 
 interface StudioLazyWriterRoomAiReview {
@@ -180,10 +181,11 @@ export interface StudioLazyPanelStackHandlers {
   ) => boolean | void | Promise<boolean | void>;
   onApplyScenarioPreview: () => void;
   onCancelScenario: () => void;
-  onChangeScenarioScene: (index: number, patch: { beatType?: ScenarioBeatType; summary?: string; imagePrompt?: string; dialogue?: string; continuity?: ScenarioPreviewItem["continuity"]; }) => void;
+  onChangeScenarioScene: (index: number, patch: Partial<ScenarioPreviewItem>) => void;
   onDiscardScenarioPreview: () => void;
   onGenerateScenario: () => void;
-  onGenerateScenarioImages: () => void;
+  onGenerateScenarioImages: (request?: StudioScenarioImageGenerationRequest) => void;
+  onImportScenarioProductionPlan: (handoff: StudioAiComicComposerHandoff) => void;
   onRegenerateScenarioImage: (index: number) => void;
   onRemoveScenarioScene: (index: number) => void;
   onScenarioApplyTargetChange: (target: "current-page" | "new-page") => void;

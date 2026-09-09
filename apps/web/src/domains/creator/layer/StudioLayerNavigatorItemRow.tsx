@@ -7,6 +7,7 @@ import {
   Film,
   Ghost,
   Grid2X2,
+  GripVertical,
   Layers3,
   Lock,
   LockOpen,
@@ -18,6 +19,7 @@ import {
 import {
   memo,
   useState,
+  type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -46,6 +48,7 @@ import {
   type StudioLayerPaletteStatusKind,
 } from "./studio-layer-palette-visual";
 
+import type { LayerSelectionDropSide } from "../studio-layers";
 import type { StudioLiveLayerOwnership } from "../live/studio-live-layer-ownership";
 
 import { cn } from "@/shared/lib/utils";
@@ -104,6 +107,11 @@ export interface LayerNavigatorRowHandlers {
     event: ReactMouseEvent<HTMLButtonElement>,
     itemId: string
   ) => void;
+  onItemDragStart?: (event: ReactDragEvent<HTMLElement>, itemId: string, key: string) => void;
+  onItemDragEnd?: () => void;
+  onItemDragOver?: (event: ReactDragEvent<HTMLElement>, itemId: string, key: string) => void;
+  onItemDragLeave?: (event: ReactDragEvent<HTMLElement>, key: string) => void;
+  onItemDrop?: (event: ReactDragEvent<HTMLElement>) => void;
   registerRowRef: (key: string, node: HTMLElement | null) => void;
 }
 
@@ -134,6 +142,9 @@ export interface StudioLayerNavigatorItemRowProps {
    * Peer ownership blocks local opacity/lock controls until the lease ends.
    */
   liveOwnership?: StudioLiveLayerOwnership | null;
+  dragEnabled?: boolean;
+  dropSide?: LayerSelectionDropSide | null;
+  dragHelpId?: string;
 }
 
 /**
@@ -165,6 +176,9 @@ export const StudioLayerNavigatorItemRow = memo(
     actionPopoverId,
     stableHandlers,
     liveOwnership = null,
+    dragEnabled = false,
+    dropSide = null,
+    dragHelpId,
   }: StudioLayerNavigatorItemRowProps) {
     const Icon = STUDIO_LAYER_NAVIGATOR_KIND_ICONS[kind];
     const peerBlocked = liveOwnership?.blocksLocalEdit === true;
@@ -237,7 +251,7 @@ export const StudioLayerNavigatorItemRow = memo(
           aria-level={level}
           aria-selected={selected}
           aria-current={current ? "true" : undefined}
-          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G"
+          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"
           aria-label={`${item.label}, ${accessibleMetadata}`}
           tabIndex={tabStop ? 0 : -1}
           onFocus={() => stableHandlers.onRowFocus(rowKey)}
@@ -246,6 +260,9 @@ export const StudioLayerNavigatorItemRow = memo(
           onDoubleClick={(event) =>
             stableHandlers.onRowDoubleClick(event, item.id, item.label)
           }
+          onDragOver={(event) => stableHandlers.onItemDragOver?.(event, item.id, rowKey)}
+          onDragLeave={(event) => stableHandlers.onItemDragLeave?.(event, rowKey)}
+          onDrop={(event) => stableHandlers.onItemDrop?.(event)}
           className={cn(
             "group/layer relative flex min-h-9 items-center gap-1 rounded-lg border px-1 py-0.5 text-left transition-[border-color,background-color,box-shadow] duration-150 [contain-intrinsic-size:44px] [content-visibility:auto] motion-reduce:transition-none max-lg:min-h-11 pointer-coarse:min-h-11",
             current
@@ -263,7 +280,18 @@ export const StudioLayerNavigatorItemRow = memo(
             showLiveOwnershipBadge ? liveOwnership!.kind : "free"
           }
           data-studio-live-ownership-blocked={peerBlocked ? "true" : "false"}
+          data-studio-layer-drop-side={dropSide ?? undefined}
         >
+          {dropSide ? (
+            <span
+              aria-hidden
+              data-studio-layer-drop-indicator={dropSide}
+              className={cn(
+                "pointer-events-none absolute inset-x-1 z-20 h-0.5 rounded-full bg-accent shadow-[0_0_0_1px_oklch(0.2_0.02_60),0_0_8px_oklch(0.72_0.18_42/0.75)]",
+                dropSide === "front" ? "-top-0.5" : "-bottom-0.5"
+              )}
+            />
+          ) : null}
           <span
             aria-hidden
             data-studio-layer-selection-marker={selectionState}
@@ -280,6 +308,28 @@ export const StudioLayerNavigatorItemRow = memo(
           >
             {current ? <CircleDot size={13} strokeWidth={2.25} /> : selected ? <Check size={13} strokeWidth={2.5} /> : null}
           </span>
+          <button
+            type="button"
+            tabIndex={-1}
+            draggable={dragEnabled}
+            disabled={!dragEnabled}
+            data-layer-row-control
+            data-studio-layer-drag-handle="item"
+            onClick={(event) => event.stopPropagation()}
+            onDragStart={(event) =>
+              stableHandlers.onItemDragStart?.(event, item.id, rowKey)
+            }
+            onDragEnd={() => stableHandlers.onItemDragEnd?.()}
+            aria-label={`${item.label} 레이어 끌어 순서 변경`}
+            aria-describedby={dragHelpId}
+            title={dragEnabled ? "끌어서 순서를 바꾸거나 그룹으로 이동" : undefined}
+            className={cn(
+              "hidden size-6 shrink-0 cursor-grab place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25 [@media(pointer:fine)]:grid",
+              STUDIO_LAYER_NAVIGATOR_FOCUS_RING
+            )}
+          >
+            <GripVertical size={13} aria-hidden />
+          </button>
           {item.color ? (
             <span
               aria-label={`색 라벨 ${STUDIO_LAYER_COLOR_LABELS[item.color]}`}

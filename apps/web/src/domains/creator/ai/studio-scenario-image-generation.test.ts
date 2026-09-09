@@ -94,6 +94,8 @@ function session(mode: "background" | "character" | "role" = "background", hasIm
     preview: () => preview,
     ledger: () => ledger,
     regenerate: () => createStudioScenarioImageGenerationExecutors({ ...context, scenarioResult: preview }).executeRegenerateScenarioImage(0),
+    generate: (request?: Parameters<ReturnType<typeof createStudioScenarioImageGenerationExecutors>["executeGenerateScenarioImages"]>[0]) =>
+      createStudioScenarioImageGenerationExecutors({ ...context, scenarioResult: preview }).executeGenerateScenarioImages(request),
   };
 }
 
@@ -140,10 +142,72 @@ describe("reviewed scenario image replacement integrity", () => {
       imageDataUrl: REPLACEMENT_IMAGE,
       imageProvenance: { provider: "replacement.example.test", model: "replacement-model" },
     });
+    expect(current.preview()?.items[0]?.imageCandidates).toHaveLength(2);
+    expect(current.preview()?.items[0]?.imageCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ imageDataUrl: ORIGINAL_IMAGE }),
+        expect.objectContaining({
+          imageDataUrl: REPLACEMENT_IMAGE,
+          qualityProfile: "balanced",
+          variationStrategy: "directorial",
+          variationLabel: "기본 연출",
+        }),
+      ]),
+    );
     expect(current.preview()?.items[0]?.imageError).toBeUndefined();
     expect(current.preview()?.items[1]).toEqual(current.original.items[1]);
     expect(current.ledger().operations.map((operation) => operation.status).sort()).toEqual(["failed", "succeeded"]);
     expect(generateImage).toHaveBeenCalledTimes(2);
+  });
+
+  it("routes selected final-quality coverage recipes into provider prompts and candidate metadata", async () => {
+    const current = session("background", false);
+    generateImage.mockResolvedValue({ ok: true, data: { dataUrl: REPLACEMENT_IMAGE } });
+
+    await current.generate({
+      indexes: [0],
+      variants: 2,
+      qualityProfile: "final",
+      variationStrategy: "coverage",
+    });
+
+    expect(generateImage).toHaveBeenCalledTimes(2);
+    expect(studioAiClient.generateBackgroundImage).toHaveBeenCalledTimes(2);
+    expect(studioAiClient.generateConsistentCharacterImage).not.toHaveBeenCalled();
+    const prompts = generateImage.mock.calls.map((call) =>
+      String(typeof call[2] === "string" ? call[2] : call[1]),
+    );
+    expect(prompts[0]).toContain("품질 단계: 최종 작화");
+    expect(prompts[0]).toContain("와이드 설정 숏");
+    expect(prompts[1]).toContain("미디엄 퍼포먼스");
+    expect(current.preview()?.items[0]?.imageCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ qualityProfile: "final", variationLabel: "와이드 설정 숏" }),
+        expect.objectContaining({ qualityProfile: "final", variationLabel: "미디엄 퍼포먼스" }),
+      ]),
+    );
+  });
+
+  it("rejects an oversized explicit batch before any provider call or paid operation starts", async () => {
+    const current = session("background", false);
+    const repeated = Array.from({ length: 7 }, (_, index) => ({
+      ...current.preview()!.items[0]!,
+      summary: `${index + 1}번 컷`,
+      imagePrompt: `${index + 1}번 프롬프트`,
+    }));
+    const oversizedContext: StudioScenarioImageGenerationContext = {
+      ...current.context,
+      scenarioResult: { ...current.preview()!, items: repeated },
+    };
+
+    await createStudioScenarioImageGenerationExecutors(oversizedContext).executeGenerateScenarioImages({
+      indexes: repeated.map((_, index) => index),
+      variants: 4,
+    });
+
+    expect(generateImage).not.toHaveBeenCalled();
+    expect(oversizedContext.setScenarioError).toHaveBeenCalledWith(expect.stringContaining("최대 24개"));
+    expect(current.ledger().operations).toHaveLength(0);
   });
 
   it("keeps the reviewed result intact when an in-flight replacement is cancelled", async () => {

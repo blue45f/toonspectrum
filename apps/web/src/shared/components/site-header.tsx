@@ -1,30 +1,28 @@
 import {
-  Search,
-  Palette,
   Menu,
+  Palette,
+  Search,
   X,
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { AuthMenuShell } from "../../domains/auth/components/auth-menu-shell";
 
+import {
+  PRIMARY_SITE_NAVIGATION,
+  SITE_NAVIGATION_ITEMS,
+  siteNavigationLocale,
+  siteNavigationText,
+} from "./site-navigation";
 import { ToonSpectrumMark } from "./visual-marks";
 
-import { cx } from "@/shared/lib/cx";
-import { useT } from "@/shared/lib/i18n";
-import { keepInlineText } from "@/shared/lib/text";
-import { useUi } from "@/shared/lib/ui-store";
 import { isImmersiveMobileRoute } from "@/app/routes/immersive-mobile-route";
 import { usePathname } from "@/compat/navigation";
 import Link from "@/compat/router-link";
-
-const NAV = [
-  { i18n: "nav.home", href: "/", exact: true },
-  { i18n: "nav.creators", href: "/create" },
-  { i18n: "nav.assets", href: "/market" },
-  { i18n: "nav.discover", href: "/explore" },
-  { i18n: "nav.allMenu", href: "/sitemap" },
-];
+import { cx } from "@/shared/lib/cx";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { keepInlineText } from "@/shared/lib/text";
+import { useUi } from "@/shared/lib/ui-store";
 
 const MobileHeaderNavigation = lazy(() =>
   import("./site-header-mobile-nav").then((mod) => ({ default: mod.MobileHeaderNavigation }))
@@ -32,12 +30,8 @@ const MobileHeaderNavigation = lazy(() =>
 
 function useActive() {
   const path = usePathname();
-  return (href: string, exact?: boolean) => {
-    if (href === "/create") {
-      return path === "/create" || path.startsWith("/create/");
-    }
-    return exact ? path === href : path === href || path.startsWith(href + "/");
-  };
+  return (href: string, exact?: boolean) =>
+    exact ? path === href : path === href || path.startsWith(`${href}/`);
 }
 
 function matchesMobileNavigationViewport() {
@@ -72,8 +66,10 @@ function MobileNavigationFallback() {
 export function SiteHeader() {
   const isActive = useActive();
   const pathname = usePathname();
+  const language = useI18n((state) => state.lang);
+  const locale = siteNavigationLocale(language);
   const t = useT();
-  const openSearch = useUi((s) => s.openCommandPalette);
+  const openSearch = useUi((state) => state.openCommandPalette);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const isMobileNavigationViewport = useMobileNavigationViewport();
@@ -82,23 +78,20 @@ export function SiteHeader() {
   const panelRef = useRef<HTMLDivElement>(null);
   const shouldRenderMobileNavigation = menuOpen || isMobileNavigationViewport;
   const hideBottomTabs = isImmersiveMobileRoute(pathname);
+  const studio = SITE_NAVIGATION_ITEMS.studio;
 
-  // 수동으로 메뉴를 닫은 뒤에는 모달 배경의 inert 해제가 반영된 다음 호출 버튼으로 돌아간다.
-  // 라우트 이동에 따른 자동 닫힘은 ScrollToTop이 본문 포커스를 소유하므로 이 경로를 쓰지 않는다.
+  // 수동 닫기 뒤에는 모달 격리가 풀린 다음 호출 버튼으로 포커스를 되돌린다.
+  // 라우트 이동과 데스크톱 전환은 새 화면/내비게이션이 포커스를 이어받으므로 복원하지 않는다.
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
     window.requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }));
   }, []);
 
-  // 라우트 이동 시 오버플로 메뉴 닫기
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
 
-  // CSS swaps the overflow trigger/dialog for the desktop navigation at 1360px. Close the
-  // stateful modal at the same boundary so its focus trap, inert background, and scroll lock are
-  // cleaned up instead of remaining attached to a display:none dialog. This automatic path does
-  // not restore focus to the trigger because that trigger is hidden at the new breakpoint.
+  // CSS가 전체 메뉴를 데스크톱 내비게이션으로 교체하는 동일 경계에서 상태와 포커스 트랩도 정리한다.
   useEffect(() => {
     const desktopNavigation = window.matchMedia(DESKTOP_NAVIGATION_QUERY);
     const closeAtDesktop = () => {
@@ -113,96 +106,118 @@ export function SiteHeader() {
     <>
       <header
         data-site-chrome="header"
-        className="sticky top-0 z-50 border-b border-line/70 bg-gradient-to-b from-panel/90 to-panel/80 backdrop-blur-xl"
+        className="sticky top-0 z-50 border-b border-line/70 bg-canvas/80 shadow-sm backdrop-blur-2xl"
       >
-        <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-2 px-4 sm:px-6">
-          {/* 로고 */}
-          <Link href="/" className="group flex shrink-0 items-center gap-2.5 whitespace-nowrap pr-2">
-            <ToonSpectrumMark className="transition-transform duration-150 group-hover:scale-105" />
-            <span className="flex items-center gap-1.5">
-              <span className="font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">
-                {t("app.name")}
+        <div className="mx-auto flex h-[4.25rem] max-w-[1320px] items-center gap-2 px-4 sm:px-6">
+          <Link
+            href="/"
+            aria-label={`${t("app.name")} · ${siteNavigationText(SITE_NAVIGATION_ITEMS.home.description, locale)}`}
+            className="group flex min-w-0 shrink-0 items-center gap-2.5 whitespace-nowrap pr-1 sm:pr-3"
+          >
+            <span className="relative grid size-9 shrink-0 place-items-center rounded-xl border border-line/70 bg-panel/85 shadow-sm transition-transform duration-200 ease-out-expo group-hover:-rotate-3 group-hover:scale-[1.03]">
+              <ToonSpectrumMark className="size-7" />
+              <span aria-hidden="true" className="absolute -bottom-1 -right-1 size-2.5 rounded-full border-2 border-canvas bg-accent" />
+            </span>
+            <span className="min-w-0">
+              <span className="flex items-center gap-1.5">
+                <span className="truncate font-display text-[1.05rem] font-bold tracking-[-0.02em] text-fg transition-colors group-hover:text-accent sm:text-lg">
+                  {t("app.name")}
+                </span>
+                <span
+                  className="hidden rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-display text-[0.55rem] font-bold uppercase leading-none tracking-[0.12em] text-accent min-[410px]:inline"
+                  title={t("app.brandBeta")}
+                >
+                  BETA
+                </span>
               </span>
-              <span
-                className="hidden rounded-[0.4rem] border border-accent/40 bg-accent/15 px-1.5 py-0.5 font-display text-[0.6rem] font-bold uppercase leading-none tracking-wide text-accent min-[400px]:inline"
-                title={t("app.brandBeta")}
-              >
-                BETA
+              <span className="hidden font-display text-[0.56rem] font-semibold uppercase tracking-[0.16em] text-fg-3 lg:block">
+                Create · Share · Discover
               </span>
             </span>
           </Link>
 
-          {/* 데스크톱 내비: 탐색 목적지는 한 번씩만 노출하고 Studio는 우측 CTA가 전담한다. */}
-          <nav className="ml-2 hidden items-center gap-0.5 min-[1360px]:flex">
-            {NAV.map((n) => {
-              const active = isActive(n.href, n.exact);
+          <nav
+            aria-label={locale === "ko" ? "주요 메뉴" : "Primary navigation"}
+            className="ml-2 hidden items-center gap-0.5 rounded-2xl border border-line/60 bg-panel/60 p-1 shadow-sm min-[1360px]:flex"
+          >
+            {PRIMARY_SITE_NAVIGATION.map((item) => {
+              const active = isActive(item.href, item.exact);
               return (
                 <Link
-                  key={n.href}
-                  href={n.href}
+                  key={item.id}
+                  href={item.href}
                   aria-current={active ? "page" : undefined}
+                  title={siteNavigationText(item.description, locale)}
                   className={cx(
-                    "relative inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-2 text-sm font-medium transition-colors duration-150 xl:px-3",
-                    active ? "text-accent" : "text-fg-2 hover:bg-raised/70 hover:text-fg"
+                    "relative inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-xl px-3 py-2 text-[0.82rem] font-semibold transition-all duration-150",
+                    active
+                      ? "bg-card text-accent shadow-sm"
+                      : "text-fg-2 hover:bg-raised/70 hover:text-fg"
                   )}
                 >
-                  {active && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-0 -z-10 rounded-full bg-accent-soft transition-colors duration-150"
-                    />
-                  )}
-                  {t(n.i18n)}
+                  {siteNavigationText(item.label, locale)}
+                  {active && <span aria-hidden="true" className="absolute inset-x-3 -bottom-1 h-0.5 rounded-full bg-accent" />}
                 </Link>
               );
             })}
+            <Link
+              href="/sitemap"
+              title={locale === "ko" ? "목적별 전체 메뉴 보기" : "Browse every destination by purpose"}
+              className="inline-flex min-h-9 items-center rounded-xl px-3 py-2 text-[0.82rem] font-semibold text-fg-2 transition-colors hover:bg-raised/70 hover:text-fg"
+            >
+              {t("nav.allMenu")}
+            </Link>
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <button
+              type="button"
               onClick={openSearch}
               aria-label={t("nav.searchOpen")}
-              className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 pointer-coarse:h-11 sm:w-48 sm:justify-between lg:w-40 xl:w-56"
+              className="group flex size-11 items-center justify-center rounded-xl border border-line bg-card/75 text-fg-3 shadow-sm transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 sm:w-48 sm:justify-between sm:px-3 lg:w-40 xl:w-52"
             >
               <span className="flex min-w-0 items-center gap-2">
-                <Search size={16} className="shrink-0" />
-                <span className="hidden truncate sm:inline">{t("nav.search")}</span>
+                <Search size={16} className="shrink-0 transition-colors group-hover:text-accent" />
+                <span className="hidden truncate text-sm sm:inline">{t("nav.search")}</span>
               </span>
               <kbd
                 aria-hidden="true"
-                className="hidden items-center gap-0.5 rounded-md border border-line bg-panel px-1.5 py-0.5 text-[0.65rem] sm:flex lg:hidden xl:flex"
+                className="hidden items-center gap-0.5 rounded-md border border-line bg-panel px-1.5 py-0.5 font-display text-[0.62rem] text-fg-3 sm:flex lg:hidden xl:flex"
               >
                 ⌘K
               </kbd>
             </button>
 
-            {/* Studio 핵심 CTA — 모바일에서는 하단 탭바가 동일 진입점을 제공한다. */}
             <Link
-              href="/studio"
-              aria-label={t("nav.studio")}
-              aria-current={isActive("/studio") ? "page" : undefined}
+              href={studio.href}
+              aria-label={siteNavigationText(studio.label, locale)}
+              aria-current={isActive(studio.href) ? "page" : undefined}
+              title={siteNavigationText(studio.description, locale)}
               className={cx(
-                "group hidden h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium [text-wrap:nowrap] [word-break:keep-all] transition-colors pointer-coarse:h-11 sm:flex",
-                isActive("/studio")
-                  ? "bg-accent text-on-accent"
-                  : "border border-line bg-card text-fg-2 hover:text-fg hover:border-line-strong"
+                "group relative hidden h-11 shrink-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm transition-all duration-200 ease-out-expo sm:flex",
+                isActive(studio.href)
+                  ? "border-accent bg-accent text-on-accent"
+                  : "border-line-strong bg-fg text-canvas hover:-translate-y-0.5 hover:border-fg"
               )}
             >
-              <Palette size={16} className="shrink-0 text-fg-3 transition-colors group-hover:text-accent" />
-              <span className="hidden min-w-max whitespace-nowrap [text-wrap:nowrap] [word-break:keep-all] xl:inline-block">
-                {keepInlineText(t("nav.studio"))}
+              <span aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-on-accent/40 to-transparent" />
+              <Palette size={16} className="shrink-0 transition-transform duration-200 group-hover:-rotate-6 group-hover:scale-110" />
+              <span className="hidden min-w-max whitespace-nowrap xl:inline-block">
+                {keepInlineText(siteNavigationText(studio.label, locale))}
               </span>
             </Link>
+
             <AuthMenuShell />
 
             <button
               ref={triggerRef}
-              onClick={() => setMenuOpen((o) => !o)}
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
               aria-label={t("nav.allMenu")}
               aria-haspopup="dialog"
               aria-expanded={menuOpen}
               aria-controls={menuId}
-              className="grid size-11 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg min-[1360px]:hidden"
+              className="grid size-11 place-items-center rounded-xl border border-line bg-card/80 text-fg-2 shadow-sm transition-colors hover:border-line-strong hover:bg-raised hover:text-fg min-[1360px]:hidden"
             >
               {menuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
