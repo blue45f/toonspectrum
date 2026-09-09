@@ -1,0 +1,53 @@
+name: Codex sync Studio epic branch with main
+
+on:
+  push:
+    branches:
+      - codex/studio-epic-completion-20260909
+    paths:
+      - .github/workflows/codex-sync-main.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: codex-sync-studio-epic-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/studio-epic-completion-20260909
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Merge current main while preserving main on conflicting hunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          set +e
+          git merge --no-ff --no-edit -X theirs origin/main
+          merge_rc=$?
+          set -e
+          if [ "$merge_rc" -ne 0 ]; then
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            if [ -z "$conflicts" ]; then
+              echo "Merge failed without resolvable conflict paths" >&2
+              exit "$merge_rc"
+            fi
+            printf '%s\n' "$conflicts" > /tmp/conflicts.txt
+            while IFS= read -r path; do
+              [ -n "$path" ] || continue
+              git checkout --theirs -- "$path"
+              git add -- "$path"
+            done < /tmp/conflicts.txt
+            git commit -m "chore(studio): sync epic completion branch with current main"
+          fi
+          git status --short
+          git push origin HEAD:codex/studio-epic-completion-20260909
