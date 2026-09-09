@@ -66,7 +66,7 @@ export const SITE_NAVIGATION_ITEMS = {
   shaper: item("shaper", "/shaper", UserRoundPen, "캐릭터 셰이퍼", "Character shaper", "캐릭터·포즈·구도를 입체적으로", "Shape characters, poses and composition"),
   market: item("market", "/market", Store, "에셋 마켓", "Asset market", "배경·소품·템플릿을 작업에 연결", "Find backgrounds, props and templates"),
   gallery: item("gallery", "/create", Images, "창작 갤러리", "Creator gallery", "다른 창작자의 작품과 제작 흐름", "Meet creators and their work"),
-  explore: item("explore", "/explore", Compass, "찾기", "Discover", "장르와 취향으로 다음 작품 발견", "Discover stories by genre and taste"),
+  explore: item("explore", "/discover", Compass, "찾기", "Discover", "검색·취향·추천·랭킹에서 원하는 방식으로 작품 발견", "Find stories through search, taste, recommendations or rankings"),
   ranking: item("ranking", "/ranking", TrendingUp, "통합 랭킹", "Rankings", "기간과 지표별 인기 흐름", "See trends across periods and signals"),
   calendar: item("calendar", "/calendar", CalendarDays, "연재 캘린더", "Release calendar", "요일별 신작과 연재 일정", "Track releases by day"),
   recommend: item("recommend", "/recommend", Sparkles, "맞춤 추천", "Recommendations", "지금 취향에 맞는 작품", "Find stories matched to your taste"),
