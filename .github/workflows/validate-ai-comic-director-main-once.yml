@@ -9,11 +9,11 @@ permissions:
 
 concurrency:
   group: validate-ai-comic-director-main-20260909
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   validate:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     env:
       NODE_OPTIONS: --max-old-space-size=8192
