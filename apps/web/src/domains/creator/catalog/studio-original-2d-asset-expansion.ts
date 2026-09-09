@@ -52,7 +52,9 @@ function makeAsset(packageId: string, descriptor: AssetDescriptor): StudioOrigin
     svg: wrapSvg(width, height, descriptor.body),
     origin: "original-procedural",
     license: STUDIO_ORIGINAL_FREE_ASSET_LICENSE,
-    placementPresets: descriptor.placement ?? ["pointer", "current-view"],
+    placementPresets:
+      descriptor.placement
+        ?? (["pointer", "current-view"] as const satisfies readonly StudioMarketplacePlacementPreset[]),
   });
 }
 
