@@ -9,12 +9,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: harden-scene3d-projection-semantics-v2
+  group: harden-scene3d-projection-semantics-v3
   cancel-in-progress: true
 
 jobs:
   harden:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-slim
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
