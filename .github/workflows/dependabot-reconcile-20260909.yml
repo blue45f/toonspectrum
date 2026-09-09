@@ -18,12 +18,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  alerts:
-    name: Probe GitHub Dependabot alert access
+  reconcile:
+    name: Audit lockfile and probe Dependabot status access
     runs-on: ubuntu-slim
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - name: Reject advisory exclusions
+        run: node scripts/verify-security-advisory-exceptions.mjs
+      - name: Verify manifest and lockfile consistency
+        run: pnpm install --frozen-lockfile --lockfile-only --ignore-scripts
+      - name: Run the all-severity pnpm audit
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm audit --json --audit-level low | tee "$RUNNER_TEMP/pnpm-audit.json"
+      - name: Publish the audit summary
+        if: always()
+        shell: bash
+        run: |
+          node <<'NODE'
+          const { appendFileSync, existsSync, readFileSync } = require("node:fs");
+          const path = `${process.env.RUNNER_TEMP}/pnpm-audit.json`;
+          const lines = ["### Dependabot dependency audit", ""];
+          if (!existsSync(path)) {
+            lines.push("No pnpm audit report was produced.");
+          } else {
+            const report = JSON.parse(readFileSync(path, "utf8"));
+            const metadata = report.metadata?.vulnerabilities ?? {};
+            const severities = ["info", "low", "moderate", "high", "critical"];
+            for (const severity of severities) {
+              lines.push(`- ${severity}: ${metadata[severity] ?? 0}`);
+            }
+            lines.push(`- total: ${metadata.total ?? 0}`);
+          }
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
+          NODE
       - name: Probe the open-alert endpoint without hiding permission failures
+        if: always()
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: bash
@@ -75,42 +108,4 @@ jobs:
             console.error(error instanceof Error ? error.message : error);
             process.exitCode = 1;
           });
-          NODE
-
-  audit:
-    name: Audit the exact pnpm lockfile
-    runs-on: ubuntu-slim
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - name: Reject advisory exclusions
-        run: node scripts/verify-security-advisory-exceptions.mjs
-      - name: Verify manifest and lockfile consistency
-        run: pnpm install --frozen-lockfile --lockfile-only --ignore-scripts
-      - name: Run the all-severity pnpm audit
-        shell: bash
-        run: |
-          set -o pipefail
-          pnpm audit --json --audit-level low | tee "$RUNNER_TEMP/pnpm-audit.json"
-      - name: Publish the audit summary
-        if: always()
-        shell: bash
-        run: |
-          node <<'NODE'
-          const { appendFileSync, existsSync, readFileSync } = require("node:fs");
-          const path = `${process.env.RUNNER_TEMP}/pnpm-audit.json`;
-          const lines = ["### Dependabot dependency audit", ""];
-          if (!existsSync(path)) {
-            lines.push("No pnpm audit report was produced.");
-          } else {
-            const report = JSON.parse(readFileSync(path, "utf8"));
-            const metadata = report.metadata?.vulnerabilities ?? {};
-            const severities = ["info", "low", "moderate", "high", "critical"];
-            for (const severity of severities) {
-              lines.push(`- ${severity}: ${metadata[severity] ?? 0}`);
-            }
-            lines.push(`- total: ${metadata.total ?? 0}`);
-          }
-          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
           NODE
