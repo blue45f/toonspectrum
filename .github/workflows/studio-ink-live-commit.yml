@@ -21,7 +21,6 @@ on:
   pull_request:
     branches: [main, release/salvage-integration-20260908]
     paths:
-      - ".github/workflows/studio-ink-live-commit.yml"
       - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"
       - "scripts/studio-ink-fidelity-cases.ts"
       - "scripts/studio-ink-fidelity-cases.test.ts"
