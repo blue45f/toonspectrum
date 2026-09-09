@@ -12,18 +12,26 @@ permissions:
   contents: write
 
 concurrency:
-  group: studio-tooltip-pro-materialize-${{ github.ref }}
+  group: studio-tooltip-pro-materialize-arm-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   materialize:
     if: ${{ !contains(github.event.head_commit.message, 'refine tooltip interaction and motion') }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 25
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Integrate latest main baseline
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -70,8 +78,6 @@ jobs:
         run: git diff --check
       - name: Commit materialized implementation
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "feat(studio): refine tooltip interaction and motion"
           git push origin HEAD:${{ github.ref_name }}
