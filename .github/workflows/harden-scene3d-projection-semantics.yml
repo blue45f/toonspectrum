@@ -1,0 +1,64 @@
+name: Harden Scene3D projection semantics
+
+on:
+  push:
+    branches: [feat/scene3d-runtime-projection-20260910]
+    paths: [.github/workflows/harden-scene3d-projection-semantics.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: harden-scene3d-projection-semantics
+  cancel-in-progress: true
+
+jobs:
+  harden:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/scene3d-runtime-projection-20260910
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Apply source-semantic corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/harden-scene3d-projection-semantics.py
+
+      - name: Validate projection contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection-math.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection-math.test.ts
+          git diff --check
+
+      - name: Commit semantic hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/harden-scene3d-projection-semantics.yml \
+                scripts/harden-scene3d-projection-semantics.py
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'fix(scene3d): preserve BG3D projection semantics'
+          git push --no-verify origin HEAD:feat/scene3d-runtime-projection-20260910
