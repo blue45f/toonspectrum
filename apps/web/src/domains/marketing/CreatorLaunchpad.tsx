@@ -37,6 +37,7 @@ import {
   type CreatorLaunchGoal,
   type CreatorLaunchPace,
 } from "@/shared/lib/creator-continuity";
+import { copyText } from "@/shared/lib/copy-text";
 import {
   getPwaInstallServerSnapshot,
   getPwaInstallSnapshot,
@@ -48,31 +49,6 @@ const GOALS: readonly CreatorLaunchGoal[] = ["draw", "comic", "character", "mate
 const PACES: readonly CreatorLaunchPace[] = ["quick", "project"];
 const GOAL_ICONS = { draw: Brush, comic: LayoutGrid, character: Box, materials: Search } as const;
 const PACE_ICONS = { quick: Clock3, project: Layers } as const;
-
-async function copyText(value: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(value);
-      return true;
-    }
-  } catch {
-    // Continue to the selection fallback.
-  }
-  try {
-    const field = document.createElement("textarea");
-    field.value = value;
-    field.setAttribute("readonly", "");
-    field.style.position = "fixed";
-    field.style.opacity = "0";
-    document.body.append(field);
-    field.select();
-    const copied = document.execCommand("copy");
-    field.remove();
-    return copied;
-  } catch {
-    return false;
-  }
-}
 
 function rememberHref(href: string): void {
   try {
