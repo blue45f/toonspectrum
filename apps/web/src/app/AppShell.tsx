@@ -5,6 +5,7 @@ import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
+import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
 import { pingVisit } from "@/shared/lib/visits-api";
 import {
   isStudioRoutePathname,
@@ -48,6 +49,20 @@ function ScrollToTop() {
     globalThis.scrollTo({ top: 0, left: 0 });
     if (previousLocation === null) return;
     document.getElementById("main-content")?.focus({ preventScroll: true });
+  }, [pathname, search]);
+
+  return null;
+}
+
+/**
+ * Remembers only an allow-listed destination and a safe launch preset. Artwork,
+ * work IDs and arbitrary query parameters never cross this boundary.
+ */
+function CreatorContinuityTracker() {
+  const { pathname, search } = useLocation();
+
+  useEffect(() => {
+    recordCreatorDestination(pathname, search);
   }, [pathname, search]);
 
   return null;
@@ -125,6 +140,7 @@ export function AppShell({
         <StoreSync />
       </Suspense>
       <ScrollToTop />
+      <CreatorContinuityTracker />
       {showSkipLink ? (
         <a
           href="#main-content"
