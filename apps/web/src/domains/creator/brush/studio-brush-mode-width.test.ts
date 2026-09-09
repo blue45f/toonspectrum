@@ -13,29 +13,38 @@ const PEN_STATE: StudioBrushModeWidthState = {
 };
 
 describe("Studio pixel-pencil width isolation", () => {
-  it("restores the artist's non-pixel width after leaving the one-pixel tool", () => {
+  it("keeps an integer pixel tip while restoring the non-pixel width on exit", () => {
     const pixel = planStudioDrawModeChange(PEN_STATE, "pixel");
     expect(pixel).toEqual({
       drawMode: "pixel",
-      strokeWidth: 1,
+      strokeWidth: 7,
       lastNonPixelStrokeWidth: 7,
     });
 
     expect(planStudioDrawModeChange(pixel, "pen")).toEqual(PEN_STATE);
   });
 
-  it("does not let pixel-only width requests overwrite the remembered brush width", () => {
+  it("edits the active pixel tip without overwriting the remembered brush width", () => {
     const pixel = planStudioDrawModeChange(PEN_STATE, "pixel");
-    expect(planStudioStrokeWidthChange(pixel, 48)).toEqual(pixel);
+    expect(planStudioStrokeWidthChange(pixel, 47.6)).toEqual({
+      drawMode: "pixel",
+      strokeWidth: 48,
+      lastNonPixelStrokeWidth: 7,
+    });
   });
 
-  it("keeps the active width across non-pixel tools and remembers later edits", () => {
-    const marker = planStudioDrawModeChange(PEN_STATE, "eraser");
-    expect(marker.strokeWidth).toBe(7);
+  it("clamps unsafe pixel widths and preserves later non-pixel edits", () => {
+    const pixel = planStudioDrawModeChange(
+      { ...PEN_STATE, strokeWidth: 500 },
+      "pixel",
+    );
+    expect(pixel.strokeWidth).toBe(64);
+    expect(planStudioStrokeWidthChange(pixel, Number.POSITIVE_INFINITY).strokeWidth).toBe(64);
 
+    const marker = planStudioDrawModeChange(PEN_STATE, "eraser");
     const resized = planStudioStrokeWidthChange(marker, 18);
-    const pixel = planStudioDrawModeChange(resized, "pixel");
-    expect(planStudioDrawModeChange(pixel, "shape")).toMatchObject({
+    const resizedPixel = planStudioDrawModeChange(resized, "pixel");
+    expect(planStudioDrawModeChange(resizedPixel, "shape")).toMatchObject({
       drawMode: "shape",
       strokeWidth: 18,
       lastNonPixelStrokeWidth: 18,

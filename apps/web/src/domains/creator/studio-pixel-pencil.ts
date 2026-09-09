@@ -15,6 +15,8 @@ export const STUDIO_PIXEL_PENCIL_DEFAULT_MAX_POINT_PAIRS = 100_000;
 export const STUDIO_PIXEL_PENCIL_HARD_MAX_POINT_PAIRS = 1_000_000;
 export const STUDIO_PIXEL_PENCIL_DEFAULT_MAX_CELL_VISITS = 400_000;
 export const STUDIO_PIXEL_PENCIL_HARD_MAX_CELL_VISITS = 4_000_000;
+export const STUDIO_PIXEL_PENCIL_MIN_STROKE_WIDTH = 1;
+export const STUDIO_PIXEL_PENCIL_MAX_STROKE_WIDTH = 64;
 
 /**
  * Integer document coordinates are kept inside float32's exact integer range so a WebGPU consumer
@@ -29,6 +31,7 @@ export interface StudioPixelPencilCell {
 
 export type StudioPixelPencilPlanReason =
   | "invalid-points"
+  | "invalid-stroke-width"
   | "invalid-coordinate"
   | "coordinate-out-of-range"
   | "invalid-limits"
@@ -51,7 +54,7 @@ export interface StudioPixelPencilPlan {
 export interface StudioPixelPencilPlanInput {
   /** Flat document-coordinate pairs. Plain arrays and numeric typed arrays are accepted. */
   readonly points: unknown;
-  readonly strokeWidth?: number;
+  readonly strokeWidth?: unknown;
   readonly maximumCells?: number;
   readonly maximumPointPairs?: number;
   readonly maximumCellVisits?: number;
@@ -170,6 +173,84 @@ export function studioPixelPencilCellAt(
     : null;
 }
 
+export type StudioPixelPencilSampleUpdate = "ignore" | "append" | "replace-tail";
+
+export interface StudioPixelPencilSampleUpdateInput {
+  /** Flat point pairs already recorded for the active stroke. */
+  readonly points: unknown;
+  readonly nextX: unknown;
+  readonly nextY: unknown;
+  readonly strokeWidth?: unknown;
+  /** Aseprite-style one-pixel corner cleanup. Defaults to enabled. */
+  readonly pixelPerfect?: boolean;
+}
+
+/**
+ * Normalizes a pixel tip to an integer document-cell diameter. The hard upper bound protects every
+ * renderer from accidental quadratic stamp work and makes malformed persisted widths fail closed.
+ */
+export function normalizeStudioPixelPencilStrokeWidth(value: unknown): number | null {
+  if (value === undefined) return STUDIO_PIXEL_PENCIL_MIN_STROKE_WIDTH;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
+  const rounded = Math.round(value);
+  if (!Number.isSafeInteger(rounded) || rounded < STUDIO_PIXEL_PENCIL_MIN_STROKE_WIDTH) {
+    return null;
+  }
+  return Math.min(rounded, STUDIO_PIXEL_PENCIL_MAX_STROKE_WIDTH);
+}
+
+function samePixelCell(
+  left: StudioPixelPencilCell,
+  right: StudioPixelPencilCell
+): boolean {
+  return left.x === right.x && left.y === right.y;
+}
+
+/**
+ * Plans one active-stroke update without mutating the source point array.
+ *
+ * For a 1px tip, A→B→C where AB and BC are cardinal steps and AC is a diagonal replaces B with
+ * C. This removes the doubled stair-step corner while preserving sparse moves, larger tips, and the
+ * versioned replay result of every already-persisted stroke.
+ */
+export function planStudioPixelPencilSampleUpdate(
+  input: StudioPixelPencilSampleUpdateInput
+): StudioPixelPencilSampleUpdate {
+  const source = normalizePointSource(input.points);
+  const width = normalizeStudioPixelPencilStrokeWidth(input.strokeWidth);
+  const next = studioPixelPencilCellAt(input.nextX, input.nextY);
+  if (!source || source.length % 2 !== 0 || width === null || next === null) return "ignore";
+
+  let current: StudioPixelPencilCell | null = null;
+  let previous: StudioPixelPencilCell | null = null;
+  for (let index = source.length - 2; index >= 0; index -= 2) {
+    const cell = studioPixelPencilCellAt(source.at(index), source.at(index + 1));
+    if (!cell) return "ignore";
+    if (!current) {
+      current = cell;
+    } else if (!samePixelCell(current, cell)) {
+      previous = cell;
+      break;
+    }
+  }
+
+  if (!current) return "append";
+  if (samePixelCell(current, next)) return "ignore";
+  if (input.pixelPerfect === false || width !== 1 || !previous) return "append";
+
+  const previousToCurrent =
+    Math.abs(previous.x - current.x) + Math.abs(previous.y - current.y);
+  const currentToNext = Math.abs(current.x - next.x) + Math.abs(current.y - next.y);
+  const previousToNextX = Math.abs(previous.x - next.x);
+  const previousToNextY = Math.abs(previous.y - next.y);
+  return previousToCurrent === 1
+    && currentToNext === 1
+    && previousToNextX === 1
+    && previousToNextY === 1
+    ? "replace-tail"
+    : "append";
+}
+
 /**
  * Pixel input is accepted when it crosses a cell boundary, even if the physical move is shorter
  * than one document unit. A distance-only filter would lose short edge crossings at pointer-up.
@@ -180,11 +261,12 @@ export function shouldAppendStudioPixelPencilSample(input: {
   readonly nextX: unknown;
   readonly nextY: unknown;
 }): boolean {
-  const previous = studioPixelPencilCellAt(input.lastX, input.lastY);
-  const next = studioPixelPencilCellAt(input.nextX, input.nextY);
-  return previous !== null
-    && next !== null
-    && (previous.x !== next.x || previous.y !== next.y);
+  return planStudioPixelPencilSampleUpdate({
+    points: [input.lastX, input.lastY],
+    nextX: input.nextX,
+    nextY: input.nextY,
+    pixelPerfect: false,
+  }) === "append";
 }
 
 function cellKey(cell: StudioPixelPencilCell): number {
@@ -237,6 +319,12 @@ export function planStudioPixelPencilCells(
 ): StudioPixelPencilPlan {
   const limits = normalizeLimits(input);
   if (!limits) return emptyPlan("invalid-limits");
+  const width = normalizeStudioPixelPencilStrokeWidth(input.strokeWidth);
+  if (width === null) return emptyPlan("invalid-stroke-width");
+  const radius = Math.floor(width / 2);
+  const isEven = width % 2 === 0;
+  const minimumTipOffset = -radius;
+  const maximumTipOffset = isEven ? radius - 1 : radius;
 
   const source = normalizePointSource(input.points);
   if (!source || source.length % 2 !== 0) return emptyPlan("invalid-points");
@@ -254,6 +342,14 @@ export function planStudioPixelPencilCells(
     const y = documentCoordinateToCell(source.at(index + 1));
     if ("reason" in x) return emptyPlan(x.reason, sourcePointPairs);
     if ("reason" in y) return emptyPlan(y.reason, sourcePointPairs);
+    if (
+      x.cell + minimumTipOffset < -STUDIO_PIXEL_PENCIL_MAX_ABS_CELL
+      || x.cell + maximumTipOffset > STUDIO_PIXEL_PENCIL_MAX_ABS_CELL
+      || y.cell + minimumTipOffset < -STUDIO_PIXEL_PENCIL_MAX_ABS_CELL
+      || y.cell + maximumTipOffset > STUDIO_PIXEL_PENCIL_MAX_ABS_CELL
+    ) {
+      return emptyPlan("coordinate-out-of-range", sourcePointPairs);
+    }
     const previous = vertices[vertices.length - 1];
     if (!previous || previous.x !== x.cell || previous.y !== y.cell) {
       vertices.push({ x: x.cell, y: y.cell });
@@ -281,15 +377,11 @@ export function planStudioPixelPencilCells(
     return true;
   };
 
-  const width = Math.max(1, Math.round(input.strokeWidth ?? 1));
-  const radius = Math.floor(width / 2);
-  const isEven = width % 2 === 0;
-
   const visitStampedCell = (center: StudioPixelPencilCell): boolean => {
     if (width <= 1) return visit(center);
     const radiusSq = (width / 2) * (width / 2);
-    for (let dy = -radius; dy <= (isEven ? radius - 1 : radius); dy++) {
-      for (let dx = -radius; dx <= (isEven ? radius - 1 : radius); dx++) {
+    for (let dy = minimumTipOffset; dy <= maximumTipOffset; dy++) {
+      for (let dx = minimumTipOffset; dx <= maximumTipOffset; dx++) {
         // Circle constraint for widths >= 3 to maintain smooth round pixel tips
         if (width >= 3 && dx * dx + dy * dy > radiusSq + 0.25) continue;
         if (!visit({ x: center.x + dx, y: center.y + dy })) return false;

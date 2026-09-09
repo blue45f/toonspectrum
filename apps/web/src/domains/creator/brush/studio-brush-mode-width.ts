@@ -1,9 +1,19 @@
 import type { DrawMode } from "../studio-editor-tool-model";
+import {
+  normalizeStudioPixelPencilStrokeWidth,
+  STUDIO_PIXEL_PENCIL_MIN_STROKE_WIDTH,
+} from "../studio-pixel-pencil";
 
 export interface StudioBrushModeWidthState {
   readonly drawMode: DrawMode;
   readonly strokeWidth: number;
   readonly lastNonPixelStrokeWidth: number;
+}
+
+function pixelWidth(requested: number, fallback: number): number {
+  return normalizeStudioPixelPencilStrokeWidth(requested)
+    ?? normalizeStudioPixelPencilStrokeWidth(fallback)
+    ?? STUDIO_PIXEL_PENCIL_MIN_STROKE_WIDTH;
 }
 
 export function planStudioStrokeWidthChange(
@@ -13,7 +23,7 @@ export function planStudioStrokeWidthChange(
   if (state.drawMode === "pixel") {
     return {
       ...state,
-      strokeWidth: 1,
+      strokeWidth: pixelWidth(requestedWidth, state.strokeWidth),
     };
   }
   return {
@@ -28,14 +38,14 @@ export function planStudioDrawModeChange(
   nextMode: DrawMode,
 ): StudioBrushModeWidthState {
   if (nextMode === state.drawMode) {
-    return state.drawMode === "pixel" && state.strokeWidth !== 1
-      ? { ...state, strokeWidth: 1 }
+    return state.drawMode === "pixel"
+      ? { ...state, strokeWidth: pixelWidth(state.strokeWidth, 1) }
       : state;
   }
   if (nextMode === "pixel") {
     return {
       drawMode: nextMode,
-      strokeWidth: 1,
+      strokeWidth: pixelWidth(state.strokeWidth, 1),
       lastNonPixelStrokeWidth:
         state.drawMode === "pixel"
           ? state.lastNonPixelStrokeWidth

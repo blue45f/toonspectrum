@@ -395,7 +395,7 @@ describe("planStudioDrawPointerStart", () => {
     {
       mode: "pixel" as const,
       expectedMode: "pen" as const,
-      expectedWidth: 1,
+      expectedWidth: 8,
       expectedPressure: 1,
       expectedSpacing: 1,
       expectedFill: undefined,
@@ -441,11 +441,12 @@ describe("planStudioDrawPointerStart", () => {
     );
   });
 
-  it("stores pixel pencil as a versioned hard-grid stroke without pen dynamics or symmetry", () => {
+  it("stores integer pixel tips and user symmetry without inheriting pen dynamics", () => {
     const plan = planStudioDrawPointerStart(input({
       drawMode: "pixel",
       brush: "airbrush",
       brushOpacity: 0.65,
+      strokeWidth: 7.6,
       symmetry: { type: "radial", centerX: 10, centerY: 20, radialCount: 12 },
     }));
 
@@ -453,14 +454,25 @@ describe("planStudioDrawPointerStart", () => {
     expect(plan.capturePointerDynamics).toBe(false);
     expect(plan.element).toMatchObject({
       brush: STUDIO_PIXEL_PENCIL_RENDER_MODE,
-      strokeWidth: 1,
+      strokeWidth: 8,
       pressures: [1],
       opacity: 0.65,
       sampleSpacing: 1,
+      symmetry: { type: "radial", centerX: 10, centerY: 20, radialCount: 12 },
     });
     expect(plan.element.pressureModel).toBeUndefined();
     expect(plan.element.brushDynamics).toBeUndefined();
-    expect(plan.element.symmetry).toBeUndefined();
+  });
+
+  it("caps malformed and oversized pixel tip requests at a safe persisted width", () => {
+    expect(planStudioDrawPointerStart(input({
+      drawMode: "pixel",
+      strokeWidth: 500,
+    })).element.strokeWidth).toBe(64);
+    expect(planStudioDrawPointerStart(input({
+      drawMode: "pixel",
+      strokeWidth: Number.POSITIVE_INFINITY,
+    })).element.strokeWidth).toBe(1);
   });
 
   it("snapshots pen tilt for calligraphy without mistaking mouse tilt for stylus input", () => {
