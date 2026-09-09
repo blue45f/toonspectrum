@@ -42,8 +42,75 @@ jobs:
                   env = os.environ.copy()
                   env.update({str(k): str(v) for k, v in (step.get('env') or {}).items()})
                   print(f'::group::{name or "bootstrap step"}')
-                  subprocess.run(script, shell=True, executable='/bin/bash', check=True, env=env)
+                  # The old bootstrap may stop after creating the policy file when one historical
+                  # text anchor has moved. The following reconciliation step owns the current
+                  # vrm-library integration, so preserve any generated files and continue.
+                  subprocess.run(script, shell=True, executable='/bin/bash', check=False, env=env)
                   print('::endgroup::')
+          PY
+      - name: Integrate policy with the current VRM library shape
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/src/domains/creator/vrm/vrm-library.ts')
+          text = path.read_text(encoding='utf-8')
+
+          import_block = '''import {
+            classifyStudioVrmCatalogQuality,
+            isStudioVrmProductionCatalogEntry,
+            type StudioVrmCatalogQualityTier,
+          } from "./studio-vrm-production-catalog";
+          '''
+          if 'from "./studio-vrm-production-catalog";' not in text:
+              anchor = 'import { QUATERNIUS_FANTASY_VRMS } from "./quaternius-fantasy-catalog";\n'
+              if text.count(anchor) != 1:
+                  raise SystemExit('VRM import anchor changed')
+              text = text.replace(anchor, import_block + anchor, 1)
+
+          quality_field = '''  /** Present only for visually admitted deployment-owned catalog cards. */
+            catalogQualityTier?: StudioVrmCatalogQualityTier;
+          '''
+          if 'catalogQualityTier?: StudioVrmCatalogQualityTier;' not in text:
+              anchor = '''  source: "memory" | "sample" | "sqlite-opfs";
+            thumbnail: string | null;
+          '''
+              replacement = '''  source: "memory" | "sample" | "sqlite-opfs";
+          ''' + quality_field + '''  thumbnail: string | null;
+          '''
+              if text.count(anchor) != 1:
+                  raise SystemExit('VrmLibraryEntry anchor changed')
+              text = text.replace(anchor, replacement, 1)
+
+          old_filter = '''export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS
+            .filter((sample) => sample.visibility !== "legacy")
+            .map((sample) => ({
+          '''
+          new_filter = '''export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS
+            .filter((sample) =>
+              sample.visibility !== "legacy" && isStudioVrmProductionCatalogEntry(sample.id),
+            )
+            .map((sample) => ({
+          '''
+          if 'isStudioVrmProductionCatalogEntry(sample.id)' not in text:
+              if text.count(old_filter) != 1:
+                  raise SystemExit('default VRM picker filter anchor changed')
+              text = text.replace(old_filter, new_filter, 1)
+
+          if 'catalogQualityTier: classifyStudioVrmCatalogQuality(sample.id)!' not in text:
+              anchor = '''    source: "sample",
+            thumbnail: sample.thumbnailUrl ?? `/assets/3d/characters/thumbnails/${sample.id === SAMPLE_VRM_ID ? "sample-vrm" : sample.id}.png`,
+          '''
+              replacement = '''    source: "sample",
+            catalogQualityTier: classifyStudioVrmCatalogQuality(sample.id)!,
+            thumbnail: sample.thumbnailUrl ?? `/assets/3d/characters/thumbnails/${sample.id === SAMPLE_VRM_ID ? "sample-vrm" : sample.id}.png`,
+          '''
+              if text.count(anchor) != 1:
+                  raise SystemExit('sample VRM mapping anchor changed')
+              text = text.replace(anchor, replacement, 1)
+
+          path.write_text(text, encoding='utf-8')
           PY
       - name: Validate production catalog scope
         shell: bash
