@@ -1,0 +1,63 @@
+name: Reconcile Dependabot alerts
+
+on:
+  push:
+    branches:
+      - security/dependabot-reconcile-20260909
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install the exact dependency graph
+        run: pnpm install --frozen-lockfile
+      - name: Run the repository all-severity security audit
+        run: pnpm run audit:security
+      - name: Read open Dependabot alerts
+        id: alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api \
+            --method GET \
+            --paginate \
+            --slurp \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${GITHUB_REPOSITORY}/dependabot/alerts" \
+            -f state=open \
+            -f per_page=100 > /tmp/dependabot-alert-pages.json
+          jq 'add // []' /tmp/dependabot-alert-pages.json > /tmp/dependabot-open-alerts.json
+          count="$(jq 'length' /tmp/dependabot-open-alerts.json)"
+          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+          echo "OPEN_DEPENDABOT_ALERT_COUNT=${count}"
+          jq -r '.[] | [
+            (.number | tostring),
+            (.dependency.package.ecosystem // "unknown"),
+            (.dependency.package.name // "unknown"),
+            (.dependency.manifest_path // "unknown"),
+            (.dependency.scope // "unknown"),
+            (.security_advisory.ghsa_id // "unknown"),
+            (.security_advisory.severity // "unknown"),
+            (.security_vulnerability.vulnerable_version_range // "unknown"),
+            (.security_vulnerability.first_patched_version.identifier // "unavailable")
+          ] | @tsv' /tmp/dependabot-open-alerts.json
+      - name: Require the GitHub alert view to be clear
+        if: steps.alerts.outputs.count != '0'
+        run: |
+          echo "Dependabot still reports ${{ steps.alerts.outputs.count }} open alert(s)."
+          exit 1
