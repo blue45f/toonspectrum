@@ -52,11 +52,25 @@ jobs:
           from pathlib import Path
           path = Path('apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts')
           text = path.read_text(encoding='utf-8')
-          old = 'if (source[key] !== undefined || STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS[key] !== undefined) {'
-          new = 'if (source[key] !== undefined) {'
-          if text.count(old) != 1:
-              raise SystemExit(f'expected one optional anatomy clamp, found {text.count(old)}')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          source_old = '''export function clampStudioMannequinBodyParams(input: unknown): StudioMannequinBodyParams {
+            const source = (typeof input === "object" && input !== null
+              ? input
+              : {}) as Partial<Record<keyof StudioMannequinBodyParams, unknown>>;
+          '''
+          source_new = '''export function clampStudioMannequinBodyParams(input: unknown): StudioMannequinBodyParams {
+            const hasObjectInput = typeof input === "object" && input !== null;
+            const source = (hasObjectInput
+              ? input
+              : {}) as Partial<Record<keyof StudioMannequinBodyParams, unknown>>;
+          '''
+          if text.count(source_old) != 1:
+              raise SystemExit(f'expected one clamp input anchor, found {text.count(source_old)}')
+          text = text.replace(source_old, source_new, 1)
+          condition_old = 'if (source[key] !== undefined || STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS[key] !== undefined) {'
+          condition_new = 'if (!hasObjectInput || source[key] !== undefined) {'
+          if text.count(condition_old) != 1:
+              raise SystemExit(f'expected one optional anatomy clamp, found {text.count(condition_old)}')
+          path.write_text(text.replace(condition_old, condition_new, 1), encoding='utf-8')
           PY
       - name: Validate mannequin anatomy scope
         shell: bash
