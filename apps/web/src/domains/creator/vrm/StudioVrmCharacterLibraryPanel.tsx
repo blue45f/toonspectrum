@@ -404,6 +404,8 @@ export function StudioVrmCharacterLibraryPanel({
                 <span className="grid h-[4.5rem] place-items-center overflow-hidden rounded-lg border border-line/80 bg-panel">
                   <img
                     alt=""
+                    decoding="async"
+                    loading="eager"
                     className="h-full w-full object-contain"
                     src={entry.thumbnail ?? buildFallbackVrmLibraryThumbnail(entry.name, entry.id)}
                     onError={(event) => {
