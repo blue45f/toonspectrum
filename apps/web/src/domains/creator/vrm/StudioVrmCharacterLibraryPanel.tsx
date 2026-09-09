@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState, type ChangeEventHandler } from "react";
 
 import { presentStudioVrmLicenseAuthority } from "./studio-vrm-license-product-gate";
+import { filterStudioVrmProductionLibraryEntries } from "./studio-vrm-production-catalog";
 import { buildFallbackVrmLibraryThumbnail, type VrmLibraryEntry } from "./vrm-library";
 
 const LIBRARY_BATCH_SIZE = 12;
@@ -93,13 +94,14 @@ export function StudioVrmCharacterLibraryPanel({
   const loadMorePendingRef = useRef(false);
   const loadMoreActionRef = useRef<() => void>(() => undefined);
 
-  const entryById = new Map(entries.map((entry) => [entry.id, entry] as const));
+  const catalogEntries = filterStudioVrmProductionLibraryEntries(entries, [activeModelId]);
+  const entryById = new Map(catalogEntries.map((entry) => [entry.id, entry] as const));
   const recentEntries = recentCharacterIds
     .map((id) => entryById.get(id))
     .filter((entry): entry is VrmLibraryEntry => entry !== undefined)
     .slice(0, 6);
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
-  const filteredEntries = entries.filter((entry) =>
+  const filteredEntries = catalogEntries.filter((entry) =>
     entry.name.toLocaleLowerCase("ko-KR").includes(normalizedQuery),
   );
   const visibleEntries = filteredEntries.slice(0, visibleCount);
@@ -109,7 +111,7 @@ export function StudioVrmCharacterLibraryPanel({
   const canExpandLocal = hiddenEntryCount > 0;
   const canFetchRemote = !canExpandLocal && hasMoreEntries && typeof onLoadMore === "function";
   const hasMoreToReveal = canExpandLocal || canFetchRemote;
-  const hasUploadedModels = entries.some((entry) => entry.source !== "sample");
+  const hasUploadedModels = catalogEntries.some((entry) => entry.source !== "sample");
 
   // Search is a new filtered list — always restart from the first progressive window.
   useEffect(() => {
@@ -220,7 +222,7 @@ export function StudioVrmCharacterLibraryPanel({
         VRM 업로드
       </button>
       <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
-        여러 .vrm 파일을 한 번에 올려 로맨스, 판타지, 학원물, 액션 등 장르별 캐릭터를 전환하세요. VRoid Studio에서 무료 애니메이션풍 VRM 캐릭터를 직접 만들 수 있습니다.
+        기본 목록은 확대 시각 감사를 통과한 번들 캐릭터만 표시합니다. 직접 업로드한 VRM과 기존 문서에서 참조하는 모델은 이 품질 필터와 무관하게 그대로 유지됩니다.
         이용 조건이 없거나 손상된 모델도 로컬 미리보기는 가능하지만, 모델 파일을 포함하는 archive·내보내기·공유는 확인 전까지 차단됩니다.
       </p>
 
@@ -372,7 +374,7 @@ export function StudioVrmCharacterLibraryPanel({
           </div>
         ) : null}
 
-        {entries.length > 0 && filteredEntries.length === 0 ? (
+        {catalogEntries.length > 0 && filteredEntries.length === 0 ? (
           <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">
             "{query}"와 일치하는 캐릭터가 없어요.
           </div>
