@@ -18,9 +18,11 @@ jobs:
           ref: fix/scene3d-bg-quality-20260910
           fetch-depth: 0
           persist-credentials: true
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+          cache: pnpm
       - name: Materialize high-resolution insert product code
         shell: bash
         run: |
@@ -46,7 +48,6 @@ jobs:
       - name: Validate BG3D insertion scope
         shell: bash
         run: |
-          corepack enable
           pnpm install --frozen-lockfile
           pnpm exec vitest run \
             apps/web/src/domains/creator/bg3d/studio-bg3d-insert-resolution-boundary.test.ts
