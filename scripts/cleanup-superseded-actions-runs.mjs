@@ -6,7 +6,11 @@ const ACTIVE_STATUSES = ["queued", "in_progress"];
 
 export function selectSupersededActionsRuns(
   runs,
-  { currentRunId, pullRequestStates = new Map() } = {},
+  {
+    currentRunId,
+    pullRequestStates = new Map(),
+    openPullHeadBranches = new Set(),
+  } = {},
 ) {
   const current = Number(currentRunId);
   const active = runs.filter((run) =>
@@ -32,10 +36,17 @@ export function selectSupersededActionsRuns(
   for (const run of active) {
     if (run.event !== "pull_request") continue;
     const number = run.pull_requests?.[0]?.number;
-    if (!Number.isInteger(number)) continue;
-    const state = pullRequestStates.get(number);
+    const state = Number.isInteger(number) ? pullRequestStates.get(number) : undefined;
     if (state && state !== "open") {
       selected.set(Number(run.id), { run, reason: `pull-request-${state}` });
+      continue;
+    }
+
+    // GitHub commonly returns an empty pull_requests array for old/closed PR workflow runs.
+    // Keep only heads that still belong to an open PR; everything else is stale queue debt.
+    const branch = typeof run.head_branch === "string" ? run.head_branch : "";
+    if ((!Number.isInteger(number) || !state) && branch && !openPullHeadBranches.has(branch)) {
+      selected.set(Number(run.id), { run, reason: "pull-request-no-longer-open" });
     }
   }
 
@@ -80,6 +91,21 @@ async function listRuns({ token, repository, status, fetchImpl }) {
   return runs;
 }
 
+async function listOpenPulls({ token, repository, fetchImpl }) {
+  const pulls = [];
+  for (let page = 1; page <= 10; page += 1) {
+    const batch = await githubRequest({
+      token,
+      repository,
+      path: `/pulls?state=open&per_page=100&page=${page}`,
+      fetchImpl,
+    });
+    pulls.push(...(batch ?? []));
+    if (!Array.isArray(batch) || batch.length < 100) break;
+  }
+  return pulls;
+}
+
 export async function cleanupSupersededActionsRuns({
   token,
   repository,
@@ -91,11 +117,18 @@ export async function cleanupSupersededActionsRuns({
     throw new Error("Missing Actions queue cleanup environment.");
   }
 
-  const runs = (
-    await Promise.all(
+  const [runsByStatus, openPulls] = await Promise.all([
+    Promise.all(
       ACTIVE_STATUSES.map((status) => listRuns({ token, repository, status, fetchImpl })),
-    )
-  ).flat();
+    ),
+    listOpenPulls({ token, repository, fetchImpl }),
+  ]);
+  const runs = runsByStatus.flat();
+  const openPullHeadBranches = new Set(
+    openPulls
+      .map((pull) => pull?.head?.ref)
+      .filter((value) => typeof value === "string" && value.length > 0),
+  );
 
   const prNumbers = new Set(
     runs
@@ -117,6 +150,7 @@ export async function cleanupSupersededActionsRuns({
   const candidates = selectSupersededActionsRuns(runs, {
     currentRunId,
     pullRequestStates,
+    openPullHeadBranches,
   });
   const cancelled = [];
   const skipped = [];
@@ -150,6 +184,7 @@ export async function cleanupSupersededActionsRuns({
 
   return {
     activeRunsScanned: runs.filter((run) => ACTIVE_EVENTS.has(run.event)).length,
+    openPullHeads: openPullHeadBranches.size,
     candidateRuns: candidates.length,
     cancelled,
     skipped,
