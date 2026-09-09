@@ -6,6 +6,10 @@ on:
       - feat/character-modeler-parity-20260909
     paths:
       - ".github/workflows/character-modeler-assets-20260909.yml"
+      - "scripts/blender/export_character_modular_parts.py"
+      - "scripts/blender/toonstudio_character_pipeline.py"
+      - "config/blender/avatar-orion-production.json"
+      - "tools/blender/toonstudio_blender_kit/**"
 
 permissions:
   contents: write
