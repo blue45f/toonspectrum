@@ -1,0 +1,71 @@
+name: Scene3D projection hardening bootstrap
+
+on:
+  push:
+    branches: [feat/scene3d-runtime-projection-20260910]
+    paths: [.github/workflows/scene3d-projection-hardening-arm.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scene3d-projection-hardening-v4
+  cancel-in-progress: true
+
+jobs:
+  harden:
+    runs-on: ubuntu-slim
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/scene3d-runtime-projection-20260910
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Apply reviewed projection and document corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/harden-scene3d-projection-semantics.py
+          python3 scripts/harden-scene3d-document-validation.py
+          python3 scripts/fix-scene3d-contract-test-types.py
+
+      - name: Validate projection and unified document contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document-contract-hardening.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection-math.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document-contract-hardening.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection-math.test.ts
+          git diff --check
+
+      - name: Commit product code and remove bootstrap files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/scene3d-projection-hardening-arm.yml \
+                .github/workflows/harden-scene3d-projection-semantics.yml \
+                scripts/harden-scene3d-projection-semantics.py \
+                scripts/harden-scene3d-document-validation.py \
+                scripts/fix-scene3d-contract-test-types.py
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'fix(scene3d): preserve and validate projection semantics'
+          git push --no-verify origin HEAD:feat/scene3d-runtime-projection-20260910
