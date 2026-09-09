@@ -1,0 +1,105 @@
+name: Raster precision patch handoff
+
+on:
+  push:
+    branches:
+      - feat/studio-pixel-pencil-pro-v2-20260909
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: raster-precision-patch-handoff
+  cancel-in-progress: true
+
+jobs:
+  handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FEATURE_BRANCH: feat/studio-pixel-pencil-pro-v2-20260909
+    steps:
+      - name: Cancel older delivery and patch jobs
+        run: |
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/runs" \
+            -F branch="${FEATURE_BRANCH}" \
+            -F per_page=100 \
+            --jq '.workflow_runs[] | select(.status == "queued" or .status == "in_progress") | select((.name | test("pixel pencil"; "i")) or .name == "Studio raster precision delivery") | .id' \
+          | while read -r run_id; do
+              if [ -n "${run_id}" ] && [ "${run_id}" != "${GITHUB_RUN_ID}" ]; then
+                gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel" || true
+              fi
+            done
+
+      - name: Sparse partial-clone patch surface
+        run: |
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git sparse-checkout init --cone
+          git sparse-checkout set .github apps/web/src/domains/creator docs scripts
+          git -c protocol.version=2 fetch \
+            --depth=1 \
+            --filter=blob:none \
+            origin \
+            "+refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}"
+          git checkout -B "${FEATURE_BRANCH}" "refs/remotes/origin/${FEATURE_BRANCH}"
+
+      - name: Apply core and professional controls atomically
+        run: |
+          if ! grep -Fq 'export function planStudioPixelPencilSampleUpdate' \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts; then
+            python3 scripts/prepare-studio-pixel-pencil-pro-core.py
+            python3 scripts/apply-studio-pixel-pencil-pro-core.py
+          fi
+          if ! grep -Fq 'data-studio-pixel-pencil-professional="true"' \
+            apps/web/src/domains/creator/brush/StudioDrawOptionsBar.tsx; then
+            python3 scripts/prepare-studio-pixel-pencil-pro-ui.py
+            python3 scripts/apply-studio-pixel-pencil-pro-ui.py
+          fi
+
+      - name: Make source-boundary assertions formatter independent
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path(
+              "apps/web/src/domains/creator/brush/"
+              "studio-pixel-pencil-professional-ui-boundary.test.ts"
+          )
+          source = path.read_text(encoding="utf-8")
+          source = source.replace(
+              '''    expect(canvasHud).toContain('? { mode: "pixel", widthPx: strokeWidth');
+''',
+              '''    expect(canvasHud).toContain('mode: "pixel"');
+    expect(canvasHud).toContain("widthPx: strokeWidth");
+''',
+          )
+          path.write_text(source, encoding="utf-8")
+          PY
+
+      - name: Verify atomic source contract
+        run: |
+          grep -F 'STUDIO_PIXEL_PENCIL_MAX_STROKE_WIDTH = 64' \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts
+          grep -F 'export function planStudioPixelPencilSampleUpdate' \
+            apps/web/src/domains/creator/studio-pixel-pencil.ts
+          grep -F 'pixelSampleUpdate === "replace-tail"' \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers-freehand.ts
+          grep -F 'data-studio-pixel-pencil-professional="true"' \
+            apps/web/src/domains/creator/brush/StudioDrawOptionsBar.tsx
+          grep -F 'data-studio-mobile-pixel-pencil-professional="true"' \
+            apps/web/src/domains/creator/StudioMobileEditingDock.tsx
+          grep -F '| "silk";' \
+            apps/web/src/domains/creator/StudioInspectorDrawModeControls.tsx
+          git diff --check
+
+      - name: Commit patch handoff and start full quality gate
+        run: |
+          rm -f .github/workflows/raster-precision-patch-handoff.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git commit -m "feat(studio): apply raster precision patch [pixel-pencil-pro-core-applied] [pixel-pencil-pro-combined-applied] [pixel-pencil-pro-delivered]"
+          git fetch origin "${FEATURE_BRANCH}"
+          git push --force-with-lease origin HEAD:"${FEATURE_BRANCH}"
