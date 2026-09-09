@@ -1,0 +1,430 @@
+name: Scene3D projection bootstrap
+
+on:
+  push:
+    branches:
+      - feat/scene3d-runtime-projection-20260910
+    paths:
+      - .github/workflows/scene3d-projection-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/scene3d-runtime-projection-20260910
+          fetch-depth: 0
+      - name: Promote procedural primitives to first-class Scene3D entities
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/src/domains/creator/scene3d/studio-scene3d-document.ts')
+          text = path.read_text(encoding='utf-8')
+
+          anchor = '''interface StudioScene3dEntityBase {\n  readonly id: string;\n  readonly name: string;\n  readonly transform: StudioScene3dTransform;\n  readonly visible: boolean;\n  readonly locked: boolean;\n  readonly castShadow: boolean;\n  readonly receiveShadow: boolean;\n  readonly parentId: string | null;\n}\n\n'''
+          addition = anchor + '''export const STUDIO_SCENE3D_PRIMITIVE_KINDS = Object.freeze([\n  "box",\n  "cylinder",\n  "plane",\n  "sphere",\n  "hemisphere",\n  "cone",\n  "pyramid",\n  "triangularPrism",\n  "hexPrism",\n  "torus",\n  "tube",\n  "ring",\n  "capsule",\n] as const);\n\nexport type StudioScene3dPrimitiveKind = (typeof STUDIO_SCENE3D_PRIMITIVE_KINDS)[number];\n\nexport interface StudioScene3dPrimitiveEntity extends StudioScene3dEntityBase {\n  readonly kind: "primitive";\n  readonly primitiveKind: StudioScene3dPrimitiveKind;\n  readonly color: string;\n}\n\n'''
+          if text.count(anchor) != 1:
+              raise SystemExit('Scene3D entity base anchor changed')
+          text = text.replace(anchor, addition, 1)
+
+          old_union = '''export type StudioScene3dEntity =\n  | StudioScene3dCharacterEntity\n  | StudioScene3dModelEntity\n  | StudioScene3dSplatEntity;\n'''
+          new_union = '''export type StudioScene3dEntity =\n  | StudioScene3dPrimitiveEntity\n  | StudioScene3dCharacterEntity\n  | StudioScene3dModelEntity\n  | StudioScene3dSplatEntity;\n'''
+          if text.count(old_union) != 1:
+              raise SystemExit('Scene3D entity union changed')
+          text = text.replace(old_union, new_union, 1)
+
+          old_entity = '''  if (value.parentId !== null && !isString(value.parentId)) return false;\n  if (value.kind === "character") {\n'''
+          new_entity = '''  if (value.parentId !== null && !isString(value.parentId)) return false;\n  if (value.kind === "primitive") {\n    return STUDIO_SCENE3D_PRIMITIVE_KINDS.includes(value.primitiveKind as StudioScene3dPrimitiveKind)\n      && isString(value.color, 32);\n  }\n  if (value.kind === "character") {\n'''
+          if text.count(old_entity) != 1:
+              raise SystemExit('Scene3D entity validator anchor changed')
+          text = text.replace(old_entity, new_entity, 1)
+
+          old_loop = '''  const assetIds = new Set(value.assets.map((asset) => asset.id));\n  for (const entity of value.entities) {\n    if (!assetIds.has(entity.assetId)) {\n      throw new StudioScene3dDocumentError("MISSING_ENTITY_ASSET", `${entity.id}가 참조하는 asset이 없습니다.`);\n    }\n'''
+          new_loop = '''  const assetIds = new Set(value.assets.map((asset) => asset.id));\n  for (const entity of value.entities) {\n    if (entity.kind !== "primitive" && !assetIds.has(entity.assetId)) {\n      throw new StudioScene3dDocumentError("MISSING_ENTITY_ASSET", `${entity.id}가 참조하는 asset이 없습니다.`);\n    }\n'''
+          if text.count(old_loop) != 1:
+              raise SystemExit('Scene3D asset-reference loop changed')
+          path.write_text(text.replace(old_loop, new_loop, 1), encoding='utf-8')
+          PY
+      - name: Add BG3D projection adapter
+        shell: bash
+        run: |
+          cat > apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.ts <<'EOF'
+          import type {
+            StudioBg3dCameraSettings,
+            StudioBg3dModelAttachment,
+            StudioBg3dSceneDocument,
+            StudioBg3dTransform,
+          } from "../bg3d/studio-bg3d-scene-document";
+          import {
+            assertStudioScene3dDocument,
+            type StudioScene3dAssetReference,
+            type StudioScene3dCamera,
+            type StudioScene3dDocumentV1,
+            type StudioScene3dEntity,
+            type StudioScene3dLight,
+            type StudioScene3dQuat,
+            type StudioScene3dTransform,
+          } from "./studio-scene3d-document";
+
+          const OUTPUT_MIN_HEIGHT = 2160;
+          const OUTPUT_MAX_EDGE = 4096;
+          const DEFAULT_FAR = 5000;
+
+          function clamp(value: number, minimum: number, maximum: number): number {
+            return Math.min(maximum, Math.max(minimum, value));
+          }
+
+          function eulerXyzToQuaternion(rotation: readonly [number, number, number]): StudioScene3dQuat {
+            const [x, y, z] = rotation;
+            const cx = Math.cos(x / 2);
+            const sx = Math.sin(x / 2);
+            const cy = Math.cos(y / 2);
+            const sy = Math.sin(y / 2);
+            const cz = Math.cos(z / 2);
+            const sz = Math.sin(z / 2);
+            return Object.freeze([
+              sx * cy * cz + cx * sy * sz,
+              cx * sy * cz - sx * cy * sz,
+              cx * cy * sz + sx * sy * cz,
+              cx * cy * cz - sx * sy * sz,
+            ] as const);
+          }
+
+          function projectTransform(source: StudioBg3dTransform): StudioScene3dTransform {
+            return Object.freeze({
+              position: Object.freeze([...source.position] as [number, number, number]),
+              rotation: eulerXyzToQuaternion(source.rotation),
+              scale: Object.freeze([...source.scale] as [number, number, number]),
+            });
+          }
+
+          function projectAttachment(source: StudioBg3dModelAttachment): StudioScene3dAssetReference {
+            const contentSha256 = source.hash.replace(/^sha256:/u, "");
+            const publicDomain = source.rights.status === "public-domain";
+            const owned = source.rights.status === "owned";
+            return Object.freeze({
+              id: `bg3d:${source.id}`,
+              kind: "mesh",
+              version: contentSha256.slice(0, 12),
+              contentSha256,
+              uri: `attachment:${source.id}`,
+              mime: source.mime,
+              byteSize: source.byteSize,
+              rights: Object.freeze({
+                commercialUse: source.rights.commercialUse,
+                redistribution: publicDomain || owned,
+                derivativeUse: publicDomain || owned,
+                licenseName: source.rights.licenseName ?? source.rights.status,
+              }),
+              // Legacy/user assets remain editable but never become production catalogue entries
+              // until the new visual admission pipeline produces evidence for their exact hash.
+              quality: Object.freeze({
+                accepted: false,
+                score: 0,
+                reportUri: "/assets/3d/quality/legacy-unreviewed.json",
+              }),
+            });
+          }
+
+          function focalLengthFromVerticalFov(fovDegrees: number): number {
+            const radians = clamp(fovDegrees, 1, 179) * Math.PI / 180;
+            return clamp(18 / Math.tan(radians / 2), 8, 300);
+          }
+
+          function projectCamera(
+            source: StudioBg3dCameraSettings,
+            id: string,
+            name: string,
+          ): StudioScene3dCamera {
+            return Object.freeze({
+              id,
+              name,
+              projection: source.projection ?? "perspective",
+              position: Object.freeze([...source.position] as [number, number, number]),
+              target: Object.freeze([...source.target] as [number, number, number]),
+              up: Object.freeze([...(source.up ?? [0, 1, 0])] as [number, number, number]),
+              focalLengthMm: focalLengthFromVerticalFov(source.fovDegrees),
+              orthoScale: Math.max(0.001, 5 / Math.max(0.001, source.zoom ?? 1)),
+              near: Math.max(0.001, source.nearClip ?? 0.03),
+              far: DEFAULT_FAR,
+              lensShift: Object.freeze([...(source.lensShift ?? [0, 0])] as [number, number]),
+            });
+          }
+
+          function projectDirectionalLight(
+            id: string,
+            name: string,
+            light: StudioBg3dSceneDocument["lighting"]["key"],
+          ): StudioScene3dLight {
+            const target = Object.freeze([0, 1, 0] as const);
+            return Object.freeze({
+              id,
+              name,
+              kind: "directional",
+              color: light.color,
+              intensity: light.intensity,
+              position: Object.freeze([
+                target[0] + light.direction[0] * 10,
+                target[1] + light.direction[1] * 10,
+                target[2] + light.direction[2] * 10,
+              ] as const),
+              target,
+              castShadow: light.castsShadow,
+            });
+          }
+
+          export function projectStudioBg3dDocumentToScene3d(input: {
+            readonly documentId: string;
+            readonly source: StudioBg3dSceneDocument;
+            readonly revision?: number;
+            readonly now?: string;
+          }): StudioScene3dDocumentV1 {
+            const { source } = input;
+            const now = input.now ?? new Date().toISOString();
+            const assets = source.attachments.map(projectAttachment);
+            const entities: StudioScene3dEntity[] = source.nodes.map((node) => {
+              const base = {
+                id: node.id,
+                name: node.name,
+                transform: projectTransform(node.transform),
+                visible: node.visible,
+                locked: node.locked,
+                castShadow: node.castsShadow,
+                receiveShadow: node.receivesShadow,
+                parentId: node.parentId ?? null,
+              } as const;
+              if (node.kind === "primitive") {
+                return Object.freeze({
+                  ...base,
+                  kind: "primitive" as const,
+                  primitiveKind: node.primitiveKind,
+                  color: node.color,
+                });
+              }
+              return Object.freeze({
+                ...base,
+                kind: "model" as const,
+                assetId: `bg3d:${node.attachmentId}`,
+                materialVariantId: null,
+              });
+            });
+
+            const mainCamera = projectCamera(source.camera, "camera:main", "메인 카메라");
+            const shotCameras = (source.shots ?? []).map((shot) => projectCamera(
+              { ...source.camera, ...(shot.camera ?? {}) },
+              `camera:shot:${shot.id}`,
+              `${shot.name} 카메라`,
+            ));
+            const height = clamp(Math.round(source.output.exportHeight), OUTPUT_MIN_HEIGHT, OUTPUT_MAX_EDGE);
+            const aspect = clamp(source.output.exportAspectRatio ?? 1, 0.1, 10);
+            const width = clamp(Math.round(height * aspect), 64, OUTPUT_MAX_EDGE);
+            const mode = source.background.mode === "transparent"
+              ? "transparent"
+              : source.background.mode === "color"
+                ? "color"
+                : "procedural-sky";
+
+            const document: StudioScene3dDocumentV1 = Object.freeze({
+              kind: "toonspectrum.scene3d",
+              version: 1,
+              documentId: input.documentId,
+              revision: input.revision ?? 0,
+              coordinateSystem: Object.freeze({ unit: "meter", handedness: "right", upAxis: "Y", forwardAxis: "-Z" }),
+              assets: Object.freeze(assets),
+              entities: Object.freeze(entities),
+              cameras: Object.freeze([mainCamera, ...shotCameras]),
+              activeCameraId: source.activeShotId ? `camera:shot:${source.activeShotId}` : mainCamera.id,
+              lights: Object.freeze([
+                projectDirectionalLight("light:key", "키 라이트", source.lighting.key),
+                projectDirectionalLight("light:fill", "필 라이트", source.lighting.fill),
+              ]),
+              environment: Object.freeze({
+                mode,
+                color: source.background.color,
+                assetId: null,
+                rotationDegrees: source.background.panoramaRotation,
+                intensity: source.lighting.ambientIntensity,
+                groundEnabled: true,
+                groundHeight: 0,
+                groundShadowOpacity: source.render.shadows ? 0.22 : 0,
+              }),
+              render: Object.freeze({
+                profile: "webtoon",
+                colorSpace: "srgb",
+                toneMapping: source.render.toneMapping === "aces" ? "aces" : "neutral",
+                exposure: source.render.exposure,
+                antialiasing: source.render.antialias ? "msaa" : "ssaa",
+                shadows: Object.freeze({
+                  enabled: source.render.shadows,
+                  mode: "csm",
+                  cascades: 3,
+                  mapSize: source.quality.desktop.shadowMapSize,
+                }),
+                effects: Object.freeze({
+                  ssgi: false,
+                  sss: false,
+                  contactShadows: source.render.shadows,
+                  bloom: false,
+                  depthOfField: false,
+                }),
+                toon: Object.freeze({
+                  enabled: source.output.tone.mode !== "none",
+                  rampSteps: Math.max(2, source.output.tone.levels),
+                  outline: source.output.line.enabled,
+                  outlineWidthPx: source.output.line.widthPx,
+                  semanticLines: source.output.line.enabled,
+                }),
+              }),
+              output: Object.freeze({
+                width,
+                height,
+                pixelRatio: 1,
+                transparent: source.output.transparentBackground || source.background.mode === "transparent",
+                preserveAlpha: true,
+                smartLayer: true,
+                semanticPasses: Object.freeze(["beauty", "line", "shadow", "depth", "normal", "object-id", "material-id"] as const),
+              }),
+              shots: Object.freeze((source.shots ?? []).map((shot) => Object.freeze({
+                id: shot.id,
+                name: shot.name,
+                cameraId: `camera:shot:${shot.id}`,
+                hiddenEntityIds: Object.freeze((shot.nodeVisibility ?? []).filter((entry) => !entry.visible).map((entry) => entry.nodeId)),
+                renderProfileOverride: null,
+              }))),
+              createdAt: now,
+              updatedAt: now,
+            });
+            assertStudioScene3dDocument(document);
+            return document;
+          }
+          EOF
+      - name: Add projection tests
+        shell: bash
+        run: |
+          cat > apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts <<'EOF'
+          import { describe, expect, it } from "vitest";
+
+          import {
+            DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+            type StudioBg3dSceneDocument,
+          } from "../bg3d/studio-bg3d-scene-document";
+          import { isStudioScene3dDocument } from "./studio-scene3d-document";
+          import { projectStudioBg3dDocumentToScene3d } from "./studio-scene3d-bg3d-projection";
+
+          describe("BG3D → Scene3D projection", () => {
+            it("keeps primitives procedural and models content-addressed while sharing camera/light/output authority", () => {
+              const source: StudioBg3dSceneDocument = {
+                ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+                attachments: [{
+                  id: "chair",
+                  name: "Chair",
+                  mime: "model/gltf-binary",
+                  byteSize: 1024,
+                  hash: `sha256:${"a".repeat(64)}`,
+                  rights: {
+                    status: "public-domain",
+                    commercialUse: true,
+                    attributionRequired: false,
+                    licenseName: "CC0-1.0",
+                  },
+                  source: "bundled",
+                }],
+                nodes: [{
+                  id: "floor",
+                  name: "Floor",
+                  kind: "primitive",
+                  primitiveKind: "plane",
+                  color: "#dddddd",
+                  transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [4, 1, 4] },
+                  visible: true,
+                  locked: false,
+                  castsShadow: false,
+                  receivesShadow: true,
+                  parentId: null,
+                }, {
+                  id: "chair-node",
+                  name: "Chair",
+                  kind: "model",
+                  attachmentId: "chair",
+                  transform: { position: [1, 0, 0], rotation: [0, Math.PI / 2, 0], scale: [1, 1, 1] },
+                  visible: true,
+                  locked: false,
+                  castsShadow: true,
+                  receivesShadow: true,
+                  parentId: null,
+                }],
+                output: {
+                  ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output,
+                  exportHeight: 640,
+                  exportAspectRatio: 0.75,
+                },
+              };
+
+              const projected = projectStudioBg3dDocumentToScene3d({
+                documentId: "scene:test",
+                source,
+                now: "2026-09-10T00:00:00.000Z",
+              });
+
+              expect(isStudioScene3dDocument(projected)).toBe(true);
+              expect(projected.entities.map((entity) => entity.kind)).toEqual(["primitive", "model"]);
+              expect(projected.assets).toHaveLength(1);
+              expect(projected.assets[0]).toMatchObject({
+                id: "bg3d:chair",
+                uri: "attachment:chair",
+                quality: { accepted: false, score: 0 },
+              });
+              expect(projected.output.height).toBe(2160);
+              expect(projected.output.width).toBe(1620);
+              expect(projected.output.pixelRatio).toBe(1);
+              expect(projected.lights.map((light) => light.id)).toEqual(["light:key", "light:fill"]);
+            });
+
+            it("creates independent shot cameras instead of dropping legacy camera overrides", () => {
+              const source: StudioBg3dSceneDocument = {
+                ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+                shots: [{
+                  id: "close-up",
+                  name: "Close up",
+                  camera: { fovDegrees: 25 },
+                  nodeVisibility: [],
+                }],
+                activeShotId: "close-up",
+              };
+
+              const projected = projectStudioBg3dDocumentToScene3d({ documentId: "scene:shot", source });
+
+              expect(projected.activeCameraId).toBe("camera:shot:close-up");
+              expect(projected.cameras).toHaveLength(2);
+              expect(projected.cameras[1]?.focalLengthMm).toBeGreaterThan(projected.cameras[0]!.focalLengthMm);
+            });
+          });
+          EOF
+      - name: Validate projection
+        shell: bash
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+      - name: Commit projection and remove bootstrap workflow
+        shell: bash
+        run: |
+          git config user.name "toonstudio-3d-ci"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/scene3d-projection-bootstrap.yml
+          git add apps/web/src/domains/creator/scene3d/studio-scene3d-document.ts \
+                  apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.ts \
+                  apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts
+          git diff --cached --check
+          git commit -m "feat(scene3d): project legacy BG3D into unified scene authority"
+          git push origin HEAD:feat/scene3d-runtime-projection-20260910
