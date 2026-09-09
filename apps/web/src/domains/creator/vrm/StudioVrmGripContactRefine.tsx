@@ -9,6 +9,10 @@ import {
   sameStudioVrmContactValues,
   type StudioVrmContactReplay,
 } from "./studio-vrm-contact-refinement";
+import {
+  createStudioVrmGripContactTargets,
+  type StudioVrmGripFingerOrdinal,
+} from "./studio-vrm-grip-contact-targets";
 import { createAutoGripFingerOverrides, resolvePropAttachment, resolveSecondaryPropTarget } from "./studio-vrm-prop-rig";
 import { propDefById } from "./studio-vrm-props";
 
@@ -21,11 +25,21 @@ const STUDIO_VRM_GRIP_CONTACT_PRIORITY = -1.5;
 const FINGERS = ["Index", "Middle", "Ring", "Little"] as const;
 const SEGMENTS = ["Proximal", "Intermediate", "Distal"] as const;
 const LIMITS = [80, 100, 65].map(THREE.MathUtils.degToRad);
-type ContactPass = { run(): void; release(): boolean };
 
-function createContactPasses(vrm: VRM, items: readonly PropInstance[], metrics: VrmPropRigMetrics, locked: readonly string[]) {
+export type StudioVrmGripContactPass = { run(): void; release(): boolean };
+
+/**
+ * Product-authoritative grip passes. The browser visual harness can import this exact factory so
+ * screenshots cannot silently drift to a legacy hand solver.
+ */
+export function createStudioVrmGripContactPasses(
+  vrm: VRM,
+  items: readonly PropInstance[],
+  metrics: VrmPropRigMetrics,
+  locked: readonly string[],
+): StudioVrmGripContactPass[] {
   const authority = createAutoGripFingerOverrides(items, propDefById, metrics);
-  const passes: ContactPass[] = [];
+  const passes: StudioVrmGripContactPass[] = [];
   for (const item of items) {
     const def = propDefById(item.propId);
     // Flat, precision-pinch and support poses keep their own authored profiles.
@@ -48,25 +62,33 @@ function createContactPasses(vrm: VRM, items: readonly PropInstance[], metrics: 
       const hand = vrm.humanoid?.getNormalizedBoneNode(`${side}Hand`);
       if (!hand) continue;
       const chains: THREE.Object3D[][] = [];
-      for (const finger of FINGERS) {
+      const fingerOrdinals: StudioVrmGripFingerOrdinal[] = [];
+      for (const [fingerIndex, finger] of FINGERS.entries()) {
         const names = SEGMENTS.map((segment) => `${side}${finger}${segment}` as VRMHumanBoneName);
         // A locked joint protects its entire finger, not unrelated unlocked fingers.
         if (names.some((name) => locked.includes(name))) continue;
         const nodes = names.map((name) => vrm.humanoid?.getNormalizedBoneNode(name));
         if (nodes.some((node) => !node)) continue;
         chains.push(nodes as THREE.Object3D[]);
+        fingerOrdinals.push(fingerIndex as StudioVrmGripFingerOrdinal);
       }
       if (chains.length === 0) continue;
       const bones = chains.flat();
       const endpoints = chains.map((chain) => chain[2]);
+      const endpointWorldPositions = endpoints.map(() => new THREE.Vector3());
       const groups = chains.map((_, index) => [index * 3, index * 3 + 1, index * 3 + 2]);
       const radius = (anchor.gripRadius ?? def.grip.radius) * resolved.scale;
       const handSize = side === "left" ? metrics.leftHand : metrics.rightHand;
       if (![radius, handSize].every((value) => Number.isFinite(value) && value > 0)) continue;
-      const target = new THREE.Vector3();
-      const localTarget = new THREE.Vector3();
+      const gripCenter = new THREE.Vector3();
+      const localCenter = new THREE.Vector3();
+      const gripAxis = new THREE.Vector3();
+      const fallbackRadial = new THREE.Vector3();
+      const localAxis = new THREE.Vector3();
+      const localRadial = new THREE.Vector3();
       const scratch = new THREE.Vector3();
       const rotation = new THREE.Quaternion();
+      const inverseHandRotation = new THREE.Quaternion();
       const offset = new THREE.Vector3(...anchor.position).sub(new THREE.Vector3(...resolved.anchor.position)).multiplyScalar(resolved.scale);
       const localRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
         THREE.MathUtils.degToRad(resolved.rotationDeg[0]),
@@ -108,22 +130,35 @@ function createContactPasses(vrm: VRM, items: readonly PropInstance[], metrics: 
               return;
             }
             sourceHand.updateWorldMatrix(true, false);
-            target.set(...resolved.socketPosition);
-            sourceHand.localToWorld(target);
+            gripCenter.set(...resolved.socketPosition);
+            sourceHand.localToWorld(gripCenter);
             sourceHand.getWorldQuaternion(rotation).multiply(localRotation).normalize();
-            target.add(scratch.copy(offset).applyQuaternion(rotation));
+            gripCenter.add(scratch.copy(offset).applyQuaternion(rotation));
+            gripAxis.set(...anchor.up).applyQuaternion(rotation).normalize();
+            fallbackRadial.set(...anchor.forward).applyQuaternion(rotation).normalize();
             hand.updateWorldMatrix(true, true);
             const determinant = hand.matrixWorld.determinant();
             if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-12
-              || !target.toArray().every(Number.isFinite)
-              || target.distanceTo(hand.getWorldPosition(scratch)) > handSize * 1.8) {
+              || !gripCenter.toArray().every(Number.isFinite)
+              || !gripAxis.toArray().every(Number.isFinite)
+              || !fallbackRadial.toArray().every(Number.isFinite)
+              || gripCenter.distanceTo(hand.getWorldPosition(scratch)) > handSize * 1.8) {
               release(); // Do not leave a previous correction on an unreachable contact.
               return;
             }
-            localTarget.copy(target);
-            hand.worldToLocal(localTarget);
+
+            localCenter.copy(gripCenter);
+            hand.worldToLocal(localCenter);
+            hand.getWorldQuaternion(inverseHandRotation).invert();
+            localAxis.copy(gripAxis).applyQuaternion(inverseHandRotation).normalize();
+            localRadial.copy(fallbackRadial).applyQuaternion(inverseHandRotation).normalize();
             const m = hand.matrixWorld.elements;
-            const context = [localTarget.x, localTarget.y, localTarget.z];
+            const context = [
+              localCenter.x, localCenter.y, localCenter.z,
+              localAxis.x, localAxis.y, localAxis.z,
+              localRadial.x, localRadial.y, localRadial.z,
+              radius, handSize, ...fingerOrdinals,
+            ];
             // Scale/shear Gram matrix is invariant under common rigid movement.
             for (let a = 0; a < 3; a += 1) {
               for (let b = a; b < 3; b += 1) context.push(m[a * 4] * m[b * 4] + m[a * 4 + 1] * m[b * 4 + 1] + m[a * 4 + 2] * m[b * 4 + 2]);
@@ -136,17 +171,38 @@ function createContactPasses(vrm: VRM, items: readonly PropInstance[], metrics: 
             if (plan.kind === "replay") { apply(plan.angles); return; }
             const initial = [...plan.angles];
             if (!sameStudioVrmContactValues(initial, current)) apply(initial);
+
+            endpoints.forEach((node, index) => node.getWorldPosition(endpointWorldPositions[index]!));
+            const contactPlan = createStudioVrmGripContactTargets({
+              center: gripCenter,
+              axis: gripAxis,
+              fallbackRadial,
+              fingertipWorldPositions: endpointWorldPositions,
+              fingerOrdinals,
+              gripRadius: radius,
+              handSize,
+              side,
+            });
+            if (!contactPlan) {
+              cache = null;
+              return;
+            }
+
             const result = refineStudioVrmContact({
               initial, groups,
               limits: bones.map((_, index) => LIMITS[index % 3]),
-              goal: radius * 2.2 + handSize * 0.4,
-              minImprovement: Math.max(1e-5, handSize * 0.008),
+              goal: contactPlan.tolerance,
+              minImprovement: Math.max(5e-6, handSize * 0.004),
               allowRelaxation: true,
-              maxAngularChange: THREE.MathUtils.degToRad(20),
-              maxEvaluations: 64,
+              maxAngularChange: THREE.MathUtils.degToRad(24),
+              maxEvaluations: 80,
               apply,
-              measure: () => Math.max(...endpoints.map((node) => node.getWorldPosition(scratch).distanceTo(target))),
-              measureContacts: () => endpoints.map((node) => node.getWorldPosition(scratch).distanceTo(target)),
+              measure: () => Math.max(...endpoints.map((node, index) => (
+                node.getWorldPosition(scratch).distanceTo(contactPlan.targets[index]!)
+              ))),
+              measureContacts: () => endpoints.map((node, index) => (
+                node.getWorldPosition(scratch).distanceTo(contactPlan.targets[index]!)
+              )),
             });
             if (result.reason === "invalid" || !result.restored) {
               cache = null;
@@ -179,7 +235,7 @@ export function StudioVrmGripContactRefine({ vrm, items, metrics, rigRevision, l
   const invalidate = useThree((state) => state.invalidate);
   const passes = useMemo(() => {
     void rigRevision;
-    return disabled ? [] : createContactPasses(vrm, items, metrics, lockedBones);
+    return disabled ? [] : createStudioVrmGripContactPasses(vrm, items, metrics, lockedBones);
   }, [disabled, items, lockedBones, metrics, rigRevision, vrm]);
   // Release old passes before the new frame callbacks run, including StrictMode replay.
   useLayoutEffect(() => {
