@@ -19,6 +19,7 @@ interface MobileHeaderNavigationProps {
   panelRef: RefObject<HTMLDivElement | null>;
   closeMenu: () => void;
   isActive: (href: string, exact?: boolean) => boolean;
+  isPurposeActive: (href: string, exact?: boolean) => boolean;
   hideBottomTabs?: boolean;
 }
 
@@ -87,6 +88,7 @@ export function MobileHeaderNavigation({
   panelRef,
   closeMenu,
   isActive,
+  isPurposeActive,
   hideBottomTabs = false,
 }: MobileHeaderNavigationProps) {
   const language = useI18n((state) => state.lang);
@@ -297,7 +299,7 @@ export function MobileHeaderNavigation({
         >
           <div className="mx-auto grid max-w-md grid-cols-5 pb-[env(safe-area-inset-bottom)]">
             {MOBILE_SITE_TABS.map((item) => {
-              const active = isActive(item.href, item.exact);
+              const active = isPurposeActive(item.href, item.exact);
               const Icon = item.icon;
               const label = siteNavigationText(item.label, locale);
               const isPrimaryCreate = item.id === "make";
