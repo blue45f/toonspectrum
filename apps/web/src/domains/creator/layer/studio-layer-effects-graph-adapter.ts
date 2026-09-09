@@ -1,12 +1,14 @@
-import { studioDeterministicContentId } from "../studio-deterministic-serialization";
 import {
+  STUDIO_EFFECT_GRAPH_VERSION,
   planStudioEffectGraphRender,
   validateStudioAdjustmentEffectGraph,
   type StudioAdjustmentEffectGraph,
   type StudioEffectGraphEdge,
   type StudioEffectGraphNode,
   type StudioEffectGraphRenderPlan,
+  type StudioLiveEffectKind,
 } from "../filter/studio-adjustment-effect-graph";
+import { studioDeterministicContentId } from "../studio-deterministic-serialization";
 import type {
   StudioLayerEffect,
   StudioLayerEffectsStack,
@@ -56,26 +58,33 @@ function effectParameters(
   }
 }
 
-function liveEffectKind(effect: StudioLayerEffect): "glow" | "drop-shadow" | "inflate" {
+function liveEffectKind(effect: StudioLayerEffect): StudioLiveEffectKind {
   if (effect.kind === "drop-shadow") return "drop-shadow";
   if (effect.kind === "relief") return "inflate";
   return "glow";
 }
 
-export interface StudioLayerEffectsRenderPlan extends StudioEffectGraphRenderPlan {
-  readonly backend: "cpu" | "webgpu";
-  readonly cacheKey: string;
+function normalizedNodeId(index: number, effectId: string): string {
+  const safeId = effectId
+    .trim()
+    .replace(/[^\w.:-]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .slice(0, 160);
+  return `layer-effect-${index}-${safeId || "effect"}`;
 }
 
 export function studioLayerEffectsStackToGraph(
   stack: StudioLayerEffectsStack,
   sourceHash: string,
 ): StudioAdjustmentEffectGraph {
+  const normalizedSourceHash = sourceHash.trim();
+  if (!normalizedSourceHash) throw new TypeError("sourceHash is required.");
+
   const nodes: StudioEffectGraphNode[] = [
     Object.freeze({
       id: "layer-source",
       kind: "source",
-      sourceHash,
+      sourceHash: normalizedSourceHash,
       embedded: true,
       enabled: true,
       opacity: 1,
@@ -84,8 +93,9 @@ export function studioLayerEffectsStackToGraph(
   ];
   const edges: StudioEffectGraphEdge[] = [];
   let inputNodeId = "layer-source";
+
   stack.effects.forEach((effect, index) => {
-    const nodeId = `layer-effect-${index}-${effect.id}`;
+    const nodeId = normalizedNodeId(index, effect.id);
     nodes.push(
       Object.freeze({
         id: nodeId,
@@ -95,8 +105,8 @@ export function studioLayerEffectsStackToGraph(
         opacity: 1,
         blendMode: "normal",
         parameters: Object.freeze({
-sourceKind: effect.kind,
-...effectParameters(effect),
+          sourceKind: effect.kind,
+          ...effectParameters(effect),
         }),
         preferredBackend: "auto",
       }),
@@ -104,20 +114,21 @@ sourceKind: effect.kind,
     edges.push(Object.freeze({ from: inputNodeId, to: nodeId, input: "source" }));
     inputNodeId = nodeId;
   });
+
   nodes.push(
     Object.freeze({
       id: "layer-output",
       kind: "output",
+      outputColorSpace: "srgb",
       enabled: true,
       opacity: 1,
       blendMode: "normal",
-      outputColorSpace: "srgb",
     }),
   );
   edges.push(Object.freeze({ from: inputNodeId, to: "layer-output", input: "source" }));
 
   const graph: StudioAdjustmentEffectGraph = Object.freeze({
-    version: 1,
+    version: STUDIO_EFFECT_GRAPH_VERSION,
     id: "layer-effects-live-graph",
     revision: stack.effects.length,
     nodes: Object.freeze(nodes),
@@ -128,24 +139,27 @@ sourceKind: effect.kind,
   return graph;
 }
 
+export interface StudioLayerEffectsRenderPlan extends StudioEffectGraphRenderPlan {
+  readonly backend: "cpu" | "webgpu";
+  readonly cacheKey: string;
+}
+
 export function planStudioLayerEffectsStack(
   stack: StudioLayerEffectsStack,
   sourceHash: string,
   backend: "cpu" | "webgpu" = "webgpu",
 ): StudioLayerEffectsRenderPlan {
-  const plan = planStudioEffectGraphRender({
+  const renderPlan = planStudioEffectGraphRender({
     graph: studioLayerEffectsStackToGraph(stack, sourceHash),
     purpose: "preview",
     webGpuAvailable: backend === "webgpu",
     sourceColorSpace: "srgb",
   });
-  return Object.freeze({
-    ...plan,
+  const cacheKey = studioDeterministicContentId({
     backend,
-    cacheKey: studioDeterministicContentId({
-      graphHash: plan.graphHash,
-      purpose: plan.purpose,
-      backend,
-    }),
+    graphHash: renderPlan.graphHash,
+    purpose: renderPlan.purpose,
+    steps: renderPlan.steps,
   });
+  return Object.freeze({ ...renderPlan, backend, cacheKey });
 }
