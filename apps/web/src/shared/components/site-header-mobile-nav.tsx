@@ -100,9 +100,6 @@ export function MobileHeaderNavigation({
     const overlay = overlayRef.current;
     if (!dialog || !overlay) return;
 
-    // `overlayRef` is locally owned; deriving the document from the prop-owned
-    // panel ref makes React Compiler conservatively treat scroll locking as a
-    // prop mutation even though only the global document is changed.
     const ownerDocument = overlay.ownerDocument;
     const previousBodyOverflow = ownerDocument.body.style.overflow;
     const previousRootOverflow = ownerDocument.documentElement.style.overflow;
@@ -263,7 +260,7 @@ export function MobileHeaderNavigation({
                 ))}
               </div>
 
-              <div className="mt-4 grid gap-2 rounded-2xl border border-line/70 bg-panel/55 p-3 sm:grid-cols-2 sm:p-4">
+              <div className="mt-4 grid gap-2 rounded-2xl border border-line/70 bg-panel/55 p-3 sm:grid-cols-3 sm:p-4">
                 {SITE_UTILITY_NAVIGATION.map((item) => {
                   const active = isActive(item.href, item.exact);
                   const Icon = item.icon;
@@ -283,9 +280,7 @@ export function MobileHeaderNavigation({
                     >
                       <Icon size={17} className={active ? "text-on-accent" : "text-fg-3 group-hover:text-accent"} />
                       <span>{label}</span>
-                      <span aria-hidden="true" className={cx("ml-auto text-xs", active ? "text-on-accent/75" : "text-fg-3")}>
-                        ↗
-                      </span>
+                      <span aria-hidden="true" className={cx("ml-auto text-xs", active ? "text-on-accent/75" : "text-fg-3")}>↗</span>
                     </Link>
                   );
                 })}
@@ -305,7 +300,7 @@ export function MobileHeaderNavigation({
               const active = isActive(item.href, item.exact);
               const Icon = item.icon;
               const label = siteNavigationText(item.label, locale);
-              const isStudio = item.id === "studio";
+              const isPrimaryCreate = item.id === "make";
               return (
                 <Link
                   key={item.id}
@@ -315,10 +310,10 @@ export function MobileHeaderNavigation({
                   className={cx(
                     "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.62rem] font-semibold transition-colors",
                     active ? "text-accent" : "text-fg-3 hover:text-fg",
-                    isStudio && "z-10"
+                    isPrimaryCreate && "z-10"
                   )}
                 >
-                  {isStudio ? (
+                  {isPrimaryCreate ? (
                     <span
                       className={cx(
                         "-mt-5 grid size-11 place-items-center rounded-2xl border shadow-lg transition-transform",
@@ -335,7 +330,7 @@ export function MobileHeaderNavigation({
                       <Icon size={19} strokeWidth={active ? 2.35 : 1.85} />
                     </span>
                   )}
-                  <span className={isStudio ? "-mt-0.5" : undefined}>{label}</span>
+                  <span className={isPrimaryCreate ? "-mt-0.5" : undefined}>{label}</span>
                 </Link>
               );
             })}
