@@ -72,6 +72,11 @@ try {
     assert.equal((await recent.getAttribute("href"))?.includes("workId"), false);
     assert.equal((await recent.getAttribute("href"))?.includes("token"), false);
 
+    const normalizedBeforeInteraction = await page.evaluate((key) => localStorage.getItem(key), storageKey);
+    assert(normalizedBeforeInteraction);
+    assert.equal(normalizedBeforeInteraction.includes("private-document"), false);
+    assert.equal(normalizedBeforeInteraction.includes("secret"), false);
+
     await launchpad.getByRole("button", { name: /자료와 재료 모으기/ }).click();
     await expect(recommendation).toHaveAttribute("href", "/research/assets");
     const saved = JSON.parse(await page.evaluate((key) => localStorage.getItem(key), storageKey));
@@ -117,6 +122,7 @@ try {
       viewport: [width, height],
       persistedPlan: true,
       sanitizedRecentHref: true,
+      sanitizedOnHydration: true,
       installPrompt: true,
       offlineSignal: true,
       noHorizontalOverflow: true,
