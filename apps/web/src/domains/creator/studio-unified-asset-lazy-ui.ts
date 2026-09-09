@@ -4,15 +4,18 @@ import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const studioUnifiedAssetToolPopoverContentLoader =
   createStudioIntentLazyLoader(() =>
-    import("./StudioUnifiedAssetToolPopoverContent"),
+    Promise.all([
+      import("./StudioUnifiedAssetToolPopoverContent"),
+      import("./StudioUnifiedAssetToolPopoverContentDirectDrag"),
+    ]).then(([, directDragModule]) => directDragModule),
   );
 
 export const LazyStudioUnifiedAssetToolPopoverContent = lazyRetry(
   () =>
     studioUnifiedAssetToolPopoverContentLoader.load().then((module) => ({
-      default: module.StudioUnifiedAssetToolPopoverContent,
+      default: module.StudioUnifiedAssetToolPopoverContentDirectDrag,
     })),
-  "StudioUnifiedAssetToolPopoverContent",
+  "StudioUnifiedAssetToolPopoverContentDirectDrag",
 );
 
 export function preloadStudioUnifiedAssetToolPopoverContent(): void {
