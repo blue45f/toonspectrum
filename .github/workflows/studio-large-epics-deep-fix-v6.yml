@@ -1,0 +1,79 @@
+name: Studio large epics deep fixes
+
+on:
+  push:
+    branches:
+      - codex/studio-large-epics-closure-20260909
+    paths:
+      - .github/workflows/studio-large-epics-deep-fix-v6.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      BRANCH: codex/studio-large-epics-closure-20260909
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Narrow graph unions and normalize adapter objects
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          adapter = Path('apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.ts')
+          text = adapter.read_text()
+          text = text.replace('    Object.freeze({\n      id: "layer-source",', '    Object.freeze({\n      id: "layer-source",', 1)
+          text = text.replace('      }),\n    ),\n  ];', '      }),\n    ) as StudioEffectGraphNode,\n  ];', 1)
+          text = text.replace('        parameters: Object.freeze({\n          sourceKind: effect.kind,\n          ...effectParameters(effect),\n        }),\n      }),\n    );', '        parameters: Object.freeze({\n          sourceKind: effect.kind,\n          ...effectParameters(effect),\n        }),\n      }) as StudioEffectGraphNode,\n    );')
+          text = text.replace('      inputNodeId,\n    }),\n  );', '      inputNodeId,\n    }) as StudioEffectGraphNode,\n  );')
+          adapter.write_text(text)
+
+          test = Path('apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts')
+          text = test.read_text()
+          text = text.replace(
+            '    expect(graph.nodes.find((node) => node.id === "layer-effect-1-glow")?.enabled).toBe(false);',
+            '''    const glow = graph.nodes.find((node) => node.id === "layer-effect-1-glow");
+    expect(glow?.kind === "live-effect" ? glow.enabled : undefined).toBe(false);''',
+          )
+          test.write_text(text)
+          PY
+
+      - name: Verify and self-remove
+        run: |
+          pnpm exec eslint --fix --max-warnings=0 \
+            apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.ts \
+            apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts
+          pnpm exec vitest run apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          rm -f .github/workflows/studio-large-epics-deep-fix-v6.yml
+
+      - name: Publish with retries
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps .github/workflows/studio-large-epics-deep-fix-v6.yml
+          git commit -m "fix(studio): narrow layer effect graph adapter unions"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$BRANCH"
+            if git rebase "origin/$BRANCH" && git push origin HEAD:"$BRANCH"; then exit 0; fi
+            git rebase --abort || true
+            sleep $((attempt * 7))
+          done
+          exit 1
