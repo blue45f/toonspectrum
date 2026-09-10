@@ -358,7 +358,20 @@ export function StudioAiComicDirectorPanel({
   const items = useMemo(() => preview ?? [], [preview]);
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
-  const [stage, setStage] = useState<StudioAiComicDirectorStage>(() => items.length ? "direction" : "brief");
+  const [stage, setStage] = useState<StudioAiComicDirectorStage>(() => {
+    if (
+      busy ||
+      items.some(
+        (item) =>
+          Boolean(item.imageDataUrl) ||
+          scenarioImageCandidates(item).length > 0 ||
+          Boolean(item.imageError),
+      )
+    ) {
+      return "production";
+    }
+    return items.length ? "direction" : "brief";
+  });
   const [selectedIndexes, setSelectedIndexes] = useState<number[]>(() => items.map((_, index) => index));
   const [activeIndex, setActiveIndex] = useState(0);
   const [directions, setDirections] = useState<Record<number, DirectorDirection>>({});
