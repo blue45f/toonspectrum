@@ -27,6 +27,14 @@ describe("site navigation information architecture", () => {
     expect(new Set(groupedItems.map((item) => item.href)).size).toBe(groupedItems.length);
   });
 
+  it("keeps the fortune and tarot experience discoverable from the shared directory", () => {
+    const growItems = SITE_NAVIGATION_GROUPS.find((group) => group.id === "grow")?.items;
+
+    expect(growItems).toContain(SITE_NAVIGATION_ITEMS.fortune);
+    expect(SITE_NAVIGATION_ITEMS.fortune.href).toBe("/fortune");
+    expect(SITE_NAVIGATION_ITEMS.fortune.label.ko).toContain("타로");
+  });
+
   it("uses the desktop Home logo space for Studio while keeping Market first-class", () => {
     expect(PRIMARY_SITE_NAVIGATION.map((item) => item.id)).toEqual([
       "explore",
