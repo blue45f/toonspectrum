@@ -108,18 +108,18 @@ const MIN_BUNDLE_FILE_BYTES = 100 * 1024;
 
 describe("VRM library helpers", () => {
   it("uses polished character names for bundled VRMs", () => {
-    const names = SAMPLE_VRM_ENTRIES.map((entry) => entry.name);
+    const names = SAMPLE_VRMS.map((sample) => sample.name);
 
     // 대표 엔트리 스팟 체크(기존 + 2026-07 신규).
     expect(
       ["sample-vrm", "avatar-a", "avatar-b", "avatar-c"].map(
-        (id) => SAMPLE_VRM_ENTRIES.find((entry) => entry.id === id)?.name,
+        (id) => SAMPLE_VRMS.find((sample) => sample.id === id)?.name,
       ),
     ).toEqual(["루미", "하린", "세라", "유나"]);
     expect(SAMPLE_VRM_ENTRIES[0]).toMatchObject({ id: "sample-vrm", name: "루미" });
     expect(
       ["quaternius-female-peasant", "quaternius-male-peasant", "quaternius-female-ranger"].map(
-        (id) => SAMPLE_VRM_ENTRIES.find((entry) => entry.id === id)?.name,
+        (id) => SAMPLE_VRMS.find((sample) => sample.id === id)?.name,
       ),
     ).toEqual(["Quaternius Peasant (Female)", "Quaternius Peasant (Male)", "Quaternius Ranger (Female)"]);
     expect(names).toContain("데빌 (악마)");

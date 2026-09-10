@@ -16,6 +16,14 @@ import {
   inspectStudioVrmLicenseAuthority,
   type StudioVrmLicenseAuthority,
 } from "./studio-vrm-license-product-gate";
+import {
+  isStudioVrmTechnicallyAdmittedThumbnail,
+} from "./studio-vrm-thumbnail-technical-denylist.generated";
+import { isStudioVrmProductionThumbnailUrl } from "./studio-vrm-thumbnail-quality";
+import {
+  isStudioVrmTechnicallyAdmittedModel,
+} from "./studio-vrm-model-technical-denylist.generated";
+import { isStudioVrmProductionModelUrl } from "./studio-vrm-model-quality";
 
 const DB_NAME = "toonspectrum-studio-vrm-library";
 const DB_VERSION = 1;
@@ -334,7 +342,14 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "eugenia", name: "유제니아 (할머니)", thumbnailUrl: "/assets/3d/characters/thumbnails/eugenia.png", url: "/vrm/Eugenia.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS
-  .filter((sample) => sample.visibility !== "legacy")
+  .filter(
+    (sample) =>
+      sample.visibility !== "legacy"
+      && isStudioVrmProductionThumbnailUrl(sample.thumbnailUrl)
+      && isStudioVrmTechnicallyAdmittedThumbnail(sample.id)
+      && isStudioVrmProductionModelUrl(sample.url)
+      && isStudioVrmTechnicallyAdmittedModel(sample.id),
+  )
   .map((sample) => ({
     id: sample.id,
     name: sample.name,
