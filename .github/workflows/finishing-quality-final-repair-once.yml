@@ -54,17 +54,21 @@ jobs:
           elif new_signature not in menubar:
               raise RuntimeError("menubar import regression test signature not found")
 
-          old_assertion = '''    expect(screen.getByRole("button", { name: "ORA · CBZ · WILL" }))
-              .toHaveProperty("disabled", true);'''
-          new_assertion = '''    await waitFor(() => {
-              const interchangeButtons = screen.getAllByRole("button", {
-                name: "ORA · CBZ · WILL",
-              });
-              expect(interchangeButtons.length).toBeGreaterThan(0);
-              for (const button of interchangeButtons) {
-                expect(button).toHaveProperty("disabled", true);
-              }
-            });'''
+          old_assertion = (
+              '    expect(screen.getByRole("button", { name: "ORA · CBZ · WILL" }))\n'
+              '      .toHaveProperty("disabled", true);'
+          )
+          new_assertion = (
+              '    await waitFor(() => {\n'
+              '      const interchangeButtons = screen.getAllByRole("button", {\n'
+              '        name: "ORA · CBZ · WILL",\n'
+              '      });\n'
+              '      expect(interchangeButtons.length).toBeGreaterThan(0);\n'
+              '      for (const button of interchangeButtons) {\n'
+              '        expect(button).toHaveProperty("disabled", true);\n'
+              '      }\n'
+              '    });'
+          )
           if old_assertion in menubar:
               menubar = menubar.replace(old_assertion, new_assertion, 1)
           elif new_assertion not in menubar:
@@ -76,8 +80,10 @@ jobs:
           )
           hints = hints_path.read_text(encoding="utf-8")
           old_count = "    expect(buttons).toHaveLength(40);"
-          new_count = '''    // Four direct 3D launchers moved behind the shared lazy 3D Studio popover.
-              expect(buttons).toHaveLength(36);'''
+          new_count = (
+              "    // Four direct 3D launchers moved behind the shared lazy 3D Studio popover.\n"
+              "    expect(buttons).toHaveLength(36);"
+          )
           if old_count in hints:
               hints = hints.replace(old_count, new_count, 1)
           elif new_count not in hints:
