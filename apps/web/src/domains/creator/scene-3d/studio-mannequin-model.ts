@@ -486,7 +486,8 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
 
 /** 알 수 없는 입력을 항상 유효한 파라미터로 정규화한다(방어적 파싱 공용 진입점). */
 export function clampStudioMannequinBodyParams(input: unknown): StudioMannequinBodyParams {
-  const source = (typeof input === "object" && input !== null
+  const hasObjectInput = typeof input === "object" && input !== null;
+  const source = (hasObjectInput
     ? input
     : {}) as Partial<Record<keyof StudioMannequinBodyParams, unknown>>;
   const result = {} as Record<keyof StudioMannequinBodyParams, number>;
@@ -501,13 +502,15 @@ export function clampStudioMannequinBodyParams(input: unknown): StudioMannequinB
     }
   }
   for (const key of Object.keys(STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES) as StudioMannequinAnatomyParamKey[]) {
-    const [min, max] = STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES[key];
-    result[key] = clampNumber(
-      source[key],
-      min,
-      max,
-      STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS[key] ?? 1,
-    );
+    if (!hasObjectInput || source[key] !== undefined) {
+      const [min, max] = STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES[key];
+      result[key] = clampNumber(
+        source[key],
+        min,
+        max,
+        STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS[key] ?? 1,
+      );
+    }
   }
   return result as StudioMannequinBodyParams;
 }

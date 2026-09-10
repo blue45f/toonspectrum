@@ -1,0 +1,109 @@
+name: Finish Help Center storage boundary on ARM
+
+on:
+  push:
+    branches: [fix/studio-architecture-ratchet-20260910]
+    paths: [.github/workflows/studio-architecture-ratchet-arm.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finish-help-center-storage-boundary
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-architecture-ratchet-20260910
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/studio-architecture-ratchet-materialize.yml
+            .github/workflows/studio-architecture-ratchet-executor.yml
+            .github/workflows/studio-architecture-ratchet-slim-executor.yml
+            .github/workflows/studio-architecture-ratchet-arm.yml
+            apps/web/src/domains/creator/StudioHelpCenterDialog.tsx
+            apps/web/src/domains/creator/studio-browser-storage-estimator.ts
+          persist-credentials: true
+
+      - name: Move storage capability behind the runtime boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/src/domains/creator/StudioHelpCenterDialog.tsx')
+          source = path.read_text(encoding='utf-8')
+          import_anchor = 'import { getStudioGpuFabricCapabilities } from "./render/studio-gpu-fabric";\n'
+          import_line = 'import { studioBrowserStorageEstimator } from "./studio-browser-storage-estimator";\n'
+          if import_line not in source:
+              if source.count(import_anchor) != 1:
+                  raise SystemExit('unexpected GPU import anchor')
+              source = source.replace(import_anchor, import_anchor + import_line, 1)
+          old = '''module.estimateStudioOpfsQuota(
+              typeof navigator !== "undefined" && navigator.storage?.estimate
+                ? { estimate: () => navigator.storage.estimate() }
+                : null,
+            )'''
+          new = 'module.estimateStudioOpfsQuota(studioBrowserStorageEstimator())'
+          if old in source:
+              source = source.replace(old, new, 1)
+          elif new not in source:
+              raise SystemExit('storage estimate call anchor changed')
+          if 'navigator.storage' in source:
+              raise SystemExit('Help Center still owns navigator.storage')
+          path.write_text(source, encoding='utf-8')
+
+          test = Path('apps/web/src/domains/creator/studio-help-center-storage-boundary.test.ts')
+          test.write_text('''import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const source = readFileSync(
+  new URL("./StudioHelpCenterDialog.tsx", import.meta.url),
+  "utf8",
+);
+
+describe("Help Center browser storage ownership", () => {
+  it("delegates quota estimation to the shared runtime boundary", () => {
+    expect(source).toContain(
+      'import { studioBrowserStorageEstimator } from "./studio-browser-storage-estimator";',
+    );
+    expect(source).toContain(
+      "module.estimateStudioOpfsQuota(studioBrowserStorageEstimator())",
+    );
+    expect(source).not.toContain("navigator.storage");
+  });
+});
+''', encoding='utf-8')
+          PY
+          grep -q 'studioBrowserStorageEstimator()' apps/web/src/domains/creator/StudioHelpCenterDialog.tsx
+          ! grep -q 'navigator.storage' apps/web/src/domains/creator/StudioHelpCenterDialog.tsx
+          git diff --check
+
+      - name: Commit source-only boundary repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/studio-architecture-ratchet-materialize.yml \
+                .github/workflows/studio-architecture-ratchet-executor.yml \
+                .github/workflows/studio-architecture-ratchet-slim-executor.yml \
+                .github/workflows/studio-architecture-ratchet-arm.yml
+          git add --sparse \
+            apps/web/src/domains/creator/StudioHelpCenterDialog.tsx \
+            apps/web/src/domains/creator/studio-help-center-storage-boundary.test.ts \
+            .github/workflows/studio-architecture-ratchet-materialize.yml \
+            .github/workflows/studio-architecture-ratchet-executor.yml \
+            .github/workflows/studio-architecture-ratchet-slim-executor.yml \
+            .github/workflows/studio-architecture-ratchet-arm.yml
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'fix(studio): complete Help Center storage boundary'
+          git push --no-verify origin HEAD:fix/studio-architecture-ratchet-20260910

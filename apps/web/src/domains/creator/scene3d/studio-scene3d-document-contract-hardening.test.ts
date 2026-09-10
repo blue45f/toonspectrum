@@ -13,12 +13,25 @@ type DeepMutable<T> = T extends readonly (infer Item)[]
     : T;
 
 function mutableDocument(): DeepMutable<StudioScene3dDocumentV1> {
-  return structuredClone(
+  const cloned: unknown = structuredClone(
     createStudioScene3dDocument("contract-test"),
-  ) as DeepMutable<StudioScene3dDocumentV1>;
+  );
+  return cloned as DeepMutable<StudioScene3dDocumentV1>;
 }
 
 describe("unified Scene3D document contract hardening", () => {
+  it("creates an isolated mutable fixture without weakening the readonly product contract", () => {
+    const source = createStudioScene3dDocument("contract-test");
+    const cloned: unknown = structuredClone(source);
+    const mutable = cloned as DeepMutable<StudioScene3dDocumentV1>;
+    const sourcePassCount = source.output.semanticPasses.length;
+
+    mutable.output.semanticPasses.push("depth");
+
+    expect(mutable.output.semanticPasses).toHaveLength(sourcePassCount + 1);
+    expect(source.output.semanticPasses).toHaveLength(sourcePassCount);
+  });
+
   it("rejects unsupported render, output, environment, and duplicate pass values", () => {
     const badAa = mutableDocument();
     badAa.render.antialiasing = "fxaa" as never;
