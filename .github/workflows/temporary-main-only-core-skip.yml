@@ -1,5 +1,6 @@
 name: Temporary main-only convergence core skip
 
+# Explicitly retained only until the main-only branch convergence completes.
 on:
   pull_request:
     branches: [main]
