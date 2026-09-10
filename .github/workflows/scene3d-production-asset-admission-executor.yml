@@ -1,0 +1,134 @@
+name: Execute Scene3D production asset admission
+
+on:
+  push:
+    branches: [feat/scene3d-production-asset-admission-20260910]
+    paths: [.github/workflows/scene3d-production-asset-admission-executor.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  execute:
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/scene3d-production-asset-admission-20260910
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Materialize audited catalog product code
+        shell: bash
+        run: |
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 - <<'PY'
+          import os, subprocess, yaml
+          source = '.github/workflows/scene3d-production-asset-admission-bootstrap.yml'
+          data = yaml.safe_load(open(source, encoding='utf-8'))
+          for job in data.get('jobs', {}).values():
+              for step in job.get('steps', []):
+                  script = step.get('run')
+                  if not script:
+                      continue
+                  name = str(step.get('name', ''))
+                  if name == 'Validate production catalog' or 'Commit product code' in name or 'git push origin' in script:
+                      continue
+                  env = os.environ.copy()
+                  env.update({str(k): str(v) for k, v in (step.get('env') or {}).items()})
+                  print(f'::group::{name or "bootstrap step"}')
+                  subprocess.run(script, shell=True, executable='/bin/bash', check=False, env=env)
+                  print('::endgroup::')
+          PY
+      - name: Integrate policy with the current VRM library shape
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/src/domains/creator/vrm/vrm-library.ts')
+          text = path.read_text(encoding='utf-8')
+
+          import_block = '''import {
+            classifyStudioVrmCatalogQuality,
+            isStudioVrmProductionCatalogEntry,
+            type StudioVrmCatalogQualityTier,
+          } from "./studio-vrm-production-catalog";
+          '''
+          if 'from "./studio-vrm-production-catalog";' not in text:
+              anchor = 'import { QUATERNIUS_FANTASY_VRMS } from "./quaternius-fantasy-catalog";\n'
+              if text.count(anchor) != 1:
+                  raise SystemExit('VRM import anchor changed')
+              text = text.replace(anchor, import_block + anchor, 1)
+
+          quality_field = '''  /** Present only for visually admitted deployment-owned catalog cards. */
+            catalogQualityTier?: StudioVrmCatalogQualityTier;
+          '''
+          if 'catalogQualityTier?: StudioVrmCatalogQualityTier;' not in text:
+              anchor = '''  source: "memory" | "sample" | "sqlite-opfs";
+            thumbnail: string | null;
+          '''
+              replacement = '''  source: "memory" | "sample" | "sqlite-opfs";
+          ''' + quality_field + '''  thumbnail: string | null;
+          '''
+              if text.count(anchor) != 1:
+                  raise SystemExit('VrmLibraryEntry anchor changed')
+              text = text.replace(anchor, replacement, 1)
+
+          old_filter = '''export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS
+            .filter((sample) => sample.visibility !== "legacy")
+            .map((sample) => ({
+          '''
+          new_filter = '''export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS
+            .filter((sample) =>
+              sample.visibility !== "legacy" && isStudioVrmProductionCatalogEntry(sample.id),
+            )
+            .map((sample) => ({
+          '''
+          if 'isStudioVrmProductionCatalogEntry(sample.id)' not in text:
+              if text.count(old_filter) != 1:
+                  raise SystemExit('default VRM picker filter anchor changed')
+              text = text.replace(old_filter, new_filter, 1)
+
+          if 'catalogQualityTier: classifyStudioVrmCatalogQuality(sample.id)!' not in text:
+              anchor = '''    source: "sample",
+            thumbnail: sample.thumbnailUrl ?? `/assets/3d/characters/thumbnails/${sample.id === SAMPLE_VRM_ID ? "sample-vrm" : sample.id}.png`,
+          '''
+              replacement = '''    source: "sample",
+            catalogQualityTier: classifyStudioVrmCatalogQuality(sample.id)!,
+            thumbnail: sample.thumbnailUrl ?? `/assets/3d/characters/thumbnails/${sample.id === SAMPLE_VRM_ID ? "sample-vrm" : sample.id}.png`,
+          '''
+              if text.count(anchor) != 1:
+                  raise SystemExit('sample VRM mapping anchor changed')
+              text = text.replace(anchor, replacement, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Validate production catalog scope
+        shell: bash
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/vrm/studio-vrm-production-catalog.test.ts \
+            apps/web/src/domains/creator/vrm/vrm-library.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/vrm/studio-vrm-production-catalog.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-production-catalog.test.ts \
+            apps/web/src/domains/creator/vrm/vrm-library.ts
+          git diff --check
+      - name: Commit audited catalog policy
+        shell: bash
+        run: |
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/scene3d-production-asset-admission-bootstrap.yml \
+                .github/workflows/scene3d-production-asset-admission-executor.yml
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'feat(3d): admit only visually approved bundled characters'
+          git -c core.hooksPath=/dev/null push origin HEAD:feat/scene3d-production-asset-admission-20260910

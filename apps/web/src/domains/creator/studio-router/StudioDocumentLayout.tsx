@@ -2,8 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import {
-  createStudioLiveInstantWorkId,
   readStudioLiveRoomQuery,
+  resolveStudioLiveInstantWorkIdForTab,
   shouldPublishStudioLiveJamRoom,
   withStudioLiveJamRoom,
 } from "../live/studio-live-jam-session";
@@ -21,6 +21,15 @@ interface StudioDocumentLayoutProps {
   /** Guest-draft adoption epoch owned by `StudioRouter`; part of the boundary key above. */
   readonly draftSessionEpoch: number;
   readonly studioRoute: StudioWorkspaceRoute;
+}
+
+function currentStudioSessionStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -43,9 +52,15 @@ export function StudioDocumentLayout({
   const liveRoomParam = readStudioLiveRoomQuery(params);
   const workId = studioRoute.workId;
   const remixId = studioRoute.remixSourceWorkId;
-  // Lazy state instead of a render-phase ref write: react-compiler rejects mutating hook-derived
-  // refs during render, and the initializer runs exactly once per mounted boundary either way.
-  const [instantWorkId] = useState(createStudioLiveInstantWorkId);
+  // Keep the owner room stable for this tab across reloads and boundary remounts. A companion tab
+  // receives the room URL but not this tab's sessionStorage ownership receipt, so it still gets a
+  // distinct instant id and remains fail-closed until CRDT convergence.
+  const [instantWorkId] = useState(() => resolveStudioLiveInstantWorkIdForTab({
+    workId,
+    remixId,
+    roomId: liveRoomParam,
+    storage: currentStudioSessionStorage(),
+  }));
   useEffect(() => {
     if (!shouldPublishStudioLiveJamRoom({
       remixId,

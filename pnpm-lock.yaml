@@ -39,7 +39,7 @@ overrides:
   browserslist@>=4.0.0 <4.28.7: 4.28.7
   '@vercel/python-analysis>minimatch': 10.2.3
   '@vercel/static-config>ajv': 8.18.0
-  smol-toml@>=1.0.0 <1.6.1: 1.6.1
+  smol-toml@>=1.0.0 <1.7.1: 1.7.1
   '@tootallnate/once@>=2.0.0 <2.0.1': 2.0.1
   protobufjs@>=7.5.0 <7.6.5: 7.6.5
   body-parser@>=1.0.0 <1.20.6: 1.20.6
@@ -6867,8 +6867,8 @@ packages:
     resolution: {integrity: sha512-stxByr12oeeOyY2BlviTNQlYV5xOj47GirPr4yA1hE9JCtxfQN0+tVbkxwCtYDQWhEKWFHsEK48ORg5jrouCAg==}
     engines: {node: '>=20'}
 
-  smol-toml@1.6.1:
-    resolution: {integrity: sha512-dWUG8F5sIIARXih1DTaQAX4SsiTXhInKf1buxdY9DIg4ZYPZK5nGM1VRIYmEbDbsHt7USo99xSLFu5Q1IqTmsg==}
+  smol-toml@1.7.1:
+    resolution: {integrity: sha512-PPlsspAZ4jbMBu5DMFhfUGDQLu/vrL4SyBROVS37x8ynnVmFIs1VPBz1Co8Xks3TvpIaZXmU85y4DrQ+UyVFoQ==}
     engines: {node: '>= 18'}
 
   socket.io-adapter@2.5.8:
@@ -10477,7 +10477,7 @@ snapshots:
       fs-extra: 11.1.1
       js-yaml: 4.3.2
       minimatch: 10.2.3
-      smol-toml: 1.6.1
+      smol-toml: 1.7.1
       zod: 3.22.4
 
   '@vercel/python@6.56.1':
@@ -10514,7 +10514,7 @@ snapshots:
     dependencies:
       execa: 5.1.1
       get-port: 5.1.1
-      smol-toml: 1.6.1
+      smol-toml: 1.7.1
 
   '@vercel/sandbox@2.4.0':
     dependencies:
@@ -14026,7 +14026,7 @@ snapshots:
       ansi-styles: 6.2.3
       is-fullwidth-code-point: 5.1.0
 
-  smol-toml@1.6.1: {}
+  smol-toml@1.7.1: {}
 
   socket.io-adapter@2.5.8:
     dependencies:
@@ -14620,7 +14620,7 @@ snapshots:
       jsonc-parser: 3.3.1
       luxon: 3.7.2
       sandbox: 3.4.0
-      smol-toml: 1.6.1
+      smol-toml: 1.7.1
       undici: 7.29.0
       uuid: 14.0.1
       zod: 4.1.11
