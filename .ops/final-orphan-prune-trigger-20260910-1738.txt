@@ -1,3 +1,4 @@
 Trigger exact tree-identical orphan cleanup.
 Target: ops/isolated-prune-base-20260910-1701 @ 1fd92c430125b578b6ea481dbc2eb7b776f6d18a
 Never merge this branch; the workflow closes the PR and deletes its own refs.
+Retrigger live-ref self-clean against main 30ae664bdd42f863820f2ad8c831aba246b2c661.
