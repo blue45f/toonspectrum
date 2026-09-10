@@ -1,7 +1,7 @@
 {
   "schema": "toonspectrum.bundle-baseline/1",
-  "recordedAt": "2026-09-06T15:07:41.887Z",
-  "note": "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs. 2026-08-14: re-measured on the brush-quality wave rebased onto main — the wave's dry-media kernels, carrier ribbons and verified-engine lanes cost ~100 KiB raw / ~33 KiB gzip on the studio route, which main's living-ink WGSL split does not offset. 2026-08-14: first runtime block measured by a probe that actually reaches a returning user — the previous one seeded localStorage keys that had moved into SQLite, so it recorded a first-run tour. Startup grew to 276 requests / 6228 KiB because the durable local database now gates what the artist sees: the coach only resolves after the UI preference, work and autosave hydrations, so studio-local-database*, studio-ui-preferences-sqlite, studio-workspace-sqlite-runtime and studio-autosave-sqlite-store are boot-critical rather than deferrable. studio-tournament-sqlite-persistence is the documented post-mount hydration that keeps the first stroke on the right renderer lane. Shrinking further needs a lightweight boot fast path with SQLite as the later authority; filed separately, not traded for a first-render flicker.",
+  "recordedAt": "2026-09-10T17:41:56.000Z",
+  "note": "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs. 2026-08-14: re-measured on the brush-quality wave rebased onto main — the wave's dry-media kernels, carrier ribbons and verified-engine lanes cost ~100 KiB raw / ~33 KiB gzip on the studio route, which main's living-ink WGSL split does not offset. 2026-08-14: first runtime block measured by a probe that actually reaches a returning user — the previous one seeded localStorage keys that had moved into SQLite, so it recorded a first-run tour. Startup grew to 276 requests / 6228 KiB because the durable local database now gates what the artist sees: the coach only resolves after the UI preference, work and autosave hydrations, so studio-local-database*, studio-ui-preferences-sqlite, studio-workspace-sqlite-runtime and studio-autosave-sqlite-store are boot-critical rather than deferrable. studio-tournament-sqlite-persistence is the documented post-mount hydration that keeps the first stroke on the right renderer lane. Shrinking further needs a lightweight boot fast path with SQLite as the later authority; filed separately, not traded for a first-render flicker. 2026-09-11: accepted the consolidated #1289 product wave after production build verification. The static Studio route grew to ~5823.4 KiB raw / ~1882.6 KiB gzip and 274 chunks; the app-shell delta is ~5258.6 KiB raw / ~1699.4 KiB gzip and 265 chunks. This records the measured feature breadth without disabling the 2% ratchet.",
   "policy": {
     "byteTolerance": 0.02,
     "countTolerance": 0.02,
@@ -9,13 +9,13 @@
     "authority": "scripts/check-studio-bundle.mjs (this file records the values only)"
   },
   "static": {
-    "Studio route raw": 5826000,
-    "Studio route gzip": 1869981,
-    "StudioPage entry raw": 2287097,
-    "StudioPage entry gzip": 701134,
-    "Studio route after app shell raw": 5192729,
-    "Studio route after app shell gzip": 1671718,
-    "Studio route after app shell chunks": 250,
+    "Studio route raw": 5963162,
+    "Studio route gzip": 1927782,
+    "StudioPage entry raw": 2339226,
+    "StudioPage entry gzip": 716698,
+    "Studio route after app shell raw": 5384806,
+    "Studio route after app shell gzip": 1740186,
+    "Studio route after app shell chunks": 265,
     "app entry raw": 633271,
     "app entry gzip": 198263,
     "BG3D editor activation raw": 3481757,
@@ -34,7 +34,7 @@
     "BG3D PSD Worker gzip": 83718,
     "BG3D physics Worker raw": 2312208,
     "BG3D physics Worker gzip": 853440,
-    "Studio route chunks": 260,
+    "Studio route chunks": 274,
     "app entry chunks": 10
   },
   "runtime": {
