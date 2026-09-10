@@ -1,0 +1,283 @@
+name: Isolated integrated branch prune
+
+on:
+  pull_request:
+    branches:
+      - "ops/integrated-prune-base-20260910-1710"
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: isolated-integrated-branch-prune-20260910-1710
+  cancel-in-progress: true
+
+jobs:
+  prune:
+    if: >-
+      github.repository == 'blue45f/toonspectrum' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'ops/integrated-prune-trigger-20260910-1710' &&
+      github.base_ref == 'ops/integrated-prune-base-20260910-1710'
+    runs-on: macos-14
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      TRIGGER_PR: ${{ github.event.pull_request.number }}
+      TRIGGER_HEAD: ${{ github.head_ref }}
+      TRIGGER_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      TRIGGER_BASE: ${{ github.base_ref }}
+      TRIGGER_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - name: Delete only branches already integrated into main
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const repository = process.env.REPO;
+          const [owner, repo] = repository.split('/');
+          const token = process.env.GH_TOKEN;
+          const triggerPr = Number(process.env.TRIGGER_PR);
+          const triggerHead = process.env.TRIGGER_HEAD;
+          const triggerHeadSha = process.env.TRIGGER_HEAD_SHA;
+          const triggerBase = process.env.TRIGGER_BASE;
+          const triggerBaseSha = process.env.TRIGGER_BASE_SHA;
+          const apiRoot = 'https://api.github.com';
+          const headers = {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'toonspectrum-isolated-integrated-branch-prune',
+          };
+
+          class HttpError extends Error {
+            constructor(status, method, path, payload) {
+              super(`${method} ${path} -> ${status}`);
+              this.status = status;
+              this.payload = payload;
+            }
+          }
+
+          async function request(path, init = {}) {
+            const method = init.method || 'GET';
+            const response = await fetch(`${apiRoot}${path}`, {
+              ...init,
+              headers: {
+                ...headers,
+                ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+                ...(init.headers || {}),
+              },
+            });
+            if (response.status === 204) return null;
+            const text = await response.text();
+            let payload = null;
+            try { payload = text ? JSON.parse(text) : null; } catch { payload = text; }
+            if (!response.ok) throw new HttpError(response.status, method, path, payload);
+            return payload;
+          }
+
+          async function maybe(path) {
+            try { return await request(path); }
+            catch (error) { if (error.status === 404) return null; throw error; }
+          }
+
+          async function paged(path, itemKey) {
+            const items = [];
+            for (let page = 1; page <= 20; page += 1) {
+              const separator = path.includes('?') ? '&' : '?';
+              const payload = await request(`${path}${separator}per_page=100&page=${page}`);
+              const batch = itemKey ? (payload[itemKey] || []) : payload;
+              if (!Array.isArray(batch)) throw new Error(`unexpected pagination payload for ${path}`);
+              items.push(...batch);
+              if (batch.length < 100) return items;
+            }
+            throw new Error(`pagination cap exceeded for ${path}`);
+          }
+
+          const encodeRef = (branch) => branch.split('/').map(encodeURIComponent).join('/');
+          const openPulls = async (params) => request(`/repos/${owner}/${repo}/pulls?${new URLSearchParams({ state: 'open', per_page: '1', ...params })}`);
+          const hasOpenReference = async (branch) => {
+            const [heads, bases] = await Promise.all([
+              openPulls({ head: `${owner}:${branch}` }),
+              openPulls({ base: branch }),
+            ]);
+            return heads.length > 0 || bases.length > 0;
+          };
+
+          async function mergeCommitIsOnMain(mergeSha, mainSha) {
+            if (!/^[0-9a-f]{40}$/.test(mergeSha || '')) return false;
+            const compare = await request(`/repos/${owner}/${repo}/compare/${mainSha}...${mergeSha}`);
+            return Number(compare.ahead_by ?? -1) === 0;
+          }
+
+          async function classifyIntegrated(branch, sha, mainSha, defaultBranch) {
+            if (sha === mainSha) return { integrated: true, reason: 'exact_main_head' };
+
+            try {
+              const compare = await request(`/repos/${owner}/${repo}/compare/${sha}...${mainSha}`);
+              if (compare.merge_base_commit?.sha === sha) {
+                return { integrated: true, reason: 'head_is_main_ancestor' };
+              }
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            const pulls = await paged(`/repos/${owner}/${repo}/pulls?${new URLSearchParams({ state: 'closed', head: `${owner}:${branch}` })}`, null);
+            for (const pull of pulls) {
+              if (!pull.merged_at) continue;
+              if (pull.base?.ref !== defaultBranch) continue;
+              if (pull.head?.repo?.full_name !== repository) continue;
+              if (pull.head?.sha !== sha) continue;
+              if (await mergeCommitIsOnMain(pull.merge_commit_sha, mainSha)) {
+                return { integrated: true, reason: `exact_merged_pr_${pull.number}` };
+              }
+            }
+
+            return { integrated: false, reason: 'not_proven_integrated' };
+          }
+
+          const row = (branch, sha, decision, evidence) => ({ branch, sha, decision, evidence });
+
+          (async () => {
+            const repoInfo = await request(`/repos/${owner}/${repo}`);
+            const defaultBranch = repoInfo.default_branch;
+            if (defaultBranch !== 'main') throw new Error(`default branch changed to ${defaultBranch}`);
+
+            const main = await request(`/repos/${owner}/${repo}/branches/${encodeRef(defaultBranch)}`);
+            const mainSha = main.commit.sha;
+            const branches = await paged(`/repos/${owner}/${repo}/branches`, null);
+            const openPrs = await paged(`/repos/${owner}/${repo}/pulls?state=open`, null);
+            const openHeads = new Set(openPrs.filter((pull) => pull.head?.repo?.full_name === repository).map((pull) => pull.head.ref));
+            const openBases = new Set(openPrs.map((pull) => pull.base?.ref).filter(Boolean));
+            const reserved = new Set([defaultBranch, triggerHead, triggerBase]);
+            const results = [];
+            let scanned = 0;
+            let integratedCandidates = 0;
+            let deleteAttempts = 0;
+
+            for (const branchInfo of branches) {
+              const branch = branchInfo.name;
+              const sha = branchInfo.commit?.sha || '';
+              scanned += 1;
+
+              if (reserved.has(branch)) {
+                results.push(row(branch, sha, 'preserved', 'reserved_branch'));
+                continue;
+              }
+              if (branchInfo.protected) {
+                results.push(row(branch, sha, 'preserved', 'protected_branch'));
+                continue;
+              }
+              if (openHeads.has(branch) || openBases.has(branch)) {
+                results.push(row(branch, sha, 'preserved', 'open_pull_request_reference'));
+                continue;
+              }
+              if (!/^[0-9a-f]{40}$/.test(sha)) {
+                results.push(row(branch, sha, 'preserved', 'invalid_head_sha'));
+                continue;
+              }
+
+              let classification;
+              try {
+                classification = await classifyIntegrated(branch, sha, mainSha, defaultBranch);
+              } catch (error) {
+                results.push(row(branch, sha, 'preserved', `classification_error:${error.message}`));
+                continue;
+              }
+              if (!classification.integrated) continue;
+              integratedCandidates += 1;
+
+              const runs = await request(`/repos/${owner}/${repo}/actions/runs?${new URLSearchParams({ branch, per_page: '100' })}`);
+              if ((runs.workflow_runs || []).some((run) => run.status !== 'completed')) {
+                results.push(row(branch, sha, 'preserved', `active_workflow_run:${classification.reason}`));
+                continue;
+              }
+
+              const branchPath = `/repos/${owner}/${repo}/branches/${encodeRef(branch)}`;
+              const finalBranch = await maybe(branchPath);
+              if (!finalBranch) {
+                results.push(row(branch, sha, 'already_missing', classification.reason));
+                continue;
+              }
+              if (finalBranch.commit?.sha !== sha || finalBranch.protected) {
+                results.push(row(branch, sha, 'preserved', `changed_during_final_recheck:${classification.reason}`));
+                continue;
+              }
+              if (await hasOpenReference(branch)) {
+                results.push(row(branch, sha, 'preserved', `new_open_pull_request:${classification.reason}`));
+                continue;
+              }
+              const refPath = `/repos/${owner}/${repo}/git/ref/heads/${encodeRef(branch)}`;
+              const ref = await maybe(refPath);
+              if (!ref || ref.object?.sha !== sha) {
+                results.push(row(branch, sha, 'preserved', `ref_changed_during_final_recheck:${classification.reason}`));
+                continue;
+              }
+              if (deleteAttempts >= 50) {
+                results.push(row(branch, sha, 'preserved', `delete_cap_reached:${classification.reason}`));
+                continue;
+              }
+
+              deleteAttempts += 1;
+              try {
+                await request(`/repos/${owner}/${repo}/git/refs/heads/${encodeRef(branch)}`, { method: 'DELETE' });
+                results.push(row(branch, sha, 'deleted', classification.reason));
+              } catch (error) {
+                results.push(row(branch, sha, 'failed', `delete_failed:${classification.reason}:${error.message}`));
+              }
+            }
+
+            const decisions = results.filter((item) => item.decision !== 'preserved' || item.evidence !== 'reserved_branch');
+            const deleted = results.filter((item) => item.decision === 'deleted').length;
+            const alreadyMissing = results.filter((item) => item.decision === 'already_missing').length;
+            const preservedIntegrated = results.filter((item) => item.decision === 'preserved' && (item.evidence.includes('workflow') || item.evidence.includes('recheck') || item.evidence.includes('pull_request') || item.evidence.includes('delete_cap'))).length;
+            const failed = results.filter((item) => item.decision === 'failed').length;
+            const lines = [
+              '# Isolated integrated branch prune',
+              '',
+              `- Repository: \`${repository}\``,
+              `- Main snapshot: \`${mainSha}\``,
+              `- Branches scanned: \`${scanned}\``,
+              `- Open PRs protected: \`${openPrs.length}\``,
+              `- Proven integrated candidates: \`${integratedCandidates}\``,
+              `- Deleted: \`${deleted}\``,
+              `- Already missing during recheck: \`${alreadyMissing}\``,
+              `- Integrated candidates preserved by safety checks: \`${preservedIntegrated}\``,
+              `- Delete failures: \`${failed}\``,
+              '',
+              '| Branch | Head | Decision | Evidence |',
+              '|---|---|---|---|',
+              ...results
+                .filter((item) => ['deleted', 'already_missing', 'failed'].includes(item.decision) || item.evidence.includes('workflow') || item.evidence.includes('recheck') || item.evidence.includes('new_open') || item.evidence.includes('delete_cap'))
+                .map((item) => `| \`${item.branch}\` | \`${(item.sha || '').slice(0, 12)}\` | ${item.decision} | ${item.evidence} |`),
+            ];
+            const report = `${lines.join('\n')}\n`;
+            console.log(report);
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
+
+            const [currentHead, currentBase] = await Promise.all([
+              request(`/repos/${owner}/${repo}/branches/${encodeRef(triggerHead)}`),
+              request(`/repos/${owner}/${repo}/branches/${encodeRef(triggerBase)}`),
+            ]);
+            if (currentHead.commit?.sha !== triggerHeadSha || currentHead.protected) throw new Error('isolated trigger head moved or became protected');
+            if (currentBase.commit?.sha !== triggerBaseSha || currentBase.protected) throw new Error('isolated trigger base moved or became protected');
+
+            await request(`/repos/${owner}/${repo}/pulls/${triggerPr}`, { method: 'PATCH', body: JSON.stringify({ state: 'closed' }) });
+            await request(`/repos/${owner}/${repo}/git/refs/heads/${encodeRef(triggerHead)}`, { method: 'DELETE' });
+            await request(`/repos/${owner}/${repo}/git/refs/heads/${encodeRef(triggerBase)}`, { method: 'DELETE' });
+
+            const selfReport = `\n## Isolated runner cleanup\n\n- Closed temporary PR: #${triggerPr}\n- Deleted temporary head: \`${triggerHead}\`\n- Deleted temporary base: \`${triggerBase}\`\n- No file or commit was merged into \`main\`.\n`;
+            console.log(selfReport);
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, selfReport);
+            if (failed > 0) process.exitCode = 1;
+          })().catch((error) => {
+            console.error(error.stack || String(error));
+            process.exitCode = 1;
+          });
+          NODE

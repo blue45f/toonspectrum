@@ -1,9 +1,0 @@
-CC0 1.0 Universal (CC0 1.0)
-Public Domain Dedication
-https://creativecommons.org/publicdomain/zero/1.0/
-
-Original complete characters by Quaternius.
-https://quaternius.com/packs/ultimatemodularcharacters.html
-https://quaternius.com/packs/ultimatemodularwomen.html
-
-ToonStudio conversion: preserved original meshes and palette materials; normalized the four strongest skin weights for browser skinning, with discarded influence statistics in the manifest; restored female solid-palette opacity where the FBX-imported shader alpha contradicted source RGBA alpha=1; reparented female upper legs under hips with a maximum 2e-5 matrix round-trip tolerance; exported GLB and added VRM1 humanoid/license metadata without altering the exported binary chunk. No expressions, toe bones or missing thumb bones were invented.
