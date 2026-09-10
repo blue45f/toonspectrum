@@ -3,6 +3,17 @@ name: Studio collaboration document sync
 on:
   workflow_dispatch:
 
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/studio-collaboration-sync.yml"
+      - "scripts/verify-studio-collaboration-sync.mts"
+      - "scripts/lib/studio-verify-preview-harness.mjs"
+      - "scripts/lib/studio-verify-preview-harness.mts"
+      - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
+      - "apps/web/src/domains/creator/live/**"
+      - "apps/web/src/domains/creator/studio-cuttoon-editor/**"
+
   push:
     branches: [main]
     paths:
