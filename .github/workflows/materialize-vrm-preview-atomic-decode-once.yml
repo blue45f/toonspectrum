@@ -1,0 +1,378 @@
+name: Materialize VRM preview atomic decoding once
+
+on:
+  push:
+    branches: [feat/vrm-preview-atomic-decode-20260910]
+    paths: [.github/workflows/materialize-vrm-preview-atomic-decode-once.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-vrm-preview-atomic-decode-20260910
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/vrm-preview-atomic-decode-20260910
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Add atomic image transition component
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.tsx <<'EOF'
+          import {
+            type SyntheticEvent,
+            useEffect,
+            useRef,
+            useState,
+          } from "react";
+
+          import { cn } from "@/shared/lib/utils";
+
+          export interface StudioVrmCharacterPreviewImageProps {
+            readonly alt: string;
+            readonly className?: string;
+            readonly fallbackDelayMs?: number;
+            readonly fallbackSrc: string;
+            readonly src: string | null;
+          }
+
+          interface PendingPreview {
+            readonly id: number;
+            readonly src: string;
+          }
+
+          const DEFAULT_FALLBACK_DELAY_MS = 1_200;
+
+          /**
+           * Keeps the last decoded frame visible until the replacement has loaded and decoded.
+           * This prevents virtualized/library hydration updates from briefly exposing initials-only
+           * fallbacks between two real character thumbnails.
+           */
+          export function StudioVrmCharacterPreviewImage({
+            alt,
+            className,
+            fallbackDelayMs = DEFAULT_FALLBACK_DELAY_MS,
+            fallbackSrc,
+            src,
+          }: StudioVrmCharacterPreviewImageProps) {
+            const initialSrc = src ?? fallbackSrc;
+            const [displayedSrc, setDisplayedSrc] = useState(initialSrc);
+            const [isDisplayedReady, setIsDisplayedReady] = useState(false);
+            const [pending, setPending] = useState<PendingPreview | null>(null);
+            const requestIdRef = useRef(0);
+
+            useEffect(() => {
+              if (src === displayedSrc) {
+                requestIdRef.current += 1;
+                setPending(null);
+                return;
+              }
+
+              const id = requestIdRef.current + 1;
+              requestIdRef.current = id;
+
+              if (src !== null) {
+                setPending({ id, src });
+                return;
+              }
+
+              if (displayedSrc === fallbackSrc) {
+                setPending(null);
+                return;
+              }
+
+              const timeout = window.setTimeout(() => {
+                if (requestIdRef.current !== id) return;
+                setPending({ id, src: fallbackSrc });
+              }, Math.max(0, fallbackDelayMs));
+
+              return () => window.clearTimeout(timeout);
+            }, [displayedSrc, fallbackDelayMs, fallbackSrc, src]);
+
+            const commitPending = async (
+              event: SyntheticEvent<HTMLImageElement>,
+              candidate: PendingPreview,
+            ) => {
+              const image = event.currentTarget;
+              try {
+                await image.decode?.();
+              } catch {
+                // The load event already proves that the browser has a usable frame. Some WebViews
+                // reject decode() after load, so that rejection must not reintroduce a blank card.
+              }
+              if (requestIdRef.current !== candidate.id) return;
+              setDisplayedSrc(candidate.src);
+              setIsDisplayedReady(true);
+              setPending(null);
+            };
+
+            const handleDisplayedError = () => {
+              if (displayedSrc === fallbackSrc) return;
+              requestIdRef.current += 1;
+              setDisplayedSrc(fallbackSrc);
+              setIsDisplayedReady(false);
+              setPending(null);
+            };
+
+            const handlePendingError = (candidate: PendingPreview) => {
+              if (requestIdRef.current !== candidate.id) return;
+              if (candidate.src !== fallbackSrc) {
+                const id = candidate.id + 1;
+                requestIdRef.current = id;
+                setPending({ id, src: fallbackSrc });
+                return;
+              }
+              setPending(null);
+            };
+
+            return (
+              <span
+                className="relative block h-full w-full overflow-hidden"
+                data-preview-ready={isDisplayedReady ? "true" : "false"}
+              >
+                <img
+                  alt={alt}
+                  className={cn("h-full w-full", className)}
+                  data-testid="vrm-preview-visible"
+                  decoding="async"
+                  draggable={false}
+                  loading="lazy"
+                  onError={handleDisplayedError}
+                  onLoad={() => setIsDisplayedReady(true)}
+                  src={displayedSrc}
+                />
+                {pending ? (
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className={cn(
+                      "pointer-events-none absolute inset-0 h-full w-full opacity-0",
+                      className,
+                    )}
+                    data-testid="vrm-preview-pending"
+                    decoding="async"
+                    draggable={false}
+                    onError={() => handlePendingError(pending)}
+                    onLoad={(event) => void commitPending(event, pending)}
+                    src={pending.src}
+                  />
+                ) : null}
+                {!isDisplayedReady ? (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 animate-pulse bg-gradient-to-br from-white/4 via-white/8 to-transparent"
+                    data-testid="vrm-preview-skeleton"
+                  />
+                ) : null}
+              </span>
+            );
+          }
+          EOF
+
+          cat > apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.test.tsx <<'EOF'
+          import { act, fireEvent, render, screen } from "@testing-library/react";
+          import { afterEach, describe, expect, it, vi } from "vitest";
+
+          import { StudioVrmCharacterPreviewImage } from "./StudioVrmCharacterPreviewImage";
+
+          afterEach(() => {
+            vi.useRealTimers();
+          });
+
+          describe("StudioVrmCharacterPreviewImage", () => {
+            it("uses the real thumbnail on first paint instead of flashing the initials fallback", () => {
+              render(
+                <StudioVrmCharacterPreviewImage
+                  alt="Lumi"
+                  fallbackSrc="fallback.svg"
+                  src="lumi.webp"
+                />,
+              );
+
+              expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
+                "src",
+                "lumi.webp",
+              );
+              expect(screen.queryByTestId("vrm-preview-pending")).not.toBeInTheDocument();
+            });
+
+            it("keeps the decoded frame until the replacement finishes loading", async () => {
+              const { rerender } = render(
+                <StudioVrmCharacterPreviewImage
+                  alt="Lumi"
+                  fallbackSrc="fallback.svg"
+                  src="lumi-a.webp"
+                />,
+              );
+              fireEvent.load(screen.getByTestId("vrm-preview-visible"));
+
+              rerender(
+                <StudioVrmCharacterPreviewImage
+                  alt="Lumi"
+                  fallbackSrc="fallback.svg"
+                  src="lumi-b.webp"
+                />,
+              );
+
+              expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
+                "src",
+                "lumi-a.webp",
+              );
+              const pending = screen.getByTestId("vrm-preview-pending");
+              expect(pending).toHaveAttribute("src", "lumi-b.webp");
+              fireEvent.load(pending);
+
+              await screen.findByDisplayValue?.(undefined as never).catch(() => undefined);
+              expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
+                "src",
+                "lumi-b.webp",
+              );
+            });
+
+            it("absorbs short null hydration windows without exposing the fallback", () => {
+              vi.useFakeTimers();
+              const { rerender } = render(
+                <StudioVrmCharacterPreviewImage
+                  alt="Lumi"
+                  fallbackDelayMs={1_200}
+                  fallbackSrc="fallback.svg"
+                  src="lumi.webp"
+                />,
+              );
+              fireEvent.load(screen.getByTestId("vrm-preview-visible"));
+
+              rerender(
+                <StudioVrmCharacterPreviewImage
+                  alt="Lumi"
+                  fallbackDelayMs={1_200}
+                  fallbackSrc="fallback.svg"
+                  src={null}
+                />,
+              );
+              act(() => vi.advanceTimersByTime(800));
+              rerender(
+                <StudioVrmCharacterPreviewImage
+                  alt="Lumi"
+                  fallbackDelayMs={1_200}
+                  fallbackSrc="fallback.svg"
+                  src="lumi.webp"
+                />,
+              );
+
+              expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
+                "src",
+                "lumi.webp",
+              );
+              expect(screen.queryByTestId("vrm-preview-pending")).not.toBeInTheDocument();
+            });
+
+            it("falls back only after an actual image error", () => {
+              render(
+                <StudioVrmCharacterPreviewImage
+                  alt="Lumi"
+                  fallbackSrc="fallback.svg"
+                  src="broken.webp"
+                />,
+              );
+
+              fireEvent.error(screen.getByTestId("vrm-preview-visible"));
+              expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
+                "src",
+                "fallback.svg",
+              );
+            });
+          });
+          EOF
+
+      - name: Replace the raw character-card image atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx")
+          source = path.read_text(encoding="utf-8")
+
+          import_line = 'import { StudioVrmCharacterPreviewImage } from "./StudioVrmCharacterPreviewImage";\n'
+          if import_line not in source:
+              lines = source.splitlines(keepends=True)
+              last_local = -1
+              for index, line in enumerate(lines):
+                  if line.startswith("import ") and 'from "./' in line:
+                      last_local = index
+              if last_local < 0:
+                  raise SystemExit("VRM library panel local import anchor changed")
+              lines.insert(last_local + 1, import_line)
+              source = "".join(lines)
+
+          needle = "entry.thumbnail ?? buildFallbackVrmLibraryThumbnail(entry.name, entry.id)"
+          src_index = source.find(needle)
+          if src_index < 0:
+              raise SystemExit("VRM card thumbnail source anchor changed")
+          image_start = source.rfind("<img", 0, src_index)
+          image_end = source.find("/>", src_index)
+          if image_start < 0 or image_end < 0 or image_end - image_start > 900:
+              raise SystemExit("Could not isolate the VRM card img element safely")
+          image_end += 2
+          line_start = source.rfind("\n", 0, image_start) + 1
+          indent = source[line_start:image_start]
+          if not indent.isspace():
+              raise SystemExit("VRM card image is not on a standalone JSX line")
+
+          replacement = f'''<StudioVrmCharacterPreviewImage
+          {indent}  alt=""
+          {indent}  className="object-contain"
+          {indent}  fallbackSrc={{buildFallbackVrmLibraryThumbnail(entry.name, entry.id)}}
+          {indent}  src={{entry.thumbnail}}
+          {indent}/>'''
+          source = source[:image_start] + replacement + source[image_end:]
+          path.write_text(source, encoding="utf-8")
+          PY
+
+      - name: Validate preview lifecycle and the existing character library
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.test.tsx \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.test.tsx \
+            apps/web/src/domains/creator/vrm/studio-vrm-bundled-thumbnail-stability.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.tsx \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.test.tsx \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx
+          git diff --check
+
+      - name: Commit product-only slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/materialize-vrm-preview-atomic-decode-once.yml
+          git add \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.tsx \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.test.tsx \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx \
+            .github/workflows/materialize-vrm-preview-atomic-decode-once.yml
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'feat(vrm): switch character previews after decode'
+          git push --no-verify origin HEAD:feat/vrm-preview-atomic-decode-20260910
