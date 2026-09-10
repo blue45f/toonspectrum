@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { SAMPLE_VRMS } from "../apps/web/src/domains/creator/vrm/vrm-library";
 import {
   isStudioVrmProductionThumbnailUrl,
 } from "../apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality";
+import { SAMPLE_VRMS } from "../apps/web/src/domains/creator/vrm/vrm-library";
 
 type Dimensions = Readonly<{ width: number; height: number }>;
 

@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { SAMPLE_VRMS } from "../apps/web/src/domains/creator/vrm/vrm-library";
 import {
   classifyStudioVrmModelTechnicalRejection,
   isStudioVrmProductionModelUrl,
@@ -9,6 +8,7 @@ import {
   type StudioVrmModelTechnicalMetrics,
   type StudioVrmModelTechnicalRejectionCode,
 } from "../apps/web/src/domains/creator/vrm/studio-vrm-model-quality";
+import { SAMPLE_VRMS } from "../apps/web/src/domains/creator/vrm/vrm-library";
 
 type GltfAccessor = Readonly<{
   count?: number;
