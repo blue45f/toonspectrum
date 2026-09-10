@@ -1,0 +1,9 @@
+/*
+ * The Draft Save Center is intentionally a fixed global status control at z-index 58.
+ * Dismissible Studio notices can occupy the same top-right region, so keep the whole notice
+ * directly actionable above the save control instead of forcing browser QA to click through it.
+ */
+[role="status"]:has(> [data-studio-status-notice-dismiss="true"]) {
+  position: relative;
+  z-index: 59;
+}

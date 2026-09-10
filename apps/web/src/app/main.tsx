@@ -10,6 +10,7 @@ import { initializePwaInstallCapture } from "../shared/lib/pwa-install-store";
 import App from "./App";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
 import "../styles/globals.css";
+import "../styles/studio-overlay-stacking.css";
 
 const STUDIO_BG3D_MAGIC_PRODUCTION_PROOF_QUERY =
   "__studioBg3dMagicProductionProof";
