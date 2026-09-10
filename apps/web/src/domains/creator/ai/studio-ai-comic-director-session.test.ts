@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createStudioAiComicApplyDiff,
+  createStudioAiComicDirectorId,
   createStudioAiComicDirectorSession,
   hydrateStudioAiComicDirectorSession,
   loadStudioAiComicDirectorSession,
@@ -83,6 +84,23 @@ class MemoryStorage {
 }
 
 describe("AI Comic Director session", () => {
+  it("uses Web Crypto entropy when randomUUID is unavailable", () => {
+    const generated = createStudioAiComicDirectorId("comic", {
+      getRandomValues(array) {
+        array.set(Array.from({ length: 16 }, (_, index) => index));
+        return array;
+      },
+    });
+
+    expect(generated).toBe("comic-000102030405060708090a0b0c0d0e0f");
+  });
+
+  it("fails closed when secure entropy is unavailable", () => {
+    expect(() => createStudioAiComicDirectorId("comic", null)).toThrow(
+      "안전한 AI 코믹 디렉터 식별자를 생성할 수 없습니다.",
+    );
+  });
+
   it("round-trips a durable local session without image authority changes", () => {
     const storage = new MemoryStorage();
     const session = createStudioAiComicDirectorSession({
