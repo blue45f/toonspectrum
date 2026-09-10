@@ -144,10 +144,10 @@ async function ensureLocalPreviewTransport(page: Page, label: string): Promise<v
   if (EXISTING_ORIGIN) return;
 
   const liveMode = page.locator("[data-studio-live-mode]").first();
-  const currentMode = await liveMode
+  const initialMode = await liveMode
     .getAttribute("data-studio-live-mode", { timeout: 800 })
     .catch(() => null);
-  if (currentMode === "local") return;
+  if (initialMode === "local") return;
 
   const presenceDock = page.locator('[data-studio-presence-dock="true"]').first();
   await presenceDock.waitFor({ state: "visible", timeout: 20_000 });
@@ -162,15 +162,19 @@ async function ensureLocalPreviewTransport(page: Page, label: string): Promise<v
     }
   }
 
-  await fallback.waitFor({ state: "visible", timeout: 20_000 });
-  await fallback.click();
-  await page.waitForFunction(
-    () => document
-      .querySelector<HTMLElement>("[data-studio-live-mode]")
-      ?.dataset.studioLiveMode === "local",
-    undefined,
-    { timeout: 20_000 },
-  );
+  await liveMode.waitFor({ state: "attached", timeout: 20_000 });
+  const mountedMode = await liveMode.getAttribute("data-studio-live-mode");
+  if (mountedMode !== "local") {
+    await fallback.waitFor({ state: "visible", timeout: 20_000 });
+    await fallback.click();
+    await page.waitForFunction(
+      () => document
+        .querySelector<HTMLElement>("[data-studio-live-mode]")
+        ?.dataset.studioLiveMode === "local",
+      undefined,
+      { timeout: 20_000 },
+    );
+  }
   await page.getByRole("button", { name: "팀 작업 공간 닫기" }).first()
     .click({ timeout: 1_500 })
     .catch(() => undefined);
@@ -183,18 +187,22 @@ async function waitForDocumentLane(
 ): Promise<string> {
   const dock = page.locator('[data-studio-presence-dock="true"]').first();
   await dock.waitFor({ state: "visible", timeout: 30_000 });
-  await page.waitForFunction(
+  const readyPhaseHandle = await page.waitForFunction(
     (readyPhases) => {
       const phase = document
         .querySelector<HTMLElement>('[data-studio-presence-dock="true"]')
         ?.dataset.studioSyncPhase;
-      return typeof phase === "string" && readyPhases.includes(phase);
+      return typeof phase === "string" && readyPhases.includes(phase) ? phase : false;
     },
     [...READY_PHASES],
     { timeout: 30_000 },
   );
-  const phase = await dock.getAttribute("data-studio-sync-phase");
-  assert.ok(phase && READY_PHASES.has(phase), `unexpected document sync phase: ${phase}`);
+  const phase = await readyPhaseHandle.jsonValue();
+  await readyPhaseHandle.dispose();
+  assert.ok(
+    typeof phase === "string" && READY_PHASES.has(phase),
+    `unexpected document sync phase: ${String(phase)}`,
+  );
   diagnostics.phases.push(phase);
   return phase;
 }
