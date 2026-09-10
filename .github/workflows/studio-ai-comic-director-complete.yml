@@ -18,7 +18,7 @@ on:
       - "apps/web/src/domains/creator/StudioLazyPanelStack.tsx"
       - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
       - "apps/web/src/domains/creator/studio-scenario-layout.ts"
-      - "apps/web/src/domains/creator/studio-router/StudioAiComicDirectorRoute*.tsx"
+      - "apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute*.tsx"
       - "apps/web/src/domains/creator/studio-router/studio-ai-comic-director-route*.ts"
       - "apps/web/src/domains/creator/studio-router/studio-route-manifest*.ts"
       - "apps/api/src/modules/studio-ai/studio-ai-comic-director*.ts"
@@ -93,7 +93,7 @@ jobs:
             apps/web/src/domains/creator/ai/StudioAiToolPopoverBody*.tsx \
             apps/web/src/domains/creator/StudioScenarioCandidateDesk*.tsx \
             apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel*.tsx \
-            apps/web/src/domains/creator/studio-router/StudioAiComicDirectorRoute*.tsx \
+            apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute*.tsx \
             apps/web/src/domains/creator/studio-router/studio-ai-comic-director-route*.ts \
             apps/api/src/modules/studio-ai/studio-ai-comic-director*.ts
 
