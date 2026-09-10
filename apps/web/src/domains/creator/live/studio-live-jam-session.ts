@@ -25,6 +25,67 @@ export function createStudioLiveInstantWorkId(
   return `${STUDIO_LIVE_JAM_WORK_ID_PREFIX}${now().toString(36)}-${salt}`;
 }
 
+const STUDIO_LIVE_OWNER_ROOM_SESSION_KEY = "toonspectrum:studio-live-owner-room:v1";
+
+export interface StudioLiveOwnerRoomSessionStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+function readStudioLiveOwnedRoomId(
+  storage: StudioLiveOwnerRoomSessionStorage | null | undefined,
+): string | null {
+  if (!storage) return null;
+  try {
+    const value = storage.getItem(STUDIO_LIVE_OWNER_ROOM_SESSION_KEY)?.trim() ?? "";
+    return value.length > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberStudioLiveOwnedRoomId(
+  storage: StudioLiveOwnerRoomSessionStorage | null | undefined,
+  roomId: string,
+): void {
+  if (!storage) return;
+  try {
+    storage.setItem(STUDIO_LIVE_OWNER_ROOM_SESSION_KEY, roomId);
+  } catch {
+    // Storage can be unavailable in hardened/private WebViews. The fresh id still works for this mount.
+  }
+}
+
+/**
+ * Keeps the auto-published local room identity stable across reloads and document-boundary remounts.
+ *
+ * `sessionStorage` is intentionally tab-scoped: the owner tab remembers the room it published, while
+ * a companion tab opened with `noopener` receives only the shared URL and therefore generates its own
+ * instant id. That preserves the owner-vs-joiner lock boundary after a reload instead of turning the
+ * owner into a false remote participant merely because React created a new layout instance.
+ */
+export function resolveStudioLiveInstantWorkIdForTab(input: {
+  workId: string | null;
+  remixId: string | null;
+  roomId: string | null;
+  storage?: StudioLiveOwnerRoomSessionStorage | null;
+  now?: () => number;
+  random?: () => number;
+}): string {
+  const fresh = () => createStudioLiveInstantWorkId(input.now, input.random);
+
+  if (input.workId || input.remixId) return fresh();
+
+  const roomId = input.roomId?.trim() ?? "";
+  if (roomId) {
+    return readStudioLiveOwnedRoomId(input.storage) === roomId ? roomId : fresh();
+  }
+
+  const instantWorkId = fresh();
+  rememberStudioLiveOwnedRoomId(input.storage, instantWorkId);
+  return instantWorkId;
+}
+
 export function resolveStudioLiveSessionWorkId(input: {
   workId: string | null;
   roomId: string | null;

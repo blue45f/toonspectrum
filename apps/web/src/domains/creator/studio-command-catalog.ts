@@ -33,26 +33,55 @@ const MANUAL_MENU_ID = "help/user-manual";
 const BRUSH_LAB_MENU_ID = "brush/brush-lab";
 const TRANSPARENT_COLOR_COMMAND_ID: CommandId = "color.toggle-transparent";
 const TRANSPARENT_COLOR_SHORTCUT = "Shift+C";
+const BRUSH_STUDIO_COMMAND_ID: CommandId = "brush.studio";
 
 /**
  * The base file keeps measured historical conflicts. The public catalog must describe the
- * command users can execute now: Crop owns C and transparent ink owns Shift+C.
+ * commands users can execute now while preserving old terminology as aliases.
  */
 const NORMALIZED_BASE_CATALOG: readonly StudioCommandCatalogEntry[] = Object.freeze(
   BASE_CATALOG.map((entry) => {
-    if (entry.id !== TRANSPARENT_COLOR_COMMAND_ID) return entry;
-    return Object.freeze({
-      ...entry,
-      shortcut: TRANSPARENT_COLOR_SHORTCUT,
-      origins: Object.freeze(
-        entry.origins.map((origin) =>
-          origin.source === "keymap"
-            ? Object.freeze({ ...origin, shortcut: TRANSPARENT_COLOR_SHORTCUT })
-            : origin,
+    if (entry.id === TRANSPARENT_COLOR_COMMAND_ID) {
+      return Object.freeze({
+        ...entry,
+        shortcut: TRANSPARENT_COLOR_SHORTCUT,
+        origins: Object.freeze(
+          entry.origins.map((origin) =>
+            origin.source === "keymap"
+              ? Object.freeze({ ...origin, shortcut: TRANSPARENT_COLOR_SHORTCUT })
+              : origin,
+          ),
         ),
-      ),
-      note: "Crop uses C; transparent-colour drawing uses Shift+C after the guided-UX migration.",
-    });
+        note: "Crop uses C; transparent-colour drawing uses Shift+C after the guided-UX migration.",
+      });
+    }
+
+    if (entry.id === BRUSH_STUDIO_COMMAND_ID) {
+      return Object.freeze({
+        ...entry,
+        labels: Object.freeze([
+          {
+            locale: "ko",
+            label: "현재 브러시 세부 설정",
+            description: "현재 선택한 브러시의 펜촉·필압·도장·입력·엔진 조합을 편집합니다.",
+          },
+          {
+            locale: "en",
+            label: "Current brush settings",
+            description: "Edit the selected brush tip, pressure, stamp, input, and engine settings.",
+          },
+        ]),
+        aliases: Object.freeze([
+          ...entry.aliases,
+          { vendor: "toonstudio", locale: "ko", term: "브러시 스튜디오" } as const,
+          { vendor: "toonstudio", locale: "ko", term: "브러시 상세 설정" } as const,
+          { vendor: "toonstudio", locale: "en", term: "Brush Studio" } as const,
+        ]),
+        note: "The in-editor Brush Studio edits the current brush; the dedicated brush.lab command owns guided brush authoring.",
+      });
+    }
+
+    return entry;
   }),
 );
 
@@ -83,7 +112,6 @@ const BRUSH_LAB_COMMAND: StudioCommandCatalogEntry = {
     { vendor: "toonstudio", locale: "ko", term: "브러시 연구실" },
     { vendor: "toonstudio", locale: "ko", term: "브러시 제작실" },
     { vendor: "toonstudio", locale: "en", term: "Brush Studio V6" },
-    { vendor: "procreate", locale: "en", term: "Brush Studio" },
   ],
   helpNodeId: "help/brush/lab",
   origins: [{ source: "menu", nativeId: BRUSH_LAB_MENU_ID, status: "wired" }],

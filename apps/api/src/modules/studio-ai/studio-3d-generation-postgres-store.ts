@@ -1,5 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
+import { Logger } from "@nestjs/common";
+import { Pool, type PoolClient } from "pg";
+
+import {
+  normalizePgConnectionStringForTls,
+  observePgPoolIdleErrors,
+} from "../../db/pg-connection";
 import type {
   Studio3dGenerationArtifactRevision,
   Studio3dGenerationJobRecord,
@@ -13,6 +20,45 @@ interface PostgresSql {
   unsafe(query: string, parameters?: readonly unknown[]): Promise<SqlResult>;
   begin<T>(operation: (sql: PostgresSql) => Promise<T>): Promise<T>;
   end(options?: { readonly timeout?: number }): Promise<void>;
+}
+
+class NodePostgresSql implements PostgresSql {
+  constructor(
+    private readonly pool: Pool,
+    private readonly transactionClient?: PoolClient,
+  ) {}
+
+  async unsafe(query: string, parameters: readonly unknown[] = []): Promise<SqlResult> {
+    const queryable = this.transactionClient ?? this.pool;
+    const result = await queryable.query<SqlRow>(query, [...parameters]);
+    return result.rows;
+  }
+
+  async begin<T>(operation: (sql: PostgresSql) => Promise<T>): Promise<T> {
+    if (this.transactionClient) return operation(this);
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const transaction = new NodePostgresSql(this.pool, client);
+      const result = await operation(transaction);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        // Preserve the original operation error if the connection is already unusable.
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async end(_options?: { readonly timeout?: number }): Promise<void> {
+    if (!this.transactionClient) await this.pool.end();
+  }
 }
 
 export interface Studio3dGenerationStoredArtifact {
@@ -56,20 +102,19 @@ export class PostgresStudio3dGenerationStore
   }
 
   async #createClient(connectionString: string): Promise<PostgresSql> {
-    const moduleName = "postgres";
-    const imported = (await import(moduleName)) as Record<string, unknown>;
-    const factory = (imported.default ?? imported) as (
-      url: string,
-      options: Readonly<Record<string, unknown>>,
-    ) => PostgresSql;
-    if (typeof factory !== "function") throw new TypeError("The postgres driver did not expose a client factory.");
-    return factory(connectionString, {
+    const normalizedConnectionString = normalizePgConnectionStringForTls(connectionString);
+    const pool = new Pool({
+      connectionString: normalizedConnectionString,
       max: 4,
-      idle_timeout: 20,
-      connect_timeout: 15,
-      prepare: false,
-      transform: { undefined: null },
+      idleTimeoutMillis: 20_000,
+      connectionTimeoutMillis: 15_000,
+      allowExitOnIdle: true,
     });
+    observePgPoolIdleErrors(pool, {
+      connectionString: normalizedConnectionString,
+      logger: new Logger("Studio3dGenerationPostgresStore"),
+    });
+    return new NodePostgresSql(pool);
   }
 
   async #client(): Promise<PostgresSql> {
