@@ -1,15 +1,15 @@
-name: Codex studio insert batch draft verification
+name: Studio insert batch race recovery
 
 on:
   push:
     branches:
-      - fix/studio-insert-batch-integration-20260909
+      - fix/studio-insert-batch-race-20260910
 
 permissions:
   contents: write
 
 concurrency:
-  group: codex-studio-insert-batch-draft-verification
+  group: studio-insert-batch-race-recovery-20260910
   cancel-in-progress: true
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: fix/studio-insert-batch-integration-20260909
+          ref: fix/studio-insert-batch-race-20260910
           fetch-depth: 0
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
@@ -108,5 +108,5 @@ jobs:
           git config user.name "OpenAI Codex"
           git config user.email "codex@openai.com"
           git add -A
-          git commit -m "fix(studio): finalize verified batch insertion integration [codex-insert-draft-verified]"
-          git push origin HEAD:fix/studio-insert-batch-integration-20260909
+          git commit -m "fix(studio): serialize batch insertion queue state [codex-insert-draft-verified]"
+          git push origin HEAD:fix/studio-insert-batch-race-20260910
