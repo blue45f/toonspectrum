@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { requestStudioAiComicComposerOpen } from "../../ai/studio-ai-comic-composer-intent";
 import { createStudioAiComicDirectorApiClient } from "../../ai/studio-ai-comic-director-api";
 import {
+  createStudioAiComicDirectorId,
   createStudioAiComicDirectorSession,
   loadStudioAiComicDirectorSession,
   reconcileStudioAiComicDirectorJobs,
@@ -34,11 +35,6 @@ import { cn } from "@/shared/lib/utils";
 
 interface StudioAiComicDirectorRouteProps {
   readonly resolution: StudioCompositionRouteResolution;
-}
-
-function uid(): string {
-  return globalThis.crypto?.randomUUID?.()
-    ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function routePath(
@@ -70,7 +66,7 @@ function initialSession(
     }
   }
   return createStudioAiComicDirectorSession({
-    id: resolution.sessionId === "new" ? uid() : resolution.sessionId,
+    id: resolution.sessionId === "new" ? createStudioAiComicDirectorId() : resolution.sessionId,
     workId: resolution.workId,
     remixSourceWorkId: resolution.remixSourceWorkId,
     title: "새 AI 코믹 디렉터 세션",
@@ -206,7 +202,7 @@ export function StudioAiComicDirectorRoute({
     const name = newBibleName.normalize("NFKC").trim();
     if (!name) return;
     const entry: StudioAiVisualBibleEntry = {
-      id: uid(),
+      id: createStudioAiComicDirectorId(),
       kind: newBibleKind,
       name,
       version: "v1",
