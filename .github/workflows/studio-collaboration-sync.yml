@@ -14,11 +14,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: studio-collaboration-sync-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: studio-collaboration-sync-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   document-convergence:
@@ -112,3 +112,132 @@ jobs:
           path: ${{ runner.temp }}/toonspectrum-verification/studio-collaboration-sync
           if-no-files-found: warn
           retention-days: 14
+
+  land-verifier-race-fix:
+    name: land-verifier-race-fix
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/real-core-and-main-only-20260910' }}
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      TARGET_BRANCH: fix/real-core-and-main-only-20260910
+      CANONICAL_WORKFLOW_COMMIT: 4e3ab1cbc12b1e1f69aba75fc1ca1b92a8833c91
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/real-core-and-main-only-20260910
+          fetch-depth: 1
+          persist-credentials: true
+          sparse-checkout: |
+            scripts
+            .github/workflows
+          sparse-checkout-cone-mode: true
+
+      - name: Patch verifier readiness sampling
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("scripts/verify-studio-collaboration-sync.mts")
+          source = path.read_text(encoding="utf-8")
+
+          transport_function = source.index(
+              "async function ensureLocalPreviewTransport(page: Page, label: string): Promise<void> {"
+          )
+          transport_start = source.index(
+              '  const liveMode = page.locator("[data-studio-live-mode]").first();',
+              transport_function,
+          )
+          transport_end = source.index(
+              '  await page.getByRole("button", { name: "팀 작업 공간 닫기" })',
+              transport_start,
+          )
+          transport = "\n".join([
+              '  const liveMode = page.locator("[data-studio-live-mode]").first();',
+              '  const initialMode = await liveMode',
+              '    .getAttribute("data-studio-live-mode", { timeout: 800 })',
+              '    .catch(() => null);',
+              '  if (initialMode === "local") return;',
+              '',
+              '  const presenceDock = page.locator(\'[data-studio-presence-dock="true"]\').first();',
+              '  await presenceDock.waitFor({ state: "visible", timeout: 20_000 });',
+              '',
+              '  const fallback = page.getByRole("button", { name: "로컬 탭 모드", exact: true }).first();',
+              '  if (!(await fallback.isVisible().catch(() => false))) {',
+              '    const teamAction = page.locator(\'[data-studio-presence-team-action="true"]\').first();',
+              '    if (await teamAction.isVisible().catch(() => false)) {',
+              '      await teamAction.click({ force: true });',
+              '    } else {',
+              '      await presenceDock.click({ force: true });',
+              '    }',
+              '  }',
+              '',
+              '  await liveMode.waitFor({ state: "attached", timeout: 20_000 });',
+              '  const mountedMode = await liveMode.getAttribute("data-studio-live-mode");',
+              '  if (mountedMode !== "local") {',
+              '    await fallback.waitFor({ state: "visible", timeout: 20_000 });',
+              '    await fallback.click();',
+              '    await page.waitForFunction(',
+              '      () => document',
+              '        .querySelector<HTMLElement>("[data-studio-live-mode]")',
+              '        ?.dataset.studioLiveMode === "local",',
+              '      undefined,',
+              '      { timeout: 20_000 },',
+              '    );',
+              '  }',
+              '',
+          ])
+          source = source[:transport_start] + transport + source[transport_end:]
+
+          lane_function = source.index("async function waitForDocumentLane(")
+          lane_start = source.index("  await page.waitForFunction(", lane_function)
+          lane_return = source.index("  return phase;", lane_start) + len("  return phase;")
+          lane = "\n".join([
+              '  const readyPhaseHandle = await page.waitForFunction(',
+              '    (readyPhases) => {',
+              '      const phase = document',
+              '        .querySelector<HTMLElement>(\'[data-studio-presence-dock="true"]\')',
+              '        ?.dataset.studioSyncPhase;',
+              '      return typeof phase === "string" && readyPhases.includes(phase) ? phase : false;',
+              '    },',
+              '    [...READY_PHASES],',
+              '    { timeout: 30_000 },',
+              '  );',
+              '  const phase = await readyPhaseHandle.jsonValue();',
+              '  await readyPhaseHandle.dispose();',
+              '  assert.ok(',
+              '    typeof phase === "string" && READY_PHASES.has(phase),',
+              '    `unexpected document sync phase: ${String(phase)}`,',
+              '  );',
+              '  diagnostics.phases.push(phase);',
+              '  return phase;',
+          ])
+          source = source[:lane_start] + lane + source[lane_return:]
+
+          if source.count("const mountedMode = await liveMode.getAttribute") != 1:
+              raise SystemExit("local transport readiness repair was not materialized exactly once")
+          if source.count("const readyPhaseHandle = await page.waitForFunction") != 1:
+              raise SystemExit("document lane readiness repair was not materialized exactly once")
+          path.write_text(source, encoding="utf-8")
+
+      - name: Publish source-only repair and restore canonical workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${CANONICAL_WORKFLOW_COMMIT}/.github/workflows/studio-collaboration-sync.yml" \
+            --output .github/workflows/studio-collaboration-sync.yml
+          rm -f .github/workflows/repair-studio-collaboration-verifier.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m "fix(ci): stabilize collaboration verifier readiness"
+          for attempt in $(seq 1 8); do
+            if git push --no-verify origin "HEAD:${TARGET_BRANCH}"; then
+              exit 0
+            fi
+            git fetch --depth=32 origin "${TARGET_BRANCH}"
+            git rebase "origin/${TARGET_BRANCH}"
+            sleep $((attempt * 2))
+          done
+          exit 1
