@@ -1,0 +1,295 @@
+name: Converge Studio security fast once
+
+on:
+  push:
+    branches:
+      - fix/studio-final-ci-convergence-20260910
+    paths:
+      - .github/workflows/converge-studio-security-fast-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: converge-studio-security-ai-recovery-20260910
+  cancel-in-progress: true
+
+jobs:
+  patch-test-and-push:
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-final-ci-convergence-20260910
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Merge latest protected main
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge --no-edit origin/main
+
+      - name: Apply secure IDs, recovery navigation, and workflow cleanup
+        shell: python
+        run: |
+          import re
+          import textwrap
+          from pathlib import Path
+
+          def write(path_name: str, content: str) -> None:
+              Path(path_name).write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
+
+          panel = Path("apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx")
+          panel_source = panel.read_text(encoding="utf-8")
+          helper_import = 'import { createStudioAiComicDirectorId } from "./studio-ai-comic-director-id";\n'
+          if helper_import not in panel_source:
+              panel_source, count = re.subn(
+                  r'(\} from "\./studio-ai-comic-director-api";\n)',
+                  r'\1' + helper_import,
+                  panel_source,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit("Panel API import boundary changed")
+          panel_source, count = re.subn(
+              r'function uid\(prefix: string\): string \{\n\s*return globalThis\.crypto\?\.randomUUID\?\.\(\) \?\? `\$\{prefix\}-\$\{Date\.now\(\)\.toString\(36\)\}-\$\{Math\.random\(\)\.toString\(36\)\.slice\(2, 10\)\}`;\n\}',
+              'function uid(prefix: string): string {\n  return createStudioAiComicDirectorId(prefix);\n}',
+              panel_source,
+              count=1,
+          )
+          if count != 1 and "return createStudioAiComicDirectorId(prefix);" not in panel_source:
+              raise SystemExit("Panel insecure ID boundary changed")
+          panel.write_text(panel_source, encoding="utf-8")
+
+          route = Path("apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx")
+          route_source = route.read_text(encoding="utf-8")
+          route_helper_import = 'import { createStudioAiComicDirectorId } from "../../ai/studio-ai-comic-director-id";\n'
+          if route_helper_import not in route_source:
+              route_source, count = re.subn(
+                  r'(import \{ createStudioAiComicDirectorApiClient \} from "\.\./\.\./ai/studio-ai-comic-director-api";\n)',
+                  r'\1' + route_helper_import,
+                  route_source,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit("Route API import boundary changed")
+          route_source, count = re.subn(
+              r'function uid\(\): string \{\n\s*return globalThis\.crypto\?\.randomUUID\?\.\(\)\n\s*\?\? `comic-\$\{Date\.now\(\)\.toString\(36\)\}-\$\{Math\.random\(\)\.toString\(36\)\.slice\(2, 10\)\}`;\n\}',
+              'function uid(): string {\n  return createStudioAiComicDirectorId("comic");\n}',
+              route_source,
+              count=1,
+          )
+          if count != 1 and 'return createStudioAiComicDirectorId("comic");' not in route_source:
+              raise SystemExit("Route insecure ID boundary changed")
+          route.write_text(route_source, encoding="utf-8")
+
+          launchpad = Path("apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx")
+          launchpad_source = launchpad.read_text(encoding="utf-8")
+          director_label = "AI 코믹 디렉터 · 스토리 → 편집 가능한 컷"
+          if director_label not in launchpad_source:
+              launchpad_source, count = re.subn(
+                  r'(\s+disabled=\{action\.disabled \|\| !action\.onClick\}\n)(\s+aria-describedby=\{descriptionId\})',
+                  r'\1      aria-label={\n        action.id === "director"\n          ? "AI 코믹 디렉터 · 스토리 → 편집 가능한 컷"\n          : undefined\n      }\n\2',
+                  launchpad_source,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit("Launchpad action boundary changed")
+          launchpad.write_text(launchpad_source, encoding="utf-8")
+
+          launchpad_test = Path("apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx")
+          launchpad_test_source = launchpad_test.read_text(encoding="utf-8")
+          if director_label not in launchpad_test_source:
+              old_click = '    fireEvent.click(screen.getByRole("button", { name: /AI 코믹 디렉터/u }));\n'
+              new_click = '''
+                const director = screen.getByRole("button", {
+                  name: /AI 코믹 디렉터 · 스토리 → 편집 가능한 컷/u,
+                });
+                expect(director.getAttribute("data-studio-ai-production-action")).toBe("director");
+
+                fireEvent.click(director);
+              '''
+              if launchpad_test_source.count(old_click) != 1:
+                  raise SystemExit("Launchpad director test boundary changed")
+              launchpad_test_source = launchpad_test_source.replace(
+                  old_click,
+                  textwrap.dedent(new_click).lstrip(),
+                  1,
+              )
+          launchpad_test.write_text(launchpad_test_source, encoding="utf-8")
+
+          write(
+              "apps/web/src/domains/creator/ai/studio-ai-comic-director-id.ts",
+              '''
+              export type StudioAiComicDirectorCrypto = Partial<
+                Pick<Crypto, "randomUUID" | "getRandomValues">
+              >;
+
+              function normalizedIdPrefix(prefix: string): string {
+                return prefix
+                  .normalize("NFKC")
+                  .replace(/[^a-zA-Z0-9_-]+/gu, "-")
+                  .replace(/^-+|-+$/gu, "")
+                  .slice(0, 32) || "id";
+              }
+
+              /**
+               * Creates identifiers exclusively from Web Crypto entropy. Environments without a
+               * secure random source fail closed rather than silently falling back to Math.random.
+               */
+              export function createStudioAiComicDirectorId(
+                prefix: string,
+                cryptoApi: StudioAiComicDirectorCrypto | undefined =
+                  typeof globalThis.crypto === "undefined" ? undefined : globalThis.crypto,
+              ): string {
+                if (typeof cryptoApi?.randomUUID === "function") {
+                  try {
+                    return cryptoApi.randomUUID();
+                  } catch {
+                    // Some embedded browsers expose randomUUID but reject it at call time.
+                  }
+                }
+
+                if (typeof cryptoApi?.getRandomValues !== "function") {
+                  throw new Error("Web Crypto randomness is required to create Studio AI comic IDs.");
+                }
+
+                const bytes = new Uint8Array(16);
+                cryptoApi.getRandomValues(bytes);
+                const token = Array.from(
+                  bytes,
+                  (byte) => byte.toString(16).padStart(2, "0"),
+                ).join("");
+                return `${normalizedIdPrefix(prefix)}-${token}`;
+              }
+              ''',
+          )
+
+          write(
+              "apps/web/src/domains/creator/ai/studio-ai-comic-director-id.test.ts",
+              '''
+              import { describe, expect, it } from "vitest";
+
+              import {
+                createStudioAiComicDirectorId,
+                type StudioAiComicDirectorCrypto,
+              } from "./studio-ai-comic-director-id";
+
+              function secureBytes(
+                fill: (bytes: Uint8Array) => void,
+              ): Crypto["getRandomValues"] {
+                return ((view: ArrayBufferView) => {
+                  const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+                  fill(bytes);
+                  return view;
+                }) as Crypto["getRandomValues"];
+              }
+
+              describe("createStudioAiComicDirectorId", () => {
+                it("prefers a secure random UUID", () => {
+                  const cryptoApi: StudioAiComicDirectorCrypto = {
+                    randomUUID: () => "00000000-0000-4000-8000-000000000001",
+                  };
+
+                  expect(createStudioAiComicDirectorId("comic", cryptoApi)).toBe(
+                    "00000000-0000-4000-8000-000000000001",
+                  );
+                });
+
+                it("uses secure random bytes when randomUUID is unavailable", () => {
+                  const cryptoApi: StudioAiComicDirectorCrypto = {
+                    getRandomValues: secureBytes((bytes) => {
+                      bytes.forEach((_, index) => {
+                        bytes[index] = index;
+                      });
+                    }),
+                  };
+
+                  expect(createStudioAiComicDirectorId("comic session", cryptoApi)).toBe(
+                    "comic-session-000102030405060708090a0b0c0d0e0f",
+                  );
+                });
+
+                it("uses secure random bytes when an embedded randomUUID call fails", () => {
+                  const cryptoApi: StudioAiComicDirectorCrypto = {
+                    randomUUID: () => {
+                      throw new Error("embedded browser rejection");
+                    },
+                    getRandomValues: secureBytes((bytes) => bytes.fill(255)),
+                  };
+
+                  expect(createStudioAiComicDirectorId("comic", cryptoApi)).toBe(
+                    `comic-${"ff".repeat(16)}`,
+                  );
+                });
+
+                it("fails closed when no secure randomness exists", () => {
+                  expect(() => createStudioAiComicDirectorId("comic", {})).toThrow(
+                    "Web Crypto randomness is required",
+                  );
+                });
+              });
+              ''',
+          )
+
+          stale_paths = (
+              ".github/code-scanning-open-alerts.json",
+              ".github/code-scanning-open-alerts.md",
+              ".github/workflows/code-scanning-audit-temp.yml",
+              ".github/workflows/restore-ci-after-bulk-integration.yml",
+              ".github/workflows/fix-mannequin-terminal-scale-once.yml",
+              ".github/workflows/patch-mannequin-foot-scaling.yml",
+              ".github/workflows/fix-pr1057-ci.yml",
+              ".github/workflows/character-3d-ux-patch-20260909.yml",
+              ".github/workflows/character-modeler-assets-20260909.yml",
+              ".github/workflows/apply-learn-landmark-fix.yml",
+              ".github/workflows/apply-studio-effects-workspace.yml",
+              ".github/workflows/converge-studio-security-and-ai-recovery-once.yml",
+              ".github/workflows/converge-studio-security-fast-once.yml",
+          )
+          for stale_path in stale_paths:
+              Path(stale_path).unlink(missing_ok=True)
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Verify focused security and navigation regressions
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-id.test.ts \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-id.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-id.test.ts \
+            apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx \
+            apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx
+          pnpm exec tsc -p tsconfig.json --noEmit --incremental false
+          git diff --check
+
+      - name: Commit verified convergence
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          HUSKY=0 git commit -m "fix(studio): converge security, recovery, and CI workflows"
+          HUSKY=0 git push origin HEAD:fix/studio-final-ci-convergence-20260910
