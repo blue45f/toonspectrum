@@ -24,11 +24,12 @@ describe("unified Scene3D document contract hardening", () => {
     const source = createStudioScene3dDocument("contract-test");
     const cloned: unknown = structuredClone(source);
     const mutable = cloned as DeepMutable<StudioScene3dDocumentV1>;
+    const sourcePassCount = source.output.semanticPasses.length;
 
     mutable.output.semanticPasses.push("depth");
 
-    expect(mutable.output.semanticPasses).toContain("depth");
-    expect(source.output.semanticPasses).not.toContain("depth");
+    expect(mutable.output.semanticPasses).toHaveLength(sourcePassCount + 1);
+    expect(source.output.semanticPasses).toHaveLength(sourcePassCount);
   });
 
   it("rejects unsupported render, output, environment, and duplicate pass values", () => {
