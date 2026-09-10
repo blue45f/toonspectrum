@@ -184,6 +184,7 @@ const STUDIO_CONTEXT_PREFIXES = [
   "/research",
   "/opportunities",
   "/market",
+  "/learn",
 ] as const;
 
 function matchesPathPrefix(pathname: string, prefix: string): boolean {
