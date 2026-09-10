@@ -56,6 +56,11 @@ export function StudioDrawingInputDeck(
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const right = deckSideOffset(props.mobile, props.dockInsets);
+  // The mobile workspace toggle occupies the dock's right edge. Anchor this floating
+  // launcher above the published canvas inset instead of overlapping that control.
+  const bottom = props.mobile
+    ? "calc(var(--studio-canvas-bottom-inset, 7rem) + 0.75rem)"
+    : undefined;
 
   const close = useCallback((): void => {
     setOpen(false);
@@ -80,7 +85,7 @@ export function StudioDrawingInputDeck(
           STUDIO_FOCUS_RING,
           open && "border-accent/55 bg-accent-soft text-accent"
         )}
-        style={{ right }}
+        style={{ right, bottom }}
       >
         <Activity size={15} aria-hidden="true" />
         <span className={props.mobile ? "sr-only" : undefined}>입력</span>
