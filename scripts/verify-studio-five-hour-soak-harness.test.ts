@@ -28,9 +28,9 @@ describe("Studio five-hour soak browser state isolation", () => {
     expect(open).toContain('[data-studio-mobile-editing-dock="true"]');
     expect(open).toContain('name: "브러시 설정 (굵기·색·프리셋)"');
     expect(open).toContain('page.locator("#studio-mobile-draw-settings")');
-    expect(open).toContain('sheet.locator('[data-studio-open-brush-library="true"]')');
+    expect(open).toContain(`sheet.locator('[data-studio-open-brush-library="true"]')`);
     expect(open).toContain('[data-studio-brush-library="true"]');
-    expect(open).not.toContain('dock.locator('[data-studio-open-brush-library="true"]')');
+    expect(open).not.toContain(`dock.locator('[data-studio-open-brush-library="true"]')`);
   });
 
   it("keeps mobile and desktop brush selection on their actual surfaces", () => {

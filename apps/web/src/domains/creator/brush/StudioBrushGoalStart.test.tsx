@@ -14,14 +14,12 @@ describe("StudioBrushGoalStart", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /깔끔한 선화/u })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByRole("button", { name: /그래픽 외곽선/u })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    expect(
+      screen.getByRole("button", { name: /깔끔한 선화/u }).getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen.getByRole("button", { name: /그래픽 외곽선/u }).getAttribute("aria-pressed"),
+    ).toBe("false");
   });
 
   it("opens the dry-media tip controls from the ink and pencil goal", () => {
