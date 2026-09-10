@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join, matchesGlob } from "node:path";
 
 import { describe, expect, it } from "vitest";
-import { parseCLI } from "vitest/node";
 import { parse as parseYaml } from "yaml";
 
 const repositoryRoot = new URL("../", import.meta.url);
@@ -32,16 +31,13 @@ function usesActions(job) {
 }
 
 const PLAYWRIGHT_INSTALL = "pnpm exec playwright install --with-deps chromium";
-const ROOT_SHARD_COMMAND =
-  "pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }} --testTimeout=120000";
+const ROOT_SHARD_ARGUMENT = "--shard=${{ matrix.shard }}/${{ strategy.job-total }}";
 const HEADED_PARITY_COMMAND =
   'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console';
 
 describe("database integration runner CI policy", () => {
   it.each([
     "ci.yml", "bg3d-runtime-regression.yml", "studio-ink-live-commit.yml",
-    "studio-production-integrity.yml", "character-merge-validation.yml",
-    "studio-finishing-quality.yml",
   ])(
     "runs %s for both main and the active integration branch",
     (filename) => {
@@ -79,16 +75,37 @@ describe("database integration runner CI policy", () => {
   });
 
   it.each([
-    "feedback-community-validation.yml", "studio-2d-asset-quality.yml",
-    "studio-brush-filter-stability.yml", "studio-manual.yml", "studio-mesh-sync-repair.yml",
-  ])("keeps %s enabled while its changes are integrated before main", (filename) => {
+    "marketplace-integrity.yml",
+    "marketplace-authoring.yml",
+    "studio-mesh-sync-repair.yml",
+    "character-merge-validation.yml",
+    "studio-cc0-library.yml",
+    "feedback-community-validation.yml",
+    "studio-manual.yml",
+    "studio-2d-asset-quality.yml",
+    "character-shaper-discovery-quality.yml",
+    "studio-production-integrity.yml",
+    "studio-ai-comic-director-complete.yml",
+    "studio-finishing-quality.yml",
+    "learning-quality.yml",
+    "studio-collaboration-sync.yml",
+    "studio-promo-video.yml",
+    "character-contact-naturalness.yml",
+    "studio-brush-filter-stability.yml",
+    "studio-discovery-ux.yml",
+    "creator-resources.yml",
+    "studio-vrm-asset-quality.yml",
+    "kmas-reference-library.yml",
+  ])("runs %s on initial PR validation and changed-area branch pushes", (filename) => {
     const workflow = readYaml(`.github/workflows/${filename}`);
-    const branches = ["main", "release/salvage-integration-20260908"];
-    expect(workflow.on.pull_request.branches).toEqual(branches);
-    // Extend existing main push coverage; feature-only push filters keep their original scope.
-    if (workflow.on.push?.branches?.includes("main")) {
-      expect(workflow.on.push.branches).toEqual(expect.arrayContaining(branches));
-    }
+    expect(workflow.on.pull_request.types).toEqual(["opened", "reopened", "ready_for_review"]);
+    expect(workflow.on.pull_request.paths).toEqual(workflow.on.push.paths);
+    expect(workflow.on.push.branches).toBeUndefined();
+    expect(workflow.on).toHaveProperty("workflow_dispatch");
+    expect(workflow.concurrency).toEqual({
+      group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}",
+      "cancel-in-progress": true,
+    });
   });
 
   it("reruns the ink gate when its tracked preview harness source changes", () => {
@@ -163,28 +180,23 @@ describe("database integration runner CI policy", () => {
     }
   });
 
-  it.each([1, 2, 3])("passes matrix shard %i to the actual Vitest CLI parser", (shard) => {
+  it.each([1, 2, 3, 4])("keeps matrix shard %i in the four-way root suite", (shard) => {
     const workflow = readYaml(".github/workflows/ci.yml");
-    const packageManifest = readJson("package.json");
-    const total = workflow.jobs.test.strategy.matrix.shard.length;
-    const prefix = "pnpm run test:root ";
-    const command = runCommands(workflow.jobs.test).find((run) => run.startsWith(prefix));
-    expect(command).toBeDefined();
+    const matrix = workflow.jobs.test.strategy.matrix.shard;
+    expect(matrix).toEqual([1, 2, 3, 4]);
+    expect(matrix).toContain(shard);
 
-    // pnpm 11 forwards a standalone `--` verbatim; Vitest puts everything after it in
-    // options["--"] instead of parsing --shard. Inspect the real parser, not just the YAML text.
-    const argumentsText = command.slice(prefix.length)
-      .replaceAll("${{ matrix.shard }}", String(shard))
-      .replace("${{ strategy.job-total }}", String(total));
-    const parsed = parseCLI([
-      ...packageManifest.scripts["test:root"].split(/\s+/u),
-      ...argumentsText.trim().split(/\s+/u),
-    ]);
-
-    expect(parsed.options.shard).toBe(`${shard}/${total}`);
-    expect(parsed.options.coverage).toMatchObject({ enabled: true, reportsDirectory: `coverage/shard-${shard}` });
-    expect(parsed.options["--"]).toEqual([]);
-    expect(parsed.filter).toEqual([]);
+    const step = workflow.jobs.test.steps.find(
+      (candidate) => candidate.name === "Run this shard of the root Vitest suite with per-file progress",
+    );
+    expect(step?.run).toContain(`args=(${ROOT_SHARD_ARGUMENT})`);
+    expect(step?.run).toContain(
+      'if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == "refs/heads/main" ]]; then',
+    );
+    expect(step?.run).toContain(
+      'args+=(--coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }} --testTimeout=120000)',
+    );
+    expect(step?.run).toContain('pnpm run test:root "${args[@]}"');
   });
 
   it("imports every shard's measured coverage before SonarQube analysis", () => {
@@ -217,7 +229,7 @@ describe("database integration runner CI policy", () => {
     const workflow = readYaml(".github/workflows/ci.yml");
     const sonar = readYaml(".github/workflows/sonarqube.yml");
     const steps = sonar.jobs.sonarqube.steps;
-    const guardIndex = steps.findIndex((step) => step.name === "Require all three nonempty coverage reports");
+    const guardIndex = steps.findIndex((step) => step.name === "Require all four nonempty coverage reports");
     const downloadIndex = steps.findIndex((step) => step.uses?.startsWith("actions/download-artifact@"));
     const scanIndex = steps.findIndex((step) => step.uses?.startsWith("SonarSource/sonarqube-scan-action@"));
     expect(guardIndex).toBeGreaterThan(downloadIndex);
@@ -258,7 +270,7 @@ describe("database integration runner CI policy", () => {
     const shardCommands = runCommands(shardJob);
     const serialCommands = runCommands(serialJob);
 
-    expect(shardJob?.strategy?.matrix?.shard).toEqual([1, 2, 3]);
+    expect(shardJob?.strategy?.matrix?.shard).toEqual([1, 2, 3, 4]);
     expect(shardJob?.strategy?.["fail-fast"]).toBe(false);
     expect(shardJob?.name).toBe("test (${{ matrix.shard }}/${{ strategy.job-total }})");
     expect(shardJob?.services?.postgres?.image).toBe("postgres:16-alpine");
@@ -275,7 +287,7 @@ describe("database integration runner CI policy", () => {
     // Every shard provisions and migration-proves its own database before its slice of the suite.
     const stepNames = (shardJob?.steps ?? []).map((step) => step.name);
     const shardStepIndex = (shardJob?.steps ?? []).findIndex(
-      (step) => step.run === ROOT_SHARD_COMMAND,
+      (step) => step.name === "Run this shard of the root Vitest suite with per-file progress",
     );
     expect(shardStepIndex).toBeGreaterThanOrEqual(0);
     for (const provisioningStep of [
@@ -292,9 +304,8 @@ describe("database integration runner CI policy", () => {
     expect(shardJob?.steps?.[shardStepIndex]).toMatchObject({
       name: "Run this shard of the root Vitest suite with per-file progress",
       "timeout-minutes": 20,
-      run: ROOT_SHARD_COMMAND,
     });
-    expect(shardCommands.filter((command) => command === ROOT_SHARD_COMMAND)).toHaveLength(1);
+    expect(shardJob?.steps?.[shardStepIndex]?.run).toContain(ROOT_SHARD_ARGUMENT);
 
     // The wall-clock budget pass needs a runner that is doing nothing else, then the disposable
     // Redis and workerd integrations ride the same quiet runner because each is seconds long.
@@ -302,7 +313,7 @@ describe("database integration runner CI policy", () => {
     expect(serialJob?.services).toBeUndefined();
     expect(serialJob?.strategy).toBeUndefined();
     expect(serialCommands).toEqual([
-      "pnpm install --frozen-lockfile",
+      "pnpm install --frozen-lockfile --prefer-offline",
       "pnpm run test:perf",
       "pnpm run test:redis:integration",
       "pnpm run test:cloudflare-realtime",
@@ -387,15 +398,16 @@ describe("database integration runner CI policy", () => {
 
     // The checks that used to live inside the single core job each keep their own runner.
     expect(runCommands(workflow.jobs?.lint)).toEqual([
-      "pnpm install --frozen-lockfile",
+      "pnpm install --frozen-lockfile --prefer-offline",
       "pnpm run audit:security",
       "pnpm run validate:architecture",
       "pnpm run verify:csp",
       "pnpm run verify:toolchain-coverage",
+      "python3 scripts/verify-pr-workflow-fanout.py",
       "pnpm run lint",
     ]);
     expect(runCommands(workflow.jobs?.typecheck)).toEqual([
-      "pnpm install --frozen-lockfile",
+      "pnpm install --frozen-lockfile --prefer-offline",
       "pnpm run typecheck",
       "pnpm run typecheck:cloudflare-realtime",
     ]);
@@ -446,7 +458,7 @@ describe("database integration runner CI policy", () => {
     const checkout = paritySteps.find((step) => step.uses === "actions/checkout@v6");
     expect(checkout?.with?.["persist-credentials"]).toBe(false);
 
-    const installIndex = parityCommands.indexOf("pnpm install --frozen-lockfile");
+    const installIndex = parityCommands.indexOf("pnpm install --frozen-lockfile --prefer-offline");
     const browserInstallIndex = parityCommands.indexOf(PLAYWRIGHT_INSTALL);
     const buildIndex = parityCommands.indexOf("pnpm run build:bundle");
     const parityIndex = parityCommands.indexOf(HEADED_PARITY_COMMAND);
@@ -535,7 +547,7 @@ describe("database integration runner CI policy", () => {
     for (const job of [routeJob, featureJob]) {
       const checkout = (job?.steps ?? []).find((step) => step.uses === "actions/checkout@v6");
       expect(checkout?.with?.["persist-credentials"]).toBe(false);
-      expect(job?.needs).toBeUndefined();
+      expect(job?.needs).toBe("core");
     }
 
     // Every browser gate serves the same dist the tsc-inclusive `build` job produces; only the

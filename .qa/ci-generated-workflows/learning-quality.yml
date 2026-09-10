@@ -1,0 +1,61 @@
+name: Learning quality
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    branches: [main]
+    paths: ['apps/web/src/domains/learn/**', 'e2e/learn*.spec.ts', 'tsconfig.learning.json', '.github/workflows/learning-quality.yml', 'apps/web/src/domains/creator/studio-impasto-relief-shading-v1*.ts']
+  push:
+    paths: ['apps/web/src/domains/learn/**', 'e2e/learn*.spec.ts', 'tsconfig.learning.json', '.github/workflows/learning-quality.yml', 'apps/web/src/domains/creator/studio-impasto-relief-shading-v1*.ts']
+
+  workflow_dispatch:
+permissions:
+  contents: read
+
+# main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
+# cancel-in-progress 가 취소할 대상을 갖지 못한다.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  learning-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      VITE_CATALOG_SOURCE: static
+      PLAYWRIGHT_CHANNEL: ''
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm exec tsc -p tsconfig.learning.json
+      - run: pnpm exec eslint apps/web/src/domains/learn e2e/learn.spec.ts e2e/learn-resilience.spec.ts e2e/learn-guided-lessons.spec.ts apps/web/src/domains/creator/studio-impasto-relief-shading-v1.ts apps/web/src/domains/creator/studio-impasto-relief-shading-v1.light-constants.test.ts --max-warnings=0
+      # Directory discovery includes the accessibility suite instead of silently omitting it.
+      - name: Learning and shading output regressions
+        run: pnpm exec vitest run apps/web/src/domains/learn apps/web/src/domains/creator/studio-impasto-relief-shading-v1.light-constants.test.ts
+      # Full performance budgets run once in CI/core's isolated serial lane. Repeating them here
+      # both consumes a runner and makes wall-clock assertions compete with browser work.
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install-deps chromium
+      - run: pnpm exec playwright test e2e/learn.spec.ts e2e/learn-resilience.spec.ts e2e/learn-guided-lessons.spec.ts
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: learning-browser-evidence
+          path: test-results/
+          if-no-files-found: ignore

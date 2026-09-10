@@ -1,0 +1,110 @@
+name: Marketplace authoring
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    paths:
+      - "apps/web/src/shared/lib/creator-marketplace-authoring-workshop*"
+      - "apps/web/src/domains/market/**"
+      - "apps/web/src/domains/creator/MarketplaceBrush*"
+      - "apps/web/src/domains/creator/**/StudioBrushStudio.tsx"
+      - "e2e/marketplace-authoring-*.spec.ts"
+      - "marketplace-benchmark/**"
+      - ".github/workflows/marketplace-authoring.yml"
+  push:
+    paths:
+      - "apps/web/src/shared/lib/creator-marketplace-authoring-workshop*"
+      - "apps/web/src/domains/market/**"
+      - "apps/web/src/domains/creator/MarketplaceBrush*"
+      - "apps/web/src/domains/creator/**/StudioBrushStudio.tsx"
+      - "e2e/marketplace-authoring-*.spec.ts"
+      - ".github/workflows/marketplace-authoring.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Authoring contract and component tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/shared/lib/creator-marketplace-authoring-workshop.test.ts
+          apps/web/src/domains/market/components/MarketplaceAuthoringWorkshop.test.tsx
+          apps/web/src/domains/market/components/MarketplaceBrushRecipeAccelerator.test.tsx
+          --reporter=default
+      - name: Focused authoring lint
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/shared/lib/creator-marketplace-authoring-workshop.ts
+          apps/web/src/shared/lib/creator-marketplace-authoring-workshop.test.ts
+          apps/web/src/domains/market/components/MarketplaceAuthoringWorkshop.tsx
+          apps/web/src/domains/market/components/MarketplaceBrushRecipeAccelerator.tsx
+      - name: Explain global gate ownership
+        run: |
+          echo 'Repository-wide typecheck, lint and production build are owned once by required CI/core.'
+
+  chromium:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install-deps chromium
+      - name: Chromium desktop, mobile and in-app authoring
+        run: >-
+          xvfb-run -a --server-args="-screen 0 1920x1200x24"
+          pnpm exec playwright test
+          e2e/marketplace-authoring-workshop.spec.ts
+          e2e/marketplace-authoring-inapp.spec.ts
+          --project=chromium
+          --reporter=line
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: marketplace-authoring-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,115 @@
+name: Studio VRM asset quality
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/studio-vrm-asset-quality.yml"
+      - "apps/web/public/assets/3d/characters/**"
+      - "apps/web/public/vrm/**"
+      - "apps/web/src/domains/creator/vrm/**"
+      - "scripts/generate-vrm-model-technical-denylist.ts"
+      - "scripts/generate-vrm-thumbnail-technical-denylist.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  push:
+    paths:
+      - ".github/workflows/studio-vrm-asset-quality.yml"
+      - "apps/web/public/assets/3d/characters/**"
+      - "apps/web/public/vrm/**"
+      - "apps/web/src/domains/creator/vrm/**"
+      - "scripts/generate-vrm-model-technical-denylist.ts"
+      - "scripts/generate-vrm-thumbnail-technical-denylist.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          lfs: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Reproduce thumbnail and model admission evidence
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          pnpm exec tsx scripts/generate-vrm-thumbnail-technical-denylist.ts
+          pnpm exec tsx scripts/generate-vrm-model-technical-denylist.ts
+          git diff --exit-code -- \
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-technical-denylist.generated.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-model-technical-denylist.generated.ts
+
+      - name: Run focused VRM quality tests
+        run: |
+          set -euo pipefail
+          tests=(
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-security.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-production-thumbnail-files.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-integration.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts
+            apps/web/src/domains/creator/vrm/vrm-library.test.ts
+          )
+          if [[ -f apps/web/src/domains/creator/vrm/studio-vrm-production-catalog.test.ts ]]; then
+            tests+=(apps/web/src/domains/creator/vrm/studio-vrm-production-catalog.test.ts)
+          fi
+          pnpm exec vitest run "${tests[@]}"
+
+      - name: Lint and validate architecture
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored \
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-security.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-production-thumbnail-files.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-integration.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-technical-denylist.generated.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-model-technical-denylist.generated.ts \
+            apps/web/src/domains/creator/vrm/vrm-library.ts \
+            scripts/generate-vrm-thumbnail-technical-denylist.ts \
+            scripts/generate-vrm-model-technical-denylist.ts
+          node scripts/validate-architecture.mjs
+
+      - name: Typecheck and production build
+        run: |
+          set -euo pipefail
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm build
+
+      - name: Upload exact asset audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-vrm-asset-quality-${{ github.run_id }}
+          path: artifacts/studio-vrm-*-quality-report.json
+          if-no-files-found: warn
+          retention-days: 14

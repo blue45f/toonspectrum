@@ -1,0 +1,89 @@
+name: Character merge validation
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    branches: [main, release/salvage-integration-20260908]
+    paths:
+      - 'scripts/check-studio-bundle.mjs'
+      - 'scripts/lib/studio-crdt-bundle-boundary*'
+      - 'scripts/lib/repo-paths.mjs'
+      - 'scripts/integration-test-runner-ci-policy.test.mjs'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - ".github/workflows/character-merge-validation.yml"
+      - "apps/web/src/domains/creator/vrm/**"
+      - "apps/web/src/domains/creator/character-shaper/**"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts*"
+      - "apps/web/src/domains/creator/studio-router/studio-route-manifest*"
+      - "scripts/verify-character-contact-naturalness.mjs"
+  push:
+    paths:
+      - 'scripts/check-studio-bundle.mjs'
+      - 'scripts/lib/studio-crdt-bundle-boundary*'
+      - 'scripts/lib/repo-paths.mjs'
+      - 'scripts/integration-test-runner-ci-policy.test.mjs'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - ".github/workflows/character-merge-validation.yml"
+      - "apps/web/src/domains/creator/vrm/**"
+      - "apps/web/src/domains/creator/character-shaper/**"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts*"
+      - "apps/web/src/domains/creator/studio-router/studio-route-manifest*"
+      - "scripts/verify-character-contact-naturalness.mjs"
+
+  workflow_dispatch:
+permissions:
+  contents: read
+
+# main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
+# cancel-in-progress 가 취소할 대상을 갖지 못한다.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  character-merge-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    # Repository-wide lint/typecheck/build are executed once by required CI/core.
+    # This lane keeps character-specific math, routes, regressions and bundle proof.
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Check camera compiler and import rules
+        run: pnpm exec eslint --max-warnings=0 apps/web/src/domains/creator/vrm/StudioVrmCameraDirector.tsx apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx
+      - name: Verify contact naturalness against production math
+        run: node --experimental-strip-types --test scripts/verify-character-contact-naturalness.mjs
+      - name: Run character, hand, contact, framing and route regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/vrm/studio-vrm-hand-poses.test.ts \
+            apps/web/src/domains/creator/vrm/useStudioVrmPoserPoseEdit.hand.test.ts \
+            apps/web/src/domains/creator/character-shaper/character-shaper-hand-glyph.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-preview-framing.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-secondary-hand-contact.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-contact-refinement.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-portrait-framing.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-prop-rig.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-prop-grip-contact.test.ts \
+            apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx \
+            apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
+      - name: Build production assets without repeating the core typecheck
+        run: pnpm run build:bundle
+      - name: Verify Studio bundle budget
+        run: pnpm run check:studio-bundle
