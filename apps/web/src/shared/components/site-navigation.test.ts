@@ -83,15 +83,19 @@ describe("site navigation information architecture", () => {
     expect(siteNavigationContextForPath("/studio/canvas")).toBe("studio");
     expect(siteNavigationContextForPath("/studio/assets/brushes/new")).toBe("studio");
     expect(siteNavigationContextForPath("/learn/webtoon")).toBe("studio");
+    expect(siteNavigationContextForPath("/help")).toBe("studio");
+    expect(siteNavigationContextForPath("/help/getting-started")).toBe("studio");
     expect(siteNavigationContextForPath("/market")).toBe("studio");
     expect(siteNavigationContextForPath("/discover")).toBe("spectrum");
     expect(siteNavigationContextForPath("/community")).toBe("spectrum");
 
     expect(primarySiteNavigationForPath("/studio")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
+    expect(primarySiteNavigationForPath("/help")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
     expect(primarySiteNavigationForPath("/discover")).toBe(TOONSPECTRUM_PRIMARY_NAVIGATION);
     expect(siteNavigationGroupsForPath("/studio")).toBe(TOONSTUDIO_NAVIGATION_GROUPS);
     expect(siteNavigationGroupsForPath("/discover")).toBe(TOONSPECTRUM_NAVIGATION_GROUPS);
     expect(mobileSiteTabsForPath("/studio")).toBe(TOONSTUDIO_MOBILE_TABS);
+    expect(mobileSiteTabsForPath("/help")).toBe(TOONSTUDIO_MOBILE_TABS);
     expect(mobileSiteTabsForPath("/discover")).toBe(TOONSPECTRUM_MOBILE_TABS);
   });
 
@@ -122,7 +126,7 @@ describe("site navigation information architecture", () => {
 
   it("provides complete Korean and English labels for every destination", () => {
     for (const item of Object.values(SITE_NAVIGATION_ITEMS)) {
-      expect(item.href).toMatch(/^\//);
+      expect(item.href).toMatch(/^\//u);
       expect(siteNavigationText(item.label, "ko-KR").length).toBeGreaterThan(0);
       expect(siteNavigationText(item.label, "en-US").length).toBeGreaterThan(0);
       expect(siteNavigationText(item.description, "ko").length).toBeGreaterThan(0);
