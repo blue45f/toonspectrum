@@ -16,6 +16,8 @@ jobs:
   materialize:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
