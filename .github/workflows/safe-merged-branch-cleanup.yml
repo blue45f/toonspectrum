@@ -1,4 +1,4 @@
-name: Safe merged branch cleanup
+name: Curated superseded branch prune
 
 on:
   pull_request:
@@ -17,322 +17,344 @@ permissions:
   actions: read
 
 concurrency:
-  group: safe-merged-branch-cleanup-${{ github.event.pull_request.number }}
+  group: curated-superseded-branch-prune-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
-  cleanup:
+  prune:
     if: >-
       github.repository == 'blue45f/toonspectrum' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.head_ref == 'ops/safe-merged-branch-cleanup-20260910'
+      github.head_ref == 'ops/curated-superseded-branch-prune-20260910-1637'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
-      DEFAULT_BRANCH: main
-      EXECUTE: "true"
       PR_NUMBER: ${{ github.event.pull_request.number }}
       HEAD_BRANCH: ${{ github.head_ref }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
-      - name: Audit and delete only fully merged branches
+      - name: Delete only exact closed and superseded refs
         shell: bash
         run: |
           set -Eeuo pipefail
 
           owner="${REPO%%/*}"
-          default_branch="$DEFAULT_BRANCH"
-          execute="${EXECUTE:-false}"
-          workdir="$RUNNER_TEMP/safe-branch-cleanup"
+          workdir="$RUNNER_TEMP/curated-superseded-branch-prune"
           mkdir -p "$workdir"
 
-          branches_json="$workdir/branches.json"
-          open_prs_json="$workdir/open-prs.json"
-          candidates="$workdir/candidates.tsv"
-          skipped="$workdir/skipped.tsv"
+          candidates="$workdir/candidates.json"
           results="$workdir/results.tsv"
           report="$workdir/report.md"
-
-          : > "$candidates"
-          : > "$skipped"
           : > "$results"
 
-          gh api "repos/$REPO/branches?per_page=100" > "$branches_json"
-          branch_count="$(jq 'length' "$branches_json")"
-          if (( branch_count >= 100 )); then
-            echo "Safety stop: branch listing may be paginated ($branch_count entries)." >&2
+          cat > "$candidates" <<'JSON'
+          [
+            {
+              "branch": "fix/studio-final-stability-20260910",
+              "sha": "7fd1ec37153666eebb63102beabe272983f953a9",
+              "sourcePr": 1237,
+              "mode": "no_diff",
+              "replacements": [],
+              "needles": ["변경 파일이 0개", "제품 변경이나 추가 검증 자산이 없"]
+            },
+            {
+              "branch": "fix/studio-ai-reference-navigation-main-20260910-v2",
+              "sha": "07faad1df89d8672a84802aa450d41ae437c3d13",
+              "sourcePr": 1216,
+              "mode": "replacement",
+              "replacements": [1210],
+              "needles": ["PR #1210", "추가 제품 변경은 없습니다"]
+            },
+            {
+              "branch": "fix/studio-ai-reference-navigation-20260910",
+              "sha": "513e0934c29647050f6765ece9968bbab0cd511e",
+              "sourcePr": 1203,
+              "mode": "replacement",
+              "replacements": [1210],
+              "needles": ["#1210으로 재구성", "실제 제품 변경"]
+            },
+            {
+              "branch": "chore/retire-scene3d-one-shot-materializers-20260910",
+              "sha": "9e344e0c0683d12b6a259365cc9d0bc197a23902",
+              "sourcePr": 1202,
+              "mode": "replacement",
+              "replacements": [1200],
+              "needles": ["#1200에 이미 있습니다", "제품 코드 및 상설 품질 게이트 변경 없음"]
+            },
+            {
+              "branch": "chore/cleanup-retired-one-shot-workflows-20260910",
+              "sha": "bcba27717fabf946a66a7bd9304f5c5f3fb59f2b",
+              "sourcePr": 1199,
+              "mode": "replacement",
+              "replacements": [1197, 1200],
+              "needles": ["superseded by #1197", "two remaining Scene3D"]
+            },
+            {
+              "branch": "fix/studio-full-stability-convergence-20260910",
+              "sha": "78aea9c0d42d3a66e3ff0a250e33b828f7bcb3aa",
+              "sourcePr": 1195,
+              "mode": "replacement",
+              "replacements": [1192, 1193],
+              "needles": ["#1192 / #1193", "유일한 잔여 diff"]
+            },
+            {
+              "branch": "fix/studio-status-notice-save-center-stacking-v2-20260910",
+              "sha": "9814f13d89378f15255756184d62abeed8c90ebf",
+              "sourcePr": 1196,
+              "mode": "replacement",
+              "replacements": [1192],
+              "needles": ["#1192", "No unique product change remains here"]
+            },
+            {
+              "branch": "fix/bg3d-atomic-template-switch-main-20260910",
+              "sha": "9e2eef9928e0ade44aaba0d295df61fb1e023ff9",
+              "sourcePr": 1168,
+              "mode": "replacement",
+              "replacements": [1157],
+              "needles": ["#1157", "남은 고유 파일은 일회성 복구 workflow"]
+            },
+            {
+              "branch": "fix/vrm-preview-thumbnail-stability-20260910",
+              "sha": "5c4e18e1fa6deb65167d189e85f34c4dbce32fc4",
+              "sourcePr": 1175,
+              "mode": "replacement",
+              "replacements": [1161],
+              "needles": ["#1161", "유일한 변경은"]
+            },
+            {
+              "branch": "fix/studio-brush-worker-recovery-20260910",
+              "sha": "176464fc24287d376a0220398f0aefca362486b5",
+              "sourcePr": 1149,
+              "mode": "replacement",
+              "replacements": [1152],
+              "needles": ["PR #1152", "오래된 기준 커밋의 중복본"]
+            },
+            {
+              "branch": "fix/production-build-and-cleanup-safety-20260910",
+              "sha": "143ea89188558cc5394d133ea69bb52acb3f14a0",
+              "sourcePr": 1147,
+              "mode": "replacement",
+              "replacements": [1150],
+              "needles": ["fix/production-build-and-cleanup-safety-v2-20260910", "product type fixes are preserved"]
+            }
+          ]
+          JSON
+
+          candidate_count="$(jq 'length' "$candidates")"
+          if (( candidate_count < 1 || candidate_count > 20 )); then
+            echo "Safety stop: unexpected candidate count $candidate_count" >&2
             exit 1
           fi
 
-          gh api "repos/$REPO/pulls?state=open&per_page=100" > "$open_prs_json"
-          open_pr_count="$(jq 'length' "$open_prs_json")"
-          if (( open_pr_count >= 100 )); then
-            echo "Safety stop: open PR listing may be paginated ($open_pr_count entries)." >&2
+          repo_json="$workdir/repository.json"
+          gh api "repos/$REPO" > "$repo_json"
+          default_branch="$(jq -r '.default_branch // ""' "$repo_json")"
+          if [[ "$default_branch" != "main" ]]; then
+            echo "Safety stop: default branch changed to '$default_branch'" >&2
             exit 1
           fi
 
-          default_sha="$(
-            jq -r --arg branch "$default_branch" \
-              '.[] | select(.name == $branch) | .commit.sha' "$branches_json"
-          )"
-          if [[ -z "$default_sha" || "$default_sha" == "null" ]]; then
-            echo "Safety stop: default branch SHA could not be resolved." >&2
-            exit 1
-          fi
-
-          declare -A open_heads=()
-          while IFS=$'\t' read -r head_repo head_ref; do
-            if [[ "$head_repo" == "$REPO" && -n "$head_ref" ]]; then
-              open_heads["$head_ref"]=1
-            fi
-          done < <(
-            jq -r '.[] | [(.head.repo.full_name // ""), .head.ref] | @tsv' "$open_prs_json"
-          )
-
-          record_skip() {
-            printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$skipped"
+          record() {
+            printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" >> "$results"
           }
 
-          while IFS=$'\t' read -r branch sha protected; do
-            if [[ "$branch" == "$default_branch" ]]; then
-              record_skip "$branch" "$sha" "default_branch"
-              continue
-            fi
+          branch_endpoint() {
+            jq -rn --arg value "$1" '$value | @uri'
+          }
 
-            case "$branch" in
-              chore/*|dependabot/*|feat/*|fix/*|integrate/*|ops/*|recover/*|renovate/*|safety/*|test/*|validate/*)
-                ;;
-              *)
-                record_skip "$branch" "$sha" "non_ephemeral_name"
-                continue
-                ;;
-            esac
-
-            if [[ "$protected" == "true" ]]; then
-              record_skip "$branch" "$sha" "protected_branch"
-              continue
-            fi
-
-            if [[ -n "${open_heads[$branch]:-}" ]]; then
-              record_skip "$branch" "$sha" "open_pull_request"
-              continue
-            fi
-
-            prs_json="$workdir/prs-$(printf '%s' "$branch" | sha256sum | cut -d' ' -f1).json"
-            if ! gh api -X GET "repos/$REPO/pulls" \
-              -f state=closed \
-              -f head="$owner:$branch" \
-              -f per_page=100 > "$prs_json"; then
-              record_skip "$branch" "$sha" "merged_pr_lookup_failed"
-              continue
-            fi
-
-            if (( $(jq 'length' "$prs_json") >= 100 )); then
-              record_skip "$branch" "$sha" "merged_pr_history_may_be_paginated"
-              continue
-            fi
-
-            match="$(
-              jq -r \
-                --arg sha "$sha" \
-                --arg repo "$REPO" \
-                '[
-                  .[]
-                  | select(
-                      .merged_at != null
-                      and .head.sha == $sha
-                      and (.head.repo.full_name // "") == $repo
-                      and (.merge_commit_sha // "") != ""
-                    )
-                ]
-                | sort_by(.merged_at)
-                | last
-                | [(.number // ""), (.merge_commit_sha // ""), (.base.ref // "")]
-                | @tsv' "$prs_json"
-            )"
-
-            IFS=$'\t' read -r pr_number merge_commit_sha pr_base <<< "$match"
-            if [[ -z "$pr_number" || -z "$merge_commit_sha" ]]; then
-              record_skip "$branch" "$sha" "no_exact_merged_pr_head"
-              continue
-            fi
-
-            compare_json="$workdir/compare-pr-$pr_number.json"
-            if ! gh api "repos/$REPO/compare/$default_sha...$merge_commit_sha" > "$compare_json"; then
-              record_skip "$branch" "$sha" "merge_commit_compare_failed"
-              continue
-            fi
-
-            merge_ahead="$(jq -r '.ahead_by // -1' "$compare_json")"
-            if [[ "$merge_ahead" != "0" ]]; then
-              record_skip "$branch" "$sha" "merged_pr_not_reachable_from_main"
-              continue
-            fi
-
-            printf '%s\t%s\t%s\t%s\t%s\n' \
-              "$branch" "$sha" "$pr_number" "$merge_commit_sha" "$pr_base" >> "$candidates"
-          done < <(
-            jq -r '.[] | [.name, .commit.sha, (.protected | tostring)] | @tsv' "$branches_json"
-          )
-
-          candidate_count="$(wc -l < "$candidates" | tr -d ' ')"
-          if (( candidate_count > 100 )); then
-            echo "Safety stop: candidate count $candidate_count exceeds the hard limit." >&2
-            exit 1
-          fi
-
-          deleted_count=0
-          audit_only_count=0
-          race_skipped_count=0
-          failed_count=0
-
-          while IFS=$'\t' read -r branch expected_sha pr_number merge_commit_sha pr_base; do
-            [[ -n "$branch" ]] || continue
-
-            branch_encoded="$(jq -rn --arg value "$branch" '$value | @uri')"
-            current_branch_json="$workdir/current-$(printf '%s' "$branch" | sha256sum | cut -d' ' -f1).json"
-            if ! gh api "repos/$REPO/branches/$branch_encoded" > "$current_branch_json"; then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "skipped" "branch_missing_before_delete" "$pr_number" >> "$results"
-              ((race_skipped_count += 1))
-              continue
-            fi
-
-            current_sha="$(jq -r '.commit.sha // ""' "$current_branch_json")"
-            current_protected="$(jq -r '.protected // true' "$current_branch_json")"
-            if [[ "$current_sha" != "$expected_sha" ]]; then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "skipped" "head_sha_changed" "$pr_number" >> "$results"
-              ((race_skipped_count += 1))
-              continue
-            fi
-            if [[ "$current_protected" == "true" ]]; then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "skipped" "became_protected" "$pr_number" >> "$results"
-              ((race_skipped_count += 1))
-              continue
-            fi
-
-            open_now_json="$workdir/open-now-$(printf '%s' "$branch" | sha256sum | cut -d' ' -f1).json"
-            if ! gh api -X GET "repos/$REPO/pulls" \
+          open_pr_count() {
+            local filter_name="$1"
+            local branch="$2"
+            gh api -X GET "repos/$REPO/pulls" \
               -f state=open \
-              -f head="$owner:$branch" \
-              -f per_page=1 > "$open_now_json"; then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "skipped" "open_pr_recheck_failed" "$pr_number" >> "$results"
-              ((race_skipped_count += 1))
-              continue
+              -f "$filter_name=$branch" \
+              -f per_page=1 \
+              --jq 'length'
+          }
+
+          replacement_is_on_main() {
+            local replacement_pr="$1"
+            local default_sha="$2"
+            local replacement_json="$workdir/replacement-$replacement_pr.json"
+            local compare_json="$workdir/replacement-$replacement_pr-reachability.json"
+
+            gh api "repos/$REPO/pulls/$replacement_pr" > "$replacement_json"
+            local merged_at merge_sha replacement_base replacement_repo
+            merged_at="$(jq -r '.merged_at // ""' "$replacement_json")"
+            merge_sha="$(jq -r '.merge_commit_sha // ""' "$replacement_json")"
+            replacement_base="$(jq -r '.base.ref // ""' "$replacement_json")"
+            replacement_repo="$(jq -r '.head.repo.full_name // ""' "$replacement_json")"
+            if [[ -z "$merged_at" || ! "$merge_sha" =~ ^[0-9a-f]{40}$ || "$replacement_base" != "$default_branch" || "$replacement_repo" != "$REPO" ]]; then
+              return 1
             fi
-            if (( $(jq 'length' "$open_now_json") > 0 )); then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "skipped" "new_open_pull_request" "$pr_number" >> "$results"
-              ((race_skipped_count += 1))
+
+            gh api "repos/$REPO/compare/$default_sha...$merge_sha" > "$compare_json"
+            [[ "$(jq -r '.ahead_by // -1' "$compare_json")" == "0" ]]
+          }
+
+          while IFS= read -r candidate; do
+            branch="$(jq -r '.branch' <<< "$candidate")"
+            expected_sha="$(jq -r '.sha' <<< "$candidate")"
+            source_pr="$(jq -r '.sourcePr' <<< "$candidate")"
+            mode="$(jq -r '.mode' <<< "$candidate")"
+            encoded_branch="$(branch_endpoint "$branch")"
+
+            if [[ "$branch" == "$default_branch" || "$branch" == "$HEAD_BRANCH" || ! "$expected_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              record "$branch" "$expected_sha" "preserved" "invalid_or_reserved_candidate" "$source_pr"
               continue
             fi
 
-            active_runs_json="$workdir/runs-$(printf '%s' "$branch" | sha256sum | cut -d' ' -f1).json"
-            if ! gh api -X GET "repos/$REPO/actions/runs" \
-              -f branch="$branch" \
-              -f per_page=20 > "$active_runs_json"; then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "skipped" "workflow_run_recheck_failed" "$pr_number" >> "$results"
-              ((race_skipped_count += 1))
+            branch_json="$workdir/branch-$(printf '%s' "$branch" | sha256sum | cut -d' ' -f1).json"
+            if ! gh api "repos/$REPO/branches/$encoded_branch" > "$branch_json" 2>/dev/null; then
+              record "$branch" "$expected_sha" "preserved" "already_missing" "$source_pr"
               continue
             fi
-            if (( $(jq '[.workflow_runs[] | select(.status != "completed")] | length' "$active_runs_json") > 0 )); then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "skipped" "active_workflow_run" "$pr_number" >> "$results"
-              ((race_skipped_count += 1))
+
+            current_sha="$(jq -r '.commit.sha // ""' "$branch_json")"
+            protected="$(jq -r '.protected // true' "$branch_json")"
+            if [[ "$current_sha" != "$expected_sha" ]]; then
+              record "$branch" "$expected_sha" "preserved" "head_sha_changed:$current_sha" "$source_pr"
+              continue
+            fi
+            if [[ "$protected" == "true" ]]; then
+              record "$branch" "$expected_sha" "preserved" "protected_branch" "$source_pr"
+              continue
+            fi
+
+            head_query="$owner:$branch"
+            if (( $(open_pr_count head "$head_query") > 0 )); then
+              record "$branch" "$expected_sha" "preserved" "open_pull_request_head" "$source_pr"
+              continue
+            fi
+            if (( $(open_pr_count base "$branch") > 0 )); then
+              record "$branch" "$expected_sha" "preserved" "open_pull_request_base" "$source_pr"
+              continue
+            fi
+
+            source_json="$workdir/source-pr-$source_pr.json"
+            gh api "repos/$REPO/pulls/$source_pr" > "$source_json"
+            source_state="$(jq -r '.state // ""' "$source_json")"
+            source_merged="$(jq -r '.merged_at // ""' "$source_json")"
+            source_base="$(jq -r '.base.ref // ""' "$source_json")"
+            source_head="$(jq -r '.head.ref // ""' "$source_json")"
+            source_head_sha="$(jq -r '.head.sha // ""' "$source_json")"
+            source_repo="$(jq -r '.head.repo.full_name // ""' "$source_json")"
+            if [[ "$source_state" != "closed" || -n "$source_merged" || "$source_base" != "$default_branch" || "$source_head" != "$branch" || "$source_head_sha" != "$expected_sha" || "$source_repo" != "$REPO" ]]; then
+              record "$branch" "$expected_sha" "preserved" "source_pr_identity_or_state_changed" "$source_pr"
+              continue
+            fi
+
+            source_text="$(jq -r '[.title // "", .body // ""] | join("\n")' "$source_json")"
+            proof_ok=true
+            while IFS= read -r needle; do
+              [[ -n "$needle" ]] || continue
+              if ! grep -Fq -- "$needle" <<< "$source_text"; then
+                proof_ok=false
+                break
+              fi
+            done < <(jq -r '.needles[]' <<< "$candidate")
+            if [[ "$proof_ok" != "true" ]]; then
+              record "$branch" "$expected_sha" "preserved" "source_pr_proof_changed" "$source_pr"
               continue
             fi
 
             current_default_sha="$(gh api "repos/$REPO/branches/$default_branch" --jq '.commit.sha')"
-            reachability_json="$workdir/reach-$pr_number.json"
-            if ! gh api "repos/$REPO/compare/$current_default_sha...$merge_commit_sha" > "$reachability_json"; then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "skipped" "reachability_recheck_failed" "$pr_number" >> "$results"
-              ((race_skipped_count += 1))
-              continue
-            fi
-            if [[ "$(jq -r '.ahead_by // -1' "$reachability_json")" != "0" ]]; then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "skipped" "merge_commit_no_longer_on_main" "$pr_number" >> "$results"
-              ((race_skipped_count += 1))
-              continue
-            fi
-
-            if [[ "$execute" != "true" ]]; then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "eligible" "audit_only" "$pr_number" >> "$results"
-              ((audit_only_count += 1))
-              continue
-            fi
-
-            if gh api --method DELETE "repos/$REPO/git/refs/heads/$branch"; then
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "deleted" "exact_merged_pr_head" "$pr_number" >> "$results"
-              ((deleted_count += 1))
+            if [[ "$mode" == "no_diff" ]]; then
+              changed_files="$(jq -r '.changed_files // -1' "$source_json")"
+              additions="$(jq -r '.additions // -1' "$source_json")"
+              deletions="$(jq -r '.deletions // -1' "$source_json")"
+              if [[ "$changed_files" != "0" || "$additions" != "0" || "$deletions" != "0" ]]; then
+                record "$branch" "$expected_sha" "preserved" "source_pr_no_longer_empty" "$source_pr"
+                continue
+              fi
+            elif [[ "$mode" == "replacement" ]]; then
+              replacements_ok=true
+              while IFS= read -r replacement_pr; do
+                [[ -n "$replacement_pr" ]] || continue
+                if ! replacement_is_on_main "$replacement_pr" "$current_default_sha"; then
+                  replacements_ok=false
+                  break
+                fi
+              done < <(jq -r '.replacements[]' <<< "$candidate")
+              if [[ "$replacements_ok" != "true" ]]; then
+                record "$branch" "$expected_sha" "preserved" "replacement_not_merged_on_current_main" "$source_pr"
+                continue
+              fi
             else
-              printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$branch" "$expected_sha" "failed" "delete_api_failed" "$pr_number" >> "$results"
-              ((failed_count += 1))
+              record "$branch" "$expected_sha" "preserved" "unknown_proof_mode" "$source_pr"
+              continue
             fi
-          done < "$candidates"
+
+            active_runs_json="$workdir/runs-$(printf '%s' "$branch" | sha256sum | cut -d' ' -f1).json"
+            if ! gh api -X GET "repos/$REPO/actions/runs" -f branch="$branch" -f per_page=100 > "$active_runs_json"; then
+              record "$branch" "$expected_sha" "preserved" "workflow_run_lookup_failed" "$source_pr"
+              continue
+            fi
+            if (( $(jq '[.workflow_runs[] | select(.status != "completed")] | length' "$active_runs_json") > 0 )); then
+              record "$branch" "$expected_sha" "preserved" "active_workflow_run" "$source_pr"
+              continue
+            fi
+
+            final_branch_json="$workdir/final-branch-$(printf '%s' "$branch" | sha256sum | cut -d' ' -f1).json"
+            if ! gh api "repos/$REPO/branches/$encoded_branch" > "$final_branch_json" 2>/dev/null; then
+              record "$branch" "$expected_sha" "preserved" "missing_during_final_recheck" "$source_pr"
+              continue
+            fi
+            final_sha="$(jq -r '.commit.sha // ""' "$final_branch_json")"
+            final_protected="$(jq -r '.protected // true' "$final_branch_json")"
+            if [[ "$final_sha" != "$expected_sha" || "$final_protected" == "true" ]]; then
+              record "$branch" "$expected_sha" "preserved" "changed_during_final_recheck" "$source_pr"
+              continue
+            fi
+            if (( $(open_pr_count head "$head_query") > 0 || $(open_pr_count base "$branch") > 0 )); then
+              record "$branch" "$expected_sha" "preserved" "new_open_pull_request" "$source_pr"
+              continue
+            fi
+
+            if gh api --method DELETE "repos/$REPO/git/refs/heads/$branch" >/dev/null; then
+              record "$branch" "$expected_sha" "deleted" "$mode" "$source_pr"
+            else
+              record "$branch" "$expected_sha" "failed" "delete_api_failed" "$source_pr"
+            fi
+          done < <(jq -c '.[]' "$candidates")
+
+          deleted_count="$(awk -F '\t' '$3 == "deleted" { count += 1 } END { print count + 0 }' "$results")"
+          preserved_count="$(awk -F '\t' '$3 == "preserved" { count += 1 } END { print count + 0 }' "$results")"
+          failed_count="$(awk -F '\t' '$3 == "failed" { count += 1 } END { print count + 0 }' "$results")"
 
           {
-            echo "# Safe merged branch cleanup"
+            echo "# Curated superseded branch prune"
             echo
             echo "- Repository: \`$REPO\`"
             echo "- Default branch: \`$default_branch\`"
-            echo "- Default branch snapshot: \`$default_sha\`"
-            echo "- Mode: \`$([[ "$execute" == "true" ]] && echo execute || echo audit-only)\`"
-            echo "- Branches inspected: \`$branch_count\`"
-            echo "- Exact merged candidates: \`$candidate_count\`"
+            echo "- Candidates: \`$candidate_count\`"
             echo "- Deleted: \`$deleted_count\`"
-            echo "- Eligible in audit-only mode: \`$audit_only_count\`"
-            echo "- Race/safety skips: \`$race_skipped_count\`"
+            echo "- Preserved by safety checks: \`$preserved_count\`"
             echo "- Delete failures: \`$failed_count\`"
             echo
-            echo "## Results"
-            echo
-            echo "| Branch | Expected SHA | Decision | Evidence | PR |"
+            echo "| Branch | Expected SHA | Decision | Evidence | Source PR |"
             echo "|---|---|---|---|---|"
-            while IFS=$'\t' read -r branch sha decision evidence pr_number; do
+            while IFS=$'\t' read -r branch sha decision evidence source_pr; do
               [[ -n "$branch" ]] || continue
-              echo "| \`$branch\` | \`${sha:0:12}\` | $decision | $evidence | #$pr_number |"
+              echo "| \`$branch\` | \`${sha:0:12}\` | $decision | $evidence | #$source_pr |"
             done < "$results"
-            echo
-            echo "## Preserved branches"
-            echo
-            echo "| Branch | SHA | Reason |"
-            echo "|---|---|---|"
-            while IFS=$'\t' read -r branch sha reason; do
-              [[ -n "$branch" ]] || continue
-              echo "| \`$branch\` | \`${sha:0:12}\` | $reason |"
-            done < "$skipped"
           } > "$report"
 
-          if (( failed_count > 0 )); then
-            cat "$report"
-            cat "$report" >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
+          cat "$report"
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
 
-          self_branch_encoded="$(jq -rn --arg value "$HEAD_BRANCH" '$value | @uri')"
+          self_branch_encoded="$(branch_endpoint "$HEAD_BRANCH")"
           self_branch_json="$workdir/self-branch.json"
           gh api "repos/$REPO/branches/$self_branch_encoded" > "$self_branch_json"
           current_self_sha="$(jq -r '.commit.sha // ""' "$self_branch_json")"
           if [[ "$current_self_sha" != "$HEAD_SHA" ]]; then
-            echo "Safety stop: cleanup branch moved from $HEAD_SHA to $current_self_sha." >&2
-            cat "$report"
-            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+            echo "Safety stop: temporary cleanup branch moved from $HEAD_SHA to $current_self_sha" >&2
             exit 1
           fi
 
-          gh api --method PATCH "repos/$REPO/pulls/$PR_NUMBER" \
-            -f state=closed > "$workdir/self-pr-close.json"
+          gh api --method PATCH "repos/$REPO/pulls/$PR_NUMBER" -f state=closed > "$workdir/self-pr-close.json"
           gh api --method DELETE "repos/$REPO/git/refs/heads/$HEAD_BRANCH"
 
           {
@@ -341,16 +363,17 @@ jobs:
             echo
             echo "- Closed temporary PR: #$PR_NUMBER"
             echo "- Deleted temporary branch: \`$HEAD_BRANCH\` at \`${HEAD_SHA:0:12}\`"
-            echo "- No cleanup workflow was merged into \`main\`."
-          } >> "$report"
+            echo "- The temporary workflow change was never merged into \`main\`."
+          } | tee -a "$report" >> "$GITHUB_STEP_SUMMARY"
 
-          cat "$report"
-          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          if (( failed_count > 0 )); then
+            exit 1
+          fi
 
       - name: Upload cleanup audit
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: safe-merged-branch-cleanup-${{ github.run_id }}
-          path: ${{ runner.temp }}/safe-branch-cleanup
+          name: curated-superseded-branch-prune-${{ github.run_id }}
+          path: ${{ runner.temp }}/curated-superseded-branch-prune
           retention-days: 30
