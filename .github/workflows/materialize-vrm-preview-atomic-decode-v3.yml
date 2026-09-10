@@ -1,0 +1,162 @@
+name: Materialize VRM preview atomic decoding v3
+
+on:
+  push:
+    branches: [feat/vrm-preview-atomic-decode-20260910]
+    paths: [.github/workflows/materialize-vrm-preview-atomic-decode-v3.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-vrm-preview-atomic-decode-20260910
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/vrm-preview-atomic-decode-20260910
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Materialize reviewed preview changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --user pyyaml
+          python3 - <<'PY'
+          import os
+          import subprocess
+          import yaml
+
+          data = yaml.safe_load(open(
+              '.github/workflows/materialize-vrm-preview-atomic-decode-once.yml',
+              encoding='utf-8',
+          ))
+          selected = {
+              'Add atomic image transition component',
+              'Replace the raw character-card image atomically',
+          }
+          for step in data['jobs']['materialize']['steps']:
+              if step.get('name') not in selected:
+                  continue
+              subprocess.run(
+                  step['run'],
+                  shell=True,
+                  executable='/bin/bash',
+                  check=True,
+                  env=os.environ.copy(),
+              )
+          PY
+
+      - name: Remove shared-style coupling and fix async assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          component = Path('apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.tsx')
+          source = component.read_text(encoding='utf-8')
+          source = source.replace('import { cn } from "@/shared/lib/utils";\n\n', '', 1)
+          props_anchor = 'export interface StudioVrmCharacterPreviewImageProps {'
+          helper = '''function previewClassName(...values: Array<string | undefined>): string {
+            return values.filter((value): value is string => Boolean(value)).join(" ");
+          }
+
+          '''
+          if helper not in source:
+              if source.count(props_anchor) != 1:
+                  raise SystemExit('preview props anchor changed')
+              source = source.replace(props_anchor, helper + props_anchor, 1)
+          source = source.replace(
+              'className={cn("h-full w-full", className)}',
+              'className={previewClassName("h-full w-full", className)}',
+              1,
+          )
+          source = source.replace(
+              '''className={cn(
+                      "pointer-events-none absolute inset-0 h-full w-full opacity-0",
+                      className,
+                    )}''',
+              '''className={previewClassName(
+                      "pointer-events-none absolute inset-0 h-full w-full opacity-0",
+                      className,
+                    )}''',
+              1,
+          )
+          if 'cn(' in source or '@/shared/lib/utils' in source:
+              raise SystemExit('preview still depends on the shared cn utility')
+          component.write_text(source, encoding='utf-8')
+
+          test = Path('apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.test.tsx')
+          source = test.read_text(encoding='utf-8')
+          source = source.replace(
+              'import { act, fireEvent, render, screen } from "@testing-library/react";',
+              'import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";',
+              1,
+          )
+          old = '''              await screen.findByDisplayValue?.(undefined as never).catch(() => undefined);
+              expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
+                "src",
+                "lumi-b.webp",
+              );'''
+          new = '''              await waitFor(() => {
+                expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
+                  "src",
+                  "lumi-b.webp",
+                );
+              });'''
+          if old in source:
+              source = source.replace(old, new, 1)
+          if 'findByDisplayValue?.' in source:
+              raise SystemExit('non-deterministic async assertion remains')
+          test.write_text(source, encoding='utf-8')
+          PY
+
+      - name: Validate preview lifecycle and existing library behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.test.tsx \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.test.tsx \
+            apps/web/src/domains/creator/vrm/studio-vrm-bundled-thumbnail-stability.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.tsx \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.test.tsx \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+
+      - name: Commit product-only slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/materialize-vrm-preview-atomic-decode-once.yml \
+                .github/workflows/materialize-vrm-preview-atomic-decode-v2.yml \
+                .github/workflows/materialize-vrm-preview-atomic-decode-v3.yml
+          git add \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.tsx \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.test.tsx \
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx \
+            .github/workflows/materialize-vrm-preview-atomic-decode-once.yml \
+            .github/workflows/materialize-vrm-preview-atomic-decode-v2.yml \
+            .github/workflows/materialize-vrm-preview-atomic-decode-v3.yml
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'feat(vrm): switch character previews after decode'
+          git push --no-verify origin HEAD:feat/vrm-preview-atomic-decode-20260910
