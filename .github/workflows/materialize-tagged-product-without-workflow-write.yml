@@ -1,4 +1,4 @@
-# Manual trigger after GITHUB_TOKEN push suppression.
+# Manual retry after the BG3D extreme-aspect policy fix.
 name: Materialize tagged product without workflow writes
 
 on:
