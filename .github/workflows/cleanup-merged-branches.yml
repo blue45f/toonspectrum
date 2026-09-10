@@ -10,19 +10,17 @@ on:
 
 permissions:
   actions: write
-  contents: read
+  contents: write
   issues: read
   pull-requests: read
 
 concurrency:
-  # Cleanup is observational for branches and destructive only for superseded Actions runs.
-  # Keep only the latest lightweight cleanup generation so it never becomes queue debt itself.
   group: merged-branch-cleanup-v4
   cancel-in-progress: true
 
 jobs:
   cleanup:
-    name: Audit integrated branches and drain stale Actions runs
+    name: Converge integrated branches and drain stale Actions runs
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 8
     steps:
@@ -44,13 +42,13 @@ jobs:
             node --check "$RUNNER_TEMP/${script}"
           done
 
-      - name: Audit integrated branches without deleting them
+      - name: Delete refs already integrated into main
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          node "$RUNNER_TEMP/cleanup-merged-branches.mjs" --all \
+          node "$RUNNER_TEMP/cleanup-merged-branches.mjs" --all --apply \
             | tee "$RUNNER_TEMP/cleanup-report.json"
 
       - name: Cancel superseded queued and running workflow runs
