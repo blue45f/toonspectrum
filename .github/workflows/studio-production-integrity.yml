@@ -65,10 +65,28 @@ jobs:
           test -s "$RUNNER_TEMP/performance.patch"
 
           if ! git apply --3way --index "$RUNNER_TEMP/performance.patch"; then
-            echo "3-way application could not resolve every product overlap." >&2
-            git status --short
-            git diff --name-only --diff-filter=U
-            exit 1
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U | sort)
+            expected=(
+              apps/web/src/domains/market/components/MarketProductionFitWorkbench.test.tsx
+              apps/web/src/domains/market/pages/MarketBrowsePage.test.tsx
+              apps/web/src/domains/market/pages/MarketHomePage.test.tsx
+            )
+            mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+            if [[ "$(printf '%s\n' "${conflicts[@]}")" != "$(printf '%s\n' "${expected_sorted[@]}")" ]]; then
+              echo "Unexpected performance integration conflicts:" >&2
+              printf '  %s\n' "${conflicts[@]}" >&2
+              exit 1
+            fi
+            # These three source-branch changes only aligned old market assertions.
+            # Preserve the newer convergence-branch regressions instead of replacing them.
+            for file in "${expected[@]}"; do
+              git checkout --ours -- "$file"
+              git add "$file"
+            done
+            if git diff --name-only --diff-filter=U | grep -q .; then
+              echo "Unresolved conflicts remain after preserving parent tests." >&2
+              exit 1
+            fi
           fi
 
           git diff --cached --check
