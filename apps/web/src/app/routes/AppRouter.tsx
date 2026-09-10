@@ -8,7 +8,10 @@ import { useRouteTitle } from "./route-titles";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
+import {
+  isStudioWorkspaceLocation,
+  isStudioWorkspaceRoutePathname,
+} from "@/domains/creator/studio-workspace-route";
 
 function readInitialDocumentPathname(): string | null {
   try {
@@ -20,8 +23,8 @@ function readInitialDocumentPathname(): string | null {
   }
 }
 
-// This module lives for one browser document. Retain the initial delivery mode across SPA
-// transitions because a document opened on `/studio` may keep COOP even when COEP is unavailable.
+// This module lives for one browser document. Retain editor delivery mode across SPA transitions,
+// but do not load cross-origin isolation for the lightweight Studio home, assets or learning pages.
 const INITIAL_DOCUMENT_PATHNAME = readInitialDocumentPathname();
 
 const StudioCrossOriginIsolationGate = lazyRetry(
@@ -54,13 +57,14 @@ export function AppRouter() {
   const { pathname, search } = useLocation();
   useRouteTitle(pathname, search);
 
-  const documentWasStudio = isStudioRoutePathname(
+  const documentWasStudioEditor = isStudioWorkspaceRoutePathname(
     INITIAL_DOCUMENT_PATHNAME ?? pathname,
   );
+  const currentIsStudioEditor = isStudioWorkspaceLocation({ pathname, search });
   const routeTree = <AppRouteTree pathname={pathname} search={search} />;
   const needsIsolationGate =
-    isStudioRoutePathname(pathname)
-    || documentWasStudio
+    currentIsStudioEditor
+    || documentWasStudioEditor
     || globalThis.crossOriginIsolated === true;
 
   if (!needsIsolationGate) return routeTree;
@@ -69,7 +73,7 @@ export function AppRouter() {
     <Suspense fallback={<RouteFallback />}>
       <StudioCrossOriginIsolationGate
         pathname={pathname}
-        documentWasStudio={documentWasStudio}
+        documentWasStudio={documentWasStudioEditor}
         pending={<RouteFallback />}
       >
         {routeTree}
