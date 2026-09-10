@@ -4,6 +4,9 @@ on:
   push:
     branches: [fix/studio-effects-workspace-loss-20260910]
     paths: [.github/workflows/recover-studio-effects-workspace-loss.yml]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -66,7 +69,8 @@ jobs:
             .bootstrap \
             .github/workflows/apply-studio-effects-workspace.yml \
             .github/workflows/recover-studio-effects-payload.yml \
-            .github/workflows/recover-studio-effects-workspace-loss.yml
+            .github/workflows/recover-studio-effects-workspace-loss.yml \
+            .github/workflows/restore-ci-after-bulk-integration.yml
           git diff --check
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Validate effects workspace contracts
