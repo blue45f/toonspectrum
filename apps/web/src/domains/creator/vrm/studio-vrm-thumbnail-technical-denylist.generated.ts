@@ -1,5 +1,6 @@
 /** Generated from deployment-owned thumbnail files. */
 export const STUDIO_VRM_TECHNICAL_THUMBNAIL_REJECTIONS = Object.freeze({
+
 } as const);
 
 const REJECTED_IDS = new Set<string>(
