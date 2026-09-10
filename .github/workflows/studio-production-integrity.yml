@@ -84,8 +84,19 @@ jobs:
             apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts \
             apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx
       - name: Build production browser without repeating the core typecheck
+        shell: bash
         run: |
+          set +e
           pnpm run build:bundle
+          build_status=$?
+          set -e
+          if (( build_status != 0 )); then
+            echo "::group::Source-mapped Studio prerender diagnostic"
+            rm -rf apps/web/.next
+            pnpm --filter @toonspectrum/web exec next build --webpack --no-lint --debug-prerender || true
+            echo "::endgroup::"
+            exit "$build_status"
+          fi
           pnpm run check:studio-bundle
       - name: Cache Playwright Chromium
         id: playwright-cache
