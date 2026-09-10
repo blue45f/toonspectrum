@@ -1,0 +1,109 @@
+name: Fix PR 1264 test types once
+
+on:
+  push:
+    branches:
+      - integration/completed-unmerged-20260910-1655
+    paths:
+      - .github/workflows/fix-pr1264-test-types-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-pr1264-test-types-once
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: integration/completed-unmerged-20260910-1655
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Repair focused test type and syntax failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              source = target.read_text()
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one anchor, found {count}")
+              target.write_text(source.replace(old, new, 1))
+
+          replace_once(
+              "apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx",
+              '''    expect(screen.getByRole("button", { name: /깔끔한 선화/u })).toHaveAttribute(
+                "aria-pressed",
+                "true",
+              );
+              expect(screen.getByRole("button", { name: /그래픽 외곽선/u })).toHaveAttribute(
+                "aria-pressed",
+                "false",
+              );''',
+              '''    expect(
+                screen.getByRole("button", { name: /깔끔한 선화/u }).getAttribute("aria-pressed"),
+              ).toBe("true");
+              expect(
+                screen.getByRole("button", { name: /그래픽 외곽선/u }).getAttribute("aria-pressed"),
+              ).toBe("false");''',
+          )
+
+          replace_once(
+              "apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts",
+              '''    const baseDigits = base.primitives.filter((p) => p.kind === "capsule" && p.jointId === "leftHand");
+              const tunedDigits = tuned.primitives.filter((p) => p.kind === "capsule" && p.jointId === "leftHand");
+              expect(Math.abs(tunedDigits[0]!.to[1])).toBeGreaterThan(Math.abs(baseDigits[0]!.to[1]));''',
+              '''    const baseDigits = base.primitives.filter(
+                (primitive) => primitive.kind === "capsule" && primitive.jointId === "leftHand",
+              );
+              const tunedDigits = tuned.primitives.filter(
+                (primitive) => primitive.kind === "capsule" && primitive.jointId === "leftHand",
+              );
+              const baseDigit = baseDigits[0];
+              const tunedDigit = tunedDigits[0];
+              if (baseDigit?.kind !== "capsule" || tunedDigit?.kind !== "capsule") {
+                throw new Error("left-hand digit primitives are missing");
+              }
+              expect(Math.abs(tunedDigit.to[1])).toBeGreaterThan(Math.abs(baseDigit.to[1]));''',
+          )
+
+          replace_once(
+              "scripts/verify-studio-five-hour-soak-harness.test.ts",
+              '''    expect(open).toContain('sheet.locator('[data-studio-open-brush-library=\"true\"]')');''',
+              '''    expect(open).toContain(`sheet.locator('[data-studio-open-brush-library="true"]')`);''',
+          )
+          replace_once(
+              "scripts/verify-studio-five-hour-soak-harness.test.ts",
+              '''    expect(open).not.toContain('dock.locator('[data-studio-open-brush-library=\"true\"]')');''',
+              '''    expect(open).not.toContain(`dock.locator('[data-studio-open-brush-library="true"]')`);''',
+          )
+          PY
+
+          git diff --check
+
+      - name: Commit the focused fixes and retire this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-pr1264-test-types-once.yml
+          git rm -f __never_write__
+          git add \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts \
+            scripts/verify-studio-five-hour-soak-harness.test.ts
+          git diff --cached --check
+          git commit -m "test: repair Studio integration type failures"
+          git push origin HEAD:integration/completed-unmerged-20260910-1655
