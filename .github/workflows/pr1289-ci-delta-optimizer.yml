@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   optimize:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
