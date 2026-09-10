@@ -47,9 +47,9 @@ describe("Studio canonical document workspaces", () => {
       focus: "cut:34",
       language: "ko-KR",
       version: "approved-4",
-      search: "?room=team-a&mode=upload",
+      search: "?room=team-a&mode=upload&id=legacy&remix=old",
     })).toBe(
-      "/studio/p/project-1/d/episode-2?focus=cut%3A34&language=ko-KR&mode=upload&room=team-a&version=approved-4&workspace=comic",
+      "/studio/p/project-1/d/episode-2?focus=cut%3A34&language=ko-KR&room=team-a&version=approved-4&workspace=comic",
     );
   });
 
@@ -70,10 +70,10 @@ describe("Studio canonical document workspaces", () => {
     }
   });
 
-  it("keeps draft documents separate while retaining unknown collaboration query state", () => {
+  it("keeps draft documents separate while retaining collaboration query state", () => {
     const result = parseStudioDocumentLocation({
       pathname: "/studio/draft/draft-7",
-      search: "?workspace=design&room=team-2",
+      search: "?workspace=design&room=team-2&mode=upload&draft=legacy",
     });
     expect(result).toMatchObject({
       kind: "document",
@@ -124,6 +124,18 @@ describe("Studio canonical document workspaces", () => {
     })).toEqual({ kind: "invalid-document", errorCode: "invalid-workspace" });
     expect(parseStudioDocumentLocation({
       pathname: "/studio/p/project-1/d/document-1",
+      search: "?focus=cut%3A1&focus=cut%3A2",
+    })).toEqual({ kind: "invalid-document", errorCode: "invalid-focus" });
+    expect(parseStudioDocumentLocation({
+      pathname: "/studio/p/project-1/d/document-1",
+      search: "?language=ko&language=en",
+    })).toEqual({ kind: "invalid-document", errorCode: "invalid-language" });
+    expect(parseStudioDocumentLocation({
+      pathname: "/studio/p/project-1/d/document-1",
+      search: "?version=v1&version=v2",
+    })).toEqual({ kind: "invalid-document", errorCode: "invalid-version" });
+    expect(parseStudioDocumentLocation({
+      pathname: "/studio/p/project-1/d/document-1",
       search: "?workspace=draw&language=not_a_locale",
     })).toEqual({ kind: "invalid-document", errorCode: "invalid-language" });
     expect(parseStudioDocumentLocation({ pathname: "/studio/p/project-1/overview" })).toEqual({
@@ -133,13 +145,23 @@ describe("Studio canonical document workspaces", () => {
     expect(isStudioDocumentWorkspace("server-lock")).toBe(false);
   });
 
-  it("requires exactly one project-document or draft identity when building hrefs", () => {
+  it("requires exactly one valid project-document or draft identity when building hrefs", () => {
     expect(() => studioDocumentHref({ workspace: "draw" })).toThrow();
     expect(() => studioDocumentHref({
       projectId: "project-1",
       documentId: "document-1",
       draftId: "draft-1",
       workspace: "draw",
+    })).toThrow();
+    expect(() => studioDocumentHref({
+      draftId: "draft-1",
+      workspace: "draw",
+      focus: "",
+    })).toThrow();
+    expect(() => studioDocumentHref({
+      draftId: "draft-1",
+      workspace: "draw",
+      language: "bad_tag",
     })).toThrow();
   });
 });
