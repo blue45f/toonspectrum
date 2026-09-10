@@ -20,7 +20,7 @@ function mutate(source, before, after) {
 }
 
 describe("Vercel fallback workflow policy", () => {
-  it("accepts the checked-in manual, project-bound workflow", () => {
+  it("accepts the checked-in manual, main-contained prebuilt workflow", () => {
     expect(validateVercelFallbackWorkflow(fallback)).toEqual([]);
   });
 
@@ -57,31 +57,80 @@ describe("Vercel fallback workflow policy", () => {
 
     const override = mutate(
       fallback,
-      "      - name: Deploy frontend to Vercel production\n",
-      "      - name: Deploy frontend to Vercel production\n        env:\n          VERCEL_PROJECT_ID: wrong-project\n",
+      "      - name: Deploy prebuilt output to Vercel production\n",
+      "      - name: Deploy prebuilt output to Vercel production\n        env:\n          VERCEL_PROJECT_ID: wrong-project\n",
     );
     expect(validateVercelFallbackWorkflow(override)).toContain(
-      "Vercel fallback step 5 must not override job-level VERCEL_PROJECT_ID",
+      "Vercel fallback step 10 must not override job-level VERCEL_PROJECT_ID",
     );
   });
 
-  it("rejects alternate workspace installs and a weakened deploy command", () => {
+  it("rejects refs outside main and weakened toolchain setup", () => {
+    const noAncestryGate = mutate(
+      fallback,
+      '          if ! git merge-base --is-ancestor "$deploy_sha" "$main_sha"; then\n',
+      '          if false; then\n',
+    );
+    expect(validateVercelFallbackWorkflow(noAncestryGate)).toContain(
+      "Vercel fallback must reject refs outside current main history",
+    );
+
+    const unpinnedCli = mutate(
+      fallback,
+      '          npm install --global --no-audit --no-fund "vercel@${VERCEL_CLI_VERSION}"\n',
+      "          npm install --global --no-audit --no-fund vercel@latest\n",
+    );
+    expect(validateVercelFallbackWorkflow(unpinnedCli)).toContain(
+      "Vercel fallback workflow does not install its pinned CLI version",
+    );
+  });
+
+  it("rejects alternate workspace installs and a weakened prebuilt path", () => {
     const workspaceInstall = mutate(
       fallback,
-      "          npm install --global --no-audit --no-fund \"vercel@${VERCEL_CLI_VERSION}\"\n",
-      "          pnpm i\n          npm install --global --no-audit --no-fund \"vercel@${VERCEL_CLI_VERSION}\"\n",
+      '          npm install --global --no-audit --no-fund "vercel@${VERCEL_CLI_VERSION}"\n',
+      '          pnpm i\n          npm install --global --no-audit --no-fund "vercel@${VERCEL_CLI_VERSION}"\n',
     );
     expect(validateVercelFallbackWorkflow(workspaceInstall)).toContain(
       "Vercel source fallback must not install workspace dependencies: pnpm i",
     );
 
-    const previewDeploy = mutate(
+    const previewBuild = mutate(
       fallback,
-      '        run: vercel deploy --prod --yes --token "$VERCEL_TOKEN"',
-      '        run: vercel deploy --yes --token "$VERCEL_TOKEN"',
+      '        run: vercel build --prod --yes --token "$VERCEL_TOKEN"',
+      '        run: vercel build --yes --token "$VERCEL_TOKEN"',
     );
-    expect(validateVercelFallbackWorkflow(previewDeploy)).toContain(
-      "Vercel fallback workflow is missing its exact production deploy command",
+    expect(validateVercelFallbackWorkflow(previewBuild)).toContain(
+      "Vercel fallback workflow must create the production prebuilt artifact",
+    );
+
+    const remoteBuild = mutate(
+      fallback,
+      'vercel deploy --prebuilt --prod --yes --archive=tgz --token "$VERCEL_TOKEN"',
+      'vercel deploy --prod --yes --archive=tgz --token "$VERCEL_TOKEN"',
+    );
+    expect(validateVercelFallbackWorkflow(remoteBuild)).toContain(
+      "Vercel fallback workflow is missing its exact prebuilt production deploy contract",
+    );
+  });
+
+  it("rejects an uninspected or incomplete Vercel output", () => {
+    const noFunctions = mutate(
+      fallback,
+      "          test -d .vercel/output/functions\n",
+      "          echo \"function output not checked\"\n",
+    );
+    expect(validateVercelFallbackWorkflow(noFunctions)).toContain(
+      "Vercel fallback workflow must verify the immutable static and function output",
+    );
+
+    const noUrlReceipt = mutate(
+      fallback,
+      '          echo "url=${deployment_url}" >> "$GITHUB_OUTPUT"\n',
+      '          echo "deployment complete"\n',
+    );
+    expect(validateVercelFallbackWorkflow(noUrlReceipt)).toContain(
+      "Vercel fallback workflow is missing its exact prebuilt production deploy contract",
     );
   });
 });
