@@ -1,7 +1,7 @@
 # PR #1289 non-main branch convergence
 
-- Started from: `75b16799d889091cd58d8b51ee018f7054112d80`
-- Completed at: 2026-09-10T18:06:40Z
+- Started from: `415452d8653282f6ce91c65219a992167408208f`
+- Completed at: 2026-09-10T18:07:33Z
 - Canonical `.github/workflows` restored from the PR head before convergence.
 
 ## Included remote branches
