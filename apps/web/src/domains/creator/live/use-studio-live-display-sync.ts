@@ -123,8 +123,7 @@ export function useStudioLiveDisplaySync(
         commit(snapshot);
         return;
       }
-      cancelScheduled();
-      scheduleLatest(snapshot.phase, delayMs);
+      if (timerRef.current === null) scheduleLatest(snapshot.phase, delayMs);
       return;
     }
 
