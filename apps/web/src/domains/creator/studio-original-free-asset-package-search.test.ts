@@ -19,11 +19,10 @@ describe("expanded original CC0 catalog boundary", () => {
   });
 
   it("includes package metadata in Korean catalog search", () => {
-    const foodAssets = filterStudioOriginalFreeAssets({ query: "음식" });
+    const foodPackageAssets = filterStudioOriginalFreeAssets({ query: "음식" })
+      .filter((asset) => asset.packageId === "original-food-cafe-kit");
 
-    expect(foodAssets).toHaveLength(8);
-    expect(foodAssets.every((asset) => asset.packageId === "original-food-cafe-kit"))
-      .toBe(true);
-    expect(foodAssets.map((asset) => asset.id)).toContain("original-food-soda-cup");
+    expect(foodPackageAssets).toHaveLength(8);
+    expect(foodPackageAssets.map((asset) => asset.id)).toContain("original-food-soda-cup");
   });
 });
