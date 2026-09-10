@@ -1,0 +1,234 @@
+name: Apply CodeQL insecure-randomness fixes once
+
+on:
+  push:
+    branches:
+      - fix/code-scanning-alerts-20260910-v2
+    paths:
+      - .github/workflows/apply-code-scanning-fixes-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Patch affected sources through the GitHub API
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: ${{ github.ref_name }}
+          TARGET_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import json
+          import os
+          from typing import Any
+          from urllib.error import HTTPError
+          from urllib.parse import quote
+          from urllib.request import Request, urlopen
+
+          token = os.environ["GH_TOKEN"]
+          branch = os.environ["TARGET_BRANCH"]
+          repository = os.environ["TARGET_REPOSITORY"]
+          api_root = "https://api.github.com"
+
+          def request(method: str, endpoint: str, payload: dict[str, Any] | None = None) -> Any:
+              body = None if payload is None else json.dumps(payload).encode("utf-8")
+              req = Request(
+                  f"{api_root}{endpoint}",
+                  data=body,
+                  method=method,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "User-Agent": "toonspectrum-codeql-remediation",
+                  },
+              )
+              try:
+                  with urlopen(req, timeout=60) as response:
+                      raw = response.read()
+              except HTTPError as error:
+                  detail = error.read().decode("utf-8", errors="replace")
+                  raise RuntimeError(f"GitHub API {method} {endpoint} failed: {error.code} {detail}") from error
+              return json.loads(raw) if raw else None
+
+          def content_endpoint(path: str, *, include_ref: bool = False) -> str:
+              endpoint = f"/repos/{repository}/contents/{quote(path, safe='/')}"
+              if include_ref:
+                  endpoint += f"?ref={quote(branch, safe='')}"
+              return endpoint
+
+          def fetch_text(path: str) -> tuple[str, str]:
+              data = request("GET", content_endpoint(path, include_ref=True))
+              if not isinstance(data, dict) or not isinstance(data.get("content"), str):
+                  raise RuntimeError(f"Unexpected contents response for {path}")
+              return base64.b64decode(data["content"]).decode("utf-8"), str(data["sha"])
+
+          def replace_once(text: str, old: str, new: str, path: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"Expected exactly one match in {path}, found {count}: {old[:80]!r}")
+              return text.replace(old, new, 1)
+
+          def update_text(path: str, transform, message: str) -> None:
+              current, sha = fetch_text(path)
+              updated = transform(current)
+              if updated == current:
+                  raise RuntimeError(f"No change produced for {path}")
+              request(
+                  "PUT",
+                  content_endpoint(path),
+                  {
+                      "message": message,
+                      "content": base64.b64encode(updated.encode("utf-8")).decode("ascii"),
+                      "sha": sha,
+                      "branch": branch,
+                  },
+              )
+
+          session_path = "apps/web/src/domains/creator/ai/studio-ai-comic-director-session.ts"
+          route_path = "apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx"
+          panel_path = "apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx"
+          test_path = "apps/web/src/domains/creator/ai/studio-ai-comic-director-session.test.ts"
+          workflow_path = ".github/workflows/apply-code-scanning-fixes-once.yml"
+
+          def patch_session(text: str) -> str:
+              old = '''function id(): string {
+            return globalThis.crypto?.randomUUID?.()
+              ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          }'''
+              new = '''export interface StudioAiComicDirectorCrypto {
+            readonly randomUUID?: () => string;
+            readonly getRandomValues?: (
+              array: Uint8Array<ArrayBuffer>,
+            ) => Uint8Array<ArrayBuffer>;
+          }
+
+          export function createStudioAiComicDirectorId(
+            prefix = "comic",
+            cryptoApi: StudioAiComicDirectorCrypto | null | undefined =
+              globalThis.crypto as StudioAiComicDirectorCrypto | undefined,
+          ): string {
+            if (typeof cryptoApi?.randomUUID === "function") {
+              return cryptoApi.randomUUID();
+            }
+            if (typeof cryptoApi?.getRandomValues !== "function") {
+              throw new Error("안전한 AI 코믹 디렉터 식별자를 생성할 수 없습니다.");
+            }
+            const bytes = new Uint8Array(16);
+            cryptoApi.getRandomValues(bytes);
+            const entropy = Array.from(
+              bytes,
+              (byte) => byte.toString(16).padStart(2, "0"),
+            ).join("");
+            return `${prefix}-${entropy}`;
+          }'''
+              text = replace_once(text, old, new, session_path)
+              text = replace_once(
+                  text,
+                  "    id: input.id ?? id(),",
+                  "    id: input.id ?? createStudioAiComicDirectorId(),",
+                  session_path,
+              )
+              if "Math.random" in text:
+                  raise RuntimeError(f"Insecure randomness remains in {session_path}")
+              return text
+
+          def patch_route(text: str) -> str:
+              text = replace_once(
+                  text,
+                  "  createStudioAiComicDirectorSession,\n",
+                  "  createStudioAiComicDirectorId,\n  createStudioAiComicDirectorSession,\n",
+                  route_path,
+              )
+              old = '''function uid(): string {
+            return globalThis.crypto?.randomUUID?.()
+              ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          }
+
+          '''
+              text = replace_once(text, old, "", route_path)
+              call_count = text.count("uid()")
+              if call_count != 2:
+                  raise RuntimeError(f"Expected two uid() calls in {route_path}, found {call_count}")
+              text = text.replace("uid()", "createStudioAiComicDirectorId()")
+              if "Math.random" in text or "function uid" in text:
+                  raise RuntimeError(f"Insecure local ID helper remains in {route_path}")
+              return text
+
+          def patch_panel(text: str) -> str:
+              text = replace_once(
+                  text,
+                  "  createStudioAiComicDirectorSession,\n",
+                  "  createStudioAiComicDirectorId,\n  createStudioAiComicDirectorSession,\n",
+                  panel_path,
+              )
+              old = '''function uid(prefix: string): string {
+            return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          }'''
+              new = '''function uid(prefix: string): string {
+            return createStudioAiComicDirectorId(prefix);
+          }'''
+              text = replace_once(text, old, new, panel_path)
+              if "Math.random" in text:
+                  raise RuntimeError(f"Insecure randomness remains in {panel_path}")
+              return text
+
+          def patch_test(text: str) -> str:
+              text = replace_once(
+                  text,
+                  "  createStudioAiComicApplyDiff,\n  createStudioAiComicDirectorSession,\n",
+                  "  createStudioAiComicApplyDiff,\n  createStudioAiComicDirectorId,\n  createStudioAiComicDirectorSession,\n",
+                  test_path,
+              )
+              marker = 'describe("AI Comic Director session", () => {\n'
+              tests = '''describe("AI Comic Director session", () => {
+            it("uses Web Crypto entropy when randomUUID is unavailable", () => {
+              const generated = createStudioAiComicDirectorId("comic", {
+                getRandomValues(array) {
+                  array.set(Array.from({ length: 16 }, (_, index) => index));
+                  return array;
+                },
+              });
+
+              expect(generated).toBe("comic-000102030405060708090a0b0c0d0e0f");
+            });
+
+            it("fails closed when secure entropy is unavailable", () => {
+              expect(() => createStudioAiComicDirectorId("comic", null)).toThrow(
+                "안전한 AI 코믹 디렉터 식별자를 생성할 수 없습니다.",
+              );
+            });
+
+          '''
+              return replace_once(text, marker, tests, test_path)
+
+          update_text(session_path, patch_session, "fix(security): centralize secure comic director IDs")
+          update_text(route_path, patch_route, "fix(security): remove route Math.random ID fallback")
+          update_text(panel_path, patch_panel, "fix(security): secure panel operation IDs")
+          update_text(test_path, patch_test, "test(security): cover secure comic director IDs")
+
+          workflow_text, workflow_sha = fetch_text(workflow_path)
+          if "Apply CodeQL insecure-randomness fixes once" not in workflow_text:
+              raise RuntimeError("Refusing to delete an unexpected workflow file")
+          request(
+              "DELETE",
+              content_endpoint(workflow_path),
+              {
+                  "message": "ci(security): remove completed one-shot remediation",
+                  "sha": workflow_sha,
+                  "branch": branch,
+              },
+          )
+          print("Applied secure ID patches and removed the one-shot workflow.")
+          PY
