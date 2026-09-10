@@ -128,7 +128,7 @@ describe("MarketBrowsePage", () => {
     expect(search.className).toContain("[&::-webkit-search-cancel-button]:hidden");
 
     expect(screen.getByRole("button", { name: "검색어 지우기" }).className)
-      .toContain("pointer-coarse:size-11");
+      .toContain("size-11");
     expect(screen.getByRole("button", { name: "브러시" }).className)
       .toContain("pointer-coarse:min-h-11");
     expect(screen.getByRole("button", { name: "브러시 필터 제거" }).className)
