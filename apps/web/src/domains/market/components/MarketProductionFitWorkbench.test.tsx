@@ -81,10 +81,10 @@ describe("MarketProductionFitWorkbench", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "이 리소스를 지금 쓸 수 있나요?" }))
-      .toBeTruthy();
+    expect(screen.getByRole("heading", { name: "이 리소스를 지금 쓸 수 있나요?" })).toBeTruthy();
     expect(screen.getByText("현재 제작 조건과 일치")).toBeTruthy();
     expect(screen.getByText("문제 없음 7")).toBeTruthy();
+    expect(screen.getByText(/실제 적용 전 미리보기를 확인하세요/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "내 환경에 맞는 리소스만 보기" })
       .getAttribute("href")).toBe("/market/fit");
     expect(screen.getByRole("link", { name: /사용권 원문/ }).getAttribute("rel"))

@@ -35,7 +35,7 @@ describe("market comparison model", () => {
     const rows = createMarketComparisonRows(fixtures());
     expect(rows.find((row) => row.key === "license")).toMatchObject({
       different: true,
-      values: ["ToonSpectrum 표준 사용권", "CC0 1.0"],
+      values: ["ToonStudio 표준 사용권", "CC0 1.0"],
     });
     expect(rows.find((row) => row.key === "ai")).toMatchObject({
       different: true,

@@ -133,7 +133,7 @@ describe("MarketResourceDetailArticle actions and metadata", () => {
       .toBe(`/market/browse?publisher=${record.publisher.id}`);
     expect(screen.getByRole("link", { name: "같은 종류의 리소스 더 보기" }).getAttribute("href"))
       .toBe("/market/browse?kind=asset");
-    expect(screen.getByRole("link", { name: "ToonSpectrum 표준 사용권" }).getAttribute("href"))
+    expect(screen.getByRole("link", { name: "ToonStudio 표준 사용권" }).getAttribute("href"))
       .toBe("/terms");
     expect(screen.getByRole("heading", { name: "게시 manifest 기반 권리·호환성 확인" }))
       .toBeTruthy();
