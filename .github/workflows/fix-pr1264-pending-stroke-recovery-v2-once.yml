@@ -1,0 +1,101 @@
+name: Fix PR 1264 pending stroke recovery v2 once
+
+on:
+  push:
+    branches:
+      - integration/completed-unmerged-20260910-1655
+    paths:
+      - .github/workflows/fix-pr1264-pending-stroke-recovery-v2-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-pr1264-pending-stroke-recovery-v2-once
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "1"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply focused recovery integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/web/src/domains/creator/studio-autosave-opfs-session.ts")
+          source = path.read_text(encoding="utf-8")
+          import_anchor = 'import { sha256HexPortable } from "./studio-sha256";\n'
+          import_line = 'import { shouldPreferStudioPendingStrokeEmergencyRecovery } from "./studio-pending-stroke-recovery";\n'
+          if import_line not in source:
+            if source.count(import_anchor) != 1:
+              raise SystemExit("unexpected sha256 import anchor count")
+            source = source.replace(import_anchor, import_line + import_anchor, 1)
+
+          winner_anchor = '''  if (
+            compatibilityCandidate === null
+            || timestamp(compatibilityCandidate.savedAt) <= timestamp(winner.savedAt)
+          ) {
+          '''
+          recovery_block = '''  if (
+            compatibilityCandidate
+            && shouldPreferStudioPendingStrokeEmergencyRecovery(
+              winner.payload!,
+              compatibilityCandidate.payload,
+            )
+          ) {
+            return Object.freeze({
+              candidate: compatibilityCandidate,
+              compatibilityCandidate,
+              authority: "browser-storage-compatibility",
+              durability: "compatibility-only",
+              migratedToOpfs,
+            });
+          }
+
+          '''
+          if recovery_block not in source:
+            if source.count(winner_anchor) != 1:
+              raise SystemExit("unexpected compatibility winner anchor count")
+            source = source.replace(winner_anchor, recovery_block + winner_anchor, 1)
+          path.write_text(source, encoding="utf-8")
+          PY
+          rm -f \
+            .github/workflows/fix-pr1264-pending-stroke-recovery-once.yml \
+            .github/workflows/fix-pr1264-pending-stroke-recovery-v2-once.yml
+      - name: Verify focused recovery contract
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-pending-stroke-recovery.test.ts \
+            apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts
+          pnpm run typecheck
+          pnpm run validate:architecture
+      - name: Commit verified repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix(studio): recover the newest complete pending stroke snapshot"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
