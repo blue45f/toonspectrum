@@ -1,101 +1,22 @@
-name: Studio ink live-commit fidelity
+name: Retire superseded PR 1280 Studio ink fidelity
 
 on:
   push:
-    branches: [main, release/salvage-integration-20260908]
+    branches:
+      - integration/final-main-consolidation-20260910
     paths:
-      - ".github/workflows/studio-ink-live-commit.yml"
-      - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"
-      - "scripts/studio-ink-fidelity-cases.ts"
-      - "scripts/studio-ink-fidelity-cases.test.ts"
-      - "scripts/verify-studio-long-stroke.mts"
-      - "scripts/lib/studio-verify-preview-harness.mjs"
-      - "scripts/lib/studio-verify-preview-harness.mts"
-      - "apps/web/src/domains/creator/brush/**"
-      - "apps/web/src/domains/creator/canvas/**"
-      - "apps/web/src/domains/creator/studio-brush*"
-      - "apps/web/src/domains/creator/studio-canonical-stroke*"
-      - "apps/web/src/domains/creator/studio-velocity-pressure*"
-      - "apps/web/src/domains/creator/StudioCanvas*"
-      - "apps/web/src/domains/creator/StudioPage.tsx"
-  pull_request:
-    branches: [main, release/salvage-integration-20260908]
-    paths:
-      - "scripts/verify-inkwash-dippen-live-commit-fidelity.mts"
-      - "scripts/studio-ink-fidelity-cases.ts"
-      - "scripts/studio-ink-fidelity-cases.test.ts"
-      - "scripts/verify-studio-long-stroke.mts"
-      - "scripts/lib/studio-verify-preview-harness.mjs"
-      - "scripts/lib/studio-verify-preview-harness.mts"
-      - "apps/web/src/domains/creator/brush/**"
-      - "apps/web/src/domains/creator/canvas/**"
-      - "apps/web/src/domains/creator/studio-brush*"
-      - "apps/web/src/domains/creator/studio-canonical-stroke*"
-      - "apps/web/src/domains/creator/studio-velocity-pressure*"
-      - "apps/web/src/domains/creator/StudioCanvas*"
-      - "apps/web/src/domains/creator/StudioPage.tsx"
-  schedule:
-    # Nightly remains the broad drift detector even when a dependency changes outside the PR paths.
-    - cron: "23 18 * * *"
-  workflow_dispatch:
+      - .github/workflows/studio-ink-live-commit.yml
 
 permissions:
   contents: read
 
 concurrency:
-  group: studio-ink-live-commit-v3-${{ github.event.pull_request.number || github.ref }}
+  group: studio-ink-live-commit-v3-1280
   cancel-in-progress: true
 
 jobs:
-  fidelity:
-    name: ink-live-commit-fidelity
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 40
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
-      TOONSPECTRUM_INK_FIDELITY_SPAWN_PREVIEW: "1"
+  retired:
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Resolve verification directory
-        run: |
-          echo "TOONSPECTRUM_VERIFY_DIR=$RUNNER_TEMP/toonspectrum-verification" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/toonspectrum-verification"
-      - name: Cache Playwright Chromium
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
-      - name: Install Chromium browser
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
-      - name: Install Chromium system dependencies
-        run: pnpm exec playwright install-deps chromium
-      - name: Validate the fidelity harness
-        run: |
-          pnpm exec eslint --max-warnings=0 \
-            scripts/verify-studio-long-stroke.mts \
-            scripts/verify-inkwash-dippen-live-commit-fidelity.mts \
-            scripts/studio-ink-fidelity-cases.ts \
-            scripts/studio-ink-fidelity-cases.test.ts
-          pnpm exec vitest run scripts/studio-ink-fidelity-cases.test.ts
-      - name: Build production Studio assets
-        run: pnpm run build:bundle
-      - name: Verify ink-wash and dip-pen live/commit fidelity
-        run: pnpm exec tsx scripts/verify-inkwash-dippen-live-commit-fidelity.mts
-      - name: Upload fidelity evidence when useful
-        if: failure() || github.event_name == 'schedule'
-        uses: actions/upload-artifact@v4
-        with:
-          name: studio-ink-live-commit-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/toonspectrum-verification/studio-ink-live-commit
-          if-no-files-found: warn
-          retention-days: 7
+      - run: echo 'superseded PR #1280 fidelity run retired'
