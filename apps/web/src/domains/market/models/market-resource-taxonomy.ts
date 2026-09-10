@@ -4,7 +4,6 @@ import {
   Images,
   LayoutTemplate,
   Palette,
-  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 
