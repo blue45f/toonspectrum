@@ -5,6 +5,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { resolveStudioBg3dInsertQualityPlan } from "./studio-bg3d-insert-quality-policy";
 
 export function attachStudioBg3dEditorInsertHost(h) {
   const {
@@ -485,17 +486,19 @@ export function attachStudioBg3dEditorInsertHost(h) {
       // Canvas insertion is a persisted output-pixel contract, not a display-density
       // contract. Keep identical scenes deterministic across monitors and retain enough
       // source pixels for webtoon composition before the device pixel budget clamps it.
-      const requestedCaptureHeight = Math.min(
-        4096,
-        Math.max(2160, Math.round(adapted.document.output.exportHeight)),
-      );
-      const captureSize = resolveStudioBg3dLtCaptureSize({
-        sourceWidth: sourceSize.width,
-        sourceHeight: sourceSize.height,
-        aspectRatio: captureFrame.aspectRatio,
-        requestedHeight: requestedCaptureHeight,
-        maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
-      });
+      const qualityPlan = resolveStudioBg3dInsertQualityPlan({
+  exportHeight: adapted.document.output.exportHeight,
+  aspectRatio: captureFrame.aspectRatio,
+  deviceMaxPixels: deviceQuality.maxRenderPixels,
+  rendererMaxPixels: STUDIO_BG3D_LT_RENDER_MAX_PIXELS,
+});
+const captureSize = resolveStudioBg3dLtCaptureSize({
+  sourceWidth: sourceSize.width,
+  sourceHeight: sourceSize.height,
+  aspectRatio: captureFrame.aspectRatio,
+  requestedHeight: qualityPlan.requestedHeight,
+  maxPixels: qualityPlan.maxPixels,
+});
       if (!captureSize) {
         throw new Error("LT capture size admission failed.");
       }
