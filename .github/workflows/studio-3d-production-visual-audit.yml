@@ -1,0 +1,102 @@
+name: Studio 3D production visual audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Production Studio URL to audit
+        required: false
+        default: https://www.toonstudio.cloud/studio
+  schedule:
+    - cron: "17 18 * * *"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: studio-3d-production-visual-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AUDIT_URL: ${{ inputs.url || 'https://www.toonstudio.cloud/studio' }}
+      OUTPUT_DIR: artifacts/studio-3d-production-audit
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install audit runtime
+        run: |
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Verify audit policy
+        run: node --test scripts/lib/studio-3d-production-audit-policy.test.mjs
+
+      - name: Audit production Studio on desktop, retina and mobile
+        id: production-audit
+        continue-on-error: true
+        run: |
+          node scripts/audit-studio-3d-production.mjs \
+            --url "$AUDIT_URL" \
+            --output "$OUTPUT_DIR"
+
+      - name: Upload screenshots and machine-readable report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-3d-production-visual-audit
+          path: artifacts/studio-3d-production-audit
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Open, update or close the production quality issue
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          title='[3D QA] production visual quality regression'
+          existing=$(gh issue list --state open --search "$title in:title" \
+            --json number,title --jq ".[] | select(.title == \"${title}\") | .number" \
+            | head -n1)
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          if [[ "${{ steps.production-audit.outcome }}" == "success" ]]; then
+            if [[ -n "$existing" ]]; then
+              gh issue close "$existing" \
+                --comment "Production visual audit passed on all targets. Evidence: ${run_url}"
+            fi
+            exit 0
+          fi
+
+          if [[ -f "$OUTPUT_DIR/report.md" ]]; then
+            {
+              printf 'Automated production visual audit failed.\n\n'
+              cat "$OUTPUT_DIR/report.md"
+              printf '\n## Evidence\n\n- Workflow run: %s\n- Artifact: `studio-3d-production-visual-audit`\n' "$run_url"
+            } > "$RUNNER_TEMP/studio-3d-production-audit-issue.md"
+          else
+            printf 'The production audit failed before producing a report. Workflow run: %s\n' "$run_url" \
+              > "$RUNNER_TEMP/studio-3d-production-audit-issue.md"
+          fi
+
+          if [[ -n "$existing" ]]; then
+            gh issue edit "$existing" --body-file "$RUNNER_TEMP/studio-3d-production-audit-issue.md"
+          else
+            gh issue create --title "$title" --body-file "$RUNNER_TEMP/studio-3d-production-audit-issue.md"
+          fi
+
+      - name: Enforce blocking findings
+        if: steps.production-audit.outcome != 'success'
+        run: exit 1
