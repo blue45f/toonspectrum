@@ -21,7 +21,12 @@ describe("StudioAiProductionLaunchpad", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /AI 코믹 디렉터/u }));
+    const director = screen.getByRole("button", {
+      name: /AI 코믹 디렉터 · 스토리 → 편집 가능한 컷/u,
+    });
+    expect(director.getAttribute("data-studio-ai-production-action")).toBe("director");
+
+    fireEvent.click(director);
     fireEvent.click(
       screen.getByRole("button", { name: /화풍·연출 레시피 만들기/u }),
     );
