@@ -124,6 +124,27 @@ async function dismissOverlays(page: Page): Promise<void> {
   await page.keyboard.press("Escape").catch(() => undefined);
 }
 
+async function waitForCanvasSurface(page: Page): Promise<void> {
+  const canvas = page.locator(".konvajs-content").first();
+  const blankCanvas = page.getByRole("button", { name: "빈 캔버스", exact: true }).first();
+  const example = page.getByText("예시로 시작", { exact: true }).first();
+  const deadline = Date.now() + 30_000;
+
+  while (Date.now() < deadline) {
+    if (await canvas.isVisible().catch(() => false)) return;
+
+    if (await blankCanvas.isVisible().catch(() => false)) {
+      await blankCanvas.click({ timeout: 2_000 }).catch(() => undefined);
+    } else if (await example.isVisible().catch(() => false)) {
+      await example.click({ timeout: 2_000 }).catch(() => undefined);
+    }
+
+    await page.waitForTimeout(200);
+  }
+
+  await canvas.waitFor({ state: "visible", timeout: 1 });
+}
+
 async function waitForRoomUrl(page: Page): Promise<string> {
   await page.waitForFunction(
     () => Boolean(new URL(window.location.href).searchParams.get("room")?.trim()),
@@ -402,7 +423,7 @@ try {
   const pageA = attachedA.page;
   log("open A");
   await pageA.goto(`${origin}/studio`, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await pageA.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
+  await waitForCanvasSurface(pageA);
   await dismissOverlays(pageA);
   const roomUrl = await waitForRoomUrl(pageA);
   await ensureLocalPreviewTransport(pageA, "A");
@@ -413,7 +434,7 @@ try {
   const pageB = attachedB.page;
   log("open B in same room");
   await pageB.goto(roomUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await pageB.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
+  await waitForCanvasSurface(pageB);
   await dismissOverlays(pageB);
   await ensureLocalPreviewTransport(pageB, "B");
   const phaseB = await waitForDocumentLane(pageB, attachedB.diagnostics);
@@ -444,7 +465,7 @@ try {
   const pageC = attachedC.page;
   log("open late joiner C");
   await pageC.goto(roomUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  await pageC.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
+  await waitForCanvasSurface(pageC);
   await dismissOverlays(pageC);
   await ensureLocalPreviewTransport(pageC, "C");
   const phaseC = await waitForDocumentLane(pageC, attachedC.diagnostics);
