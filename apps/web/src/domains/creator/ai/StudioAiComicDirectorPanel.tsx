@@ -67,6 +67,7 @@ import type { StudioAiImageReferenceDocument } from "./studio-ai-image-reference
 import type { StudioAiSettings, StudioTextAiProvenance } from "./studio-ai-client";
 import type { ScenarioImageCandidate, ScenarioPreviewItem } from "../studio-scenario-layout";
 
+import { createSecureRandomUuid } from "@/shared/lib/secure-random-id";
 import { cn } from "@/shared/lib/utils";
 
 const STORY_TEXT_MAX = 12_000;
@@ -155,7 +156,9 @@ export interface StudioAiComicDirectorPanelProps {
 }
 
 function uid(prefix: string): string {
-  return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${prefix}-${createSecureRandomUuid(
+    `이 브라우저에서는 안전한 ${prefix} ID를 만들 수 없습니다.`,
+  )}`;
 }
 
 function stripDirectorDirective(prompt: string): string {
