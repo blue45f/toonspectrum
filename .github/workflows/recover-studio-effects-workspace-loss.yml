@@ -1,0 +1,105 @@
+name: Recover Studio effects workspace loss
+
+on:
+  push:
+    branches: [fix/studio-effects-workspace-loss-20260910]
+    paths: [.github/workflows/recover-studio-effects-workspace-loss.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: recover-studio-effects-workspace-loss-20260910
+  cancel-in-progress: true
+
+jobs:
+  recover:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 50
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-effects-workspace-loss-20260910
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.20.0
+          cache: pnpm
+      - name: Verify and apply the retained implementation payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/studio-effects-payload.part* | base64 --decode > /tmp/studio-effects-payload.tar.xz
+          printf '%s  %s\n' \
+            'd26c240ae2dd5bb5d31ffbc9ad21a4abe9c64494b76871ebe8034d3aba28abe6' \
+            '/tmp/studio-effects-payload.tar.xz' | sha256sum --check --strict
+          xz --test /tmp/studio-effects-payload.tar.xz
+          mkdir -p /tmp/studio-effects-payload
+          tar --extract --xz --file /tmp/studio-effects-payload.tar.xz --directory /tmp/studio-effects-payload
+          printf '%s  %s\n' \
+            'fb9077931ae82f4eb39c9516ec1d238dd3d6c3272b034d77af380673f0c42521' \
+            '/tmp/studio-effects-payload/toonstudio-effects-workspace.patch' | sha256sum --check --strict
+          printf '%s  %s\n' \
+            '40666f3aca7514b0cb98d0dba8dade0951a9ed10ade945fb7e500be45057eee5' \
+            '/tmp/studio-effects-payload/enhance-effects-workspace.mjs' | sha256sum --check --strict
+          node --check /tmp/studio-effects-payload/enhance-effects-workspace.mjs
+          git apply --check /tmp/studio-effects-payload/toonstudio-effects-workspace.patch
+          git apply /tmp/studio-effects-payload/toonstudio-effects-workspace.patch
+          node /tmp/studio-effects-payload/enhance-effects-workspace.mjs
+          node <<'NODE'
+          const fs = require("node:fs");
+          const target = "apps/web/src/domains/creator/studio-effects-workspace.ts";
+          const before = '    tags: ["야간", "네온", "발광", "도시", "night", "neon"],';
+          const after = '    tags: ["야간", "네온", "발광", "도시", "night", "neon", "glow"],';
+          const source = fs.readFileSync(target, "utf8");
+          if (!source.includes(before)) throw new Error("night-neon recipe metadata anchor was not found");
+          fs.writeFileSync(target, source.replace(before, after));
+          NODE
+          rm -rf \
+            .bootstrap \
+            .github/workflows/apply-studio-effects-workspace.yml \
+            .github/workflows/recover-studio-effects-payload.yml \
+            .github/workflows/recover-studio-effects-workspace-loss.yml
+          git diff --check
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Validate effects workspace contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed=(
+            apps/web/src/domains/creator/studio-effects-workspace.ts
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.tsx
+            apps/web/src/domains/creator/studio-effects-workspace.test.ts
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.tsx
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx
+          )
+          pnpm exec eslint --fix "${changed[@]}"
+          pnpm exec eslint --max-warnings=0 "${changed[@]}"
+          pnpm run validate:architecture
+          pnpm run typecheck
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-effects-workspace.test.ts \
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx \
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx \
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.opacity.test.tsx
+          pnpm run verify:studio-filter-dialog
+          pnpm run build:bundle
+          git diff --check
+      - name: Publish validated product-only recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): recover non-destructive effects workspace"
+          git push origin HEAD:fix/studio-effects-workspace-loss-20260910
