@@ -443,7 +443,7 @@ describe("StudioMenubarContent", () => {
     expect(setAssetRightsAuditOpen).toHaveBeenCalledWith(true);
   });
 
-  it("ref-clicks root import inputs and turns the busy control into an explicit cancel action", () => {
+  it("ref-clicks root import inputs and turns the busy control into an explicit cancel action", async () => {
     // File inputs live on StudioPage root (data-studio-document-import-inputs), not in menubar.
     const stableHandlers = createHandlers();
     const interchangeImportInputRef = {
@@ -487,8 +487,15 @@ describe("StudioMenubarContent", () => {
         })}
       />
     );
-    expect(screen.getByRole("button", { name: "ORA · CBZ · WILL" }))
-      .toHaveProperty("disabled", true);
+    await waitFor(() => {
+      const interchangeButtons = screen.getAllByRole("button", {
+        name: "ORA · CBZ · WILL",
+      });
+      expect(interchangeButtons.length).toBeGreaterThan(0);
+      for (const button of interchangeButtons) {
+        expect(button).toHaveProperty("disabled", true);
+      }
+    });
   });
 
   it("delegates mobile immersive and save actions without taking controller state", () => {
