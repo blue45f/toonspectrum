@@ -1,4 +1,5 @@
 import {
+  STUDIO_ORIGINAL_FREE_ASSET_LICENSE,
   STUDIO_ORIGINAL_FREE_ASSET_PACKAGES as BASE_PACKAGES,
   STUDIO_ORIGINAL_FREE_ASSETS as BASE_ASSETS,
   findStudioOriginalFreeAsset as findBaseAsset,
@@ -24,18 +25,24 @@ export {
 const BASE_ASSET_IDS = new Set(BASE_ASSETS.map((asset) => asset.id));
 
 function normalizeExpansionAsset(asset: StudioOriginalFreeAsset): StudioOriginalFreeAsset {
-  if (!BASE_ASSET_IDS.has(asset.id)) return asset;
-
   // Existing ids are project/runtime contracts. New authored material never replaces an
   // older visual just because a catalog author picked the same descriptive slug.
-  const replacementId = asset.id === "original-city-bicycle"
-    ? "original-city-commuter-bike"
-    : `${asset.id}-v2`;
+  const replacementId = !BASE_ASSET_IDS.has(asset.id)
+    ? asset.id
+    : asset.id === "original-city-bicycle"
+      ? "original-city-commuter-bike"
+      : `${asset.id}-v2`;
 
+  // The expansion authoring module is loaded through this public facade. Re-stamp the
+  // canonical base license at the aggregation boundary so ESM initialization order can
+  // never expose incomplete package or item rights metadata to Studio consumers.
   return Object.freeze({
     ...asset,
     id: replacementId,
-    contentFingerprint: `original-svg:v2:${replacementId}`,
+    contentFingerprint: replacementId === asset.id
+      ? asset.contentFingerprint
+      : `original-svg:v2:${replacementId}`,
+    license: STUDIO_ORIGINAL_FREE_ASSET_LICENSE,
   });
 }
 
@@ -44,6 +51,7 @@ const EXPANSION_PACKAGES: readonly StudioOriginalFreeAssetPackage[] = Object.fre
     const includedItems = Object.freeze(pkg.includedItems.map(normalizeExpansionAsset));
     return Object.freeze({
       ...pkg,
+      license: STUDIO_ORIGINAL_FREE_ASSET_LICENSE,
       includedItems,
       packageFingerprint: `${pkg.packageFingerprint}:normalized`,
     });
@@ -73,6 +81,29 @@ export const STUDIO_ORIGINAL_FREE_ASSETS: readonly StudioOriginalFreeAsset[] = O
   ...EXPANSION_ASSETS,
 ]);
 
+const PACKAGE_SEARCH_TEXT: ReadonlyMap<string, string> = new Map(
+  STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.map((pkg) => [
+    pkg.id,
+    [pkg.name, pkg.summary, pkg.category, ...pkg.tags]
+      .join("\n")
+      .toLocaleLowerCase("ko-KR"),
+  ]),
+);
+
+const ASSET_SEARCH_TEXT: ReadonlyMap<string, string> = new Map(
+  STUDIO_ORIGINAL_FREE_ASSETS.map((asset) => [
+    asset.id,
+    [
+      asset.name,
+      asset.category,
+      ...asset.tags,
+      PACKAGE_SEARCH_TEXT.get(asset.packageId) ?? "",
+    ]
+      .join("\n")
+      .toLocaleLowerCase("ko-KR"),
+  ]),
+);
+
 export function findStudioOriginalFreeAsset(assetId: unknown): StudioOriginalFreeAsset | null {
   if (typeof assetId !== "string") return null;
   return findBaseAsset(assetId)
@@ -101,9 +132,6 @@ export function filterStudioOriginalFreeAssets(input: {
     if (packageIds.size > 0 && !packageIds.has(asset.packageId)) return false;
     if (categories.size > 0 && !categories.has(asset.category)) return false;
     if (!query) return true;
-    return [asset.name, asset.category, ...asset.tags]
-      .join("\n")
-      .toLocaleLowerCase("ko-KR")
-      .includes(query);
+    return (ASSET_SEARCH_TEXT.get(asset.id) ?? "").includes(query);
   });
 }
