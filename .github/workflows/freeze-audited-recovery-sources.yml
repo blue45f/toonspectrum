@@ -1,0 +1,117 @@
+name: Freeze audited recovery sources
+
+on:
+  push:
+    branches: [fix/real-core-and-main-only-20260910]
+    paths: [.github/workflows/freeze-audited-recovery-sources.yml]
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: freeze-audited-recovery-sources-20260910
+  cancel-in-progress: true
+
+jobs:
+  freeze:
+    runs-on: ubuntu-slim
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: fix/real-core-and-main-only-20260910
+    steps:
+      - name: Cancel superseded self-patching and duplicate recovery runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          current="${GITHUB_RUN_ID}"
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs?branch=${TARGET_BRANCH}&per_page=100" \
+            --jq '.workflow_runs[] | select(.id != '"${current}"') | select(.status == "queued" or .status == "in_progress") | select(.name == "Recover audited deleted product work" or .name == "CI final React compiler fix once" or .name == "Studio AI comic director complete") | .id' \
+            | while IFS= read -r run_id; do
+                [[ -n "$run_id" ]] || continue
+                echo "Cancelling superseded run ${run_id}"
+                gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel" >/dev/null 2>&1 || true
+              done
+
+      - name: Create or verify immutable recovery tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          ensure_tag() {
+            local tag="$1"
+            local sha="$2"
+            local encoded existing
+            encoded="$(jq -rn --arg value "tags/${tag}" '$value|@uri')"
+            existing="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${encoded}" --jq '.object.sha' 2>/dev/null || true)"
+            if [[ -n "$existing" ]]; then
+              [[ "$existing" == "$sha" ]] || {
+                echo "Tag ${tag} already points to ${existing}; expected ${sha}." >&2
+                exit 1
+              }
+              echo "Verified ${tag} -> ${sha}"
+              return
+            fi
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${tag}" \
+              -f sha="${sha}" >/dev/null
+            echo "Created ${tag} -> ${sha}"
+          }
+
+          ensure_tag recovery/2026-09-10/pre-recovery-main d110925528e8ab2c485d5502cef7eae0e8d056dc
+          ensure_tag recovery/2026-09-10/pre-recovery-pr1289 89fd666a84bc606295ddf6ffab4e69bd6274cfda
+          ensure_tag recovery/2026-09-10/studio-3d-production-quality a8c475dc38060d46e50406b3802ead1867ab2515
+          ensure_tag recovery/2026-09-10/vrm-model-quality 591c59ad9f7e6cebb7fe519287bc49274a4a56d1
+          ensure_tag recovery/2026-09-10/vrm-thumbnail-quality ae94cb5b06c1f9e2fa7ce9665d9be61aa93730f4
+          ensure_tag recovery/2026-09-10/bg3d-webgl-context a09c8533f8a6ba96f043345f2ccb9ff1a5b6a5dd
+          ensure_tag recovery/2026-09-10/vrm-preview-atomic-decode 546922a3cb1b888de8b4ceeeb0548b21db726ce1
+          ensure_tag recovery/2026-09-10/studio-effects-workspace f76a78bc047d42dcc74cda6002307d50fb491cd8
+          ensure_tag recovery/2026-09-10/studio-unified-3d-entry 1b71d831407324fb4b2d9e5b4f0c1cabb5dd1d52
+          ensure_tag recovery/2026-09-10/studio-insert-batch-race b0c830f74a6dc1d8574829f91ddba3b8332869ca
+          ensure_tag recovery/2026-09-10/concurrent-webgl-recovery 94a6eefdd52edc47078574f9e8be4bfdf512cad1
+          ensure_tag recovery/2026-09-10/concurrent-vrm-quality-bootstrap 7f9c5acdee0c1be255d18887267be85288130e2d
+
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/real-core-and-main-only-20260910
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Record the immutable source map and retire temporary workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .qa
+          cat > .qa/deleted-work-recovery-source-tags-2026-09-10.md <<'EOF'
+          # Deleted-work recovery source tags — 2026-09-10
+
+          Immutable lightweight tags preserve every audited source before product reconstruction:
+
+          - `recovery/2026-09-10/pre-recovery-main`
+          - `recovery/2026-09-10/pre-recovery-pr1289`
+          - `recovery/2026-09-10/studio-3d-production-quality`
+          - `recovery/2026-09-10/vrm-model-quality`
+          - `recovery/2026-09-10/vrm-thumbnail-quality`
+          - `recovery/2026-09-10/bg3d-webgl-context`
+          - `recovery/2026-09-10/vrm-preview-atomic-decode`
+          - `recovery/2026-09-10/studio-effects-workspace`
+          - `recovery/2026-09-10/studio-unified-3d-entry`
+          - `recovery/2026-09-10/studio-insert-batch-race`
+          - `recovery/2026-09-10/concurrent-webgl-recovery`
+          - `recovery/2026-09-10/concurrent-vrm-quality-bootstrap`
+
+          Tags are preservation evidence only. Main receives reconstructed product code and tests after current-main validation; one-shot materializers are not retained.
+          EOF
+
+          rm -f \
+            .github/workflows/recover-audited-deleted-product-work.yml \
+            .github/workflows/freeze-audited-recovery-sources.yml \
+            .github/workflows/ci-final-react-compiler-fix.yml
+
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit \
+            -m "chore(recovery): freeze audited sources and retire bootstraps"
+          git push --no-verify origin "HEAD:${TARGET_BRANCH}"
