@@ -1,3 +1,4 @@
+# Manual trigger after GITHUB_TOKEN push suppression.
 name: Materialize tagged product without workflow writes
 
 on:
