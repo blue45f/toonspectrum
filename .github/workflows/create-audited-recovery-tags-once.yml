@@ -1,5 +1,6 @@
 name: Create audited recovery tags once
 
+# Registered by the previous commit; this update executes the one-shot tag creation.
 on:
   push:
     branches:
