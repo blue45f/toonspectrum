@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Commit SHA, tag, or branch to deploy (defaults to the triggering ref)
+        description: Commit SHA, tag, or branch already contained in main (defaults to the triggering ref)
         required: false
         type: string
 
@@ -34,6 +34,7 @@ jobs:
       - name: Require fallback deployment configuration
         shell: bash
         run: |
+          set -euo pipefail
           if [[ -z "${VERCEL_TOKEN:-}" || -z "${VERCEL_ORG_ID:-}" || -z "${VERCEL_PROJECT_ID:-}" ]]; then
             echo "::error::VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID are all required for the manual fallback deploy."
             exit 1
@@ -42,7 +43,23 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Require a reviewed commit from the current main history
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          deploy_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse origin/main)"
+          if ! git merge-base --is-ancestor "$deploy_sha" "$main_sha"; then
+            echo "::error::Ref ${{ inputs.ref || github.sha }} resolves to ${deploy_sha}, which is not contained in origin/main (${main_sha})."
+            exit 1
+          fi
+          echo "sha=${deploy_sha}" >> "$GITHUB_OUTPUT"
+          echo "main_sha=${main_sha}" >> "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v6
 
@@ -54,6 +71,7 @@ jobs:
       - name: Install and verify pinned Vercel CLI
         shell: bash
         run: |
+          set -euo pipefail
           npm install --global --no-audit --no-fund "vercel@${VERCEL_CLI_VERSION}"
           actual_version="$(vercel --version 2>&1 | awk '/Vercel CLI/{version=$NF} END {print version}')"
           echo "Vercel CLI ${actual_version}"
@@ -68,6 +86,7 @@ jobs:
       - name: Verify immutable prebuilt output
         shell: bash
         run: |
+          set -euo pipefail
           test -f .vercel/output/config.json
           test -d .vercel/output/static
           test -d .vercel/output/functions
@@ -78,12 +97,21 @@ jobs:
         id: deploy
         shell: bash
         run: |
-          deployment_url="$(vercel deploy --prebuilt --prod --yes --archive=tgz --token "$VERCEL_TOKEN")"
+          set -euo pipefail
+          deployment_output="$(vercel deploy --prebuilt --prod --yes --archive=tgz --token "$VERCEL_TOKEN")"
+          deployment_url="$(printf '%s\n' "$deployment_output" | awk '/^https:\/\//{url=$0} END{print url}')"
+          if [[ ! "$deployment_url" =~ ^https:// ]]; then
+            echo "::error::Vercel CLI did not return a production deployment URL."
+            printf '%s\n' "$deployment_output"
+            exit 1
+          fi
           echo "url=${deployment_url}" >> "$GITHUB_OUTPUT"
           {
             echo "## Vercel production fallback"
             echo
-            echo "- Ref: \`${{ inputs.ref || github.sha }}\`"
+            echo "- Requested ref: \`${{ inputs.ref || github.sha }}\`"
+            echo "- Immutable commit: \`${{ steps.source.outputs.sha }}\`"
+            echo "- Main at validation: \`${{ steps.source.outputs.main_sha }}\`"
             echo "- Deployment: ${deployment_url}"
             echo "- Mode: GitHub-runner prebuilt upload"
           } >> "$GITHUB_STEP_SUMMARY"
