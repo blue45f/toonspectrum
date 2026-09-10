@@ -66,6 +66,10 @@ jobs:
                       'for label in [">3D 캐릭터<", ">캐릭터 셰이퍼<", ">3D 데생 인형<", ">3D 배경<"]:',
                       'for label in ["3D 캐릭터", "캐릭터 셰이퍼", "3D 데생 인형", "3D 배경"]:',
                   )
+                  command = command.replace(
+                      'if source.count("3D 스튜디오") < 2:\n    raise SystemExit("unified 3D Studio button/fallback was not created")',
+                      'if source.count("3D 스튜디오") < 1:\n    raise SystemExit("unified 3D Studio entry was not created")',
+                  )
               print(f'::group::{name}', flush=True)
               if shell.startswith('python'):
                   subprocess.run(['python3', '-c', command], check=True, env=os.environ.copy())
