@@ -1,0 +1,89 @@
+name: Apply performance stabilization patch
+
+on:
+  push:
+    branches:
+      - codex/perf-live-status-20260910
+
+permissions:
+  contents: write
+
+concurrency:
+  group: codex-performance-patch-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[perf-patch-applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Apply surgical source changes
+        run: python3 scripts/.codex-performance-patch.py
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint changed source
+        run: >-
+          pnpm exec eslint
+          apps/web/src/domains/creator/live/use-studio-live-display-sync.ts
+          apps/web/src/domains/creator/live/use-studio-live-display-sync.test.tsx
+          apps/web/src/domains/creator/live/StudioLiveCanvasOverlay.tsx
+          apps/web/src/domains/creator/live/StudioLiveCollaborationPanel.tsx
+          apps/web/src/domains/creator/live/StudioLiveCollaborationCommandCenter.tsx
+          apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx
+          apps/web/src/domains/creator/StudioLeftToolRail.tsx
+          apps/web/src/shared/components/back-to-top.tsx
+          apps/web/src/domains/market/components/MarketDetailStickyBar.tsx
+
+      - name: Run focused regression tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/live/use-studio-live-display-sync.test.tsx
+          apps/web/src/domains/creator/live/StudioLiveCanvasOverlay.test.tsx
+          apps/web/src/domains/creator/live/StudioLiveCollaborationPanel.test.tsx
+          apps/web/src/domains/creator/live/StudioLiveCollaborationCommandCenter.test.tsx
+          apps/web/src/domains/creator/live/studio-live-collaboration-command-center.integration.test.ts
+          apps/web/src/domains/creator/live/studio-live-collaboration-reload-boundary.test.ts
+          apps/web/src/domains/creator/StudioLeftToolRail.test.tsx
+          apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.original-delivery.test.tsx
+
+      - name: Typecheck workspace
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+
+      - name: Commit verified source changes
+        shell: bash
+        run: |
+          git add \
+            apps/web/src/domains/creator/live/use-studio-live-display-sync.ts \
+            apps/web/src/domains/creator/live/use-studio-live-display-sync.test.tsx \
+            apps/web/src/domains/creator/live/StudioLiveCanvasOverlay.tsx \
+            apps/web/src/domains/creator/live/StudioLiveCollaborationPanel.tsx \
+            apps/web/src/domains/creator/live/StudioLiveCollaborationCommandCenter.tsx \
+            apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx \
+            apps/web/src/domains/creator/StudioLeftToolRail.tsx \
+            apps/web/src/shared/components/back-to-top.tsx \
+            apps/web/src/domains/market/components/MarketDetailStickyBar.tsx
+          git diff --cached --check
+          git config user.name "toonstudio-performance-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "perf: stabilize high-frequency studio UI updates [perf-patch-applied]"
+          git push origin HEAD:${{ github.ref_name }}
