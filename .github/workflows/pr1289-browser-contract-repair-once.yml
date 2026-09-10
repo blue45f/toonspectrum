@@ -1,5 +1,6 @@
 name: PR 1289 browser contract repair once
 
+# The workflow existed before this push so GitHub registers this second-generation trigger.
 on:
   push:
     branches:
@@ -39,6 +40,8 @@ jobs:
           def replace_once(path: str, old: str, new: str) -> None:
               target = Path(path)
               text = target.read_text(encoding="utf-8")
+              if new in text:
+                  return
               if old not in text:
                   raise RuntimeError(f"expected source block not found: {path}")
               target.write_text(text.replace(old, new, 1), encoding="utf-8")
@@ -81,16 +84,15 @@ jobs:
     }
 ''',
           )
-          replace_once(
-              "scripts/verify-studio-ai-image-references.mts",
-              '      const dialog = activePage.getByRole("dialog", { name: "시나리오 자동 생성", exact: true });\n',
-              '      const dialog = scenarioDialogLocator();\n',
-          )
-          replace_once(
-              "scripts/verify-studio-ai-image-references.mts",
-              '      const dialog = activePage.getByRole("dialog", { name: "시나리오 자동 생성", exact: true });\n',
-              '      const dialog = scenarioDialogLocator();\n',
-          )
+          target = Path("scripts/verify-studio-ai-image-references.mts")
+          text = target.read_text(encoding="utf-8")
+          old_dialog = '      const dialog = activePage.getByRole("dialog", { name: "시나리오 자동 생성", exact: true });\n'
+          new_dialog = '      const dialog = scenarioDialogLocator();\n'
+          if old_dialog in text:
+              text = text.replace(old_dialog, new_dialog, 2)
+              target.write_text(text, encoding="utf-8")
+          elif text.count(new_dialog) < 2:
+              raise RuntimeError("AI image reference dialog selectors were not found")
 
           replace_once(
               "scripts/verify-api-serverless-build.mjs",
@@ -109,10 +111,11 @@ jobs:
           PY
       - name: Validate changed TypeScript and JavaScript
         run: pnpm exec eslint apps/web/src/domains/creator/brush/StudioDrawingInputDeck.tsx scripts/verify-studio-ai-image-references.mts scripts/verify-api-serverless-build.mjs
-      - name: Commit repair and remove one-time workflow
+      - name: Restore canonical workflows, commit, and push
         shell: bash
         run: |
           set -euo pipefail
+          git show 13cfe2ecb2c2268815bc2d9c49349fb2abd76657:.github/workflows/feedback-community-validation.yml > .github/workflows/feedback-community-validation.yml
           rm -f .github/workflows/pr1289-browser-contract-repair-once.yml
           git diff --check
           git config user.name github-actions[bot]
