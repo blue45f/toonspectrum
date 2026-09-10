@@ -1,0 +1,123 @@
+name: PR 1289 browser contract repair once
+
+on:
+  push:
+    branches:
+      - fix/real-core-and-main-only-20260910
+    paths:
+      - .github/workflows/pr1289-browser-contract-repair-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr1289-browser-contract-repair-once
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/real-core-and-main-only-20260910
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply deterministic browser contract repairs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if old not in text:
+                  raise RuntimeError(f"expected source block not found: {path}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "apps/web/src/domains/creator/brush/StudioDrawingInputDeck.tsx",
+              '  const right = deckSideOffset(props.mobile, props.dockInsets);\n',
+              '  const right = deckSideOffset(props.mobile, props.dockInsets);\n'
+              '  // The mobile workspace toggle occupies the dock\'s right edge. Anchor this floating\n'
+              '  // launcher above the published canvas inset instead of overlapping that control.\n'
+              '  const bottom = props.mobile\n'
+              '    ? "calc(var(--studio-canvas-bottom-inset, 7rem) + 0.75rem)"\n'
+              '    : undefined;\n',
+          )
+          replace_once(
+              "apps/web/src/domains/creator/brush/StudioDrawingInputDeck.tsx",
+              '        style={{ right }}\n',
+              '        style={{ right, bottom }}\n',
+          )
+
+          replace_once(
+              "scripts/verify-studio-ai-image-references.mts",
+              '''    async function menu(group: string, id: string): Promise<void> {
+      await activePage.locator(`[data-studio-main-menu-trigger="${group}"]`).click();
+      await activePage.locator('[data-studio-main-menu-panel="true"]').locator(`[data-studio-menu-item-id="${id}"]`).click();
+    }
+''',
+              '''    async function menu(group: string, id: string): Promise<void> {
+      const trigger = activePage.locator(`[data-studio-main-menu-trigger="${group}"]`);
+      if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click();
+      const panel = activePage
+        .locator('[data-studio-main-menu-panel="true"]:visible')
+        .filter({ has: activePage.locator(`[data-studio-menu-item-id="${id}"]`) })
+        .first();
+      await panel.waitFor({ state: "visible" });
+      await panel.locator(`[data-studio-menu-item-id="${id}"]`).click();
+    }
+    function scenarioDialogLocator() {
+      return activePage.getByRole("dialog").filter({ hasText: "AI 이미지 참조 팩" }).first();
+    }
+''',
+          )
+          replace_once(
+              "scripts/verify-studio-ai-image-references.mts",
+              '      const dialog = activePage.getByRole("dialog", { name: "시나리오 자동 생성", exact: true });\n',
+              '      const dialog = scenarioDialogLocator();\n',
+          )
+          replace_once(
+              "scripts/verify-studio-ai-image-references.mts",
+              '      const dialog = activePage.getByRole("dialog", { name: "시나리오 자동 생성", exact: true });\n',
+              '      const dialog = scenarioDialogLocator();\n',
+          )
+
+          replace_once(
+              "scripts/verify-api-serverless-build.mjs",
+              '''      await writeFile(resolve(output, `${prefix}bootstrap.log`), child.stdout + child.stderr);
+      assert.equal(child.status, 0, `Lambda bootstrap failed; see ${output}/${prefix}bootstrap.log`);
+''',
+              '''      const bootstrapLog = child.stdout + child.stderr;
+      await writeFile(resolve(output, `${prefix}bootstrap.log`), bootstrapLog);
+      assert.equal(
+        child.status,
+        0,
+        `Lambda bootstrap failed for ${name}; see ${output}/${prefix}bootstrap.log\\n${bootstrapLog.slice(-8_000)}`,
+      );
+''',
+          )
+          PY
+      - name: Validate changed TypeScript and JavaScript
+        run: pnpm exec eslint apps/web/src/domains/creator/brush/StudioDrawingInputDeck.tsx scripts/verify-studio-ai-image-references.mts scripts/verify-api-serverless-build.mjs
+      - name: Commit repair and remove one-time workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/pr1289-browser-contract-repair-once.yml
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'fix(ci): stabilize mobile and AI reference browser contracts'
+          git push --no-verify origin HEAD:fix/real-core-and-main-only-20260910
