@@ -1,5 +1,7 @@
 import type { ScenarioPreviewItem } from "../studio-scenario-layout";
 
+import { createSecureRandomUuid } from "@/shared/lib/secure-random-id";
+
 export type StudioAiComicDirectorStage =
   | "brief"
   | "direction"
@@ -154,8 +156,9 @@ const ENTRY_SOURCES: readonly StudioAiComicDirectorEntrySource[] = [
 ];
 
 function id(): string {
-  return globalThis.crypto?.randomUUID?.()
-    ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return createSecureRandomUuid(
+    "이 브라우저에서는 안전한 AI 코믹 디렉터 문서 ID를 만들 수 없습니다.",
+  );
 }
 
 function enumValue<T extends string>(
