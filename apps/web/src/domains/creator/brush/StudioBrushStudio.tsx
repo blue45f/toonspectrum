@@ -111,6 +111,7 @@ import {
   StudioBrushWatercolorProgramControls,
 } from "./StudioBrushEngineMixer";
 import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
+import { StudioBrushGoalStart } from "./StudioBrushGoalStart";
 import { StudioBrushInputControls } from "./StudioBrushInputControls";
 
 import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
@@ -1594,6 +1595,18 @@ export function StudioBrushStudio({
         </header>
 
         {restoreAction}
+
+        <StudioBrushGoalStart
+          activePresetId={matchedPreset}
+          activeSection={category}
+          onSelectPreset={(presetId) =>
+            onSelectDynamicsPreset(
+              presetId,
+              studioBrushDynamicsPresetSelectionSettings(presetId),
+            )
+          }
+          onOpenSection={(section) => setCategory(section)}
+        />
 
         <div className="shrink-0 border-b border-line p-2 sm:hidden">
           <StudioBrushDynamicsPreview settings={settings} strokeWidth={strokeWidth} color={color} />
