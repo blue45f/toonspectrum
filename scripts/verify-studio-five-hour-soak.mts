@@ -199,12 +199,22 @@ async function gcHeap(cdp: CDPSession | null, startedAt: number): Promise<HeapSa
   }
 }
 
+async function closeBrushCatalog(page: Page): Promise<boolean> {
+  const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
+  if (!(await catalog.isVisible().catch(() => false))) return true;
+  await page.keyboard.press("Escape").catch(() => undefined);
+  return catalog.waitFor({ state: "hidden", timeout: 3_000 })
+    .then(() => true)
+    .catch(() => false);
+}
+
 async function selectBrush(page: Page, item: StudioBrushCatalogItem): Promise<boolean> {
   await page.keyboard.press("b");
   const toolbar = page.locator('[data-studio-draw-options="true"]');
   if (!(await toolbar.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false))) {
     return false;
   }
+  if (!(await closeBrushCatalog(page))) return false;
   const pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
   if (!(await pill.isVisible().catch(() => false))) return false;
   await pill.click();
@@ -224,13 +234,12 @@ async function selectBrush(page: Page, item: StudioBrushCatalogItem): Promise<bo
     await page.waitForTimeout(100);
   }
   if (await option.count() === 0) {
-    await page.keyboard.press("Escape");
+    await closeBrushCatalog(page);
     return false;
   }
   await option.first().scrollIntoViewIfNeeded();
   await option.first().click({ force: true });
-  await catalog.waitFor({ state: "hidden", timeout: 3_000 }).catch(() => undefined);
-  return true;
+  return closeBrushCatalog(page);
 }
 
 async function ensurePenReady(page: Page): Promise<boolean> {
@@ -242,6 +251,9 @@ async function ensurePenReady(page: Page): Promise<boolean> {
 }
 
 async function drawEvidenceStroke(page: Page, cycle: number): Promise<{ changed: number; shot: Buffer }> {
+  if (!(await closeBrushCatalog(page))) {
+    throw new Error("brush catalogue stayed open before drawing evidence");
+  }
   const stage = page.locator(".konvajs-content").first();
   const box = await stage.boundingBox();
   if (!box || box.width < 120 || box.height < 120) return { changed: -1, shot: Buffer.alloc(0) };

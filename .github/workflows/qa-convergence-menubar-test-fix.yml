@@ -1,0 +1,69 @@
+name: QA convergence menubar test fix
+
+on:
+  push:
+    branches:
+      - fix/qa-convergence-20260910
+    paths:
+      - .github/workflows/qa-convergence-menubar-test-fix.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qa-convergence-menubar-test-fix-20260910
+  cancel-in-progress: false
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/qa-convergence-20260910
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Scope the root-import action to the menubar owner
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("apps/web/src/domains/creator/StudioMenubarContent.test.tsx")
+          source = path.read_text()
+          old = 'fireEvent.click(screen.getByRole("button", { name: "ORA · CBZ · WILL" }));'
+          new = 'fireEvent.click(within(view.container).getByRole("button", { name: "ORA · CBZ · WILL" }));'
+          count = source.count(old)
+          if count != 1:
+              raise SystemExit(f"expected exactly one root-import query, found {count}")
+          path.write_text(source.replace(old, new, 1))
+      - name: Verify focused regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/StudioMenubarContent.test.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-procedural-starter-integration-boundary.test.ts \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-optional-anatomy-normalization.test.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document-contract-hardening.test.ts
+          node --test scripts/security-smol-toml-floor.test.mjs
+          pnpm exec eslint --no-ignore --max-warnings 0 \
+            apps/web/src/domains/creator/StudioMenubarContent.test.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-procedural-starter-integration-boundary.test.ts \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-optional-anatomy-normalization.test.ts \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts \
+            apps/web/src/domains/creator/scene3d/studio-scene3d-document-contract-hardening.test.ts
+          git diff --check
+      - name: Commit verified patch and retire one-shot workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/qa-convergence-menubar-test-fix.yml
+          git add apps/web/src/domains/creator/StudioMenubarContent.test.tsx
+          git diff --cached --check
+          git commit -m "fix(test): scope menubar import action to its owner"
+          git push origin HEAD:fix/qa-convergence-20260910
