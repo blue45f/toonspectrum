@@ -1,59 +1,123 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  MOBILE_SITE_TABS,
-  PRIMARY_SITE_NAVIGATION,
-  SITE_NAVIGATION_GROUPS,
   SITE_NAVIGATION_ITEMS,
   SITE_UTILITY_NAVIGATION,
+  TOONSPECTRUM_MOBILE_TABS,
+  TOONSPECTRUM_NAVIGATION_GROUPS,
+  TOONSPECTRUM_PRIMARY_NAVIGATION,
+  TOONSTUDIO_MOBILE_TABS,
+  TOONSTUDIO_NAVIGATION_GROUPS,
+  TOONSTUDIO_PRIMARY_NAVIGATION,
+  mobileSiteTabsForPath,
+  primarySiteNavigationForPath,
+  siteNavigationContextForPath,
+  siteNavigationGroupsForPath,
   siteNavigationLocale,
   siteNavigationText,
 } from "./site-navigation";
 
 describe("site navigation information architecture", () => {
-  it("organizes the full experience into four distinct user-purpose groups", () => {
-    expect(SITE_NAVIGATION_GROUPS.map((group) => group.id)).toEqual([
-      "create",
-      "discover",
-      "grow",
-      "connect",
+  it("separates creation and discovery into distinct product navigation", () => {
+    expect(TOONSTUDIO_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
+      "studio",
+      "make",
+      "studio-assets",
+      "learn",
     ]);
-    expect(SITE_NAVIGATION_GROUPS.find((group) => group.id === "create")?.items[0]).toBe(
-      SITE_NAVIGATION_ITEMS.make,
-    );
+    expect(TOONSPECTRUM_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
+      "explore",
+      "ranking",
+      "community",
+      "library",
+    ]);
 
-    const groupedItems = SITE_NAVIGATION_GROUPS.flatMap((group) => group.items);
-    expect(new Set(groupedItems.map((item) => item.id)).size).toBe(groupedItems.length);
-    expect(new Set(groupedItems.map((item) => item.href)).size).toBe(groupedItems.length);
+    expect(SITE_NAVIGATION_ITEMS.studio.href).toBe("/studio");
+    expect(SITE_NAVIGATION_ITEMS.make.href).toBe("/studio/new");
+    expect(SITE_NAVIGATION_ITEMS.studioAssets.href).toBe("/studio/assets");
   });
 
-  it("uses the desktop Home logo space for Studio while keeping Market first-class", () => {
-    expect(PRIMARY_SITE_NAVIGATION.map((item) => item.id)).toEqual([
-      "explore",
+  it("keeps the Studio drawer bounded while retaining all advanced destinations", () => {
+    expect(TOONSTUDIO_NAVIGATION_GROUPS.map((group) => group.id)).toEqual([
+      "studio-work",
+      "studio-create",
+      "studio-ecosystem",
+    ]);
+    expect(TOONSTUDIO_NAVIGATION_GROUPS[0]?.items).toEqual([
+      SITE_NAVIGATION_ITEMS.studio,
+      SITE_NAVIGATION_ITEMS.make,
+      SITE_NAVIGATION_ITEMS.studioAssets,
+      SITE_NAVIGATION_ITEMS.learn,
+    ]);
+
+    const groupedIds = TOONSTUDIO_NAVIGATION_GROUPS.flatMap((group) =>
+      group.items.map((item) => item.id)
+    );
+    expect(groupedIds).toEqual(expect.arrayContaining([
       "studio",
+      "make",
+      "studio-assets",
+      "learn",
+      "comic",
+      "shaper",
+      "research",
       "market",
-      "community",
+      "gallery",
+      "opportunities",
+    ]));
+  });
+
+  it("keeps the Spectrum drawer focused on discovery, community and personal history", () => {
+    expect(TOONSPECTRUM_NAVIGATION_GROUPS.map((group) => group.id)).toEqual([
+      "discover",
+      "connect",
+      "personal",
+    ]);
+    expect(TOONSPECTRUM_NAVIGATION_GROUPS[0]?.items[0]).toBe(
+      SITE_NAVIGATION_ITEMS.explore,
+    );
+  });
+
+  it("switches desktop and mobile navigation from the current product context", () => {
+    expect(siteNavigationContextForPath("/studio")).toBe("studio");
+    expect(siteNavigationContextForPath("/studio/canvas")).toBe("studio");
+    expect(siteNavigationContextForPath("/studio/assets/brushes/new")).toBe("studio");
+    expect(siteNavigationContextForPath("/learn/webtoon")).toBe("studio");
+    expect(siteNavigationContextForPath("/market")).toBe("studio");
+    expect(siteNavigationContextForPath("/discover")).toBe("spectrum");
+    expect(siteNavigationContextForPath("/community")).toBe("spectrum");
+
+    expect(primarySiteNavigationForPath("/studio")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
+    expect(primarySiteNavigationForPath("/discover")).toBe(TOONSPECTRUM_PRIMARY_NAVIGATION);
+    expect(siteNavigationGroupsForPath("/studio")).toBe(TOONSTUDIO_NAVIGATION_GROUPS);
+    expect(siteNavigationGroupsForPath("/discover")).toBe(TOONSPECTRUM_NAVIGATION_GROUPS);
+    expect(mobileSiteTabsForPath("/studio")).toBe(TOONSTUDIO_MOBILE_TABS);
+    expect(mobileSiteTabsForPath("/discover")).toBe(TOONSPECTRUM_MOBILE_TABS);
+  });
+
+  it("uses stable five-slot mobile navigation in each product", () => {
+    expect(TOONSTUDIO_MOBILE_TABS.map((item) => item.id)).toEqual([
+      "studio",
+      "make",
+      "studio-assets",
+      "learn",
       "me",
     ]);
-    expect(SITE_NAVIGATION_ITEMS.studio.href).toBe("/studio/projects");
-    expect(SITE_NAVIGATION_ITEMS.make.label.ko).toBe("새로 만들기");
-  });
-
-  it("uses stable places for all five mobile tabs", () => {
-    expect(MOBILE_SITE_TABS.map((item) => item.id)).toEqual([
+    expect(TOONSPECTRUM_MOBILE_TABS.map((item) => item.id)).toEqual([
       "home",
       "explore",
-      "studio",
-      "market",
-      "me",
+      "ranking",
+      "community",
+      "library",
     ]);
-    expect(MOBILE_SITE_TABS[2]).toBe(SITE_NAVIGATION_ITEMS.studio);
-    expect(MOBILE_SITE_TABS[3]).toBe(SITE_NAVIGATION_ITEMS.market);
   });
 
-  it("keeps Help discoverable while leaving My library as the final utility focus destination", () => {
-    expect(SITE_UTILITY_NAVIGATION[0]).toBe(SITE_NAVIGATION_ITEMS.help);
-    expect(SITE_UTILITY_NAVIGATION.at(-1)).toBe(SITE_NAVIGATION_ITEMS.library);
+  it("keeps Help, Settings and account destinations available from the utility area", () => {
+    expect(SITE_UTILITY_NAVIGATION).toEqual([
+      SITE_NAVIGATION_ITEMS.help,
+      SITE_NAVIGATION_ITEMS.settings,
+      SITE_NAVIGATION_ITEMS.me,
+    ]);
   });
 
   it("provides complete Korean and English labels for every destination", () => {
