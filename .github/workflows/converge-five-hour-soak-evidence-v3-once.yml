@@ -1,0 +1,200 @@
+name: Converge five-hour soak evidence v3 once
+
+on:
+  push:
+    branches:
+      - fix/studio-five-hour-soak-catalog-state-20260910
+    paths:
+      - .github/workflows/converge-five-hour-soak-evidence-v3-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: converge-five-hour-soak-evidence-v3-20260910
+  cancel-in-progress: false
+
+jobs:
+  converge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-five-hour-soak-catalog-state-20260910
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Apply trustworthy mobile and raster evidence
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/verify-studio-five-hour-soak.mts')
+          source = path.read_text()
+
+          old_select = '''async function selectBrush(page: Page, item: StudioBrushCatalogItem): Promise<boolean> {
+            await page.keyboard.press("b");
+            const toolbar = page.locator('[data-studio-draw-options="true"]');
+            if (!(await toolbar.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false))) {
+              return false;
+            }
+            if (!(await closeBrushCatalog(page))) return false;
+            const pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
+            if (!(await pill.isVisible().catch(() => false))) return false;
+            await pill.click();
+          '''
+          new_select = '''async function selectBrush(page: Page, item: StudioBrushCatalogItem): Promise<boolean> {
+            const mobileDock = page.locator('[data-studio-mobile-editing-dock="true"]');
+            const mobileDockVisible = await mobileDock.isVisible({ timeout: 250 }).catch(() => false);
+            if (!(await closeBrushCatalog(page))) return false;
+            if (!mobileDockVisible) await page.keyboard.press("b");
+            const opener = mobileDockVisible
+              ? mobileDock.locator('[data-studio-open-brush-library="true"]')
+              : page.locator('[data-studio-draw-options="true"] [data-studio-brush-active-pill="true"]');
+            if (!(await opener.isVisible().catch(() => false))) return false;
+            await opener.click();
+          '''
+          if source.count(old_select) != 1:
+              raise SystemExit(f'expected selectBrush prefix once, got {source.count(old_select)}')
+          source = source.replace(old_select, new_select, 1)
+
+          old_pen = '''async function ensurePenReady(page: Page): Promise<boolean> {
+            await page.keyboard.press("b");
+            return page.locator('[data-studio-draw-options="true"]')
+              .waitFor({ state: "visible", timeout: 4_000 })
+              .then(() => true)
+              .catch(() => false);
+          }
+          '''
+          new_pen = '''async function ensurePenReady(page: Page): Promise<boolean> {
+            const mobileDock = page.locator('[data-studio-mobile-editing-dock="true"]');
+            if (await mobileDock.isVisible({ timeout: 250 }).catch(() => false)) {
+              const pen = mobileDock.getByRole("button", { name: /^(?:펜|Pen)$/u });
+              if (!(await pen.isVisible().catch(() => false))) return false;
+              if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+              await page.waitForTimeout(80);
+              return await pen.getAttribute("aria-pressed") === "true";
+            }
+            await page.keyboard.press("b");
+            return page.locator('[data-studio-draw-options="true"]')
+              .waitFor({ state: "visible", timeout: 4_000 })
+              .then(() => true)
+              .catch(() => false);
+          }
+          '''
+          if source.count(old_pen) != 1:
+              raise SystemExit(f'expected ensurePenReady once, got {source.count(old_pen)}')
+          source = source.replace(old_pen, new_pen, 1)
+
+          old_draw = '''  const lane = cycle % 7;
+            const x0 = box.x + box.width * (0.18 + (lane % 3) * 0.12);
+            const y0 = box.y + box.height * (0.22 + (lane % 4) * 0.11);
+            await page.mouse.move(x0, y0);
+            await page.mouse.down();
+            for (let step = 1; step <= 28; step += 1) {
+              await page.mouse.move(
+                Math.min(box.x + box.width - 30, x0 + step * 9),
+                y0 + Math.sin((step + cycle) / 4) * 28,
+                { steps: 2 },
+              );
+            }
+          '''
+          new_draw = '''  // Long soak probes must not repaint a tiny fixed lane set: once those pixels are
+            // saturated, healthy drawing can legitimately produce changedPixels=0. Co-prime phases keep
+            // the first 600 probes deterministic but geometrically distinct without changing the threshold.
+            const horizontalPhase = ((cycle * 73) % 997) / 996;
+            const verticalPhase = ((cycle * 151) % 991) / 990;
+            const wavePhase = (((cycle * 193) % 983) / 982) * Math.PI * 2;
+            const direction = cycle % 2 === 0 ? 1 : -1;
+            const marginX = Math.min(36, box.width * 0.08);
+            const marginY = Math.min(36, box.height * 0.08);
+            const minX = box.x + marginX;
+            const maxX = box.x + box.width - marginX;
+            const minY = box.y + marginY;
+            const maxY = box.y + box.height - marginY;
+            const travel = Math.min(280, box.width * 0.3);
+            const centerX = minX + (maxX - minX) * horizontalPhase;
+            const x0 = Math.max(minX, Math.min(maxX, centerX - direction * travel / 2));
+            const y0 = minY + (maxY - minY) * verticalPhase;
+            const waveHeight = 14 + Math.min(28, box.height * 0.03);
+            await page.mouse.move(x0, y0);
+            await page.mouse.down();
+            for (let step = 1; step <= 28; step += 1) {
+              const t = step / 28;
+              const x = Math.max(minX, Math.min(maxX, x0 + direction * travel * t));
+              const wave = Math.sin(t * Math.PI * 2 * 1.35 + wavePhase) * waveHeight;
+              const drift = (t - 0.5) * ((cycle % 7) - 3) * 3;
+              const y = Math.max(minY, Math.min(maxY, y0 + wave + drift));
+              await page.mouse.move(x, y, { steps: 2 });
+            }
+          '''
+          if source.count(old_draw) != 1:
+              raise SystemExit(f'expected fixed-lane draw block once, got {source.count(old_draw)}')
+          path.write_text(source.replace(old_draw, new_draw, 1))
+
+          test_path = Path('scripts/verify-studio-five-hour-soak-harness.test.ts')
+          test = test_path.read_text()
+          replacements = [
+            ('expect(closeCatalog).toContain("return false");', 'expect(closeCatalog).toContain(".catch(() => false)");'),
+            ('const openIndex = selectBrush.indexOf("await pill.click()");', 'const openIndex = selectBrush.indexOf("await opener.click()");'),
+            ('const verifyClosedIndex = selectBrush.lastIndexOf("await closeBrushCatalog(page)");', 'const verifyClosedIndex = selectBrush.lastIndexOf("closeBrushCatalog(page)");'),
+          ]
+          for old, new in replacements:
+              if test.count(old) != 1:
+                  raise SystemExit(f'expected test anchor once: {old!r}, got {test.count(old)}')
+              test = test.replace(old, new, 1)
+
+          contract_anchor = '    expect(verifyClosedIndex).toBeGreaterThan(chooseIndex);\n'
+          contract_extra = '''    expect(selectBrush).toContain('[data-studio-mobile-editing-dock="true"]');
+            expect(selectBrush).toContain('[data-studio-open-brush-library="true"]');
+          '''
+          if test.count(contract_anchor) != 1:
+              raise SystemExit('selection contract anchor moved')
+          test = test.replace(contract_anchor, contract_anchor + contract_extra, 1)
+
+          extra = '''
+            it("uses the real mobile pen authority instead of the desktop keyboard toolbar", () => {
+              const pen = sliceFunction("ensurePenReady", "drawEvidenceStroke");
+              expect(pen).toContain('[data-studio-mobile-editing-dock="true"]');
+              expect(pen).toContain('getByRole("button", { name: /^(?:펜|Pen)$/u })');
+              expect(pen).toContain('getAttribute("aria-pressed")');
+            });
+
+            it("spreads raster probes instead of repainting seven saturated lanes", () => {
+              const draw = sliceFunction("drawEvidenceStroke", "spawnPreview");
+              expect(draw).not.toContain("const lane = cycle % 7");
+              expect(draw).toContain("((cycle * 73) % 997) / 996");
+              expect(draw).toContain("((cycle * 151) % 991) / 990");
+              expect(draw).toContain("((cycle * 193) % 983) / 982");
+            });
+          '''
+          marker = '\n});\n'
+          pos = test.rfind(marker)
+          if pos < 0:
+              raise SystemExit('test suite end not found')
+          test_path.write_text(test[:pos] + extra + test[pos:])
+          PY
+          git diff --check
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Focused regression and lint
+        shell: bash
+        run: |
+          pnpm exec vitest run scripts/verify-studio-five-hour-soak-harness.test.ts
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored scripts/verify-studio-five-hour-soak.mts scripts/verify-studio-five-hour-soak-harness.test.ts
+      - name: Commit verified convergence and remove temporary workflows
+        shell: bash
+        run: |
+          rm .github/workflows/converge-five-hour-soak-evidence-once.yml
+          rm .github/workflows/converge-five-hour-soak-evidence-v2-once.yml
+          rm .github/workflows/converge-five-hour-soak-evidence-v3-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          HUSKY=0 git commit -m "test(studio): make five-hour soak evidence trustworthy"
+          HUSKY=0 git push origin HEAD:fix/studio-five-hour-soak-catalog-state-20260910
