@@ -20,7 +20,7 @@ permissions:
 jobs:
   audit:
     if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - name: Check out the audit branch
