@@ -1,0 +1,586 @@
+name: Recover audited deleted product work
+
+on:
+  push:
+    branches: [fix/real-core-and-main-only-20260910]
+    paths: [.github/workflows/recover-audited-deleted-product-work.yml]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: recover-audited-deleted-product-work-20260910
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+      TARGET_BRANCH: fix/real-core-and-main-only-20260910
+      TAG_BG3D_QUALITY: recovery/2026-09-10/studio-3d-production-quality
+      TAG_VRM_MODEL: recovery/2026-09-10/vrm-model-quality
+      TAG_VRM_THUMBNAIL: recovery/2026-09-10/vrm-thumbnail-quality
+      TAG_BG3D_WEBGL: recovery/2026-09-10/bg3d-webgl-context
+      TAG_VRM_PREVIEW: recovery/2026-09-10/vrm-preview-atomic-decode
+      TAG_EFFECTS: recovery/2026-09-10/studio-effects-workspace
+      TAG_UNIFIED_3D: recovery/2026-09-10/studio-unified-3d-entry
+      TAG_INSERT_BATCH: recovery/2026-09-10/studio-insert-batch-race
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/real-core-and-main-only-20260910
+          fetch-depth: 0
+          lfs: true
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Preserve every audited source as an immutable recovery tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+
+          ensure_tag() {
+            local tag="$1"
+            local sha="$2"
+            local encoded existing
+            encoded="$(jq -rn --arg value "tags/${tag}" '$value|@uri')"
+            existing="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${encoded}" --jq '.object.sha' 2>/dev/null || true)"
+            if [[ -n "$existing" ]]; then
+              if [[ "$existing" != "$sha" ]]; then
+                echo "Recovery tag ${tag} already points to ${existing}, expected ${sha}." >&2
+                exit 1
+              fi
+              echo "Verified existing tag ${tag} -> ${sha}"
+              return
+            fi
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${tag}" \
+              -f sha="${sha}" >/dev/null
+            echo "Created tag ${tag} -> ${sha}"
+          }
+
+          ensure_tag "recovery/2026-09-10/pre-recovery-main" "$(git rev-parse origin/main)"
+          ensure_tag "recovery/2026-09-10/pre-recovery-pr1289" "$(git rev-parse HEAD^)"
+          ensure_tag "$TAG_BG3D_QUALITY" a8c475dc38060d46e50406b3802ead1867ab2515
+          ensure_tag "$TAG_VRM_MODEL" 591c59ad9f7e6cebb7fe519287bc49274a4a56d1
+          ensure_tag "$TAG_VRM_THUMBNAIL" ae94cb5b06c1f9e2fa7ce9665d9be61aa93730f4
+          ensure_tag "$TAG_BG3D_WEBGL" a09c8533f8a6ba96f043345f2ccb9ff1a5b6a5dd
+          ensure_tag "$TAG_VRM_PREVIEW" 546922a3cb1b888de8b4ceeeb0548b21db726ce1
+          ensure_tag "$TAG_EFFECTS" f76a78bc047d42dcc74cda6002307d50fb491cd8
+          ensure_tag "$TAG_UNIFIED_3D" 1b71d831407324fb4b2d9e5b4f0c1cabb5dd1d52
+          ensure_tag "$TAG_INSERT_BATCH" b0c830f74a6dc1d8574829f91ddba3b8332869ca
+
+          git fetch --force --tags origin
+          for tag in \
+            "$TAG_BG3D_QUALITY" "$TAG_VRM_MODEL" "$TAG_VRM_THUMBNAIL" \
+            "$TAG_BG3D_WEBGL" "$TAG_VRM_PREVIEW" "$TAG_EFFECTS" \
+            "$TAG_UNIFIED_3D" "$TAG_INSERT_BATCH"
+          do
+            git cat-file -e "refs/tags/${tag}^{commit}"
+          done
+
+      - name: Prepare reviewed materializers and dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check pyyaml
+          pnpm install --frozen-lockfile --prefer-offline
+          mkdir -p "$RUNNER_TEMP/audited-recovery"
+
+          git show "$TAG_BG3D_WEBGL:.github/workflows/materialize-bg3d-webgl-recovery-once.yml" > "$RUNNER_TEMP/audited-recovery/bg3d-webgl-once.yml"
+          git show "$TAG_BG3D_WEBGL:.github/workflows/materialize-bg3d-webgl-recovery-v2.yml" > "$RUNNER_TEMP/audited-recovery/bg3d-webgl-v2.yml"
+          git show "$TAG_BG3D_WEBGL:.github/workflows/materialize-bg3d-webgl-recovery-v3.yml" > "$RUNNER_TEMP/audited-recovery/bg3d-webgl-v3.yml"
+          git show "$TAG_VRM_PREVIEW:.github/workflows/materialize-vrm-preview-atomic-decode-once.yml" > "$RUNNER_TEMP/audited-recovery/vrm-preview-once.yml"
+          git show "$TAG_VRM_PREVIEW:.github/workflows/materialize-vrm-preview-atomic-decode-v3.yml" > "$RUNNER_TEMP/audited-recovery/vrm-preview-v3.yml"
+          git show "$TAG_UNIFIED_3D:.github/workflows/recover-studio-unified-3d-entry.yml" > "$RUNNER_TEMP/audited-recovery/unified-3d.yml"
+          git show "$TAG_INSERT_BATCH:.github/workflows/codex-studio-insert-batch-draft-verify.yml" > "$RUNNER_TEMP/audited-recovery/insert-batch.yml"
+          git show "$TAG_VRM_THUMBNAIL:.github/workflows/materialize-studio-vrm-thumbnail-quality-gate.yml" > "$RUNNER_TEMP/audited-recovery/vrm-thumbnail.yml"
+
+          cat > "$RUNNER_TEMP/audited-recovery/run-step.py" <<'PY'
+          from __future__ import annotations
+
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          import yaml
+
+          workflow_path = Path(sys.argv[1])
+          job_name = sys.argv[2]
+          step_name = sys.argv[3]
+          document = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+          steps = document["jobs"][job_name]["steps"]
+          selected = next((step for step in steps if step.get("name") == step_name), None)
+          if selected is None or not isinstance(selected.get("run"), str):
+              raise SystemExit(f"Missing reviewed step: {workflow_path} :: {job_name} :: {step_name}")
+          command = selected["run"]
+          shell = str(selected.get("shell", "bash"))
+          env = os.environ.copy()
+          print(f"Executing reviewed step: {step_name}")
+          if shell.startswith("python"):
+              subprocess.run(["python3", "-c", command], check=True, env=env)
+          else:
+              subprocess.run(command, shell=True, executable="/bin/bash", check=True, env=env)
+          PY
+
+      - name: Restore deterministic BG3D insertion quality
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout "$TAG_BG3D_QUALITY" -- \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-extreme-aspect.test.ts
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          policy = Path("apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.ts")
+          text = policy.read_text(encoding="utf-8")
+          if "STUDIO_BG3D_INSERT_MIN_DIMENSION" not in text:
+              text = text.replace(
+                  "export const STUDIO_BG3D_INSERT_MIN_EDGE = 256;\n",
+                  "export const STUDIO_BG3D_INSERT_MIN_EDGE = 256;\n"
+                  "export const STUDIO_BG3D_INSERT_MIN_DIMENSION = 64;\n",
+                  1,
+              )
+          text = text.replace(
+              "Math.max(STUDIO_BG3D_INSERT_MIN_EDGE, Math.round(width * scale))",
+              "Math.max(STUDIO_BG3D_INSERT_MIN_DIMENSION, Math.round(width * scale))",
+          )
+          text = text.replace(
+              "Math.max(STUDIO_BG3D_INSERT_MIN_EDGE, Math.round(height * scale))",
+              "Math.max(STUDIO_BG3D_INSERT_MIN_DIMENSION, Math.round(height * scale))",
+          )
+          policy.write_text(text, encoding="utf-8")
+
+          host = Path("apps/web/src/domains/creator/bg3d/studio-bg3d-editor-insert-host.ts")
+          source = host.read_text(encoding="utf-8")
+          import_line = 'import { resolveStudioBg3dInsertQualityPlan } from "./studio-bg3d-insert-quality-policy";\n'
+          if import_line not in source:
+              anchor = 'import * as R from "./studio-bg3d-editor-runtime-bindings";\n'
+              if source.count(anchor) != 1:
+                  raise SystemExit("BG3D insert host import anchor changed")
+              source = source.replace(anchor, anchor + import_line, 1)
+
+          old = '''      const requestedCaptureHeight = Math.min(
+            4096,
+            Math.max(2160, Math.round(adapted.document.output.exportHeight)),
+          );
+          const captureSize = resolveStudioBg3dLtCaptureSize({
+            sourceWidth: sourceSize.width,
+            sourceHeight: sourceSize.height,
+            aspectRatio: captureFrame.aspectRatio,
+            requestedHeight: requestedCaptureHeight,
+            maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
+          });'''
+          new = '''      const qualityPlan = resolveStudioBg3dInsertQualityPlan({
+            exportHeight: adapted.document.output.exportHeight,
+            aspectRatio: captureFrame.aspectRatio,
+            deviceMaxPixels: deviceQuality.maxRenderPixels,
+            rendererMaxPixels: STUDIO_BG3D_LT_RENDER_MAX_PIXELS,
+          });
+          const captureSize = resolveStudioBg3dLtCaptureSize({
+            sourceWidth: sourceSize.width,
+            sourceHeight: sourceSize.height,
+            aspectRatio: captureFrame.aspectRatio,
+            requestedHeight: qualityPlan.requestedHeight,
+            maxPixels: qualityPlan.maxPixels,
+          });'''
+          if new not in source:
+              if source.count(old) != 1:
+                  raise SystemExit(f"BG3D insertion sizing anchor changed: {source.count(old)}")
+              source = source.replace(old, new, 1)
+          host.write_text(source, encoding="utf-8")
+          PY
+
+          cat > apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-integration-boundary.test.ts <<'EOF'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+
+          const source = readFileSync(
+            new URL("./studio-bg3d-editor-insert-host.ts", import.meta.url),
+            "utf8",
+          );
+
+          describe("BG3D production insert quality integration", () => {
+            it("delegates sizing to the deterministic quality authority", () => {
+              const start = source.indexOf("async function handleInsert");
+              const end = source.indexOf("h.handleInsert = handleInsert;", start);
+              const handler = source.slice(start, end);
+              expect(start).toBeGreaterThanOrEqual(0);
+              expect(handler).toContain("resolveStudioBg3dInsertQualityPlan({");
+              expect(handler).toContain("requestedHeight: qualityPlan.requestedHeight");
+              expect(handler).toContain("maxPixels: qualityPlan.maxPixels");
+              expect(handler).not.toContain("devicePixelRatio");
+              expect(handler).not.toContain("requestedCaptureHeight");
+            });
+          });
+          EOF
+
+      - name: Restore VRM model and thumbnail technical admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout "$TAG_VRM_MODEL" -- \
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.test.ts \
+            scripts/generate-vrm-model-technical-denylist.ts
+          git checkout "$TAG_VRM_THUMBNAIL" -- \
+            apps/web/src/domains/creator/vrm/studio-vrm-production-thumbnail-files.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-security.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.test.ts \
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.ts
+
+          pnpm exec tsx scripts/generate-vrm-model-technical-denylist.ts \
+            | tee "$RUNNER_TEMP/vrm-model-quality-report.json"
+          python3 "$RUNNER_TEMP/audited-recovery/run-step.py" \
+            "$RUNNER_TEMP/audited-recovery/vrm-thumbnail.yml" \
+            thumbnail-quality \
+            "Harden URL admission and prepare technical scanner"
+          pnpm exec tsx scripts/generate-vrm-thumbnail-technical-denylist.ts \
+            | tee "$RUNNER_TEMP/vrm-thumbnail-quality-report.json"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          library = Path("apps/web/src/domains/creator/vrm/vrm-library.ts")
+          text = library.read_text(encoding="utf-8")
+          imports = '''import {
+            isStudioVrmTechnicallyAdmittedModel,
+          } from "./studio-vrm-model-technical-denylist.generated";
+          import { isStudioVrmProductionModelUrl } from "./studio-vrm-model-quality";
+          import {
+            isStudioVrmTechnicallyAdmittedThumbnail,
+          } from "./studio-vrm-thumbnail-technical-denylist.generated";
+          import { isStudioVrmProductionThumbnailUrl } from "./studio-vrm-thumbnail-quality";
+          '''
+          if "isStudioVrmTechnicallyAdmittedModel" not in text:
+              anchor = "\nconst DB_NAME"
+              if text.count(anchor) != 1:
+                  raise SystemExit("VRM library import boundary changed")
+              text = text.replace(anchor, "\n" + imports + anchor, 1)
+
+          old = '.filter((sample) => sample.visibility !== "legacy")'
+          new = '''.filter(
+            (sample) =>
+              sample.visibility !== "legacy"
+              && isStudioVrmProductionModelUrl(sample.url)
+              && isStudioVrmTechnicallyAdmittedModel(sample.id)
+              && isStudioVrmProductionThumbnailUrl(sample.thumbnailUrl)
+              && isStudioVrmTechnicallyAdmittedThumbnail(sample.id),
+          )'''
+          if "isStudioVrmTechnicallyAdmittedThumbnail(sample.id)" not in text:
+              if text.count(old) != 1:
+                  raise SystemExit(f"VRM sample discovery anchor changed: {text.count(old)}")
+              text = text.replace(old, new, 1)
+          library.write_text(text, encoding="utf-8")
+          PY
+
+          cat > apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts <<'EOF'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+
+          import { SAMPLE_VRM_ENTRIES, SAMPLE_VRMS } from "./vrm-library";
+          import { STUDIO_VRM_TECHNICAL_MODEL_REJECTIONS } from "./studio-vrm-model-technical-denylist.generated";
+          import { isStudioVrmProductionModelUrl } from "./studio-vrm-model-quality";
+
+          const source = readFileSync(new URL("./vrm-library.ts", import.meta.url), "utf8");
+
+          describe("VRM technical model quality integration", () => {
+            it("keeps every default catalogue entry outside the generated model denylist", () => {
+              const rejected = new Set(Object.keys(STUDIO_VRM_TECHNICAL_MODEL_REJECTIONS));
+              const samples = new Map(SAMPLE_VRMS.map((sample) => [sample.id, sample]));
+              expect(SAMPLE_VRM_ENTRIES.length).toBeGreaterThan(0);
+              for (const entry of SAMPLE_VRM_ENTRIES) {
+                expect(rejected.has(entry.id), entry.id).toBe(false);
+                expect(isStudioVrmProductionModelUrl(samples.get(entry.id)?.url), entry.id).toBe(true);
+              }
+            });
+
+            it("keeps technical model admission in new-project discovery", () => {
+              expect(source).toContain("isStudioVrmProductionModelUrl(sample.url)");
+              expect(source).toContain("isStudioVrmTechnicallyAdmittedModel(sample.id)");
+            });
+          });
+          EOF
+
+          cat > apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-integration.test.ts <<'EOF'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+
+          import { SAMPLE_VRM_ENTRIES } from "./vrm-library";
+          import { STUDIO_VRM_TECHNICAL_THUMBNAIL_REJECTIONS } from "./studio-vrm-thumbnail-technical-denylist.generated";
+          import { isStudioVrmProductionThumbnailUrl } from "./studio-vrm-thumbnail-quality";
+
+          const source = readFileSync(new URL("./vrm-library.ts", import.meta.url), "utf8");
+
+          describe("VRM production thumbnail quality integration", () => {
+            it("exposes only technically admitted deployment-owned card art", () => {
+              const rejected = new Set(Object.keys(STUDIO_VRM_TECHNICAL_THUMBNAIL_REJECTIONS));
+              for (const entry of SAMPLE_VRM_ENTRIES) {
+                expect(rejected.has(entry.id), entry.id).toBe(false);
+                expect(isStudioVrmProductionThumbnailUrl(entry.thumbnail), entry.id).toBe(true);
+              }
+            });
+
+            it("keeps technical thumbnail admission in new-project discovery", () => {
+              expect(source).toContain("isStudioVrmProductionThumbnailUrl(sample.thumbnailUrl)");
+              expect(source).toContain("isStudioVrmTechnicallyAdmittedThumbnail(sample.id)");
+            });
+          });
+          EOF
+
+      - name: Restore WebGL recovery and bounded texture filtering
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner="$RUNNER_TEMP/audited-recovery/run-step.py"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/bg3d-webgl-once.yml" materialize \
+            "Add deterministic WebGL context recovery state machine"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/bg3d-webgl-once.yml" materialize \
+            "Install the recovery agent inside the primary Canvas"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/bg3d-webgl-v2.yml" materialize \
+            "Add bounded anisotropic texture quality pass"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/bg3d-webgl-v2.yml" materialize \
+            "Install texture quality agent beside context recovery"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/bg3d-webgl-v3.yml" materialize \
+            "Use a real DOM for texture exclusion tests"
+
+      - name: Restore atomic VRM preview transitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner="$RUNNER_TEMP/audited-recovery/run-step.py"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/vrm-preview-once.yml" materialize \
+            "Add atomic image transition component"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/vrm-preview-once.yml" materialize \
+            "Replace the raw character-card image atomically"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/vrm-preview-v3.yml" materialize \
+            "Remove shared-style coupling and fix async assertions"
+
+      - name: Restore non-destructive Studio effects workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/studio-effects-payload.b64"
+          : > "$payload"
+          for part in 00 01 02 03 04; do
+            git show "$TAG_EFFECTS:.bootstrap/studio-effects-payload.part${part}" >> "$payload"
+          done
+          base64 --decode "$payload" > "$RUNNER_TEMP/studio-effects-payload.tar.xz"
+          printf '%s  %s\n' \
+            d26c240ae2dd5bb5d31ffbc9ad21a4abe9c64494b76871ebe8034d3aba28abe6 \
+            "$RUNNER_TEMP/studio-effects-payload.tar.xz" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/studio-effects-payload"
+          tar --extract --xz \
+            --file "$RUNNER_TEMP/studio-effects-payload.tar.xz" \
+            --directory "$RUNNER_TEMP/studio-effects-payload"
+          printf '%s  %s\n' \
+            fb9077931ae82f4eb39c9516ec1d238dd3d6c3272b034d77af380673f0c42521 \
+            "$RUNNER_TEMP/studio-effects-payload/toonstudio-effects-workspace.patch" \
+            | sha256sum --check --strict
+          printf '%s  %s\n' \
+            40666f3aca7514b0cb98d0dba8dade0951a9ed10ade945fb7e500be45057eee5 \
+            "$RUNNER_TEMP/studio-effects-payload/enhance-effects-workspace.mjs" \
+            | sha256sum --check --strict
+          git apply --3way --whitespace=fix \
+            "$RUNNER_TEMP/studio-effects-payload/toonstudio-effects-workspace.patch"
+          node "$RUNNER_TEMP/studio-effects-payload/enhance-effects-workspace.mjs"
+          node <<'NODE'
+          const fs = require("node:fs");
+          const target = "apps/web/src/domains/creator/studio-effects-workspace.ts";
+          const before = '    tags: ["야간", "네온", "발광", "도시", "night", "neon"],';
+          const after = '    tags: ["야간", "네온", "발광", "도시", "night", "neon", "glow"],';
+          const source = fs.readFileSync(target, "utf8");
+          if (!source.includes(after)) {
+            if (!source.includes(before)) throw new Error("night-neon recipe metadata anchor changed");
+            fs.writeFileSync(target, source.replace(before, after));
+          }
+          NODE
+
+      - name: Restore unified 3D entry and batch queue serialization
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner="$RUNNER_TEMP/audited-recovery/run-step.py"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/unified-3d.yml" recover \
+            "Collapse duplicate 3D launchers into one guided entry"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/unified-3d.yml" recover \
+            "Add focused IA regression coverage"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/insert-batch.yml" verify-and-commit \
+            "Make queue state immediately observable to async workers"
+          python3 "$runner" "$RUNNER_TEMP/audited-recovery/insert-batch.yml" verify-and-commit \
+            "Add focused queue-state regression coverage"
+
+      - name: Disable destructive branch deletion and write recovery manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path(".github/workflows/cleanup-merged-branches.yml")
+          source = path.read_text(encoding="utf-8")
+          start = source.find("  main-only-convergence:\n")
+          end = source.find("  cleanup:\n", start)
+          if start >= 0:
+              if end < 0:
+                  raise SystemExit("cleanup workflow job boundary changed")
+              source = source[:start] + source[end:]
+          lines = []
+          for line in source.splitlines(keepends=True):
+              if line.startswith("    if:") and "main-only-convergence" in line:
+                  continue
+              lines.append(line)
+          source = "".join(lines).replace(
+              "group: merged-branch-cleanup-v5",
+              "group: merged-branch-cleanup-v6",
+              1,
+          )
+          if "Delete every non-main branch" in source or "git/refs/heads/${encoded}" in source:
+              raise SystemExit("destructive all-branch deletion remains")
+          path.write_text(source, encoding="utf-8")
+          PY
+
+          mkdir -p .qa
+          cat > .qa/deleted-work-recovery-2026-09-10.md <<EOF
+          # Deleted work recovery — 2026-09-10
+
+          This product-only recovery was rebuilt on PR #1289 from audited, immutable source tags.
+
+          - \\`$TAG_BG3D_QUALITY\`: deterministic BG3D insertion quality
+          - \\`$TAG_VRM_MODEL\`: VRM model technical admission
+          - \\`$TAG_VRM_THUMBNAIL\`: VRM thumbnail technical admission
+          - \\`$TAG_BG3D_WEBGL\`: WebGL context recovery and bounded texture filtering
+          - \\`$TAG_VRM_PREVIEW\`: atomic preview decoding and swaps
+          - \\`$TAG_EFFECTS\`: non-destructive effects workspace
+          - \\`$TAG_UNIFIED_3D\`: one guided 3D Studio entry
+          - \\`$TAG_INSERT_BATCH\`: immediately serialized async batch queue state
+
+          The former commit-message-triggered deletion of every non-default branch was removed.
+          Generated scanners and one-shot recovery workflows are not retained in the product tree.
+          EOF
+
+      - name: Validate recovered product slices
+        shell: bash
+        run: |
+          set -euo pipefail
+          focused_tests=(
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-extreme-aspect.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-integration-boundary.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-resolution-boundary.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-security.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-production-thumbnail-files.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-integration.test.ts
+            apps/web/src/domains/creator/vrm/vrm-library.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-production-catalog.test.ts
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.test.tsx
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.test.tsx
+            apps/web/src/domains/creator/vrm/studio-vrm-bundled-thumbnail-stability.test.ts
+            apps/web/src/domains/creator/studio-effects-workspace.test.ts
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.opacity.test.tsx
+            apps/web/src/domains/creator/studio-unified-3d-entry.test.ts
+            apps/web/src/domains/creator/studio-tool-belt-reachability.test.ts
+            apps/web/src/domains/creator/StudioSceneToolPopoverBody.test.tsx
+            apps/web/src/domains/creator/studio-insert-batch-queue-state.test.ts
+            apps/web/src/domains/creator/studio-insert-batch-model.test.ts
+            apps/web/src/domains/creator/StudioInsertBatchPreflight.test.tsx
+            apps/web/src/domains/creator/studio-insert-batch-reachability.test.ts
+          )
+          pnpm exec vitest run "${focused_tests[@]}"
+
+          changed=(
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-extreme-aspect.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-integration-boundary.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-editor-insert-host.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.ts
+            apps/web/src/domains/creator/bg3d/StudioBg3dWebglContextRecoveryAgent.tsx
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.ts
+            apps/web/src/domains/creator/bg3d/StudioBg3dTextureQualityAgent.tsx
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts
+            apps/web/src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-technical-denylist.generated.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-security.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-production-thumbnail-files.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-integration.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-technical-denylist.generated.ts
+            apps/web/src/domains/creator/vrm/vrm-library.ts
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.tsx
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterPreviewImage.test.tsx
+            apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx
+            apps/web/src/domains/creator/studio-effects-workspace.ts
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.tsx
+            apps/web/src/domains/creator/studio-effects-workspace.test.ts
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.tsx
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx
+            apps/web/src/domains/creator/StudioToolBeltCreateModeGroups.tsx
+            apps/web/src/domains/creator/studio-unified-3d-entry.test.ts
+            apps/web/src/domains/creator/StudioInsertBatchPreflight.tsx
+            apps/web/src/domains/creator/studio-insert-batch-queue-state.test.ts
+          )
+          pnpm exec eslint --fix --no-warn-ignored "${changed[@]}"
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored "${changed[@]}"
+          pnpm run validate:architecture
+          pnpm run verify:studio-menus
+          pnpm run verify:studio-filter-dialog
+          pnpm run typecheck
+          pnpm --dir apps/web build
+          git diff --check
+
+      - name: Commit a workflow-free recovered product tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            scripts/generate-vrm-model-technical-denylist.ts \
+            scripts/generate-vrm-thumbnail-technical-denylist.ts \
+            .github/workflows/recover-audited-deleted-product-work.yml
+          rm -rf artifacts
+          if grep -R -n --exclude-dir=node_modules --exclude-dir=.git \
+            -E '<<<<<<<|=======|>>>>>>>' \
+            apps/web/src .github/workflows .qa; then
+            echo "Merge markers remain after recovery." >&2
+            exit 1
+          fi
+          git add -A
+          git diff --cached --check
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git -c core.hooksPath=/dev/null commit \
+            -m "feat(recovery): restore audited deleted product work"
+          git push --no-verify origin "HEAD:${TARGET_BRANCH}"

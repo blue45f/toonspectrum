@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { requestStudioAiComicComposerOpen } from "../../ai/studio-ai-comic-composer-intent";
@@ -105,6 +105,7 @@ export function StudioAiComicDirectorRoute({
   const navigate = useNavigate();
   const api = useMemo(() => createStudioAiComicDirectorApiClient(), []);
   const [session, setSession] = useState(() => initialSession(resolution));
+  const initialSessionRef = useRef(session);
   const [syncState, setSyncState] = useState<
     "local" | "loading" | "saved" | "conflict" | "error"
   >("local");
@@ -121,10 +122,11 @@ export function StudioAiComicDirectorRoute({
 
   useEffect(() => {
     let active = true;
+    const seedSession = initialSessionRef.current;
     const synchronize = async () => {
       setSyncState("loading");
       if (resolution.sessionId === "new") {
-        const created = await api.createSession(session);
+        const created = await api.createSession(seedSession);
         if (!active) return;
         if (created.ok) {
           setSession(created.data);
@@ -133,7 +135,7 @@ export function StudioAiComicDirectorRoute({
           setSyncState(created.code === "not_authenticated" ? "local" : "error");
           setMessage(created.message);
         }
-        navigate(routePath(resolution, session.id), { replace: true });
+        navigate(routePath(resolution, seedSession.id), { replace: true });
         return;
       }
 
@@ -148,7 +150,7 @@ export function StudioAiComicDirectorRoute({
         return;
       }
       if (remote.code === "not_found") {
-        const created = await api.createSession(session);
+        const created = await api.createSession(seedSession);
         if (!active) return;
         if (created.ok) {
           setSession(created.data);
@@ -166,9 +168,7 @@ export function StudioAiComicDirectorRoute({
     return () => {
       active = false;
     };
-  // Route identity owns remote hydration; `session` is deliberately read as the local create snapshot.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on session would resync after setSession and loop.
-  }, [api, navigate, resolution, session.id]);
+  }, [api, navigate, resolution]);
 
   const patchSession = (
     patch: Partial<
