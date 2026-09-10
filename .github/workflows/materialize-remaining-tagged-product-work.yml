@@ -21,6 +21,7 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=8192
       TARGET_BRANCH: fix/real-core-and-main-only-20260910
       SOURCE_MATERIALIZER_SHA: ae8ab74deb66af434c5bbc08551a593b345d8d9d
+      EFFECTS_SOURCE_SHA: f76a78bc047d42dcc74cda6002307d50fb491cd8
     steps:
       - uses: actions/checkout@v6
         with:
