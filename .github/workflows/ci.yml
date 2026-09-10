@@ -30,6 +30,7 @@ name: CI
 # 임계 경로는 35분 → 약 11분이다(3D 시각 검증의 7.5분짜리 단일 케이스와 in-app 기능 스윕이 하한).
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, release/salvage-integration-20260908]
   pull_request:
@@ -64,11 +65,12 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm run audit:security
       - run: pnpm run validate:architecture
       - run: pnpm run verify:csp
       - run: pnpm run verify:toolchain-coverage
+      - run: python3 scripts/verify-pr-workflow-fanout.py
       - run: pnpm run lint
 
   typecheck:
@@ -83,7 +85,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm run typecheck
       # Worker 전용 tsconfig 는 루트 typecheck 에 포함되지 않는다. 별도 gate 하지 않으면
       # Durable Object/runtime 타입 회귀가 false-green 이 된다.
@@ -101,7 +103,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       # 여기서는 tsc 를 포함한 정식 `build` 를 쓴다. 릴리스 산출물이 만들어지는 경로 자체가
       # 그대로 통과하는지를 증명하는 잡이기 때문이다.
       - run: pnpm run build
@@ -127,7 +129,7 @@ jobs:
       # shard 하나가 깨져도 나머지 shard 의 신호는 그대로 받는다.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     # DB-backed 테스트(community 등)는 PostgreSQL을 사용한다(libSQL 파일 → Postgres 마이그레이션).
     # shard 마다 자기 컨테이너를 가지므로 shard 간 상태가 섞이지 않는다.
     services:
@@ -158,7 +160,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       # 루트 스위트에는 실제 Chromium 을 띄우는 브라우저 프로브(packages/studio-engine-*)가 있다.
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
@@ -328,8 +330,15 @@ jobs:
         # on the four-worker runner (run 34195132851). Keep their full numerical inputs
         # and assertions, with a bounded 120s coverage-only test timeout. The normal
         # 30s suite and uninstrumented serial performance budgets stay unchanged.
-        run: pnpm run test:root --shard=${{ matrix.shard }}/${{ strategy.job-total }} --coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }} --testTimeout=120000
+        run: |
+          set -euo pipefail
+          args=(--shard=${{ matrix.shard }}/${{ strategy.job-total }})
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == "refs/heads/main" ]]; then
+            args+=(--coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }} --testTimeout=120000)
+          fi
+          pnpm run test:root "${args[@]}"
       - name: Preserve this shard's coverage for SonarQube
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
         with:
           name: sonar-coverage-${{ matrix.shard }}
@@ -339,6 +348,7 @@ jobs:
           retention-days: 7
 
   sonarqube:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: test
     uses: ./.github/workflows/sonarqube.yml
     secrets: inherit
@@ -359,7 +369,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Run timing budgets and exhaustive CPU references one file at a time
         run: pnpm run test:perf
       # The root Vitest run intentionally skips Redis without a disposable target.
@@ -418,7 +428,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Build production Studio assets on the isolated runner
@@ -489,11 +499,12 @@ jobs:
           fi
           echo "Every core gate and the Studio 3D runtime proof succeeded."
 
-  # ── core 와 병렬로 도는 브라우저 게이트 ──────────────────────────────────────────────────
-  # 아래 잡들은 자체적으로 dist 를 만들거나 vite dev 서버를 띄우므로 core 에 의존하지 않는다.
-  # 브랜치 보호 필수 체크는 아니다(러너 환경 의존이 크다 — DEPLOY.md).
+  # ── core 성공 후 도는 비필수 브라우저 회귀 ──────────────────────────────────────────────────
+  # 아래 잡들은 브랜치 보호 필수가 아니므로 core가 성공한 뒤 실행한다.
+  # core 실패 시 비싼 브라우저·빌드 작업을 시작하지 않아 PR 피드백을 앞당긴다.
 
   studio-3d-visual:
+    needs: core
     # 렌더된 프레임을 근거로 하는 Studio 3D 표면 회귀.
     #
     # `studio-3d-runtime`은 WebGPU/WebGL2 캡처 동등성이라는 릴리스 오라클을 본다. 이 잡은 그
@@ -531,7 +542,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Verify Studio 3D surfaces against rendered frames
@@ -552,6 +563,7 @@ jobs:
           if-no-files-found: ignore
 
   studio-inapp-browser:
+    needs: core
     # 인앱 브라우저(카카오톡·인스타그램·네이버앱) 라우트 스윕. 이 게이트가 잡는 회귀 — 화면 밖으로
     # 밀린 컨트롤, 눌러도 아무 일 없는 팝업 버튼, 나갈 문이 없는 바닥의 라우트 — 는 유닛 테스트가
     # 볼 수 없는 실제 레이아웃·DOM 문제라서 브라우저를 띄워야만 확인된다.
@@ -576,7 +588,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       # 두 게이트 모두 vite preview 로 dist/ 를 서빙하므로 프로덕션 빌드가 먼저 있어야 한다.
@@ -593,6 +605,7 @@ jobs:
         run: pnpm run verify:studio-mobile-top
 
   studio-inapp-feature-sweep:
+    needs: core
     # 라우트 스윕은 라우트를 한 번씩 열어 보고 크롬 모양을 잰 뒤 앱을 건드리지 않는다. 누군가 도구를
     # 고르고 시트를 열고 스트로크를 그릴 때만 나타나는 오류는 게이트 앞에 선 적이 없었고, 그래서
     # 첫 스트로크마다 터지는 React #185 렌더 루프가 모든 폰 프로파일에서 두 에러 바운더리가 조용한
@@ -611,7 +624,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Build production Studio assets
@@ -645,6 +658,7 @@ jobs:
           retention-days: 7
 
   studio-filter-dialog:
+    needs: core
     # 상단 필터 메뉴 → StudioFilterDialog → 미리보기 → 적용 → 실행취소를 프로덕션 빌드에서
     # 실제로 몰아본다. 이 게이트가 없는 동안 페이지 합성·레이어 필터 전체가 브라우저에서
     # 다이얼로그조차 못 여는 상태로 지나갔다 — createImageBitmap(svgBlob) 이 Chromium·WebKit
@@ -659,7 +673,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Build for vite preview
@@ -691,6 +705,7 @@ jobs:
           retention-days: 7
 
   studio-p5-brush-real-runtime:
+    needs: core
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -700,7 +715,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Verify real p5.brush Worker WebGL2 runtime

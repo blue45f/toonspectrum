@@ -1,6 +1,7 @@
 name: Feedback community validation
 on:
-  pull_request:
+  workflow_dispatch:
+  push:
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'apps/api/src/**'
@@ -12,7 +13,7 @@ on:
       - 'scripts/verify-feedback-community-db.mts'
       - '*feedback*.ts'
       - '.github/workflows/feedback-community-validation.yml'
-  workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 # A failed test piped through tee must fail its step, not just appear in a log.
