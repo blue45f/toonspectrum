@@ -3,10 +3,12 @@ import { ArrowRight, Brush, Images, LayoutTemplate, Palette, Sparkles } from "lu
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 
-import type {
-  CreatorMarketplaceResourceKind,
-  CreatorMarketplaceResourceRecord,
-} from "@/shared/lib/creator-marketplace-resource-contract";
+import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
+
+import {
+  marketSceneCompletionBrowseHref,
+  marketSceneCompletionSequenceForKind,
+} from "../models/market-scene-completion";
 
 interface MarketSceneCompletionJourneyProps {
   readonly record: CreatorMarketplaceResourceRecord;
@@ -19,24 +21,6 @@ const FAMILY_META = {
   brush: { label: "브러시", description: "선화·채색·질감 다듬기", kind: "brush", icon: Brush },
   look: { label: "색·보정", description: "팔레트와 필터로 장면 마감", kind: "palette", icon: Palette },
 } as const;
-
-export type MarketSceneJourneyFamily = keyof typeof FAMILY_META;
-
-export function marketSceneCompletionSequenceForKind(
-  kind: CreatorMarketplaceResourceKind,
-): readonly MarketSceneJourneyFamily[] {
-  if (kind === "template") return ["asset", "brush", "look"];
-  if (kind === "asset") return ["template", "brush", "look"];
-  if (kind === "brush") return ["template", "asset", "look"];
-  if (kind === "palette" || kind === "filter") return ["template", "asset", "brush"];
-  return ["template", "asset", "brush"];
-}
-
-export function marketSceneCompletionBrowseHref(kind: string, tag: string | null): string {
-  const params = new URLSearchParams({ kind });
-  if (tag) params.set("tag", tag);
-  return `/market/browse?${params.toString()}`;
-}
 
 export function MarketSceneCompletionJourney({ record, className }: MarketSceneCompletionJourneyProps) {
   const tag = record.tags[0]?.trim() || null;
