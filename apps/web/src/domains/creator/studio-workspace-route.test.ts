@@ -12,6 +12,7 @@ import {
   studioCanvasHref,
   studioDccHref,
   studioRouteStageKey,
+  studioWorkspaceCanonicalHref,
   studioWorkspaceReturnHref,
 } from "./studio-workspace-route";
 
@@ -34,6 +35,9 @@ describe("studio workspace routes", () => {
     ["/studio/3d/dcc/sculpt", "", "dcc", null, "sculpt", "/studio/3d/dcc/sculpt"],
     ["/studio/work/work-1/3d", "", "dcc", "work-1", "model", "/studio/work/work-1/3d/dcc/model"],
     ["/studio/work/work-1/3d/dcc/shot", "", "dcc", "work-1", "shot", "/studio/work/work-1/3d/dcc/shot"],
+    ["/studio/p/project-1/d/document-1", "?workspace=comic", "comic", "document-1", null, "/studio/p/project-1/d/document-1"],
+    ["/studio/p/project-1/d/document-1", "?workspace=3d", "bg3d", "document-1", null, "/studio/p/project-1/d/document-1"],
+    ["/studio/draft/draft-1", "?workspace=slides", "canvas", null, null, "/studio/draft/draft-1"],
   ] as const)(
     "parses %s as a durable %s workspace route",
     (rawPath, search, surface, workId, dccMode, canonicalPathname) => {
@@ -48,6 +52,33 @@ describe("studio workspace routes", () => {
       });
     },
   );
+
+  it("retains canonical project, document, draft and workspace identity", () => {
+    expect(parseStudioWorkspaceRoute({
+      pathname: "/studio/p/project-1/d/document-2",
+      search: "?workspace=localization&focus=cut%3A8&room=team-a",
+    })).toMatchObject({
+      valid: true,
+      projectId: "project-1",
+      documentId: "document-2",
+      draftId: null,
+      documentWorkspace: "localization",
+      workId: "document-2",
+      surface: "comic",
+    });
+    expect(parseStudioWorkspaceRoute({
+      pathname: "/studio/draft/draft-7",
+      search: "?workspace=design",
+    })).toMatchObject({
+      valid: true,
+      projectId: null,
+      documentId: null,
+      draftId: "draft-7",
+      documentWorkspace: "design",
+      workId: null,
+      surface: "canvas",
+    });
+  });
 
   it.each([
     ["/studio", "", "invalid-path"],
@@ -68,6 +99,8 @@ describe("studio workspace routes", () => {
     ["/studio/canvas", "?id=work-1&remix=source-1", "identity-conflict"],
     ["/studio/canvas", "?mode=upload&mode=upload", "invalid-mode"],
     ["/studio/3d/dcc/model", "?mode=upload", "invalid-mode"],
+    ["/studio/p/project-1/d/document-1", "?workspace=unknown", "invalid-path"],
+    ["/studio/p/project-1/d/document-1", "?workspace=draw&workspace=comic", "invalid-path"],
   ] as const)("fails closed for %s", (pathname, search, errorCode) => {
     expect(parseStudioWorkspaceRoute({ pathname, search })).toEqual({
       errorCode,
@@ -104,6 +137,19 @@ describe("studio workspace routes", () => {
     })).toMatchObject({ valid: true, workId: "work/한글" });
   });
 
+  it("canonicalizes document query state without legacy identity switches", () => {
+    const route = parseStudioWorkspaceRoute({
+      pathname: "/studio/p/project-1/d/document-1",
+      search: "?workspace=comic&room=team-a&id=legacy&mode=upload&project=old",
+    });
+    if (!route.valid) throw new Error("fixture route failed");
+    expect(studioWorkspaceCanonicalHref(route,
+      "?workspace=comic&room=team-a&id=legacy&mode=upload&project=old",
+    )).toBe(
+      "/studio/p/project-1/d/document-1?room=team-a&workspace=comic",
+    );
+  });
+
   it("keeps one route-stage lifecycle only within the same Studio document", () => {
     expect(studioRouteStageKey(STUDIO_HOME_PATHNAME)).toBe(STUDIO_HOME_PATHNAME);
     expect(studioRouteStageKey(STUDIO_DRAFT_CANVAS_PATHNAME)).toBe("/studio/draft/editor");
@@ -122,6 +168,14 @@ describe("studio workspace routes", () => {
       pathname: STUDIO_DRAFT_CANVAS_PATHNAME,
       search: "?remix=source-1",
     })).toBe("/studio/remix:source-1/editor");
+    expect(studioRouteStageKey({
+      pathname: "/studio/p/project-1/d/document-2",
+      search: "?workspace=draw",
+    })).toBe("/studio/project:project-1:document:document-2/editor");
+    expect(studioRouteStageKey({
+      pathname: "/studio/draft/draft-4",
+      search: "?workspace=slides",
+    })).toBe("/studio/draft:draft-4/editor");
     expect(studioRouteStageKey({
       pathname: "/studio/work/work-1/canvas",
       search: "?mode=upload&mode=upload",
@@ -143,6 +197,14 @@ describe("studio workspace routes", () => {
       "/studio/work/work-1/3d/dcc/model",
       "/studio/work/work-1/3d/dcc/shot",
     )).toBe(true);
+    expect(shouldPreserveStudioRouteLifecycle(
+      { pathname: "/studio/p/project-1/d/document-2", search: "?workspace=draw" },
+      { pathname: "/studio/p/project-1/d/document-2", search: "?workspace=comic" },
+    )).toBe(true);
+    expect(shouldPreserveStudioRouteLifecycle(
+      { pathname: "/studio/p/project-1/d/document-2", search: "?workspace=draw" },
+      { pathname: "/studio/p/project-2/d/document-2", search: "?workspace=draw" },
+    )).toBe(false);
     expect(shouldPreserveStudioRouteLifecycle(
       "/studio/work/work-1/canvas",
       "/studio/work/work-2/3d/dcc/model",
@@ -188,6 +250,8 @@ describe("studio workspace routes", () => {
   it("distinguishes the Studio front door from actual editor workspace routes", () => {
     expect(isStudioWorkspaceRoutePathname(STUDIO_HOME_PATHNAME)).toBe(false);
     expect(isStudioWorkspaceRoutePathname(STUDIO_DRAFT_CANVAS_PATHNAME)).toBe(true);
+    expect(isStudioWorkspaceRoutePathname("/studio/p/project-1/d/document-1")).toBe(true);
+    expect(isStudioWorkspaceRoutePathname("/studio/draft/draft-1")).toBe(true);
     expect(isStudioWorkspaceRoutePathname("/studio/work/work-1/3d/dcc/cad")).toBe(true);
     expect(isStudioWorkspaceRoutePathname("/studio/tools-companion")).toBe(false);
     expect(isStudioWorkspaceRoutePathname("/studio//3d/dcc/model")).toBe(false);
@@ -228,6 +292,25 @@ describe("studio workspace routes", () => {
         pathname: "/ranking",
       },
     }, dccRoute)).toBeNull();
+  });
+
+  it("returns from a DCC workbench to the canonical project document", () => {
+    const documentRoute = parseStudioWorkspaceRoute({
+      pathname: "/studio/p/project-1/d/document-1",
+      search: "?workspace=draw&room=team-2",
+    });
+    const dccRoute = parseStudioWorkspaceRoute({
+      pathname: "/studio/work/document-1/3d/dcc/model",
+    });
+    if (!documentRoute.valid || !dccRoute.valid) throw new Error("fixture route failed");
+    const state = createStudioDccNavigationState(documentRoute, {
+      key: "canonical-document-entry",
+      pathname: "/studio/p/project-1/d/document-1",
+      search: "?workspace=draw&room=team-2",
+    });
+    expect(studioWorkspaceReturnHref(state, dccRoute)).toBe(
+      "/studio/p/project-1/d/document-1?room=team-2&workspace=draw",
+    );
   });
 
   it("canonicalizes legacy draft return receipts to the explicit canvas route", () => {
