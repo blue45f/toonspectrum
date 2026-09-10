@@ -84,6 +84,7 @@ function isolateMenuBranch(overlay: HTMLElement): () => void {
   };
 }
 
+/** Render context-aware mobile tabs and the accessible full-navigation dialog. */
 export function MobileHeaderNavigation({
   menuOpen,
   menuId,

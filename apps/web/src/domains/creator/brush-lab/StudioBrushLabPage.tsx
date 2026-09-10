@@ -41,6 +41,7 @@ const STEPS = [
   },
 ] as const;
 
+/** Render the unified Brush Editor landing surface and its available workflows. */
 export function StudioBrushLabPage() {
   const params = useParams<{ workId?: string; sourceWorkId?: string }>();
   const scope = params.workId

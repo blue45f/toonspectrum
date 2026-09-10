@@ -41,6 +41,7 @@ function readInitialDocumentPathname(): string | null {
   }
 }
 
+/** Redirect a legacy `/studio` editor query to the canonical draft-canvas route. */
 function legacyStudioEditorHref(pathname: string, search: string): string | null {
   if (pathname !== STUDIO_HOME_PATHNAME || search.length === 0) return null;
   const params = new URLSearchParams(search);
@@ -50,6 +51,7 @@ function legacyStudioEditorHref(pathname: string, search: string): string | null
   return hasLegacyEditorState ? `${STUDIO_DRAFT_CANVAS_PATHNAME}${search}` : null;
 }
 
+/** Bridge route-level command-palette events into the shared UI store. */
 function CommandPaletteEventBridge() {
   const openCommandPalette = useUi((state) => state.openCommandPalette);
 
@@ -73,6 +75,7 @@ const StudioCrossOriginIsolationGate = lazyRetry(
   "StudioCrossOriginIsolationGate",
 );
 
+/** Render the registered application routes inside their loading and error boundaries. */
 function AppRouteTree({ pathname, search }: {
   readonly pathname: string;
   readonly search: string;
@@ -93,6 +96,7 @@ function AppRouteTree({ pathname, search }: {
   );
 }
 
+/** Render application routing with cross-origin isolation limited to editor workspaces. */
 export function AppRouter() {
   const { pathname, search } = useLocation();
   useRouteTitle(pathname, search);

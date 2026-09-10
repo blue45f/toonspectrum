@@ -187,28 +187,33 @@ const STUDIO_CONTEXT_PREFIXES = [
   "/learn",
 ] as const;
 
+/** Match a pathname against an exact route prefix or one of its descendants. */
 function matchesPathPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
+/** Select the Studio or Spectrum navigation context for a pathname. */
 export function siteNavigationContextForPath(pathname: string): SiteNavigationContext {
   return STUDIO_CONTEXT_PREFIXES.some((prefix) => matchesPathPrefix(pathname, prefix))
     ? "studio"
     : "spectrum";
 }
 
+/** Return the primary navigation destinations for the pathname's product context. */
 export function primarySiteNavigationForPath(pathname: string): readonly SiteNavigationItem[] {
   return siteNavigationContextForPath(pathname) === "studio"
     ? TOONSTUDIO_PRIMARY_NAVIGATION
     : TOONSPECTRUM_PRIMARY_NAVIGATION;
 }
 
+/** Return grouped drawer navigation for the pathname's product context. */
 export function siteNavigationGroupsForPath(pathname: string): readonly SiteNavigationGroup[] {
   return siteNavigationContextForPath(pathname) === "studio"
     ? TOONSTUDIO_NAVIGATION_GROUPS
     : TOONSPECTRUM_NAVIGATION_GROUPS;
 }
 
+/** Return stable mobile tabs for the pathname's product context. */
 export function mobileSiteTabsForPath(pathname: string): readonly SiteNavigationItem[] {
   return siteNavigationContextForPath(pathname) === "studio"
     ? TOONSTUDIO_MOBILE_TABS

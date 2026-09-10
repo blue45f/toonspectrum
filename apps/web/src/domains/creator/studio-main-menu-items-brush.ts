@@ -36,12 +36,14 @@ export function studioBrushLabHref(pathname: string): string {
   return "/studio/assets/brushes/new";
 }
 
+/** Open the canonical Brush Editor in its guided creation mode. */
 function openGuidedBrushEditor(): void {
   const location = globalThis.location;
   if (!location) return;
   location.assign(studioBrushLabHref(location.pathname));
 }
 
+/** Build brush menu commands for the active Studio document and UI capabilities. */
 export function buildStudioBrushMenuItems({
   editor,
   state,

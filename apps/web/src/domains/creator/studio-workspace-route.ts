@@ -154,6 +154,7 @@ function singleQueryIdentity(
   return normalizeStudioIdentity(values[0] ?? null);
 }
 
+/** Return whether a pathname belongs to the Studio route namespace. */
 export function isStudioRoutePathname(pathname: string): boolean {
   return pathname === STUDIO_HOME_PATHNAME || pathname.startsWith(`${STUDIO_HOME_PATHNAME}/`);
 }
@@ -257,6 +258,7 @@ function assertStudioHrefIdentity(
   }
 }
 
+/** Build the canonical 2D editor pathname for a draft, work, or remix identity. */
 export function studio2dPathname(
   workId: string | null,
   surface: Studio2dWorkspaceSurface,
@@ -372,6 +374,7 @@ interface ParsedSurface {
   readonly surface: StudioWorkspaceSurface;
 }
 
+/** Parse the optional workspace surface suffix from a Studio route tail. */
 function parseSurface(tail: readonly string[]): ParsedSurface | null {
   // Work/remix routes may omit the surface and still mean their primary canvas.
   if (tail.length === 0) return { dccMode: null, surface: "canvas" };
@@ -392,6 +395,7 @@ function parseSurface(tail: readonly string[]): ParsedSurface | null {
   return null;
 }
 
+/** Parse and validate a Studio workspace location into its canonical route identity. */
 export function parseStudioWorkspaceRoute({
   pathname,
   search,
@@ -500,6 +504,7 @@ function ownData(value: object, key: PropertyKey): unknown {
   return descriptor && "value" in descriptor ? descriptor.value : undefined;
 }
 
+/** Resolve a safe return URL from Studio navigation state with a canonical fallback. */
 export function studioWorkspaceReturnHref(
   state: unknown,
   currentRoute: StudioWorkspaceRoute,

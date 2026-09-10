@@ -60,6 +60,7 @@ interface SectionDefinition {
   actions: readonly ProjectAction[];
 }
 
+/** Create a localized project action that resolves its href from a project id. */
 const action = (
   icon: LucideIcon,
   koTitle: string,
@@ -76,6 +77,7 @@ const action = (
   badge,
 });
 
+/** Build an editor workspace URL for a project and optional surface. */
 function workHref(projectId: string, surface = "canvas"): string {
   return `/studio/work/${encodeURIComponent(projectId)}/${surface}`;
 }
@@ -197,14 +199,17 @@ const SECTION_DEFINITIONS: Readonly<Record<StudioProjectSection, SectionDefiniti
 
 const PRIMARY_SECTIONS = STUDIO_PROJECT_NAVIGATION.map((item) => item.id) as readonly Exclude<StudioProjectSection, "settings">[];
 
+/** Normalize an application language tag to a supported project-shell locale. */
 function localeFromLanguage(language: string): Locale {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
+/** Build the canonical URL for a section of a Studio project. */
 function projectSectionHref(projectId: string, section: StudioProjectSection): string {
   return `/studio/p/${encodeURIComponent(projectId)}/${section}`;
 }
 
+/** Render a localized Studio project section with navigation and contextual actions. */
 export function StudioProjectShellPage({ section }: { readonly section: StudioProjectSection }) {
   const { projectId = "" } = useParams<{ projectId: string }>();
   const language = useI18n((state) => state.lang);

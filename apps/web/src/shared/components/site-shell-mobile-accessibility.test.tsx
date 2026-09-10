@@ -17,6 +17,7 @@ vi.mock("../../domains/auth/components/auth-menu-shell", () => ({
 const mediaMatches = new Map<string, boolean>();
 const mediaListeners = new Map<string, Set<(event: MediaQueryListEvent) => void>>();
 
+/** Install a controllable mobile `matchMedia` test double. */
 function installMobileMatchMedia(): void {
   mediaMatches.clear();
   mediaListeners.clear();

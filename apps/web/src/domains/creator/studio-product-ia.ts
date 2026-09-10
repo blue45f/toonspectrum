@@ -240,6 +240,7 @@ export const STUDIO_LEGACY_ROUTE_ALIASES = [
   { from: "/create", to: "/showcase" },
 ] as const;
 
+/** Return each duplicated string once, preserving first duplicate discovery order. */
 function duplicateValues(values: readonly string[]): string[] {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
@@ -250,6 +251,7 @@ function duplicateValues(values: readonly string[]): string[] {
   return [...duplicates];
 }
 
+/** Find the first forbidden default-UI term contained in a label. */
 function containsForbiddenTerm(value: string): string | null {
   const normalized = value.toLocaleLowerCase();
   return STUDIO_FORBIDDEN_DEFAULT_UI_TERMS.find((term) =>
@@ -257,10 +259,12 @@ function containsForbiddenTerm(value: string): string | null {
   ) ?? null;
 }
 
+/** Look up a Studio capability definition by its stable identifier. */
 export function studioCapabilityById(id: string): StudioCapabilityDefinition | null {
   return STUDIO_CAPABILITY_REGISTRY.find((capability) => capability.id === id) ?? null;
 }
 
+/** Validate navigation, ownership, route, and vocabulary invariants for the Studio IA. */
 export function validateStudioProductIa(): readonly string[] {
   const issues: string[] = [];
 

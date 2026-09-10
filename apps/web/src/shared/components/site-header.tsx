@@ -92,6 +92,7 @@ function pathMatchesAny(pathname: string, prefixes: readonly string[]): boolean 
   return prefixes.some((prefix) => matchesPrefix(pathname, prefix));
 }
 
+/** Return whether a pathname belongs to the Studio work purpose in the header. */
 function isStudioWorkPurpose(pathname: string): boolean {
   if (!matchesPrefix(pathname, "/studio")) return false;
   return !pathMatchesAny(pathname, STUDIO_WORK_EXCLUDED_PREFIXES);
@@ -152,6 +153,7 @@ function MobileNavigationFallback() {
   );
 }
 
+/** Render the responsive site header for the active Studio or Spectrum context. */
 export function SiteHeader() {
   const isActive = useDestinationActive();
   const pathname = usePathname();
