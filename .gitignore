@@ -53,6 +53,8 @@ __pycache__/
 /tmp/
 /scratch/
 /artifacts/
+# Temporary self-patching payload shards belong in CI artifacts or commit history.
+/.bootstrap/
 /.playwright-mcp/
 /*.png
 
