@@ -1,0 +1,59 @@
+name: Create audited recovery tags once
+
+on:
+  push:
+    branches:
+      - fix/real-core-and-main-only-20260910
+    paths:
+      - .github/workflows/create-audited-recovery-tags-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: create-audited-recovery-tags-20260910
+  cancel-in-progress: false
+
+jobs:
+  tags:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Create or verify immutable recovery tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+
+          ensure_tag() {
+            local tag="$1"
+            local sha="$2"
+            local existing
+            existing="$(git rev-parse -q --verify "refs/tags/${tag}^{commit}" 2>/dev/null || true)"
+            if [[ -n "$existing" ]]; then
+              if [[ "$existing" != "$sha" ]]; then
+                echo "Recovery tag ${tag} points to ${existing}, expected ${sha}." >&2
+                exit 1
+              fi
+              echo "Verified ${tag} -> ${sha}"
+              return
+            fi
+            git tag "$tag" "$sha"
+            git push origin "refs/tags/${tag}"
+            echo "Created ${tag} -> ${sha}"
+          }
+
+          ensure_tag "recovery/2026-09-10/pre-recovery-main" "d110925528e8ab2c485d5502cef7eae0e8d056dc"
+          ensure_tag "recovery/2026-09-10/pre-recovery-pr1289" "$GITHUB_SHA"
+          ensure_tag "recovery/2026-09-10/studio-3d-production-quality" "a8c475dc38060d46e50406b3802ead1867ab2515"
+          ensure_tag "recovery/2026-09-10/vrm-model-quality" "591c59ad9f7e6cebb7fe519287bc49274a4a56d1"
+          ensure_tag "recovery/2026-09-10/vrm-thumbnail-quality" "ae94cb5b06c1f9e2fa7ce9665d9be61aa93730f4"
+          ensure_tag "recovery/2026-09-10/bg3d-webgl-context" "a09c8533f8a6ba96f043345f2ccb9ff1a5b6a5dd"
+          ensure_tag "recovery/2026-09-10/vrm-preview-atomic-decode" "546922a3cb1b888de8b4ceeeb0548b21db726ce1"
+          ensure_tag "recovery/2026-09-10/studio-effects-workspace" "f76a78bc047d42dcc74cda6002307d50fb491cd8"
+          ensure_tag "recovery/2026-09-10/studio-unified-3d-entry" "1b71d831407324fb4b2d9e5b4f0c1cabb5dd1d52"
+          ensure_tag "recovery/2026-09-10/studio-insert-batch-race" "b0c830f74a6dc1d8574829f91ddba3b8332869ca"
