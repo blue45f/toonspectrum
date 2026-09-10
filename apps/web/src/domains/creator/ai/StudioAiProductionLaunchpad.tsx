@@ -117,7 +117,7 @@ function ActionCard({
 
 export function StudioAiProductionLaunchpad({
   imageConfigured,
- textConfigured,
+  textConfigured,
   onOpenScenario,
   onOpenSuperSuite,
   onPreloadSuperSuite,
