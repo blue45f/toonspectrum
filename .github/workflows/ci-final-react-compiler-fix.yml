@@ -1,6 +1,5 @@
 name: CI final React compiler fix once
 
-# The first commit registers this one-shot workflow; this follow-up push executes it.
 on:
   push:
     branches:
@@ -62,9 +61,11 @@ jobs:
           )
           effect = effect.replace('api.createSession(session)', 'api.createSession(seedSession)')
           effect = effect.replace('routePath(resolution, session.id)', 'routePath(resolution, seedSession.id)')
-          old_tail = '''  // Route identity owns remote hydration; `session` is deliberately read as the local create snapshot.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on session would resync after setSession and loop.
-  }, [api, navigate, resolution, session.id]);'''
+          old_tail = (
+              '  // Route identity owns remote hydration; `session` is deliberately read as the local create snapshot.\n'
+              '  // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on session would resync after setSession and loop.\n'
+              '  }, [api, navigate, resolution, session.id]);'
+          )
           new_tail = '  }, [api, navigate, resolution]);'
           if old_tail not in effect:
               raise SystemExit('suppressed effect dependency tail not found')
