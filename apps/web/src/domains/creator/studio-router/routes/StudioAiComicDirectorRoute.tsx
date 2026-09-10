@@ -30,6 +30,7 @@ import { STUDIO_EASE, STUDIO_FOCUS_RING, STUDIO_TOUCH_TARGET } from "../../studi
 
 import type { StudioCompositionRouteResolution } from "../studio-route-manifest";
 
+import { createSecureRandomUuid } from "@/shared/lib/secure-random-id";
 import { cn } from "@/shared/lib/utils";
 
 interface StudioAiComicDirectorRouteProps {
@@ -37,8 +38,9 @@ interface StudioAiComicDirectorRouteProps {
 }
 
 function uid(): string {
-  return globalThis.crypto?.randomUUID?.()
-    ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return createSecureRandomUuid(
+    "이 브라우저에서는 안전한 AI 코믹 디렉터 세션 ID를 만들 수 없습니다.",
+  );
 }
 
 function routePath(
