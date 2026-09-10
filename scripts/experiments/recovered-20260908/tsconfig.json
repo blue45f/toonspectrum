@@ -1,6 +1,0 @@
-{
-  "extends": "../../../tsconfig.json",
-  "compilerOptions": { "incremental": false },
-  "include": ["*.ts", "*.tsx", "*.mts", "fixtures/*.ts", "../../../apps/web/src/vite-env.d.ts"],
-  "exclude": []
-}
