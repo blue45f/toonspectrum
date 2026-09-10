@@ -20,6 +20,7 @@ jobs:
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
       TARGET_BRANCH: fix/real-core-and-main-only-20260910
+      SOURCE_MATERIALIZER_SHA: ae8ab74deb66af434c5bbc08551a593b345d8d9d
     steps:
       - uses: actions/checkout@v6
         with:
@@ -38,7 +39,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git show "${GITHUB_SHA}^:.github/workflows/materialize-remaining-tagged-product-work.yml" \
+          git show "${SOURCE_MATERIALIZER_SHA}:.github/workflows/materialize-remaining-tagged-product-work.yml" \
             > "$RUNNER_TEMP/product-materializer.yml"
 
           python3 - <<'PY'
