@@ -17,6 +17,9 @@ export const STUDIO_2D_WORKSPACE_SURFACES = [
   "character",
 ] as const;
 
+export const STUDIO_HOME_PATHNAME = "/studio" as const;
+export const STUDIO_DRAFT_CANVAS_PATHNAME = "/studio/canvas" as const;
+
 export type StudioDccWorkbenchMode =
   (typeof STUDIO_DCC_WORKBENCH_MODES)[number];
 
@@ -152,7 +155,7 @@ function singleQueryIdentity(
 }
 
 export function isStudioRoutePathname(pathname: string): boolean {
-  return pathname === "/studio" || pathname.startsWith("/studio/");
+  return pathname === STUDIO_HOME_PATHNAME || pathname.startsWith(`${STUDIO_HOME_PATHNAME}/`);
 }
 
 function studioWorkspaceLocation(
@@ -266,7 +269,7 @@ export function studio2dPathname(
   if (workId !== null) {
     return `/studio/work/${encodeURIComponent(workId)}/${surface}`;
   }
-  return surface === "canvas" ? "/studio" : `/studio/${surface}`;
+  return `/studio/${surface}`;
 }
 
 export function studioCanvasPathname(
@@ -370,6 +373,7 @@ interface ParsedSurface {
 }
 
 function parseSurface(tail: readonly string[]): ParsedSurface | null {
+  // Work/remix routes may omit the surface and still mean their primary canvas.
   if (tail.length === 0) return { dccMode: null, surface: "canvas" };
   if (tail.length === 1 && isStudio2dWorkspaceSurface(tail[0])) {
     return { dccMode: null, surface: tail[0] };
@@ -403,6 +407,9 @@ export function parseStudioWorkspaceRoute({
   if (segments.some((segment) => segment.length === 0) || segments[0] !== "studio") {
     return invalidStudioWorkspaceRoute("invalid-path");
   }
+
+  // Bare /studio is the product front door. Editor workspaces always have an explicit surface.
+  if (segments.length === 1) return invalidStudioWorkspaceRoute("invalid-path");
 
   const pathIdentity = parsePathIdentity(segments);
   if ("valid" in pathIdentity) return pathIdentity;
@@ -521,7 +528,12 @@ export function studioWorkspaceReturnHref(
   ) {
     return null;
   }
-  const returnRoute = parseStudioWorkspaceRoute({ pathname, search });
+
+  // Older draft sessions stored /studio as the return path. Canonicalize them to /studio/canvas.
+  const normalizedPathname = pathname === STUDIO_HOME_PATHNAME
+    ? STUDIO_DRAFT_CANVAS_PATHNAME
+    : pathname;
+  const returnRoute = parseStudioWorkspaceRoute({ pathname: normalizedPathname, search });
   if (!returnRoute.valid || returnRoute.surface === "dcc") return null;
   if (
     returnRoute.workId !== currentRoute.workId
@@ -529,5 +541,5 @@ export function studioWorkspaceReturnHref(
   ) {
     return null;
   }
-  return `${pathname}${search}`;
+  return studioWorkspaceCanonicalHref(returnRoute, search);
 }
