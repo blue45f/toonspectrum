@@ -1,0 +1,167 @@
+name: Recover Studio unified 3D entry
+
+on:
+  push:
+    branches: [fix/studio-unified-3d-entry-loss-20260910]
+    paths: [.github/workflows/recover-studio-unified-3d-entry.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: recover-studio-unified-3d-entry-20260910
+  cancel-in-progress: true
+
+jobs:
+  recover:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-unified-3d-entry-loss-20260910
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Collapse duplicate 3D launchers into one guided entry
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("apps/web/src/domains/creator/StudioToolBeltCreateModeGroups.tsx")
+          source = path.read_text(encoding="utf-8")
+
+          for line in [
+              "  Boxes,\n",
+              "  UsersRound,\n",
+              "  PersonStanding,\n",
+              "  Sparkles,\n",
+              "    bg3dOpen,\n",
+              "    mannequinPoserOpen,\n",
+              "    poserVrmOpen,\n",
+              "    characterShaperOpen,\n",
+              "    setBg3dOpen,\n",
+              "    setMannequinPoserOpen,\n",
+              "    setPoserVrmOpen,\n",
+              "    setCharacterShaperOpen,\n",
+          ]:
+              if source.count(line) != 1:
+                  raise SystemExit(f"3D toolbar import/state anchor changed: {line!r}")
+              source = source.replace(line, "", 1)
+
+          start = '      {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (\n'
+          end = '\n\n      {(studioUiDensityAllows(uiDensityMode, "toolbar-scene") || activeToolbarGroup === "bgGroup") ? ('
+          if source.count(start) != 1 or source.count(end) != 1:
+              raise SystemExit("3D/reference toolbar markers changed; refusing unsafe rewrite")
+          left, rest = source.split(start, 1)
+          _, right = rest.split(end, 1)
+          reference = '''      {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
+        <>
+          <StudioToolbarDivider label="참조" />
+          <StudioToolbarCluster label="참고 이미지">
+            <StudioToolBeltHintTarget hint={hints.reference}>
+              <button
+                type="button"
+                onClick={() => setReferencePanelOpen((v) => !v)}
+                onMouseEnter={preloadStudioReferencePanel}
+                onFocus={preloadStudioReferencePanel}
+                className={cn(toolBtn(referencePanelOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
+                aria-pressed={referencePanelOpen}
+              >
+                <PictureInPicture2
+                  size={STUDIO_ICON_SIZE.toolCompact}
+                  strokeWidth={STUDIO_ICON_STROKE}
+                  aria-hidden
+                  className={studioToolIconClass({ tone: "accent" })}
+                />
+                참고 이미지
+              </button>
+            </StudioToolBeltHintTarget>
+          </StudioToolbarCluster>
+        </>
+      ) : null}'''
+          source = left + reference + end + right
+
+          replacements = [
+              ('<StudioToolbarDivider label="장면" />', '<StudioToolbarDivider label="3D" />'),
+              ('label="배경·톤"', 'label="3D 제작·배경"'),
+              ('                  배경\n                  <ChevronDown', '                  3D 스튜디오\n                  <ChevronDown'),
+              ('fallback={<StudioPanelLoading label="배경 메뉴를 여는 중..." />}', 'fallback={<StudioPanelLoading label="3D 스튜디오를 여는 중..." />}'),
+          ]
+          for old, new in replacements:
+              if source.count(old) != 1:
+                  raise SystemExit(f"3D scene entry anchor changed: {old!r}")
+              source = source.replace(old, new, 1)
+
+          forbidden = [">3D 캐릭터<", ">캐릭터 셰이퍼<", ">3D 데생 인형<", ">3D 배경<"]
+          for label in forbidden:
+              if label in source:
+                  raise SystemExit(f"duplicate 3D launcher remains: {label}")
+          if source.count("3D 스튜디오") < 2:
+              raise SystemExit("unified 3D Studio button/fallback was not created")
+          if source.count("참고 이미지") < 1:
+              raise SystemExit("reference-image entry was lost")
+          path.write_text(source, encoding="utf-8")
+      - name: Add focused IA regression coverage
+        shell: bash
+        run: |
+          cat > apps/web/src/domains/creator/studio-unified-3d-entry.test.ts <<'TS'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+
+          const toolbarSource = readFileSync(
+            new URL("./StudioToolBeltCreateModeGroups.tsx", import.meta.url),
+            "utf8",
+          );
+          const popoverSource = readFileSync(
+            new URL("./StudioSceneToolPopoverBody.tsx", import.meta.url),
+            "utf8",
+          );
+
+          describe("Studio unified 3D entry", () => {
+            it("offers one toolbar entry while retaining guided specialist tools inside the 3D workspace", () => {
+              expect(toolbarSource).toContain("3D 스튜디오");
+              expect(toolbarSource).toContain("참고 이미지");
+              expect(toolbarSource).not.toContain(">3D 캐릭터<");
+              expect(toolbarSource).not.toContain(">캐릭터 셰이퍼<");
+              expect(toolbarSource).not.toContain(">3D 데생 인형<");
+              expect(toolbarSource).not.toContain(">3D 배경<");
+
+              expect(popoverSource).toContain("3D 장면 만들기");
+              expect(popoverSource).toContain("캐릭터 제작");
+              expect(popoverSource).toContain("포즈·손");
+              expect(popoverSource).toContain("인체 참고");
+            });
+          });
+          TS
+      - name: Validate unified 3D contracts
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/StudioToolBeltCreateModeGroups.tsx \
+            apps/web/src/domains/creator/StudioSceneToolPopoverBody.tsx \
+            apps/web/src/domains/creator/studio-unified-3d-entry.test.ts
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-unified-3d-entry.test.ts \
+            apps/web/src/domains/creator/studio-tool-belt-reachability.test.ts \
+            apps/web/src/domains/creator/StudioSceneToolPopoverBody.test.tsx
+          pnpm run verify:studio-menus
+          pnpm exec tsc -p tsconfig.json
+          git diff --check
+      - name: Publish validated product-only recovery
+        run: |
+          rm -f \
+            .github/workflows/recover-studio-unified-3d-entry.yml \
+            .github/workflows/character-3d-ux-patch-20260909.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): unify 3D tools into one guided workflow"
+          git push origin HEAD:fix/studio-unified-3d-entry-loss-20260910
