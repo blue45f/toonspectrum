@@ -1,120 +1,30 @@
 name: Studio production integrity
 
 on:
-  pull_request:
-    branches: [main, release/salvage-integration-20260908]
-    paths:
-      - 'scripts/check-studio-bundle.mjs'
-      - 'scripts/lib/studio-crdt-bundle-boundary*'
-      - 'scripts/lib/repo-paths.mjs'
-      - 'scripts/integration-test-runner-ci-policy.test.mjs'
-      - 'vite.config.ts'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'apps/web/src/domains/creator/studio-production/**'
-      - 'apps/web/src/domains/creator/studio-router/studio-route-manifest*'
-      - 'apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*'
-      - 'apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary*'
-      - 'apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts*'
-      - 'apps/web/src/domains/creator/StudioInspector*'
-      - 'apps/web/src/domains/creator/studio-batch-rename*'
-      - '.github/workflows/ci.yml'
-      - '.github/workflows/studio-production-integrity.yml'
-      - 'scripts/ci-executed-gates.test.mjs'
   push:
-    branches: [main, release/salvage-integration-20260908]
-    paths:
-      - 'scripts/check-studio-bundle.mjs'
-      - 'scripts/lib/studio-crdt-bundle-boundary*'
-      - 'scripts/lib/repo-paths.mjs'
-      - 'scripts/integration-test-runner-ci-policy.test.mjs'
-      - 'vite.config.ts'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'apps/web/src/domains/creator/studio-production/**'
-      - 'apps/web/src/domains/creator/studio-router/studio-route-manifest*'
-      - 'apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*'
-      - 'apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary*'
-      - 'apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts*'
-      - 'apps/web/src/domains/creator/StudioInspector*'
-      - 'apps/web/src/domains/creator/studio-batch-rename*'
-      - '.github/workflows/ci.yml'
-      - '.github/workflows/studio-production-integrity.yml'
-      - 'scripts/ci-executed-gates.test.mjs'
-  workflow_dispatch:
+    branches: [recover/tagged-product-final-20260911]
+    paths: [.github/workflows/studio-production-integrity.yml]
 
 permissions:
   contents: write
 
-# 복구 materializer가 동시 CI 수정 커밋 때문에 중단되지 않도록 일시적으로 현재 PR 실행을 직렬화한다.
-# 제품-only 복구 커밋이 이 파일을 정본으로 되돌린다.
 concurrency:
-  group: studio-production-integrity-${{ github.event.pull_request.number || github.ref }}
+  group: tagged-product-final-20260911
   cancel-in-progress: false
 
 jobs:
-  production-integrity:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Verify real CI execution contract
-        run: node --test scripts/ci-executed-gates.test.mjs
-      - name: Verify actual production routes and Inspector integration
-        run: |
-          pnpm exec vitest run \
-            apps/web/src/domains/creator/studio-production/studio-production-scope.test.ts \
-            apps/web/src/domains/creator/studio-production/StudioProductionHubPage.scope.test.tsx \
-            apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts \
-            apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
-            apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts \
-            apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx \
-            apps/web/src/domains/creator/studio-batch-rename.test.ts \
-            apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx \
-            apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts \
-            apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx
-      - name: Build production browser without repeating the core typecheck
-        run: |
-          pnpm run build:bundle
-          pnpm run check:studio-bundle
-      - name: Cache Playwright Chromium
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
-      - name: Install Chromium browser
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
-      - name: Install Chromium system dependencies
-        run: pnpm exec playwright install-deps chromium
-      - name: Inspect actual production browser
-        run: pnpm run verify:studio-menus
-
-  tagged-product-materializer:
-    name: materialize-tagged-product-work
-    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/real-core-and-main-only-20260910' }}
+  materialize-tagged-product-work:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 75
     env:
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
-      TARGET_BRANCH: fix/real-core-and-main-only-20260910
+      TARGET_BRANCH: recover/tagged-product-final-20260911
       CANONICAL_WORKFLOW_COMMIT: abe44c2f6b715a2eedf192f75f205ab4b097c93e
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: fix/real-core-and-main-only-20260910
+          ref: recover/tagged-product-final-20260911
           fetch-depth: 0
           persist-credentials: true
       - uses: pnpm/action-setup@v6
@@ -123,17 +33,9 @@ jobs:
           node-version: 24
           cache: pnpm
       - name: Execute reviewed materializer steps
-        id: materialize
         shell: bash
         run: |
           set -euo pipefail
-          workflow=.github/workflows/materialize-remaining-tagged-product-work.yml
-          if [[ ! -f "$workflow" ]]; then
-            echo "needed=false" >> "$GITHUB_OUTPUT"
-            echo "Tagged product materialization is already present."
-            exit 0
-          fi
-          echo "needed=true" >> "$GITHUB_OUTPUT"
           python3 -m pip install --disable-pip-version-check pyyaml
           python3 - <<'PY'
           from __future__ import annotations
@@ -170,7 +72,6 @@ jobs:
               raise SystemExit(f'{stop_name!r} was not found in reviewed materializer')
           PY
       - name: Publish product-only recovery and restore canonical workflow
-        if: steps.materialize.outputs.needed == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -187,14 +88,4 @@ jobs:
           git diff --cached --check
           git -c core.hooksPath=/dev/null commit \
             -m "feat(studio): materialize remaining tagged recovery work"
-
-          for attempt in $(seq 1 8); do
-            if git push --no-verify origin "HEAD:${TARGET_BRANCH}"; then
-              exit 0
-            fi
-            git fetch origin "${TARGET_BRANCH}"
-            git rebase "origin/${TARGET_BRANCH}"
-            sleep $((attempt * 2))
-          done
-          echo "Could not publish tagged product recovery after conflict retries." >&2
-          exit 1
+          git push --no-verify origin "HEAD:${TARGET_BRANCH}"
