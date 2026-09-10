@@ -4,6 +4,9 @@ on:
   push:
     branches: [fix/mannequin-terminal-joints-20260910]
     paths: [.github/workflows/recover-mannequin-terminal-joints.yml]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -154,9 +157,11 @@ jobs:
           rm -f \
             .github/workflows/recover-mannequin-terminal-joints.yml \
             .github/workflows/fix-mannequin-terminal-scale-once.yml \
-            .github/workflows/patch-mannequin-foot-scaling.yml
+            .github/workflows/patch-mannequin-foot-scaling.yml \
+            .github/workflows/restore-ci-after-bulk-integration.yml
           git config user.name "OpenAI Codex"
           git config user.email "codex@openai.com"
           git add -A
+          git diff --cached --check
           git commit -m "fix(mannequin): preserve terminal joint continuity"
           git push origin HEAD:fix/mannequin-terminal-joints-20260910
