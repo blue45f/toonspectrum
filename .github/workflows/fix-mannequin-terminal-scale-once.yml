@@ -1,0 +1,204 @@
+name: Fix mannequin terminal scaling once
+
+on:
+  push:
+    branches: [fix/mannequin-anatomy-scaling-main-20260910]
+    paths: [.github/workflows/fix-mannequin-terminal-scale-once.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-mannequin-terminal-scale-20260910-v1
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Patch product files through the Git data API and retire this workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          branch = "fix/mannequin-anatomy-scaling-main-20260910"
+          workflow_path = ".github/workflows/fix-mannequin-terminal-scale-once.yml"
+          model_path = "apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts"
+          test_path = "apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts"
+          api = f"https://api.github.com/repos/{repo}"
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "toonstudio-mannequin-scale-fix",
+          }
+
+          def request(method: str, path: str, payload=None):
+              body = None if payload is None else json.dumps(payload).encode("utf-8")
+              req = urllib.request.Request(api + path, data=body, method=method, headers=headers)
+              try:
+                  with urllib.request.urlopen(req) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as error:
+                  detail = error.read().decode("utf-8", "replace")
+                  raise SystemExit(f"GitHub API {method} {path} failed: {error.code} {detail}")
+
+          def read_text(path: str, ref: str) -> str:
+              encoded_path = urllib.parse.quote(path, safe="/")
+              encoded_ref = urllib.parse.quote(ref, safe="")
+              data = request("GET", f"/contents/{encoded_path}?ref={encoded_ref}")
+              return base64.b64decode(data["content"]).decode("utf-8")
+
+          ref_path = urllib.parse.quote(f"heads/{branch}", safe="/")
+          ref = request("GET", f"/git/ref/{ref_path}")
+          head_sha = ref["object"]["sha"]
+          commit = request("GET", f"/git/commits/{head_sha}")
+          base_tree = commit["tree"]["sha"]
+
+          model = read_text(model_path, head_sha)
+          replacements = [
+              (
+                  'radius: 0.095 * hu * handScale',
+                  'radius: 0.095 * hu * limbR',
+                  2,
+              ),
+              (
+                  'scale: vec3((0.26 * hu) / footLen, ankleHeight / footLen, 1)',
+                  'scale: vec3((0.26 * hu * footScale) / footLen, (ankleHeight * footScale) / footLen, 1)',
+                  2,
+              ),
+              (
+                  'radius: 0.105 * hu * limbR * footScale',
+                  'radius: 0.105 * hu * limbR',
+                  2,
+              ),
+          ]
+          for old, new, expected in replacements:
+              actual = model.count(old)
+              if actual != expected:
+                  raise SystemExit(f"model anchor changed for {old!r}: expected {expected}, got {actual}")
+              model = model.replace(old, new)
+
+          tests = read_text(test_path, head_sha)
+          start_marker = '  it("해부학 세부 파라미터가 신장을 바꾸지 않고 각 실루엣 축에 독립적으로 반영된다", () => {'
+          end_marker = '  it("체인 길이는 관절 오프셋과 정합한다", () => {'
+          start = tests.find(start_marker)
+          end = tests.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit(f"test block anchors changed: start={start}, end={end}")
+          replacement_test = '''  it("해부학 세부 파라미터가 신장과 말단 관절 연결을 보존하며 독립 반영된다", () => {
+            const base = buildStudioMannequinSpec(params());
+            const tuned = buildStudioMannequinSpec(params({
+              torsoDepth: 1.3, waistWidth: 1.2, limbThickness: 1.25,
+              handScale: 1.2, footScale: 1.2, neckThickness: 1.2,
+            }));
+            const handTuned = buildStudioMannequinSpec(params({ handScale: 1.2 }));
+            const footTuned = buildStudioMannequinSpec(params({ footScale: 1.2 }));
+            const limbTuned = buildStudioMannequinSpec(params({ limbThickness: 1.25 }));
+            for (const spec of [tuned, handTuned, footTuned, limbTuned]) {
+              expect(studioMannequinRestStature(spec)).toBeCloseTo(base.heightM, 12);
+            }
+
+            const sphere = (
+              spec: ReturnType<typeof buildStudioMannequinSpec>,
+              jointId: string,
+              matchesCenter: (center: readonly [number, number, number]) => boolean,
+            ) => spec.primitives.find((primitive) =>
+              primitive.kind === "sphere"
+              && primitive.jointId === jointId
+              && matchesCenter(primitive.center));
+            const capsule = (spec: ReturnType<typeof buildStudioMannequinSpec>, jointId: string) =>
+              spec.primitives.find((primitive) => primitive.kind === "capsule" && primitive.jointId === jointId);
+            const sphereAxis = (
+              primitive: ReturnType<typeof buildStudioMannequinSpec>["primitives"][number] | undefined,
+              axis: 0 | 1 | 2,
+            ) => {
+              expect(primitive?.kind).toBe("sphere");
+              if (primitive?.kind !== "sphere") return Number.NaN;
+              return primitive.radius * (primitive.scale?.[axis] ?? 1);
+            };
+
+            const baseChest = sphere(base, "chest", (center) => center[1] !== 0);
+            const tunedChest = sphere(tuned, "chest", (center) => center[1] !== 0);
+            expect(sphereAxis(tunedChest, 2)).toBeGreaterThan(sphereAxis(baseChest, 2));
+            const baseSpine = capsule(base, "spine");
+            const tunedSpine = capsule(tuned, "spine");
+            if (baseSpine?.kind === "capsule" && tunedSpine?.kind === "capsule") {
+              expect(tunedSpine.radius).toBeGreaterThan(baseSpine.radius);
+            }
+            const baseArm = capsule(base, "leftUpperArm");
+            const tunedArm = capsule(tuned, "leftUpperArm");
+            if (baseArm?.kind === "capsule" && tunedArm?.kind === "capsule") {
+              expect(tunedArm.radius).toBeGreaterThan(baseArm.radius);
+            }
+            const baseNeck = capsule(base, "neck");
+            const tunedNeck = capsule(tuned, "neck");
+            if (baseNeck?.kind === "capsule" && tunedNeck?.kind === "capsule") {
+              expect(tunedNeck.radius).toBeGreaterThan(baseNeck.radius);
+            }
+
+            const basePalm = sphere(base, "leftHand", (center) => center[1] < 0);
+            const handPalm = sphere(handTuned, "leftHand", (center) => center[1] < 0);
+            expect(sphereAxis(handPalm, 0)).toBeGreaterThan(sphereAxis(basePalm, 0));
+            expect(sphereAxis(handPalm, 1)).toBeGreaterThan(sphereAxis(basePalm, 1));
+            const baseWrist = sphere(base, "leftHand", (center) => center[1] === 0);
+            const handWrist = sphere(handTuned, "leftHand", (center) => center[1] === 0);
+            const limbWrist = sphere(limbTuned, "leftHand", (center) => center[1] === 0);
+            expect(sphereAxis(handWrist, 0)).toBeCloseTo(sphereAxis(baseWrist, 0), 12);
+            expect(sphereAxis(limbWrist, 0)).toBeGreaterThan(sphereAxis(baseWrist, 0));
+            const baseDigits = base.primitives.filter((primitive) =>
+              primitive.kind === "capsule" && primitive.jointId === "leftHand");
+            const handDigits = handTuned.primitives.filter((primitive) =>
+              primitive.kind === "capsule" && primitive.jointId === "leftHand");
+            expect(Math.abs(handDigits[0]!.to[1])).toBeGreaterThan(Math.abs(baseDigits[0]!.to[1]));
+
+            const baseFoot = sphere(base, "leftFoot", (center) => center[1] < 0);
+            const scaledFoot = sphere(footTuned, "leftFoot", (center) => center[1] < 0);
+            expect(sphereAxis(scaledFoot, 0)).toBeGreaterThan(sphereAxis(baseFoot, 0));
+            expect(sphereAxis(scaledFoot, 2)).toBeGreaterThan(sphereAxis(baseFoot, 2));
+            const baseAnkle = sphere(base, "leftFoot", (center) => center[1] === 0);
+            const footAnkle = sphere(footTuned, "leftFoot", (center) => center[1] === 0);
+            const limbAnkle = sphere(limbTuned, "leftFoot", (center) => center[1] === 0);
+            expect(sphereAxis(footAnkle, 0)).toBeCloseTo(sphereAxis(baseAnkle, 0), 12);
+            expect(sphereAxis(limbAnkle, 0)).toBeGreaterThan(sphereAxis(baseAnkle, 0));
+          });
+
+'''
+          tests = tests[:start] + replacement_test + tests[end:]
+
+          for label, content in (("model", model), ("tests", tests)):
+              if "\r" in content:
+                  raise SystemExit(f"unexpected CR in {label}")
+              if not content.endswith("\n"):
+                  raise SystemExit(f"missing final newline in {label}")
+
+          model_blob = request("POST", "/git/blobs", {"content": model, "encoding": "utf-8"})["sha"]
+          test_blob = request("POST", "/git/blobs", {"content": tests, "encoding": "utf-8"})["sha"]
+          tree = request("POST", "/git/trees", {
+              "base_tree": base_tree,
+              "tree": [
+                  {"path": model_path, "mode": "100644", "type": "blob", "sha": model_blob},
+                  {"path": test_path, "mode": "100644", "type": "blob", "sha": test_blob},
+                  {"path": workflow_path, "mode": "100644", "type": "blob", "sha": None},
+              ],
+          })
+          new_commit = request("POST", "/git/commits", {
+              "message": "fix(mannequin): keep terminal scales independent at rendered axes",
+              "tree": tree["sha"],
+              "parents": [head_sha],
+          })
+          request("PATCH", f"/git/refs/{ref_path}", {"sha": new_commit["sha"], "force": False})
+          print(f"published {new_commit['sha']}")
+          PY
