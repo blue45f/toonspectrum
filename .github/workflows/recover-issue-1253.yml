@@ -1,0 +1,169 @@
+name: Recover issue 1253 VRM quality convergence
+
+on:
+  push:
+    branches:
+      - fix/issue-1253-vrm-quality-convergence-20260910
+    paths:
+      - ".github/workflows/recover-issue-1253.yml"
+      - "scripts/generate-vrm-thumbnail-technical-denylist.ts"
+      - "scripts/generate-vrm-model-technical-denylist.ts"
+      - "scripts/patch-vrm-library-quality-gates.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: recover-issue-1253-vrm-quality-convergence
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          lfs: true
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Configure commit identity
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Generate exact LFS-backed thumbnail and model evidence
+        run: |
+          set -euo pipefail
+          rm -rf artifacts
+          mkdir -p artifacts
+          pnpm exec tsx scripts/generate-vrm-thumbnail-technical-denylist.ts \
+            | tee artifacts/studio-vrm-thumbnail-quality-summary.json
+          pnpm exec tsx scripts/generate-vrm-model-technical-denylist.ts \
+            | tee artifacts/studio-vrm-model-quality-summary.json
+          node <<'NODE'
+          const fs = require("node:fs");
+          for (const file of [
+            "artifacts/studio-vrm-thumbnail-quality-report.json",
+            "artifacts/studio-vrm-model-quality-report.json",
+          ]) {
+            const report = JSON.parse(fs.readFileSync(file, "utf8"));
+            if (!Number.isInteger(report.scanned) || report.scanned < 1) {
+              throw new Error(`${file}: scanner inspected no assets`);
+            }
+            const infrastructureFailures = Object.values(report.rejected ?? {}).filter(
+              (reason) => typeof reason === "string" && (
+                reason.includes("git-lfs-pointer") || reason.startsWith("scan-error:")
+              ),
+            );
+            if (infrastructureFailures.length > 0) {
+              throw new Error(`${file}: incomplete evidence: ${infrastructureFailures.join(", ")}`);
+            }
+          }
+          NODE
+
+      - name: Compose both gates into default catalogue discovery
+        run: python3 scripts/patch-vrm-library-quality-gates.py .
+
+      - name: Reproduce and lint deterministic evidence
+        run: |
+          set -euo pipefail
+          thumbnail_before=$(git hash-object apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-technical-denylist.generated.ts)
+          model_before=$(git hash-object apps/web/src/domains/creator/vrm/studio-vrm-model-technical-denylist.generated.ts)
+          pnpm exec tsx scripts/generate-vrm-thumbnail-technical-denylist.ts >/dev/null
+          pnpm exec tsx scripts/generate-vrm-model-technical-denylist.ts >/dev/null
+          test "$thumbnail_before" = "$(git hash-object apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-technical-denylist.generated.ts)"
+          test "$model_before" = "$(git hash-object apps/web/src/domains/creator/vrm/studio-vrm-model-technical-denylist.generated.ts)"
+          files=(
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-security.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-production-thumbnail-files.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-integration.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-technical-denylist.generated.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-technical-denylist.generated.ts
+            apps/web/src/domains/creator/vrm/vrm-library.ts
+            apps/web/src/domains/creator/vrm/vrm-library.test.ts
+            scripts/generate-vrm-thumbnail-technical-denylist.ts
+            scripts/generate-vrm-model-technical-denylist.ts
+          )
+          pnpm exec eslint --fix --no-warn-ignored "${files[@]}"
+          pnpm exec tsx scripts/generate-vrm-thumbnail-technical-denylist.ts >/dev/null
+          pnpm exec tsx scripts/generate-vrm-model-technical-denylist.ts >/dev/null
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored "${files[@]}"
+
+      - name: Run focused VRM quality tests
+        run: |
+          set -euo pipefail
+          tests=(
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-security.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-production-thumbnail-files.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality-integration.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality.test.ts
+            apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts
+            apps/web/src/domains/creator/vrm/vrm-library.test.ts
+          )
+          if [[ -f apps/web/src/domains/creator/vrm/studio-vrm-production-catalog.test.ts ]]; then
+            tests+=(apps/web/src/domains/creator/vrm/studio-vrm-production-catalog.test.ts)
+          fi
+          pnpm exec vitest run "${tests[@]}"
+
+      - name: Run architecture, full TypeScript and production build
+        run: |
+          set -euo pipefail
+          node scripts/validate-architecture.mjs
+          pnpm exec tsc -p tsconfig.json --noEmit
+          pnpm build
+          git diff --check
+
+      - name: Record audit summary
+        if: always()
+        run: |
+          if [[ -f artifacts/studio-vrm-thumbnail-quality-report.json ]]; then
+            node -e 'const r=require("./artifacts/studio-vrm-thumbnail-quality-report.json"); console.log(`Thumbnail scan: ${r.scanned} scanned, ${Object.keys(r.rejected).length} denied`)' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ -f artifacts/studio-vrm-model-quality-report.json ]]; then
+            node -e 'const r=require("./artifacts/studio-vrm-model-quality-report.json"); console.log(`Model scan: ${r.scanned} scanned, ${Object.keys(r.rejected).length} denied`)' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload exact audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-1253-vrm-quality-evidence-${{ github.run_id }}
+          path: artifacts/studio-vrm-*-quality-report.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Commit workflow-free convergence result
+        run: |
+          set -euo pipefail
+          rm -rf artifacts
+          rm -f .github/workflows/recover-issue-1253.yml
+          rm -f scripts/patch-vrm-library-quality-gates.py
+          allowed='^(\.github/workflows/studio-vrm-asset-quality\.yml|apps/web/src/domains/creator/vrm/(studio-vrm-(thumbnail|model)-(quality|quality\.test|quality-integration\.test|technical-denylist\.generated)\.ts|studio-vrm-thumbnail-quality-security\.test\.ts|studio-vrm-production-thumbnail-files\.test\.ts|vrm-library(\.test)?\.ts)|scripts/generate-vrm-(thumbnail|model)-technical-denylist\.ts|\.github/workflows/recover-issue-1253\.yml|scripts/patch-vrm-library-quality-gates\.py)$'
+          while IFS= read -r path; do
+            [[ "$path" =~ $allowed ]] || { echo "Unexpected changed path: $path" >&2; exit 1; }
+          done < <({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit \
+            -m 'fix(vrm): converge thumbnail and model quality gates (#1253)'
+          git push origin HEAD:fix/issue-1253-vrm-quality-convergence-20260910
