@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - fix/studio-insert-batch-race-20260910
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -14,7 +17,7 @@ concurrency:
 
 jobs:
   verify-and-commit:
-    if: ${{ !contains(github.event.head_commit.message, '[codex-insert-draft-verified]') }}
+    if: ${{ !contains(github.event.head_commit.message || '', '[codex-insert-draft-verified]') }}
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     env:
@@ -69,11 +72,33 @@ jobs:
               )
           path.write_text(source.replace(before, after, 1))
 
+      - name: Add focused queue-state regression coverage
+        shell: bash
+        run: |
+          cat > apps/web/src/domains/creator/studio-insert-batch-queue-state.test.ts <<'TS'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+
+          const source = readFileSync(
+            new URL("./StudioInsertBatchPreflight.tsx", import.meta.url),
+            "utf8",
+          );
+
+          describe("Studio insert batch async queue state", () => {
+            it("publishes each worker result to the ref before scheduling React state", () => {
+              expect(source).toContain("const next = update(itemsRef.current);");
+              expect(source).toContain("itemsRef.current = next;\n    setItems(next);");
+              expect(source).not.toContain("setItems((current) => {");
+            });
+          });
+          TS
+
       - name: Lint focused files
         run: |
           pnpm exec eslint --fix \
             apps/web/src/domains/creator/StudioInsertBatchPreflight.tsx \
             apps/web/src/domains/creator/StudioInsertBatchPreflight.test.tsx \
+            apps/web/src/domains/creator/studio-insert-batch-queue-state.test.ts \
             apps/web/src/domains/creator/studio-insert-batch-model.ts \
             apps/web/src/domains/creator/studio-insert-batch-model.test.ts \
             apps/web/src/domains/creator/studio-insert-batch-reachability.test.ts \
@@ -81,6 +106,7 @@ jobs:
           pnpm exec eslint --max-warnings=0 \
             apps/web/src/domains/creator/StudioInsertBatchPreflight.tsx \
             apps/web/src/domains/creator/StudioInsertBatchPreflight.test.tsx \
+            apps/web/src/domains/creator/studio-insert-batch-queue-state.test.ts \
             apps/web/src/domains/creator/studio-insert-batch-model.ts \
             apps/web/src/domains/creator/studio-insert-batch-model.test.ts \
             apps/web/src/domains/creator/studio-insert-batch-reachability.test.ts \
@@ -89,6 +115,7 @@ jobs:
       - name: Run focused insertion regressions
         run: |
           pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-insert-batch-queue-state.test.ts \
             apps/web/src/domains/creator/studio-insert-batch-model.test.ts \
             apps/web/src/domains/creator/StudioInsertBatchPreflight.test.tsx \
             apps/web/src/domains/creator/studio-insert-batch-reachability.test.ts \
@@ -104,9 +131,12 @@ jobs:
 
       - name: Commit verified product-only diff
         run: |
-          rm .github/workflows/codex-studio-insert-batch-draft-verify.yml
+          rm -f \
+            .github/workflows/codex-studio-insert-batch-draft-verify.yml \
+            .github/workflows/restore-ci-after-bulk-integration.yml
           git config user.name "OpenAI Codex"
           git config user.email "codex@openai.com"
           git add -A
+          git diff --cached --check
           git commit -m "fix(studio): serialize batch insertion queue state [codex-insert-draft-verified]"
           git push origin HEAD:fix/studio-insert-batch-race-20260910
