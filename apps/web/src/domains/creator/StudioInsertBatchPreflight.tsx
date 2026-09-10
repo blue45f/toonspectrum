@@ -336,11 +336,9 @@ export function StudioInsertBatchPreflight({
       current: readonly BatchItem[],
     ) => readonly BatchItem[],
   ): void {
-    setItems((current) => {
-      const next = update(current);
-      itemsRef.current = next;
-      return next;
-    });
+    const next = update(itemsRef.current);
+    itemsRef.current = next;
+    setItems(next);
   }
 
   useEffect(() => {

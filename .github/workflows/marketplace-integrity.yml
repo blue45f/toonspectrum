@@ -60,6 +60,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Prepare explicit API test environment
+        run: install -m 600 /dev/null apps/api/.env.test
       - run: git diff --check
       - name: Strict marketplace lint
         run: >-

@@ -305,7 +305,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
         zoomOutUnavailableReason,
       })}
       {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 드래그 핸들러는 에셋 드롭 전용이고, 핸드 이동은 capture-phase 포인터 훅, 실제 편집은 내부 Konva Stage가 담당한다 */}
+      { }
       <div
         ref={wrapRef}
         data-studio-canvas-viewport

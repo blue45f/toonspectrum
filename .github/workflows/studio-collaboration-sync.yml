@@ -54,8 +54,17 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/production"
           mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/branch"
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install-deps chromium
       - name: Reproduce the currently deployed Studio
         id: production-baseline
         continue-on-error: true
@@ -63,8 +72,8 @@ jobs:
           TOONSPECTRUM_VERIFY_ORIGIN: https://www.toonstudio.cloud
           TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonspectrum-verification/studio-collaboration-sync/production
         run: pnpm exec tsx scripts/verify-studio-collaboration-sync.mts
-      - name: Build production Studio assets
-        run: pnpm run build
+      - name: Build production Studio assets without repeating the core typecheck
+        run: pnpm run build:bundle
       - name: Verify the pull-request build
         env:
           TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonspectrum-verification/studio-collaboration-sync/branch

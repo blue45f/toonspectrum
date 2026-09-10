@@ -80,7 +80,7 @@ describe("MarketHomePage", () => {
     );
 
     expect(
-      screen.getByRole("link", { name: "스튜디오에서 공유하기" }).getAttribute("href")
+      screen.getByRole("link", { name: "Studio에서 첫 리소스 공유하기" }).getAttribute("href")
     ).toBe("/studio?assetMarket=community&communityView=share");
   });
 

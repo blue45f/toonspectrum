@@ -196,7 +196,7 @@ describe("speech-bubble library preferences", () => {
       }),
     ).toBe(true);
     expect(storage.value).toContain(
-      `\"version\":${BUBBLE_LIBRARY_PREFERENCES_VERSION}`,
+      `"version":${BUBBLE_LIBRARY_PREFERENCES_VERSION}`,
     );
     expect(readBubbleLibraryPreferences(storage)).toEqual({
       favoriteIds: ["heart", "speech"],

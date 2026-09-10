@@ -1,12 +1,10 @@
 import {
   AlertTriangle,
-  Check,
   ChevronRight,
   Clapperboard,
   ImagePlus,
   Layers3,
   Loader2,
-  RefreshCw,
   ScanSearch,
   ShieldCheck,
   Sparkles,
@@ -26,7 +24,6 @@ import { createPortal } from "react-dom";
 import {
   STUDIO_EASE,
   STUDIO_FOCUS_RING,
-  STUDIO_TOUCH_TARGET,
 } from "../studio-panel-ui";
 import { SCENARIO_BEAT_LABELS, SCENARIO_BEAT_TYPES, type ScenarioBeatType } from "../studio-story-beats";
 import { StudioContinuityMetadataEditor } from "../StudioContinuityMetadataEditor";
@@ -348,7 +345,6 @@ export function StudioAiComicDirectorPanel({
   progress,
   error,
   preview,
-  textProvenance,
   onGenerate,
   onGenerateImages,
   onChangeScene,
@@ -359,10 +355,23 @@ export function StudioAiComicDirectorPanel({
   onApply,
   onDiscard,
 }: StudioAiComicDirectorPanelProps): ReactElement | null {
-  const items = preview ?? [];
+  const items = useMemo(() => preview ?? [], [preview]);
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
-  const [stage, setStage] = useState<StudioAiComicDirectorStage>(() => items.length ? "direction" : "brief");
+  const [stage, setStage] = useState<StudioAiComicDirectorStage>(() => {
+    if (
+      busy ||
+      items.some(
+        (item) =>
+          Boolean(item.imageDataUrl) ||
+          scenarioImageCandidates(item).length > 0 ||
+          Boolean(item.imageError),
+      )
+    ) {
+      return "production";
+    }
+    return items.length ? "direction" : "brief";
+  });
   const [selectedIndexes, setSelectedIndexes] = useState<number[]>(() => items.map((_, index) => index));
   const [activeIndex, setActiveIndex] = useState(0);
   const [directions, setDirections] = useState<Record<number, DirectorDirection>>({});
@@ -392,7 +401,7 @@ export function StudioAiComicDirectorPanel({
       return valid.length || current.length ? valid : items.map((_, index) => index);
     });
     setActiveIndex((current) => Math.min(Math.max(0, current), Math.max(0, items.length - 1)));
-  }, [items.length]);
+  }, [items]);
 
   useEffect(() => {
     setSession((current) => ({
