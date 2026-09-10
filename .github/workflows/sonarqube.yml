@@ -1,6 +1,6 @@
 name: SonarQube
 
-# Reuse the coverage produced by CI's three test shards. Running this workflow
+# Reuse the coverage produced by CI's four test shards. Running this workflow
 # independently would scan before those reports exist and report 0% coverage.
 on:
   workflow_call:
@@ -54,7 +54,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.secrets.outputs.configured == 'true'
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Download coverage from every CI shard
         if: steps.secrets.outputs.configured == 'true'
@@ -63,10 +63,10 @@ jobs:
           pattern: sonar-coverage-*
           path: coverage
 
-      - name: Require all three nonempty coverage reports
+      - name: Require all four nonempty coverage reports
         if: steps.secrets.outputs.configured == 'true'
         run: |
-          for shard in 1 2 3; do
+          for shard in 1 2 3 4; do
             test -s "coverage/sonar-coverage-$shard/lcov.info"
           done
 

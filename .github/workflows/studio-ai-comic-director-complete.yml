@@ -2,7 +2,32 @@ name: Studio AI comic director complete
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main]
+    paths:
+      - "apps/web/src/domains/creator/ai/studio-ai-comic-composer-*.ts"
+      - "apps/web/src/domains/creator/ai/studio-ai-comic-director*.ts"
+      - "apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel*.tsx"
+      - "apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad*.tsx"
+      - "apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow*.ts"
+      - "apps/web/src/domains/creator/ai/studio-scenario-image-generation*.ts"
+      - "apps/web/src/domains/creator/ai/StudioAiEpisodeProduction*.tsx"
+      - "apps/web/src/domains/creator/ai/StudioAiToolPopoverBody*.ts*"
+      - "apps/web/src/domains/creator/StudioScenarioCandidateDesk*.tsx"
+      - "apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel*.tsx"
+      - "apps/web/src/domains/creator/StudioThreeDPreviewPanelStack.tsx"
+      - "apps/web/src/domains/creator/StudioLazyPanelStack.tsx"
+      - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
+      - "apps/web/src/domains/creator/studio-scenario-layout.ts"
+      - "apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute*.tsx"
+      - "apps/web/src/domains/creator/studio-router/studio-ai-comic-director-route*.ts"
+      - "apps/web/src/domains/creator/studio-router/studio-route-manifest*.ts"
+      - "apps/api/src/modules/studio-ai/studio-ai-comic-director*.ts"
+      - "apps/api/src/modules/studio-ai/studio-ai.module.ts"
+      - "apps/api/src/db/schema/studio-ai-comic-director.schema.ts"
+      - "apps/api/src/db/schema/index.ts"
+      - ".github/workflows/studio-ai-comic-director-complete.yml"
+  push:
     paths:
       - "apps/web/src/domains/creator/ai/studio-ai-comic-composer-*.ts"
       - "apps/web/src/domains/creator/ai/studio-ai-comic-director*.ts"
@@ -32,7 +57,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: studio-ai-comic-director-complete-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -56,7 +81,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --prefer-offline
 
       # 기존 quality/complete 워크플로의 기능 검증을 한 러너에서 모두 수행한다.
       # 체크아웃·캐시 복원·설치를 두 번 지불하지 않으면서 테스트 범위는 유지한다.

@@ -1,6 +1,7 @@
 name: Studio promo video quality
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main]
     paths:
       - 'apps/web/src/domains/creator/promo/**'
@@ -12,11 +13,24 @@ on:
       - 'tools/verify-studio-promo-preview.mjs'
       - 'tools/verify-studio-promo-output.py'
       - '.github/workflows/studio-promo-video.yml'
+  push:
+    paths:
+      - 'apps/web/src/domains/creator/promo/**'
+      - 'apps/web/src/app/routes/groups/creator.routes.tsx'
+      - 'apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx'
+      - 'e2e/studio-promo.spec.ts'
+      - 'apps/web/tools/browser-harnesses/promo-e2e.html'
+      - 'tools/verify-studio-promo-recording.mjs'
+      - 'tools/verify-studio-promo-preview.mjs'
+      - 'tools/verify-studio-promo-output.py'
+      - '.github/workflows/studio-promo-video.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: studio-promo-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
 jobs:
   promo-quality:
     runs-on: ubuntu-latest
@@ -31,7 +45,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Recording and preview lifecycle regressions (mocked boundaries)
         run: |
           node tools/verify-studio-promo-recording.mjs

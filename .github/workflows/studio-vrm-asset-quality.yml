@@ -2,6 +2,17 @@ name: Studio VRM asset quality
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/studio-vrm-asset-quality.yml"
+      - "apps/web/public/assets/3d/characters/**"
+      - "apps/web/public/vrm/**"
+      - "apps/web/src/domains/creator/vrm/**"
+      - "scripts/generate-vrm-model-technical-denylist.ts"
+      - "scripts/generate-vrm-thumbnail-technical-denylist.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  push:
     paths:
       - ".github/workflows/studio-vrm-asset-quality.yml"
       - "apps/web/public/assets/3d/characters/**"
@@ -17,7 +28,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: studio-vrm-asset-quality-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

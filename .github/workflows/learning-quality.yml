@@ -2,19 +2,20 @@ name: Learning quality
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main]
     paths: ['apps/web/src/domains/learn/**', 'e2e/learn*.spec.ts', 'tsconfig.learning.json', '.github/workflows/learning-quality.yml', 'apps/web/src/domains/creator/studio-impasto-relief-shading-v1*.ts']
   push:
-    branches: [main]
     paths: ['apps/web/src/domains/learn/**', 'e2e/learn*.spec.ts', 'tsconfig.learning.json', '.github/workflows/learning-quality.yml', 'apps/web/src/domains/creator/studio-impasto-relief-shading-v1*.ts']
 
+  workflow_dispatch:
 permissions:
   contents: read
 
 # main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
 # cancel-in-progress 가 취소할 대상을 갖지 못한다.
 concurrency:
-  group: learning-quality-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -32,7 +33,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm exec tsc -p tsconfig.learning.json
       - run: pnpm exec eslint apps/web/src/domains/learn e2e/learn.spec.ts e2e/learn-resilience.spec.ts e2e/learn-guided-lessons.spec.ts apps/web/src/domains/creator/studio-impasto-relief-shading-v1.ts apps/web/src/domains/creator/studio-impasto-relief-shading-v1.light-constants.test.ts --max-warnings=0
       # Directory discovery includes the accessibility suite instead of silently omitting it.

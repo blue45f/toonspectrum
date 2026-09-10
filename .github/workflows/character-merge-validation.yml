@@ -2,6 +2,7 @@ name: Character merge validation
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'scripts/check-studio-bundle.mjs'
@@ -19,7 +20,6 @@ on:
       - "apps/web/src/domains/creator/studio-router/studio-route-manifest*"
       - "scripts/verify-character-contact-naturalness.mjs"
   push:
-    branches: [main, release/salvage-integration-20260908]
     paths:
       - 'scripts/check-studio-bundle.mjs'
       - 'scripts/lib/studio-crdt-bundle-boundary*'
@@ -36,13 +36,14 @@ on:
       - "apps/web/src/domains/creator/studio-router/studio-route-manifest*"
       - "scripts/verify-character-contact-naturalness.mjs"
 
+  workflow_dispatch:
 permissions:
   contents: read
 
 # main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
 # cancel-in-progress 가 취소할 대상을 갖지 못한다.
 concurrency:
-  group: character-merge-validation-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -62,7 +63,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Check camera compiler and import rules
         run: pnpm exec eslint --max-warnings=0 apps/web/src/domains/creator/vrm/StudioVrmCameraDirector.tsx apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx
       - name: Verify contact naturalness against production math

@@ -1,13 +1,8 @@
 name: Studio discovery UX
 
 on:
-  workflow_call:
-    inputs:
-      source_ref:
-        required: true
-        type: string
-  workflow_dispatch:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     paths:
       - 'apps/web/src/domains/creator/brush/**'
       - 'apps/web/src/domains/creator/filter/**'
@@ -20,11 +15,30 @@ on:
       - 'scripts/verify-studio-discovery-ux.mts'
       - '.github/workflows/studio-discovery-ux.yml'
 
+  push:
+    paths:
+      - 'apps/web/src/domains/creator/brush/**'
+      - 'apps/web/src/domains/creator/filter/**'
+      - 'apps/web/src/domains/creator/studio-tool-search*'
+      - 'apps/web/src/domains/creator/studio-brush.ts'
+      - 'apps/web/src/domains/creator/studio-creative-ux.ts'
+      - 'apps/web/src/domains/creator/studio-basic-brush-expansion.test.ts'
+      - 'apps/web/src/domains/creator/StudioUnifiedBrushPicker.test.tsx'
+      - 'apps/web/src/domains/creator/studio-main-menu-items-filter*'
+      - 'scripts/verify-studio-discovery-ux.mts'
+      - '.github/workflows/studio-discovery-ux.yml'
+
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_ref:
+        required: true
+        type: string
 permissions:
   contents: read
 
 concurrency:
-  group: studio-discovery-ux-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -43,7 +57,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Focused creator lint
         run: >-
           pnpm exec eslint --max-warnings=0
@@ -84,7 +98,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm run build:bundle
       - run: test -s dist/.vite/manifest.json
       - uses: actions/upload-artifact@v6
@@ -113,7 +127,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Cache Playwright Chromium
         id: playwright-cache
         uses: actions/cache@v4

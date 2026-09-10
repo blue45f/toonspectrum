@@ -2,6 +2,7 @@ name: Studio production integrity
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'scripts/check-studio-bundle.mjs'
@@ -22,7 +23,6 @@ on:
       - '.github/workflows/studio-production-integrity.yml'
       - 'scripts/ci-executed-gates.test.mjs'
   push:
-    branches: [main, release/salvage-integration-20260908]
     paths:
       - 'scripts/check-studio-bundle.mjs'
       - 'scripts/lib/studio-crdt-bundle-boundary*'
@@ -49,7 +49,7 @@ permissions:
 # main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
 # cancel-in-progress 가 취소할 대상을 갖지 못한다.
 concurrency:
-  group: studio-production-integrity-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -67,7 +67,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Verify real CI execution contract
         run: node --test scripts/ci-executed-gates.test.mjs
       - name: Verify actual production routes and Inspector integration

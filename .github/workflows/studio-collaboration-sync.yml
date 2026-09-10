@@ -1,9 +1,8 @@
 name: Studio collaboration document sync
 
 on:
-  workflow_dispatch:
-
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main]
     paths:
       - ".github/workflows/studio-collaboration-sync.yml"
@@ -15,7 +14,6 @@ on:
       - "apps/web/src/domains/creator/studio-cuttoon-editor/**"
 
   push:
-    branches: [main]
     paths:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"
@@ -24,12 +22,14 @@ on:
       - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
       - "apps/web/src/domains/creator/live/**"
       - "apps/web/src/domains/creator/studio-cuttoon-editor/**"
+  workflow_dispatch:
+
   workflow_call:
 permissions:
   contents: read
 
 concurrency:
-  group: studio-collaboration-sync-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Verify presence/document readiness policy and transport contracts
         run: >-
           pnpm exec vitest run
