@@ -1,0 +1,130 @@
+[
+  {
+    "number": 65,
+    "state": "open",
+    "rule": {
+      "id": "js/insecure-randomness",
+      "name": "js/insecure-randomness",
+      "severity": "warning",
+      "security_severity_level": "high",
+      "tags": [
+        "external/cwe/cwe-338",
+        "security"
+      ]
+    },
+    "tool": "CodeQL",
+    "created_at": "2026-09-09T11:43:19Z",
+    "updated_at": "2026-09-09T11:43:19Z",
+    "most_recent_instance": {
+      "ref": "refs/heads/main",
+      "state": "open",
+      "category": "/language:javascript-typescript",
+      "analysis_key": "dynamic/github-code-scanning/codeql:analyze",
+      "environment": "{\"build-mode\":\"none\",\"category\":\"/language:javascript-typescript\",\"language\":\"javascript-typescript\",\"runner\":\"[\\\"ubuntu-latest\\\"]\"}",
+      "classifications": [],
+      "location": {
+        "path": "apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx",
+        "start_line": 46,
+        "end_line": 46,
+        "start_column": 3,
+        "end_column": 12
+      }
+    }
+  },
+  {
+    "number": 66,
+    "state": "open",
+    "rule": {
+      "id": "js/insecure-randomness",
+      "name": "js/insecure-randomness",
+      "severity": "warning",
+      "security_severity_level": "high",
+      "tags": [
+        "external/cwe/cwe-338",
+        "security"
+      ]
+    },
+    "tool": "CodeQL",
+    "created_at": "2026-09-09T11:43:19Z",
+    "updated_at": "2026-09-09T11:43:19Z",
+    "most_recent_instance": {
+      "ref": "refs/heads/main",
+      "state": "open",
+      "category": "/language:javascript-typescript",
+      "analysis_key": "dynamic/github-code-scanning/codeql:analyze",
+      "environment": "{\"build-mode\":\"none\",\"category\":\"/language:javascript-typescript\",\"language\":\"javascript-typescript\",\"runner\":\"[\\\"ubuntu-latest\\\"]\"}",
+      "classifications": [],
+      "location": {
+        "path": "apps/web/src/domains/creator/ai/studio-ai-comic-director-api.ts",
+        "start_line": 294,
+        "end_line": 294,
+        "start_column": 37,
+        "end_column": 46
+      }
+    }
+  },
+  {
+    "number": 67,
+    "state": "open",
+    "rule": {
+      "id": "js/insecure-randomness",
+      "name": "js/insecure-randomness",
+      "severity": "warning",
+      "security_severity_level": "high",
+      "tags": [
+        "external/cwe/cwe-338",
+        "security"
+      ]
+    },
+    "tool": "CodeQL",
+    "created_at": "2026-09-09T11:43:19Z",
+    "updated_at": "2026-09-09T11:43:19Z",
+    "most_recent_instance": {
+      "ref": "refs/heads/main",
+      "state": "open",
+      "category": "/language:javascript-typescript",
+      "analysis_key": "dynamic/github-code-scanning/codeql:analyze",
+      "environment": "{\"build-mode\":\"none\",\"category\":\"/language:javascript-typescript\",\"language\":\"javascript-typescript\",\"runner\":\"[\\\"ubuntu-latest\\\"]\"}",
+      "classifications": [],
+      "location": {
+        "path": "apps/web/src/domains/creator/ai/studio-ai-comic-director-api.ts",
+        "start_line": 261,
+        "end_line": 261,
+        "start_column": 22,
+        "end_column": 31
+      }
+    }
+  },
+  {
+    "number": 68,
+    "state": "open",
+    "rule": {
+      "id": "js/insecure-randomness",
+      "name": "js/insecure-randomness",
+      "severity": "warning",
+      "security_severity_level": "high",
+      "tags": [
+        "external/cwe/cwe-338",
+        "security"
+      ]
+    },
+    "tool": "CodeQL",
+    "created_at": "2026-09-09T11:43:19Z",
+    "updated_at": "2026-09-09T11:43:19Z",
+    "most_recent_instance": {
+      "ref": "refs/heads/main",
+      "state": "open",
+      "category": "/language:javascript-typescript",
+      "analysis_key": "dynamic/github-code-scanning/codeql:analyze",
+      "environment": "{\"build-mode\":\"none\",\"category\":\"/language:javascript-typescript\",\"language\":\"javascript-typescript\",\"runner\":\"[\\\"ubuntu-latest\\\"]\"}",
+      "classifications": [],
+      "location": {
+        "path": "apps/web/src/domains/creator/ai/studio-ai-comic-director-session.ts",
+        "start_line": 377,
+        "end_line": 377,
+        "start_column": 49,
+        "end_column": 58
+      }
+    }
+  }
+]
