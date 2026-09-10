@@ -1,0 +1,282 @@
+name: Converge remaining Studio fixes once
+
+on:
+  push:
+    branches: [fix/restore-required-core-gate-20260910]
+    paths: [.github/workflows/converge-remaining-studio-fixes-once.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: converge-remaining-studio-fixes-20260910
+  cancel-in-progress: true
+
+jobs:
+  materialize-and-verify:
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/restore-required-core-gate-20260910
+          fetch-depth: 1
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Bring forward verified product-only fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin \
+            refs/heads/fix/studio-ai-reference-navigation-20260910:refs/remotes/origin/fix/studio-ai-reference-navigation-20260910 \
+            refs/heads/ops/vercel-main-only-builds-20260910-v2:refs/remotes/origin/ops/vercel-main-only-builds-20260910-v2 \
+            refs/heads/fix/mannequin-anatomy-scaling-main-20260910:refs/remotes/origin/fix/mannequin-anatomy-scaling-main-20260910 \
+            refs/heads/feat/brush-goal-guided-entry-clean-20260910:refs/remotes/origin/feat/brush-goal-guided-entry-clean-20260910
+
+          git checkout origin/fix/studio-ai-reference-navigation-20260910 -- \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx
+
+          git checkout origin/ops/vercel-main-only-builds-20260910-v2 -- vercel.json
+
+          git checkout origin/fix/mannequin-anatomy-scaling-main-20260910 -- \
+            apps/web/src/domains/creator/scene-3d/StudioMannequinPoserPanel.tsx \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts
+
+          git checkout origin/feat/brush-goal-guided-entry-clean-20260910 -- \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
+            apps/web/src/domains/creator/brush/studio-brush-goal-start-integration-boundary.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushStudio.tsx
+
+      - name: Replace predictable AI director identities with Web Crypto
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > apps/web/src/domains/creator/ai/studio-ai-comic-director-id.ts <<'EOF'
+          const SECURE_ID_BYTES = 16;
+
+          function secureRandomBytes(): Uint8Array {
+            const cryptoApi = globalThis.crypto;
+            if (typeof cryptoApi?.getRandomValues !== "function") {
+              throw new Error("이 환경에서는 안전한 AI 코믹 디렉터 ID를 만들 수 없습니다.");
+            }
+            const bytes = new Uint8Array(SECURE_ID_BYTES);
+            cryptoApi.getRandomValues(bytes);
+            return bytes;
+          }
+
+          /**
+           * Creates a non-predictable durable identifier for sessions, jobs, approvals, and bible
+           * entries. randomUUID is preferred; Web Crypto bytes cover WebViews that omit it. We
+           * deliberately fail closed instead of returning a clock/Math.random identifier that can
+           * collide or be guessed across synced documents.
+           */
+          export function createStudioAiComicDirectorId(prefix = "comic"): string {
+            const cryptoApi = globalThis.crypto;
+            try {
+              const uuid = cryptoApi?.randomUUID?.();
+              if (uuid) return uuid;
+            } catch {
+              // Some embedded browsers expose randomUUID but throw outside a secure context.
+            }
+
+            const bytes = secureRandomBytes();
+            // RFC 4122 version/variant bits make the fallback structurally recognizable while the
+            // prefix keeps operation IDs readable in diagnostics.
+            bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+            bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+            const token = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+            return `${prefix}-${token}`;
+          }
+          EOF
+
+          cat > apps/web/src/domains/creator/ai/studio-ai-comic-director-id.test.ts <<'EOF'
+          import { readFileSync } from "node:fs";
+
+          import { afterEach, describe, expect, it, vi } from "vitest";
+
+          import { createStudioAiComicDirectorId } from "./studio-ai-comic-director-id";
+
+          afterEach(() => {
+            vi.unstubAllGlobals();
+          });
+
+          describe("AI comic director secure identity", () => {
+            it("prefers the platform UUID source", () => {
+              vi.stubGlobal("crypto", { randomUUID: () => "secure-platform-uuid" });
+              expect(createStudioAiComicDirectorId("job")).toBe("secure-platform-uuid");
+            });
+
+            it("uses secure random bytes when an embedded browser omits randomUUID", () => {
+              vi.stubGlobal("crypto", {
+                getRandomValues: (target: Uint8Array) => {
+                  target.fill(0);
+                  return target;
+                },
+              });
+              expect(createStudioAiComicDirectorId("job")).toBe(
+                "job-00000000000040008000000000000000",
+              );
+            });
+
+            it("fails closed when Web Crypto entropy is unavailable", () => {
+              vi.stubGlobal("crypto", undefined);
+              expect(() => createStudioAiComicDirectorId()).toThrow(
+                "안전한 AI 코믹 디렉터 ID",
+              );
+            });
+
+            it("keeps predictable randomness out of every AI director identity owner", () => {
+              const session = readFileSync(
+                new URL("./studio-ai-comic-director-session.ts", import.meta.url),
+                "utf8",
+              );
+              const panel = readFileSync(
+                new URL("./StudioAiComicDirectorPanel.tsx", import.meta.url),
+                "utf8",
+              );
+              const route = readFileSync(
+                new URL("../studio-router/routes/StudioAiComicDirectorRoute.tsx", import.meta.url),
+                "utf8",
+              );
+              expect(session).not.toContain("Math.random");
+              expect(panel).not.toContain("Math.random");
+              expect(route).not.toContain("Math.random");
+              expect(session).toContain("createStudioAiComicDirectorId");
+              expect(panel).toContain("createStudioAiComicDirectorId");
+              expect(route).toContain("createStudioAiComicDirectorId");
+            });
+          });
+          EOF
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          route_path = Path("apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx")
+          route = route_path.read_text()
+          api_import = 'import { createStudioAiComicDirectorApiClient } from "../../ai/studio-ai-comic-director-api";\n'
+          id_import = 'import { createStudioAiComicDirectorId } from "../../ai/studio-ai-comic-director-id";\n'
+          if route.count(api_import) != 1:
+              raise SystemExit("AI director route API import anchor changed")
+          route = route.replace(api_import, api_import + id_import, 1)
+          old_uid = '''function uid(): string {
+            return globalThis.crypto?.randomUUID?.()
+              ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          }
+
+          '''
+          if route.count(old_uid) != 1:
+              raise SystemExit(f"expected one route uid helper, found {route.count(old_uid)}")
+          route = route.replace(old_uid, "", 1).replace("uid()", "createStudioAiComicDirectorId()")
+          route_path.write_text(route)
+
+          session_path = Path("apps/web/src/domains/creator/ai/studio-ai-comic-director-session.ts")
+          session = session_path.read_text()
+          type_import = 'import type { ScenarioPreviewItem } from "../studio-scenario-layout";\n'
+          local_import = 'import { createStudioAiComicDirectorId } from "./studio-ai-comic-director-id";\n'
+          if session.count(type_import) != 1:
+              raise SystemExit("AI director session import anchor changed")
+          session = session.replace(type_import, type_import + local_import, 1)
+          old_id = '''function id(): string {
+            return globalThis.crypto?.randomUUID?.()
+              ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          }
+
+          '''
+          if session.count(old_id) != 1:
+              raise SystemExit(f"expected one session id helper, found {session.count(old_id)}")
+          session = session.replace(old_id, "", 1).replace("input.id ?? id()", "input.id ?? createStudioAiComicDirectorId()")
+          session_path.write_text(session)
+
+          panel_path = Path("apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx")
+          panel = panel_path.read_text()
+          api_block = '''import {
+            createStudioAiComicDirectorApiClient,
+            type StudioAiComicDirectorApiClient,
+          } from "./studio-ai-comic-director-api";
+          '''
+          id_line = 'import { createStudioAiComicDirectorId } from "./studio-ai-comic-director-id";\n'
+          if panel.count(api_block) != 1:
+              raise SystemExit("AI director panel API import anchor changed")
+          panel = panel.replace(api_block, api_block + id_line, 1)
+          old_panel_uid = '''function uid(prefix: string): string {
+            return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          }
+
+          '''
+          if panel.count(old_panel_uid) != 1:
+              raise SystemExit(f"expected one panel uid helper, found {panel.count(old_panel_uid)}")
+          panel = panel.replace(old_panel_uid, "", 1).replace("uid(", "createStudioAiComicDirectorId(")
+          panel_path.write_text(panel)
+          PY
+
+      - name: Verify focused behavior and repository hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'JSON.parse(require("node:fs").readFileSync("vercel.json", "utf8"))'
+          test ! -e .github/workflows/restore-ci-after-bulk-integration.yml
+          ! grep -R "Math.random" \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-session.ts \
+            apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx \
+            apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx
+          pnpm install --frozen-lockfile
+          pnpm exec eslint --fix --no-warn-ignored \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-id.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-id.test.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-session.ts \
+            apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx \
+            apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx \
+            apps/web/src/domains/creator/scene-3d/StudioMannequinPoserPanel.tsx \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
+            apps/web/src/domains/creator/brush/studio-brush-goal-start-integration-boundary.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushStudio.tsx
+          git diff --check
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-id.test.ts \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx \
+            apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.test.tsx \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-optional-anatomy-normalization.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
+            apps/web/src/domains/creator/brush/studio-brush-goal-start-integration-boundary.test.ts
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.tsx \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-id.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-id.test.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-session.ts \
+            apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx \
+            apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx \
+            apps/web/src/domains/creator/scene-3d/StudioMannequinPoserPanel.tsx \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.tsx \
+            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
+            apps/web/src/domains/creator/brush/studio-brush-goal-start-integration-boundary.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushStudio.tsx
+
+      - name: Commit product-only convergence
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/converge-remaining-studio-fixes-once.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m "fix(studio): converge remaining stabilization work"
+          git -c core.hooksPath=/dev/null push --no-verify origin HEAD:fix/restore-required-core-gate-20260910
