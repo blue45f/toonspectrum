@@ -36,7 +36,9 @@ describe("AI Comic Director composition route", () => {
       canonicalHref: "/studio/work/work-42/compose/session-9?focus=quality",
       editorHref: "/studio/work/work-42/canvas",
     });
-    expect(resolved.lifecycleKey).toContain("work%3Awork-42");
+    expect(resolved.lifecycleKey).toBe(
+      "/studio/work:work-42/composition:session-9",
+    );
   });
 
   it("keeps remix identity and rejects malformed session ids", () => {
