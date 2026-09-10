@@ -82,7 +82,7 @@ describe("StudioSaveSyncStatusCenter", () => {
   });
 
   it("shows copy success only after the diagnostics actually reach the clipboard", async () => {
-    const writeText = vi.fn(() => Promise.resolve());
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
     stubClipboard(writeText);
     const journal = createEmptyOperationJournal("doc-copy-success");
 

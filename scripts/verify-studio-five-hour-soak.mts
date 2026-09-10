@@ -17,7 +17,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { chromium, type Browser, type CDPSession, type Page } from "playwright";
+import { chromium, type Browser, type CDPSession, type Locator, type Page } from "playwright";
 import { decodePng } from "image-js";
 
 import {
