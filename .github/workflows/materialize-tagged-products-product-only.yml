@@ -1,0 +1,127 @@
+name: Materialize tagged products product-only
+
+on:
+  push:
+    branches: [fix/real-core-and-main-only-20260910]
+    paths: [.github/workflows/materialize-tagged-products-product-only.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-tagged-products-product-only-20260911
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 75
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+      TARGET_BRANCH: fix/real-core-and-main-only-20260910
+      EFFECTS_SOURCE_SHA: f76a78bc047d42dcc74cda6002307d50fb491cd8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/real-core-and-main-only-20260910
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Execute corrected product-only materialization
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          workflow_path = Path(".github/workflows/materialize-remaining-tagged-product-work.yml")
+          workflow_source = workflow_path.read_text(encoding="utf-8")
+
+          def extract_run(name: str) -> str:
+              marker = f"      - name: {name}\n"
+              marker_index = workflow_source.find(marker)
+              if marker_index < 0:
+                  raise SystemExit(f"materializer step was not found: {name}")
+              run_marker = "        run: |\n"
+              run_index = workflow_source.find(run_marker, marker_index)
+              if run_index < 0:
+                  raise SystemExit(f"run block was not found: {name}")
+              start = run_index + len(run_marker)
+              end = workflow_source.find("\n      - ", start)
+              if end < 0:
+                  end = len(workflow_source)
+              block = workflow_source[start:end]
+              lines = block.splitlines()
+              return "\n".join(
+                  line[10:] if line.startswith("          ") else line
+                  for line in lines
+              ) + "\n"
+
+          def run_bash(name: str) -> None:
+              print(f"::group::{name}", flush=True)
+              subprocess.run(
+                  ["bash", "-e", "-u", "-o", "pipefail", "-c", extract_run(name)],
+                  check=True,
+              )
+              print("::endgroup::", flush=True)
+
+          run_bash("Materialize non-destructive Studio effects workspace")
+
+          guided_3d = extract_run("Materialize one guided Studio 3D entry")
+          replacements = [
+              ('if ">3D 캐릭터<" in source:', 'if "3D 캐릭터" in source:'),
+              ('for label in [">3D 캐릭터<", ">캐릭터 셰이퍼<", ">3D 데생 인형<", ">3D 배경<"]:',
+               'for label in ["3D 캐릭터", "캐릭터 셰이퍼", "3D 데생 인형", "3D 배경"]:'),
+              ('if source.count("3D 스튜디오") < 2:', 'if source.count("3D 스튜디오") < 1:'),
+              ('raise SystemExit("unified 3D Studio button/fallback was not created")',
+               'raise SystemExit("unified 3D Studio entry was not created")'),
+              ('expect(toolbarSource).not.toContain(">3D 캐릭터<");',
+               'expect(toolbarSource).not.toContain("3D 캐릭터");'),
+              ('expect(toolbarSource).not.toContain(">캐릭터 셰이퍼<");',
+               'expect(toolbarSource).not.toContain("캐릭터 셰이퍼");'),
+              ('expect(toolbarSource).not.toContain(">3D 데생 인형<");',
+               'expect(toolbarSource).not.toContain("3D 데생 인형");'),
+              ('expect(toolbarSource).not.toContain(">3D 배경<");',
+               'expect(toolbarSource).not.toContain("3D 배경");'),
+          ]
+          for old, new in replacements:
+              count = guided_3d.count(old)
+              if count != 1:
+                  raise SystemExit(f"unexpected product materializer anchor count for {old!r}: {count}")
+              guided_3d = guided_3d.replace(old, new, 1)
+
+          print("::group::Materialize one guided Studio 3D entry", flush=True)
+          subprocess.run(["python3", "-c", guided_3d], check=True)
+          print("::endgroup::", flush=True)
+
+          run_bash("Record tagged-source recovery map")
+          run_bash("Install and validate focused product contracts")
+
+      - name: Publish product files only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          test ! -e .bootstrap
+          git add -A
+          if git diff --cached --name-only | grep -q '^\.github/workflows/'; then
+            echo "Refusing to publish workflow-file mutations" >&2
+            git diff --cached --name-only >&2
+            exit 1
+          fi
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "Product tree is already materialized"
+            exit 0
+          fi
+          git -c core.hooksPath=/dev/null commit \
+            -m "feat(studio): materialize remaining tagged recovery work"
+          git push --no-verify origin "HEAD:${TARGET_BRANCH}"

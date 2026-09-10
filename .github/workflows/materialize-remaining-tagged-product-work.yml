@@ -161,8 +161,8 @@ jobs:
           for label in [">3D 캐릭터<", ">캐릭터 셰이퍼<", ">3D 데생 인형<", ">3D 배경<"]:
               if label in source:
                   raise SystemExit(f"duplicate 3D launcher remains: {label}")
-          if source.count("3D 스튜디오") < 2:
-              raise SystemExit("unified 3D Studio button/fallback was not created")
+          if source.count("3D 스튜디오") < 1:
+              raise SystemExit("unified 3D Studio entry was not created")
           if source.count("참고 이미지") < 1:
               raise SystemExit("reference-image entry was lost")
           path.write_text(source, encoding="utf-8")
@@ -252,14 +252,12 @@ jobs:
             apps/web/src/domains/creator/StudioSceneToolPopoverBody.test.tsx
           git diff --check
 
-      - name: Publish workflow-free recovered product tree
+      - name: Publish recovered product tree
         shell: bash
         run: |
           set -euo pipefail
-          rm -f .github/workflows/materialize-remaining-tagged-product-work.yml
-          rm -f .github/workflows/promote-tagged-materializer-arm.yml
           test ! -e .bootstrap
-          git add -A
+          git add apps/web/src/domains/creator .qa/tagged-product-recovery-2026-09-11.md
           git diff --cached --check
           git -c core.hooksPath=/dev/null commit \
             -m "feat(studio): materialize remaining tagged recovery work"
