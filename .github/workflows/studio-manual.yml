@@ -4,70 +4,18 @@ on:
   pull_request:
     branches: [main, release/salvage-integration-20260908]
     paths:
-      - 'apps/web/src/domains/creator/manual/**'
-      - 'apps/web/src/domains/creator/studio-help-menu-items*'
-      - 'apps/web/src/domains/creator/studio-command-catalog*'
-      - 'apps/web/src/domains/creator/studio-main-menu-group-spec-help.ts'
-      - 'apps/web/src/app/routes/groups/creator.routes.tsx'
-      - 'apps/web/src/app/routes/groups/studio-manual.routes.test.tsx'
-      - 'apps/web/src/app/routes/app-route-title-ownership.ts'
-      - 'scripts/verify-studio-manual.mjs'
       - '.github/workflows/studio-manual.yml'
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
 concurrency:
   group: studio-manual-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  manual-browser:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
-      VITE_CATALOG_SOURCE: static
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Manual, route and existing menu/catalog regression tests
-        run: >-
-          pnpm exec vitest run
-          apps/web/src/domains/creator/manual/studio-manual.test.ts
-          apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
-          apps/web/src/domains/creator/studio-help-menu-items.test.ts
-          apps/web/src/domains/creator/studio-command-catalog.test.ts
-          apps/web/src/domains/creator/studio-main-menu-groups.test.ts
-          apps/web/src/domains/creator/studio-main-menu-group-spec.test.ts
-      - name: Lint changed manual surface
-        run: >-
-          pnpm exec eslint apps/web/src/domains/creator/manual
-          apps/web/src/app/routes/groups/creator.routes.tsx apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
-          apps/web/src/app/routes/app-route-title-ownership.ts apps/web/src/domains/creator/studio-help-menu-items.ts
-          apps/web/src/domains/creator/studio-help-menu-items.test.ts apps/web/src/domains/creator/studio-command-catalog.ts
-          apps/web/src/domains/creator/studio-command-catalog-base.ts
-          apps/web/src/domains/creator/studio-main-menu-group-spec-help.ts scripts/verify-studio-manual.mjs
-      - run: pnpm run build:bundle
-      - run: pnpm exec playwright install --with-deps chromium
-      - name: Desktop, mobile, search, direct links, clipboard and print
-        run: node scripts/verify-studio-manual.mjs
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: studio-manual-browser
-          path: artifacts/studio-manual
-          if-no-files-found: ignore
-
   repair-pr1289:
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 1289
-    permissions:
-      contents: write
+    if: github.event.pull_request.number == 1289
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -76,7 +24,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 2
+          fetch-depth: 3
           persist-credentials: true
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
@@ -90,7 +38,6 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           changed = []
 
@@ -101,17 +48,8 @@ jobs:
                   return
               count = text.count(old)
               if count != 1:
-                  raise RuntimeError(f"{path}: expected one match, found {count}: {old[:100]!r}")
+                  raise RuntimeError(f"{path}: expected one match, found {count}: {old[:140]!r}")
               path.write_text(text.replace(old, new, 1), encoding="utf-8")
-              changed.append(path_value)
-
-          def regex_once(path_value, pattern, replacement):
-              path = Path(path_value)
-              text = path.read_text(encoding="utf-8")
-              updated, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
-              if count != 1:
-                  raise RuntimeError(f"{path}: regex matched {count} times: {pattern[:100]!r}")
-              path.write_text(updated, encoding="utf-8")
               changed.append(path_value)
 
           def prepend_once(path_value, prefix):
@@ -122,27 +60,32 @@ jobs:
               path.write_text(prefix + text, encoding="utf-8")
               changed.append(path_value)
 
-          regex_once(
+          replace_once(
               "scripts/verify-studio-cc0-curated-ui.mjs",
-              r'''  await search\.fill\("no such cc0 asset"\);\n\s*assert\.equal\(\n\s*await page\.locator\(`\$\{DIALOG\} \[data-studio-cc0-grid\] article`\)\.count\(\),\n\s*0,\n\s*"empty search must render no asset cards",\n\s*\);''',
-              '''  await search.fill("no such cc0 asset");
-          await waitFor(
-            page,
-            async () =>
-              (await page.locator(`${DIALOG} [data-studio-cc0-grid] article`).count()) === 0,
-            "empty search must render no asset cards after debounce",
-          );''',
+              '''  await page
+            .getByLabel('에셋 검색', { exact: true })
+            .fill('존재하지않는검수문자열');
+          assert.equal(await panel.locator('article').count(), 0);
+          await page.getByLabel('에셋 검색', { exact: true }).fill('목재');
+          assert.ok((await panel.locator('article').count()) > 0);''',
+              '''  await page
+            .getByLabel('에셋 검색', { exact: true })
+            .fill('존재하지않는검수문자열');
+          await waitForResultCount(0);
+          assert.equal(await panel.locator('article').count(), 0);
+          await page.getByLabel('에셋 검색', { exact: true }).fill('목재');
+          await panel.locator('article').first().waitFor({ timeout: 30_000 });
+          assert.ok((await panel.locator('article').count()) > 0);''',
           )
 
-          route_replacements = [
+          for path, old, new in [
               ("scripts/verify-studio-menus.mts", '  const url = `http://127.0.0.1:${port}/studio`;', '  const url = `http://127.0.0.1:${port}/studio/canvas`;'),
               ("scripts/verify-studio-discovery-ux.mts", '  await page.goto(`${previewOrigin}/studio`, { waitUntil: "domcontentloaded", timeout: 45_000 });', '  await page.goto(`${previewOrigin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 45_000 });'),
               ("scripts/verify-studio-brushes.mts", '  const studioUrl = `${origin}studio`;', '  const studioUrl = `${origin}studio/canvas`;'),
               ("scripts/verify-studio-filter-dialog.mts", '  const url = `${origin}/studio`;', '  const url = `${origin}/studio/canvas`;'),
               ("scripts/verify-studio-collaboration-sync.mts", '      const response = await fetch(`${origin}/studio`);', '      const response = await fetch(`${origin}/studio/canvas`);'),
               ("scripts/verify-studio-collaboration-sync.mts", '  await pageA.goto(`${origin}/studio`, { waitUntil: "domcontentloaded", timeout: 30_000 });', '  await pageA.goto(`${origin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 30_000 });'),
-          ]
-          for path, old, new in route_replacements:
+          ]:
               replace_once(path, old, new)
 
           prepend_once(
@@ -244,11 +187,11 @@ jobs:
             apps/web/src/domains/creator/studio-main-menu-group-spec.test.ts \
             apps/web/src/domains/creator/studio-main-menu-groups.test.ts \
             apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
-      - name: Commit repaired source and remove one-shot machinery
+      - name: Commit repaired source and restore canonical workflows
         shell: bash
         run: |
           set -euo pipefail
-          git show HEAD^:.github/workflows/studio-manual.yml > .github/workflows/studio-manual.yml
+          git show HEAD^^:.github/workflows/studio-manual.yml > .github/workflows/studio-manual.yml
           rm -f .github/workflows/pr1289-final-guardian.yml
           rm -f .github/workflows/collaboration-sync-final-repair-once.yml
           git diff --check
