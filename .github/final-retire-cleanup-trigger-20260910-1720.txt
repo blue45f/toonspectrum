@@ -1,2 +1,3 @@
 Trigger isolated cleanup-only branch retirement.
 Runner: ubuntu-slim; safety predicates unchanged.
+Base/head refs are frozen from live branch state at job start.
