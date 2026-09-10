@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: isolated-temp-runner-retirement-20260910-1720
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   retire:
@@ -22,7 +22,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.head_ref == 'ops/isolated-prune-trigger-20260910-1701' &&
       github.base_ref == 'ops/isolated-prune-base-20260910-1701'
-    runs-on: macos-14
+    runs-on: ubuntu-slim
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
