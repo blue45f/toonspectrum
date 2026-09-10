@@ -209,15 +209,15 @@ async function closeBrushCatalog(page: Page): Promise<boolean> {
 }
 
 async function selectBrush(page: Page, item: StudioBrushCatalogItem): Promise<boolean> {
-  await page.keyboard.press("b");
-  const toolbar = page.locator('[data-studio-draw-options="true"]');
-  if (!(await toolbar.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false))) {
-    return false;
-  }
+  const mobileDock = page.locator('[data-studio-mobile-editing-dock="true"]');
+  const mobileDockVisible = await mobileDock.isVisible({ timeout: 250 }).catch(() => false);
   if (!(await closeBrushCatalog(page))) return false;
-  const pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
-  if (!(await pill.isVisible().catch(() => false))) return false;
-  await pill.click();
+  if (!mobileDockVisible) await page.keyboard.press("b");
+  const opener = mobileDockVisible
+    ? mobileDock.locator('[data-studio-open-brush-library="true"]')
+    : page.locator('[data-studio-draw-options="true"] [data-studio-brush-active-pill="true"]');
+  if (!(await opener.isVisible().catch(() => false))) return false;
+  await opener.click();
   const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
   if (!(await catalog.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false))) {
     return false;
@@ -243,6 +243,14 @@ async function selectBrush(page: Page, item: StudioBrushCatalogItem): Promise<bo
 }
 
 async function ensurePenReady(page: Page): Promise<boolean> {
+  const mobileDock = page.locator('[data-studio-mobile-editing-dock="true"]');
+  if (await mobileDock.isVisible({ timeout: 250 }).catch(() => false)) {
+    const pen = mobileDock.getByRole("button", { name: /^(?:펜|Pen)$/u });
+    if (!(await pen.isVisible().catch(() => false))) return false;
+    if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+    await page.waitForTimeout(80);
+    return await pen.getAttribute("aria-pressed") === "true";
+  }
   await page.keyboard.press("b");
   return page.locator('[data-studio-draw-options="true"]')
     .waitFor({ state: "visible", timeout: 4_000 })
@@ -260,17 +268,32 @@ async function drawEvidenceStroke(page: Page, cycle: number): Promise<{ changed:
   await page.mouse.move(4, 4);
   await page.waitForTimeout(80);
   const before = await page.screenshot({ clip: box, animations: "disabled" });
-  const lane = cycle % 7;
-  const x0 = box.x + box.width * (0.18 + (lane % 3) * 0.12);
-  const y0 = box.y + box.height * (0.22 + (lane % 4) * 0.11);
+  // Keep hundreds of soak probes deterministic without repainting a tiny fixed lane set.
+  // Saturated pixels can otherwise make a healthy drawing pipeline report changedPixels=0.
+  const horizontalPhase = ((cycle * 73) % 997) / 996;
+  const verticalPhase = ((cycle * 151) % 991) / 990;
+  const wavePhase = (((cycle * 193) % 983) / 982) * Math.PI * 2;
+  const direction = cycle % 2 === 0 ? 1 : -1;
+  const marginX = Math.min(36, box.width * 0.08);
+  const marginY = Math.min(36, box.height * 0.08);
+  const minX = box.x + marginX;
+  const maxX = box.x + box.width - marginX;
+  const minY = box.y + marginY;
+  const maxY = box.y + box.height - marginY;
+  const travel = Math.min(280, box.width * 0.3);
+  const centerX = minX + (maxX - minX) * horizontalPhase;
+  const x0 = Math.max(minX, Math.min(maxX, centerX - direction * travel / 2));
+  const y0 = minY + (maxY - minY) * verticalPhase;
+  const waveHeight = 14 + Math.min(28, box.height * 0.03);
   await page.mouse.move(x0, y0);
   await page.mouse.down();
   for (let step = 1; step <= 28; step += 1) {
-    await page.mouse.move(
-      Math.min(box.x + box.width - 30, x0 + step * 9),
-      y0 + Math.sin((step + cycle) / 4) * 28,
-      { steps: 2 },
-    );
+    const t = step / 28;
+    const x = Math.max(minX, Math.min(maxX, x0 + direction * travel * t));
+    const wave = Math.sin(t * Math.PI * 2 * 1.35 + wavePhase) * waveHeight;
+    const drift = (t - 0.5) * ((cycle % 7) - 3) * 3;
+    const y = Math.max(minY, Math.min(maxY, y0 + wave + drift));
+    await page.mouse.move(x, y, { steps: 2 });
   }
   await page.mouse.up();
   await page.mouse.move(4, 4);
