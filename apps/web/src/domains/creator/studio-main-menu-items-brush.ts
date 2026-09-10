@@ -1,21 +1,10 @@
 /**
- * §15.3 Brush — the group the regroup audit scored 0 of 10.
+ * Drawing and brush commands.
  *
- * That score was never about missing features. The preset browser
- * (`StudioBrushLibrarySheet`), the dynamics editor (`StudioBrushStudio`), the
- * saved library (`StudioBrushLibraryPanel`) and the ABR/MYB/KPP importers all
- * ship — every one of them reachable only by hunting through the right
- * inspector, in a product whose whole point is the brush. The rows here are
- * doors onto those surfaces; nothing new is invented, and the §15.3 rows the
- * product genuinely lacks (Particle/Physics, Fidelity Lab, Team Preset
- * Versioning) stay recorded as gaps in `studio-main-menu-group-spec.ts` rather
- * than faked with an entry that leads nowhere.
- *
- * It lives in its own module (not in `studio-main-menu-items-artwork.ts` with
- * Select/Layer/Transform) so the drawing group's rows can grow without pushing
- * three unrelated §15.3 groups toward a shared line budget.
- *
- * Pure catalogue — no React, no browser, no page state.
+ * The underlying editor surfaces remain compatible, but the user-facing model is intentionally
+ * reduced to three concepts: choose a brush, edit the current brush, or create a new brush.
+ * Saved/imported/natural-media capabilities are projections of that same system rather than
+ * separate products.
  */
 
 import {
@@ -38,26 +27,21 @@ import {
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
 
-/** Keep the current document/remix context when moving into the full Brush Studio V6 workspace. */
+/** Keep the current document/remix context when moving into the full Brush Editor workspace. */
 export function studioBrushLabHref(pathname: string): string {
   const work = /^\/studio\/work\/([^/]+)/u.exec(pathname);
   if (work?.[1]) return `/studio/work/${work[1]}/brush-lab`;
   const remix = /^\/studio\/remix\/([^/]+)/u.exec(pathname);
   if (remix?.[1]) return `/studio/remix/${remix[1]}/brush-lab`;
-  return "/studio/brush-lab";
+  return "/studio/assets/brushes/new";
 }
 
-function openGuidedBrushLab(): void {
+function openGuidedBrushEditor(): void {
   const location = globalThis.location;
   if (!location) return;
   location.assign(studioBrushLabHref(location.pathname));
 }
 
-/**
- * The former product-only `그리기` group. The group id became `brush` to match
- * §15.3 while the Korean label and its locale key stayed put (the spec table's
- * `labelKey`), so 75 shipped translations keep resolving.
- */
 export function buildStudioBrushMenuItems({
   editor,
   state,
@@ -113,18 +97,18 @@ export function buildStudioBrushMenuItems({
       commandId: "brush.correct-current-stroke",
       searchActivation: "execute",
       shortcut: "⌥⇧Q",
-      label: "현재 스트로크 교정…",
+      label: "방금 그린 선 다듬기…",
       icon: Shapes,
       disabled: !ui.correctCurrentStroke,
       unavailableReason: ui.correctCurrentStroke
         ? undefined
-        : "현재 스트로크를 교정할 편집기가 연결되어 있지 않아요.",
+        : "다듬을 수 있는 선을 먼저 그려 주세요.",
       onSelect: () => { ui.correctCurrentStroke?.(); },
     },
     {
       id: "preset-browser",
       commandId: "brush.preset-browser",
-      label: "브러시 프리셋 목록…",
+      label: "브러시 선택…",
       icon: LibraryBig,
       onSelect: () => {
         ui.openBrushPresetBrowser();
@@ -133,7 +117,7 @@ export function buildStudioBrushMenuItems({
     {
       id: "brush-studio",
       commandId: "brush.studio",
-      label: "현재 브러시 세부 설정…",
+      label: "현재 브러시 설정…",
       icon: SlidersHorizontal,
       onSelect: () => {
         ui.openBrushStudio();
@@ -143,14 +127,14 @@ export function buildStudioBrushMenuItems({
       id: "brush-lab",
       commandId: "brush.lab",
       searchActivation: "execute",
-      label: "목적별 브러시 제작실…",
+      label: "새 브러시 만들기…",
       icon: Sparkles,
-      onSelect: openGuidedBrushLab,
+      onSelect: openGuidedBrushEditor,
     },
     {
       id: "natural-media",
       commandId: "brush.natural-media",
-      label: "자연 매체 · 안료…",
+      label: "자연 매체 설정…",
       icon: Droplets,
       onSelect: () => {
         ui.openNaturalMediaBrushes();
@@ -159,7 +143,7 @@ export function buildStudioBrushMenuItems({
     {
       id: "my-brushes",
       commandId: "brush.saved-library",
-      label: "내 브러시…",
+      label: "브러시 관리…",
       icon: BookMarked,
       onSelect: () => {
         ui.openBrushLibrary();
@@ -179,7 +163,7 @@ export function buildStudioBrushMenuItems({
       id: "bg",
       commandId: "brush.background-tone",
       legacyPath: "draw/bg",
-      label: "배경 · 톤",
+      label: "배경·톤 열기",
       icon: Mountain,
       onSelect: () => {
         ui.openStudioMenu("bgFill");
@@ -189,7 +173,7 @@ export function buildStudioBrushMenuItems({
       id: "style",
       commandId: "brush.palette-brand",
       legacyPath: "draw/style",
-      label: "팔레트 · 브랜드",
+      label: "작품 팔레트",
       icon: Palette,
       separatorAfter: true,
       onSelect: () => {
@@ -210,7 +194,7 @@ export function buildStudioBrushMenuItems({
     {
       id: "silk-flow",
       commandId: "brush.silk-flow",
-      label: "실크 대칭",
+      label: "대칭 그리기",
       icon: Wind,
       onSelect: () => {
         ui.enableSilkSymmetry();
