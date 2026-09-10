@@ -2,13 +2,15 @@ import { X } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 
 import {
-  MOBILE_SITE_TABS,
-  SITE_NAVIGATION_GROUPS,
   SITE_UTILITY_NAVIGATION,
+  mobileSiteTabsForPath,
+  siteNavigationContextForPath,
+  siteNavigationGroupsForPath,
   siteNavigationLocale,
   siteNavigationText,
 } from "./site-navigation";
 
+import { usePathname } from "@/compat/navigation";
 import Link from "@/compat/router-link";
 import { cx } from "@/shared/lib/cx";
 import { useI18n, useT } from "@/shared/lib/i18n";
@@ -91,10 +93,17 @@ export function MobileHeaderNavigation({
   isPurposeActive,
   hideBottomTabs = false,
 }: MobileHeaderNavigationProps) {
+  const pathname = usePathname();
   const language = useI18n((state) => state.lang);
   const locale = siteNavigationLocale(language);
   const t = useT();
   const overlayRef = useRef<HTMLDivElement>(null);
+  const navigationContext = siteNavigationContextForPath(pathname);
+  const navigationGroups = siteNavigationGroupsForPath(pathname);
+  const mobileTabs = mobileSiteTabsForPath(pathname);
+  const menuDescription = navigationContext === "studio"
+    ? (locale === "ko" ? "작업 단계와 결과에서 바로 시작하세요" : "Start from your work or the result you need")
+    : (locale === "ko" ? "찾고 싶은 작품과 활동에서 시작하세요" : "Start from the stories and activity you want");
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -176,15 +185,16 @@ export function MobileHeaderNavigation({
             aria-modal="true"
             aria-label={t("nav.allMenu")}
             tabIndex={-1}
+            data-site-product={navigationContext}
             className="absolute inset-x-0 top-0 max-h-[100dvh] overflow-y-auto overscroll-contain border-b border-line-strong bg-canvas/95 shadow-2xl backdrop-blur-2xl motion-safe:animate-fade-up"
           >
             <div className="sticky top-0 z-10 border-b border-line/60 bg-canvas/92 backdrop-blur-2xl">
               <div className="mx-auto flex min-h-[4.25rem] max-w-[1320px] items-center justify-between gap-4 px-4 sm:px-6">
                 <div>
-                  <span className="block font-display text-sm font-bold text-fg">{t("nav.menu")}</span>
-                  <span className="mt-0.5 block text-[0.68rem] text-fg-3">
-                    {locale === "ko" ? "하고 싶은 일에서 바로 시작하세요" : "Start with what you want to do"}
+                  <span className="block font-display text-sm font-bold text-fg">
+                    {navigationContext === "studio" ? "ToonStudio" : t("nav.menu")}
                   </span>
+                  <span className="mt-0.5 block text-[0.68rem] text-fg-3">{menuDescription}</span>
                 </div>
                 <button
                   type="button"
@@ -200,7 +210,7 @@ export function MobileHeaderNavigation({
 
             <nav className="mx-auto max-w-[1320px] px-4 pb-6 pt-5 sm:px-6 sm:pb-8">
               <div className="grid gap-4 lg:grid-cols-2">
-                {SITE_NAVIGATION_GROUPS.map((group, groupIndex) => (
+                {navigationGroups.map((group, groupIndex) => (
                   <section
                     key={group.id}
                     aria-labelledby={`${menuId}-${group.id}`}
@@ -295,10 +305,11 @@ export function MobileHeaderNavigation({
       {!hideBottomTabs && (
         <nav
           aria-label={t("nav.quickAccess")}
+          data-site-product={navigationContext}
           className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/92 shadow-[0_-12px_35px_-28px_var(--color-fg)] backdrop-blur-2xl md:hidden"
         >
           <div className="mx-auto grid max-w-md grid-cols-5 pb-[env(safe-area-inset-bottom)]">
-            {MOBILE_SITE_TABS.map((item) => {
+            {mobileTabs.map((item) => {
               const active = isPurposeActive(item.href, item.exact);
               const Icon = item.icon;
               const label = siteNavigationText(item.label, locale);
