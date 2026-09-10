@@ -1,3 +1,9 @@
+import {
+  parseStudioDocumentLocation,
+  studioDocumentWorkspaceToLegacySurface,
+  type StudioDocumentWorkspaceId,
+} from "./studio-document-workspace";
+
 export const STUDIO_DCC_WORKBENCH_MODES = [
   "model",
   "build",
@@ -41,10 +47,14 @@ export type StudioWorkspaceRouteErrorCode =
 export interface StudioWorkspaceRoute {
   readonly canonicalPathname: string;
   readonly dccMode: StudioDccWorkbenchMode | null;
+  readonly documentId: string | null;
+  readonly documentWorkspace: StudioDocumentWorkspaceId | null;
+  readonly draftId: string | null;
   readonly legacyPublishQuery: boolean;
   readonly legacyRemixQuery: boolean;
   readonly legacyWorkIdQuery: boolean;
   readonly presentation: StudioWorkspacePresentation;
+  readonly projectId: string | null;
   readonly remixSourceWorkId: string | null;
   readonly surface: StudioWorkspaceSurface;
   readonly valid: true;
@@ -185,8 +195,13 @@ export function isStudioUploadWorkspaceLocation(
 }
 
 export function studioWorkspaceDocumentIdentity(
-  route: Pick<StudioWorkspaceRoute, "remixSourceWorkId" | "workId">,
+  route: Pick<StudioWorkspaceRoute, "remixSourceWorkId" | "workId">
+    & Partial<Pick<StudioWorkspaceRoute, "documentId" | "draftId" | "projectId">>,
 ): string {
+  if (route.projectId && route.documentId) {
+    return `project:${encodeURIComponent(route.projectId)}:document:${encodeURIComponent(route.documentId)}`;
+  }
+  if (route.draftId) return `draft:${encodeURIComponent(route.draftId)}`;
   if (route.remixSourceWorkId !== null) {
     return `remix:${encodeURIComponent(route.remixSourceWorkId)}`;
   }
@@ -335,6 +350,21 @@ export function studioWorkspaceCanonicalHref(
   route: StudioWorkspaceRoute,
   search?: string | URLSearchParams,
 ): string {
+  if (route.documentWorkspace !== null) {
+    const params = queryParams(search);
+    params.delete("id");
+    params.delete("mode");
+    params.delete("remix");
+    params.delete("project");
+    params.delete("draft");
+    params.delete("workspace");
+    params.set("workspace", route.documentWorkspace);
+    params.sort();
+    const serialized = params.toString();
+    return serialized.length > 0
+      ? `${route.canonicalPathname}?${serialized}`
+      : route.canonicalPathname;
+  }
   return `${route.canonicalPathname}${workspaceQuery(search)}`;
 }
 
@@ -404,6 +434,29 @@ export function parseStudioWorkspaceRoute({
     return invalidStudioWorkspaceRoute("invalid-path");
   }
 
+  const documentRoute = parseStudioDocumentLocation({ pathname, search });
+  if (documentRoute.kind === "invalid-document") {
+    return invalidStudioWorkspaceRoute("invalid-path");
+  }
+  if (documentRoute.kind === "document") {
+    return Object.freeze({
+      canonicalPathname: documentRoute.canonicalPathname,
+      dccMode: null,
+      documentId: documentRoute.documentId,
+      documentWorkspace: documentRoute.workspace,
+      draftId: documentRoute.draftId,
+      legacyPublishQuery: false,
+      legacyRemixQuery: false,
+      legacyWorkIdQuery: false,
+      presentation: "editor",
+      projectId: documentRoute.projectId,
+      remixSourceWorkId: null,
+      surface: studioDocumentWorkspaceToLegacySurface(documentRoute.workspace),
+      valid: true,
+      workId: documentRoute.documentId,
+    });
+  }
+
   const rawSegments = pathname.split("/");
   if (rawSegments[0] !== "") return invalidStudioWorkspaceRoute("invalid-path");
   const segments = rawSegments.slice(1);
@@ -468,11 +521,15 @@ export function parseStudioWorkspaceRoute({
   return Object.freeze({
     canonicalPathname,
     dccMode: parsedSurface.dccMode,
+    documentId: null,
+    documentWorkspace: null,
+    draftId: null,
     legacyPublishQuery,
     legacyRemixQuery:
       pathIdentity.remixSourceWorkId === null && queryRemixId !== null,
     legacyWorkIdQuery: pathIdentity.workId === null && queryWorkId !== null,
     presentation: legacyPublishQuery ? "publish" : "editor",
+    projectId: null,
     remixSourceWorkId,
     surface: parsedSurface.surface,
     valid: true,
