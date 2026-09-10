@@ -33,6 +33,7 @@ jobs:
           persist-credentials: true
           sparse-checkout: |
             apps/web/src/domains/creator
+            docs/rewrite
             .github/workflows
             .qa
           sparse-checkout-cone-mode: true
