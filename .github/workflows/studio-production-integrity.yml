@@ -10,15 +10,14 @@ permissions:
 
 concurrency:
   group: tagged-product-final-20260911
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   materialize-tagged-product-work:
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 75
+    runs-on: ubuntu-slim
+    timeout-minutes: 12
     env:
       HUSKY: "0"
-      NODE_OPTIONS: --max-old-space-size=8192
       TARGET_BRANCH: recover/tagged-product-final-20260911
       CANONICAL_WORKFLOW_COMMIT: abe44c2f6b715a2eedf192f75f205ab4b097c93e
     steps:
@@ -27,12 +26,10 @@ jobs:
           ref: recover/tagged-product-final-20260911
           fetch-depth: 0
           persist-credentials: true
-      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: pnpm
-      - name: Execute reviewed materializer steps
+      - name: Execute reviewed product materializers
         shell: bash
         run: |
           set -euo pipefail
@@ -49,7 +46,7 @@ jobs:
           workflow = Path('.github/workflows/materialize-remaining-tagged-product-work.yml')
           document = yaml.safe_load(workflow.read_text(encoding='utf-8'))
           steps = document['jobs']['materialize']['steps']
-          stop_name = 'Publish workflow-free recovered product tree'
+          stop_name = 'Install locked dependencies'
           for step in steps:
               if step.get('name') == stop_name:
                   break
