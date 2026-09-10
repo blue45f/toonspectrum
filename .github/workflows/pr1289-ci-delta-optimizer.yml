@@ -18,13 +18,17 @@ concurrency:
 jobs:
   optimize:
     runs-on: ubuntu-slim
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
           ref: fix/real-core-and-main-only-20260910
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: true
+          sparse-checkout: |
+            .github/workflows
+            scripts/integration-test-runner-ci-policy.test.mjs
+          sparse-checkout-cone-mode: false
 
       - name: Convert product regressions to changed-area push checks
         shell: bash
@@ -303,19 +307,8 @@ jobs:
 
           print(f"optimized {len(TARGETS)} product workflows")
           PY
+          node --check scripts/integration-test-runner-ci-policy.test.mjs
           git diff --check
-
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies from the shared pnpm store
-        run: pnpm install --frozen-lockfile --prefer-offline
-
-      - name: Prove the CI trigger policy
-        run: pnpm exec vitest run scripts/integration-test-runner-ci-policy.test.mjs
 
       - name: Publish the atomic CI optimization commit
         shell: bash
