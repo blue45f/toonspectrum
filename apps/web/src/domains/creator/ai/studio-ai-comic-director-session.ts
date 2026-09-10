@@ -153,9 +153,31 @@ const ENTRY_SOURCES: readonly StudioAiComicDirectorEntrySource[] = [
   "storyboard",
 ];
 
-function id(): string {
-  return globalThis.crypto?.randomUUID?.()
-    ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+export interface StudioAiComicDirectorCrypto {
+  readonly randomUUID?: () => string;
+  readonly getRandomValues?: (
+    array: Uint8Array<ArrayBuffer>,
+  ) => Uint8Array<ArrayBuffer>;
+}
+
+export function createStudioAiComicDirectorId(
+  prefix = "comic",
+  cryptoApi: StudioAiComicDirectorCrypto | null | undefined =
+    globalThis.crypto as StudioAiComicDirectorCrypto | undefined,
+): string {
+  if (typeof cryptoApi?.randomUUID === "function") {
+    return cryptoApi.randomUUID();
+  }
+  if (typeof cryptoApi?.getRandomValues !== "function") {
+    throw new Error("안전한 AI 코믹 디렉터 식별자를 생성할 수 없습니다.");
+  }
+  const bytes = new Uint8Array(16);
+  cryptoApi.getRandomValues(bytes);
+  const entropy = Array.from(
+    bytes,
+    (byte) => byte.toString(16).padStart(2, "0"),
+  ).join("");
+  return `${prefix}-${entropy}`;
 }
 
 function enumValue<T extends string>(
@@ -214,7 +236,7 @@ export function createStudioAiComicDirectorSession(input: {
   const now = new Date().toISOString();
   return {
     version: 1,
-    id: input.id ?? id(),
+    id: input.id ?? createStudioAiComicDirectorId(),
     workId: input.workId ?? null,
     remixSourceWorkId: input.remixSourceWorkId ?? null,
     title: input.title?.trim() || "AI 코믹 디렉터 세션",
