@@ -191,7 +191,7 @@ describe("GitHub workflow safety", () => {
       `\non: [pull_request]\npermissions: write-all\njobs:\n  patch:\n    runs-on: ubuntu-latest\n    env: { BRANCH_NAME: main }\n    steps: []\n`,
     );
     expect(findUnsafePullRequestBranchTargets(flowWriteAll)).toContain(
-      "jobs.patch.env.BRANCH_NAME=\"main\"",
+      'jobs.patch.env.BRANCH_NAME="main"',
     );
 
     const flowMappings = parseWorkflow(
@@ -199,12 +199,12 @@ describe("GitHub workflow safety", () => {
       `\non: { pull_request: {} }\njobs:\n  patch:\n    permissions: { contents: write }\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v6\n        with: { ref: feat/hard-coded }\n`,
     );
     expect(findUnsafePullRequestBranchTargets(flowMappings)).toContain(
-      "jobs.patch.steps[0].with.ref=\"feat/hard-coded\"",
+      'jobs.patch.steps[0].with.ref="feat/hard-coded"',
     );
 
     const dynamicTarget = parseWorkflow(
       "dynamic-target.yml",
-      `\non: [pull_request]\npermissions: write-all\njobs:\n  patch:\n    runs-on: ubuntu-latest\n    env: { BRANCH_NAME: \"\${{ github.head_ref }}\" }\n    steps:\n      - uses: actions/checkout@v6\n        with: { ref: \"\${{ github.event.pull_request.head.sha }}\" }\n`,
+      `\non: [pull_request]\npermissions: write-all\njobs:\n  patch:\n    runs-on: ubuntu-latest\n    env: { BRANCH_NAME: "\${{ github.head_ref }}" }\n    steps:\n      - uses: actions/checkout@v6\n        with: { ref: "\${{ github.event.pull_request.head.sha }}" }\n`,
     );
     expect(findUnsafePullRequestBranchTargets(dynamicTarget)).toEqual([]);
   });
