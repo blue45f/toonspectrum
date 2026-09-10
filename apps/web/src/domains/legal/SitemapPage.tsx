@@ -50,39 +50,110 @@ const destination = (
   description: { ko: koDescription, en: enDescription },
 });
 
+const PERSONAL_DESTINATIONS = [
+  SITE_NAVIGATION_ITEMS.me,
+  {
+    id: "profile-account",
+    href: "/me",
+    icon: UserRound,
+    label: { ko: "프로필·계정", en: "Profile & account" },
+    description: {
+      ko: "프로필과 계정 정보, 내 활동 관리",
+      en: "Manage your profile, account details and activity",
+    },
+  },
+  ...SITE_UTILITY_NAVIGATION,
+] as const;
+
+/**
+ * Canonical user-facing destinations only. Dynamic detail pages, administrator and authentication
+ * routes, redirect aliases, Studio companion windows and unfinished placeholders stay out of the
+ * public directory.
+ */
 const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
   {
-    id: "creative-tools",
+    id: "studio-workspaces",
     icon: Wrench,
-    label: { ko: "제작 도구 더보기", en: "More creative tools" },
+    label: { ko: "Studio 작업공간", en: "Studio workspaces" },
     description: {
-      ko: "표현을 확장하고 제작 과정을 익히는 전문 도구",
-      en: "Specialized tools for expanding expression and learning the workflow",
+      ko: "드로잉·애니메이션·3D·게시까지 직접 여는 제작 화면",
+      en: "Open drawing, animation, 3D and publishing workspaces directly",
     },
     items: [
+      destination("/studio", "빈 캔버스 편집기", "Blank canvas editor", "새 초안을 바로 열어 자유롭게 제작", "Open a draft and start creating immediately"),
+      destination("/studio/animation", "애니메이션 작업실", "Animation workspace", "프레임과 움직임을 편집", "Edit frames and motion"),
+      destination("/studio/brushes", "Studio 브러시", "Studio brushes", "작업 중 브러시를 선택하고 조정", "Choose and tune brushes while editing"),
+      destination("/studio/bg3d", "3D 배경", "3D backgrounds", "장면 배경과 카메라 구도 설계", "Build scene backgrounds and camera composition"),
+      destination("/studio/poser", "포즈 스튜디오", "Pose studio", "인체 포즈와 구도 참고 만들기", "Create pose and composition references"),
+      destination("/studio/character", "캐릭터 작업실", "Character workspace", "캐릭터 외형·표정·자세 제작", "Build character looks, expressions and poses"),
+      destination("/studio/3d/dcc/model", "3D 모델링", "3D modeling", "메시를 만들고 편집하는 기본 작업 모드", "Create and edit meshes in the core modeling mode"),
+      destination("/studio/3d/dcc/build", "3D 공간 제작", "3D environment build", "방·배경·공간 구조 제작", "Build rooms, backgrounds and spatial structures"),
+      destination("/studio/3d/dcc/cad", "정밀 CAD", "Precision CAD", "치수 기반 솔리드와 소품 설계", "Design dimensioned solids and props"),
+      destination("/studio/3d/dcc/sculpt", "3D 조형", "3D sculpting", "브러시로 형태와 디테일 조형", "Sculpt forms and detail with brushes"),
+      destination("/studio/3d/dcc/material", "재질·UV", "Materials & UV", "표면 재질과 UV 구성", "Build surface materials and UV layouts"),
+      destination("/studio/3d/dcc/shot", "컷·선화", "Shot & line art", "카메라 컷과 비사실 렌더 설계", "Design camera shots and non-photoreal rendering"),
+      destination("/studio/lift3d", "2D → 3D 변환", "2D to 3D lift", "이미지 소재를 3D 장면으로 확장", "Lift image subjects into 3D scenes"),
+      destination("/studio/storyworld", "스토리월드", "Storyworld", "인물·장소·설정의 관계 정리", "Organize characters, locations and story relationships"),
+      destination("/studio/publish", "Studio 게시", "Studio publish", "완성한 초안의 게시 준비", "Prepare a finished draft for publishing"),
+      destination("/studio/manual", "Studio 사용 설명서", "Studio manual", "도구·작업 흐름·문제 해결 안내", "Learn tools, workflows and troubleshooting"),
       destination("/brush-lab", "브러시 연구실", "Brush lab", "브러시를 만들고 시험하기", "Build and test custom brushes"),
       destination("/music", "음악·사운드", "Music & sound", "작품에 연결할 음원 만들기", "Create audio for your work"),
-      destination("/learn", "웹툰 제작 강좌", "Creation courses", "기초부터 스튜디오 실습까지", "Learn from foundations to studio practice"),
+      destination("/create/promo", "프로모션 제작", "Promotion studio", "작품 홍보용 이미지와 소재 만들기", "Create promotional visuals and assets"),
+    ],
+  },
+  {
+    id: "learning-publishing",
+    icon: BookOpen,
+    label: { ko: "학습·기획·출판", en: "Learning, planning & publishing" },
+    description: {
+      ko: "제작을 배우고 이야기와 공개 준비를 구체화",
+      en: "Learn production and prepare stories and releases",
+    },
+    items: [
+      destination("/learn", "웹툰 제작 강좌", "Creation courses", "기초부터 Studio 실습까지", "Learn from foundations to studio practice"),
       destination("/learn/glossary", "웹툰 용어 사전", "Creation glossary", "제작 용어와 예시 빠르게 찾기", "Find production terms and examples"),
+      destination("/learn/studio", "Studio 실습 과정", "Studio practice", "배운 내용을 작업공간에서 따라 하기", "Practice lessons inside the workspace"),
+      destination("/learn/records", "학습 기록 관리", "Learning records", "진행 기록을 백업하고 복원", "Back up and restore learning progress"),
       destination("/learn/recipes", "제작 레시피", "Creative recipes", "연출을 직접 조작하며 학습", "Learn direction through hands-on recipes"),
       destination("/story-lab", "스토리 연구실", "Story lab", "인물·욕망·갈등 설계", "Shape characters, desire and conflict"),
       destination("/publishing", "연재·출판 준비", "Publishing prep", "원고·권리·소개 자료 점검", "Check manuscripts, rights and pitch materials"),
     ],
   },
   {
+    id: "production-collaboration",
+    icon: Sparkles,
+    label: { ko: "제작 운영·협업", en: "Production & collaboration" },
+    description: {
+      ko: "검수·버전·발표·공유와 공동 작업 흐름",
+      en: "Review, version, present, share and collaborate on work",
+    },
+    items: [
+      destination("/studio/review", "리뷰·승인", "Review & approval", "작업을 검수하고 의견 반영", "Review work and resolve feedback"),
+      destination("/studio/versions", "버전·복구", "Versions & recovery", "저장 이력과 복구 지점 관리", "Manage version history and recovery points"),
+      destination("/studio/present", "발표 모드", "Presentation mode", "작업을 발표용 화면으로 확인", "Preview work in presentation mode"),
+      destination("/studio/share", "공유 설정", "Sharing", "링크와 협업 권한 관리", "Manage links and collaboration access"),
+      destination("/studio/join", "협업 참여", "Join collaboration", "초대받은 공동 작업에 참여", "Join an invited collaborative session"),
+    ],
+  },
+  {
     id: "collections",
-    icon: BookOpen,
+    icon: Database,
     label: { ko: "작품·에셋 관리", en: "Work & asset management" },
     description: {
-      ko: "공개 작품과 제작 재료를 더 세밀하게 관리",
-      en: "Manage published work and creative materials in more detail",
+      ko: "공개 작품과 제작 재료를 더 세밀하게 탐색하고 관리",
+      en: "Explore and manage published work and creative materials in detail",
     },
     items: [
       destination("/create/challenges", "창작 챌린지", "Creative challenges", "주제별 창작 이벤트", "Join themed creative events"),
       destination("/authors", "작가별 보기", "Browse creators", "작가와 대표 작품 탐색", "Explore creators and representative work"),
+      destination("/discover/works", "만화·작법서 탐색", "Comics & craft books", "만화와 창작 참고서를 함께 검색", "Search comics and creative craft books"),
       destination("/market/browse", "에셋 상세 탐색", "Browse assets", "종류·사용권으로 리소스 찾기", "Find resources by type and license"),
+      destination("/market/fit", "에셋 핏 랩", "Asset fit lab", "현재 작업에 맞는 에셋 점검", "Evaluate assets against the current project"),
+      destination("/market/publish", "에셋 등록", "Publish an asset", "마켓에 리소스 제출·배포", "Submit and publish resources to Market"),
+      destination("/market/manage", "판매·배포 관리", "Manage listings", "등록한 에셋과 배포 상태 관리", "Manage published assets and distribution"),
       destination("/market/library", "내 에셋", "My assets", "획득한 리소스 관리", "Manage acquired resources"),
       destination("/market/wishlist", "찜한 에셋", "Saved assets", "나중에 사용할 리소스", "Keep resources for later"),
+      destination("/market/compare", "에셋 비교", "Compare assets", "후보 리소스의 차이 비교", "Compare shortlisted resources"),
       destination("/references", "작품 레퍼런스", "Story references", "공식 자료 탐색과 연구 노트", "Explore official sources and notes"),
       destination("/research/assets", "레퍼런스 아틀라스", "Reference atlas", "복식·소품·미술 자료를 장면별로", "Browse costume, prop and art references by scene"),
       destination("/research/books", "글로벌 판본 탐색", "Global editions", "Open Library·openBD 메타데이터 검색", "Search Open Library and openBD metadata"),
@@ -90,18 +161,20 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
   },
   {
     id: "data-discovery",
-    icon: Database,
+    icon: Search,
     label: { ko: "검색·데이터 도구", en: "Search & data tools" },
     description: {
-      ko: "작품을 비교하고 태그와 데이터로 더 깊게 탐색",
-      en: "Compare stories and explore more deeply through tags and data",
+      ko: "작품을 비교하고 취향·태그·공식 데이터로 더 깊게 탐색",
+      en: "Compare stories and explore through taste, tags and official data",
     },
     items: [
       destination("/search", "통합 검색", "Unified search", "작품·작가·태그 검색", "Search stories, creators and tags"),
+      destination("/explore", "취향 탐색", "Taste explorer", "장르·태그·조건으로 작품 둘러보기", "Browse stories by genre, tag and preference"),
       destination("/compare", "작품 비교", "Compare stories", "두 작품의 주요 지표 비교", "Compare key signals across two stories"),
       destination("/random", "랜덤 발견", "Random discovery", "조건에 맞는 작품 무작위 추천", "Discover a random matching story"),
       destination("/tags", "태그로 찾기", "Explore tags", "인기·유사 태그 탐색", "Explore popular and related tags"),
       destination("/news", "업계 소식", "Industry news", "웹툰·웹소설 관련 소식", "Follow webtoon and web novel news"),
+      destination("/insights/resources", "공식 자료·API 안내", "Official data & APIs", "데이터 출처와 연동 방법 확인", "Review official sources and integration guidance"),
     ],
   },
   {
@@ -122,14 +195,16 @@ const EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
     icon: ShieldCheck,
     label: { ko: "안내·지원·정책", en: "Help, support & policy" },
     description: {
-      ko: "서비스 원칙과 데이터 출처, 문의 및 권리 정책",
-      en: "Service principles, data sources, support and rights policies",
+      ko: "서비스 원칙과 접근성, 데이터 출처, 문의 및 권리 정책",
+      en: "Service principles, accessibility, data sources, support and rights policies",
     },
     items: [
       destination("/about", "서비스 소개", "About ToonStudio", "기능과 운영 원칙", "Features and operating principles"),
       destination("/about/data", "데이터 출처", "Data sources", "공급자별 연결·이용 준비 상태", "Provider connections and readiness"),
       destination("/about/crawler", "공개 데이터 수집 정책", "Public data policy", "자동수집 원칙·제외·중지 요청", "Collection rules, exclusions and opt-out"),
       destination("/guide", "랭킹 산정 방식", "Ranking guide", "데이터와 산식 설명", "Understand ranking data and formulas"),
+      destination("/accessibility", "접근성 안내", "Accessibility", "키보드·스크린리더·표시 지원", "Keyboard, screen reader and display support"),
+      destination("/design", "디자인 시스템", "Design system", "색상·타이포·컴포넌트 원칙", "Colors, typography and component guidelines"),
       destination("/support", "이용 문의", "Support", "서비스 이용 도움받기", "Get help using the service"),
       destination("/contact", "광고·제휴", "Business contact", "광고와 파트너십 문의", "Advertising and partnership inquiries"),
       destination("/copyright", "저작권 안내", "Copyright", "콘텐츠·권리 정책", "Content and rights policy"),
@@ -148,8 +223,8 @@ const PAGE_COPY = {
     core: "핵심 작업 흐름",
     coreDescription: "자주 쓰는 목적지를 창작 여정에 맞춰 네 갈래로 정리했습니다.",
     personal: "내 공간과 환경",
-    extended: "더 세밀하게 찾기",
-    extendedDescription: "특정 도구, 관리 화면, 데이터와 정책이 필요할 때 이용하세요.",
+    extended: "전체 기능과 페이지",
+    extendedDescription: "직접 열 수 있는 제작·학습·관리·데이터·정책 페이지를 한곳에 모았습니다.",
     home: "메인으로 돌아가기",
   },
   en: {
@@ -160,8 +235,8 @@ const PAGE_COPY = {
     core: "Core creative flow",
     coreDescription: "Frequent destinations are organized into four paths that follow the creative journey.",
     personal: "Your space and preferences",
-    extended: "Find something specific",
-    extendedDescription: "Use these paths when you need a specialist tool, management screen, data or policy.",
+    extended: "All features and pages",
+    extendedDescription: "Browse every directly accessible creation, learning, management, data and policy page.",
     home: "Back to home",
   },
 } as const;
@@ -171,7 +246,6 @@ export function SitemapPage() {
   const locale = siteNavigationLocale(language);
   const copy = PAGE_COPY[locale];
   const t = useT();
-  const personalDestinations = [SITE_NAVIGATION_ITEMS.me, ...SITE_UTILITY_NAVIGATION] as const;
 
   return (
     <Container size="wide" className="py-6 sm:py-10 lg:py-14">
@@ -285,13 +359,14 @@ export function SitemapPage() {
           </span>
           <h2 id="sitemap-personal-title" className="font-display text-base font-bold text-fg">{copy.personal}</h2>
         </div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {personalDestinations.map((item) => {
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {PERSONAL_DESTINATIONS.map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.id}
                 href={item.href}
+                title={siteNavigationText(item.description, locale)}
                 className="group flex min-h-16 items-center gap-3 rounded-2xl border border-line bg-card/75 px-4 py-3 text-sm font-bold text-fg-2 transition-colors hover:border-line-strong hover:bg-card hover:text-fg"
               >
                 <Icon size={17} className="text-fg-3 transition-colors group-hover:text-accent" aria-hidden="true" />
