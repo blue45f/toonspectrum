@@ -11,6 +11,9 @@ describe("StudioSmartFiltersPanel", () => {
     );
     expect(html).toContain('type="search"');
     expect(html).toContain("필터 이름·효과 검색");
+    expect(html).toContain("효과 작업공간");
+    expect(html).toContain("웹툰 레시피 · 렌더 진단");
+    expect(html).toContain("전체 15개 레시피 보기");
     expect(html).toContain("사용 가능한 필터 77개");
     expect(html).toContain("섀도우/하이라이트");
     expect(html).toContain("노출 / 감마 / 오프셋");
@@ -237,6 +240,8 @@ describe("StudioSmartFiltersPanel", () => {
     expect(html).toContain("언샤프 마스크 끄기");
     expect(html).toContain("언샤프 마스크 위로 이동");
     expect(html).toContain("언샤프 마스크 아래로 이동");
+    expect(html).toContain("언샤프 마스크 복제");
+    expect(html).toContain("언샤프 마스크 초기값으로 재설정");
     expect(html).toContain("언샤프 마스크 삭제");
     expect(html.match(/type="range"/g)?.length).toBe(3);
     expect(html).toContain("임계값");
