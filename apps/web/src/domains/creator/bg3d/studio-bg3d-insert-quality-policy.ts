@@ -3,6 +3,8 @@ export const STUDIO_BG3D_INSERT_MAX_EDGE = 4_096;
 export const STUDIO_BG3D_INSERT_MIN_EDGE = 256;
 export const STUDIO_BG3D_INSERT_MIN_DIMENSION = 64;
 
+const STUDIO_BG3D_INSERT_MAX_ASPECT_ERROR = 0.005;
+
 export type StudioBg3dInsertQualityTier = "constrained" | "production" | "ultra";
 
 export interface StudioBg3dInsertQualityPlanInput {
@@ -41,15 +43,75 @@ function assertFinitePositive(name: string, value: number): void {
   }
 }
 
+function aspectError(width: number, height: number, aspectRatio: number): number {
+  return Math.abs(width / height - aspectRatio);
+}
+
+function improveRoundedAspectRatio(
+  width: number,
+  height: number,
+  roundedWidth: number,
+  roundedHeight: number,
+): { readonly width: number; readonly height: number } {
+  const aspectRatio = width / height;
+  const initialError = aspectError(roundedWidth, roundedHeight, aspectRatio);
+  if (initialError <= STUDIO_BG3D_INSERT_MAX_ASPECT_ERROR) {
+    return Object.freeze({ width: roundedWidth, height: roundedHeight });
+  }
+
+  const landscape = aspectRatio >= 1;
+  const initialLongestEdge = landscape ? roundedWidth : roundedHeight;
+  const minimumLongestEdge = Math.max(
+    STUDIO_BG3D_INSERT_MIN_DIMENSION,
+    initialLongestEdge - STUDIO_BG3D_INSERT_MIN_DIMENSION,
+  );
+
+  let bestWidth = roundedWidth;
+  let bestHeight = roundedHeight;
+  let bestError = initialError;
+
+  for (let longestEdge = initialLongestEdge - 1; longestEdge >= minimumLongestEdge; longestEdge -= 1) {
+    const candidateWidth = landscape
+      ? longestEdge
+      : Math.max(STUDIO_BG3D_INSERT_MIN_DIMENSION, Math.round(longestEdge * aspectRatio));
+    const candidateHeight = landscape
+      ? Math.max(STUDIO_BG3D_INSERT_MIN_DIMENSION, Math.round(longestEdge / aspectRatio))
+      : longestEdge;
+
+    if (
+      candidateWidth > STUDIO_BG3D_INSERT_MAX_EDGE ||
+      candidateHeight > STUDIO_BG3D_INSERT_MAX_EDGE
+    ) {
+      continue;
+    }
+
+    const candidateError = aspectError(candidateWidth, candidateHeight, aspectRatio);
+    if (candidateError < bestError) {
+      bestWidth = candidateWidth;
+      bestHeight = candidateHeight;
+      bestError = candidateError;
+      if (candidateError === 0) break;
+    }
+  }
+
+  return Object.freeze({ width: bestWidth, height: bestHeight });
+}
+
 function fitInsideMaximumEdge(
   width: number,
   height: number,
 ): { readonly width: number; readonly height: number } {
   const scale = Math.min(1, STUDIO_BG3D_INSERT_MAX_EDGE / Math.max(width, height));
-  return Object.freeze({
-    width: Math.max(STUDIO_BG3D_INSERT_MIN_DIMENSION, Math.round(width * scale)),
-    height: Math.max(STUDIO_BG3D_INSERT_MIN_DIMENSION, Math.round(height * scale)),
-  });
+  const roundedWidth = Math.max(
+    STUDIO_BG3D_INSERT_MIN_DIMENSION,
+    Math.round(width * scale),
+  );
+  const roundedHeight = Math.max(
+    STUDIO_BG3D_INSERT_MIN_DIMENSION,
+    Math.round(height * scale),
+  );
+
+  return improveRoundedAspectRatio(width, height, roundedWidth, roundedHeight);
 }
 
 /**
