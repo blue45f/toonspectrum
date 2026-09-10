@@ -1,3 +1,4 @@
+# Triggered from a non-Actions credential so the final product-only recovery can run.
 name: Materialize remaining tagged product work
 
 on:
