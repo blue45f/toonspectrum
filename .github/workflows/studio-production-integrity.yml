@@ -1,105 +1,102 @@
 name: Studio production integrity
 
 on:
+  pull_request:
+    branches: [main, release/salvage-integration-20260908]
+    paths:
+      - 'scripts/check-studio-bundle.mjs'
+      - 'scripts/lib/studio-crdt-bundle-boundary*'
+      - 'scripts/lib/repo-paths.mjs'
+      - 'scripts/integration-test-runner-ci-policy.test.mjs'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'apps/web/src/domains/creator/studio-production/**'
+      - 'apps/web/src/domains/creator/studio-router/studio-route-manifest*'
+      - 'apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*'
+      - 'apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary*'
+      - 'apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts*'
+      - 'apps/web/src/domains/creator/StudioInspector*'
+      - 'apps/web/src/domains/creator/studio-batch-rename*'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/studio-production-integrity.yml'
+      - 'scripts/ci-executed-gates.test.mjs'
   push:
-    branches: [integrate/perf-debounce-throttle-20260911]
-    paths: [.github/workflows/studio-production-integrity.yml]
+    branches: [main, release/salvage-integration-20260908]
+    paths:
+      - 'scripts/check-studio-bundle.mjs'
+      - 'scripts/lib/studio-crdt-bundle-boundary*'
+      - 'scripts/lib/repo-paths.mjs'
+      - 'scripts/integration-test-runner-ci-policy.test.mjs'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'apps/web/src/domains/creator/studio-production/**'
+      - 'apps/web/src/domains/creator/studio-router/studio-route-manifest*'
+      - 'apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*'
+      - 'apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary*'
+      - 'apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts*'
+      - 'apps/web/src/domains/creator/StudioInspector*'
+      - 'apps/web/src/domains/creator/studio-batch-rename*'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/studio-production-integrity.yml'
+      - 'scripts/ci-executed-gates.test.mjs'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
+# main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
+# cancel-in-progress 가 취소할 대상을 갖지 못한다.
 concurrency:
-  group: integrate-perf-debounce-throttle-20260911
+  group: studio-production-integrity-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  integrate-performance-work:
-    runs-on: ubuntu-slim
-    timeout-minutes: 15
+  production-integrity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     env:
-      TARGET_BRANCH: integrate/perf-debounce-throttle-20260911
-      PARENT_BRANCH: fix/real-core-and-main-only-20260910
-      SOURCE_BRANCH: codex/perf-debounce-throttle-main-20260911
-      SOURCE_BASE: main
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: integrate/perf-debounce-throttle-20260911
-          fetch-depth: 1
-          persist-credentials: true
-
-      - name: Apply only the cumulative performance product diff
-        shell: bash
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify real CI execution contract
+        run: node --test scripts/ci-executed-gates.test.mjs
+      - name: Verify actual production routes and Inspector integration
         run: |
-          set -euo pipefail
-          git config user.name "OpenAI Codex"
-          git config user.email "codex@openai.com"
-
-          git fetch --no-tags --depth=1 origin \
-            "${SOURCE_BASE}:refs/remotes/origin/${SOURCE_BASE}"
-          git fetch --no-tags --depth=32 origin \
-            "${SOURCE_BRANCH}:refs/remotes/origin/${SOURCE_BRANCH}"
-
-          files=(
-            apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx
-            apps/web/src/domains/creator/StudioLeftToolRail.tsx
-            apps/web/src/domains/creator/live/StudioLiveCanvasOverlay.tsx
-            apps/web/src/domains/creator/live/StudioLiveCollaborationCommandCenter.tsx
-            apps/web/src/domains/creator/live/StudioLiveCollaborationPanel.tsx
-            apps/web/src/domains/creator/live/use-studio-live-display-sync.test.tsx
-            apps/web/src/domains/creator/live/use-studio-live-display-sync.ts
-            apps/web/src/domains/market/components/MarketDetailStickyBar.tsx
-            apps/web/src/domains/market/components/MarketProductionFitWorkbench.test.tsx
-            apps/web/src/domains/market/components/MarketResourceDetailArticle.test.tsx
-            apps/web/src/domains/market/components/MarketSceneCompletionJourney.tsx
-            apps/web/src/domains/market/models/market-comparison.test.ts
-            apps/web/src/domains/market/models/market-resource-taxonomy.ts
-            apps/web/src/domains/market/pages/MarketBrowsePage.test.tsx
-            apps/web/src/domains/market/pages/MarketHomePage.test.tsx
-            apps/web/src/shared/components/back-to-top.tsx
-          )
-
-          git diff --binary \
-            "origin/${SOURCE_BASE}" "origin/${SOURCE_BRANCH}" \
-            -- "${files[@]}" > "$RUNNER_TEMP/performance.patch"
-          test -s "$RUNNER_TEMP/performance.patch"
-
-          if ! git apply --3way --index "$RUNNER_TEMP/performance.patch"; then
-            mapfile -t conflicts < <(git diff --name-only --diff-filter=U | sort)
-            expected=(
-              apps/web/src/domains/market/components/MarketProductionFitWorkbench.test.tsx
-              apps/web/src/domains/market/pages/MarketBrowsePage.test.tsx
-              apps/web/src/domains/market/pages/MarketHomePage.test.tsx
-            )
-            mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
-            if [[ "$(printf '%s\n' "${conflicts[@]}")" != "$(printf '%s\n' "${expected_sorted[@]}")" ]]; then
-              echo "Unexpected performance integration conflicts:" >&2
-              printf '  %s\n' "${conflicts[@]}" >&2
-              exit 1
-            fi
-            # These three source-branch changes only aligned old market assertions.
-            # Preserve the newer convergence-branch regressions instead of replacing them.
-            for file in "${expected[@]}"; do
-              git checkout --ours -- "$file"
-              git add "$file"
-            done
-            if git diff --name-only --diff-filter=U | grep -q .; then
-              echo "Unresolved conflicts remain after preserving parent tests." >&2
-              exit 1
-            fi
-          fi
-
-          git diff --cached --check
-
-      - name: Publish product-only integration
-        shell: bash
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-production/studio-production-scope.test.ts \
+            apps/web/src/domains/creator/studio-production/StudioProductionHubPage.scope.test.tsx \
+            apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts \
+            apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx \
+            apps/web/src/domains/creator/studio-batch-rename.test.ts \
+            apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx \
+            apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts \
+            apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx
+      - name: Build production browser without repeating the core typecheck
         run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --location \
-            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${PARENT_BRANCH}/.github/workflows/studio-production-integrity.yml" \
-            --output .github/workflows/studio-production-integrity.yml
-          git add -A
-          git diff --cached --check
-          git -c core.hooksPath=/dev/null commit \
-            -m "perf(studio): debounce and throttle high-frequency UI updates"
-          git push --no-verify origin "HEAD:${TARGET_BRANCH}"
+          pnpm run build:bundle
+          pnpm run check:studio-bundle
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install-deps chromium
+      - name: Inspect actual production browser
+        run: pnpm run verify:studio-menus
