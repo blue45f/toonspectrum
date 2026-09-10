@@ -59,7 +59,7 @@ describe("ToonStudio original free starter asset packs", () => {
     }
   });
 
-  it("searches across Korean names and tags and intersects package/category filters", () => {
+  it("searches across Korean asset and package metadata and intersects filters", () => {
     expect(filterStudioOriginalFreeAssets({ query: "병원" }).map((asset) => asset.id))
       .toEqual([]); // Retired blockouts remain resolvable by ID but are not selectable.
 
@@ -70,6 +70,11 @@ describe("ToonStudio original free starter asset packs", () => {
     expect(overlays.length).toBeGreaterThanOrEqual(16);
     expect(overlays.map((asset) => asset.id)).toContain("original-fx-shock-burst");
     expect(overlays.map((asset) => asset.id)).toContain("original-night-bokeh");
+
+    const foodPackageResults = filterStudioOriginalFreeAssets({ query: "음식" })
+      .filter((asset) => asset.packageId === "original-food-cafe-kit");
+    expect(foodPackageResults).toHaveLength(8);
+    expect(foodPackageResults.map((asset) => asset.id)).toContain("original-food-coffee-cup");
 
     expect(filterStudioOriginalFreeAssets({
       packageIds: ["original-daily-props"],
