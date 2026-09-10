@@ -92,13 +92,13 @@ export interface StudioMannequinBodyParams {
   readonly noseHeight?: number;
   /** 몸통 앞뒤 깊이. 얇은 실루엣↔입체 흉곽. 0.75–1.35. */
   readonly torsoDepth?: number;
-  /** 허리 중심 볼륨. 0.7–1.3. */
+  /** 허리 중심부 폭/질량. 0.7–1.3. */
   readonly waistWidth?: number;
   /** 팔·다리 전체 굵기 배율. 0.7–1.35. */
   readonly limbThickness?: number;
   /** 손바닥·손가락 크기 배율. 0.75–1.3. */
   readonly handScale?: number;
-  /** 발 길이·발볼·발목 크기 배율. 0.75–1.3. */
+  /** 발 길이·발볼 크기 배율. 0.75–1.3. */
   readonly footScale?: number;
   /** 목 굵기 배율. 0.75–1.3. */
   readonly neckThickness?: number;
@@ -504,12 +504,7 @@ export function clampStudioMannequinBodyParams(input: unknown): StudioMannequinB
   for (const key of Object.keys(STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES) as StudioMannequinAnatomyParamKey[]) {
     if (!hasObjectInput || source[key] !== undefined) {
       const [min, max] = STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES[key];
-      result[key] = clampNumber(
-        source[key],
-        min,
-        max,
-        STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS[key] ?? 1,
-      );
+      result[key] = clampNumber(source[key], min, max, STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS[key] ?? 1);
     }
   }
   return result as StudioMannequinBodyParams;
@@ -918,14 +913,14 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
     { kind: "capsule", jointId: "leftUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.115 * hu * limbR },
     { kind: "sphere", jointId: "leftLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * limbR },
     { kind: "capsule", jointId: "leftLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.095 * hu * limbR },
-    { kind: "sphere", jointId: "leftHand", center: vec3(0, 0, 0), radius: 0.095 * hu * limbR * handScale },
+    { kind: "sphere", jointId: "leftHand", center: vec3(0, 0, 0), radius: 0.095 * hu * handScale },
     { kind: "sphere", jointId: "leftHand", center: vec3(0, -handLen * 0.5, 0), radius: handLen * 0.5, scale: vec3(0.45, 1, 0.28) },
     ...buildHandDigitPrimitives("leftHand", handLen, 1),
     { kind: "sphere", jointId: "rightUpperArm", center: vec3(0, 0, 0), radius: 0.14 * hu * limbR },
     { kind: "capsule", jointId: "rightUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.115 * hu * limbR },
     { kind: "sphere", jointId: "rightLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * limbR },
     { kind: "capsule", jointId: "rightLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.095 * hu * limbR },
-    { kind: "sphere", jointId: "rightHand", center: vec3(0, 0, 0), radius: 0.095 * hu * limbR * handScale },
+    { kind: "sphere", jointId: "rightHand", center: vec3(0, 0, 0), radius: 0.095 * hu * handScale },
     { kind: "sphere", jointId: "rightHand", center: vec3(0, -handLen * 0.5, 0), radius: handLen * 0.5, scale: vec3(0.45, 1, 0.28) },
     ...buildHandDigitPrimitives("rightHand", handLen, -1),
     // 다리 — 고관절·무릎·발목 관절구와 둥근 발 볼륨.
@@ -938,7 +933,7 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       jointId: "leftFoot",
       center: vec3(0, -ankleHeight * 0.5, footLen * 0.22),
       radius: footLen * 0.5,
-      scale: vec3((0.26 * hu * footScale) / footLen, (ankleHeight * footScale) / footLen, 1),
+      scale: vec3((0.26 * hu) / footLen, ankleHeight / footLen, 1),
     },
     { kind: "sphere", jointId: "leftFoot", center: vec3(0, 0, 0), radius: 0.105 * hu * limbR * footScale },
     { kind: "sphere", jointId: "rightUpperLeg", center: vec3(0, 0, 0), radius: 0.18 * hu * limbR },
@@ -950,7 +945,7 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       jointId: "rightFoot",
       center: vec3(0, -ankleHeight * 0.5, footLen * 0.22),
       radius: footLen * 0.5,
-      scale: vec3((0.26 * hu * footScale) / footLen, (ankleHeight * footScale) / footLen, 1),
+      scale: vec3((0.26 * hu) / footLen, ankleHeight / footLen, 1),
     },
     { kind: "sphere", jointId: "rightFoot", center: vec3(0, 0, 0), radius: 0.105 * hu * limbR * footScale },
   ];
