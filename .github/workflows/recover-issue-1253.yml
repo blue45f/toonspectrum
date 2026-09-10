@@ -6,6 +6,9 @@ on:
       - fix/issue-1253-vrm-quality-convergence-20260910
     paths:
       - ".github/workflows/recover-issue-1253.yml"
+      - "scripts/generate-vrm-thumbnail-technical-denylist.ts"
+      - "scripts/generate-vrm-model-technical-denylist.ts"
+      - "scripts/patch-vrm-library-quality-gates.py"
 
 permissions:
   contents: write
