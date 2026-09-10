@@ -62,7 +62,8 @@ describe("BG3D procedural starter UI integration boundary", () => {
 
   it("keeps rights, search, budget, and mobile touch affordances visible in the leaf", () => {
     expect(starterPanelSource).toContain("오리지널 · CC0");
-    expect(starterPanelSource).toContain('aria-label="블록아웃 프리셋 검색"');
+    expect(starterPanelSource).toContain('aria-label="3D 에셋 검색"');
+    expect(starterPanelSource).not.toContain('aria-label="블록아웃 프리셋 검색"');
     expect(starterPanelSource).toContain("asset.budget.triangles");
     expect(starterPanelSource).toContain("disabled={Boolean(disabledReason)}");
     expect(starterPanelSource).toContain("min-h-11");
