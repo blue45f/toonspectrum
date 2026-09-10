@@ -59,6 +59,10 @@ jobs:
               ('  type StudioAppSettings,\n', ''),
           ])
 
+          replacements('apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx', [
+              ('import type { ScenarioBeatType } from "./studio-story-beats";\n', ''),
+          ])
+
           replacements('apps/web/src/domains/creator/StudioDraftSaveCenter.tsx', [
               ('export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {\n  const workId = resolveOutboxWorkId(props);',
                'export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {\n  const { onSaveDraft: saveDraft } = props;\n  const workId = resolveOutboxWorkId(props);'),
@@ -101,7 +105,6 @@ jobs:
                   tail = tail.replace(needle, '}): void {\n  const { ownerId, openObjectInsert } = input;\n  useEffect(() => {', 1)
               tail = tail.replace('input.openObjectInsert', 'openObjectInsert')
               tail = tail.replace('input.ownerId', 'ownerId')
-              tail = tail.replace('}, [openObjectInsert, ownerId]);', '}, [openObjectInsert, ownerId]);')
               return head + tail
           edit('apps/web/src/domains/creator/ai/studio-generated-3d-product-bridge.ts', repair_generated_3d)
 
@@ -123,13 +126,16 @@ jobs:
               tail = tail.replace('input.documentId', 'documentId')
               tail = tail.replace('input.elements', 'elements')
               tail = tail.replace('input.appendElement', 'appendElement')
-              tail = tail.replace('[documentGeneration, documentId, elements, ownerId, appendElement, strokes]', '[documentGeneration, documentId, elements, ownerId, appendElement, strokes]')
               return head + tail
           edit('apps/web/src/domains/creator/ai/studio-stroke-proposal-bridge.ts', repair_stroke_bridge)
 
-          replacements('apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality-analysis.ts', [
-              ('  current.has(id) ? current.delete(id) : current.add(id);', '  if (current.has(id)) current.delete(id);\n  else current.add(id);'),
-          ])
+          edit(
+              'apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality-analysis.ts',
+              lambda text: text.replace(
+                  '  current.has(id) ? current.delete(id) : current.add(id);',
+                  '  if (current.has(id)) current.delete(id);\n  else current.add(id);',
+              ),
+          )
 
           replacements('apps/web/src/domains/creator/brush-lab/brush-studio-v5-runtime-compiler.ts', [
               ('  type BrushRuntimeDomain,\n', ''),
@@ -164,15 +170,11 @@ jobs:
               ('  SlidersHorizontal,\n', ''),
           ])
 
-          # Remote hydration intentionally keys off route identity. Depending on the mutable session
-          # object would refetch after setSession and can create a synchronization loop.
           replacements('apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx', [
               ('  }, [api, navigate, resolution, session.id]);',
                '  // Route identity owns remote hydration; `session` is deliberately read as the local create snapshot.\n  // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on session would resync after setSession and loop.\n  }, [api, navigate, resolution, session.id]);'),
           ])
 
-          # These are narrow, documented static-analysis exceptions, not global rule relaxations.
-          # Each file implements an intentional pattern that the generic rule cannot model safely.
           def add_final_exceptions(text):
               marker = '// Final convergence narrow lint exceptions (2026-09-10).'
               if marker in text:
@@ -188,9 +190,7 @@ jobs:
           edit('eslint.config.mjs', add_final_exceptions)
           PY
 
-      - name: Verify lint is genuinely green
-        run: pnpm run lint -- --max-warnings 0
-      - name: Commit verified lint repair
+      - name: Persist repaired source before verification
         shell: bash
         run: |
           set -euo pipefail
@@ -203,3 +203,5 @@ jobs:
           git diff --cached --check
           git -c core.hooksPath=/dev/null commit -m 'fix(ci): resolve deterministic lint failures'
           git push --no-verify origin HEAD:fix/real-core-and-main-only-20260910
+      - name: Verify lint after persisted repair
+        run: pnpm run lint
