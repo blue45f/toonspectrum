@@ -1,5 +1,6 @@
 name: CI final React compiler fix once
 
+# The first commit registers this one-shot workflow; this follow-up push executes it.
 on:
   push:
     branches:
