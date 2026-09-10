@@ -17,7 +17,20 @@ const EVIDENCE_ROOT =
 const HARNESS_PATH = "/__studio_hokusai_natural_media_quality_v2__";
 const HARNESS_ENTRY =
   "/scripts/studio-hokusai-natural-media-quality-browser.ts";
-const TIMEOUT_MILLISECONDS = 120_000;
+// The browser harness intentionally runs many independent direct and Worker/WASM
+// renders. Each Worker render keeps its own 30-second failure timeout; this larger
+// value is only the outer orchestration budget for slower shared ARM runners.
+const DEFAULT_TIMEOUT_MILLISECONDS = 300_000;
+const MINIMUM_TIMEOUT_MILLISECONDS = 60_000;
+const configuredTimeoutMilliseconds = Number.parseInt(
+  process.env.TOONSPECTRUM_HOKUSAI_QUALITY_TIMEOUT_MS ?? "",
+  10,
+);
+const TIMEOUT_MILLISECONDS =
+  Number.isSafeInteger(configuredTimeoutMilliseconds)
+  && configuredTimeoutMilliseconds >= MINIMUM_TIMEOUT_MILLISECONDS
+    ? configuredTimeoutMilliseconds
+    : DEFAULT_TIMEOUT_MILLISECONDS;
 const CSP =
   "default-src 'none'; "
   + "script-src 'self' 'wasm-unsafe-eval'; "
@@ -268,6 +281,7 @@ async function main() { // NOSONAR javascript:S3776
     const diagnostics = {
       browserVersion: browser.version(),
       contentSecurityPolicy: CSP,
+      timeoutMilliseconds: TIMEOUT_MILLISECONDS,
       consoleErrors: [],
       consoleWarnings: [],
       pageErrors: [],
@@ -289,11 +303,34 @@ async function main() { // NOSONAR javascript:S3776
     await page.goto(`http://127.0.0.1:${port}${HARNESS_PATH}`, {
       waitUntil: "domcontentloaded",
     });
-    await page.waitForFunction(
-      () => window.__studioHokusaiNaturalMediaQualityResult !== undefined,
-      undefined,
-      { timeout: TIMEOUT_MILLISECONDS },
-    );
+    try {
+      await page.waitForFunction(
+        () => window.__studioHokusaiNaturalMediaQualityResult !== undefined,
+        undefined,
+        { timeout: TIMEOUT_MILLISECONDS },
+      );
+    } catch (error) {
+      const harnessState = await page.evaluate(() => {
+        const result = window.__studioHokusaiNaturalMediaQualityResult;
+        return {
+          bodyReady: document.body.dataset.ready ?? null,
+          bodyText: document.body.innerText.slice(0, 2_000),
+          resultPresent: result !== undefined,
+          resultStatus:
+            result && typeof result === "object" && "status" in result
+              ? result.status
+              : null,
+        };
+      }).catch((stateError) => ({
+        stateReadError:
+          stateError instanceof Error ? stateError.message : String(stateError),
+      }));
+      writeJson("browser-diagnostics.json", {
+        ...diagnostics,
+        harnessState,
+      });
+      throw error;
+    }
     const result = await page.evaluate(
       () => window.__studioHokusaiNaturalMediaQualityResult,
     );
