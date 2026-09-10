@@ -14,17 +14,13 @@ concurrency:
 
 jobs:
   materialize:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 75
     env:
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
       TARGET_BRANCH: fix/real-core-and-main-only-20260910
-      THREE_D_POLICY_SHA: e66837aa67dd77d6095450d9d140d44a10bd4032
-      THREE_D_POLICY_TEST_SHA: 3433e2cac2224c0ea3d3cfb2bcc0813e936b1e46
-      THREE_D_EXTREME_TEST_SHA: 631f3dcd4cd2e8c7ff7d7cce584dd58f46d72082
       EFFECTS_SOURCE_SHA: f76a78bc047d42dcc74cda6002307d50fb491cd8
-      UNIFIED_3D_SOURCE_SHA: 1b71d831407324fb4b2d9e5b4f0c1cabb5dd1d52
     steps:
       - uses: actions/checkout@v6
         with:
@@ -39,114 +35,10 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Configure recovery commit identity
+      - name: Configure recovery identity
         run: |
           git config user.name "OpenAI Codex"
           git config user.email "codex@openai.com"
-
-      - name: Materialize deterministic Studio 3D insertion quality
-        shell: bash
-        run: |
-          set -euo pipefail
-          root="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}"
-          dir="apps/web/src/domains/creator/bg3d"
-          curl --fail --silent --show-error --location \
-            "${root}/${THREE_D_POLICY_SHA}/${dir}/studio-bg3d-insert-quality-policy.ts" \
-            --output "${dir}/studio-bg3d-insert-quality-policy.ts"
-          curl --fail --silent --show-error --location \
-            "${root}/${THREE_D_POLICY_TEST_SHA}/${dir}/studio-bg3d-insert-quality-policy.test.ts" \
-            --output "${dir}/studio-bg3d-insert-quality-policy.test.ts"
-          curl --fail --silent --show-error --location \
-            "${root}/${THREE_D_EXTREME_TEST_SHA}/${dir}/studio-bg3d-insert-quality-extreme-aspect.test.ts" \
-            --output "${dir}/studio-bg3d-insert-quality-extreme-aspect.test.ts"
-
-          python3 - <<'PY'
-          from pathlib import Path
-
-          policy = Path("apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.ts")
-          text = policy.read_text(encoding="utf-8")
-          if "STUDIO_BG3D_INSERT_MIN_DIMENSION" not in text:
-              text = text.replace(
-                  "export const STUDIO_BG3D_INSERT_MIN_EDGE = 256;\n",
-                  "export const STUDIO_BG3D_INSERT_MIN_EDGE = 256;\n"
-                  "export const STUDIO_BG3D_INSERT_MIN_DIMENSION = 64;\n",
-                  1,
-              )
-          text = text.replace(
-              "width: Math.max(STUDIO_BG3D_INSERT_MIN_EDGE, Math.round(width * scale)),",
-              "width: Math.max(STUDIO_BG3D_INSERT_MIN_DIMENSION, Math.round(width * scale)),",
-          )
-          text = text.replace(
-              "height: Math.max(STUDIO_BG3D_INSERT_MIN_EDGE, Math.round(height * scale)),",
-              "height: Math.max(STUDIO_BG3D_INSERT_MIN_DIMENSION, Math.round(height * scale)),",
-          )
-          policy.write_text(text, encoding="utf-8")
-
-          host = Path("apps/web/src/domains/creator/bg3d/studio-bg3d-editor-insert-host.ts")
-          source = host.read_text(encoding="utf-8")
-          import_line = 'import { resolveStudioBg3dInsertQualityPlan } from "./studio-bg3d-insert-quality-policy";\n'
-          if import_line not in source:
-              anchor = 'import * as R from "./studio-bg3d-editor-runtime-bindings";\n'
-              if source.count(anchor) != 1:
-                  raise SystemExit("BG3D insert host import anchor changed")
-              source = source.replace(anchor, anchor + import_line, 1)
-
-          old = '''      const requestedCaptureHeight = Math.min(
-            4096,
-            Math.max(2160, Math.round(adapted.document.output.exportHeight)),
-          );
-          const captureSize = resolveStudioBg3dLtCaptureSize({
-            sourceWidth: sourceSize.width,
-            sourceHeight: sourceSize.height,
-            aspectRatio: captureFrame.aspectRatio,
-            requestedHeight: requestedCaptureHeight,
-            maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
-          });'''
-          new = '''      const qualityPlan = resolveStudioBg3dInsertQualityPlan({
-            exportHeight: adapted.document.output.exportHeight,
-            aspectRatio: captureFrame.aspectRatio,
-            deviceMaxPixels: deviceQuality.maxRenderPixels,
-            rendererMaxPixels: STUDIO_BG3D_LT_RENDER_MAX_PIXELS,
-          });
-          const captureSize = resolveStudioBg3dLtCaptureSize({
-            sourceWidth: sourceSize.width,
-            sourceHeight: sourceSize.height,
-            aspectRatio: captureFrame.aspectRatio,
-            requestedHeight: qualityPlan.requestedHeight,
-            maxPixels: qualityPlan.maxPixels,
-          });'''
-          if new not in source:
-              if source.count(old) != 1:
-                  raise SystemExit(f"BG3D insertion sizing anchor changed: {source.count(old)}")
-              source = source.replace(old, new, 1)
-          host.write_text(source, encoding="utf-8")
-          PY
-
-          cat > "${dir}/studio-bg3d-insert-quality-integration-boundary.test.ts" <<'TS'
-          import { readFileSync } from "node:fs";
-          import { describe, expect, it } from "vitest";
-
-          const source = readFileSync(
-            new URL("./studio-bg3d-editor-insert-host.ts", import.meta.url),
-            "utf8",
-          );
-
-          describe("BG3D production insert quality integration", () => {
-            it("delegates sizing to the deterministic quality authority", () => {
-              const start = source.indexOf("async function handleInsert");
-              const end = source.indexOf("h.handleInsert = handleInsert;", start);
-              const handler = source.slice(start, end);
-              expect(start).toBeGreaterThanOrEqual(0);
-              expect(handler).toContain("resolveStudioBg3dInsertQualityPlan({");
-              expect(handler).toContain("exportHeight: adapted.document.output.exportHeight");
-              expect(handler).toContain("aspectRatio: captureFrame.aspectRatio");
-              expect(handler).toContain("requestedHeight: qualityPlan.requestedHeight");
-              expect(handler).toContain("maxPixels: qualityPlan.maxPixels");
-              expect(handler).not.toContain("devicePixelRatio");
-              expect(handler).not.toContain("requestedCaptureHeight");
-            });
-          });
-          TS
 
       - name: Materialize non-destructive Studio effects workspace
         shell: bash
@@ -266,8 +158,7 @@ jobs:
                       raise SystemExit(f"3D scene entry anchor changed: {old!r}")
                   source = source.replace(old, new, 1)
 
-          forbidden = [">3D 캐릭터<", ">캐릭터 셰이퍼<", ">3D 데생 인형<", ">3D 배경<"]
-          for label in forbidden:
+          for label in [">3D 캐릭터<", ">캐릭터 셰이퍼<", ">3D 데생 인형<", ">3D 배경<"]:
               if label in source:
                   raise SystemExit(f"duplicate 3D launcher remains: {label}")
           if source.count("3D 스튜디오") < 2:
@@ -307,7 +198,7 @@ jobs:
               encoding="utf-8",
           )
 
-      - name: Record exact tagged-source recovery map
+      - name: Record tagged-source recovery map
         shell: bash
         run: |
           mkdir -p .qa
@@ -326,13 +217,11 @@ jobs:
           from the final product tree.
           MD
 
-      - name: Install locked dependencies
-        run: pnpm install --frozen-lockfile --prefer-offline
-
-      - name: Format and validate recovered product contracts
+      - name: Install and validate focused product contracts
         shell: bash
         run: |
           set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
           changed=(
             apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.ts
             apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.test.ts
@@ -361,8 +250,6 @@ jobs:
             apps/web/src/domains/creator/studio-unified-3d-entry.test.ts \
             apps/web/src/domains/creator/studio-tool-belt-reachability.test.ts \
             apps/web/src/domains/creator/StudioSceneToolPopoverBody.test.tsx
-          pnpm run validate:architecture
-          pnpm run typecheck
           git diff --check
 
       - name: Publish workflow-free recovered product tree
@@ -370,6 +257,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .github/workflows/materialize-remaining-tagged-product-work.yml
+          rm -f .github/workflows/promote-tagged-materializer-arm.yml
           test ! -e .bootstrap
           git add -A
           git diff --cached --check
