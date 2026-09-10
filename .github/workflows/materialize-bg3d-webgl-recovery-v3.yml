@@ -1,0 +1,129 @@
+name: Materialize BG3D recovery and texture quality v3
+
+on:
+  push:
+    branches: [feat/bg3d-webgl-context-recovery-20260910]
+    paths: [.github/workflows/materialize-bg3d-webgl-recovery-v3.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-bg3d-webgl-context-recovery-20260910
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/bg3d-webgl-context-recovery-20260910
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Reuse reviewed recovery and texture materialization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --user pyyaml
+          python3 - <<'PY'
+          import os
+          import subprocess
+          import yaml
+
+          for workflow, selected in [
+              (
+                  '.github/workflows/materialize-bg3d-webgl-recovery-once.yml',
+                  {
+                      'Add deterministic WebGL context recovery state machine',
+                      'Install the recovery agent inside the primary Canvas',
+                  },
+              ),
+              (
+                  '.github/workflows/materialize-bg3d-webgl-recovery-v2.yml',
+                  {
+                      'Add bounded anisotropic texture quality pass',
+                      'Install texture quality agent beside context recovery',
+                  },
+              ),
+          ]:
+              data = yaml.safe_load(open(workflow, encoding='utf-8'))
+              for step in data['jobs']['materialize']['steps']:
+                  if step.get('name') not in selected:
+                      continue
+                  subprocess.run(
+                      step['run'],
+                      shell=True,
+                      executable='/bin/bash',
+                      check=True,
+                      env=os.environ.copy(),
+                  )
+          PY
+
+      - name: Use a real DOM for texture exclusion tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.test.ts')
+          source = path.read_text(encoding='utf-8')
+          directive = '// @vitest-environment jsdom\n\n'
+          if not source.startswith(directive):
+              path.write_text(directive + source, encoding='utf-8')
+          PY
+
+      - name: Validate recovery, texture filtering and viewport integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dWebglContextRecoveryAgent.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dTextureQualityAgent.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+
+      - name: Commit product-only slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/materialize-bg3d-webgl-recovery-once.yml \
+                .github/workflows/materialize-bg3d-webgl-recovery-v2.yml \
+                .github/workflows/materialize-bg3d-webgl-recovery-v3.yml
+          git add \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dWebglContextRecoveryAgent.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dTextureQualityAgent.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx \
+            .github/workflows/materialize-bg3d-webgl-recovery-once.yml \
+            .github/workflows/materialize-bg3d-webgl-recovery-v2.yml \
+            .github/workflows/materialize-bg3d-webgl-recovery-v3.yml
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'feat(bg3d): recover contexts and sharpen texture filtering'
+          git push --no-verify origin HEAD:feat/bg3d-webgl-context-recovery-20260910
