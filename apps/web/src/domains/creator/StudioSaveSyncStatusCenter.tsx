@@ -21,6 +21,7 @@ import {
   resolveSaveSyncStatus,
   type StudioOperationJournalState,
 } from "./studio-operation-recovery-coordinator";
+import { useStudioCopyFeedback } from "./use-studio-copy-feedback";
 
 export interface StudioSaveSyncStatusCenterProps {
   readonly journal: StudioOperationJournalState;
@@ -42,7 +43,8 @@ export function StudioSaveSyncStatusCenter({
   onForceCheckpoint,
 }: StudioSaveSyncStatusCenterProps) {
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const diagnosticsCopy = useStudioCopyFeedback(2000);
+  const diagnosticsCopyStatus = diagnosticsCopy.statusFor("save-sync-diagnostics");
 
   const status = resolveSaveSyncStatus(journal, isOnline, isOpfsActive);
   const saveLabel = !status.localDurable
@@ -55,11 +57,7 @@ export function StudioSaveSyncStatusCenter({
 
   const handleCopyDiagnostics = () => {
     const report = formatRecoveryDiagnostics(journal, status);
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(report).catch(() => {});
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    diagnosticsCopy.copy("save-sync-diagnostics", report);
   };
 
   const StatusIcon = !status.localDurable
@@ -201,7 +199,13 @@ export function StudioSaveSyncStatusCenter({
                 className="mt-1 flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2.5 font-semibold text-fg-2 hover:bg-raised pointer-coarse:min-h-11"
               >
                 <Copy className="size-3.5" aria-hidden />
-                <span>{copied ? "진단 정보를 복사했어요" : "진단 정보 복사"}</span>
+                <span aria-live="polite">
+                  {diagnosticsCopyStatus === "copied"
+                    ? "진단 정보를 복사했어요"
+                    : diagnosticsCopyStatus === "failed"
+                      ? "진단 정보를 복사하지 못했어요"
+                      : "진단 정보 복사"}
+                </span>
               </button>
             </div>
           </details>
