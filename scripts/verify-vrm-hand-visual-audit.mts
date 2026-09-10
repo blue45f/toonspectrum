@@ -1,11 +1,15 @@
+import { spawn } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { chromium, type Page } from "playwright";
-import { createServer as createViteServer } from "vite";
+import { chromium, type Browser, type Page } from "playwright";
 
 import { WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
-import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
+import {
+  findFreePort,
+  stopChildProcess,
+  waitForServer,
+} from "./lib/studio-verify-preview-harness.mjs";
 
 const OUTPUT = resolve("artifacts/vrm-hand-visual-audit");
 const CHARACTER_IDS = ["sample-vrm", "avatar-a", "avatar-b", "avatar-c", "mio", "noa"] as const;
@@ -19,16 +23,38 @@ const receipt: Record<string, unknown> = {
 
 rmSync(OUTPUT, { recursive: true, force: true });
 mkdirSync(OUTPUT, { recursive: true });
+writeFileSync(
+  resolve(OUTPUT, "started.json"),
+  `${JSON.stringify({ startedAt: new Date().toISOString() }, null, 2)}\n`,
+);
 
-const server = await createViteServer({
-  root: WEB_ROOT,
-  configFile: WEB_VITE_CONFIG,
-  appType: "spa",
-  server: { port: await findFreePort(), strictPort: true },
-  logLevel: "error",
+const port = await findFreePort();
+const origin = `http://127.0.0.1:${port}`;
+let serverLog = "";
+const server = spawn(
+  process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+  [
+    "exec",
+    "vite",
+    "--config",
+    WEB_VITE_CONFIG,
+    "--host",
+    "127.0.0.1",
+    "--port",
+    String(port),
+    "--strictPort",
+  ],
+  {
+    cwd: WEB_ROOT,
+    stdio: ["ignore", "pipe", "pipe"],
+  },
+);
+server.stdout?.on("data", (chunk) => {
+  serverLog += String(chunk);
 });
-await server.listen();
-const origin = `http://127.0.0.1:${server.config.server.port}`;
+server.stderr?.on("data", (chunk) => {
+  serverLog += String(chunk);
+});
 
 async function settle(page: Page) {
   await page.evaluate(() => new Promise<void>((resolveFrame) => {
@@ -45,17 +71,40 @@ async function clickCharacter(page: Page, id: string) {
   return name;
 }
 
-const browser = await chromium.launch({
-  headless: true,
-  args: ["--no-sandbox", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
-});
-
+let browser: Browser | null = null;
 try {
+  await Promise.race([
+    waitForServer(origin, {
+      timeoutMs: 30_000,
+      notReadyMessage: "VRM hand visual audit Vite server did not become ready",
+    }),
+    new Promise<void>((_, reject) => {
+      server.once("exit", (code, signal) => {
+        reject(new Error(
+          `VRM hand visual audit Vite server exited before readiness (code=${String(code)}, signal=${String(signal)})\n${serverLog}`,
+        ));
+      });
+    }),
+  ]);
+
+  browser = await chromium.launch({
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu-sandbox",
+      "--use-gl=angle",
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader",
+    ],
+  });
+
   const page = await browser.newPage({ viewport: { width: 1600, height: 1200 }, deviceScaleFactor: 1 });
   page.on("pageerror", (error) => errors.push(`pageerror: ${String(error)}`));
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(`console: ${message.text()}`);
   });
+  page.on("crash", () => errors.push("page crashed while rendering VRM hand evidence"));
 
   await page.goto(`${origin}/tools/browser-harnesses/hand-compare.html`, { waitUntil: "load" });
   const handReceipts: unknown[] = [];
@@ -101,8 +150,9 @@ try {
   }
   receipt.props = propReceipts;
 } finally {
-  await browser.close().catch(() => undefined);
-  await server.close().catch(() => undefined);
+  await browser?.close().catch(() => undefined);
+  await stopChildProcess(server).catch(() => undefined);
+  writeFileSync(resolve(OUTPUT, "vite.log"), serverLog);
   writeFileSync(resolve(OUTPUT, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`);
 }
 
