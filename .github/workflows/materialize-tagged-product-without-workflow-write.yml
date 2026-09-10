@@ -1,4 +1,4 @@
-# Manual retry after the BG3D extreme-aspect policy fix.
+# Stable retry pinned to the last workflow containing the original product steps.
 name: Materialize tagged product without workflow writes
 
 on:
@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: materialize-tagged-product-without-workflow-write-20260911
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   materialize:
@@ -22,10 +22,11 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=8192
       TARGET_BRANCH: fix/real-core-and-main-only-20260910
       EFFECTS_SOURCE_SHA: f76a78bc047d42dcc74cda6002307d50fb491cd8
+      SOURCE_MATERIALIZER_SHA: 056e3a1928abb0b4840e4082fba869881e8d5763
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: fix/real-core-and-main-only-20260910
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: true
 
@@ -40,14 +41,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source_workflow=.github/workflows/materialize-remaining-tagged-product-work.yml
-          test -f "$source_workflow"
-          cp "$source_workflow" "$RUNNER_TEMP/product-materializer.yml"
+          git show "${SOURCE_MATERIALIZER_SHA}:.github/workflows/materialize-remaining-tagged-product-work.yml" \
+            > "$RUNNER_TEMP/product-materializer.yml"
           python3 - <<'PY'
           from pathlib import Path
+          import os
 
-          path = Path(__import__('os').environ['RUNNER_TEMP']) / 'product-materializer.yml'
-          source = path.read_text(encoding='utf-8')
+          path = Path(os.environ["RUNNER_TEMP"]) / "product-materializer.yml"
+          source = path.read_text(encoding="utf-8")
           replacements = [
               ('if ">3D 캐릭터<" in source:', 'if "3D 캐릭터" in source:'),
               ('for label in [">3D 캐릭터<", ">캐릭터 셰이퍼<", ">3D 데생 인형<", ">3D 배경<"]:',
@@ -65,43 +66,44 @@ jobs:
                'expect(toolbarSource).not.toContain("3D 배경");'),
           ]
           for old, new in replacements:
-              if old in source:
-                  source = source.replace(old, new, 1)
-          required = [
-              'if "3D 캐릭터" in source:',
-              'for label in ["3D 캐릭터", "캐릭터 셰이퍼", "3D 데생 인형", "3D 배경"]:',
-              'if source.count("3D 스튜디오") < 1:',
-          ]
-          for marker in required:
-              if marker not in source:
-                  raise SystemExit(f'corrected materializer marker missing: {marker}')
-          path.write_text(source, encoding='utf-8')
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"unexpected source materializer marker count for {old!r}: {count}")
+              source = source.replace(old, new, 1)
+          path.write_text(source, encoding="utf-8")
           PY
 
           ruby -ryaml - <<'RB'
-          workflow = YAML.load_file(File.join(ENV.fetch('RUNNER_TEMP'), 'product-materializer.yml'), aliases: true)
-          steps = workflow.fetch('jobs').fetch('materialize').fetch('steps')
+          workflow = YAML.load_file(File.join(ENV.fetch("RUNNER_TEMP"), "product-materializer.yml"), aliases: true)
+          steps = workflow.fetch("jobs").fetch("materialize").fetch("steps")
           wanted = {
-            'Materialize non-destructive Studio effects workspace' => ['effects.sh', 'bash'],
-            'Materialize one guided Studio 3D entry' => ['unified-3d.py', 'python'],
-            'Record tagged-source recovery map' => ['recovery-map.sh', 'bash'],
-            'Install and validate focused product contracts' => ['validate.sh', 'bash'],
+            "Materialize non-destructive Studio effects workspace" => "effects.sh",
+            "Materialize one guided Studio 3D entry" => "unified-3d.py",
+            "Record tagged-source recovery map" => "recovery-map.sh",
+            "Install and validate focused product contracts" => "validate.sh",
           }
-          wanted.each do |name, (file, _shell)|
-            step = steps.find { |candidate| candidate['name'] == name }
-            abort("missing source materializer step: #{name}") unless step && step['run']
-            File.write(File.join(ENV.fetch('RUNNER_TEMP'), file), step['run'])
+          wanted.each do |name, file|
+            step = steps.find { |candidate| candidate["name"] == name }
+            abort("missing pinned materializer step: #{name}") unless step && step["run"]
+            File.write(File.join(ENV.fetch("RUNNER_TEMP"), file), step["run"])
           end
           RB
 
-      - name: Materialize and validate product files
+      - name: Materialize Studio effects workspace
         shell: bash
-        run: |
-          set -euo pipefail
-          bash "$RUNNER_TEMP/effects.sh"
-          python3 "$RUNNER_TEMP/unified-3d.py"
-          bash "$RUNNER_TEMP/recovery-map.sh"
-          bash "$RUNNER_TEMP/validate.sh"
+        run: bash "$RUNNER_TEMP/effects.sh"
+
+      - name: Materialize unified Studio 3D entry
+        shell: bash
+        run: python3 "$RUNNER_TEMP/unified-3d.py"
+
+      - name: Record tagged-source recovery map
+        shell: bash
+        run: bash "$RUNNER_TEMP/recovery-map.sh"
+
+      - name: Validate focused product contracts
+        shell: bash
+        run: bash "$RUNNER_TEMP/validate.sh"
 
       - name: Publish product-only recovery commit
         shell: bash
@@ -111,7 +113,10 @@ jobs:
           git config user.email "codex@openai.com"
           git add apps/web/src/domains/creator .qa/tagged-product-recovery-2026-09-11.md
           git diff --cached --check
-          git diff --cached --quiet && { echo "product recovery already materialized"; exit 0; }
+          if git diff --cached --quiet; then
+            echo "product recovery already materialized"
+            exit 0
+          fi
           git -c core.hooksPath=/dev/null commit -m "feat(studio): materialize remaining tagged recovery work"
           for attempt in $(seq 1 8); do
             if git push --no-verify origin HEAD:fix/real-core-and-main-only-20260910; then
