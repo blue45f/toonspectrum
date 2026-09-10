@@ -1,1 +1,2 @@
 Trigger isolated cleanup-only branch retirement.
+Runner: ubuntu-slim; safety predicates unchanged.
