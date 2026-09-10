@@ -22,6 +22,7 @@ on:
       - 'apps/web/src/domains/creator/studio-main-menu-items-production.ts'
       - 'apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig*.tsx'
       - 'scripts/verify-studio-menus.mts'
+      - 'scripts/verify-studio-menus-ci.mjs'
       - 'scripts/studio-quality-bundle-leaves.test.mjs'
       - '.github/workflows/studio-finishing-quality.yml'
   push:
@@ -45,6 +46,7 @@ on:
       - 'apps/web/src/domains/creator/studio-main-menu-items-production.ts'
       - 'apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig*.tsx'
       - 'scripts/verify-studio-menus.mts'
+      - 'scripts/verify-studio-menus-ci.mjs'
       - 'scripts/studio-quality-bundle-leaves.test.mjs'
       - '.github/workflows/studio-finishing-quality.yml'
   workflow_dispatch:
@@ -152,7 +154,7 @@ jobs:
       - name: Verify production menus, rail and export entry points
         run: |
           set -euo pipefail
-          pnpm run verify:studio-menus 2>&1 | tee "$RUNNER_TEMP/finishing-quality/menus.log"
+          pnpm exec tsx scripts/verify-studio-menus-ci.mjs 2>&1 | tee "$RUNNER_TEMP/finishing-quality/menus.log"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
