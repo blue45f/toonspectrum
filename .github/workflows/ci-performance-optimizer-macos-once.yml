@@ -11,8 +11,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: ci-performance-optimizer-once
-  cancel-in-progress: false
+  group: ci-performance-optimizer-macos-once
+  cancel-in-progress: true
 
 jobs:
   apply:
