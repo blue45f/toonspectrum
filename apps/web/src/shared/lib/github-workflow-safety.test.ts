@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
 type UnknownRecord = Record<string, unknown>;
+type ParsedWorkflow = { name: string; parsed: UnknownRecord };
 
 const repositoryRoot = process.cwd();
 const workflowDirectory = join(repositoryRoot, ".github", "workflows");
@@ -39,13 +40,16 @@ function parseWorkflow(name: string, source: string): UnknownRecord {
   }
 }
 
-const workflows = readdirSync(workflowDirectory)
+const workflows: ParsedWorkflow[] = readdirSync(workflowDirectory)
   .filter((name) => /\.ya?ml$/u.test(name))
   .sort()
   .map((name) => {
     const source = readFileSync(join(workflowDirectory, name), "utf8");
     return { name, parsed: parseWorkflow(name, source) };
   });
+const workflowByName = new Map<string, ParsedWorkflow>(
+  workflows.map((workflow) => [workflow.name, workflow]),
+);
 
 const retiredArtifacts = [
   ".github/code-scanning-open-alerts.json",
@@ -59,6 +63,8 @@ const retiredArtifacts = [
   ".github/workflows/fix-pr1057-ci.yml",
   ".github/workflows/patch-mannequin-foot-scaling.yml",
   ".github/workflows/restore-ci-after-bulk-integration.yml",
+  ".github/workflows/studio-ai-comic-composer-quality.yml",
+  ".github/workflows/temporary-main-only-core-skip.yml",
 ] as const;
 
 function hasOwn(record: UnknownRecord, key: string): boolean {
@@ -159,6 +165,50 @@ function findUnsafePullRequestBranchTargets(workflow: UnknownRecord): string[] {
   return [...findings].sort();
 }
 
+function requireWorkflow(name: string): ParsedWorkflow {
+  const workflow = workflowByName.get(name);
+  if (!workflow) throw new Error(`missing workflow: ${name}`);
+  return workflow;
+}
+
+function pullRequestPaths(workflow: UnknownRecord): string[] {
+  if (!isRecord(workflow.on)) return [];
+  const pullRequest = workflow.on.pull_request;
+  if (!isRecord(pullRequest) || !Array.isArray(pullRequest.paths)) return [];
+  return pullRequest.paths.filter((path): path is string => typeof path === "string");
+}
+
+function findEagerCommands(
+  workflow: UnknownRecord,
+  commands: readonly string[],
+): string[] {
+  if (!isRecord(workflow.jobs)) return [];
+
+  const findings: string[] = [];
+  for (const [jobId, rawJob] of Object.entries(workflow.jobs)) {
+    if (!isRecord(rawJob) || !Array.isArray(rawJob.steps)) continue;
+    rawJob.steps.forEach((rawStep, index) => {
+      if (!isRecord(rawStep) || typeof rawStep.run !== "string") return;
+      const condition = typeof rawStep.if === "string" ? rawStep.if : "";
+      if (condition.includes("workflow_dispatch")) return;
+
+      const lines = rawStep.run
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      for (const command of commands) {
+        if (lines.some((line) => line === command || line.startsWith(`${command} `))) {
+          const stepName = typeof rawStep.name === "string"
+            ? rawStep.name
+            : `step-${index + 1}`;
+          findings.push(`${jobId}/${stepName}: ${command}`);
+        }
+      }
+    });
+  }
+  return findings;
+}
+
 describe("GitHub workflow safety", () => {
   it("reserves the protected core check name for the canonical CI workflow", () => {
     for (const workflow of workflows) {
@@ -207,6 +257,75 @@ describe("GitHub workflow safety", () => {
       `\non: [pull_request]\npermissions: write-all\njobs:\n  patch:\n    runs-on: ubuntu-latest\n    env: { BRANCH_NAME: "\${{ github.head_ref }}" }\n    steps:\n      - uses: actions/checkout@v6\n        with: { ref: "\${{ github.event.pull_request.head.sha }}" }\n`,
     );
     expect(findUnsafePullRequestBranchTargets(dynamicTarget)).toEqual([]);
+  });
+
+  it("keeps feature workflows scoped to the Studio routes they verify", () => {
+    const disallowedPaths = new Map<string, readonly string[]>([
+      [
+        "character-shaper-discovery-quality.yml",
+        [
+          "apps/web/src/domains/creator/studio-router/**",
+          "apps/web/src/domains/creator/studio-production/**",
+        ],
+      ],
+      [
+        "character-merge-validation.yml",
+        ["apps/web/src/domains/creator/studio-router/**"],
+      ],
+      [
+        "studio-ai-comic-director-complete.yml",
+        ["apps/web/src/domains/creator/studio-router/**"],
+      ],
+      [
+        "studio-production-integrity.yml",
+        ["apps/web/src/domains/creator/studio-router/**"],
+      ],
+    ]);
+
+    for (const [name, disallowed] of disallowedPaths) {
+      const workflow = requireWorkflow(name);
+      const paths = pullRequestPaths(workflow.parsed);
+      for (const path of disallowed) {
+        expect(paths, `${name} must not claim ${path}`).not.toContain(path);
+      }
+    }
+  });
+
+  it("runs repository-wide gates once in CI/core instead of every feature workflow", () => {
+    const policies = new Map<string, readonly string[]>([
+      [
+        "studio-ai-comic-director-complete.yml",
+        ["pnpm run typecheck", "pnpm run validate:architecture", "pnpm run build"],
+      ],
+      [
+        "character-shaper-discovery-quality.yml",
+        ["pnpm exec tsc -p tsconfig.json"],
+      ],
+      [
+        "character-merge-validation.yml",
+        ["pnpm run typecheck", "pnpm run build"],
+      ],
+      [
+        "studio-production-integrity.yml",
+        ["pnpm run build"],
+      ],
+      [
+        "learning-quality.yml",
+        ["pnpm run test:perf"],
+      ],
+      [
+        "studio-collaboration-sync.yml",
+        ["pnpm run build"],
+      ],
+    ]);
+
+    for (const [name, commands] of policies) {
+      const workflow = requireWorkflow(name);
+      expect(
+        findEagerCommands(workflow.parsed, commands),
+        `${name} repeats required CI/core work`,
+      ).toEqual([]);
+    }
   });
 
   it("keeps retired one-shot writers and alert snapshots out of the repository", () => {
