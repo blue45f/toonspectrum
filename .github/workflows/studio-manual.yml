@@ -4,165 +4,62 @@ on:
   pull_request:
     branches: [main, release/salvage-integration-20260908]
     paths:
+      - 'apps/web/src/domains/creator/manual/**'
+      - 'apps/web/src/domains/creator/studio-help-menu-items*'
+      - 'apps/web/src/domains/creator/studio-command-catalog*'
+      - 'apps/web/src/domains/creator/studio-main-menu-group-spec-help.ts'
+      - 'apps/web/src/app/routes/groups/creator.routes.tsx'
+      - 'apps/web/src/app/routes/groups/studio-manual.routes.test.tsx'
+      - 'apps/web/src/app/routes/app-route-title-ownership.ts'
+      - 'scripts/verify-studio-manual.mjs'
       - '.github/workflows/studio-manual.yml'
+  workflow_dispatch:
 
 permissions:
-  contents: write
-
+  contents: read
 concurrency:
   group: studio-manual-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  repair-pr1289:
-    if: github.event.pull_request.number == 1289
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
+  manual-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       NODE_OPTIONS: --max-old-space-size=8192
+      VITE_CATALOG_SOURCE: static
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-          persist-credentials: true
-
-      - name: Apply deterministic repairs
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          changed = []
-
-          def write(path: Path, text: str) -> None:
-              path.write_text(text, encoding="utf-8")
-              changed.append(str(path))
-
-          def replace(path_value: str, old: str, new: str, expected: int = 1) -> None:
-              path = Path(path_value)
-              text = path.read_text(encoding="utf-8")
-              count = text.count(old)
-              if count == 0 and new in text:
-                  return
-              if count != expected:
-                  raise RuntimeError(f"{path}: expected {expected} match(es), found {count}: {old!r}")
-              write(path, text.replace(old, new))
-
-          def regex(path_value: str, pattern: str, replacement: str, expected: int = 1) -> None:
-              path = Path(path_value)
-              text = path.read_text(encoding="utf-8")
-              updated, count = re.subn(pattern, replacement, text, count=expected, flags=re.MULTILINE)
-              if count != expected:
-                  raise RuntimeError(f"{path}: expected {expected} regex match(es), found {count}: {pattern!r}")
-              write(path, updated)
-
-          # Debounced CC0 search: wait for both empty and recovered result states.
-          regex(
-              "scripts/verify-studio-cc0-curated-ui.mjs",
-              r"(?P<i>^[ \t]*)assert\.equal\(await panel\.locator\('article'\)\.count\(\), 0\);",
-              r"\g<i>await waitForResultCount(0);\n\g<i>assert.equal(await panel.locator('article').count(), 0);",
-          )
-          regex(
-              "scripts/verify-studio-cc0-curated-ui.mjs",
-              r"(?P<i>^[ \t]*)await page\.getByLabel\('에셋 검색', \{ exact: true \}\)\.fill\('목재'\);\n(?P=i)assert\.ok\(\(await panel\.locator\('article'\)\.count\(\)\) > 0\);",
-              r"\g<i>await page.getByLabel('에셋 검색', { exact: true }).fill('목재');\n\g<i>await panel.locator('article').first().waitFor({ state: 'visible', timeout: 30_000 });\n\g<i>assert.ok((await panel.locator('article').count()) > 0);",
-          )
-
-          # Browser verifiers that need the editor must enter the editor route, not the Studio home.
-          replace("scripts/verify-studio-menus.mts", "const url = `http://127.0.0.1:${port}/studio`;", "const url = `http://127.0.0.1:${port}/studio/canvas`;")
-          replace("scripts/verify-studio-discovery-ux.mts", "page.goto(`${previewOrigin}/studio`,", "page.goto(`${previewOrigin}/studio/canvas`,")
-          replace("scripts/verify-studio-brushes.mts", "const studioUrl = `${origin}studio`;", "const studioUrl = `${origin}studio/canvas`;")
-          replace("scripts/verify-studio-filter-dialog.mts", "const url = `${origin}/studio`;", "const url = `${origin}/studio/canvas`;")
-          replace("scripts/verify-studio-collaboration-sync.mts", "fetch(`${origin}/studio`)", "fetch(`${origin}/studio/canvas`)")
-          replace("scripts/verify-studio-collaboration-sync.mts", "pageA.goto(`${origin}/studio`,", "pageA.goto(`${origin}/studio/canvas`,")
-
-          # React Testing Library DOM and disclosure-name contracts.
-          goal_test = Path("apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx")
-          goal_text = goal_test.read_text(encoding="utf-8")
-          prefix = "// @vitest-environment jsdom\n"
-          if not goal_text.startswith(prefix):
-              write(goal_test, prefix + goal_text)
-          replace(
-              "apps/web/src/domains/creator/brush/StudioDrawingPaletteStack.test.tsx",
-              'name: "브러시 스튜디오",',
-              "name: /브러시 스튜디오/u,",
-          )
-
-          # Keep guided Brush Studio adjacent to its parent product door.
-          replace(
-              "apps/web/src/domains/creator/studio-main-menu-group-spec.ts",
-              'has("Brush Studio/Brush DNA", "brush/brush-studio")',
-              'has("Brush Studio/Brush DNA", "brush/brush-studio", "brush/brush-lab")',
-          )
-          regex(
-              "apps/web/src/domains/creator/studio-command-catalog.ts",
-              r'\.\.\.BASE_MENU_INVENTORY\.flatMap\(\(id\) => id === "help/current-tool" \? \[id, MANUAL_MENU_ID\] : \[id\]\),\s*BRUSH_LAB_MENU_ID,',
-              "...BASE_MENU_INVENTORY.flatMap((id) => {\n    if (id === \"help/current-tool\") return [id, MANUAL_MENU_ID];\n    if (id === \"brush/brush-studio\") return [id, BRUSH_LAB_MENU_ID];\n    return [id];\n  }),",
-          )
-
-          # Help menu now opens the unified help home rather than a direct feature tutorial.
-          replace("apps/web/src/domains/creator/studio-main-menu-groups.test.ts", 'toBe("Feature tutorials")', 'toBe("Help home and guided learning")')
-          replace("apps/web/src/domains/creator/studio-main-menu-groups.test.ts", 'toBe("사용법 · 기능 튜토리얼")', 'toBe("도움말 홈 · 단계별 가이드")')
-          replace("apps/web/src/domains/creator/studio-main-menu-groups.test.ts", "expect(editor.openFeatureTutorial).toHaveBeenCalledOnce();", "expect(editor.openFeatureTutorial).not.toHaveBeenCalled();")
-
-          # Exact /studio is the front door; scoped URLs remain editor routes.
-          replace(
-              "apps/web/src/app/routes/groups/studio-manual.routes.test.tsx",
-              'for (const path of ["/studio", "/studio/character", "/studio/bg3d", "/studio/publish"]) {',
-              'expect(routeId("/studio")).toBe("creator-studio-home");\n    for (const path of ["/studio/canvas", "/studio/character", "/studio/bg3d", "/studio/publish"]) {',
-          )
-
-          # Stable product ids avoid localization and accessible-name timing in the learning E2E.
-          replace("e2e/learn.spec.ts", 'page.getByLabel("지금 가장 중요한 목표", { exact: true })', 'page.locator("#learn-goal")', expected=2)
-          replace("e2e/learn.spec.ts", 'page.getByLabel("현재 경험", { exact: true })', 'page.locator("#learn-level")', expected=2)
-          replace("e2e/learn.spec.ts", 'page.getByLabel("한 번에 집중할 시간", { exact: true })', 'page.locator("#learn-session-minutes")', expected=2)
-
-          print("patched files:")
-          for item in dict.fromkeys(changed):
-              print(f"- {item}")
-          PY
-          git diff --check
-
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-
-      - name: Verify repaired contracts
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm exec vitest run \
-            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
-            apps/web/src/domains/creator/brush/StudioDrawingPaletteStack.test.tsx \
-            apps/web/src/domains/creator/studio-main-menu-group-spec.test.ts \
-            apps/web/src/domains/creator/studio-main-menu-groups.test.ts \
-            apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
-          pnpm exec eslint \
-            scripts/verify-studio-cc0-curated-ui.mjs \
-            scripts/verify-studio-menus.mts \
-            scripts/verify-studio-discovery-ux.mts \
-            scripts/verify-studio-brushes.mts \
-            scripts/verify-studio-filter-dialog.mts \
-            scripts/verify-studio-collaboration-sync.mts \
-            e2e/learn.spec.ts
-
-      - name: Commit source repairs and restore canonical workflows
-        shell: bash
-        run: |
-          set -euo pipefail
-          git show 3da7a56f1923b501fb0b949753269cc7e9f57493:.github/workflows/studio-manual.yml > .github/workflows/studio-manual.yml
-          rm -f .github/workflows/pr1289-final-guardian.yml
-          rm -f .github/workflows/collaboration-sync-final-repair-once.yml
-          git diff --check
-          git config user.name toonstudio-quality-ci
-          git config user.email actions@users.noreply.github.com
-          git add -A
-          git diff --cached --check
-          git -c core.hooksPath=/dev/null commit -m 'fix(ci): repair PR 1289 failing contracts'
-          git push --no-verify origin HEAD:${{ github.event.pull_request.head.ref }}
+      - name: Manual, route and existing menu/catalog regression tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/manual/studio-manual.test.ts
+          apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
+          apps/web/src/domains/creator/studio-help-menu-items.test.ts
+          apps/web/src/domains/creator/studio-command-catalog.test.ts
+          apps/web/src/domains/creator/studio-main-menu-groups.test.ts
+          apps/web/src/domains/creator/studio-main-menu-group-spec.test.ts
+      - name: Lint changed manual surface
+        run: >-
+          pnpm exec eslint apps/web/src/domains/creator/manual
+          apps/web/src/app/routes/groups/creator.routes.tsx apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
+          apps/web/src/app/routes/app-route-title-ownership.ts apps/web/src/domains/creator/studio-help-menu-items.ts
+          apps/web/src/domains/creator/studio-help-menu-items.test.ts apps/web/src/domains/creator/studio-command-catalog.ts
+          apps/web/src/domains/creator/studio-command-catalog-base.ts
+          apps/web/src/domains/creator/studio-main-menu-group-spec-help.ts scripts/verify-studio-manual.mjs
+      - run: pnpm run build:bundle
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Desktop, mobile, search, direct links, clipboard and print
+        run: node scripts/verify-studio-manual.mjs
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: studio-manual-browser
+          path: artifacts/studio-manual
+          if-no-files-found: ignore

@@ -112,7 +112,7 @@ try {
   const page = await context.newPage();
   watch(page);
   await page.addInitScript({ content: `globalThis.__name ??= fn=>fn; localStorage.setItem("toonspectrum-studio-quick-start-dismissed","1");localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed","1");` });
-  await page.goto(`${previewOrigin}/studio`, { waitUntil: "domcontentloaded", timeout: 45_000 });
+  await page.goto(`${previewOrigin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 45_000 });
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 45_000 });
   const dismiss = page.locator('[data-studio-quickstart-dismiss="true"]');
   if (await dismiss.isVisible().catch(() => false)) await dismiss.click();

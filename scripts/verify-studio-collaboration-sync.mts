@@ -56,7 +56,7 @@ function log(step: string): void {
 async function waitForOrigin(origin: string): Promise<void> {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     try {
-      const response = await fetch(`${origin}/studio`);
+      const response = await fetch(`${origin}/studio/canvas`);
       if (response.ok || response.status < 500) return;
     } catch {
       // The preview is still starting.
@@ -401,7 +401,7 @@ try {
   diagnostics.push(attachedA.diagnostics);
   const pageA = attachedA.page;
   log("open A");
-  await pageA.goto(`${origin}/studio`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await pageA.goto(`${origin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await pageA.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
   await dismissOverlays(pageA);
   const roomUrl = await waitForRoomUrl(pageA);

@@ -274,8 +274,10 @@ try {
   await page
     .getByLabel('에셋 검색', { exact: true })
     .fill('존재하지않는검수문자열');
+  await waitForResultCount(0);
   assert.equal(await panel.locator('article').count(), 0);
   await page.getByLabel('에셋 검색', { exact: true }).fill('목재');
+  await panel.locator('article').first().waitFor({ state: 'visible', timeout: 30_000 });
   assert.ok((await panel.locator('article').count()) > 0);
   steps.push('Korean search and empty state');
   await page.getByLabel('에셋 검색', { exact: true }).fill('');

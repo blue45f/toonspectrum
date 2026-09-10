@@ -107,15 +107,15 @@ test("reset is explicit and does not erase records on cancel", async ({ page }) 
 
 test("personal plan persists, opens its guided path, and combines library filters", async ({ page }) => {
   await page.goto("/learn");
-  await page.getByLabel("지금 가장 중요한 목표", { exact: true }).selectOption("publish");
-  await page.getByLabel("현재 경험", { exact: true }).selectOption("advanced");
-  await page.getByLabel("한 번에 집중할 시간", { exact: true }).selectOption("45");
+  await page.locator("#learn-goal").selectOption("publish");
+  await page.locator("#learn-level").selectOption("advanced");
+  await page.locator("#learn-session-minutes").selectOption("45");
   await expect(page.locator(".learn-plan-result").getByRole("heading", { level: 3 })).toHaveText("첫 회차 게시 준비");
 
   await page.reload();
-  await expect(page.getByLabel("지금 가장 중요한 목표", { exact: true })).toHaveValue("publish");
-  await expect(page.getByLabel("현재 경험", { exact: true })).toHaveValue("advanced");
-  await expect(page.getByLabel("한 번에 집중할 시간", { exact: true })).toHaveValue("45");
+  await expect(page.locator("#learn-goal")).toHaveValue("publish");
+  await expect(page.locator("#learn-level")).toHaveValue("advanced");
+  await expect(page.locator("#learn-session-minutes")).toHaveValue("45");
   await page.getByRole("link", { name: /추천 경로 자세히 보기/u }).click();
   await expect(page).toHaveURL(/\/learn\/paths\/publish-ready$/u);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("첫 회차 게시 준비");

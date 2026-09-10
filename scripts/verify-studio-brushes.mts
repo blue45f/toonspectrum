@@ -4843,7 +4843,7 @@ async function main(): Promise<void> {
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/, "")}/`
     : `http://127.0.0.1:${port}/`;
-  const studioUrl = `${origin}studio`;
+  const studioUrl = `${origin}studio/canvas`;
   const server: ChildProcess | null = port === null
     ? null
     : spawnVitePreview({ port, runner: "node-vite-bin", logPath: LOG_PATH });
