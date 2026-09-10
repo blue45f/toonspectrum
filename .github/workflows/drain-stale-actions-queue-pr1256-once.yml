@@ -1,0 +1,126 @@
+name: Drain stale Actions queue for PR 1256 once
+
+on:
+  push:
+    branches:
+      - ops/drain-actions-queue-pr1251-20260910
+    paths:
+      - .github/workflows/drain-stale-actions-queue-pr1256-once.yml
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: drain-stale-actions-queue-pr1256-once
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Cancel only superseded, deleted-branch and retired-workflow runs
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const currentRunId = context.runId;
+            const cancellableStatuses = [
+              "queued",
+              "in_progress",
+              "pending",
+              "requested",
+              "waiting",
+            ];
+            const retiredWorkflowPaths = new Set([
+              ".github/workflows/apply-learn-landmark-fix.yml",
+              ".github/workflows/apply-studio-effects-workspace.yml",
+              ".github/workflows/character-3d-ux-patch-20260909.yml",
+              ".github/workflows/character-modeler-assets-20260909.yml",
+              ".github/workflows/code-scanning-audit-temp.yml",
+              ".github/workflows/drain-code-scanning-stale-runs-once.yml",
+              ".github/workflows/fix-mannequin-terminal-scale-once.yml",
+              ".github/workflows/fix-pr1057-ci.yml",
+              ".github/workflows/patch-mannequin-foot-scaling.yml",
+              ".github/workflows/prune-superseded-main-runs-clean-once.yml",
+              ".github/workflows/restore-ci-after-bulk-integration.yml",
+            ]);
+
+            const branchRows = await github.paginate(
+              github.rest.repos.listBranches,
+              { owner, repo, per_page: 100 },
+            );
+            const latestShaByBranch = new Map(
+              branchRows.map((branch) => [branch.name, branch.commit.sha]),
+            );
+
+            const openPulls = await github.paginate(
+              github.rest.pulls.list,
+              { owner, repo, state: "open", per_page: 100 },
+            );
+            for (const pull of openPulls) {
+              latestShaByBranch.set(pull.head.ref, pull.head.sha);
+            }
+
+            let cancelled = 0;
+            let preserved = 0;
+            const cancellationFailures = [];
+            for (const status of cancellableStatuses) {
+              const runs = await github.paginate(
+                github.rest.actions.listWorkflowRunsForRepo,
+                { owner, repo, status, per_page: 100 },
+              );
+              for (const run of runs) {
+                if (run.id === currentRunId) {
+                  preserved += 1;
+                  continue;
+                }
+
+                const branch = run.head_branch ?? "";
+                const sha = run.head_sha ?? "";
+                const currentSha = latestShaByBranch.get(branch);
+                const isRetiredWorkflow = retiredWorkflowPaths.has(run.path);
+                const isDeletedBranch = branch.length > 0 && currentSha == null;
+                const isSuperseded = currentSha != null && sha !== currentSha;
+                if (!isRetiredWorkflow && !isDeletedBranch && !isSuperseded) {
+                  preserved += 1;
+                  continue;
+                }
+
+                core.info(
+                  `Cancelling ${status} run ${run.id}: ${run.name} `
+                    + `${branch || "<no-branch>"}@${sha || "<no-sha>"} `
+                    + `(retired=${isRetiredWorkflow}, deleted=${isDeletedBranch}, superseded=${isSuperseded})`,
+                );
+                try {
+                  await github.rest.actions.cancelWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id,
+                  });
+                  cancelled += 1;
+                } catch (error) {
+                  if (error.status === 409 || error.status === 404) {
+                    core.info(`Run ${run.id} completed before cancellation.`);
+                  } else {
+                    cancellationFailures.push(`${run.id}: ${error.message}`);
+                  }
+                }
+              }
+            }
+
+            await core.summary
+              .addHeading("Actions queue drain")
+              .addTable([
+                [{ data: "Result", header: true }, { data: "Count", header: true }],
+                ["Cancelled", String(cancelled)],
+                ["Preserved current", String(preserved)],
+                ["Cancellation failures", String(cancellationFailures.length)],
+              ])
+              .write();
+            if (cancellationFailures.length > 0) {
+              core.setFailed(cancellationFailures.join("\n"));
+            }
