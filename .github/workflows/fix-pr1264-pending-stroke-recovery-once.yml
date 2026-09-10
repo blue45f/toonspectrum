@@ -1,0 +1,289 @@
+name: Fix PR 1264 pending stroke recovery once
+
+on:
+  push:
+    branches:
+      - integration/completed-unmerged-20260910-1655
+    paths:
+      - .github/workflows/fix-pr1264-pending-stroke-recovery-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-pr1264-pending-stroke-recovery-once
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    env:
+      CI: "1"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply focused pending-stroke recovery repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 <<'PY'
+          from pathlib import Path
+
+          helper = Path("apps/web/src/domains/creator/studio-pending-stroke-recovery.ts")
+          helper.write_text('''import type { StudioAutosavePayload } from "./studio-autosave";
+
+function timestamp(value: string): number {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
+function hasSameUniqueIds(left: readonly string[], right: readonly string[]): boolean {
+  const leftSet = new Set(left);
+  const rightSet = new Set(right);
+  if (leftSet.size !== left.length || rightSet.size !== right.length) return false;
+  if (leftSet.size !== rightSet.size) return false;
+  return [...leftSet].every((id) => rightSet.has(id));
+}
+
+export function isStudioPendingStrokeEmergencyRecoveryPayload(
+  payload: StudioAutosavePayload,
+): boolean {
+  const pending = payload.pendingStrokeDurability;
+  const lifecycle = payload.lifecycleDurability;
+  if (!pending || !lifecycle) return false;
+  if (pending.kind !== "pending-strokes" || lifecycle.kind !== "lifecycle-snapshot") {
+    return false;
+  }
+  if (pending.strokeIds.length === 0) return false;
+  if (pending.savedAt !== payload.savedAt || lifecycle.savedAt !== payload.savedAt) {
+    return false;
+  }
+  if (pending.reason !== lifecycle.reason) return false;
+  if (pending.pageId !== lifecycle.pendingStrokePageId) return false;
+  if (pending.pageId !== payload.activePageId) return false;
+  if (!hasSameUniqueIds(pending.strokeIds, lifecycle.pendingStrokeIds ?? [])) {
+    return false;
+  }
+
+  const page = payload.pagesList.find((candidate) => candidate.id === pending.pageId);
+  if (!page) return false;
+  const elementIds = new Set(page.elements.map((element) => element.id));
+  return pending.strokeIds.every((strokeId) => elementIds.has(strokeId));
+}
+
+export function shouldPreferStudioPendingStrokeEmergencyRecovery(
+  durablePayload: StudioAutosavePayload,
+  compatibilityPayload: StudioAutosavePayload,
+): boolean {
+  if (!isStudioPendingStrokeEmergencyRecoveryPayload(compatibilityPayload)) {
+    return false;
+  }
+  if (timestamp(compatibilityPayload.savedAt) < timestamp(durablePayload.savedAt)) {
+    return false;
+  }
+
+  const receipt = compatibilityPayload.pendingStrokeDurability;
+  if (!receipt) return false;
+  const durablePage = durablePayload.pagesList.find((page) => page.id === receipt.pageId);
+  const durableElementIds = new Set(
+    durablePage?.elements.map((element) => element.id) ?? [],
+  );
+  return receipt.strokeIds.some((strokeId) => !durableElementIds.has(strokeId));
+}
+''', encoding="utf-8")
+
+          test = Path("apps/web/src/domains/creator/studio-pending-stroke-recovery.test.ts")
+          test.write_text('''import { describe, expect, it } from "vitest";
+
+import type { StudioAutosavePayload } from "./studio-autosave";
+import {
+  isStudioPendingStrokeEmergencyRecoveryPayload,
+  shouldPreferStudioPendingStrokeEmergencyRecovery,
+} from "./studio-pending-stroke-recovery";
+
+const PAGE_ID = "page-1";
+const REASON = "pagehide" as const;
+
+function payload(input: {
+  readonly savedAt: string;
+  readonly elementIds: readonly string[];
+  readonly emergencyIds?: readonly string[];
+  readonly lifecycleIds?: readonly string[];
+  readonly pageId?: string;
+}): StudioAutosavePayload {
+  const pageId = input.pageId ?? PAGE_ID;
+  const emergencyIds = input.emergencyIds;
+  return {
+    savedAt: input.savedAt,
+    activePageId: PAGE_ID,
+    pagesList: [{
+      id: pageId,
+      elements: input.elementIds.map((id) => ({ id })),
+    }],
+    ...(emergencyIds
+      ? {
+          pendingStrokeDurability: {
+            kind: "pending-strokes",
+            reason: REASON,
+            pageId,
+            strokeIds: [...emergencyIds],
+            savedAt: input.savedAt,
+          },
+          lifecycleDurability: {
+            kind: "lifecycle-snapshot",
+            reason: REASON,
+            savedAt: input.savedAt,
+            pendingStrokePageId: pageId,
+            pendingStrokeIds: [...(input.lifecycleIds ?? emergencyIds)],
+          },
+        }
+      : {}),
+  } as unknown as StudioAutosavePayload;
+}
+
+describe("Studio pending-stroke recovery candidate", () => {
+  it("promotes a complete newer emergency snapshot that adds a missing stroke", () => {
+    const durable = payload({
+      savedAt: "2026-09-10T00:00:00.000Z",
+      elementIds: ["stroke-a"],
+    });
+    const compatibility = payload({
+      savedAt: "2026-09-10T00:00:00.100Z",
+      elementIds: ["stroke-a", "stroke-b"],
+      emergencyIds: ["stroke-a", "stroke-b"],
+    });
+
+    expect(isStudioPendingStrokeEmergencyRecoveryPayload(compatibility)).toBe(true);
+    expect(shouldPreferStudioPendingStrokeEmergencyRecovery(durable, compatibility)).toBe(true);
+  });
+
+  it("also preserves a same-millisecond emergency snapshot when durable content is incomplete", () => {
+    const durable = payload({
+      savedAt: "2026-09-10T00:00:00.000Z",
+      elementIds: ["stroke-a"],
+    });
+    const compatibility = payload({
+      savedAt: durable.savedAt,
+      elementIds: ["stroke-a", "stroke-b"],
+      emergencyIds: ["stroke-a", "stroke-b"],
+    });
+
+    expect(shouldPreferStudioPendingStrokeEmergencyRecovery(durable, compatibility)).toBe(true);
+  });
+
+  it("keeps durable authority for generic or older compatibility snapshots", () => {
+    const durable = payload({
+      savedAt: "2026-09-10T00:00:00.100Z",
+      elementIds: ["stroke-a"],
+    });
+    const generic = payload({
+      savedAt: "2026-09-10T00:00:00.200Z",
+      elementIds: ["stroke-a", "stroke-b"],
+    });
+    const olderEmergency = payload({
+      savedAt: "2026-09-10T00:00:00.000Z",
+      elementIds: ["stroke-a", "stroke-b"],
+      emergencyIds: ["stroke-a", "stroke-b"],
+    });
+
+    expect(shouldPreferStudioPendingStrokeEmergencyRecovery(durable, generic)).toBe(false);
+    expect(shouldPreferStudioPendingStrokeEmergencyRecovery(durable, olderEmergency)).toBe(false);
+  });
+
+  it("rejects receipts that do not match lifecycle metadata or persisted elements", () => {
+    const durable = payload({
+      savedAt: "2026-09-10T00:00:00.000Z",
+      elementIds: ["stroke-a"],
+    });
+    const mismatchedLifecycle = payload({
+      savedAt: "2026-09-10T00:00:00.100Z",
+      elementIds: ["stroke-a", "stroke-b"],
+      emergencyIds: ["stroke-a", "stroke-b"],
+      lifecycleIds: ["stroke-a"],
+    });
+    const missingElement = payload({
+      savedAt: "2026-09-10T00:00:00.100Z",
+      elementIds: ["stroke-a"],
+      emergencyIds: ["stroke-a", "stroke-b"],
+    });
+
+    expect(isStudioPendingStrokeEmergencyRecoveryPayload(mismatchedLifecycle)).toBe(false);
+    expect(isStudioPendingStrokeEmergencyRecoveryPayload(missingElement)).toBe(false);
+    expect(shouldPreferStudioPendingStrokeEmergencyRecovery(durable, missingElement)).toBe(false);
+  });
+});
+''', encoding="utf-8")
+
+          opfs = Path("apps/web/src/domains/creator/studio-autosave-opfs-session.ts")
+          source = opfs.read_text(encoding="utf-8")
+          import_anchor = 'import { sha256HexPortable } from "./studio-sha256";\n'
+          import_line = 'import { shouldPreferStudioPendingStrokeEmergencyRecovery } from "./studio-pending-stroke-recovery";\n'
+          if import_line not in source:
+            if source.count(import_anchor) != 1:
+              raise SystemExit("unexpected sha256 import anchor count")
+            source = source.replace(import_anchor, import_line + import_anchor, 1)
+
+          winner_anchor = '''  const winner = choosePreferredStudioAutosaveSnapshot(opfsCandidate, sqliteCandidate);
+  const winnerAuthority: StudioAutosaveAuthority = winner.source === "opfs" ? "opfs" : "sqlite";
+'''
+          winner_replacement = '''  const winner = choosePreferredStudioAutosaveSnapshot(opfsCandidate, sqliteCandidate);
+  if (
+    winner.state === "snapshot"
+    && compatibilityCandidate
+    && shouldPreferStudioPendingStrokeEmergencyRecovery(
+      winner.payload,
+      compatibilityCandidate.payload,
+    )
+  ) {
+    return Object.freeze({
+      candidate: compatibilityCandidate,
+      compatibilityCandidate,
+      authority: "browser-storage-compatibility" as const,
+      durability: "compatibility-only" as const,
+      migratedToOpfs,
+    });
+  }
+  const winnerAuthority: StudioAutosaveAuthority = winner.source === "opfs" ? "opfs" : "sqlite";
+'''
+          if winner_replacement not in source:
+            if source.count(winner_anchor) != 1:
+              raise SystemExit("unexpected reconciliation winner anchor count")
+            source = source.replace(winner_anchor, winner_replacement, 1)
+          opfs.write_text(source, encoding="utf-8")
+          PY
+      - name: Verify focused recovery contract
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-pending-stroke-recovery.test.ts \
+            apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts
+          pnpm run typecheck
+          pnpm run validate:architecture
+      - name: Commit repair and retire this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/fix-pr1264-pending-stroke-recovery-once.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            apps/web/src/domains/creator/studio-pending-stroke-recovery.ts \
+            apps/web/src/domains/creator/studio-pending-stroke-recovery.test.ts \
+            apps/web/src/domains/creator/studio-autosave-opfs-session.ts \
+            .github/workflows/fix-pr1264-pending-stroke-recovery-once.yml
+          git commit -m "fix(studio): recover the newest complete pending stroke snapshot"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
