@@ -1,0 +1,378 @@
+name: Materialize remaining tagged product work
+
+on:
+  push:
+    branches: [fix/real-core-and-main-only-20260910]
+    paths: [.github/workflows/materialize-remaining-tagged-product-work.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-remaining-tagged-product-work-20260911
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+      TARGET_BRANCH: fix/real-core-and-main-only-20260910
+      THREE_D_POLICY_SHA: e66837aa67dd77d6095450d9d140d44a10bd4032
+      THREE_D_POLICY_TEST_SHA: 3433e2cac2224c0ea3d3cfb2bcc0813e936b1e46
+      THREE_D_EXTREME_TEST_SHA: 631f3dcd4cd2e8c7ff7d7cce584dd58f46d72082
+      EFFECTS_SOURCE_SHA: f76a78bc047d42dcc74cda6002307d50fb491cd8
+      UNIFIED_3D_SOURCE_SHA: 1b71d831407324fb4b2d9e5b4f0c1cabb5dd1d52
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/real-core-and-main-only-20260910
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Configure recovery commit identity
+        run: |
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+
+      - name: Materialize deterministic Studio 3D insertion quality
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}"
+          dir="apps/web/src/domains/creator/bg3d"
+          curl --fail --silent --show-error --location \
+            "${root}/${THREE_D_POLICY_SHA}/${dir}/studio-bg3d-insert-quality-policy.ts" \
+            --output "${dir}/studio-bg3d-insert-quality-policy.ts"
+          curl --fail --silent --show-error --location \
+            "${root}/${THREE_D_POLICY_TEST_SHA}/${dir}/studio-bg3d-insert-quality-policy.test.ts" \
+            --output "${dir}/studio-bg3d-insert-quality-policy.test.ts"
+          curl --fail --silent --show-error --location \
+            "${root}/${THREE_D_EXTREME_TEST_SHA}/${dir}/studio-bg3d-insert-quality-extreme-aspect.test.ts" \
+            --output "${dir}/studio-bg3d-insert-quality-extreme-aspect.test.ts"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          policy = Path("apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.ts")
+          text = policy.read_text(encoding="utf-8")
+          if "STUDIO_BG3D_INSERT_MIN_DIMENSION" not in text:
+              text = text.replace(
+                  "export const STUDIO_BG3D_INSERT_MIN_EDGE = 256;\n",
+                  "export const STUDIO_BG3D_INSERT_MIN_EDGE = 256;\n"
+                  "export const STUDIO_BG3D_INSERT_MIN_DIMENSION = 64;\n",
+                  1,
+              )
+          text = text.replace(
+              "width: Math.max(STUDIO_BG3D_INSERT_MIN_EDGE, Math.round(width * scale)),",
+              "width: Math.max(STUDIO_BG3D_INSERT_MIN_DIMENSION, Math.round(width * scale)),",
+          )
+          text = text.replace(
+              "height: Math.max(STUDIO_BG3D_INSERT_MIN_EDGE, Math.round(height * scale)),",
+              "height: Math.max(STUDIO_BG3D_INSERT_MIN_DIMENSION, Math.round(height * scale)),",
+          )
+          policy.write_text(text, encoding="utf-8")
+
+          host = Path("apps/web/src/domains/creator/bg3d/studio-bg3d-editor-insert-host.ts")
+          source = host.read_text(encoding="utf-8")
+          import_line = 'import { resolveStudioBg3dInsertQualityPlan } from "./studio-bg3d-insert-quality-policy";\n'
+          if import_line not in source:
+              anchor = 'import * as R from "./studio-bg3d-editor-runtime-bindings";\n'
+              if source.count(anchor) != 1:
+                  raise SystemExit("BG3D insert host import anchor changed")
+              source = source.replace(anchor, anchor + import_line, 1)
+
+          old = '''      const requestedCaptureHeight = Math.min(
+            4096,
+            Math.max(2160, Math.round(adapted.document.output.exportHeight)),
+          );
+          const captureSize = resolveStudioBg3dLtCaptureSize({
+            sourceWidth: sourceSize.width,
+            sourceHeight: sourceSize.height,
+            aspectRatio: captureFrame.aspectRatio,
+            requestedHeight: requestedCaptureHeight,
+            maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
+          });'''
+          new = '''      const qualityPlan = resolveStudioBg3dInsertQualityPlan({
+            exportHeight: adapted.document.output.exportHeight,
+            aspectRatio: captureFrame.aspectRatio,
+            deviceMaxPixels: deviceQuality.maxRenderPixels,
+            rendererMaxPixels: STUDIO_BG3D_LT_RENDER_MAX_PIXELS,
+          });
+          const captureSize = resolveStudioBg3dLtCaptureSize({
+            sourceWidth: sourceSize.width,
+            sourceHeight: sourceSize.height,
+            aspectRatio: captureFrame.aspectRatio,
+            requestedHeight: qualityPlan.requestedHeight,
+            maxPixels: qualityPlan.maxPixels,
+          });'''
+          if new not in source:
+              if source.count(old) != 1:
+                  raise SystemExit(f"BG3D insertion sizing anchor changed: {source.count(old)}")
+              source = source.replace(old, new, 1)
+          host.write_text(source, encoding="utf-8")
+          PY
+
+          cat > "${dir}/studio-bg3d-insert-quality-integration-boundary.test.ts" <<'TS'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+
+          const source = readFileSync(
+            new URL("./studio-bg3d-editor-insert-host.ts", import.meta.url),
+            "utf8",
+          );
+
+          describe("BG3D production insert quality integration", () => {
+            it("delegates sizing to the deterministic quality authority", () => {
+              const start = source.indexOf("async function handleInsert");
+              const end = source.indexOf("h.handleInsert = handleInsert;", start);
+              const handler = source.slice(start, end);
+              expect(start).toBeGreaterThanOrEqual(0);
+              expect(handler).toContain("resolveStudioBg3dInsertQualityPlan({");
+              expect(handler).toContain("exportHeight: adapted.document.output.exportHeight");
+              expect(handler).toContain("aspectRatio: captureFrame.aspectRatio");
+              expect(handler).toContain("requestedHeight: qualityPlan.requestedHeight");
+              expect(handler).toContain("maxPixels: qualityPlan.maxPixels");
+              expect(handler).not.toContain("devicePixelRatio");
+              expect(handler).not.toContain("requestedCaptureHeight");
+            });
+          });
+          TS
+
+      - name: Materialize non-destructive Studio effects workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_root="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${EFFECTS_SOURCE_SHA}"
+          mkdir -p "$RUNNER_TEMP/tagged-effects"
+          for index in 00 01 02 03 04; do
+            curl --fail --silent --show-error --location \
+              "${source_root}/.bootstrap/studio-effects-payload.part${index}" \
+              --output "$RUNNER_TEMP/tagged-effects/part${index}"
+          done
+          cat "$RUNNER_TEMP/tagged-effects"/part* | base64 --decode \
+            > "$RUNNER_TEMP/tagged-effects/payload.tar.xz"
+          printf '%s  %s\n' \
+            'd26c240ae2dd5bb5d31ffbc9ad21a4abe9c64494b76871ebe8034d3aba28abe6' \
+            "$RUNNER_TEMP/tagged-effects/payload.tar.xz" | sha256sum --check --strict
+          xz --test "$RUNNER_TEMP/tagged-effects/payload.tar.xz"
+          mkdir -p "$RUNNER_TEMP/tagged-effects/unpacked"
+          tar --extract --xz \
+            --file "$RUNNER_TEMP/tagged-effects/payload.tar.xz" \
+            --directory "$RUNNER_TEMP/tagged-effects/unpacked"
+          patch="$RUNNER_TEMP/tagged-effects/unpacked/toonstudio-effects-workspace.patch"
+          enhancer="$RUNNER_TEMP/tagged-effects/unpacked/enhance-effects-workspace.mjs"
+          printf '%s  %s\n' \
+            'fb9077931ae82f4eb39c9516ec1d238dd3d6c3272b034d77af380673f0c42521' \
+            "$patch" | sha256sum --check --strict
+          printf '%s  %s\n' \
+            '40666f3aca7514b0cb98d0dba8dade0951a9ed10ade945fb7e500be45057eee5' \
+            "$enhancer" | sha256sum --check --strict
+          node --check "$enhancer"
+          git apply --check "$patch"
+          git apply "$patch"
+          node "$enhancer"
+
+          node <<'NODE'
+          const fs = require("node:fs");
+          const target = "apps/web/src/domains/creator/studio-effects-workspace.ts";
+          const before = '    tags: ["야간", "네온", "발광", "도시", "night", "neon"],';
+          const after = '    tags: ["야간", "네온", "발광", "도시", "night", "neon", "glow"],';
+          const source = fs.readFileSync(target, "utf8");
+          if (source.includes(before)) {
+            fs.writeFileSync(target, source.replace(before, after));
+          } else if (!source.includes(after)) {
+            throw new Error("night-neon recipe metadata anchor was not found");
+          }
+          NODE
+
+      - name: Materialize one guided Studio 3D entry
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("apps/web/src/domains/creator/StudioToolBeltCreateModeGroups.tsx")
+          source = path.read_text(encoding="utf-8")
+
+          if ">3D 캐릭터<" in source:
+              for line in [
+                  "  Boxes,\n",
+                  "  UsersRound,\n",
+                  "  PersonStanding,\n",
+                  "  Sparkles,\n",
+                  "    bg3dOpen,\n",
+                  "    mannequinPoserOpen,\n",
+                  "    poserVrmOpen,\n",
+                  "    characterShaperOpen,\n",
+                  "    setBg3dOpen,\n",
+                  "    setMannequinPoserOpen,\n",
+                  "    setPoserVrmOpen,\n",
+                  "    setCharacterShaperOpen,\n",
+              ]:
+                  if source.count(line) != 1:
+                      raise SystemExit(f"3D toolbar import/state anchor changed: {line!r}")
+                  source = source.replace(line, "", 1)
+
+              start = '      {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (\n'
+              end = '\n\n      {(studioUiDensityAllows(uiDensityMode, "toolbar-scene") || activeToolbarGroup === "bgGroup") ? ('
+              if source.count(start) != 1 or source.count(end) != 1:
+                  raise SystemExit("3D/reference toolbar markers changed")
+              left, rest = source.split(start, 1)
+              _, right = rest.split(end, 1)
+              reference = '''      {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
+                <>
+                  <StudioToolbarDivider label="참조" />
+                  <StudioToolbarCluster label="참고 이미지">
+                    <StudioToolBeltHintTarget hint={hints.reference}>
+                      <button
+                        type="button"
+                        onClick={() => setReferencePanelOpen((v) => !v)}
+                        onMouseEnter={preloadStudioReferencePanel}
+                        onFocus={preloadStudioReferencePanel}
+                        className={cn(toolBtn(referencePanelOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
+                        aria-pressed={referencePanelOpen}
+                      >
+                        <PictureInPicture2
+                          size={STUDIO_ICON_SIZE.toolCompact}
+                          strokeWidth={STUDIO_ICON_STROKE}
+                          aria-hidden
+                          className={studioToolIconClass({ tone: "accent" })}
+                        />
+                        참고 이미지
+                      </button>
+                    </StudioToolBeltHintTarget>
+                  </StudioToolbarCluster>
+                </>
+              ) : null}'''
+              source = left + reference + end + right
+
+              replacements = [
+                  ('<StudioToolbarDivider label="장면" />', '<StudioToolbarDivider label="3D" />'),
+                  ('label="배경·톤"', 'label="3D 제작·배경"'),
+                  ('                  배경\n                  <ChevronDown', '                  3D 스튜디오\n                  <ChevronDown'),
+                  ('fallback={<StudioPanelLoading label="배경 메뉴를 여는 중..." />}', 'fallback={<StudioPanelLoading label="3D 스튜디오를 여는 중..." />}'),
+              ]
+              for old, new in replacements:
+                  if source.count(old) != 1:
+                      raise SystemExit(f"3D scene entry anchor changed: {old!r}")
+                  source = source.replace(old, new, 1)
+
+          forbidden = [">3D 캐릭터<", ">캐릭터 셰이퍼<", ">3D 데생 인형<", ">3D 배경<"]
+          for label in forbidden:
+              if label in source:
+                  raise SystemExit(f"duplicate 3D launcher remains: {label}")
+          if source.count("3D 스튜디오") < 2:
+              raise SystemExit("unified 3D Studio button/fallback was not created")
+          if source.count("참고 이미지") < 1:
+              raise SystemExit("reference-image entry was lost")
+          path.write_text(source, encoding="utf-8")
+
+          Path("apps/web/src/domains/creator/studio-unified-3d-entry.test.ts").write_text(
+              '''import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+
+          const toolbarSource = readFileSync(
+            new URL("./StudioToolBeltCreateModeGroups.tsx", import.meta.url),
+            "utf8",
+          );
+          const popoverSource = readFileSync(
+            new URL("./StudioSceneToolPopoverBody.tsx", import.meta.url),
+            "utf8",
+          );
+
+          describe("Studio unified 3D entry", () => {
+            it("offers one toolbar entry while retaining specialist tools in the workspace", () => {
+              expect(toolbarSource).toContain("3D 스튜디오");
+              expect(toolbarSource).toContain("참고 이미지");
+              expect(toolbarSource).not.toContain(">3D 캐릭터<");
+              expect(toolbarSource).not.toContain(">캐릭터 셰이퍼<");
+              expect(toolbarSource).not.toContain(">3D 데생 인형<");
+              expect(toolbarSource).not.toContain(">3D 배경<");
+              expect(popoverSource).toContain("3D 장면 만들기");
+              expect(popoverSource).toContain("캐릭터 제작");
+              expect(popoverSource).toContain("포즈·손");
+              expect(popoverSource).toContain("인체 참고");
+            });
+          });
+          ''',
+              encoding="utf-8",
+          )
+
+      - name: Record exact tagged-source recovery map
+        shell: bash
+        run: |
+          mkdir -p .qa
+          cat > .qa/tagged-product-recovery-2026-09-11.md <<'MD'
+          # Tagged product recovery — 2026-09-11
+
+          Product changes reconstructed on the final convergence branch:
+
+          - Studio 3D insertion quality policy: `a8c475dc38060d46e50406b3802ead1867ab2515`
+          - Studio effects workspace payload: `f76a78bc047d42dcc74cda6002307d50fb491cd8`
+          - Unified Studio 3D entry: `1b71d831407324fb4b2d9e5b4f0c1cabb5dd1d52`
+
+          Existing convergence coverage was retained for VRM model/thumbnail admission,
+          VRM atomic preview transitions, BG3D WebGL recovery, and batch insertion races.
+          One-shot recovery workflows and transport payloads are intentionally excluded
+          from the final product tree.
+          MD
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Format and validate recovered product contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed=(
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-extreme-aspect.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-integration-boundary.test.ts
+            apps/web/src/domains/creator/bg3d/studio-bg3d-editor-insert-host.ts
+            apps/web/src/domains/creator/studio-effects-workspace.ts
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.tsx
+            apps/web/src/domains/creator/studio-effects-workspace.test.ts
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.tsx
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx
+            apps/web/src/domains/creator/StudioToolBeltCreateModeGroups.tsx
+            apps/web/src/domains/creator/studio-unified-3d-entry.test.ts
+          )
+          pnpm exec eslint --fix --no-warn-ignored "${changed[@]}"
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored "${changed[@]}"
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-extreme-aspect.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-integration-boundary.test.ts \
+            apps/web/src/domains/creator/studio-effects-workspace.test.ts \
+            apps/web/src/domains/creator/StudioEffectsWorkspacePanel.test.tsx \
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.test.tsx \
+            apps/web/src/domains/creator/StudioSmartFiltersPanel.opacity.test.tsx \
+            apps/web/src/domains/creator/studio-unified-3d-entry.test.ts \
+            apps/web/src/domains/creator/studio-tool-belt-reachability.test.ts \
+            apps/web/src/domains/creator/StudioSceneToolPopoverBody.test.tsx
+          pnpm run validate:architecture
+          pnpm run typecheck
+          git diff --check
+
+      - name: Publish workflow-free recovered product tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/materialize-remaining-tagged-product-work.yml
+          test ! -e .bootstrap
+          git add -A
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit \
+            -m "feat(studio): materialize remaining tagged recovery work"
+          git push --no-verify origin "HEAD:${TARGET_BRANCH}"
