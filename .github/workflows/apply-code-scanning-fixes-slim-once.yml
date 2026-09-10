@@ -1,0 +1,35 @@
+name: Apply CodeQL remediation on lightweight runner
+
+on:
+  push:
+    branches:
+      - fix/code-scanning-alerts-20260910-v2
+    paths:
+      - .github/workflows/apply-code-scanning-fixes-slim-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Download and run the one-shot remediation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: ${{ github.ref_name }}
+          TARGET_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${TARGET_REPOSITORY}/contents/.github/codeql-remediate-once.py?ref=${TARGET_BRANCH}" \
+            --jq .content \
+            | tr -d '\n' \
+            | base64 --decode \
+            > /tmp/codeql-remediate-once.py
+          python3 /tmp/codeql-remediate-once.py
