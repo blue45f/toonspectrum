@@ -10,7 +10,7 @@ on:
 
 permissions:
   actions: write
-  contents: read
+  contents: write
   issues: read
   pull-requests: read
 
@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   cleanup:
-    name: Audit integrated branches and drain stale Actions runs
+    name: Delete integrated branches and drain stale Actions runs
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 8
     steps:
@@ -42,13 +42,13 @@ jobs:
             node --check "$RUNNER_TEMP/${script}"
           done
 
-      - name: Audit integrated branches without deleting them
+      - name: Delete safely integrated non-main branches
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          node "$RUNNER_TEMP/cleanup-merged-branches.mjs" --all \
+          node "$RUNNER_TEMP/cleanup-merged-branches.mjs" --all --apply \
             | tee "$RUNNER_TEMP/cleanup-report.json"
 
       - name: Cancel superseded queued and running workflow runs

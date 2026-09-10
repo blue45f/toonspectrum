@@ -23,11 +23,10 @@ describe("StudioVrmCharacterPreviewImage", () => {
       />,
     );
 
-    expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
-      "src",
+    expect(screen.getByTestId("vrm-preview-visible").getAttribute("src")).toBe(
       "lumi.webp",
     );
-    expect(screen.queryByTestId("vrm-preview-pending")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vrm-preview-pending")).toBeNull();
   });
 
   it("keeps the decoded frame until the replacement finishes loading", async () => {
@@ -48,17 +47,15 @@ describe("StudioVrmCharacterPreviewImage", () => {
       />,
     );
 
-    expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
-      "src",
+    expect(screen.getByTestId("vrm-preview-visible").getAttribute("src")).toBe(
       "lumi-a.webp",
     );
     const pending = screen.getByTestId("vrm-preview-pending");
-    expect(pending).toHaveAttribute("src", "lumi-b.webp");
+    expect(pending.getAttribute("src")).toBe("lumi-b.webp");
     fireEvent.load(pending);
 
     await waitFor(() => {
-      expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
-        "src",
+      expect(screen.getByTestId("vrm-preview-visible").getAttribute("src")).toBe(
         "lumi-b.webp",
       );
     });
@@ -107,8 +104,7 @@ describe("StudioVrmCharacterPreviewImage", () => {
         decoders.get("lumi-b.webp")?.();
         await Promise.resolve();
       });
-      expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
-        "src",
+      expect(screen.getByTestId("vrm-preview-visible").getAttribute("src")).toBe(
         "lumi-a.webp",
       );
 
@@ -116,8 +112,7 @@ describe("StudioVrmCharacterPreviewImage", () => {
         decoders.get("lumi-c.webp")?.();
         await Promise.resolve();
       });
-      expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
-        "src",
+      expect(screen.getByTestId("vrm-preview-visible").getAttribute("src")).toBe(
         "lumi-c.webp",
       );
     } finally {
@@ -159,11 +154,10 @@ describe("StudioVrmCharacterPreviewImage", () => {
       />,
     );
 
-    expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
-      "src",
+    expect(screen.getByTestId("vrm-preview-visible").getAttribute("src")).toBe(
       "lumi.webp",
     );
-    expect(screen.queryByTestId("vrm-preview-pending")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vrm-preview-pending")).toBeNull();
   });
 
   it("falls back only after an actual image error", () => {
@@ -176,8 +170,7 @@ describe("StudioVrmCharacterPreviewImage", () => {
     );
 
     fireEvent.error(screen.getByTestId("vrm-preview-visible"));
-    expect(screen.getByTestId("vrm-preview-visible")).toHaveAttribute(
-      "src",
+    expect(screen.getByTestId("vrm-preview-visible").getAttribute("src")).toBe(
       "fallback.svg",
     );
   });

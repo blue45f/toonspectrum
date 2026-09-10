@@ -13,7 +13,9 @@ describe("installStudioBg3dWebglContextRecovery", () => {
     const invalidate = vi.fn();
     const resetRenderer = vi.fn();
     const snapshots: StudioBg3dWebglRecoverySnapshot[] = [];
-    let scheduled: FrameRequestCallback | null = null;
+    let scheduled: FrameRequestCallback = () => {
+      throw new Error("redraw frame was not scheduled");
+    };
     let now = 1_000;
 
     const controller = installStudioBg3dWebglContextRecovery(canvas, {
@@ -43,7 +45,7 @@ describe("installStudioBg3dWebglContextRecovery", () => {
 
     expect(resetRenderer).toHaveBeenCalledTimes(1);
     expect(invalidate).toHaveBeenCalledTimes(1);
-    scheduled?.(2_016);
+    scheduled(2_016);
     expect(invalidate).toHaveBeenCalledTimes(2);
     expect(snapshots.at(-1)).toMatchObject({
       degraded: false,
@@ -89,7 +91,9 @@ describe("installStudioBg3dWebglContextRecovery", () => {
     const canvas = document.createElement("canvas");
     const invalidate = vi.fn();
     const cancelFrame = vi.fn();
-    let scheduled: FrameRequestCallback | null = null;
+    let scheduled: FrameRequestCallback = () => {
+      throw new Error("redraw frame was not scheduled");
+    };
     const controller = installStudioBg3dWebglContextRecovery(canvas, {
       cancelFrame,
       invalidate,
@@ -104,7 +108,7 @@ describe("installStudioBg3dWebglContextRecovery", () => {
     controller.dispose();
     controller.dispose();
     await Promise.resolve();
-    scheduled?.(1_000);
+    scheduled(1_000);
     canvas.dispatchEvent(
       new Event("webglcontextlost", { cancelable: true }),
     );
