@@ -67,12 +67,9 @@ function parseGlb(bytes: Buffer): GltfJson {
   if (jsonType !== GLB_JSON_CHUNK || jsonLength <= 0 || 20 + jsonLength > bytes.length) {
     throw new Error("missing-glb-json-chunk");
   }
-  const json = bytes
-    .subarray(20, 20 + jsonLength)
-    .toString("utf8")
-    .replace(/\u0000+$/gu, "")
-    .trim();
-  return JSON.parse(json) as GltfJson;
+  let json = bytes.subarray(20, 20 + jsonLength).toString("utf8");
+  while (json.endsWith("\u0000")) json = json.slice(0, -1);
+  return JSON.parse(json.trim()) as GltfJson;
 }
 
 function parseGltf(filePath: string, bytes: Buffer): GltfJson {
