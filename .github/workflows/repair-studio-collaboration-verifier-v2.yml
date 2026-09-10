@@ -1,0 +1,155 @@
+name: Repair Studio collaboration verifier races v2
+
+on:
+  push:
+    branches: [fix/real-core-and-main-only-20260910]
+    paths: [.github/workflows/repair-studio-collaboration-verifier-v2.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-studio-collaboration-verifier-races-v2-20260911
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=4096
+      TARGET_BRANCH: fix/real-core-and-main-only-20260910
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Patch verifier readiness sampling
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("scripts/verify-studio-collaboration-sync.mts")
+          source = path.read_text(encoding="utf-8")
+
+          if "const mountedMode = await liveMode.getAttribute" not in source:
+              transport_function = source.index(
+                  "async function ensureLocalPreviewTransport(page: Page, label: string): Promise<void> {"
+              )
+              transport_start = source.index(
+                  '  const liveMode = page.locator("[data-studio-live-mode]").first();',
+                  transport_function,
+              )
+              transport_end = source.index(
+                  '  await page.getByRole("button", { name: "팀 작업 공간 닫기" })',
+                  transport_start,
+              )
+              transport = "\n".join([
+                  '  const liveMode = page.locator("[data-studio-live-mode]").first();',
+                  '  const initialMode = await liveMode',
+                  '    .getAttribute("data-studio-live-mode", { timeout: 800 })',
+                  '    .catch(() => null);',
+                  '  if (initialMode === "local") return;',
+                  '',
+                  '  const presenceDock = page.locator(\'[data-studio-presence-dock="true"]\').first();',
+                  '  await presenceDock.waitFor({ state: "visible", timeout: 20_000 });',
+                  '',
+                  '  const fallback = page.getByRole("button", { name: "로컬 탭 모드", exact: true }).first();',
+                  '  if (!(await fallback.isVisible().catch(() => false))) {',
+                  '    const teamAction = page.locator(\'[data-studio-presence-team-action="true"]\').first();',
+                  '    if (await teamAction.isVisible().catch(() => false)) {',
+                  '      await teamAction.click({ force: true });',
+                  '    } else {',
+                  '      await presenceDock.click({ force: true });',
+                  '    }',
+                  '  }',
+                  '',
+                  '  await liveMode.waitFor({ state: "attached", timeout: 20_000 });',
+                  '  const mountedMode = await liveMode.getAttribute("data-studio-live-mode");',
+                  '  if (mountedMode !== "local") {',
+                  '    await fallback.waitFor({ state: "visible", timeout: 20_000 });',
+                  '    await fallback.click();',
+                  '    await page.waitForFunction(',
+                  '      () => document',
+                  '        .querySelector<HTMLElement>("[data-studio-live-mode]")',
+                  '        ?.dataset.studioLiveMode === "local",',
+                  '      undefined,',
+                  '      { timeout: 20_000 },',
+                  '    );',
+                  '  }',
+                  '',
+              ])
+              source = source[:transport_start] + transport + source[transport_end:]
+
+          if "const readyPhaseHandle = await page.waitForFunction" not in source:
+              lane_function = source.index("async function waitForDocumentLane(")
+              lane_start = source.index("  await page.waitForFunction(", lane_function)
+              lane_return = source.index("  return phase;", lane_start) + len("  return phase;")
+              lane = "\n".join([
+                  '  const readyPhaseHandle = await page.waitForFunction(',
+                  '    (readyPhases) => {',
+                  '      const phase = document',
+                  '        .querySelector<HTMLElement>(\'[data-studio-presence-dock="true"]\')',
+                  '        ?.dataset.studioSyncPhase;',
+                  '      return typeof phase === "string" && readyPhases.includes(phase) ? phase : false;',
+                  '    },',
+                  '    [...READY_PHASES],',
+                  '    { timeout: 30_000 },',
+                  '  );',
+                  '  const phase = await readyPhaseHandle.jsonValue();',
+                  '  await readyPhaseHandle.dispose();',
+                  '  assert.ok(',
+                  '    typeof phase === "string" && READY_PHASES.has(phase),',
+                  '    `unexpected document sync phase: ${String(phase)}`,',
+                  '  );',
+                  '  diagnostics.phases.push(phase);',
+                  '  return phase;',
+              ])
+              source = source[:lane_start] + lane + source[lane_return:]
+
+          if source.count("const mountedMode = await liveMode.getAttribute") != 1:
+              raise SystemExit("mounted collaboration mode guard was not created exactly once")
+          if source.count("const readyPhaseHandle = await page.waitForFunction") != 1:
+              raise SystemExit("stable document phase sample was not created exactly once")
+          path.write_text(source, encoding="utf-8")
+
+      - name: Validate verifier source
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm exec eslint scripts/verify-studio-collaboration-sync.mts
+          git diff --check
+
+      - name: Publish verifier repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add scripts/verify-studio-collaboration-sync.mts
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "collaboration verifier already repaired"
+            exit 0
+          fi
+          git -c core.hooksPath=/dev/null commit -m "fix(ci): stabilize collaboration verifier readiness"
+          for attempt in $(seq 1 8); do
+            if git push --no-verify origin "HEAD:${TARGET_BRANCH}"; then
+              exit 0
+            fi
+            git fetch origin "${TARGET_BRANCH}"
+            git rebase "origin/${TARGET_BRANCH}"
+            sleep $((attempt * 2))
+          done
+          exit 1
