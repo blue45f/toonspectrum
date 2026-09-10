@@ -4,6 +4,9 @@ on:
   push:
     branches: [fix/studio-ai-secure-identifiers-20260910]
     paths: [.github/workflows/recover-studio-ai-secure-identifiers.yml]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -217,6 +220,7 @@ jobs:
           rm -f \
             .github/workflows/recover-studio-ai-secure-identifiers.yml \
             .github/workflows/code-scanning-audit-temp.yml \
+            .github/workflows/restore-ci-after-bulk-integration.yml \
             .github/code-scanning-open-alerts.json \
             .github/code-scanning-open-alerts.md
           git config user.name "OpenAI Codex"
