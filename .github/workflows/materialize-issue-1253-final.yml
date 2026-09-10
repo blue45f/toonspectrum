@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: materialize-issue-1253-final-vrm-admission
-  cancel-in-progress: false
+  group: materialize-issue-1253-final-vrm-admission-v2
+  cancel-in-progress: true
 
 jobs:
   materialize:
