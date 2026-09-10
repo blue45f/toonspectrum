@@ -1,0 +1,339 @@
+name: Materialize BG3D recovery and texture quality v2
+
+on:
+  push:
+    branches: [feat/bg3d-webgl-context-recovery-20260910]
+    paths: [.github/workflows/materialize-bg3d-webgl-recovery-v2.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-bg3d-webgl-context-recovery-20260910
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/bg3d-webgl-context-recovery-20260910
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Reuse reviewed context recovery materialization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --user pyyaml
+          python3 - <<'PY'
+          import os
+          import subprocess
+          import yaml
+
+          data = yaml.safe_load(open(
+              '.github/workflows/materialize-bg3d-webgl-recovery-once.yml',
+              encoding='utf-8',
+          ))
+          selected = {
+              'Add deterministic WebGL context recovery state machine',
+              'Install the recovery agent inside the primary Canvas',
+          }
+          for step in data['jobs']['materialize']['steps']:
+              if step.get('name') not in selected:
+                  continue
+              subprocess.run(
+                  step['run'],
+                  shell=True,
+                  executable='/bin/bash',
+                  check=True,
+                  env=os.environ.copy(),
+              )
+          PY
+
+      - name: Add bounded anisotropic texture quality pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.ts <<'EOF'
+          import type { Material, Object3D, Texture } from "three";
+
+          export interface StudioBg3dTextureQualityResult {
+            readonly materialsScanned: number;
+            readonly texturesScanned: number;
+            readonly texturesUpdated: number;
+          }
+
+          const TEXTURE_SLOTS = Object.freeze([
+            "alphaMap",
+            "aoMap",
+            "bumpMap",
+            "clearcoatMap",
+            "clearcoatNormalMap",
+            "clearcoatRoughnessMap",
+            "displacementMap",
+            "emissiveMap",
+            "lightMap",
+            "map",
+            "metalnessMap",
+            "normalMap",
+            "roughnessMap",
+            "sheenColorMap",
+            "sheenRoughnessMap",
+            "specularColorMap",
+            "specularIntensityMap",
+            "transmissionMap",
+            "thicknessMap",
+          ] as const);
+
+          type TextureCarrier = Material & Record<string, unknown>;
+
+          function isFilterableTexture(value: unknown): value is Texture {
+            if (!value || typeof value !== "object") return false;
+            const candidate = value as {
+              readonly isDepthTexture?: boolean;
+              readonly isTexture?: boolean;
+              readonly isVideoTexture?: boolean;
+            };
+            return candidate.isTexture === true
+              && candidate.isDepthTexture !== true
+              && candidate.isVideoTexture !== true;
+          }
+
+          /**
+           * Raises filtering quality without mutating image pixels, color space, wrapping, or
+           * compression. Shared textures are processed once and existing higher settings are kept.
+           */
+          export function upgradeStudioBg3dTextureFiltering(
+            scene: Object3D,
+            maximumAnisotropy: number,
+          ): StudioBg3dTextureQualityResult {
+            const target = Math.max(1, Math.min(16, Math.floor(maximumAnisotropy)));
+            const visitedTextures = new Set<Texture>();
+            let materialsScanned = 0;
+            let texturesUpdated = 0;
+
+            scene.traverse((object) => {
+              const materialValue = (object as Object3D & {
+                readonly material?: Material | readonly Material[];
+              }).material;
+              if (!materialValue) return;
+              const materials = Array.isArray(materialValue) ? materialValue : [materialValue];
+              for (const material of materials) {
+                materialsScanned += 1;
+                const carrier = material as TextureCarrier;
+                for (const slot of TEXTURE_SLOTS) {
+                  const texture = carrier[slot];
+                  if (!isFilterableTexture(texture) || visitedTextures.has(texture)) continue;
+                  visitedTextures.add(texture);
+                  if (texture.anisotropy >= target) continue;
+                  texture.anisotropy = target;
+                  texture.needsUpdate = true;
+                  texturesUpdated += 1;
+                }
+              }
+            });
+
+            return Object.freeze({
+              materialsScanned,
+              texturesScanned: visitedTextures.size,
+              texturesUpdated,
+            });
+          }
+          EOF
+
+          cat > apps/web/src/domains/creator/bg3d/StudioBg3dTextureQualityAgent.tsx <<'EOF'
+          import { useRef } from "react";
+          import { useFrame, useThree } from "@react-three/fiber";
+
+          import { upgradeStudioBg3dTextureFiltering } from "./studio-bg3d-texture-quality";
+
+          const PERIODIC_RESCAN_SECONDS = 2;
+
+          /** Must be rendered inside the R3F Canvas tree. */
+          export function StudioBg3dTextureQualityAgent() {
+            const gl = useThree((state) => state.gl);
+            const scene = useThree((state) => state.scene);
+            const invalidate = useThree((state) => state.invalidate);
+            const lastSignatureRef = useRef("");
+            const lastScanAtRef = useRef(Number.NEGATIVE_INFINITY);
+
+            useFrame(({ clock }) => {
+              const elapsed = clock.getElapsedTime();
+              const signature = `${scene.children.length}:${gl.info.memory.textures}`;
+              const signatureChanged = signature !== lastSignatureRef.current;
+              if (
+                !signatureChanged
+                && elapsed - lastScanAtRef.current < PERIODIC_RESCAN_SECONDS
+              ) return;
+
+              lastSignatureRef.current = signature;
+              lastScanAtRef.current = elapsed;
+              const maximum = gl.capabilities.getMaxAnisotropy();
+              const result = upgradeStudioBg3dTextureFiltering(scene, maximum);
+              if (result.texturesUpdated > 0) invalidate();
+            });
+
+            return null;
+          }
+          EOF
+
+          cat > apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.test.ts <<'EOF'
+          import {
+            DepthTexture,
+            Mesh,
+            MeshStandardMaterial,
+            Scene,
+            Texture,
+            VideoTexture,
+          } from "three";
+          import { describe, expect, it } from "vitest";
+
+          import { upgradeStudioBg3dTextureFiltering } from "./studio-bg3d-texture-quality";
+
+          describe("upgradeStudioBg3dTextureFiltering", () => {
+            it("upgrades shared material textures once and keeps higher author settings", () => {
+              const scene = new Scene();
+              const shared = new Texture();
+              const high = new Texture();
+              high.anisotropy = 16;
+              const material = new MeshStandardMaterial({
+                map: shared,
+                normalMap: shared,
+                roughnessMap: high,
+              });
+              scene.add(new Mesh(undefined, material));
+
+              const result = upgradeStudioBg3dTextureFiltering(scene, 8);
+
+              expect(shared.anisotropy).toBe(8);
+              expect(high.anisotropy).toBe(16);
+              expect(result).toEqual({
+                materialsScanned: 1,
+                texturesScanned: 2,
+                texturesUpdated: 1,
+              });
+            });
+
+            it("caps hardware values and ignores depth/video sampling contracts", () => {
+              const scene = new Scene();
+              const color = new Texture();
+              const video = new VideoTexture(document.createElement("video"));
+              const depth = new DepthTexture();
+              const material = new MeshStandardMaterial({ map: color });
+              Object.assign(material, { alphaMap: video, aoMap: depth });
+              scene.add(new Mesh(undefined, material));
+
+              const result = upgradeStudioBg3dTextureFiltering(scene, 64);
+
+              expect(color.anisotropy).toBe(16);
+              expect(video.anisotropy).toBe(1);
+              expect(depth.anisotropy).toBe(1);
+              expect(result.texturesScanned).toBe(1);
+            });
+          });
+          EOF
+
+      - name: Install texture quality agent beside context recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('apps/web/src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx')
+          source = path.read_text(encoding='utf-8')
+          import_line = 'import { StudioBg3dTextureQualityAgent } from "./StudioBg3dTextureQualityAgent";\n'
+          if import_line not in source:
+              recovery_import = 'import { StudioBg3dWebglContextRecoveryAgent } from "./StudioBg3dWebglContextRecoveryAgent";\n'
+              if source.count(recovery_import) != 1:
+                  raise SystemExit('context recovery import anchor changed')
+              source = source.replace(recovery_import, recovery_import + import_line, 1)
+
+          if '<StudioBg3dTextureQualityAgent />' not in source:
+              recovery = '<StudioBg3dWebglContextRecoveryAgent />'
+              if source.count(recovery) != 1:
+                  raise SystemExit('context recovery agent anchor changed')
+              source = source.replace(
+                  recovery,
+                  recovery + '\n          <StudioBg3dTextureQualityAgent />',
+                  1,
+              )
+          path.write_text(source, encoding='utf-8')
+
+          integration = Path(
+              'apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts'
+          )
+          test_source = integration.read_text(encoding='utf-8')
+          closing = '\n});\n'
+          addition = '''
+
+            it("installs one bounded texture quality owner inside the same Canvas", () => {
+              const canvas = source.indexOf("<Canvas");
+              const quality = source.indexOf("<StudioBg3dTextureQualityAgent", canvas);
+              const canvasEnd = source.indexOf("</Canvas>", canvas);
+
+              expect(quality).toBeGreaterThan(canvas);
+              expect(quality).toBeLessThan(canvasEnd);
+              expect(source.match(/<StudioBg3dTextureQualityAgent/g)).toHaveLength(1);
+            });
+          '''
+          if addition.strip() not in test_source:
+              if not test_source.endswith(closing):
+                  raise SystemExit('integration test closing anchor changed')
+              test_source = test_source[:-len(closing)] + addition + closing
+              integration.write_text(test_source, encoding='utf-8')
+          PY
+
+      - name: Validate recovery, texture filtering and viewport integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dWebglContextRecoveryAgent.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dTextureQualityAgent.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+
+      - name: Commit product-only slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/materialize-bg3d-webgl-recovery-once.yml \
+                .github/workflows/materialize-bg3d-webgl-recovery-v2.yml
+          git add \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dWebglContextRecoveryAgent.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dTextureQualityAgent.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-texture-quality.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx \
+            .github/workflows/materialize-bg3d-webgl-recovery-once.yml \
+            .github/workflows/materialize-bg3d-webgl-recovery-v2.yml
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'feat(bg3d): recover contexts and sharpen texture filtering'
+          git push --no-verify origin HEAD:feat/bg3d-webgl-context-recovery-20260910
