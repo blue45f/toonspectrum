@@ -1,0 +1,63 @@
+name: Cancel superseded CI once
+
+on:
+  push:
+    branches:
+      - chore/retire-stale-workflows-final-20260910
+    paths:
+      - .github/workflows/cancel-superseded-ci-once.yml
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: cancel-superseded-ci-once-1251
+  cancel-in-progress: true
+
+jobs:
+  cancel-and-retire:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Cancel non-current CI runs for this PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          branch="$GITHUB_REF_NAME"
+          cancelled=0
+
+          while IFS= read -r run_id; do
+            [[ -n "$run_id" ]] || continue
+            echo "Cancelling superseded CI run $run_id on $branch"
+            if gh api -X POST "repos/$repo/actions/runs/$run_id/cancel" >/dev/null 2>&1; then
+              cancelled=$((cancelled + 1))
+            fi
+          done < <(
+            gh api --method GET "repos/$repo/actions/runs" \
+              -f branch="$branch" \
+              -f per_page=100 \
+              --jq '.workflow_runs[] | select(.name == "CI" and .status != "completed") | .id'
+          )
+
+          echo "Cancelled $cancelled superseded CI runs."
+
+      - name: Check out the PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: chore/retire-stale-workflows-final-20260910
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Retire this one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/cancel-superseded-ci-once.yml
+          git commit -m "chore(ci): retire superseded-run canceler"
+          git push origin HEAD:chore/retire-stale-workflows-final-20260910
