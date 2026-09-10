@@ -1,99 +1,232 @@
-name: Temporary code scanning alert audit
+name: Recover Studio AI secure identifiers
 
 on:
   push:
-    branches:
-      - fix/code-scanning-alerts-20260910
-    paths:
-      - .github/workflows/code-scanning-audit-temp.yml
+    branches: [fix/studio-ai-secure-identifiers-20260910]
+    paths: [.github/workflows/code-scanning-audit-temp.yml]
   pull_request:
-    branches:
-      - main
+    branches: [main]
     types: [opened, synchronize, reopened]
-    paths:
-      - .github/workflows/code-scanning-audit-temp.yml
 
 permissions:
   contents: write
   security-events: read
 
-jobs:
-  audit:
-    if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-slim
-    timeout-minutes: 10
-    steps:
-      - name: Check out the audit branch
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
-          fetch-depth: 0
-          persist-credentials: true
+concurrency:
+  group: recover-studio-ai-secure-identifiers-20260910
+  cancel-in-progress: true
 
-      - name: Collect open code scanning alerts
-        env:
-          GH_TOKEN: ${{ github.token }}
-          AUDIT_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+jobs:
+  recover:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/studio-ai-secure-identifiers-20260910
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Replace predictable API identifiers with fail-closed secure randomness
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              source = path.read_text(encoding="utf-8")
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one secure-ID anchor, found {count}\n--- needle ---\n{old}")
+              path.write_text(source.replace(old, new, 1), encoding="utf-8")
+
+          route = Path("apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx")
+          replace_once(
+              route,
+              'import { createStudioAiComicDirectorApiClient } from "../../ai/studio-ai-comic-director-api";\n',
+              'import { createStudioAiComicDirectorApiClient } from "../../ai/studio-ai-comic-director-api";\nimport { createStudioAiSecureId } from "../../ai/studio-ai-secure-id";\n',
+          )
+          replace_once(
+              route,
+              '''function uid(): string {
+            return globalThis.crypto?.randomUUID?.()
+              ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          }''',
+              '''function uid(): string {
+            return createStudioAiSecureId("comic");
+          }''',
+          )
+
+          session = Path("apps/web/src/domains/creator/ai/studio-ai-comic-director-session.ts")
+          replace_once(
+              session,
+              'import type { ScenarioPreviewItem } from "../studio-scenario-layout";\n',
+              'import { createStudioAiSecureId } from "./studio-ai-secure-id";\n\nimport type { ScenarioPreviewItem } from "../studio-scenario-layout";\n',
+          )
+          replace_once(
+              session,
+              '''function id(): string {
+            return globalThis.crypto?.randomUUID?.()
+              ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          }''',
+              '''function id(): string {
+            return createStudioAiSecureId("comic");
+          }''',
+          )
+
+          panel = Path("apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx")
+          replace_once(
+              panel,
+              '} from "./studio-ai-comic-director-api";\n',
+              '} from "./studio-ai-comic-director-api";\nimport { createStudioAiSecureId } from "./studio-ai-secure-id";\n',
+          )
+          replace_once(
+              panel,
+              '''function uid(prefix: string): string {
+            return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+          }''',
+              '''function uid(prefix: string): string {
+            return createStudioAiSecureId(prefix);
+          }''',
+          )
+      - name: Add secure random boundary and focused regressions
         shell: bash
         run: |
-          set -euo pipefail
-          mkdir -p .github
-          gh api \
-            --method GET \
-            --paginate \
-            --slurp \
-            -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
-            > /tmp/code-scanning-pages.json
+          cat > apps/web/src/domains/creator/ai/studio-ai-secure-id.ts <<'TS'
+          export interface StudioAiSecureRandomSource {
+            readonly randomUUID?: () => string;
+            readonly getRandomValues?: (target: Uint8Array) => Uint8Array;
+          }
 
-          jq '[.[][] | {
-            number,
-            state,
-            rule: {
-              id: .rule.id,
-              name: .rule.name,
-              severity: .rule.severity,
-              security_severity_level: .rule.security_severity_level,
-              tags: .rule.tags
-            },
-            tool: .tool.name,
-            created_at,
-            updated_at,
-            most_recent_instance: {
-              ref: .most_recent_instance.ref,
-              state: .most_recent_instance.state,
-              category: .most_recent_instance.category,
-              analysis_key: .most_recent_instance.analysis_key,
-              environment: .most_recent_instance.environment,
-              classifications: .most_recent_instance.classifications,
-              location: .most_recent_instance.location
+          function secureSource(): StudioAiSecureRandomSource | undefined {
+            return globalThis.crypto as StudioAiSecureRandomSource | undefined;
+          }
+
+          function uuidFromBytes(bytes: Uint8Array): string {
+            const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+            return [
+              hex.slice(0, 8),
+              hex.slice(8, 12),
+              hex.slice(12, 16),
+              hex.slice(16, 20),
+              hex.slice(20),
+            ].join("-");
+          }
+
+          /**
+           * Creates an opaque identifier for Studio AI sessions and remote operations.
+           * Predictable time/Math.random fallbacks are intentionally forbidden because these
+           * identifiers cross the API boundary and participate in idempotency and routing.
+           */
+          export function createStudioAiSecureId(
+            fallbackPrefix = "comic",
+            source: StudioAiSecureRandomSource | null | undefined = secureSource(),
+          ): string {
+            if (source?.randomUUID) {
+              return source.randomUUID.call(source);
             }
-          }] | sort_by(.number)' \
-            /tmp/code-scanning-pages.json \
-            > .github/code-scanning-open-alerts.json
+            if (!source?.getRandomValues) {
+              throw new Error("Secure randomness is unavailable for a Studio AI identifier.");
+            }
 
-          {
-            echo '# Open code scanning alerts'
-            echo
-            echo "Generated from \`${GITHUB_REPOSITORY}\` at \`$(date -u +%Y-%m-%dT%H:%M:%SZ)\`."
-            echo
-            echo '| Alert | Severity | Rule | Location |'
-            echo '| ---: | --- | --- | --- |'
-            jq -r '.[] | [
-              ("#" + (.number | tostring)),
-              (.rule.security_severity_level // .rule.severity // "unknown"),
-              ((.rule.id // "unknown") + " — " + (.rule.name // "")),
-              ((.most_recent_instance.location.path // "unknown") + ":" + ((.most_recent_instance.location.start_line // 0) | tostring))
-            ] | "| " + join(" | ") + " |"' \
-              .github/code-scanning-open-alerts.json
-          } > .github/code-scanning-open-alerts.md
+            const bytes = new Uint8Array(16);
+            source.getRandomValues.call(source, bytes);
+            bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+            bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+            return `${fallbackPrefix}-${uuidFromBytes(bytes)}`;
+          }
+          TS
 
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add .github/code-scanning-open-alerts.json .github/code-scanning-open-alerts.md
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m 'chore(security): capture open code scanning alerts'
-          git push origin "HEAD:${AUDIT_BRANCH}"
+          cat > apps/web/src/domains/creator/ai/studio-ai-secure-id.test.ts <<'TS'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it, vi } from "vitest";
+
+          import { createStudioAiSecureId } from "./studio-ai-secure-id";
+
+          describe("Studio AI secure identifiers", () => {
+            it("prefers platform randomUUID without touching the byte fallback", () => {
+              const getRandomValues = vi.fn(() => {
+                throw new Error("fallback must not run");
+              });
+              const randomUUID = vi.fn(() => "123e4567-e89b-42d3-a456-426614174000");
+
+              expect(createStudioAiSecureId("job", { randomUUID, getRandomValues }))
+                .toBe("123e4567-e89b-42d3-a456-426614174000");
+              expect(randomUUID).toHaveBeenCalledOnce();
+              expect(getRandomValues).not.toHaveBeenCalled();
+            });
+
+            it("uses a version-4, RFC variant UUID from getRandomValues when randomUUID is absent", () => {
+              const value = createStudioAiSecureId("job", {
+                getRandomValues(target) {
+                  target.set(Array.from({ length: 16 }, (_, index) => index));
+                  return target;
+                },
+              });
+
+              expect(value).toBe("job-00010203-0405-4607-8809-0a0b0c0d0e0f");
+            });
+
+            it("fails closed when the runtime has no cryptographically secure source", () => {
+              expect(() => createStudioAiSecureId("comic", null)).toThrow(
+                "Secure randomness is unavailable",
+              );
+            });
+
+            it("keeps API-bound session and operation IDs free of predictable randomness", () => {
+              const sources = [
+                new URL("./studio-ai-comic-director-session.ts", import.meta.url),
+                new URL("./StudioAiComicDirectorPanel.tsx", import.meta.url),
+                new URL("../studio-router/routes/StudioAiComicDirectorRoute.tsx", import.meta.url),
+              ].map((url) => readFileSync(url, "utf8"));
+
+              for (const source of sources) {
+                expect(source).toContain("createStudioAiSecureId");
+                expect(source).not.toContain("Math.random");
+                expect(source).not.toContain("Date.now");
+              }
+            });
+          });
+          TS
+      - name: Validate security and API contracts
+        run: |
+          pnpm exec eslint --fix \
+            apps/web/src/domains/creator/ai/studio-ai-secure-id.ts \
+            apps/web/src/domains/creator/ai/studio-ai-secure-id.test.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-session.ts \
+            apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx \
+            apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/ai/studio-ai-secure-id.ts \
+            apps/web/src/domains/creator/ai/studio-ai-secure-id.test.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-session.ts \
+            apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx \
+            apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/ai/studio-ai-secure-id.test.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director-session.test.ts \
+            apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.test.tsx \
+            apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.test.tsx
+          pnpm exec tsc -p tsconfig.json
+          pnpm run audit:security
+          git diff --check
+      - name: Publish source fix and remove audit scaffolding
+        run: |
+          rm -f \
+            .github/workflows/recover-studio-ai-secure-identifiers.yml \
+            .github/workflows/code-scanning-audit-temp.yml \
+            .github/workflows/restore-ci-after-bulk-integration.yml \
+            .github/code-scanning-open-alerts.json \
+            .github/code-scanning-open-alerts.md
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(security): require secure Studio AI identifiers"
+          git push origin HEAD:fix/studio-ai-secure-identifiers-20260910
