@@ -1,41 +1,41 @@
 name: Safe merged branch cleanup
 
 on:
-  push:
+  pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
+      - reopened
     paths:
       - ".github/workflows/safe-merged-branch-cleanup.yml"
-  workflow_dispatch:
-    inputs:
-      execute:
-        description: "Delete eligible branches instead of audit-only"
-        required: true
-        type: choice
-        default: "false"
-        options:
-          - "false"
-          - "true"
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
   actions: read
 
 concurrency:
-  group: safe-merged-branch-cleanup
+  group: safe-merged-branch-cleanup-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   cleanup:
-    if: github.repository == 'blue45f/toonspectrum'
+    if: >-
+      github.repository == 'blue45f/toonspectrum' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'ops/safe-merged-branch-cleanup-20260910'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       DEFAULT_BRANCH: main
-      EXECUTE: ${{ github.event_name == 'push' && 'true' || inputs.execute }}
+      EXECUTE: "true"
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_BRANCH: ${{ github.head_ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
       - name: Audit and delete only fully merged branches
         shell: bash
@@ -126,6 +126,11 @@ jobs:
               -f head="$owner:$branch" \
               -f per_page=100 > "$prs_json"; then
               record_skip "$branch" "$sha" "merged_pr_lookup_failed"
+              continue
+            fi
+
+            if (( $(jq 'length' "$prs_json") >= 100 )); then
+              record_skip "$branch" "$sha" "merged_pr_history_may_be_paginated"
               continue
             fi
 
@@ -309,12 +314,38 @@ jobs:
             done < "$skipped"
           } > "$report"
 
-          cat "$report"
-          cat "$report" >> "$GITHUB_STEP_SUMMARY"
-
           if (( failed_count > 0 )); then
+            cat "$report"
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+
+          self_branch_encoded="$(jq -rn --arg value "$HEAD_BRANCH" '$value | @uri')"
+          self_branch_json="$workdir/self-branch.json"
+          gh api "repos/$REPO/branches/$self_branch_encoded" > "$self_branch_json"
+          current_self_sha="$(jq -r '.commit.sha // ""' "$self_branch_json")"
+          if [[ "$current_self_sha" != "$HEAD_SHA" ]]; then
+            echo "Safety stop: cleanup branch moved from $HEAD_SHA to $current_self_sha." >&2
+            cat "$report"
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          gh api --method PATCH "repos/$REPO/pulls/$PR_NUMBER" \
+            -f state=closed > "$workdir/self-pr-close.json"
+          gh api --method DELETE "repos/$REPO/git/refs/heads/$HEAD_BRANCH"
+
+          {
+            echo
+            echo "## Temporary runner cleanup"
+            echo
+            echo "- Closed temporary PR: #$PR_NUMBER"
+            echo "- Deleted temporary branch: \`$HEAD_BRANCH\` at \`${HEAD_SHA:0:12}\`"
+            echo "- No cleanup workflow was merged into \`main\`."
+          } >> "$report"
+
+          cat "$report"
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload cleanup audit
         if: always()
