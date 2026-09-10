@@ -23,6 +23,17 @@ const REQUIRED_STUDIO_FRONT_DOOR_SURFACES: readonly RouteSurface[] = [
   { id: "creator-studio-manual-article", path: "/studio/manual/:articleId" },
 ];
 
+const REQUIRED_PROJECT_SURFACES: readonly RouteSurface[] = [
+  { id: "creator-studio-project-root", path: "/studio/p/:projectId" },
+  { id: "creator-studio-project-overview", path: "/studio/p/:projectId/overview" },
+  { id: "creator-studio-project-story", path: "/studio/p/:projectId/story" },
+  { id: "creator-studio-project-production", path: "/studio/p/:projectId/production" },
+  { id: "creator-studio-project-assets", path: "/studio/p/:projectId/assets" },
+  { id: "creator-studio-project-review", path: "/studio/p/:projectId/review" },
+  { id: "creator-studio-project-export", path: "/studio/p/:projectId/export" },
+  { id: "creator-studio-project-settings", path: "/studio/p/:projectId/settings" },
+];
+
 describe("application route registry", () => {
   it("keeps every route id and path unique", () => {
     expect(duplicates(appRoutes.map((route) => route.id))).toEqual([]);
@@ -52,7 +63,7 @@ describe("application route registry", () => {
     ]);
   });
 
-  it("keeps one Studio wildcard after explicit front-door and compatibility routes", () => {
+  it("keeps one Studio wildcard after explicit front-door, project and compatibility routes", () => {
     const studioRoutes = appRoutes.filter((route) => route.path.startsWith("/studio"));
     const wildcardEntries = studioRoutes.filter((route) => route.path.includes("*"));
 
@@ -61,9 +72,19 @@ describe("application route registry", () => {
     ]);
     expect(studioRoutes.at(-1)).toMatchObject({ id: "creator-studio", path: "/studio/*" });
 
-    for (const required of REQUIRED_STUDIO_FRONT_DOOR_SURFACES) {
+    for (const required of [
+      ...REQUIRED_STUDIO_FRONT_DOOR_SURFACES,
+      ...REQUIRED_PROJECT_SURFACES,
+    ]) {
       expect(studioRoutes, required.id).toContainEqual(expect.objectContaining(required));
     }
+  });
+
+  it("owns the canonical six-stage project route family", () => {
+    const routeIds = appRoutes.map((route) => route.id);
+    expect(routeIds).toEqual(expect.arrayContaining(
+      REQUIRED_PROJECT_SURFACES.map((route) => route.id),
+    ));
   });
 
   it("owns the canonical Showcase namespace without removing legacy creator-gallery URLs", () => {
