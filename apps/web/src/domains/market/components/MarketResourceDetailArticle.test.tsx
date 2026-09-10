@@ -133,9 +133,10 @@ describe("MarketResourceDetailArticle actions and metadata", () => {
       .toBe(`/market/browse?publisher=${record.publisher.id}`);
     expect(screen.getByRole("link", { name: "같은 종류의 리소스 더 보기" }).getAttribute("href"))
       .toBe("/market/browse?kind=asset");
-    expect(screen.getByRole("link", { name: "ToonSpectrum 표준 사용권" }).getAttribute("href"))
+    expect(screen.getByRole("link", { name: "ToonStudio 표준 사용권" }).getAttribute("href"))
       .toBe("/terms");
-    expect(screen.getByText("작품 사용은 자유, 리소스 파일 재배포는 불가")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "게시 manifest 기반 권리·호환성 확인" }))
+      .toBeTruthy();
     expect(screen.getByRole("button", { name: "메타데이터 스냅샷 다운로드" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "세션 확인 중" })).toBeTruthy();
     expect(screen.getByTestId("release-history").getAttribute("data-resource-id"))
