@@ -1,27 +1,35 @@
-# Production pushes are deployed by Vercel Git Integration. This workflow is a
-# manual emergency fallback and fails unless all project credentials exist.
+# Production pushes are normally deployed by Vercel Git Integration.
+# This manual fallback builds on the GitHub runner and uploads immutable prebuilt output so a
+# Vercel remote-build quota incident cannot block an emergency production recovery.
 name: Vercel CLI fallback deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit SHA, tag, or branch to deploy (defaults to the triggering ref)
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: vercel-production-fallback
   cancel-in-progress: false
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       VERCEL_CLI_VERSION: "58.9.4"
       VERCEL_TELEMETRY_DISABLED: "1"
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - name: Require fallback deployment configuration
         shell: bash
@@ -32,17 +40,51 @@ jobs:
           fi
 
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+          cache: pnpm
 
       - name: Install and verify pinned Vercel CLI
+        shell: bash
         run: |
           npm install --global --no-audit --no-fund "vercel@${VERCEL_CLI_VERSION}"
           actual_version="$(vercel --version 2>&1 | awk '/Vercel CLI/{version=$NF} END {print version}')"
           echo "Vercel CLI ${actual_version}"
           test "$actual_version" = "$VERCEL_CLI_VERSION"
 
-      - name: Deploy frontend to Vercel production
-        run: vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+      - name: Pull production project settings and environment
+        run: vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+
+      - name: Build production output on the GitHub runner
+        run: vercel build --prod --yes --token "$VERCEL_TOKEN"
+
+      - name: Verify immutable prebuilt output
+        shell: bash
+        run: |
+          test -f .vercel/output/config.json
+          test -d .vercel/output/static
+          if find .vercel/output -type f -name '*.ts' -print -quit | grep -q .; then
+            echo "::error::Prebuilt output unexpectedly contains TypeScript source files."
+            exit 1
+          fi
+
+      - name: Deploy prebuilt output to Vercel production
+        id: deploy
+        shell: bash
+        run: |
+          deployment_url="$(vercel deploy --prebuilt --prod --yes --archive=tgz --token "$VERCEL_TOKEN")"
+          echo "url=${deployment_url}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Vercel production fallback"
+            echo
+            echo "- Ref: \`${{ inputs.ref || github.sha }}\`"
+            echo "- Deployment: ${deployment_url}"
+            echo "- Mode: GitHub-runner prebuilt upload"
+          } >> "$GITHUB_STEP_SUMMARY"
