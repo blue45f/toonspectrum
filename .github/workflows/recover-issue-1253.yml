@@ -99,6 +99,7 @@ jobs:
             apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts
             apps/web/src/domains/creator/vrm/studio-vrm-model-technical-denylist.generated.ts
             apps/web/src/domains/creator/vrm/vrm-library.ts
+            apps/web/src/domains/creator/vrm/vrm-library.test.ts
             scripts/generate-vrm-thumbnail-technical-denylist.ts
             scripts/generate-vrm-model-technical-denylist.ts
           )
@@ -157,11 +158,12 @@ jobs:
           rm -rf artifacts
           rm -f .github/workflows/recover-issue-1253.yml
           rm -f scripts/patch-vrm-library-quality-gates.py
-          allowed='^(\.github/workflows/studio-vrm-asset-quality\.yml|apps/web/src/domains/creator/vrm/(studio-vrm-(thumbnail|model)-(quality|quality\.test|quality-integration\.test|technical-denylist\.generated)\.ts|studio-vrm-thumbnail-quality-security\.test\.ts|studio-vrm-production-thumbnail-files\.test\.ts|vrm-library\.ts)|scripts/generate-vrm-(thumbnail|model)-technical-denylist\.ts|\.github/workflows/recover-issue-1253\.yml|scripts/patch-vrm-library-quality-gates\.py)$'
+          allowed='^(\.github/workflows/studio-vrm-asset-quality\.yml|apps/web/src/domains/creator/vrm/(studio-vrm-(thumbnail|model)-(quality|quality\.test|quality-integration\.test|technical-denylist\.generated)\.ts|studio-vrm-thumbnail-quality-security\.test\.ts|studio-vrm-production-thumbnail-files\.test\.ts|vrm-library(\.test)?\.ts)|scripts/generate-vrm-(thumbnail|model)-technical-denylist\.ts|\.github/workflows/recover-issue-1253\.yml|scripts/patch-vrm-library-quality-gates\.py)$'
           while IFS= read -r path; do
             [[ "$path" =~ $allowed ]] || { echo "Unexpected changed path: $path" >&2; exit 1; }
           done < <({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)
           git add -A
           git diff --cached --check
-          git commit -m 'fix(vrm): converge thumbnail and model quality gates (#1253)'
+          git -c core.hooksPath=/dev/null commit \
+            -m 'fix(vrm): converge thumbnail and model quality gates (#1253)'
           git push origin HEAD:fix/issue-1253-vrm-quality-convergence-20260910

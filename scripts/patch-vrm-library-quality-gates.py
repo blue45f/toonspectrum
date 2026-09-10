@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Idempotently compose thumbnail and model technical admission into vrm-library.ts."""
+"""Idempotently compose VRM quality admission and align the registry/visibility test contract."""
 
 from __future__ import annotations
 
@@ -125,21 +125,56 @@ def patch_filter(text: str) -> str:
     return text[:absolute_start] + CANONICAL_FILTER + text[absolute_end:]
 
 
+def patch_name_contract_test(repo_root: Path) -> None:
+    test_path = repo_root / "apps/web/src/domains/creator/vrm/vrm-library.test.ts"
+    source = test_path.read_text(encoding="utf-8")
+    start = source.find('  it("uses polished character names for bundled VRMs"')
+    if start < 0:
+        raise RuntimeError("Bundled VRM polished-name test was not found")
+    end = source.find("\n  it(", start + 5)
+    if end < 0:
+        raise RuntimeError("Bundled VRM polished-name test boundary was not found")
+
+    block = source[start:end]
+    if "const names = SAMPLE_VRMS.map((sample) => sample.name);" in block:
+        return
+
+    block, names_count = re.subn(
+        r"const names = SAMPLE_VRM_ENTRIES\.map\(\(entry\) => entry\.name\);",
+        "const names = SAMPLE_VRMS.map((sample) => sample.name);",
+        block,
+        count=1,
+    )
+    block, lookup_count = re.subn(
+        r"SAMPLE_VRM_ENTRIES\.find\(\(entry\) => entry\.id === id\)\?\.name",
+        "SAMPLE_VRMS.find((sample) => sample.id === id)?.name",
+        block,
+    )
+    if names_count != 1 or lookup_count != 2:
+        raise RuntimeError(
+            "Bundled VRM name test shape changed: "
+            f"names={names_count}, lookups={lookup_count}"
+        )
+
+    test_path.write_text(source[:start] + block + source[end:], encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("repo_root", type=Path)
     args = parser.parse_args()
 
-    library = args.repo_root / "apps/web/src/domains/creator/vrm/vrm-library.ts"
+    repo_root = args.repo_root.resolve()
+    library = repo_root / "apps/web/src/domains/creator/vrm/vrm-library.ts"
     if not library.is_file():
         raise SystemExit(f"VRM library not found: {library}")
 
     original = library.read_text(encoding="utf-8")
     patched = patch_filter(patch_imports(original))
 
-    for path in REQUIRED_IMPORT_PATHS:
-        if path not in patched:
-            raise RuntimeError(f"Required import was not composed: {path}")
+    for import_path in REQUIRED_IMPORT_PATHS:
+        if import_path not in patched:
+            raise RuntimeError(f"Required import was not composed: {import_path}")
     entries_start = patched.find("export const SAMPLE_VRM_ENTRIES")
     map_start = patched.find(".map(", entries_start)
     pipeline = patched[entries_start:map_start]
@@ -148,6 +183,7 @@ def main() -> None:
             raise RuntimeError(f"Required discovery admission was not composed: {marker}")
 
     library.write_text(patched, encoding="utf-8")
+    patch_name_contract_test(repo_root)
     status = "unchanged" if patched == original else "patched"
     print(f"{status}: {library}")
 
