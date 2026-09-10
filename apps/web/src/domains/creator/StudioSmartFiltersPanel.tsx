@@ -2,9 +2,11 @@
 import {
   ArrowDown,
   ArrowUp,
+  Copy,
   Eye,
   EyeOff,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
   X,
@@ -18,6 +20,10 @@ import {
   studioFilterGroupLabel,
 } from "./filter/studio-filter-catalog";
 import { StudioSmartFilterUnionControls } from "./filter/StudioSmartFilterUnionControls";
+import {
+  duplicateStudioEffectEntry,
+  resetStudioEffectEntry,
+} from "./studio-effects-workspace";
 import {
   STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
   STUDIO_ADJUSTMENT_ENGINE_IDS,
@@ -33,6 +39,7 @@ import {
   type StudioAdjustmentEntry,
   type StudioAdjustmentStack,
 } from "./studio-adjustment-stack";
+import { StudioEffectsWorkspacePanel } from "./StudioEffectsWorkspacePanel";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -666,6 +673,8 @@ export function StudioSmartFiltersPanel({
         </span>
       </div>
 
+      <StudioEffectsWorkspacePanel stack={current} onChange={patch} />
+
       <div className="rounded-xl border border-line/70 bg-card/40 p-2.5">
         <label htmlFor={searchId} className="sr-only">필터 검색</label>
         <div className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-canvas px-2.5 focus-within:border-accent">
@@ -794,6 +803,14 @@ export function StudioSmartFiltersPanel({
                   </button>
                   <button
                     type="button"
+                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 복제`}
+                    className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
+                    onClick={() => patch(duplicateStudioEffectEntry(current, entry.id))}
+                  >
+                    <Copy className="size-3.5" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
                     aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 삭제`}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 text-bad pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     onClick={() => patch(removeStudioAdjustmentEntry(current, entry.id))}
@@ -822,6 +839,22 @@ export function StudioSmartFiltersPanel({
                     %
                   </span>
                 </label>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 초기값으로 재설정`}
+                    title="파라미터와 불투명도를 기본값으로 재설정"
+                    className={buttonClass({
+                      size: "sm",
+                      variant: "quiet",
+                      className: "min-h-10 gap-1 px-2 text-[0.62rem] pointer-coarse:min-h-11",
+                    })}
+                    onClick={() => patch(resetStudioEffectEntry(current, entry.id))}
+                  >
+                    <RotateCcw className="size-3.5" aria-hidden />
+                    초기값
+                  </button>
+                </div>
                 {entry.enabled ? (
                   <StudioSmartFilterControls
                     entry={entry}

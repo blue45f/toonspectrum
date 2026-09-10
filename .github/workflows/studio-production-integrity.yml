@@ -1,112 +1,102 @@
 name: Studio production integrity
 
 on:
+  pull_request:
+    branches: [main, release/salvage-integration-20260908]
+    paths:
+      - 'scripts/check-studio-bundle.mjs'
+      - 'scripts/lib/studio-crdt-bundle-boundary*'
+      - 'scripts/lib/repo-paths.mjs'
+      - 'scripts/integration-test-runner-ci-policy.test.mjs'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'apps/web/src/domains/creator/studio-production/**'
+      - 'apps/web/src/domains/creator/studio-router/studio-route-manifest*'
+      - 'apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*'
+      - 'apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary*'
+      - 'apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts*'
+      - 'apps/web/src/domains/creator/StudioInspector*'
+      - 'apps/web/src/domains/creator/studio-batch-rename*'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/studio-production-integrity.yml'
+      - 'scripts/ci-executed-gates.test.mjs'
   push:
-    branches: [recover/tagged-product-final-20260911]
-    paths: [.github/workflows/studio-production-integrity.yml]
+    branches: [main, release/salvage-integration-20260908]
+    paths:
+      - 'scripts/check-studio-bundle.mjs'
+      - 'scripts/lib/studio-crdt-bundle-boundary*'
+      - 'scripts/lib/repo-paths.mjs'
+      - 'scripts/integration-test-runner-ci-policy.test.mjs'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'apps/web/src/domains/creator/studio-production/**'
+      - 'apps/web/src/domains/creator/studio-router/studio-route-manifest*'
+      - 'apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*'
+      - 'apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary*'
+      - 'apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts*'
+      - 'apps/web/src/domains/creator/StudioInspector*'
+      - 'apps/web/src/domains/creator/studio-batch-rename*'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/studio-production-integrity.yml'
+      - 'scripts/ci-executed-gates.test.mjs'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
+# main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
+# cancel-in-progress 가 취소할 대상을 갖지 못한다.
 concurrency:
-  group: tagged-product-final-${{ github.sha }}
-  cancel-in-progress: false
+  group: studio-production-integrity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  materialize-tagged-product-work:
-    runs-on: ubuntu-slim
-    timeout-minutes: 12
+  production-integrity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     env:
-      HUSKY: "0"
-      TARGET_BRANCH: recover/tagged-product-final-20260911
-      CANONICAL_WORKFLOW_COMMIT: abe44c2f6b715a2eedf192f75f205ab4b097c93e
-      THREE_D_POLICY_SHA: e66837aa67dd77d6095450d9d140d44a10bd4032
-      THREE_D_POLICY_TEST_SHA: 3433e2cac2224c0ea3d3cfb2bcc0813e936b1e46
-      THREE_D_EXTREME_TEST_SHA: 631f3dcd4cd2e8c7ff7d7cce584dd58f46d72082
-      EFFECTS_SOURCE_SHA: f76a78bc047d42dcc74cda6002307d50fb491cd8
-      UNIFIED_3D_SOURCE_SHA: 1b71d831407324fb4b2d9e5b4f0c1cabb5dd1d52
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: recover/tagged-product-final-20260911
-          fetch-depth: 1
-          persist-credentials: true
-          sparse-checkout: |
-            apps/web/src/domains/creator
-            docs/rewrite
-            .github/workflows
-            .qa
-          sparse-checkout-cone-mode: true
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Execute reviewed product materializers
-        shell: bash
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify real CI execution contract
+        run: node --test scripts/ci-executed-gates.test.mjs
+      - name: Verify actual production routes and Inspector integration
         run: |
-          set -euo pipefail
-          python3 -m pip install --disable-pip-version-check pyyaml
-          python3 - <<'PY'
-          from __future__ import annotations
-
-          import os
-          import subprocess
-          from pathlib import Path
-
-          import yaml
-
-          workflow = Path('.github/workflows/materialize-remaining-tagged-product-work.yml')
-          document = yaml.safe_load(workflow.read_text(encoding='utf-8'))
-          steps = document['jobs']['materialize']['steps']
-          stop_name = 'Install locked dependencies'
-          for step in steps:
-              if step.get('name') == stop_name:
-                  break
-              command = step.get('run')
-              if not isinstance(command, str):
-                  continue
-              name = str(step.get('name', 'unnamed materializer step'))
-              if name == 'Materialize deterministic Studio 3D insertion quality':
-                  print('Skipping BG3D quality materialization: the parent convergence branch already owns the verified product implementation.', flush=True)
-                  continue
-              shell = str(step.get('shell', 'bash'))
-              if name == 'Materialize one guided Studio 3D entry':
-                  command = command.replace('if ">3D 캐릭터<" in source:', 'if "3D 스튜디오" not in source:')
-                  command = command.replace(
-                      'for label in [">3D 캐릭터<", ">캐릭터 셰이퍼<", ">3D 데생 인형<", ">3D 배경<"]:',
-                      'for label in ["3D 캐릭터", "캐릭터 셰이퍼", "3D 데생 인형", "3D 배경"]:',
-                  )
-                  command = command.replace(
-                      'if source.count("3D 스튜디오") < 2:\n    raise SystemExit("unified 3D Studio button/fallback was not created")',
-                      'if source.count("3D 스튜디오") < 1:\n    raise SystemExit("unified 3D Studio entry was not created")',
-                  )
-              print(f'::group::{name}', flush=True)
-              if shell.startswith('python'):
-                  subprocess.run(['python3', '-c', command], check=True, env=os.environ.copy())
-              else:
-                  subprocess.run(
-                      ['/bin/bash', '-euo', 'pipefail', '-c', command],
-                      check=True,
-                      env=os.environ.copy(),
-                  )
-              print('::endgroup::', flush=True)
-          else:
-              raise SystemExit(f'{stop_name!r} was not found in reviewed materializer')
-          PY
-      - name: Publish product-only recovery and restore canonical workflow
-        shell: bash
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-production/studio-production-scope.test.ts \
+            apps/web/src/domains/creator/studio-production/StudioProductionHubPage.scope.test.tsx \
+            apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts \
+            apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
+            apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts \
+            apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx \
+            apps/web/src/domains/creator/studio-batch-rename.test.ts \
+            apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx \
+            apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts \
+            apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx
+      - name: Build production browser without repeating the core typecheck
         run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --location \
-            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${CANONICAL_WORKFLOW_COMMIT}/.github/workflows/studio-production-integrity.yml" \
-            --output .github/workflows/studio-production-integrity.yml
-          rm -f .github/workflows/materialize-remaining-tagged-product-work.yml
-          test -f apps/web/src/domains/creator/studio-effects-workspace.ts
-          test -f apps/web/src/domains/creator/studio-unified-3d-entry.test.ts
-          test ! -e .bootstrap
-          git config user.name "OpenAI Codex"
-          git config user.email "codex@openai.com"
-          git add -A
-          git diff --cached --check
-          git -c core.hooksPath=/dev/null commit \
-            -m "feat(studio): materialize remaining tagged recovery work"
-          git push --no-verify origin "HEAD:${TARGET_BRANCH}"
+          pnpm run build:bundle
+          pnpm run check:studio-bundle
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install-deps chromium
+      - name: Inspect actual production browser
+        run: pnpm run verify:studio-menus
