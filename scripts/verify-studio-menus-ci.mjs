@@ -99,6 +99,7 @@ Object.defineProperty(chromium, "launch", {
                       `page errors:\n${errors}`,
                       `body excerpt:\n${body}`,
                     ].join("\n"),
+                    { cause: error },
                   );
                 }
 
