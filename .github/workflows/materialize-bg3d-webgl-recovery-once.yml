@@ -1,0 +1,446 @@
+name: Materialize BG3D WebGL recovery once
+
+on:
+  push:
+    branches: [feat/bg3d-webgl-context-recovery-20260910]
+    paths: [.github/workflows/materialize-bg3d-webgl-recovery-once.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-bg3d-webgl-context-recovery-20260910
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/bg3d-webgl-context-recovery-20260910
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Add deterministic WebGL context recovery state machine
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.ts <<'EOF'
+          export type StudioBg3dWebglRecoveryPhase =
+            | "healthy"
+            | "lost"
+            | "restored"
+            | "degraded";
+
+          export interface StudioBg3dWebglRecoverySnapshot {
+            readonly degraded: boolean;
+            readonly lossCount: number;
+            readonly phase: StudioBg3dWebglRecoveryPhase;
+            readonly timestamp: number;
+          }
+
+          export interface StudioBg3dWebglRecoveryOptions {
+            readonly cancelFrame?: (frameId: number) => void;
+            readonly degradationThreshold?: number;
+            readonly invalidate: () => void;
+            readonly now?: () => number;
+            readonly onStateChange?: (snapshot: StudioBg3dWebglRecoverySnapshot) => void;
+            readonly recoveryWindowMs?: number;
+            readonly resetRenderer: () => void;
+            readonly scheduleFrame?: (callback: FrameRequestCallback) => number;
+          }
+
+          export interface StudioBg3dWebglRecoveryController {
+            readonly dispose: () => void;
+            readonly snapshot: () => StudioBg3dWebglRecoverySnapshot;
+          }
+
+          const DEFAULT_RECOVERY_WINDOW_MS = 30_000;
+          const DEFAULT_DEGRADATION_THRESHOLD = 3;
+
+          function browserScheduleFrame(callback: FrameRequestCallback): number {
+            if (typeof requestAnimationFrame === "function") {
+              return requestAnimationFrame(callback);
+            }
+            return globalThis.setTimeout(() => callback(performance.now()), 0) as unknown as number;
+          }
+
+          function browserCancelFrame(frameId: number): void {
+            if (typeof cancelAnimationFrame === "function") {
+              cancelAnimationFrame(frameId);
+              return;
+            }
+            globalThis.clearTimeout(frameId);
+          }
+
+          /**
+           * Installs a single ownership boundary for browser WebGL context lifecycle events.
+           * `preventDefault()` is mandatory: without it browsers are allowed to permanently abandon
+           * the context, leaving the editor visually frozen until a full page reload.
+           */
+          export function installStudioBg3dWebglContextRecovery(
+            canvas: HTMLCanvasElement,
+            options: StudioBg3dWebglRecoveryOptions,
+          ): StudioBg3dWebglRecoveryController {
+            const now = options.now ?? Date.now;
+            const scheduleFrame = options.scheduleFrame ?? browserScheduleFrame;
+            const cancelFrame = options.cancelFrame ?? browserCancelFrame;
+            const recoveryWindowMs = Math.max(
+              1_000,
+              options.recoveryWindowMs ?? DEFAULT_RECOVERY_WINDOW_MS,
+            );
+            const degradationThreshold = Math.max(
+              2,
+              Math.round(options.degradationThreshold ?? DEFAULT_DEGRADATION_THRESHOLD),
+            );
+
+            let disposed = false;
+            let scheduledFrame: number | null = null;
+            let lossTimes: number[] = [];
+            let current: StudioBg3dWebglRecoverySnapshot = Object.freeze({
+              degraded: false,
+              lossCount: 0,
+              phase: "healthy",
+              timestamp: now(),
+            });
+
+            const publish = (
+              phase: StudioBg3dWebglRecoveryPhase,
+              timestamp: number,
+            ) => {
+              const degraded = lossTimes.length >= degradationThreshold;
+              current = Object.freeze({
+                degraded,
+                lossCount: lossTimes.length,
+                phase: degraded && phase === "lost" ? "degraded" : phase,
+                timestamp,
+              });
+              options.onStateChange?.(current);
+            };
+
+            const handleContextLost = (event: Event) => {
+              if (disposed) return;
+              event.preventDefault();
+              const timestamp = now();
+              lossTimes = lossTimes
+                .filter((lossAt) => timestamp - lossAt <= recoveryWindowMs)
+                .concat(timestamp);
+              publish("lost", timestamp);
+            };
+
+            const handleContextRestored = () => {
+              if (disposed) return;
+              const timestamp = now();
+              try {
+                options.resetRenderer();
+              } finally {
+                // One microtask invalidation rebuilds React Three Fiber state; a following browser
+                // frame catches textures/programs that complete their own restoration asynchronously.
+                queueMicrotask(() => {
+                  if (!disposed) options.invalidate();
+                });
+                if (scheduledFrame !== null) cancelFrame(scheduledFrame);
+                scheduledFrame = scheduleFrame(() => {
+                  scheduledFrame = null;
+                  if (!disposed) options.invalidate();
+                });
+                publish("restored", timestamp);
+              }
+            };
+
+            canvas.addEventListener("webglcontextlost", handleContextLost, false);
+            canvas.addEventListener("webglcontextrestored", handleContextRestored, false);
+
+            return Object.freeze({
+              dispose: () => {
+                if (disposed) return;
+                disposed = true;
+                canvas.removeEventListener("webglcontextlost", handleContextLost, false);
+                canvas.removeEventListener("webglcontextrestored", handleContextRestored, false);
+                if (scheduledFrame !== null) cancelFrame(scheduledFrame);
+                scheduledFrame = null;
+              },
+              snapshot: () => current,
+            });
+          }
+          EOF
+
+          cat > apps/web/src/domains/creator/bg3d/StudioBg3dWebglContextRecoveryAgent.tsx <<'EOF'
+          import { useEffect, useRef } from "react";
+          import { useThree } from "@react-three/fiber";
+
+          import {
+            installStudioBg3dWebglContextRecovery,
+            type StudioBg3dWebglRecoverySnapshot,
+          } from "./studio-bg3d-webgl-context-recovery";
+
+          export const STUDIO_BG3D_WEBGL_RECOVERY_EVENT =
+            "toonstudio:bg3d-webgl-recovery" as const;
+
+          function resetRendererAfterContextRestore(renderer: unknown): void {
+            const candidate = renderer as {
+              readonly info?: { reset?: () => void };
+              readonly renderLists?: { dispose?: () => void };
+              resetState?: () => void;
+            };
+            candidate.renderLists?.dispose?.();
+            candidate.info?.reset?.();
+            candidate.resetState?.();
+          }
+
+          /** Must be rendered inside the R3F Canvas tree. */
+          export function StudioBg3dWebglContextRecoveryAgent() {
+            const gl = useThree((state) => state.gl);
+            const invalidate = useThree((state) => state.invalidate);
+            const setDpr = useThree((state) => state.setDpr);
+            const degradedRef = useRef(false);
+
+            useEffect(() => {
+              const canvas = gl.domElement;
+              const controller = installStudioBg3dWebglContextRecovery(canvas, {
+                invalidate,
+                resetRenderer: () => resetRendererAfterContextRestore(gl),
+                onStateChange: (snapshot: StudioBg3dWebglRecoverySnapshot) => {
+                  if (snapshot.degraded && !degradedRef.current) {
+                    degradedRef.current = true;
+                    const currentDpr = Math.max(1, gl.getPixelRatio());
+                    setDpr(Math.max(1, Math.round(currentDpr * 0.75 * 100) / 100));
+                  }
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(
+                      new CustomEvent<StudioBg3dWebglRecoverySnapshot>(
+                        STUDIO_BG3D_WEBGL_RECOVERY_EVENT,
+                        { detail: snapshot },
+                      ),
+                    );
+                  }
+                },
+              });
+              return controller.dispose;
+            }, [gl, invalidate, setDpr]);
+
+            return null;
+          }
+          EOF
+
+          cat > apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts <<'EOF'
+          // @vitest-environment jsdom
+
+          import { describe, expect, it, vi } from "vitest";
+
+          import {
+            installStudioBg3dWebglContextRecovery,
+            type StudioBg3dWebglRecoverySnapshot,
+          } from "./studio-bg3d-webgl-context-recovery";
+
+          describe("installStudioBg3dWebglContextRecovery", () => {
+            it("prevents permanent context abandonment and restores two render frames", async () => {
+              const canvas = document.createElement("canvas");
+              const invalidate = vi.fn();
+              const resetRenderer = vi.fn();
+              const snapshots: StudioBg3dWebglRecoverySnapshot[] = [];
+              let scheduled: FrameRequestCallback | null = null;
+
+              const controller = installStudioBg3dWebglContextRecovery(canvas, {
+                invalidate,
+                now: () => 1_000,
+                onStateChange: (snapshot) => snapshots.push(snapshot),
+                resetRenderer,
+                scheduleFrame: (callback) => {
+                  scheduled = callback;
+                  return 7;
+                },
+              });
+
+              const lost = new Event("webglcontextlost", { cancelable: true });
+              canvas.dispatchEvent(lost);
+              expect(lost.defaultPrevented).toBe(true);
+              expect(controller.snapshot()).toMatchObject({ phase: "lost", lossCount: 1 });
+
+              canvas.dispatchEvent(new Event("webglcontextrestored"));
+              await Promise.resolve();
+              expect(resetRenderer).toHaveBeenCalledTimes(1);
+              expect(invalidate).toHaveBeenCalledTimes(1);
+              scheduled?.(2_000);
+              expect(invalidate).toHaveBeenCalledTimes(2);
+              expect(snapshots.at(-1)).toMatchObject({ phase: "restored", degraded: false });
+            });
+
+            it("marks repeated losses as degraded only inside the rolling window", () => {
+              const canvas = document.createElement("canvas");
+              const timestamps = [0, 5_000, 10_000];
+              const snapshots: StudioBg3dWebglRecoverySnapshot[] = [];
+              const controller = installStudioBg3dWebglContextRecovery(canvas, {
+                invalidate: vi.fn(),
+                now: () => timestamps.shift() ?? 10_000,
+                onStateChange: (snapshot) => snapshots.push(snapshot),
+                resetRenderer: vi.fn(),
+                scheduleFrame: () => 1,
+              });
+
+              for (let index = 0; index < 3; index += 1) {
+                canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+              }
+
+              expect(controller.snapshot()).toMatchObject({
+                degraded: true,
+                lossCount: 3,
+                phase: "degraded",
+              });
+              expect(snapshots).toHaveLength(3);
+            });
+
+            it("detaches lifecycle ownership and cancels pending recovery work", () => {
+              const canvas = document.createElement("canvas");
+              const invalidate = vi.fn();
+              const cancelFrame = vi.fn();
+              const controller = installStudioBg3dWebglContextRecovery(canvas, {
+                cancelFrame,
+                invalidate,
+                resetRenderer: vi.fn(),
+                scheduleFrame: () => 99,
+              });
+
+              canvas.dispatchEvent(new Event("webglcontextrestored"));
+              controller.dispose();
+              controller.dispose();
+              canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+
+              expect(cancelFrame).toHaveBeenCalledWith(99);
+              expect(controller.snapshot().lossCount).toBe(0);
+            });
+          });
+          EOF
+
+      - name: Install the recovery agent inside the primary Canvas
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/web/src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx")
+          source = path.read_text(encoding="utf-8")
+
+          import_line = 'import { StudioBg3dWebglContextRecoveryAgent } from "./StudioBg3dWebglContextRecoveryAgent";\n'
+          if import_line not in source:
+              lines = source.splitlines(keepends=True)
+              last_local = -1
+              for index, line in enumerate(lines):
+                  if line.startswith("import ") and 'from "./' in line:
+                      last_local = index
+              if last_local < 0:
+                  raise SystemExit("BG3D viewport local import anchor changed")
+              lines.insert(last_local + 1, import_line)
+              source = "".join(lines)
+
+          if "<StudioBg3dWebglContextRecoveryAgent" not in source:
+              canvas_start = source.find("<Canvas")
+              if canvas_start < 0:
+                  raise SystemExit("BG3D viewport Canvas anchor changed")
+              brace_depth = 0
+              quote = None
+              escaped = False
+              opening_end = -1
+              for index in range(canvas_start + len("<Canvas"), len(source)):
+                  char = source[index]
+                  if quote is not None:
+                      if escaped:
+                          escaped = False
+                      elif char == "\\":
+                          escaped = True
+                      elif char == quote:
+                          quote = None
+                      continue
+                  if char in {'"', "'", "`"}:
+                      quote = char
+                  elif char == "{":
+                      brace_depth += 1
+                  elif char == "}":
+                      brace_depth = max(0, brace_depth - 1)
+                  elif char == ">" and brace_depth == 0:
+                      opening_end = index + 1
+                      break
+              if opening_end < 0 or source[opening_end - 2:opening_end] == "/>":
+                  raise SystemExit("Could not isolate an open BG3D Canvas element")
+
+              line_start = source.rfind("\n", 0, canvas_start) + 1
+              canvas_indent = source[line_start:canvas_start]
+              if not canvas_indent.isspace():
+                  raise SystemExit("BG3D Canvas is not on a standalone JSX line")
+              child_indent = canvas_indent + "  "
+              source = (
+                  source[:opening_end]
+                  + f"\n{child_indent}<StudioBg3dWebglContextRecoveryAgent />"
+                  + source[opening_end:]
+              )
+
+          path.write_text(source, encoding="utf-8")
+          PY
+
+          cat > apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts <<'EOF'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+
+          const source = readFileSync(
+            new URL("./StudioBg3dEditorViewport.tsx", import.meta.url),
+            "utf8",
+          );
+
+          describe("BG3D WebGL recovery integration", () => {
+            it("installs one recovery owner inside the main R3F Canvas", () => {
+              const canvas = source.indexOf("<Canvas");
+              const recovery = source.indexOf("<StudioBg3dWebglContextRecoveryAgent", canvas);
+              const canvasEnd = source.indexOf("</Canvas>", canvas);
+
+              expect(canvas).toBeGreaterThanOrEqual(0);
+              expect(recovery).toBeGreaterThan(canvas);
+              expect(recovery).toBeLessThan(canvasEnd);
+              expect(source.match(/<StudioBg3dWebglContextRecoveryAgent/g)).toHaveLength(1);
+            });
+          });
+          EOF
+
+      - name: Validate lifecycle, integration and existing viewport boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dWebglContextRecoveryAgent.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx
+          pnpm exec tsc -p tsconfig.json --noEmit
+          git diff --check
+
+      - name: Commit product-only slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-3d-ci
+          git config user.email actions@users.noreply.github.com
+          rm -f .github/workflows/materialize-bg3d-webgl-recovery-once.yml
+          git add \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dWebglContextRecoveryAgent.tsx \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-context-recovery.test.ts \
+            apps/web/src/domains/creator/bg3d/studio-bg3d-webgl-recovery-integration.test.ts \
+            apps/web/src/domains/creator/bg3d/StudioBg3dEditorViewport.tsx \
+            .github/workflows/materialize-bg3d-webgl-recovery-once.yml
+          git diff --cached --check
+          git -c core.hooksPath=/dev/null commit -m 'feat(bg3d): recover WebGL contexts without losing the scene'
+          git push --no-verify origin HEAD:feat/bg3d-webgl-context-recovery-20260910
