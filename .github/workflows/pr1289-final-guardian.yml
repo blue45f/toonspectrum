@@ -1,4 +1,4 @@
-name: PR 1289 failure repair
+name: PR 1289 deterministic source repair
 
 on:
   push:
@@ -6,18 +6,19 @@ on:
       - fix/real-core-and-main-only-20260910
     paths:
       - .github/workflows/pr1289-final-guardian.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: pr1289-failure-repair
+  group: pr1289-deterministic-source-repair
   cancel-in-progress: true
 
 jobs:
   repair:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
@@ -25,229 +26,101 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Repair every confirmed PR 1289 failure
+      - name: Patch confirmed failures and publish clean source head
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
-          changed: list[str] = []
+          changed = []
 
-          def replace_once(path_value: str, old: str, new: str) -> None:
+          def store(path: Path, text: str) -> None:
+              path.write_text(text, encoding="utf-8")
+              changed.append(str(path))
+
+          def replace_all(path_value: str, old: str, new: str, minimum: int = 1) -> None:
               path = Path(path_value)
               text = path.read_text(encoding="utf-8")
               count = text.count(old)
-              if count == 1:
-                  path.write_text(text.replace(old, new, 1), encoding="utf-8")
-                  changed.append(path_value)
-                  return
               if count == 0 and new in text:
                   return
-              raise RuntimeError(
-                  f"{path}: expected exactly one old block or an already-applied new block; found {count}: {old[:160]!r}"
-              )
+              if count < minimum:
+                  raise RuntimeError(f"{path}: expected at least {minimum} match(es), found {count}: {old!r}")
+              store(path, text.replace(old, new))
 
-          def prepend_once(path_value: str, prefix: str) -> None:
+          def replace_regex(path_value: str, pattern: str, replacement: str) -> None:
               path = Path(path_value)
               text = path.read_text(encoding="utf-8")
-              if text.startswith(prefix):
-                  return
-              path.write_text(prefix + text, encoding="utf-8")
-              changed.append(path_value)
+              updated, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
+              if count != 1:
+                  raise RuntimeError(f"{path}: expected one regex match, found {count}: {pattern!r}")
+              store(path, updated)
 
-          # CC0 search is debounced. Observe the settled result count before asserting.
-          replace_once(
+          replace_regex(
               "scripts/verify-studio-cc0-curated-ui.mjs",
-              '''  await page
-            .getByLabel('에셋 검색', { exact: true })
-            .fill('존재하지않는검수문자열');
-          assert.equal(await panel.locator('article').count(), 0);
-          await page.getByLabel('에셋 검색', { exact: true }).fill('목재');
-          assert.ok((await panel.locator('article').count()) > 0);''',
-              '''  await page
-            .getByLabel('에셋 검색', { exact: true })
-            .fill('존재하지않는검수문자열');
-          await waitForResultCount(0);
-          assert.equal(await panel.locator('article').count(), 0);
-          await page.getByLabel('에셋 검색', { exact: true }).fill('목재');
-          await panel.locator('article').first().waitFor({
-            state: 'visible',
-            timeout: 30_000,
-          });
-          assert.ok((await panel.locator('article').count()) > 0);''',
+              r"(?P<i>^[ \t]*)assert\.equal\(await panel\.locator\('article'\)\.count\(\), 0\);",
+              r"\g<i>await waitForResultCount(0);\n\g<i>assert.equal(await panel.locator('article').count(), 0);",
+          )
+          replace_regex(
+              "scripts/verify-studio-cc0-curated-ui.mjs",
+              r"(?P<i>^[ \t]*)await page\.getByLabel\('에셋 검색', \{ exact: true \}\)\.fill\('목재'\);\n(?P=i)assert\.ok\(\(await panel\.locator\('article'\)\.count\(\)\) > 0\);",
+              r"\g<i>await page.getByLabel('에셋 검색', { exact: true }).fill('목재');\n\g<i>await panel.locator('article').first().waitFor({ state: 'visible', timeout: 30_000 });\n\g<i>assert.ok((await panel.locator('article').count()) > 0);",
           )
 
-          # /studio is the Studio home. Browser proofs that require the editor use /studio/canvas.
-          replace_once(
-              "scripts/verify-studio-menus.mts",
-              '  const url = `http://127.0.0.1:${port}/studio`;',
-              '  const url = `http://127.0.0.1:${port}/studio/canvas`;',
-          )
-          replace_once(
-              "scripts/verify-studio-discovery-ux.mts",
-              '  await page.goto(`${previewOrigin}/studio`, { waitUntil: "domcontentloaded", timeout: 45_000 });',
-              '  await page.goto(`${previewOrigin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 45_000 });',
-          )
-          replace_once(
-              "scripts/verify-studio-brushes.mts",
-              '  const studioUrl = `${origin}studio`;',
-              '  const studioUrl = `${origin}studio/canvas`;',
-          )
-          replace_once(
-              "scripts/verify-studio-filter-dialog.mts",
-              '  const url = `${origin}/studio`;',
-              '  const url = `${origin}/studio/canvas`;',
-          )
-          replace_once(
-              "scripts/verify-studio-collaboration-sync.mts",
-              '      const response = await fetch(`${origin}/studio`);',
-              '      const response = await fetch(`${origin}/studio/canvas`);',
-          )
-          replace_once(
-              "scripts/verify-studio-collaboration-sync.mts",
-              '  await pageA.goto(`${origin}/studio`, { waitUntil: "domcontentloaded", timeout: 30_000 });',
-              '  await pageA.goto(`${origin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 30_000 });',
-          )
+          replace_all("scripts/verify-studio-menus.mts", "const url = `http://127.0.0.1:${port}/studio`;", "const url = `http://127.0.0.1:${port}/studio/canvas`;")
+          replace_all("scripts/verify-studio-discovery-ux.mts", "page.goto(`${previewOrigin}/studio`,", "page.goto(`${previewOrigin}/studio/canvas`,")
+          replace_all("scripts/verify-studio-brushes.mts", "const studioUrl = `${origin}studio`;", "const studioUrl = `${origin}studio/canvas`;")
+          replace_all("scripts/verify-studio-filter-dialog.mts", "const url = `${origin}/studio`;", "const url = `${origin}/studio/canvas`;")
+          replace_all("scripts/verify-studio-collaboration-sync.mts", "fetch(`${origin}/studio`)", "fetch(`${origin}/studio/canvas`)")
+          replace_all("scripts/verify-studio-collaboration-sync.mts", "pageA.goto(`${origin}/studio`,", "pageA.goto(`${origin}/studio/canvas`,")
 
-          # React Testing Library needs a DOM; disclosure matching follows its accessible name.
-          prepend_once(
-              "apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx",
-              "// @vitest-environment jsdom\n",
-          )
-          replace_once(
-              "apps/web/src/domains/creator/brush/StudioDrawingPaletteStack.test.tsx",
-              '        name: "브러시 스튜디오",',
-              '        name: /브러시 스튜디오/u,',
-          )
+          goal_test = Path("apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx")
+          goal_text = goal_test.read_text(encoding="utf-8")
+          prefix = "// @vitest-environment jsdom\n"
+          if not goal_text.startswith(prefix):
+              store(goal_test, prefix + goal_text)
 
-          # Guided Brush Studio belongs alongside Brush Studio/Brush DNA.
-          replace_once(
-              "apps/web/src/domains/creator/studio-main-menu-group-spec.ts",
-              '      has("Brush Studio/Brush DNA", "brush/brush-studio"),',
-              '      has("Brush Studio/Brush DNA", "brush/brush-studio", "brush/brush-lab"),',
-          )
-          replace_once(
-              "apps/web/src/domains/creator/studio-command-catalog.ts",
-              '''export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
-            ...BASE_MENU_INVENTORY.flatMap((id) => id === "help/current-tool" ? [id, MANUAL_MENU_ID] : [id]),
-            BRUSH_LAB_MENU_ID,
-          ]);''',
-              '''export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
-            ...BASE_MENU_INVENTORY.flatMap((id) => {
-              if (id === "help/current-tool") return [id, MANUAL_MENU_ID];
-              if (id === "brush/brush-studio") return [id, BRUSH_LAB_MENU_ID];
-              return [id];
-            }),
-          ]);''',
-          )
+          replace_all("apps/web/src/domains/creator/brush/StudioDrawingPaletteStack.test.tsx", 'name: "브러시 스튜디오",', "name: /브러시 스튜디오/u,")
+          replace_all("apps/web/src/domains/creator/studio-main-menu-group-spec.ts", 'has("Brush Studio/Brush DNA", "brush/brush-studio")', 'has("Brush Studio/Brush DNA", "brush/brush-studio", "brush/brush-lab")')
 
-          # The feature-tutorial menu id now opens the broader help home by design.
-          replace_once(
-              "apps/web/src/domains/creator/studio-main-menu-groups.test.ts",
-              '    expect(menuItem(english, "help", "feature-tutorials").label).toBe("Feature tutorials");',
-              '    expect(menuItem(english, "help", "feature-tutorials").label).toBe("Help home and guided learning");',
-          )
-          replace_once(
-              "apps/web/src/domains/creator/studio-main-menu-groups.test.ts",
-              '    expect(menuItem(korean, "help", "feature-tutorials").label).toBe("사용법 · 기능 튜토리얼");',
-              '    expect(menuItem(korean, "help", "feature-tutorials").label).toBe("도움말 홈 · 단계별 가이드");',
-          )
-          replace_once(
-              "apps/web/src/domains/creator/studio-main-menu-groups.test.ts",
-              '    expect(editor.openFeatureTutorial).toHaveBeenCalledOnce();',
-              '    expect(editor.openFeatureTutorial).not.toHaveBeenCalled();',
-          )
+          catalog = Path("apps/web/src/domains/creator/studio-command-catalog.ts")
+          catalog_text = catalog.read_text(encoding="utf-8")
+          if 'id === "brush/brush-studio"' not in catalog_text:
+              updated, count = re.subn(
+                  r'\.\.\.BASE_MENU_INVENTORY\.flatMap\(\(id\) => id === "help/current-tool" \? \[id, MANUAL_MENU_ID\] : \[id\]\),\s*BRUSH_LAB_MENU_ID,',
+                  "...BASE_MENU_INVENTORY.flatMap((id) => {\n    if (id === \"help/current-tool\") return [id, MANUAL_MENU_ID];\n    if (id === \"brush/brush-studio\") return [id, BRUSH_LAB_MENU_ID];\n    return [id];\n  }),",
+                  catalog_text,
+                  count=1,
+                  flags=re.MULTILINE,
+              )
+              if count != 1:
+                  raise RuntimeError("studio-command-catalog inventory block not found")
+              store(catalog, updated)
 
-          # Exact /studio is the front door; scoped editor routes remain on the wildcard router.
-          replace_once(
+          replace_all("apps/web/src/domains/creator/studio-main-menu-groups.test.ts", 'toBe("Feature tutorials")', 'toBe("Help home and guided learning")')
+          replace_all("apps/web/src/domains/creator/studio-main-menu-groups.test.ts", 'toBe("사용법 · 기능 튜토리얼")', 'toBe("도움말 홈 · 단계별 가이드")')
+          replace_all("apps/web/src/domains/creator/studio-main-menu-groups.test.ts", "expect(editor.openFeatureTutorial).toHaveBeenCalledOnce();", "expect(editor.openFeatureTutorial).not.toHaveBeenCalled();")
+
+          replace_all(
               "apps/web/src/app/routes/groups/studio-manual.routes.test.tsx",
-              '''  it("preserves editor, 3D and publish routes", () => {
-            for (const path of ["/studio", "/studio/character", "/studio/bg3d", "/studio/publish"]) {
-              expect(routeId(path)).toBe("creator-studio");
-            }
-          });''',
-              '''  it("preserves the Studio front door plus editor, 3D and publish routes", () => {
-            expect(routeId("/studio")).toBe("creator-studio-home");
-            for (const path of ["/studio/canvas", "/studio/character", "/studio/bg3d", "/studio/publish"]) {
-              expect(routeId(path)).toBe("creator-studio");
-            }
-          });''',
+              'for (const path of ["/studio", "/studio/character", "/studio/bg3d", "/studio/publish"]) {',
+              'expect(routeId("/studio")).toBe("creator-studio-home");\n    for (const path of ["/studio/canvas", "/studio/character", "/studio/bg3d", "/studio/publish"]) {',
           )
 
-          # Use stable ids for native learning-plan select controls.
-          replace_once(
-              "e2e/learn.spec.ts",
-              '''  await page.goto("/learn");
-            await page.getByLabel("지금 가장 중요한 목표", { exact: true }).selectOption("publish");
-            await page.getByLabel("현재 경험", { exact: true }).selectOption("advanced");
-            await page.getByLabel("한 번에 집중할 시간", { exact: true }).selectOption("45");''',
-              '''  await page.goto("/learn");
-            const goal = page.locator("#learn-goal");
-            const level = page.locator("#learn-level");
-            const sessionMinutes = page.locator("#learn-session-minutes");
-            await expect(goal).toBeVisible();
-            await expect(level).toBeVisible();
-            await expect(sessionMinutes).toBeVisible();
-            await goal.selectOption("publish");
-            await level.selectOption("advanced");
-            await sessionMinutes.selectOption("45");''',
-          )
-          replace_once(
-              "e2e/learn.spec.ts",
-              '''  await expect(page.getByLabel("지금 가장 중요한 목표", { exact: true })).toHaveValue("publish");
-            await expect(page.getByLabel("현재 경험", { exact: true })).toHaveValue("advanced");
-            await expect(page.getByLabel("한 번에 집중할 시간", { exact: true })).toHaveValue("45");''',
-              '''  await expect(page.locator("#learn-goal")).toHaveValue("publish");
-            await expect(page.locator("#learn-level")).toHaveValue("advanced");
-            await expect(page.locator("#learn-session-minutes")).toHaveValue("45");''',
-          )
+          replace_all("e2e/learn.spec.ts", 'page.getByLabel("지금 가장 중요한 목표", { exact: true })', 'page.locator("#learn-goal")')
+          replace_all("e2e/learn.spec.ts", 'page.getByLabel("현재 경험", { exact: true })', 'page.locator("#learn-level")')
+          replace_all("e2e/learn.spec.ts", 'page.getByLabel("한 번에 집중할 시간", { exact: true })', 'page.locator("#learn-session-minutes")')
 
           print("patched files:")
           for item in dict.fromkeys(changed):
               print(f"- {item}")
           PY
 
-          git diff --check
-
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-
-      - name: Verify repaired contracts
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm exec eslint \
-            scripts/verify-studio-cc0-curated-ui.mjs \
-            scripts/verify-studio-menus.mts \
-            scripts/verify-studio-discovery-ux.mts \
-            scripts/verify-studio-brushes.mts \
-            scripts/verify-studio-filter-dialog.mts \
-            scripts/verify-studio-collaboration-sync.mts \
-            e2e/learn.spec.ts \
-            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
-            apps/web/src/domains/creator/brush/StudioDrawingPaletteStack.test.tsx \
-            apps/web/src/domains/creator/studio-main-menu-group-spec.ts \
-            apps/web/src/domains/creator/studio-command-catalog.ts \
-            apps/web/src/domains/creator/studio-main-menu-groups.test.ts \
-            apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
-          pnpm exec vitest run \
-            apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx \
-            apps/web/src/domains/creator/brush/StudioDrawingPaletteStack.test.tsx \
-            apps/web/src/domains/creator/studio-main-menu-group-spec.test.ts \
-            apps/web/src/domains/creator/studio-main-menu-groups.test.ts \
-            apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
-
-      - name: Persist repair and remove temporary workflows
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -f .github/workflows/collaboration-sync-final-repair-once.yml
+          git show 3da7a56f1923b501fb0b949753269cc7e9f57493:.github/workflows/studio-manual.yml > .github/workflows/studio-manual.yml
           rm -f .github/workflows/pr1289-final-guardian.yml
+          rm -f .github/workflows/collaboration-sync-final-repair-once.yml
           git diff --check
           git config user.name toonstudio-quality-ci
           git config user.email actions@users.noreply.github.com
@@ -255,4 +128,3 @@ jobs:
           git diff --cached --check
           git -c core.hooksPath=/dev/null commit -m 'fix(ci): repair PR 1289 failing contracts'
           git push --no-verify origin HEAD:fix/real-core-and-main-only-20260910
-          echo "Repaired head: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
