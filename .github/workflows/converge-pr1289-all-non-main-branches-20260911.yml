@@ -1,0 +1,118 @@
+name: Converge every non-main branch into PR 1289
+
+on:
+  push:
+    branches:
+      - fix/real-core-and-main-only-20260910
+    paths:
+      - .github/workflows/converge-pr1289-all-non-main-branches-20260911.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: converge-pr1289-all-non-main-branches
+  cancel-in-progress: true
+
+jobs:
+  converge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out PR head with complete history and blob filtering
+        uses: actions/checkout@v4
+        with:
+          ref: fix/real-core-and-main-only-20260910
+          fetch-depth: 0
+          filter: blob:none
+          show-progress: false
+          persist-credentials: true
+
+      - name: Merge all non-main branch histories and preserve canonical workflows
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          target_branch='fix/real-core-and-main-only-20260910'
+          workflow_path='.github/workflows/converge-pr1289-all-non-main-branches-20260911.yml'
+          start_sha="$(git rev-parse HEAD)"
+          workflow_snapshot="$(mktemp -d)"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch --filter=blob:none --no-tags --prune origin '+refs/heads/*:refs/remotes/origin/*'
+
+          mkdir -p "$workflow_snapshot/workflows"
+          cp -a .github/workflows/. "$workflow_snapshot/workflows/"
+          rm -f "$workflow_snapshot/workflows/$(basename "$workflow_path")"
+
+          mapfile -t branches < <(
+            git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin \
+              | grep -vE "^(HEAD|main|${target_branch})$" \
+              | sort -u
+          )
+
+          merge_branch() {
+            local branch="$1"
+            local remote_ref="origin/$branch"
+
+            if git merge-base --is-ancestor "$remote_ref" HEAD; then
+              echo "Already included: $branch"
+              return 0
+            fi
+
+            echo "Merging: $branch"
+            if git merge --no-ff --no-edit -X theirs "$remote_ref"; then
+              return 0
+            fi
+
+            echo "Resolving remaining conflicts in favor of the incoming branch: $branch"
+            while IFS= read -r -d '' path; do
+              if git cat-file -e "MERGE_HEAD:$path" 2>/dev/null; then
+                git checkout --theirs -- "$path" 2>/dev/null \
+                  || git show "MERGE_HEAD:$path" > "$path"
+                git add -- "$path"
+              else
+                git rm -f -- "$path"
+              fi
+            done < <(git diff --name-only --diff-filter=U -z)
+
+            if [[ -n "$(git diff --name-only --diff-filter=U)" ]]; then
+              echo 'Unresolved conflicts remain:' >&2
+              git diff --name-only --diff-filter=U >&2
+              exit 1
+            fi
+
+            git commit --no-edit
+          }
+
+          for branch in "${branches[@]}"; do
+            merge_branch "$branch"
+          done
+
+          rm -rf .github/workflows
+          mkdir -p .github/workflows
+          cp -a "$workflow_snapshot/workflows/." .github/workflows/
+          rm -f "$workflow_path"
+
+          mkdir -p .qa
+          {
+            echo '# PR #1289 non-main branch convergence'
+            echo
+            echo "- Started from: \`$start_sha\`"
+            echo "- Completed at: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo '- Canonical `.github/workflows` restored from the PR head before convergence.'
+            echo
+            echo '## Included remote branches'
+            for branch in "${branches[@]}"; do
+              echo "- \`$branch\`: \`$(git rev-parse "origin/$branch")\`"
+            done
+          } > .qa/pr1289-all-non-main-branches-convergence-2026-09-11.md
+
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore(convergence): preserve canonical workflows and record all branches'
+          fi
+
+          git diff --check "$start_sha"..HEAD || true
+          git push origin "HEAD:refs/heads/$target_branch"
