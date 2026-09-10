@@ -20,6 +20,11 @@ jobs:
       HUSKY: "0"
       TARGET_BRANCH: recover/tagged-product-final-20260911
       CANONICAL_WORKFLOW_COMMIT: abe44c2f6b715a2eedf192f75f205ab4b097c93e
+      THREE_D_POLICY_SHA: e66837aa67dd77d6095450d9d140d44a10bd4032
+      THREE_D_POLICY_TEST_SHA: 3433e2cac2224c0ea3d3cfb2bcc0813e936b1e46
+      THREE_D_EXTREME_TEST_SHA: 631f3dcd4cd2e8c7ff7d7cce584dd58f46d72082
+      EFFECTS_SOURCE_SHA: f76a78bc047d42dcc74cda6002307d50fb491cd8
+      UNIFIED_3D_SOURCE_SHA: 1b71d831407324fb4b2d9e5b4f0c1cabb5dd1d52
     steps:
       - uses: actions/checkout@v6
         with:
