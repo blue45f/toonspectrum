@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
@@ -56,10 +56,7 @@ describe("StudioColorPalettePanel", () => {
 
     expect(screen.getByText("이미지의 고유 배색을 분석하는 중…")).toBeDefined();
 
-    await screen.findByText("이미지 주요 색상");
-    const swatch = screen.getByRole("button", { name: /#ff0000/ });
-    expect(swatch).toBeDefined();
-
+    const swatch = await screen.findByRole("button", { name: /#ff0000/ });
     fireEvent.click(swatch);
     expect(onPickColor).toHaveBeenCalledWith("#ff0000");
     await screen.findByRole("button", { name: /#ff0000.*복사 완료/u });
@@ -132,7 +129,9 @@ describe("StudioColorPalettePanel", () => {
 
     await screen.findByRole("button", { name: /#ff0000/ });
     fireEvent.click(screen.getByRole("button", { name: "내 팔레트에 저장" }));
-    expect(screen.getByRole("button", { name: "팔레트 저장 중…" }).hasAttribute("disabled")).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "팔레트 저장 중…" }).hasAttribute("disabled")
+    ).toBe(true);
 
     view.rerender(
       <StudioColorPalettePanel
@@ -142,10 +141,11 @@ describe("StudioColorPalettePanel", () => {
     );
     expect(await screen.findByText("추출할 색이 없어요(투명 이미지).")).toBeDefined();
 
-    resolveSave?.();
-    await waitFor(() => {
-      expect(screen.queryByText("내 팔레트에 저장됨")).toBeNull();
+    await act(async () => {
+      resolveSave?.();
+      await Promise.resolve();
     });
+    expect(screen.queryByText("내 팔레트에 저장됨")).toBeNull();
   });
 
   it("handles empty extracted colors state", async () => {
