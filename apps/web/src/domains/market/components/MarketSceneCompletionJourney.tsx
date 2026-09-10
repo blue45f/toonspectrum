@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- pure journey helpers are intentionally co-located with the component and unit-tested. */
 import { ArrowRight, Brush, Images, LayoutTemplate, Palette, Sparkles } from "lucide-react";
 
 import { cn } from "@/shared/lib/utils";
