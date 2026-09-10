@@ -1,0 +1,116 @@
+name: Apply CI performance optimization once
+
+on:
+  push:
+    branches:
+      - fix/real-core-and-main-only-20260910
+    paths:
+      - .github/workflows/ci-performance-optimizer-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-performance-optimizer-once
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/real-core-and-main-only-20260910
+          fetch-depth: 0
+
+      - name: Apply canonical CI and workflow fan-out optimizations
+        run: |
+          base64 --decode <<'PAYLOAD' | gzip --decompress > /tmp/apply-ci-performance-optimization.py
+          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
+          PAYLOAD
+          python3 /tmp/apply-ci-performance-optimization.py
+
+      - name: Validate optimized workflow files
+        run: |
+          set -euo pipefail
+          python3 scripts/verify-pr-workflow-fanout.py
+          ruby -rpsych -e 'ARGV.each { |path| Psych.parse_file(path) }' .github/workflows/*.yml
+          git diff --check
+          grep -Eq '^name: CI$' .github/workflows/ci.yml
+          grep -Eq '^  core:$' .github/workflows/ci.yml
+          grep -Fq 'shard: [1, 2, 3, 4]' .github/workflows/ci.yml
+
+      - name: Commit optimized CI topology
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/ci-performance-optimizer-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A .github/workflows scripts/verify-pr-workflow-fanout.py .qa/ci-performance-optimization-2026-09-11.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "perf(ci): prioritize required PR checks and remove workflow fan-out"
+          git fetch origin fix/real-core-and-main-only-20260910
+          git rebase origin/fix/real-core-and-main-only-20260910
+          git push origin HEAD:fix/real-core-and-main-only-20260910
