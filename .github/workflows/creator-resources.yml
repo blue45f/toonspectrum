@@ -1,6 +1,8 @@
 name: Creator resources verification
 on:
-  pull_request:
+  workflow_dispatch:
+  push:
+    branches: [main]
     paths:
       - 'apps/web/src/shared/lib/creator-resources.ts'
       - 'apps/web/src/shared/lib/creator-resource-workflow.ts'
@@ -16,7 +18,7 @@ on:
       - 'scripts/lib/compile-creator-resource-cases.mjs'
       - 'scripts/verify-creator-workspace-browser.mjs'
       - '.github/workflows/creator-resources.yml'
-  workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 concurrency:
