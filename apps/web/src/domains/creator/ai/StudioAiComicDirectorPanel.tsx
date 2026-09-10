@@ -52,6 +52,7 @@ import {
   createStudioAiComicDirectorApiClient,
   type StudioAiComicDirectorApiClient,
 } from "./studio-ai-comic-director-api";
+import { createStudioAiComicDirectorId } from "./studio-ai-comic-director-id";
 import {
   createStudioAiComicApplyDiff,
   createStudioAiComicDirectorSession,
@@ -155,7 +156,7 @@ export interface StudioAiComicDirectorPanelProps {
 }
 
 function uid(prefix: string): string {
-  return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return createStudioAiComicDirectorId(prefix);
 }
 
 function stripDirectorDirective(prompt: string): string {

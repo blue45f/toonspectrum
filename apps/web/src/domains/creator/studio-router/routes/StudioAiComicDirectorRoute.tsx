@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 
 import { requestStudioAiComicComposerOpen } from "../../ai/studio-ai-comic-composer-intent";
 import { createStudioAiComicDirectorApiClient } from "../../ai/studio-ai-comic-director-api";
+import { createStudioAiComicDirectorId } from "../../ai/studio-ai-comic-director-id";
 import {
   createStudioAiComicDirectorSession,
   loadStudioAiComicDirectorSession,
@@ -37,8 +38,7 @@ interface StudioAiComicDirectorRouteProps {
 }
 
 function uid(): string {
-  return globalThis.crypto?.randomUUID?.()
-    ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return createStudioAiComicDirectorId("comic");
 }
 
 function routePath(

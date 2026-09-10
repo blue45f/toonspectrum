@@ -1,5 +1,7 @@
 import type { ScenarioPreviewItem } from "../studio-scenario-layout";
 
+import { createStudioAiComicDirectorId } from "./studio-ai-comic-director-id";
+
 export type StudioAiComicDirectorStage =
   | "brief"
   | "direction"
@@ -154,8 +156,7 @@ const ENTRY_SOURCES: readonly StudioAiComicDirectorEntrySource[] = [
 ];
 
 function id(): string {
-  return globalThis.crypto?.randomUUID?.()
-    ?? `comic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return createStudioAiComicDirectorId("comic");
 }
 
 function enumValue<T extends string>(
