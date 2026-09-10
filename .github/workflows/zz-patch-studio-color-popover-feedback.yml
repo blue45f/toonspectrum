@@ -1,0 +1,48 @@
+name: Temporary Studio color popover feedback patch
+
+on:
+  push:
+    branches:
+      - fix/studio-feedback-race-stability-20260910
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-studio-color-popover-feedback-patch
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'chore(studio): run deterministic color feedback patch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/studio-feedback-race-stability-20260910
+          fetch-depth: 0
+
+      - name: Apply exact source patch
+        run: node scripts/patch-studio-color-popover-feedback.mjs
+
+      - name: Remove temporary patch machinery
+        run: |
+          rm scripts/patch-studio-color-popover-feedback.mjs
+          rm .github/workflows/zz-patch-studio-color-popover-feedback.yml
+
+      - name: Validate patch shape
+        run: |
+          git diff --check
+          git diff --exit-code -- apps/web/src/domains/creator/StudioColorPopover.tsx && exit 1 || true
+          test ! -e scripts/patch-studio-color-popover-feedback.mjs
+          test ! -e .github/workflows/zz-patch-studio-color-popover-feedback.yml
+
+      - name: Commit product-only result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(studio): stabilize color popover feedback"
+          git push origin HEAD:fix/studio-feedback-race-stability-20260910
