@@ -1,15 +1,13 @@
-name: Owner-authorized deferred PR validation
-
-# Temporary bulk-integration gate. The full repository CI remains enabled in ci.yml.
-# This workflow reports the required `core` check as `skipped`—never as a fabricated success—
-# so the current PR backlog can be integrated before one consolidated validation run.
+name: Required core gate restoration
 
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [restore/ci-after-bulk-integration-20260909]
+    paths:
+      - ".github/workflows/restore-ci-after-bulk-integration.yml"
+      - ".github/workflows/fix-mannequin-terminal-scale-once.yml"
+      - ".github/workflows/patch-mannequin-foot-scaling.yml"
 
 permissions:
   contents: read
@@ -17,8 +15,34 @@ permissions:
 jobs:
   core:
     name: core
-    if: ${{ false }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
-      - name: Record owner-authorized deferred validation
-        run: echo "Full CI is enabled but intentionally deferred for this backlog PR; the required check is transparently skipped."
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Verify exact CI cleanup scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_HEAD_REF" = "fix/ci-core-bootstrap-scope-20260910-v1"
+
+          mapfile -t changed < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | sort)
+          printf '%s\n' "${changed[@]}" > /tmp/actual
+          cat > /tmp/expected <<'EOF'
+          .github/workflows/fix-mannequin-terminal-scale-once.yml
+          .github/workflows/patch-mannequin-foot-scaling.yml
+          .github/workflows/restore-ci-after-bulk-integration.yml
+          EOF
+          diff -u /tmp/expected /tmp/actual
+
+          test ! -e .github/workflows/fix-mannequin-terminal-scale-once.yml
+          test ! -e .github/workflows/patch-mannequin-foot-scaling.yml
+          ! grep -Fq 'if: ${{ false }}' .github/workflows/restore-ci-after-bulk-integration.yml
+          grep -Fq 'paths:' .github/workflows/restore-ci-after-bulk-integration.yml
+          grep -Eq '^  core:$' .github/workflows/ci.yml
+          grep -Fq 'needs:' .github/workflows/ci.yml
+          git diff --check "$BASE_SHA" "$HEAD_SHA"
