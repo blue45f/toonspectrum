@@ -70,6 +70,7 @@ import {
 import { StudioLiveQuickCollaborationControls } from "./StudioLiveQuickCollaborationControls";
 import { useStudioLiveCursorChatBubbles } from "./use-studio-live-cursor-chat-bubbles";
 import { useStudioLiveCursorQuality } from "./use-studio-live-cursor-quality";
+import { useStudioLiveDisplaySync } from "./use-studio-live-display-sync";
 
 import type {
   StudioLiveCursorPayload,
@@ -383,6 +384,7 @@ function StudioCommentPinPreviewPortal({
   > | null>(null);
 
   useLayoutEffect(() => {
+    let measureFrame: number | null = null;
     const measure = () => {
       const anchorRect = anchor.getBoundingClientRect();
       const tooltipRect = tooltipRef.current?.getBoundingClientRect();
@@ -400,20 +402,30 @@ function StudioCommentPinPreviewPortal({
           : undefined,
       }));
     };
+    const scheduleMeasure = () => {
+      if (measureFrame !== null) return;
+      measureFrame = globalThis.requestAnimationFrame(() => {
+        measureFrame = null;
+        measure();
+      });
+    };
     measure();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    const observer = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(scheduleMeasure);
     observer?.observe(anchor);
     if (tooltipRef.current) observer?.observe(tooltipRef.current);
-    globalThis.addEventListener("resize", measure);
-    globalThis.addEventListener("scroll", measure, true);
-    globalThis.visualViewport?.addEventListener("resize", measure);
-    globalThis.visualViewport?.addEventListener("scroll", measure);
+    globalThis.addEventListener("resize", scheduleMeasure);
+    globalThis.addEventListener("scroll", scheduleMeasure, true);
+    globalThis.visualViewport?.addEventListener("resize", scheduleMeasure);
+    globalThis.visualViewport?.addEventListener("scroll", scheduleMeasure);
     return () => {
+      if (measureFrame !== null) globalThis.cancelAnimationFrame(measureFrame);
       observer?.disconnect();
-      globalThis.removeEventListener("resize", measure);
-      globalThis.removeEventListener("scroll", measure, true);
-      globalThis.visualViewport?.removeEventListener("resize", measure);
-      globalThis.visualViewport?.removeEventListener("scroll", measure);
+      globalThis.removeEventListener("resize", scheduleMeasure);
+      globalThis.removeEventListener("scroll", scheduleMeasure, true);
+      globalThis.visualViewport?.removeEventListener("resize", scheduleMeasure);
+      globalThis.visualViewport?.removeEventListener("scroll", scheduleMeasure);
     };
   }, [anchor, author, body]);
 
@@ -1245,7 +1257,6 @@ export function StudioLivePresenceDock({
   voiceControls,
 }: StudioLivePresenceDockProps) {
   // Always-on collab chrome: parent passes alwaysOn while connecting/ready (presence strip).
-  if (!alwaysOn && !connected && peers.length === 0) return null;
   const lockCount =
     Number.isFinite(activeLockCount) && activeLockCount > 0
       ? Math.floor(activeLockCount)
@@ -1261,7 +1272,7 @@ export function StudioLivePresenceDock({
   const desktopHiddenPeerCount = Math.max(0, peers.length - visiblePeers.length);
   const desktopOverflow = studioPresenceOverflowLabel(desktopHiddenPeerCount);
   const connectionLabel = studioPresenceConnectionLabel(connected);
-  const resolvedSync = syncSnapshot ?? {
+  const rawResolvedSync: StudioLiveSyncSnapshot = syncSnapshot ?? {
     ...INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
     phase: connected && operationSyncReady ? "syncing" : connected ? "syncing" : "retrying",
     transportReady: connected,
@@ -1272,6 +1283,8 @@ export function StudioLivePresenceDock({
         : "원고 연산 동기화를 준비하는 중입니다."
       : connectionLabel,
   };
+  const resolvedSync = useStudioLiveDisplaySync(rawResolvedSync) ?? rawResolvedSync;
+  if (!alwaysOn && !connected && peers.length === 0) return null;
   const syncPresentation = presentStudioLiveSyncSnapshot(resolvedSync);
   const lastAckLabel = formatStudioLiveLastAck(resolvedSync.lastAckAt);
   const syncAnnouncement = `${syncPresentation.shortLabel}. ${syncPresentation.detail}`;
