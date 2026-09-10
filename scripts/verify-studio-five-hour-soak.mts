@@ -199,29 +199,79 @@ async function gcHeap(cdp: CDPSession | null, startedAt: number): Promise<HeapSa
   }
 }
 
-async function closeBrushCatalog(page: Page): Promise<boolean> {
-  const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
-  if (!(await catalog.isVisible().catch(() => false))) return true;
-  await page.keyboard.press("Escape").catch(() => undefined);
-  return catalog.waitFor({ state: "hidden", timeout: 3_000 })
+async function closeBrushSurfaces(page: Page): Promise<boolean> {
+  const surfaces = [
+    page.locator('[data-studio-brush-catalog-session="true"]'),
+    page.locator('[data-studio-brush-library="true"]').first(),
+    page.locator('[data-studio-mobile-sheet="draw"]'),
+  ];
+  for (const surface of surfaces) {
+    if (!(await surface.isVisible().catch(() => false))) continue;
+    await page.keyboard.press("Escape").catch(() => undefined);
+    const closed = await surface.waitFor({ state: "hidden", timeout: 3_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!closed) return false;
+  }
+  return true;
+}
+
+async function openMobileBrushLibrary(page: Page): Promise<Locator | null> {
+  if (!(await closeBrushSurfaces(page))) return null;
+  const dock = page.locator('[data-studio-mobile-editing-dock="true"]');
+  const settings = dock.getByRole("button", {
+    name: "브러시 설정 (굵기·색·프리셋)",
+    exact: true,
+  });
+  if (!(await settings.isVisible().catch(() => false))) return null;
+  if (await settings.getAttribute("aria-expanded") !== "true") {
+    await settings.click({ timeout: 5_000 }).catch(() => undefined);
+  }
+  const sheet = page.locator("#studio-mobile-draw-settings");
+  const opener = sheet.locator('[data-studio-open-brush-library="true"]');
+  if (!(await opener.waitFor({ state: "visible", timeout: 5_000 })
     .then(() => true)
-    .catch(() => false);
+    .catch(() => false))) return null;
+  await opener.click({ timeout: 5_000 }).catch(() => undefined);
+  const library = page.locator('[data-studio-brush-library="true"]').first();
+  if (!(await library.waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false))) return null;
+  return library;
 }
 
 async function selectBrush(page: Page, item: StudioBrushCatalogItem): Promise<boolean> {
   const mobileDock = page.locator('[data-studio-mobile-editing-dock="true"]');
   const mobileDockVisible = await mobileDock.isVisible({ timeout: 250 }).catch(() => false);
-  if (!(await closeBrushCatalog(page))) return false;
-  if (!mobileDockVisible) await page.keyboard.press("b");
-  const opener = mobileDockVisible
-    ? mobileDock.locator('[data-studio-open-brush-library="true"]')
-    : page.locator('[data-studio-draw-options="true"] [data-studio-brush-active-pill="true"]');
-  if (!(await opener.isVisible().catch(() => false))) return false;
-  await opener.click();
-  const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
-  if (!(await catalog.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false))) {
-    return false;
+  if (mobileDockVisible) {
+    const library = await openMobileBrushLibrary(page);
+    if (!library) return false;
+    await library.getByRole("searchbox").fill(item.name);
+    const option = library.getByRole("button", { name: `${item.name} 선택`, exact: true });
+    if (!(await option.waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false))) {
+      await closeBrushSurfaces(page);
+      return false;
+    }
+    await option.scrollIntoViewIfNeeded();
+    await option.click({ force: true });
+    return closeBrushSurfaces(page);
   }
+
+  if (!(await closeBrushSurfaces(page))) return false;
+  await page.keyboard.press("b");
+  const toolbar = page.locator('[data-studio-draw-options="true"]');
+  if (!(await toolbar.waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false))) return false;
+  const pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
+  if (!(await pill.isVisible().catch(() => false))) return false;
+  await pill.click();
+  const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
+  if (!(await catalog.waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false))) return false;
   await catalog.getByRole("tab", { name: "전체", exact: true }).click().catch(() => undefined);
   await catalog.getByRole("searchbox").fill(item.name);
   const option = catalog.getByRole("button", { name: `${item.name} 선택`, exact: true });
@@ -234,12 +284,12 @@ async function selectBrush(page: Page, item: StudioBrushCatalogItem): Promise<bo
     await page.waitForTimeout(100);
   }
   if (await option.count() === 0) {
-    await closeBrushCatalog(page);
+    await closeBrushSurfaces(page);
     return false;
   }
   await option.first().scrollIntoViewIfNeeded();
   await option.first().click({ force: true });
-  return closeBrushCatalog(page);
+  return closeBrushSurfaces(page);
 }
 
 async function ensurePenReady(page: Page): Promise<boolean> {
@@ -259,8 +309,8 @@ async function ensurePenReady(page: Page): Promise<boolean> {
 }
 
 async function drawEvidenceStroke(page: Page, cycle: number): Promise<{ changed: number; shot: Buffer }> {
-  if (!(await closeBrushCatalog(page))) {
-    throw new Error("brush catalogue stayed open before drawing evidence");
+  if (!(await closeBrushSurfaces(page))) {
+    throw new Error("brush surfaces stayed open before drawing evidence");
   }
   const stage = page.locator(".konvajs-content").first();
   const box = await stage.boundingBox();

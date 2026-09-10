@@ -13,30 +13,36 @@ function sliceFunction(name: string, nextName: string): string {
 }
 
 describe("Studio five-hour soak browser state isolation", () => {
-  it("closes a stale brush catalogue instead of treating it as drawing state", () => {
-    const closeCatalog = sliceFunction("closeBrushCatalog", "selectBrush");
-    expect(closeCatalog).toContain('page.keyboard.press("Escape")');
-    expect(closeCatalog).toContain('state: "hidden"');
-    expect(closeCatalog).toContain(".catch(() => false)");
+  it("closes every brush surface that can cover mobile or desktop drawing", () => {
+    const close = sliceFunction("closeBrushSurfaces", "openMobileBrushLibrary");
+    expect(close).toContain('[data-studio-brush-catalog-session="true"]');
+    expect(close).toContain('[data-studio-brush-library="true"]');
+    expect(close).toContain('[data-studio-mobile-sheet="draw"]');
+    expect(close).toContain('page.keyboard.press("Escape")');
+    expect(close).toContain('state: "hidden"');
+    expect(close).toContain(".catch(() => false)");
   });
 
-  it("normalizes catalogue state before opening and requires it closed after selection", () => {
-    const selectBrush = sliceFunction("selectBrush", "ensurePenReady");
-    const normalizeIndex = selectBrush.indexOf("await closeBrushCatalog(page)");
-    const openIndex = selectBrush.indexOf("await opener.click()");
-    const chooseIndex = selectBrush.indexOf("await option.first().click");
-    const verifyClosedIndex = selectBrush.lastIndexOf("closeBrushCatalog(page)");
-
-    expect(normalizeIndex).toBeGreaterThanOrEqual(0);
-    expect(normalizeIndex).toBeLessThan(openIndex);
-    expect(chooseIndex).toBeGreaterThan(openIndex);
-    expect(verifyClosedIndex).toBeGreaterThan(chooseIndex);
-    expect(selectBrush).toContain('[data-studio-mobile-editing-dock="true"]');
-    expect(selectBrush).toContain('[data-studio-open-brush-library="true"]');
-    expect(selectBrush).not.toContain('waitFor({ state: "hidden", timeout: 3_000 }).catch(() => undefined)');
+  it("opens the mobile catalogue through the real draw-settings sheet", () => {
+    const open = sliceFunction("openMobileBrushLibrary", "selectBrush");
+    expect(open).toContain('[data-studio-mobile-editing-dock="true"]');
+    expect(open).toContain('name: "브러시 설정 (굵기·색·프리셋)"');
+    expect(open).toContain('page.locator("#studio-mobile-draw-settings")');
+    expect(open).toContain('sheet.locator('[data-studio-open-brush-library="true"]')');
+    expect(open).toContain('[data-studio-brush-library="true"]');
+    expect(open).not.toContain('dock.locator('[data-studio-open-brush-library="true"]')');
   });
 
-  it("uses the real mobile pen authority and keeps the desktop shortcut as fallback", () => {
+  it("keeps mobile and desktop brush selection on their actual surfaces", () => {
+    const select = sliceFunction("selectBrush", "ensurePenReady");
+    expect(select).toContain("await openMobileBrushLibrary(page)");
+    expect(select).toContain('library.getByRole("searchbox")');
+    expect(select).toContain('page.keyboard.press("b")');
+    expect(select).toContain('[data-studio-brush-active-pill="true"]');
+    expect(select).toContain("return closeBrushSurfaces(page)");
+  });
+
+  it("uses the real mobile pen authority and keeps the desktop shortcut fallback", () => {
     const pen = sliceFunction("ensurePenReady", "drawEvidenceStroke");
     expect(pen).toContain('[data-studio-mobile-editing-dock="true"]');
     expect(pen).toContain('getByRole("button", { name: /^(?:펜|Pen)$/u })');
@@ -44,14 +50,13 @@ describe("Studio five-hour soak browser state isolation", () => {
     expect(pen).toContain('page.keyboard.press("b")');
   });
 
-  it("never measures ink while the brush catalogue is covering the canvas", () => {
+  it("never measures ink while a brush surface is covering the canvas", () => {
     const draw = sliceFunction("drawEvidenceStroke", "spawnPreview");
-    const closeIndex = draw.indexOf("await closeBrushCatalog(page)");
+    const closeIndex = draw.indexOf("await closeBrushSurfaces(page)");
     const beforeShotIndex = draw.indexOf("const before = await page.screenshot");
-
     expect(closeIndex).toBeGreaterThanOrEqual(0);
     expect(closeIndex).toBeLessThan(beforeShotIndex);
-    expect(draw).toContain("brush catalogue stayed open before drawing evidence");
+    expect(draw).toContain("brush surfaces stayed open before drawing evidence");
   });
 
   it("spreads raster probes instead of repainting seven saturated lanes", () => {
