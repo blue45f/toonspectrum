@@ -60,6 +60,12 @@ jobs:
                   continue
               name = str(step.get('name', 'unnamed materializer step'))
               shell = str(step.get('shell', 'bash'))
+              if name == 'Materialize one guided Studio 3D entry':
+                  command = command.replace('if ">3D 캐릭터<" in source:', 'if "3D 스튜디오" not in source:')
+                  command = command.replace(
+                      'for label in [">3D 캐릭터<", ">캐릭터 셰이퍼<", ">3D 데생 인형<", ">3D 배경<"]:',
+                      'for label in ["3D 캐릭터", "캐릭터 셰이퍼", "3D 데생 인형", "3D 배경"]:',
+                  )
               print(f'::group::{name}', flush=True)
               if shell.startswith('python'):
                   subprocess.run(['python3', '-c', command], check=True, env=os.environ.copy())
