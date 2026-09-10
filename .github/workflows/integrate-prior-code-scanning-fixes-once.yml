@@ -1,0 +1,107 @@
+name: Integrate prior code-scanning fixes once
+
+on:
+  push:
+    branches:
+      - fix/code-scanning-alerts-20260910-v3
+    paths:
+      - .github/workflows/integrate-prior-code-scanning-fixes-once.yml
+
+permissions:
+  contents: write
+  security-events: read
+
+concurrency:
+  group: remediate-code-scanning-alerts-20260910-v3
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_BRANCH: fix/code-scanning-alerts-20260910-v3
+      PRIOR_BRANCH: fix/code-scanning-alerts-20260910
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/code-scanning-alerts-20260910-v3
+          fetch-depth: 0
+
+      - name: Synchronize refs and inventory alert paths
+        run: |
+          set -euo pipefail
+          git fetch origin main "${PRIOR_BRANCH}:${PRIOR_BRANCH}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit origin/main
+
+          gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
+            --slurp | jq -r 'add // [] | .[].most_recent_instance.location.path // empty' \
+            | sort -u > /tmp/alert-paths.txt
+
+          echo "Current alert paths:"
+          cat /tmp/alert-paths.txt
+
+      - name: Reuse only non-conflicting prior fixes for current alert files
+        run: |
+          set -euo pipefail
+          : > /tmp/reused-paths.txt
+          : > /tmp/skipped-paths.txt
+
+          while IFS= read -r path; do
+            [[ -n "$path" ]] || continue
+            case "$path" in
+              .github/workflows/*temp*.yml|.github/workflows/*once*.yml)
+                echo "$path (temporary workflow)" >> /tmp/skipped-paths.txt
+                continue
+                ;;
+            esac
+
+            # Never overwrite an autofix or another current-branch change.
+            if ! git diff --quiet origin/main...HEAD -- "$path"; then
+              echo "$path (already changed on current branch)" >> /tmp/skipped-paths.txt
+              continue
+            fi
+
+            if git cat-file -e "${PRIOR_BRANCH}:${path}" 2>/dev/null; then
+              if git diff --quiet origin/main "${PRIOR_BRANCH}" -- "$path"; then
+                echo "$path (no prior fix)" >> /tmp/skipped-paths.txt
+              else
+                git checkout "${PRIOR_BRANCH}" -- "$path"
+                echo "$path" >> /tmp/reused-paths.txt
+              fi
+            elif git cat-file -e "origin/main:${path}" 2>/dev/null; then
+              git rm -- "$path"
+              echo "$path (prior branch deletion)" >> /tmp/reused-paths.txt
+            else
+              echo "$path (not present in prior branch)" >> /tmp/skipped-paths.txt
+            fi
+          done < /tmp/alert-paths.txt
+
+          git diff --check
+          {
+            echo "## Prior security fix reuse"
+            echo
+            echo "### Reused"
+            sed 's/^/- `/' /tmp/reused-paths.txt | sed 's/$/`/' || true
+            echo
+            echo "### Skipped safely"
+            sed 's/^/- `/' /tmp/skipped-paths.txt | sed 's/$/`/' || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit selected prior fixes and retire this workflow
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/integrate-prior-code-scanning-fixes-once.yml
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "fix(security): converge prior code-scanning remediations"
+          git push origin "HEAD:${TARGET_BRANCH}"
