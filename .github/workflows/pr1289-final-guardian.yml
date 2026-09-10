@@ -24,12 +24,7 @@ jobs:
           ref: fix/real-core-and-main-only-20260910
           fetch-depth: 0
           persist-credentials: true
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+
       - name: Repair every confirmed PR 1289 failure
         shell: bash
         run: |
@@ -39,16 +34,19 @@ jobs:
 
           changed: list[str] = []
 
-          def replace_exact(path_value: str, old: str, new: str, expected: int = 1) -> None:
+          def replace_once(path_value: str, old: str, new: str) -> None:
               path = Path(path_value)
               text = path.read_text(encoding="utf-8")
               count = text.count(old)
-              if count != expected:
-                  raise RuntimeError(
-                      f"{path}: expected {expected} occurrence(s), found {count}: {old[:120]!r}"
-                  )
-              path.write_text(text.replace(old, new), encoding="utf-8")
-              changed.append(path_value)
+              if count == 1:
+                  path.write_text(text.replace(old, new, 1), encoding="utf-8")
+                  changed.append(path_value)
+                  return
+              if count == 0 and new in text:
+                  return
+              raise RuntimeError(
+                  f"{path}: expected exactly one old block or an already-applied new block; found {count}: {old[:160]!r}"
+              )
 
           def prepend_once(path_value: str, prefix: str) -> None:
               path = Path(path_value)
@@ -58,74 +56,78 @@ jobs:
               path.write_text(prefix + text, encoding="utf-8")
               changed.append(path_value)
 
-          # CC0 search is intentionally debounced; the browser proof must observe settled UI.
-          replace_exact(
+          # CC0 search is debounced. Observe the settled result count before asserting.
+          replace_once(
               "scripts/verify-studio-cc0-curated-ui.mjs",
-              '''  await search.fill("no such cc0 asset");
-          assert.equal(
-            await page.locator(`${DIALOG} [data-studio-cc0-grid] article`).count(),
-            0,
-            "empty search must render no asset cards",
-          );''',
-              '''  await search.fill("no such cc0 asset");
-          await waitFor(
-            page,
-            async () =>
-              (await page.locator(`${DIALOG} [data-studio-cc0-grid] article`).count()) === 0,
-            "empty search must render no asset cards after debounce",
-          );''',
+              '''  await page
+            .getByLabel('에셋 검색', { exact: true })
+            .fill('존재하지않는검수문자열');
+          assert.equal(await panel.locator('article').count(), 0);
+          await page.getByLabel('에셋 검색', { exact: true }).fill('목재');
+          assert.ok((await panel.locator('article').count()) > 0);''',
+              '''  await page
+            .getByLabel('에셋 검색', { exact: true })
+            .fill('존재하지않는검수문자열');
+          await waitForResultCount(0);
+          assert.equal(await panel.locator('article').count(), 0);
+          await page.getByLabel('에셋 검색', { exact: true }).fill('목재');
+          await panel.locator('article').first().waitFor({
+            state: 'visible',
+            timeout: 30_000,
+          });
+          assert.ok((await panel.locator('article').count()) > 0);''',
           )
 
-          # /studio is now the Studio home. Browser proofs that require the editor use /studio/canvas.
-          replace_exact(
+          # /studio is the Studio home. Browser proofs that require the editor use /studio/canvas.
+          replace_once(
               "scripts/verify-studio-menus.mts",
               '  const url = `http://127.0.0.1:${port}/studio`;',
               '  const url = `http://127.0.0.1:${port}/studio/canvas`;',
           )
-          replace_exact(
+          replace_once(
               "scripts/verify-studio-discovery-ux.mts",
               '  await page.goto(`${previewOrigin}/studio`, { waitUntil: "domcontentloaded", timeout: 45_000 });',
               '  await page.goto(`${previewOrigin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 45_000 });',
           )
-          replace_exact(
+          replace_once(
               "scripts/verify-studio-brushes.mts",
               '  const studioUrl = `${origin}studio`;',
               '  const studioUrl = `${origin}studio/canvas`;',
           )
-          replace_exact(
+          replace_once(
               "scripts/verify-studio-filter-dialog.mts",
               '  const url = `${origin}/studio`;',
               '  const url = `${origin}/studio/canvas`;',
           )
-          replace_exact(
+          replace_once(
               "scripts/verify-studio-collaboration-sync.mts",
               '      const response = await fetch(`${origin}/studio`);',
               '      const response = await fetch(`${origin}/studio/canvas`);',
           )
-          replace_exact(
+          replace_once(
               "scripts/verify-studio-collaboration-sync.mts",
               '  await pageA.goto(`${origin}/studio`, { waitUntil: "domcontentloaded", timeout: 30_000 });',
               '  await pageA.goto(`${origin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 30_000 });',
           )
 
-          # React Testing Library tests need a DOM and must match the disclosure's accessible name.
+          # React Testing Library needs a DOM; disclosure matching follows its accessible name.
           prepend_once(
               "apps/web/src/domains/creator/brush/StudioBrushGoalStart.test.tsx",
               "// @vitest-environment jsdom\n",
           )
-          replace_exact(
+          replace_once(
               "apps/web/src/domains/creator/brush/StudioDrawingPaletteStack.test.tsx",
               '        name: "브러시 스튜디오",',
               '        name: /브러시 스튜디오/u,',
           )
 
-          # Guided Brush Studio is a Brush Studio/Brush DNA door and belongs beside brush-studio.
-          replace_exact(
+          # Guided Brush Studio belongs alongside Brush Studio/Brush DNA.
+          replace_once(
               "apps/web/src/domains/creator/studio-main-menu-group-spec.ts",
               '      has("Brush Studio/Brush DNA", "brush/brush-studio"),',
               '      has("Brush Studio/Brush DNA", "brush/brush-studio", "brush/brush-lab"),',
           )
-          replace_exact(
+          replace_once(
               "apps/web/src/domains/creator/studio-command-catalog.ts",
               '''export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
             ...BASE_MENU_INVENTORY.flatMap((id) => id === "help/current-tool" ? [id, MANUAL_MENU_ID] : [id]),
@@ -141,24 +143,24 @@ jobs:
           )
 
           # The feature-tutorial menu id now opens the broader help home by design.
-          replace_exact(
+          replace_once(
               "apps/web/src/domains/creator/studio-main-menu-groups.test.ts",
               '    expect(menuItem(english, "help", "feature-tutorials").label).toBe("Feature tutorials");',
               '    expect(menuItem(english, "help", "feature-tutorials").label).toBe("Help home and guided learning");',
           )
-          replace_exact(
+          replace_once(
               "apps/web/src/domains/creator/studio-main-menu-groups.test.ts",
               '    expect(menuItem(korean, "help", "feature-tutorials").label).toBe("사용법 · 기능 튜토리얼");',
               '    expect(menuItem(korean, "help", "feature-tutorials").label).toBe("도움말 홈 · 단계별 가이드");',
           )
-          replace_exact(
+          replace_once(
               "apps/web/src/domains/creator/studio-main-menu-groups.test.ts",
               '    expect(editor.openFeatureTutorial).toHaveBeenCalledOnce();',
               '    expect(editor.openFeatureTutorial).not.toHaveBeenCalled();',
           )
 
           # Exact /studio is the front door; scoped editor routes remain on the wildcard router.
-          replace_exact(
+          replace_once(
               "apps/web/src/app/routes/groups/studio-manual.routes.test.tsx",
               '''  it("preserves editor, 3D and publish routes", () => {
             for (const path of ["/studio", "/studio/character", "/studio/bg3d", "/studio/publish"]) {
@@ -173,8 +175,8 @@ jobs:
           });''',
           )
 
-          # Use stable product ids for the native select controls in the learning E2E.
-          replace_exact(
+          # Use stable ids for native learning-plan select controls.
+          replace_once(
               "e2e/learn.spec.ts",
               '''  await page.goto("/learn");
             await page.getByLabel("지금 가장 중요한 목표", { exact: true }).selectOption("publish");
@@ -191,7 +193,7 @@ jobs:
             await level.selectOption("advanced");
             await sessionMinutes.selectOption("45");''',
           )
-          replace_exact(
+          replace_once(
               "e2e/learn.spec.ts",
               '''  await expect(page.getByLabel("지금 가장 중요한 목표", { exact: true })).toHaveValue("publish");
             await expect(page.getByLabel("현재 경험", { exact: true })).toHaveValue("advanced");
@@ -207,6 +209,14 @@ jobs:
           PY
 
           git diff --check
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
       - name: Verify repaired contracts
         shell: bash
         run: |
@@ -231,6 +241,7 @@ jobs:
             apps/web/src/domains/creator/studio-main-menu-group-spec.test.ts \
             apps/web/src/domains/creator/studio-main-menu-groups.test.ts \
             apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
+
       - name: Persist repair and remove temporary workflows
         shell: bash
         run: |
