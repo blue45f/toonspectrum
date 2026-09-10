@@ -178,13 +178,13 @@ export type StudioDocumentRouteResult =
   | StudioInvalidDocumentRouteResolution
   | StudioNotDocumentRouteResolution;
 
-const WORKSPACE_IDS = new Set<StudioDocumentWorkspaceId>(
+const WORKSPACE_IDS = new Set<string>(
   STUDIO_DOCUMENT_WORKSPACES.map((workspace) => workspace.id),
 );
-const WORKSPACE_BY_ID = new Map<StudioDocumentWorkspaceId, StudioDocumentWorkspaceDefinition>(
-  STUDIO_DOCUMENT_WORKSPACES.map((workspace) => [workspace.id, workspace]),
-);
 const RESERVED_QUERY_KEYS = ["workspace", "focus", "language", "version"] as const;
+const LEGACY_IDENTITY_QUERY_KEYS = ["id", "mode", "remix", "project", "draft"] as const;
+
+type DocumentQueryKey = (typeof RESERVED_QUERY_KEYS)[number];
 
 function paramsFrom(search: string | URLSearchParams | undefined): URLSearchParams {
   return search instanceof URLSearchParams
@@ -226,7 +226,7 @@ function decodeIdentity(segment: string): string | null {
 
 function singleValue(
   params: URLSearchParams,
-  key: (typeof RESERVED_QUERY_KEYS)[number],
+  key: DocumentQueryKey,
 ): string | null | undefined {
   const values = params.getAll(key);
   if (values.length > 1) return undefined;
@@ -257,6 +257,13 @@ function serializedHref(pathname: string, params: URLSearchParams): string {
   return search.length > 0 ? `${pathname}?${search}` : pathname;
 }
 
+function cleanCanonicalParams(search: string | URLSearchParams | undefined): URLSearchParams {
+  const params = paramsFrom(search);
+  for (const key of RESERVED_QUERY_KEYS) params.delete(key);
+  for (const key of LEGACY_IDENTITY_QUERY_KEYS) params.delete(key);
+  return params;
+}
+
 function requireDocumentMode(input: StudioDocumentHrefInput): {
   readonly scope: "project" | "draft";
   readonly projectId: string | null;
@@ -277,14 +284,43 @@ function requireDocumentMode(input: StudioDocumentHrefInput): {
     : { scope: "draft", projectId: null, documentId: null, draftId };
 }
 
+function normalizedDocumentState(input: StudioDocumentHrefInput): {
+  readonly workspace: StudioDocumentWorkspaceId;
+  readonly focus: string | null;
+  readonly language: string | null;
+  readonly version: string | null;
+} {
+  const workspace = input.workspace ?? "draw";
+  if (!isStudioDocumentWorkspace(workspace)) {
+    throw new Error(`Unknown Studio document workspace: ${String(workspace)}`);
+  }
+  const focus = normalizeFocus(input.focus ?? null);
+  const language = normalizeLanguage(input.language ?? null);
+  const version = normalizeVersion(input.version ?? null);
+  if (focus === undefined) throw new Error("A document href requires a valid focus target.");
+  if (language === undefined) throw new Error("A document href requires a valid language tag.");
+  if (version === undefined) throw new Error("A document href requires a valid version identity.");
+  return { workspace, focus, language, version };
+}
+
+function applyDocumentState(
+  params: URLSearchParams,
+  state: ReturnType<typeof normalizedDocumentState>,
+): void {
+  params.set("workspace", state.workspace);
+  if (state.focus) params.set("focus", state.focus);
+  if (state.language) params.set("language", state.language);
+  if (state.version) params.set("version", state.version);
+}
+
 export function isStudioDocumentWorkspace(value: unknown): value is StudioDocumentWorkspaceId {
-  return typeof value === "string" && WORKSPACE_IDS.has(value as StudioDocumentWorkspaceId);
+  return typeof value === "string" && WORKSPACE_IDS.has(value);
 }
 
 export function studioDocumentWorkspaceById(
   id: StudioDocumentWorkspaceId,
 ): StudioDocumentWorkspaceDefinition {
-  const workspace = WORKSPACE_BY_ID.get(id);
+  const workspace = STUDIO_DOCUMENT_WORKSPACES.find((candidate) => candidate.id === id);
   if (!workspace) throw new Error(`Unknown Studio document workspace: ${id}`);
   return workspace;
 }
@@ -312,13 +348,9 @@ export function studioDraftDocumentPathname(draftId: string): string {
 
 export function studioDocumentHref(input: StudioDocumentHrefInput): string {
   const identity = requireDocumentMode(input);
-  const workspace = input.workspace ?? "draw";
-  const params = paramsFrom(input.search);
-  for (const key of RESERVED_QUERY_KEYS) params.delete(key);
-  params.set("workspace", workspace);
-  if (input.focus) params.set("focus", input.focus);
-  if (input.language) params.set("language", input.language);
-  if (input.version) params.set("version", input.version);
+  const state = normalizedDocumentState(input);
+  const params = cleanCanonicalParams(input.search);
+  applyDocumentState(params, state);
 
   const pathname = identity.scope === "project"
     ? studioProjectDocumentPathname(identity.projectId ?? "", identity.documentId ?? "")
@@ -328,19 +360,12 @@ export function studioDocumentHref(input: StudioDocumentHrefInput): string {
 
 export function studioLegacyEditorHref(input: StudioDocumentHrefInput): string {
   const identity = requireDocumentMode(input);
-  const workspace = input.workspace ?? "draw";
-  const legacySurface = studioDocumentWorkspaceToLegacySurface(workspace);
-  const params = paramsFrom(input.search);
-  for (const key of RESERVED_QUERY_KEYS) params.delete(key);
-  params.delete("id");
-  params.delete("mode");
-  params.delete("remix");
-  params.set("workspace", workspace);
+  const state = normalizedDocumentState(input);
+  const legacySurface = studioDocumentWorkspaceToLegacySurface(state.workspace);
+  const params = cleanCanonicalParams(input.search);
+  applyDocumentState(params, state);
   if (identity.projectId) params.set("project", identity.projectId);
   if (identity.draftId) params.set("draft", identity.draftId);
-  if (input.focus) params.set("focus", input.focus);
-  if (input.language) params.set("language", input.language);
-  if (input.version) params.set("version", input.version);
 
   const pathname = identity.documentId
     ? `/studio/work/${encodeURIComponent(identity.documentId)}/${legacySurface}`
@@ -386,25 +411,35 @@ export function parseStudioDocumentLocation({
     return { kind: "not-document" };
   }
 
-  const params = paramsFrom(search);
-  const workspaceValue = singleValue(params, "workspace");
-  if (workspaceValue === undefined || (workspaceValue !== null && !isStudioDocumentWorkspace(workspaceValue))) {
+  const rawParams = paramsFrom(search);
+  const workspaceValue = singleValue(rawParams, "workspace");
+  if (
+    workspaceValue === undefined
+    || (workspaceValue !== null && !isStudioDocumentWorkspace(workspaceValue))
+  ) {
     return { kind: "invalid-document", errorCode: "invalid-workspace" };
   }
-  const focus = normalizeFocus(singleValue(params, "focus") ?? null);
-  if (focus === undefined) return { kind: "invalid-document", errorCode: "invalid-focus" };
-  const language = normalizeLanguage(singleValue(params, "language") ?? null);
-  if (language === undefined) return { kind: "invalid-document", errorCode: "invalid-language" };
-  const version = normalizeVersion(singleValue(params, "version") ?? null);
-  if (version === undefined) return { kind: "invalid-document", errorCode: "invalid-version" };
+  const focusValue = singleValue(rawParams, "focus");
+  if (focusValue === undefined) return { kind: "invalid-document", errorCode: "invalid-focus" };
+  const languageValue = singleValue(rawParams, "language");
+  if (languageValue === undefined) {
+    return { kind: "invalid-document", errorCode: "invalid-language" };
+  }
+  const versionValue = singleValue(rawParams, "version");
+  if (versionValue === undefined) {
+    return { kind: "invalid-document", errorCode: "invalid-version" };
+  }
+
   const workspace = (workspaceValue ?? "draw") as StudioDocumentWorkspaceId;
+  const focus = normalizeFocus(focusValue);
+  const language = normalizeLanguage(languageValue);
+  const version = normalizeVersion(versionValue);
+  if (focus === undefined) return { kind: "invalid-document", errorCode: "invalid-focus" };
+  if (language === undefined) return { kind: "invalid-document", errorCode: "invalid-language" };
+  if (version === undefined) return { kind: "invalid-document", errorCode: "invalid-version" };
 
-  for (const key of RESERVED_QUERY_KEYS) params.delete(key);
-  params.set("workspace", workspace);
-  if (focus) params.set("focus", focus);
-  if (language) params.set("language", language);
-  if (version) params.set("version", version);
-
+  const params = cleanCanonicalParams(rawParams);
+  applyDocumentState(params, { workspace, focus, language, version });
   const canonicalPathname = scope === "project"
     ? studioProjectDocumentPathname(projectId ?? "", documentId ?? "")
     : studioDraftDocumentPathname(draftId ?? "");
