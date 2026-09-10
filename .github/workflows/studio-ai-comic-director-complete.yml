@@ -4,31 +4,50 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx"
+      - "apps/web/src/domains/creator/ai/studio-ai-comic-composer-*.ts"
+      - "apps/web/src/domains/creator/ai/studio-ai-comic-director*.ts"
+      - "apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel*.tsx"
+      - "apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad*.tsx"
+      - "apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow*.ts"
+      - "apps/web/src/domains/creator/ai/studio-scenario-image-generation*.ts"
+      - "apps/web/src/domains/creator/ai/StudioAiEpisodeProduction*.tsx"
+      - "apps/web/src/domains/creator/ai/StudioAiToolPopoverBody*.ts*"
+      - "apps/web/src/domains/creator/StudioScenarioCandidateDesk*.tsx"
+      - "apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel*.tsx"
+      - "apps/web/src/domains/creator/StudioThreeDPreviewPanelStack.tsx"
+      - "apps/web/src/domains/creator/StudioLazyPanelStack.tsx"
+      - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
+      - "apps/web/src/domains/creator/studio-scenario-layout.ts"
+      - "apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute*.tsx"
+      - "apps/web/src/domains/creator/studio-router/studio-ai-comic-director-route*.ts"
+      - "apps/web/src/domains/creator/studio-router/studio-route-manifest*.ts"
+      - "apps/api/src/modules/studio-ai/studio-ai-comic-director*.ts"
+      - "apps/api/src/modules/studio-ai/studio-ai.module.ts"
+      - "apps/api/src/db/schema/studio-ai-comic-director.schema.ts"
+      - "apps/api/src/db/schema/index.ts"
       - ".github/workflows/studio-ai-comic-director-complete.yml"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: studio-ai-comic-director-complete-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  repair-compiler:
-    name: repair-compiler
-    if: ${{ github.head_ref == 'fix/real-core-and-main-only-20260910' }}
+  complete:
+    name: complete
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: fix/real-core-and-main-only-20260910
-          fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
+      # package.json의 packageManager를 단일 버전 소스로 사용한다.
       - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
@@ -36,77 +55,58 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Replace suppressed dependency with a stable seed ref
-        shell: bash
+      # 기존 quality/complete 워크플로의 기능 검증을 한 러너에서 모두 수행한다.
+      # 체크아웃·캐시 복원·설치를 두 번 지불하지 않으면서 테스트 범위는 유지한다.
+      - name: Verify complete comic director behavior
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/studio-router/studio-ai-comic-director-route.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-director-session.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-director.test.ts
+          apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.test.tsx
+          apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts
+          apps/api/src/modules/studio-ai/studio-ai-comic-director.contract.test.ts
+
+      - name: Lint comic director production surfaces
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/ai/studio-ai-comic-composer-*.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director*.ts \
+            apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel*.tsx \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad*.tsx \
+            apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow*.ts \
+            apps/web/src/domains/creator/ai/studio-scenario-image-generation*.ts \
+            apps/web/src/domains/creator/ai/StudioAiEpisodeProduction*.tsx \
+            apps/web/src/domains/creator/ai/StudioAiToolPopoverBody*.tsx \
+            apps/web/src/domains/creator/StudioScenarioCandidateDesk*.tsx \
+            apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel*.tsx \
+            apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute*.tsx \
+            apps/web/src/domains/creator/studio-router/studio-ai-comic-director-route*.ts \
+            apps/api/src/modules/studio-ai/studio-ai-comic-director*.ts
 
-          path = Path('apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx')
-          text = path.read_text(encoding='utf-8')
+      # PR의 저장소 전체 lint/typecheck/build는 필수 CI/core가 한 번 수행한다.
+      # 필요할 때만 수동 진단 실행에서 동일한 전역 검사를 재현한다.
+      - name: Typecheck web and API (manual diagnostic)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: pnpm run typecheck
 
-          text = text.replace(
-              'import { useEffect, useMemo, useState, type ReactElement } from "react";',
-              'import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";',
-              1,
-          )
+      - name: Validate architecture (manual diagnostic)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: pnpm run validate:architecture
 
-          state_line = '  const [session, setSession] = useState(() => initialSession(resolution));\n'
-          if 'const initialSessionRef = useRef(session);' not in text:
-              if state_line not in text:
-                  raise SystemExit('session state initializer not found')
-              text = text.replace(
-                  state_line,
-                  state_line + '  const initialSessionRef = useRef(session);\n',
-                  1,
-              )
-
-          effect_start = text.index(
-              '  useEffect(() => {\n'
-              '    let active = true;\n'
-              '    const synchronize = async () => {'
-          )
-          effect_end = text.index('\n\n  const patchSession = (', effect_start)
-          effect = text[effect_start:effect_end]
-          effect = effect.replace(
-              '  useEffect(() => {\n'
-              '    let active = true;\n'
-              '    const synchronize = async () => {',
-              '  useEffect(() => {\n'
-              '    let active = true;\n'
-              '    const seedSession = initialSessionRef.current;\n'
-              '    const synchronize = async () => {',
-              1,
-          )
-          effect = effect.replace('api.createSession(session)', 'api.createSession(seedSession)')
-          effect = effect.replace('routePath(resolution, session.id)', 'routePath(resolution, seedSession.id)')
-          old_tail = (
-              '  // Route identity owns remote hydration; `session` is deliberately read as the local create snapshot.\n'
-              '  // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on session would resync after setSession and loop.\n'
-              '  }, [api, navigate, resolution, session.id]);'
-          )
-          if old_tail not in effect:
-              raise SystemExit('suppressed effect dependency tail not found')
-          effect = effect.replace(old_tail, '  }, [api, navigate, resolution]);', 1)
-          text = text[:effect_start] + effect + text[effect_end:]
-          path.write_text(text, encoding='utf-8')
-          PY
-
-      - name: Verify targeted lint and route behavior
-        run: |
-          pnpm exec eslint --max-warnings=0 apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx
-          pnpm exec vitest run apps/web/src/domains/creator/studio-router/studio-ai-comic-director-route.test.ts
-
-      - name: Commit verified source repair
-        shell: bash
-        run: |
-          set -euo pipefail
-          git diff --check
-          git config user.name toonstudio-quality-ci
-          git config user.email actions@users.noreply.github.com
-          git add apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute.tsx
-          git diff --cached --check
-          git -c core.hooksPath=/dev/null commit -m 'fix(studio): satisfy React compiler without hook suppression'
-          git push --no-verify origin HEAD:fix/real-core-and-main-only-20260910
+      - name: Build production application (manual diagnostic)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: pnpm run build
