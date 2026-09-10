@@ -1,5 +1,6 @@
 name: Collaboration sync final repair once
 
+# Registered by the previous commit; this update triggers the one-shot repair.
 on:
   push:
     branches:
