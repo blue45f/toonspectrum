@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: tagged-product-final-20260911
-  cancel-in-progress: true
+  group: tagged-product-final-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   materialize-tagged-product-work:
