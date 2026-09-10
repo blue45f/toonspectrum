@@ -92,13 +92,15 @@ export function normalizeBrushQualityPolicy(value: unknown): BrushQualityPolicy 
 
 export function toggleBrushQualityPhysics(policy: BrushQualityPolicy, id: BrushPhysicsId): BrushQualityPolicy {
   const current = new Set(policy.simulation.physics);
-  current.has(id) ? current.delete(id) : current.add(id);
+  if (current.has(id)) current.delete(id);
+  else current.add(id);
   return normalizeBrushQualityPolicy({ ...policy, simulation: { ...policy.simulation, physics: [...current] } });
 }
 
 export function toggleBrushQualityProvider(policy: BrushQualityPolicy, id: BrushProviderId): BrushQualityPolicy {
   const current = new Set(policy.providers);
-  current.has(id) ? current.delete(id) : current.add(id);
+  if (current.has(id)) current.delete(id);
+  else current.add(id);
   current.add("native-webgpu");
   return normalizeBrushQualityPolicy({ ...policy, providers: [...current] });
 }

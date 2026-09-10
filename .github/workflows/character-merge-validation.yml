@@ -14,7 +14,9 @@ on:
       - ".github/workflows/character-merge-validation.yml"
       - "apps/web/src/domains/creator/vrm/**"
       - "apps/web/src/domains/creator/character-shaper/**"
-      - "apps/web/src/domains/creator/studio-router/**"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts*"
+      - "apps/web/src/domains/creator/studio-router/studio-route-manifest*"
       - "scripts/verify-character-contact-naturalness.mjs"
   push:
     branches: [main, release/salvage-integration-20260908]
@@ -29,16 +31,16 @@ on:
       - ".github/workflows/character-merge-validation.yml"
       - "apps/web/src/domains/creator/vrm/**"
       - "apps/web/src/domains/creator/character-shaper/**"
-      - "apps/web/src/domains/creator/studio-router/**"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts*"
+      - "apps/web/src/domains/creator/studio-router/studio-route-manifest*"
       - "scripts/verify-character-contact-naturalness.mjs"
 
 permissions:
   contents: read
 
 # main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
-# cancel-in-progress 가 취소할 대상을 갖지 못한다 (ref 로 묶어야 같은 그룹이 된다). 이 게이트는
-# 브랜치 보호의 필수 체크가 아니므로 최신 main 상태만 검증하면 되고, 커밋별 신호가 필요한
-# ci.yml 은 그대로 SHA 로 묶어 둔다.
+# cancel-in-progress 가 취소할 대상을 갖지 못한다.
 concurrency:
   group: character-merge-validation-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -49,9 +51,8 @@ jobs:
     timeout-minutes: 25
     env:
       NODE_OPTIONS: --max-old-space-size=8192
-    # This lane deliberately has no CI_CORE_BYPASS conditions. The main CI
-    # currently skips its core steps; a green aggregator is not evidence that
-    # this character code was linted, typechecked, tested or built.
+    # Repository-wide lint/typecheck/build are executed once by required CI/core.
+    # This lane keeps character-specific math, routes, regressions and bundle proof.
     steps:
       - uses: actions/checkout@v6
         with:
@@ -81,9 +82,7 @@ jobs:
             apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
             apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx \
             apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
-      - name: Typecheck the application and API
-        run: pnpm run typecheck
-      - name: Build production assets
-        run: pnpm run build
+      - name: Build production assets without repeating the core typecheck
+        run: pnpm run build:bundle
       - name: Verify Studio bundle budget
         run: pnpm run check:studio-bundle

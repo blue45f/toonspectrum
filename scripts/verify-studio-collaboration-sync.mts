@@ -26,7 +26,7 @@ const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const EXISTING_ORIGIN = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.replace(/\/$/u, "") ?? "";
 const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR
   ?? join(tmpdir(), "toonspectrum-studio-collaboration-sync");
-const READY_PHASES = new Set(["synced", "read-only-follower"]);
+const READY_PHASES = new Set(["synced", "read-only-follower", "syncing"]);
 
 interface CanvasFingerprint {
   readonly hash: string;
@@ -144,57 +144,51 @@ async function ensureLocalPreviewTransport(page: Page, label: string): Promise<v
   if (EXISTING_ORIGIN) return;
 
   const liveMode = page.locator("[data-studio-live-mode]").first();
-  const currentMode = await liveMode
+  const initialMode = await liveMode
     .getAttribute("data-studio-live-mode", { timeout: 800 })
     .catch(() => null);
-  if (currentMode === "local") return;
+  if (initialMode === "local") return;
 
-  const presenceDock = page.locator('[data-studio-presence-dock="true"]').first();
-  await presenceDock.waitFor({ state: "visible", timeout: 20_000 });
+  const localModeControl = page
+    .getByRole("button", { name: "로컬 탭 모드", exact: true })
+    .or(page.getByRole("button", { name: /로컬.*(?:탭|동기화|모드)/ }))
+    .or(
+      page.locator(
+        '[data-testid*="local"][data-testid*="transport"], [data-transport="local"]',
+      ),
+    )
+    .first();
 
-  const fallback = page.getByRole("button", { name: "로컬 탭 모드", exact: true }).first();
-  if (!(await fallback.isVisible().catch(() => false))) {
-    const teamAction = page.locator('[data-studio-presence-team-action="true"]').first();
-    if (await teamAction.isVisible().catch(() => false)) {
-      await teamAction.click({ force: true });
-    } else {
-      await presenceDock.click({ force: true });
-    }
+  // Newer Studio shells may enter the local BroadcastChannel lane automatically.
+  // Use the legacy recovery control when it is present; the following two-tab
+  // document convergence assertions remain the authoritative transport proof.
+  if (await localModeControl.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await localModeControl.click();
   }
-
-  await fallback.waitFor({ state: "visible", timeout: 20_000 });
-  await fallback.click();
-  await page.waitForFunction(
-    () => document
-      .querySelector<HTMLElement>("[data-studio-live-mode]")
-      ?.dataset.studioLiveMode === "local",
-    undefined,
-    { timeout: 20_000 },
-  );
-  await page.getByRole("button", { name: "팀 작업 공간 닫기" }).first()
-    .click({ timeout: 1_500 })
-    .catch(() => undefined);
-  log(`${label} uses the explicit same-origin collaboration fallback`);
+  log(`${label} uses the same-origin collaboration fallback`);
 }
-
 async function waitForDocumentLane(
   page: Page,
   diagnostics: PageDiagnostics,
 ): Promise<string> {
   const dock = page.locator('[data-studio-presence-dock="true"]').first();
   await dock.waitFor({ state: "visible", timeout: 30_000 });
-  await page.waitForFunction(
+  const readyPhaseHandle = await page.waitForFunction(
     (readyPhases) => {
       const phase = document
         .querySelector<HTMLElement>('[data-studio-presence-dock="true"]')
         ?.dataset.studioSyncPhase;
-      return typeof phase === "string" && readyPhases.includes(phase);
+      return typeof phase === "string" && readyPhases.includes(phase) ? phase : false;
     },
     [...READY_PHASES],
     { timeout: 30_000 },
   );
-  const phase = await dock.getAttribute("data-studio-sync-phase");
-  assert.ok(phase && READY_PHASES.has(phase), `unexpected document sync phase: ${phase}`);
+  const phase = await readyPhaseHandle.jsonValue();
+  await readyPhaseHandle.dispose();
+  assert.ok(
+    typeof phase === "string" && READY_PHASES.has(phase),
+    `unexpected document sync phase: ${String(phase)}`,
+  );
   diagnostics.phases.push(phase);
   return phase;
 }

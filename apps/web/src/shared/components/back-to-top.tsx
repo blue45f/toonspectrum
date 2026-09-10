@@ -14,10 +14,21 @@ export function BackToTop() {
   const t = useT();
 
   useEffect(() => {
-    const onScroll = () => setVisible(globalThis.scrollY > SHOW_AFTER_PX);
-    onScroll(); // 초기 위치 반영(딥링크로 중간에 진입한 경우)
+    let scrollFrame: number | null = null;
+    const updateVisibility = () => setVisible(globalThis.scrollY > SHOW_AFTER_PX);
+    const onScroll = () => {
+      if (scrollFrame !== null) return;
+      scrollFrame = globalThis.requestAnimationFrame(() => {
+        scrollFrame = null;
+        updateVisibility();
+      });
+    };
+    updateVisibility(); // 초기 위치 반영(딥링크로 중간에 진입한 경우)
     globalThis.addEventListener("scroll", onScroll, { passive: true });
-    return () => globalThis.removeEventListener("scroll", onScroll);
+    return () => {
+      if (scrollFrame !== null) globalThis.cancelAnimationFrame(scrollFrame);
+      globalThis.removeEventListener("scroll", onScroll);
+    };
   }, []);
 
   const onClick = () => {

@@ -38,6 +38,7 @@ export function StudioPageListResizeHandle(): ReactElement {
 export const StudioPageListPane = memo(function StudioPageListPane(
   props: StudioPageListPaneProps,
 ): ReactElement {
+  const { composeWorkAssetPreviewPage } = props;
   const [organizerOpen, setOrganizerOpen] = useState(false);
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
   const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
@@ -59,11 +60,11 @@ export const StudioPageListPane = memo(function StudioPageListPane(
   const renderThumbnail = useCallback(
     (page: PageState) => (
       <StudioPageThumbnail
-        page={props.composeWorkAssetPreviewPage(page)}
+        page={composeWorkAssetPreviewPage(page)}
         className="h-auto w-full aspect-[2/3]"
       />
     ),
-    [props.composeWorkAssetPreviewPage],
+    [composeWorkAssetPreviewPage],
   );
 
   const launcher = toolbarHost

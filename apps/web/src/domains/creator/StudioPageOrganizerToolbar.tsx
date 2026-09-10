@@ -65,7 +65,6 @@ export function StudioPageOrganizerToolbar({
   onQueryChange,
   onFilterChange,
   onSelectAll,
-  onReset,
   onRevealCurrent,
   onMove,
   onDuplicate,

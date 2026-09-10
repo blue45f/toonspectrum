@@ -16,7 +16,6 @@ import {
   type BrushRuntimeCapabilities,
   type BrushRuntimeCertification,
   type BrushRuntimeCompileOptions,
-  type BrushRuntimeDomain,
   type BrushRuntimeFieldDescriptor,
   type BrushRuntimeFieldFormat,
   type BrushRuntimeFieldId,

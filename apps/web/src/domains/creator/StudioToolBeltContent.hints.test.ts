@@ -72,7 +72,8 @@ describe("Studio ToolBelt rich hint coverage", () => {
   it("routes every native ToolBelt button through the shared single-open hint target", () => {
     const buttons = nativeControls("button", sourceFiles);
 
-    expect(buttons).toHaveLength(40);
+    // Four direct 3D launchers moved behind the shared lazy 3D Studio popover.
+    expect(buttons).toHaveLength(36);
     expect(buttons.filter((button) => nearestHintTarget(button) === null)).toEqual([]);
     expect(allSource).toContain('<StudioToolHintTarget preferredSide="bottom" {...props} />');
     expect(allSource).not.toContain('role="tooltip"');

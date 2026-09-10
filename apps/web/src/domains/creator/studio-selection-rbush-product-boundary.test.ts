@@ -43,13 +43,32 @@ describe("selection hit helpers used by product marquee / pick paths", () => {
     )).toBeNull();
   });
 
-  it("StudioPage marquee completion calls selectIdsByMarquee", () => {
+  it("StudioPage marquee completion calls the selection facade", () => {
     const page = readStudioCuttoonEditorSource();
     expect(page).toContain("selectIdsByMarquee");
     expect(page).toMatch(/const hitIds = selectIdsByMarquee\(/u);
-    const selection = readFileSync(new URL("./studio-selection.ts", import.meta.url), "utf8");
-    expect(selection).toContain("export function selectIdsByMarquee");
-    expect(selection).toContain("export function pickObjectIdAtPoint");
+
+    const selectionFacade = readFileSync(
+      new URL("./studio-selection.ts", import.meta.url),
+      "utf8",
+    );
+    expect(selectionFacade).toContain(
+      'export * from "./selection/studio-object-selection-marquee"',
+    );
+    expect(selectionFacade).toContain(
+      'export * from "./selection/studio-object-selection-pick"',
+    );
+
+    const marqueeModule = readFileSync(
+      new URL("./selection/studio-object-selection-marquee.ts", import.meta.url),
+      "utf8",
+    );
+    const pickModule = readFileSync(
+      new URL("./selection/studio-object-selection-pick.ts", import.meta.url),
+      "utf8",
+    );
+    expect(marqueeModule).toContain("export function selectIdsByMarquee");
+    expect(pickModule).toContain("export function pickObjectIdAtPoint");
   });
 
   it("large-doc spatial index remains available on the hybrid object-pick path", () => {

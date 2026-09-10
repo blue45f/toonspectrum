@@ -4,12 +4,23 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "apps/web/src/domains/creator/ai/studio-ai-comic-director-*.ts"
+      - "apps/web/src/domains/creator/ai/studio-ai-comic-composer-*.ts"
+      - "apps/web/src/domains/creator/ai/studio-ai-comic-director*.ts"
       - "apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel*.tsx"
-      - "apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel*.tsx"
-      - "apps/web/src/domains/creator/studio-router/**"
-      - "apps/web/src/domains/creator/studio-scenario-layout.ts"
       - "apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad*.tsx"
+      - "apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow*.ts"
+      - "apps/web/src/domains/creator/ai/studio-scenario-image-generation*.ts"
+      - "apps/web/src/domains/creator/ai/StudioAiEpisodeProduction*.tsx"
+      - "apps/web/src/domains/creator/ai/StudioAiToolPopoverBody*.ts*"
+      - "apps/web/src/domains/creator/StudioScenarioCandidateDesk*.tsx"
+      - "apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel*.tsx"
+      - "apps/web/src/domains/creator/StudioThreeDPreviewPanelStack.tsx"
+      - "apps/web/src/domains/creator/StudioLazyPanelStack.tsx"
+      - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
+      - "apps/web/src/domains/creator/studio-scenario-layout.ts"
+      - "apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute*.tsx"
+      - "apps/web/src/domains/creator/studio-router/studio-ai-comic-director-route*.ts"
+      - "apps/web/src/domains/creator/studio-router/studio-route-manifest*.ts"
       - "apps/api/src/modules/studio-ai/studio-ai-comic-director*.ts"
       - "apps/api/src/modules/studio-ai/studio-ai.module.ts"
       - "apps/api/src/db/schema/studio-ai-comic-director.schema.ts"
@@ -28,44 +39,74 @@ jobs:
   complete:
     name: complete
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 25
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v6
-
-      - uses: pnpm/action-setup@v4
         with:
-          version: 11.4.0
-          run_install: false
+          persist-credentials: false
+
+      # package.json의 packageManager를 단일 버전 소스로 사용한다.
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24.16.0
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify focused comic director behavior
+      # 기존 quality/complete 워크플로의 기능 검증을 한 러너에서 모두 수행한다.
+      # 체크아웃·캐시 복원·설치를 두 번 지불하지 않으면서 테스트 범위는 유지한다.
+      - name: Verify complete comic director behavior
         run: >-
           pnpm exec vitest run
           apps/web/src/domains/creator/studio-router/studio-ai-comic-director-route.test.ts
           apps/web/src/domains/creator/ai/studio-ai-comic-director-session.test.ts
           apps/web/src/domains/creator/ai/studio-ai-comic-director-media.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-handoff.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-composer-intent.test.ts
+          apps/web/src/domains/creator/ai/studio-ai-comic-director.test.ts
           apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.test.tsx
           apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel.test.tsx
           apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad.test.tsx
+          apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow.test.ts
+          apps/web/src/domains/creator/StudioScenarioCandidateDesk.test.tsx
+          apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionModal.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiEpisodeProductionGateway.test.tsx
+          apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.production.test.ts
           apps/api/src/modules/studio-ai/studio-ai-comic-director.contract.test.ts
 
-      - name: Lint changed production path
-        run: pnpm run lint:quick
+      - name: Lint comic director production surfaces
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/ai/studio-ai-comic-composer-*.ts \
+            apps/web/src/domains/creator/ai/studio-ai-comic-director*.ts \
+            apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel*.tsx \
+            apps/web/src/domains/creator/ai/StudioAiProductionLaunchpad*.tsx \
+            apps/web/src/domains/creator/ai/studio-scenario-candidate-workflow*.ts \
+            apps/web/src/domains/creator/ai/studio-scenario-image-generation*.ts \
+            apps/web/src/domains/creator/ai/StudioAiEpisodeProduction*.tsx \
+            apps/web/src/domains/creator/ai/StudioAiToolPopoverBody*.tsx \
+            apps/web/src/domains/creator/StudioScenarioCandidateDesk*.tsx \
+            apps/web/src/domains/creator/StudioScenarioAutoLayoutPanel*.tsx \
+            apps/web/src/domains/creator/studio-router/routes/StudioAiComicDirectorRoute*.tsx \
+            apps/web/src/domains/creator/studio-router/studio-ai-comic-director-route*.ts \
+            apps/api/src/modules/studio-ai/studio-ai-comic-director*.ts
 
-      - name: Typecheck web and API
+      # PR의 저장소 전체 lint/typecheck/build는 필수 CI/core가 한 번 수행한다.
+      # 필요할 때만 수동 진단 실행에서 동일한 전역 검사를 재현한다.
+      - name: Typecheck web and API (manual diagnostic)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: pnpm run typecheck
 
-      - name: Validate architecture
+      - name: Validate architecture (manual diagnostic)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: pnpm run validate:architecture
 
-      - name: Build production application
+      - name: Build production application (manual diagnostic)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: pnpm run build

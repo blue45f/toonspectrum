@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll, beforeEach, expect } from "vitest";
+import { cleanup } from "@testing-library/react";
+import { afterAll, afterEach, beforeEach, expect } from "vitest";
 import { APP_I18N_NAMESPACES, STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
 import { registerI18nLocaleEntries, setAppI18nAssetSource } from "@/shared/lib/i18n";
 import { parseStudioI18nDictionary, STUDIO_I18N_ASSET_LOCALES } from "@/domains/creator/studio-i18n-loader";
@@ -45,6 +46,13 @@ function isStudioMenubarContentTest(testPath: unknown): testPath is string {
 }
 
 if (typeof document !== "undefined") {
+  afterEach(() => {
+    // Vitest does not expose its hooks as globals in this repository. Testing Library's
+    // implicit auto-cleanup therefore never registers, leaving prior React roots and DOM
+    // nodes alive for the next test in the same file. Always unmount explicitly.
+    cleanup();
+  });
+
   beforeEach(() => {
     // Project Center persistence is product behaviour and must remain visible to its own tests.
     // Only the broad Menubar fixture needs isolation because delegated actions in that same file
