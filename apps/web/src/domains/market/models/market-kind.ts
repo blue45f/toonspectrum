@@ -105,7 +105,7 @@ export interface MarketLicenseMeta {
 export const MARKET_LICENSES: readonly MarketLicenseMeta[] = Object.freeze([
   {
     license: "toonspectrum-standard",
-    label: "ToonStudio 표준 사용권",
+    label: "ToonSpectrum 표준 사용권",
     summary: "작품에는 사용할 수 있고 리소스 파일 자체의 재배포는 허용하지 않음",
     url: null,
   },

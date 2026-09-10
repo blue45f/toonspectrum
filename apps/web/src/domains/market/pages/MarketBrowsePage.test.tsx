@@ -113,7 +113,7 @@ describe("MarketBrowsePage", () => {
     expect(screen.getByLabelText("현재 검색 쿼리").textContent).toBe("?q=alpha");
   });
 
-  it("keeps baseline and coarse-pointer controls reachable and hides the native cancel button", () => {
+  it("keeps the 48px search field and coarse-pointer controls reachable and hides the native cancel button", () => {
     render(
       <MemoryRouter initialEntries={["/market/browse?q=ink&kind=brush&license=cc0-1.0"]}>
         <MarketBrowsePage />
@@ -124,7 +124,7 @@ describe("MarketBrowsePage", () => {
     expect(search.getAttribute("maxlength")).toBe(String(
       CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS
     ));
-    expect(search.className).toContain("pointer-coarse:h-11");
+    expect(search.className).toContain("h-12");
     expect(search.className).toContain("[&::-webkit-search-cancel-button]:hidden");
 
     expect(screen.getByRole("button", { name: "검색어 지우기" }).className)
