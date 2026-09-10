@@ -1,0 +1,259 @@
+name: Curated superseded branch prune slim
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/curated-superseded-branch-prune-slim.yml"
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: curated-superseded-branch-prune-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  prune:
+    if: >-
+      github.repository == 'blue45f/toonspectrum' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'ops/curated-superseded-branch-prune-20260910-1637'
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_BRANCH: ${{ github.head_ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Delete exact superseded refs and retire this runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const repository = process.env.REPO;
+          const [owner, repo] = repository.split('/');
+          const token = process.env.GH_TOKEN;
+          const selfPr = Number(process.env.PR_NUMBER);
+          const selfBranch = process.env.HEAD_BRANCH;
+          const selfSha = process.env.HEAD_SHA;
+          const apiRoot = 'https://api.github.com';
+          const headers = {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'toonspectrum-curated-superseded-branch-prune',
+          };
+
+          const candidates = [
+            { branch: 'fix/studio-final-stability-20260910', sha: '7fd1ec37153666eebb63102beabe272983f953a9', sourcePr: 1237, mode: 'no_diff', replacements: [], needles: ['변경 파일이 0개', '제품 변경이나 추가 검증 자산이 없'] },
+            { branch: 'fix/studio-ai-reference-navigation-main-20260910-v2', sha: '07faad1df89d8672a84802aa450d41ae437c3d13', sourcePr: 1216, mode: 'replacement', replacements: [1210], needles: ['PR #1210', '추가 제품 변경은 없습니다'] },
+            { branch: 'fix/studio-ai-reference-navigation-20260910', sha: '513e0934c29647050f6765ece9968bbab0cd511e', sourcePr: 1203, mode: 'replacement', replacements: [1210], needles: ['#1210으로 재구성', '실제 제품 변경'] },
+            { branch: 'chore/retire-scene3d-one-shot-materializers-20260910', sha: '9e344e0c0683d12b6a259365cc9d0bc197a23902', sourcePr: 1202, mode: 'replacement', replacements: [1200], needles: ['#1200에 이미 있습니다', '제품 코드 및 상설 품질 게이트 변경 없음'] },
+            { branch: 'chore/cleanup-retired-one-shot-workflows-20260910', sha: 'bcba27717fabf946a66a7bd9304f5c5f3fb59f2b', sourcePr: 1199, mode: 'replacement', replacements: [1197, 1200], needles: ['superseded by #1197', 'two remaining Scene3D'] },
+            { branch: 'fix/studio-full-stability-convergence-20260910', sha: '78aea9c0d42d3a66e3ff0a250e33b828f7bcb3aa', sourcePr: 1195, mode: 'replacement', replacements: [1192, 1193], needles: ['#1192 / #1193', '유일한 잔여 diff'] },
+            { branch: 'fix/studio-status-notice-save-center-stacking-v2-20260910', sha: '9814f13d89378f15255756184d62abeed8c90ebf', sourcePr: 1196, mode: 'replacement', replacements: [1192], needles: ['#1192', 'No unique product change remains here'] },
+            { branch: 'fix/bg3d-atomic-template-switch-main-20260910', sha: '9e2eef9928e0ade44aaba0d295df61fb1e023ff9', sourcePr: 1168, mode: 'replacement', replacements: [1157], needles: ['#1157', '남은 고유 파일은 일회성 복구 workflow'] },
+            { branch: 'fix/vrm-preview-thumbnail-stability-20260910', sha: '5c4e18e1fa6deb65167d189e85f34c4dbce32fc4', sourcePr: 1175, mode: 'replacement', replacements: [1161], needles: ['#1161', '유일한 변경은'] },
+            { branch: 'fix/studio-brush-worker-recovery-20260910', sha: '176464fc24287d376a0220398f0aefca362486b5', sourcePr: 1149, mode: 'replacement', replacements: [1152], needles: ['PR #1152', '오래된 기준 커밋의 중복본'] },
+            { branch: 'fix/production-build-and-cleanup-safety-20260910', sha: '143ea89188558cc5394d133ea69bb52acb3f14a0', sourcePr: 1147, mode: 'replacement', replacements: [1150], needles: ['fix/production-build-and-cleanup-safety-v2-20260910', 'product type fixes are preserved'] },
+          ];
+
+          class HttpError extends Error {
+            constructor(status, method, path, payload) {
+              super(`${method} ${path} -> ${status}`);
+              this.status = status;
+              this.payload = payload;
+            }
+          }
+
+          async function request(path, init = {}) {
+            const method = init.method || 'GET';
+            const response = await fetch(`${apiRoot}${path}`, {
+              ...init,
+              headers: { ...headers, ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...(init.headers || {}) },
+            });
+            if (response.status === 204) return null;
+            const text = await response.text();
+            let payload = null;
+            try { payload = text ? JSON.parse(text) : null; } catch { payload = text; }
+            if (!response.ok) throw new HttpError(response.status, method, path, payload);
+            return payload;
+          }
+
+          async function maybe(path) {
+            try { return await request(path); }
+            catch (error) { if (error.status === 404) return null; throw error; }
+          }
+
+          const encodeRef = (branch) => branch.split('/').map(encodeURIComponent).join('/');
+          const pullQuery = async (params) => request(`/repos/${owner}/${repo}/pulls?${new URLSearchParams({ state: 'open', per_page: '1', ...params })}`);
+          const hasOpenReference = async (branch) => {
+            const [heads, bases] = await Promise.all([
+              pullQuery({ head: `${owner}:${branch}` }),
+              pullQuery({ base: branch }),
+            ]);
+            return heads.length > 0 || bases.length > 0;
+          };
+
+          async function replacementIsMergedOnMain(number, mainSha, defaultBranch) {
+            const pull = await request(`/repos/${owner}/${repo}/pulls/${number}`);
+            if (!pull.merged_at || !/^[0-9a-f]{40}$/.test(pull.merge_commit_sha || '') || pull.base?.ref !== defaultBranch || pull.head?.repo?.full_name !== repository) return false;
+            const compare = await request(`/repos/${owner}/${repo}/compare/${mainSha}...${pull.merge_commit_sha}`);
+            return Number(compare.ahead_by ?? -1) === 0;
+          }
+
+          function row(branch, sha, decision, evidence, sourcePr) {
+            return { branch, sha, decision, evidence, sourcePr };
+          }
+
+          (async () => {
+            if (candidates.length < 1 || candidates.length > 20) throw new Error('unexpected candidate count');
+            const repoInfo = await request(`/repos/${owner}/${repo}`);
+            const defaultBranch = repoInfo.default_branch;
+            if (defaultBranch !== 'main') throw new Error(`default branch changed to ${defaultBranch}`);
+            const main = await request(`/repos/${owner}/${repo}/branches/${encodeRef(defaultBranch)}`);
+            const mainSha = main.commit.sha;
+            const results = [];
+
+            for (const candidate of candidates) {
+              const { branch, sha, sourcePr, mode, replacements, needles } = candidate;
+              try {
+                if (branch === defaultBranch || branch === selfBranch || !/^[0-9a-f]{40}$/.test(sha)) {
+                  results.push(row(branch, sha, 'preserved', 'invalid_or_reserved_candidate', sourcePr));
+                  continue;
+                }
+
+                const branchPath = `/repos/${owner}/${repo}/branches/${encodeRef(branch)}`;
+                const current = await maybe(branchPath);
+                if (!current) {
+                  results.push(row(branch, sha, 'preserved', 'already_missing', sourcePr));
+                  continue;
+                }
+                if (current.commit?.sha !== sha) {
+                  results.push(row(branch, sha, 'preserved', `head_sha_changed:${current.commit?.sha || 'unknown'}`, sourcePr));
+                  continue;
+                }
+                if (current.protected) {
+                  results.push(row(branch, sha, 'preserved', 'protected_branch', sourcePr));
+                  continue;
+                }
+                if (await hasOpenReference(branch)) {
+                  results.push(row(branch, sha, 'preserved', 'open_pull_request_reference', sourcePr));
+                  continue;
+                }
+
+                const source = await request(`/repos/${owner}/${repo}/pulls/${sourcePr}`);
+                const sourceIdentityOk = source.state === 'closed'
+                  && !source.merged_at
+                  && source.base?.ref === defaultBranch
+                  && source.head?.ref === branch
+                  && source.head?.sha === sha
+                  && source.head?.repo?.full_name === repository;
+                if (!sourceIdentityOk) {
+                  results.push(row(branch, sha, 'preserved', 'source_pr_identity_or_state_changed', sourcePr));
+                  continue;
+                }
+                const sourceText = `${source.title || ''}\n${source.body || ''}`;
+                if (!needles.every((needle) => sourceText.includes(needle))) {
+                  results.push(row(branch, sha, 'preserved', 'source_pr_proof_changed', sourcePr));
+                  continue;
+                }
+
+                if (mode === 'no_diff') {
+                  if (source.changed_files !== 0 || source.additions !== 0 || source.deletions !== 0) {
+                    results.push(row(branch, sha, 'preserved', 'source_pr_no_longer_empty', sourcePr));
+                    continue;
+                  }
+                } else if (mode === 'replacement') {
+                  let replacementsOk = true;
+                  for (const replacement of replacements) {
+                    if (!(await replacementIsMergedOnMain(replacement, mainSha, defaultBranch))) {
+                      replacementsOk = false;
+                      break;
+                    }
+                  }
+                  if (!replacementsOk) {
+                    results.push(row(branch, sha, 'preserved', 'replacement_not_merged_on_main', sourcePr));
+                    continue;
+                  }
+                } else {
+                  results.push(row(branch, sha, 'preserved', 'unknown_proof_mode', sourcePr));
+                  continue;
+                }
+
+                const runs = await request(`/repos/${owner}/${repo}/actions/runs?${new URLSearchParams({ branch, per_page: '100' })}`);
+                if ((runs.workflow_runs || []).some((run) => run.status !== 'completed')) {
+                  results.push(row(branch, sha, 'preserved', 'active_workflow_run', sourcePr));
+                  continue;
+                }
+
+                const finalBranch = await maybe(branchPath);
+                if (!finalBranch || finalBranch.commit?.sha !== sha || finalBranch.protected) {
+                  results.push(row(branch, sha, 'preserved', 'changed_during_final_recheck', sourcePr));
+                  continue;
+                }
+                if (await hasOpenReference(branch)) {
+                  results.push(row(branch, sha, 'preserved', 'new_open_pull_request', sourcePr));
+                  continue;
+                }
+                const refPath = `/repos/${owner}/${repo}/git/ref/heads/${encodeRef(branch)}`;
+                const ref = await maybe(refPath);
+                if (!ref || ref.object?.sha !== sha) {
+                  results.push(row(branch, sha, 'preserved', 'ref_changed_during_final_recheck', sourcePr));
+                  continue;
+                }
+
+                try {
+                  await request(`/repos/${owner}/${repo}/git/refs/heads/${encodeRef(branch)}`, { method: 'DELETE' });
+                  results.push(row(branch, sha, 'deleted', mode, sourcePr));
+                } catch (error) {
+                  results.push(row(branch, sha, 'failed', `delete_failed:${error.message}`, sourcePr));
+                }
+              } catch (error) {
+                results.push(row(branch, sha, 'preserved', `safety_error:${error.message}`, sourcePr));
+              }
+            }
+
+            const deleted = results.filter((item) => item.decision === 'deleted').length;
+            const preserved = results.filter((item) => item.decision === 'preserved').length;
+            const failed = results.filter((item) => item.decision === 'failed').length;
+            const lines = [
+              '# Curated superseded branch prune',
+              '',
+              `- Repository: \`${repository}\``,
+              `- Default branch: \`${defaultBranch}\``,
+              `- Main snapshot: \`${mainSha}\``,
+              `- Candidates: \`${candidates.length}\``,
+              `- Deleted: \`${deleted}\``,
+              `- Preserved by safety checks: \`${preserved}\``,
+              `- Delete failures: \`${failed}\``,
+              '',
+              '| Branch | Expected SHA | Decision | Evidence | Source PR |',
+              '|---|---|---|---|---|',
+              ...results.map((item) => `| \`${item.branch}\` | \`${item.sha.slice(0, 12)}\` | ${item.decision} | ${item.evidence} | #${item.sourcePr} |`),
+            ];
+            const report = `${lines.join('\n')}\n`;
+            console.log(report);
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, report);
+
+            const self = await request(`/repos/${owner}/${repo}/branches/${encodeRef(selfBranch)}`);
+            if (self.commit?.sha !== selfSha || self.protected) throw new Error('temporary runner branch moved or became protected');
+            await request(`/repos/${owner}/${repo}/pulls/${selfPr}`, { method: 'PATCH', body: JSON.stringify({ state: 'closed' }) });
+            await request(`/repos/${owner}/${repo}/git/refs/heads/${encodeRef(selfBranch)}`, { method: 'DELETE' });
+            const selfReport = `\n## Temporary runner cleanup\n\n- Closed temporary PR: #${selfPr}\n- Deleted temporary branch: \`${selfBranch}\` at \`${selfSha.slice(0, 12)}\`\n- No temporary workflow was merged into \`main\`.\n`;
+            console.log(selfReport);
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, selfReport);
+            if (failed > 0) process.exitCode = 1;
+          })().catch((error) => {
+            console.error(error.stack || String(error));
+            process.exitCode = 1;
+          });
+          NODE
