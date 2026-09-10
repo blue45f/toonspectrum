@@ -81,7 +81,7 @@ describe("shared asset drag payload", () => {
     expect(parseStudioAssetDragPayload(svgDragPayload(base64Svg(safeSvg)))).not.toBeNull();
     expect(parseStudioAssetDragPayload(svgDragPayload(percentSvg(safeSvg)))).not.toBeNull();
     const allLegacyAndSelectableAssets = [...STUDIO_ORIGINAL_FREE_ASSETS, ...STUDIO_RETIRED_ORIGINAL_FREE_ASSETS];
-    expect(allLegacyAndSelectableAssets).toHaveLength(32);
+    expect(allLegacyAndSelectableAssets).toHaveLength(80);
     for (const asset of allLegacyAndSelectableAssets) {
       expect(parseStudioAssetDragPayload(svgDragPayload(
         encodeStudioOriginalAssetSvg(asset.svg)
