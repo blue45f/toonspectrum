@@ -120,9 +120,18 @@ describe("studio-mannequin-model 비례 수학", () => {
     if (baseArm?.kind === "capsule" && tunedArm?.kind === "capsule") {
       expect(tunedArm.radius).toBeGreaterThan(baseArm.radius);
     }
-    const baseDigits = base.primitives.filter((p) => p.kind === "capsule" && p.jointId === "leftHand");
-    const tunedDigits = tuned.primitives.filter((p) => p.kind === "capsule" && p.jointId === "leftHand");
-    expect(Math.abs(tunedDigits[0]!.to[1])).toBeGreaterThan(Math.abs(baseDigits[0]!.to[1]));
+    const baseDigits = base.primitives.filter(
+      (primitive) => primitive.kind === "capsule" && primitive.jointId === "leftHand",
+    );
+    const tunedDigits = tuned.primitives.filter(
+      (primitive) => primitive.kind === "capsule" && primitive.jointId === "leftHand",
+    );
+    const baseDigit = baseDigits[0];
+    const tunedDigit = tunedDigits[0];
+    if (baseDigit?.kind !== "capsule" || tunedDigit?.kind !== "capsule") {
+      throw new Error("left-hand digit primitives are missing");
+    }
+    expect(Math.abs(tunedDigit.to[1])).toBeGreaterThan(Math.abs(baseDigit.to[1]));
     const baseFoot = sphere(base, "leftFoot");
     const tunedFoot = sphere(tuned, "leftFoot");
     if (baseFoot?.kind === "sphere" && tunedFoot?.kind === "sphere") {
