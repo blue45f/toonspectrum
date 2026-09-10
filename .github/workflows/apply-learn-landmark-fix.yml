@@ -6,6 +6,9 @@ on:
       - fix/learn-landmark-loss-20260910
     paths:
       - .github/workflows/apply-learn-landmark-fix.yml
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -76,9 +79,12 @@ jobs:
       - name: Commit audited follow-up
         shell: bash
         run: |
-          rm .github/workflows/apply-learn-landmark-fix.yml
+          rm -f \
+            .github/workflows/apply-learn-landmark-fix.yml \
+            .github/workflows/restore-ci-after-bulk-integration.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/web/src/domains/learn/LearnContent.tsx e2e/learn-guided-lessons.spec.ts docs/learn/guided-lesson-experience.md .github/workflows/apply-learn-landmark-fix.yml
+          git add -A
+          git diff --cached --check
           git commit -m "fix(learn): reuse the application main landmark"
           git push origin HEAD:fix/learn-landmark-loss-20260910
