@@ -14,6 +14,8 @@ import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { StudioAsset } from "./studio-asset-library";
 
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+
 const PAGE_SIZE = 24;
 const CONTROL = "min-h-11 rounded-lg border border-line bg-card px-3 text-xs text-fg-2 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50";
 const KINDS: readonly {id: "all" | StudioCc0AssetKind; label: string}[] = [
@@ -45,6 +47,7 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
   const [inserting, setInserting] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const insertController = useRef<AbortController | null>(null);
+  const debouncedQuery = useDebouncedValue(query, 140);
 
   useEffect(() => {
     if (!open || catalog) return;
@@ -80,9 +83,9 @@ export function StudioCc0AssetLibraryPanel({onUseAsset}: {readonly onUseAsset: (
     resolveInitialFocus: dialog => dialog.querySelector<HTMLElement>("[data-autofocus='true']"),
   });
   const filtered = useMemo(() => curateStudioCc0Selection(
-    filterStudioCc0Assets(catalog ?? [], query, kind === "all" ? undefined : kind),
+    filterStudioCc0Assets(catalog ?? [], debouncedQuery, kind === "all" ? undefined : kind),
     {style, includeComponents},
-  ), [catalog, query, kind, style, includeComponents]);
+  ), [catalog, debouncedQuery, kind, style, includeComponents]);
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pages - 1);
   const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);

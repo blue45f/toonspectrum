@@ -15,6 +15,7 @@ import {
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { studioLiveParticipantColor } from "./studio-live-canvas-overlay-model";
+import { useStudioLiveDisplaySync } from "./use-studio-live-display-sync";
 
 import type {
   StudioLiveAvailability,
@@ -31,6 +32,7 @@ import type {
 } from "./studio-live-sync-safety";
 import type { StudioScreenShareState } from "../studio-screen-share";
 
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/shared/lib/utils";
 
 export type StudioLiveCollaborationSection =
@@ -415,6 +417,8 @@ export function StudioLiveCollaborationCommandCenter({
   const [activeOnly, setActiveOnly] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
+  const displaySyncSnapshot = useStudioLiveDisplaySync(syncSnapshot);
+  const debouncedQuery = useDebouncedValue(query, 120);
 
   useEffect(
     () => () => {
@@ -428,7 +432,7 @@ export function StudioLiveCollaborationCommandCenter({
     mode,
     peers,
     screenState,
-    syncSnapshot,
+    syncSnapshot: displaySyncSnapshot,
     recovery,
     followingSessionId,
   });
@@ -436,12 +440,12 @@ export function StudioLiveCollaborationCommandCenter({
     () =>
       filterStudioLiveCollaborationPeers(
         peers,
-        query,
+        debouncedQuery,
         roleFilter,
         activeOnly,
         followingSessionId
       ),
-    [activeOnly, followingSessionId, peers, query, roleFilter]
+    [activeOnly, debouncedQuery, followingSessionId, peers, roleFilter]
   );
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
   const activePeer =
@@ -453,14 +457,16 @@ export function StudioLiveCollaborationCommandCenter({
     screenState.shares.length +
     screenState.viewers.length +
     Number(screenState.watching !== null);
-  const syncValue = syncSnapshot
-    ? syncSnapshot.pendingCount > 0
-      ? syncSnapshot.pendingCount.toLocaleString("ko-KR")
-      : syncSnapshot.phase === "synced"
+  const syncValue = displaySyncSnapshot
+    ? displaySyncSnapshot.pendingCount > 0
+      ? displaySyncSnapshot.pendingCount.toLocaleString("ko-KR")
+      : displaySyncSnapshot.phase === "synced"
         ? "안전"
         : "확인"
     : "대기";
-  const syncDetail = syncSnapshot ? SYNC_PHASE_LABEL[syncSnapshot.phase] : "보호 상태 준비 중";
+  const syncDetail = displaySyncSnapshot
+    ? SYNC_PHASE_LABEL[displaySyncSnapshot.phase]
+    : "보호 상태 준비 중";
 
   const toggleRoster = () => {
     setRosterOpen((current) => {

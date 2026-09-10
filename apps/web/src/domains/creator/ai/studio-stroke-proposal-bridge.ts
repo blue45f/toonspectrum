@@ -241,40 +241,41 @@ export function useStudioAiCanvasBridge<TElement>(input: {
   readonly elements: readonly TElement[];
   readonly appendElement: (element: TElement) => void;
 }): void {
-  const documentGeneration = Number.parseInt(studioDeterministicContentId(input.elements).slice(0, 12), 16);
-  const strokes = recentStrokeContexts(input.elements);
+  const { ownerId, documentId, elements, appendElement } = input;
+  const documentGeneration = Number.parseInt(studioDeterministicContentId(elements).slice(0, 12), 16);
+  const strokes = recentStrokeContexts(elements);
   useEffect(() => {
     let activePointerStroke = false;
     const update = () => {
-      if (adapter?.ownerId !== input.ownerId) return;
+      if (adapter?.ownerId !== ownerId) return;
       emit({
         ...snapshot,
         connected: true,
-        documentId: input.documentId,
+        documentId: documentId,
         documentGeneration,
         activePointerStroke,
         recentStrokes: strokes,
       });
     };
     const nextAdapter: StudioStrokeProposalBridgeAdapter = {
-      ownerId: input.ownerId,
+      ownerId: ownerId,
       requestProposal: async () => {
         buildBoundedStudioStrokeProposalContext({
-          documentId: input.documentId,
+          documentId: documentId,
           documentGeneration,
           viewport: { x: 0, y: 0, width: 1_000_000, height: 1_000_000 },
           recentStrokes: strokes,
           semanticSummary: "current ToonStudio drawing",
         });
-        return localProposal(input.documentId, documentGeneration, strokes);
+        return localProposal(documentId, documentGeneration, strokes);
       },
       apply: (transaction) => {
-        const sourceById = new Map(strokes.map((stroke, index) => [stroke.id, input.elements[input.elements.length - strokes.length + index]]));
+        const sourceById = new Map(strokes.map((stroke, index) => [stroke.id, elements[elements.length - strokes.length + index]]));
         transaction.addedStrokes.forEach((stroke, index) => {
           const sourceId = stroke.id.split(":")[1];
-          const source = (sourceId && sourceById.get(sourceId)) ?? input.elements.at(-1);
+          const source = (sourceId && sourceById.get(sourceId)) ?? elements.at(-1);
           if (!source) throw new Error("제안 획의 원본 요소를 찾을 수 없습니다.");
-          input.appendElement(cloneElementForProposal(source, transaction, index));
+          appendElement(cloneElementForProposal(source, transaction, index));
         });
       },
       cancel: () => undefined,
@@ -304,5 +305,5 @@ export function useStudioAiCanvasBridge<TElement>(input: {
         emit(DISCONNECTED);
       }
     };
-  }, [documentGeneration, input.documentId, input.elements, input.ownerId, input.appendElement, strokes]);
+  }, [documentGeneration, documentId, elements, ownerId, appendElement, strokes]);
 }

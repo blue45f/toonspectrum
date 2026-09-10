@@ -32,7 +32,7 @@ describe("site directory experience contracts", () => {
       "/privacy",
       "/feedback",
     ]) {
-      expect(source).toContain(`\"${href}\"`);
+      expect(source).toContain(`"${href}"`);
     }
   });
 

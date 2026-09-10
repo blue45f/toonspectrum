@@ -267,7 +267,7 @@ export function analyzeStudioAiComicDirectorQuality({
         panelIndex,
       });
     }
-    if (dialogueLength(item.dialogue) > 260) {
+    if (dialogueLength(item.dialogue) > 180) {
       findings.push({
         id: `panel-${panelIndex}-dialogue-density`,
         severity: "review",

@@ -431,7 +431,11 @@ export function CreatorMarketplaceCloudLibraryAction({
         ) : (
           <ActionIcon className="h-3.5 w-3.5" aria-hidden="true" />
         )}
-        {pending ? "계정 라이브러리 변경 중" : actionLabel}
+        {pending
+          ? "계정 라이브러리 변경 중"
+          : loadState === "loading"
+            ? "계정 라이브러리 확인 중"
+            : actionLabel}
       </button>
     </div>
   );

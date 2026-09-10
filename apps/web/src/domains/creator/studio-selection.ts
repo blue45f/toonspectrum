@@ -4,13 +4,13 @@
  * Geometry, hit testing, set algebra, and layout live in focused pure modules so the canvas,
  * layer navigator, keyboard commands, and tests can share one deterministic contract.
  */
+import { normalizeRectGeometry, type Rect } from "./selection/studio-object-selection-geometry";
+
 export * from "./selection/studio-object-selection-geometry";
 export * from "./selection/studio-object-selection-layout";
 export * from "./selection/studio-object-selection-marquee";
 export * from "./selection/studio-object-selection-pick";
 export * from "./selection/studio-object-selection-set";
-
-import { normalizeRectGeometry, type Rect } from "./selection/studio-object-selection-geometry";
 
 export type CanvasPlacementFootprint = {
   width: number;

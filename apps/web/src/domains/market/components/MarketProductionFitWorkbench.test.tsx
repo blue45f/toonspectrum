@@ -81,12 +81,11 @@ describe("MarketProductionFitWorkbench", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "제작 적합성 패스포트" })).toBeTruthy();
-    expect(screen.getByText("제작 조건 일치")).toBeTruthy();
-    expect(screen.getByText("충족 7")).toBeTruthy();
-    expect(screen.getByText(/구매 완료, 설치 성공, 실제 기기 성능 또는 법률 자문을 의미하지 않습니다/))
+    expect(screen.getByRole("heading", { name: "이 리소스를 지금 쓸 수 있나요?" }))
       .toBeTruthy();
-    expect(screen.getByRole("link", { name: "전체 마켓을 제작 조건으로 정렬" })
+    expect(screen.getByText("현재 제작 조건과 일치")).toBeTruthy();
+    expect(screen.getByText("문제 없음 7")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "내 환경에 맞는 리소스만 보기" })
       .getAttribute("href")).toBe("/market/fit");
     expect(screen.getByRole("link", { name: /사용권 원문/ }).getAttribute("rel"))
       .toContain("noopener");

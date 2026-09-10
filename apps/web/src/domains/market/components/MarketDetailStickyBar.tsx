@@ -33,12 +33,23 @@ export function MarketDetailStickyBar({
   const kind = marketKindMeta(record.kind);
 
   useEffect(() => {
-    const handleScroll = () => {
+    let scrollFrame: number | null = null;
+    const updateVisibility = () => {
       // Show sticky bar when scrolled past 260px
       setVisible(window.scrollY > 260);
     };
+    const handleScroll = () => {
+      if (scrollFrame !== null) return;
+      scrollFrame = window.requestAnimationFrame(() => {
+        scrollFrame = null;
+        updateVisibility();
+      });
+    };
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      if (scrollFrame !== null) window.cancelAnimationFrame(scrollFrame);
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   if (!visible) return null;

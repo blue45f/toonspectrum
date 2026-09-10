@@ -168,7 +168,11 @@ describe("StudioAiComicDirectorPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("status").textContent).toContain("(1/4)");
+    expect(
+      screen
+        .getAllByRole("status")
+        .some((status) => status.textContent?.includes("(1/4)")),
+    ).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });

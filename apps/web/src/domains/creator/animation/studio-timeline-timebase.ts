@@ -224,7 +224,7 @@ export function transactStudioTimeline(
   if (!transactionId.trim()) throw new TypeError("timeline transaction id is required.");
   validateStudioTimelineDocument(document);
   let durationFrames = document.durationFrames;
-  let tracks = document.tracks.map((track) => ({ ...track }));
+  const tracks = document.tracks.map((track) => ({ ...track }));
   for (const mutation of mutations) {
     if (mutation.type === "set-duration") {
       durationFrames = positiveInteger(mutation.durationFrames, "durationFrames");
