@@ -1,0 +1,210 @@
+name: Final retire cleanup-only branches 20260910-1720
+
+on:
+  pull_request:
+    branches:
+      - ops/final-retire-cleanup-base-20260910-1720
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: final-retire-cleanup-only-branches-20260910-1720
+  cancel-in-progress: false
+
+jobs:
+  retire:
+    runs-on: macos-14-arm64
+    timeout-minutes: 10
+    steps:
+      - name: Verify, cancel, delete, and self-clean
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: 218448adb78a94c44f49be8c19ba9efbb79198b7
+          SELF_PR: ${{ github.event.pull_request.number }}
+          SELF_HEAD: ${{ github.event.pull_request.head.ref }}
+          SELF_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SELF_BASE: ${{ github.event.pull_request.base.ref }}
+          SELF_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+          const expectedMain = process.env.EXPECTED_MAIN;
+          const self = {
+            pr: Number(process.env.SELF_PR),
+            head: process.env.SELF_HEAD,
+            headSha: process.env.SELF_HEAD_SHA,
+            base: process.env.SELF_BASE,
+            baseSha: process.env.SELF_BASE_SHA,
+          };
+          const headers = {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${process.env.GH_TOKEN}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'toonspectrum-final-cleanup-retirement',
+          };
+          const active = new Set(['queued', 'in_progress', 'pending', 'waiting', 'requested']);
+          const encodeRef = (ref) => ref.split('/').map(encodeURIComponent).join('/');
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+          class HttpError extends Error {
+            constructor(status, method, path, body) {
+              super(`${method} ${path} -> ${status}: ${body}`);
+              this.status = status;
+            }
+          }
+
+          async function api(path, init = {}) {
+            const method = init.method || 'GET';
+            const response = await fetch(`https://api.github.com${path}`, {
+              ...init,
+              headers: {
+                ...headers,
+                ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+              },
+            });
+            if (response.status === 204) return null;
+            const text = await response.text();
+            if (!response.ok) throw new HttpError(response.status, method, path, text);
+            return text ? JSON.parse(text) : null;
+          }
+
+          async function maybe(path) {
+            try { return await api(path); }
+            catch (error) {
+              if ([404, 422].includes(error.status)) return null;
+              throw error;
+            }
+          }
+
+          async function openRefs(branch) {
+            const [heads, bases] = await Promise.all([
+              api(`/repos/${owner}/${repo}/pulls?state=open&head=${encodeURIComponent(`${owner}:${branch}`)}&per_page=100`),
+              api(`/repos/${owner}/${repo}/pulls?state=open&base=${encodeURIComponent(branch)}&per_page=100`),
+            ]);
+            return [...heads, ...bases];
+          }
+
+          async function runs(branch) {
+            const payload = await api(`/repos/${owner}/${repo}/actions/runs?branch=${encodeURIComponent(branch)}&per_page=100`);
+            return payload.workflow_runs || [];
+          }
+
+          async function stopRuns(branch) {
+            const pending = (await runs(branch)).filter((run) => active.has(run.status));
+            for (const run of pending) {
+              try {
+                await api(`/repos/${owner}/${repo}/actions/runs/${run.id}/cancel`, { method: 'POST' });
+                console.log(`Cancellation requested: ${branch} run ${run.id}`);
+              } catch (error) {
+                if (![404, 409].includes(error.status)) throw error;
+              }
+            }
+            for (let attempt = 0; attempt < 30; attempt += 1) {
+              const remaining = (await runs(branch)).filter((run) => active.has(run.status));
+              if (remaining.length === 0) return pending.length;
+              await sleep(2000);
+            }
+            const remaining = (await runs(branch)).filter((run) => active.has(run.status));
+            if (remaining.length) throw new Error(`${branch} still has active runs: ${remaining.map((run) => `${run.id}:${run.status}`).join(', ')}`);
+            return pending.length;
+          }
+
+          const targets = [
+            {
+              branch: 'ops/chatgpt-safe-branch-prune-20260910-1615-v1',
+              sha: '335e58fc211467cfbaa3e902afa121982e9455a7',
+              files: [
+                '.github/branch-prune-trigger-20260910-1615.txt',
+                '.github/workflows/chatgpt-safe-branch-prune-20260910-1615.yml',
+              ],
+            },
+            {
+              branch: 'ops/chatgpt-safe-branch-prune-fixed-20260910-1706',
+              sha: 'f3252916ddb4abe4423c46b1e572655079f346f8',
+              files: ['.github/workflows/one-shot-safe-merged-branch-prune-20260910-1706.yml'],
+            },
+            {
+              branch: 'ops/branch-prune-sink-20260910-1702',
+              sha: '10ccc636ee0ee4150193b3991aeed4c08662b331',
+              files: [],
+            },
+          ];
+
+          const repoInfo = await api(`/repos/${owner}/${repo}`);
+          if (repoInfo.default_branch !== 'main') throw new Error(`Default branch changed: ${repoInfo.default_branch}`);
+          const main = await api(`/repos/${owner}/${repo}/branches/main`);
+          if (!main.protected || main.commit?.sha !== expectedMain) throw new Error('Protected main snapshot changed');
+
+          const report = [];
+          for (const target of targets) {
+            if (['main', self.head, self.base].includes(target.branch)) throw new Error(`Reserved target: ${target.branch}`);
+            const branchPath = `/repos/${owner}/${repo}/branches/${encodeRef(target.branch)}`;
+            const branch = await maybe(branchPath);
+            if (!branch) {
+              report.push({ ...target, decision: 'already_absent', cancelled: 0 });
+              continue;
+            }
+            if (branch.protected || branch.commit?.sha !== target.sha) {
+              throw new Error(`${target.branch} moved or became protected`);
+            }
+            if ((await openRefs(target.branch)).length) throw new Error(`${target.branch} has an open PR reference`);
+
+            const comparison = await api(`/repos/${owner}/${repo}/compare/${expectedMain}...${target.sha}`);
+            const actualFiles = [...new Set((comparison.files || []).map((file) => file.filename))].sort();
+            const expectedFiles = [...target.files].sort();
+            if (JSON.stringify(actualFiles) !== JSON.stringify(expectedFiles)) {
+              throw new Error(`${target.branch} diff mismatch: ${JSON.stringify(actualFiles)}`);
+            }
+
+            const cancelled = await stopRuns(target.branch);
+            const finalBranch = await maybe(branchPath);
+            if (!finalBranch || finalBranch.protected || finalBranch.commit?.sha !== target.sha) {
+              throw new Error(`${target.branch} changed during final branch recheck`);
+            }
+            if ((await openRefs(target.branch)).length) throw new Error(`${target.branch} acquired an open PR reference`);
+            const refPath = `/repos/${owner}/${repo}/git/ref/heads/${encodeRef(target.branch)}`;
+            const ref = await maybe(refPath);
+            if (!ref || ref.object?.sha !== target.sha) throw new Error(`${target.branch} ref changed during final recheck`);
+            await api(`/repos/${owner}/${repo}/git/refs/heads/${encodeRef(target.branch)}`, { method: 'DELETE' });
+            if (await maybe(refPath)) throw new Error(`${target.branch} still exists after deletion`);
+            console.log(`Deleted ${target.branch} at ${target.sha}`);
+            report.push({ ...target, decision: 'deleted', cancelled });
+          }
+
+          const finalMain = await api(`/repos/${owner}/${repo}/branches/main`);
+          if (!finalMain.protected || finalMain.commit?.sha !== expectedMain) throw new Error('main changed during cleanup');
+
+          const [headInfo, baseInfo] = await Promise.all([
+            api(`/repos/${owner}/${repo}/branches/${encodeRef(self.head)}`),
+            api(`/repos/${owner}/${repo}/branches/${encodeRef(self.base)}`),
+          ]);
+          if (headInfo.protected || headInfo.commit?.sha !== self.headSha) throw new Error('Isolated head changed');
+          if (baseInfo.protected || baseInfo.commit?.sha !== self.baseSha) throw new Error('Isolated base changed');
+
+          await api(`/repos/${owner}/${repo}/pulls/${self.pr}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ state: 'closed' }),
+          });
+          await api(`/repos/${owner}/${repo}/git/refs/heads/${encodeRef(self.head)}`, { method: 'DELETE' });
+          await api(`/repos/${owner}/${repo}/git/refs/heads/${encodeRef(self.base)}`, { method: 'DELETE' });
+
+          const summary = [
+            '# Final cleanup-only branch retirement',
+            '',
+            `- Protected main: \`${expectedMain}\``,
+            ...report.map((item) => `- ${item.decision}: \`${item.branch}\` @ \`${item.sha.slice(0, 12)}\` (cancelled runs: ${item.cancelled})`),
+            `- Closed temporary PR: #${self.pr}`,
+            `- Deleted temporary head/base: \`${self.head}\`, \`${self.base}\``,
+            '- No commit was merged into `main`.',
+            '',
+          ].join('\n');
+          console.log(summary);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          NODE
