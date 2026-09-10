@@ -166,6 +166,8 @@ export function StudioAiComicDirectorRoute({
     return () => {
       active = false;
     };
+  // Route identity owns remote hydration; `session` is deliberately read as the local create snapshot.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on session would resync after setSession and loop.
   }, [api, navigate, resolution, session.id]);
 
   const patchSession = (

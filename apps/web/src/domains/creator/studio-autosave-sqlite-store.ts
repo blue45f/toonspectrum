@@ -180,6 +180,7 @@ export function createStudioAutosaveSqliteStore(
           throw new AggregateError(
             [primaryCause, recoveryCause],
             "SQLite 자동저장 주 저장본과 마지막 정상 저장본이 모두 손상되었습니다.",
+            { cause: primaryCause },
           );
         }
         throw primaryCause;

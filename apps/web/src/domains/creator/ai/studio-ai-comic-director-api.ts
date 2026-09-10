@@ -202,7 +202,7 @@ export function createStudioAiComicDirectorApiClient(input: {
         message: "AI 코믹 디렉터 저장 서버에 연결하지 못했어요.",
       };
     }
-    let body: unknown = null;
+    let body: unknown;
     try {
       const text = await response.text();
       body = text ? JSON.parse(text) : null;

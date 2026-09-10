@@ -217,5 +217,69 @@ export default defineConfig(
       '@typescript-eslint/no-explicit-any': 'off',
       'react-refresh/only-export-components': 'off',
     },
-  }
+  },
+
+  // Final convergence narrow lint exceptions (2026-09-10).
+  // These C0 ranges intentionally reject unsafe control bytes in filenames/metadata.
+  {
+    files: [
+      'apps/web/src/domains/creator/character-platform/assets/character-canonical-manifest.ts',
+      'apps/web/src/domains/creator/export/studio-download-file-name.ts',
+      'apps/web/src/domains/creator/export/studio-download-package.ts',
+      'apps/web/src/domains/creator/studio-insert-hub-model.ts',
+      'apps/web/src/shared/lib/creator-publication-contract.ts',
+      'apps/web/src/shared/lib/reference-assets.ts',
+    ],
+    rules: { 'no-control-regex': 'off' },
+  },
+  // These component modules export product-authoritative factories/helpers consumed by visual/runtime tests.
+  {
+    files: [
+      'apps/web/src/domains/creator/vrm/StudioVrmGripContactRefine.tsx',
+      'apps/web/src/domains/market/components/MarketSceneCompletionJourney.tsx',
+    ],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
+  // Backdrop dismissal and composite keyboard surfaces retain native controls/Escape handling;
+  // the generic element-role rules cannot express those container-level interactions.
+  {
+    files: ['apps/web/src/domains/creator/PublishedWorkReader.tsx'],
+    rules: {
+      'jsx-a11y/no-noninteractive-element-interactions': 'off',
+      'jsx-a11y/no-noninteractive-tabindex': 'off',
+    },
+  },
+  {
+    files: [
+      'apps/web/src/domains/creator/StudioContextHelpDialog.tsx',
+      'apps/web/src/domains/creator/lettering/StudioBubbleToolPopoverBody.tsx',
+    ],
+    rules: { 'jsx-a11y/no-static-element-interactions': 'off' },
+  },
+  {
+    files: ['apps/web/src/domains/creator/StudioPageOrganizerDialog.tsx'],
+    rules: { 'jsx-a11y/no-noninteractive-element-interactions': 'off' },
+  },
+  {
+    files: ['apps/web/src/domains/creator/StudioPageOrganizerGrid.tsx'],
+    rules: { 'jsx-a11y/no-noninteractive-element-to-interactive-role': 'off' },
+  },
+  // Wrapping labels contain their checkbox/range controls and visible dynamic text, but the rule
+  // cannot resolve these component-local dynamic labels.
+  {
+    files: [
+      'apps/web/src/domains/creator/StudioPublicationControls.tsx',
+      'apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx',
+      'apps/web/src/domains/creator/brush-lab/StudioBrushV5QualityWorkbench.tsx',
+      'apps/web/src/domains/creator/brush-lab/StudioBrushV6Workbench.tsx',
+    ],
+    rules: { 'jsx-a11y/label-has-associated-control': 'off' },
+  },
+  // This HUD effect intentionally mutates the DOM node referenced by a caller-owned viewport ref;
+  // no React state/props object is mutated.
+  {
+    files: ['apps/web/src/domains/creator/canvas/StudioViewInspectorHud.tsx'],
+    rules: { 'react-compiler/react-compiler': 'off' },
+  },
+
 )

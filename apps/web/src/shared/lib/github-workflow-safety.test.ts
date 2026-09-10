@@ -35,7 +35,7 @@ function parseWorkflow(name: string, source: string): UnknownRecord {
     return parsed;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`${name}: ${message}`);
+    throw new Error(`${name}: ${message}`, { cause: error });
   }
 }
 

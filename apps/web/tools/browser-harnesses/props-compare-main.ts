@@ -10,7 +10,6 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { pickNaturalIdlePose } from "@/domains/creator/studio-pose-presets";
 import { resolveStudioVrmFingerAuthority } from "@/domains/creator/vrm/studio-vrm-auto-grip-authority";
-import { createStudioVrmGripContactPasses } from "@/domains/creator/vrm/StudioVrmGripContactRefine";
 import {
   applyFingerRotations,
   applyPoseToVrm,
@@ -34,6 +33,7 @@ import {
   type PropInstance,
   type PropRigV2,
 } from "@/domains/creator/vrm/studio-vrm-props";
+import { createStudioVrmGripContactPasses } from "@/domains/creator/vrm/StudioVrmGripContactRefine";
 
 const statusEl = document.getElementById("status")!;
 

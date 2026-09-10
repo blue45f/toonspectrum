@@ -41,6 +41,7 @@ function resolveOutboxWorkId(props: StudioDraftSaveCenterProps): string | null {
  *   is waiting for the current server revision query to finish.
  */
 export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {
+  const { onSaveDraft: saveDraft } = props;
   const workId = resolveOutboxWorkId(props);
   const [hasQueuedReceipt, setHasQueuedReceipt] = useState(() => workId !== null
     && readStudioDraftSaveOutbox({ storage: outboxStorage(), workId }) !== null);
@@ -74,7 +75,7 @@ export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {
     }
 
     const save = Promise.resolve()
-      .then(() => props.onSaveDraft())
+      .then(() => saveDraft())
       .then((result) => {
         if (retainedReceipt !== null && workId !== null) {
           clearStudioDraftSaveOutbox({ storage: outboxStorage(), workId });
@@ -95,7 +96,7 @@ export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {
       });
     saveInFlightRef.current = save;
     return save;
-  }, [props.onSaveDraft, workId]);
+  }, [saveDraft, workId]);
 
   const effectiveCollaborationSyncPending = useMemo(() => (
     props.collaborationOperationSyncPending === true

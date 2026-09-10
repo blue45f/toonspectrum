@@ -33,7 +33,7 @@ export function matchesStudioLayerQueryTerm(
 ): boolean {
   if (term.kind === "invalid") return false;
 
-  let matched = false;
+  let matched: boolean;
   if (term.kind === "text") {
     matched = searchStudioLayerHaystack(item, kind, group).includes(term.value);
   } else if (term.kind === "name") {

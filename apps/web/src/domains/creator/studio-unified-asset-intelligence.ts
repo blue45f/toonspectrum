@@ -361,7 +361,7 @@ export function discoverStudioUnifiedAssets(
     || format !== "all"
     || rights !== "all"
     || editability !== "all";
-  let result = query
+  const result = query
     ? [...searchStudioUnifiedAssets(eligible, { query, limit: 240 })]
     : hasStructuredFilters
       ? [...eligible].sort(
