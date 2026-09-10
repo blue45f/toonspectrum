@@ -65,6 +65,11 @@ function ActionCard({
       onFocus={action.onPreload}
       onPointerDown={action.onPreload}
       disabled={action.disabled || !action.onClick}
+      aria-label={
+        action.id === "director"
+          ? "AI 코믹 디렉터 · 스토리 → 편집 가능한 컷"
+          : undefined
+      }
       aria-describedby={descriptionId}
       title={action.disabled ? action.disabledReason : undefined}
       data-studio-ai-production-action={action.id}
@@ -112,7 +117,7 @@ function ActionCard({
 
 export function StudioAiProductionLaunchpad({
   imageConfigured,
-  textConfigured,
+ textConfigured,
   onOpenScenario,
   onOpenSuperSuite,
   onPreloadSuperSuite,
