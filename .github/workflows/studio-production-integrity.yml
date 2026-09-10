@@ -44,13 +44,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
-# 복구 materializer가 동시 CI 수정 커밋 때문에 중단되지 않도록 일시적으로 현재 PR 실행을 직렬화한다.
-# 제품-only 복구 커밋이 이 파일을 정본으로 되돌린다.
+# main 푸시도 최신 커밋만 남긴다. 그룹을 SHA 로 묶으면 main 실행이 저마다 다른 그룹이 되어
+# cancel-in-progress 가 취소할 대상을 갖지 못한다.
 concurrency:
   group: studio-production-integrity-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   production-integrity:
@@ -100,101 +100,3 @@ jobs:
         run: pnpm exec playwright install-deps chromium
       - name: Inspect actual production browser
         run: pnpm run verify:studio-menus
-
-  tagged-product-materializer:
-    name: materialize-tagged-product-work
-    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/real-core-and-main-only-20260910' }}
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 75
-    env:
-      HUSKY: "0"
-      NODE_OPTIONS: --max-old-space-size=8192
-      TARGET_BRANCH: fix/real-core-and-main-only-20260910
-      CANONICAL_WORKFLOW_COMMIT: abe44c2f6b715a2eedf192f75f205ab4b097c93e
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: fix/real-core-and-main-only-20260910
-          fetch-depth: 0
-          persist-credentials: true
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Execute reviewed materializer steps
-        id: materialize
-        shell: bash
-        run: |
-          set -euo pipefail
-          workflow=.github/workflows/materialize-remaining-tagged-product-work.yml
-          if [[ ! -f "$workflow" ]]; then
-            echo "needed=false" >> "$GITHUB_OUTPUT"
-            echo "Tagged product materialization is already present."
-            exit 0
-          fi
-          echo "needed=true" >> "$GITHUB_OUTPUT"
-          python3 -m pip install --disable-pip-version-check pyyaml
-          python3 - <<'PY'
-          from __future__ import annotations
-
-          import os
-          import subprocess
-          from pathlib import Path
-
-          import yaml
-
-          workflow = Path('.github/workflows/materialize-remaining-tagged-product-work.yml')
-          document = yaml.safe_load(workflow.read_text(encoding='utf-8'))
-          steps = document['jobs']['materialize']['steps']
-          stop_name = 'Publish workflow-free recovered product tree'
-          for step in steps:
-              if step.get('name') == stop_name:
-                  break
-              command = step.get('run')
-              if not isinstance(command, str):
-                  continue
-              name = str(step.get('name', 'unnamed materializer step'))
-              shell = str(step.get('shell', 'bash'))
-              print(f'::group::{name}', flush=True)
-              if shell.startswith('python'):
-                  subprocess.run(['python3', '-c', command], check=True, env=os.environ.copy())
-              else:
-                  subprocess.run(
-                      ['/bin/bash', '-euo', 'pipefail', '-c', command],
-                      check=True,
-                      env=os.environ.copy(),
-                  )
-              print('::endgroup::', flush=True)
-          else:
-              raise SystemExit(f'{stop_name!r} was not found in reviewed materializer')
-          PY
-      - name: Publish product-only recovery and restore canonical workflow
-        if: steps.materialize.outputs.needed == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          git show "${CANONICAL_WORKFLOW_COMMIT}:.github/workflows/studio-production-integrity.yml" \
-            > .github/workflows/studio-production-integrity.yml
-          rm -f .github/workflows/materialize-remaining-tagged-product-work.yml
-          test -f apps/web/src/domains/creator/bg3d/studio-bg3d-insert-quality-policy.ts
-          test -f apps/web/src/domains/creator/studio-effects-workspace.ts
-          test -f apps/web/src/domains/creator/studio-unified-3d-entry.test.ts
-          test ! -e .bootstrap
-          git config user.name "OpenAI Codex"
-          git config user.email "codex@openai.com"
-          git add -A
-          git diff --cached --check
-          git -c core.hooksPath=/dev/null commit \
-            -m "feat(studio): materialize remaining tagged recovery work"
-
-          for attempt in $(seq 1 8); do
-            if git push --no-verify origin "HEAD:${TARGET_BRANCH}"; then
-              exit 0
-            fi
-            git fetch origin "${TARGET_BRANCH}"
-            git rebase "origin/${TARGET_BRANCH}"
-            sleep $((attempt * 2))
-          done
-          echo "Could not publish tagged product recovery after conflict retries." >&2
-          exit 1
