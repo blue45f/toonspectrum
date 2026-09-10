@@ -1,104 +1,70 @@
-name: Fix mannequin terminal scaling once
+name: Recover mannequin terminal joint scaling
 
 on:
   push:
-    branches: [fix/mannequin-anatomy-scaling-main-20260910]
+    branches: [fix/mannequin-terminal-joints-20260910]
     paths: [.github/workflows/fix-mannequin-terminal-scale-once.yml]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 concurrency:
-  group: fix-mannequin-terminal-scale-20260910-v1
+  group: recover-mannequin-terminal-joints-20260910
   cancel-in-progress: true
 
 jobs:
-  patch:
-    runs-on: ubuntu-slim
-    timeout-minutes: 5
+  recover:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    env:
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - name: Patch product files through the Git data API and retire this workflow
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/mannequin-terminal-joints-20260910
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Restore independent hand, foot, wrist, and ankle scaling
+        shell: python
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import base64
-          import json
-          import os
-          import urllib.error
-          import urllib.parse
-          import urllib.request
+          from pathlib import Path
 
-          repo = os.environ["GITHUB_REPOSITORY"]
-          token = os.environ["GH_TOKEN"]
-          branch = "fix/mannequin-anatomy-scaling-main-20260910"
-          workflow_path = ".github/workflows/fix-mannequin-terminal-scale-once.yml"
-          model_path = "apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts"
-          test_path = "apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts"
-          api = f"https://api.github.com/repos/{repo}"
-          headers = {
-              "Authorization": f"Bearer {token}",
-              "Accept": "application/vnd.github+json",
-              "X-GitHub-Api-Version": "2022-11-28",
-              "User-Agent": "toonstudio-mannequin-scale-fix",
-          }
-
-          def request(method: str, path: str, payload=None):
-              body = None if payload is None else json.dumps(payload).encode("utf-8")
-              req = urllib.request.Request(api + path, data=body, method=method, headers=headers)
-              try:
-                  with urllib.request.urlopen(req) as response:
-                      return json.load(response)
-              except urllib.error.HTTPError as error:
-                  detail = error.read().decode("utf-8", "replace")
-                  raise SystemExit(f"GitHub API {method} {path} failed: {error.code} {detail}")
-
-          def read_text(path: str, ref: str) -> str:
-              encoded_path = urllib.parse.quote(path, safe="/")
-              encoded_ref = urllib.parse.quote(ref, safe="")
-              data = request("GET", f"/contents/{encoded_path}?ref={encoded_ref}")
-              return base64.b64decode(data["content"]).decode("utf-8")
-
-          ref_path = urllib.parse.quote(f"heads/{branch}", safe="/")
-          ref = request("GET", f"/git/ref/{ref_path}")
-          head_sha = ref["object"]["sha"]
-          commit = request("GET", f"/git/commits/{head_sha}")
-          base_tree = commit["tree"]["sha"]
-
-          model = read_text(model_path, head_sha)
+          model_path = Path("apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts")
+          test_path = Path("apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts")
+          model = model_path.read_text(encoding="utf-8")
           replacements = [
-              (
-                  'radius: 0.095 * hu * handScale',
-                  'radius: 0.095 * hu * limbR',
-                  2,
-              ),
+              ('radius: 0.095 * hu * handScale', 'radius: 0.095 * hu * limbR', 2),
               (
                   'scale: vec3((0.26 * hu) / footLen, ankleHeight / footLen, 1)',
                   'scale: vec3((0.26 * hu * footScale) / footLen, (ankleHeight * footScale) / footLen, 1)',
                   2,
               ),
-              (
-                  'radius: 0.105 * hu * limbR * footScale',
-                  'radius: 0.105 * hu * limbR',
-                  2,
-              ),
+              ('radius: 0.105 * hu * limbR * footScale', 'radius: 0.105 * hu * limbR', 2),
           ]
           for old, new, expected in replacements:
               actual = model.count(old)
               if actual != expected:
                   raise SystemExit(f"model anchor changed for {old!r}: expected {expected}, got {actual}")
               model = model.replace(old, new)
+          model_path.write_text(model, encoding="utf-8")
 
-          tests = read_text(test_path, head_sha)
+          tests = test_path.read_text(encoding="utf-8")
           start_marker = '  it("해부학 세부 파라미터가 신장을 바꾸지 않고 각 실루엣 축에 독립적으로 반영된다", () => {'
           end_marker = '  it("체인 길이는 관절 오프셋과 정합한다", () => {'
           start = tests.find(start_marker)
           end = tests.find(end_marker, start)
           if start < 0 or end < 0:
               raise SystemExit(f"test block anchors changed: start={start}, end={end}")
-          replacement_test = '''  it("해부학 세부 파라미터가 신장과 말단 관절 연결을 보존하며 독립 반영된다", () => {
+          replacement = '''  it("해부학 세부 파라미터가 신장과 말단 관절 연결을 보존하며 독립 반영된다", () => {
             const base = buildStudioMannequinSpec(params());
             const tuned = buildStudioMannequinSpec(params({
               torsoDepth: 1.3, waistWidth: 1.2, limbThickness: 1.25,
@@ -167,6 +133,7 @@ jobs:
             const baseFoot = sphere(base, "leftFoot", (center) => center[1] < 0);
             const scaledFoot = sphere(footTuned, "leftFoot", (center) => center[1] < 0);
             expect(sphereAxis(scaledFoot, 0)).toBeGreaterThan(sphereAxis(baseFoot, 0));
+            expect(sphereAxis(scaledFoot, 1)).toBeGreaterThan(sphereAxis(baseFoot, 1));
             expect(sphereAxis(scaledFoot, 2)).toBeGreaterThan(sphereAxis(baseFoot, 2));
             const baseAnkle = sphere(base, "leftFoot", (center) => center[1] === 0);
             const footAnkle = sphere(footTuned, "leftFoot", (center) => center[1] === 0);
@@ -176,29 +143,25 @@ jobs:
           });
 
 '''
-          tests = tests[:start] + replacement_test + tests[end:]
-
-          for label, content in (("model", model), ("tests", tests)):
-              if "\r" in content:
-                  raise SystemExit(f"unexpected CR in {label}")
-              if not content.endswith("\n"):
-                  raise SystemExit(f"missing final newline in {label}")
-
-          model_blob = request("POST", "/git/blobs", {"content": model, "encoding": "utf-8"})["sha"]
-          test_blob = request("POST", "/git/blobs", {"content": tests, "encoding": "utf-8"})["sha"]
-          tree = request("POST", "/git/trees", {
-              "base_tree": base_tree,
-              "tree": [
-                  {"path": model_path, "mode": "100644", "type": "blob", "sha": model_blob},
-                  {"path": test_path, "mode": "100644", "type": "blob", "sha": test_blob},
-                  {"path": workflow_path, "mode": "100644", "type": "blob", "sha": None},
-              ],
-          })
-          new_commit = request("POST", "/git/commits", {
-              "message": "fix(mannequin): keep terminal scales independent at rendered axes",
-              "tree": tree["sha"],
-              "parents": [head_sha],
-          })
-          request("PATCH", f"/git/refs/{ref_path}", {"sha": new_commit["sha"], "force": False})
-          print(f"published {new_commit['sha']}")
-          PY
+          test_path.write_text(tests[:start] + replacement + tests[end:], encoding="utf-8")
+      - name: Validate focused mannequin contracts
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.ts \
+            apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts
+          pnpm exec vitest run apps/web/src/domains/creator/scene-3d/studio-mannequin-model.test.ts
+          pnpm exec tsc -p tsconfig.json
+          git diff --check
+      - name: Publish product-only recovery
+        run: |
+          rm -f \
+            .github/workflows/recover-mannequin-terminal-joints.yml \
+            .github/workflows/fix-mannequin-terminal-scale-once.yml \
+            .github/workflows/patch-mannequin-foot-scaling.yml \
+            .github/workflows/restore-ci-after-bulk-integration.yml
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(mannequin): preserve terminal joint continuity"
+          git push origin HEAD:fix/mannequin-terminal-joints-20260910
