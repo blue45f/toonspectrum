@@ -50,6 +50,7 @@ import {
 
 import { getProductStudioMannequinStateSqliteRepository } from "./studio-mannequin-bg3d-preset-sqlite-repository";
 import {
+  STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES,
   STUDIO_MANNEQUIN_BODY_PRESETS,
   STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
   STUDIO_MANNEQUIN_HEAD_PARAM_RANGES,
@@ -62,6 +63,7 @@ import {
   clampStudioMannequinBodyParams,
   clampStudioMannequinJointRotation,
   getStudioMannequinJointLimit,
+  type StudioMannequinAnatomyParamKey,
   type StudioMannequinBodyParams,
   type StudioMannequinBodyPresetId,
   type StudioMannequinCoreParamKey,
@@ -175,6 +177,19 @@ const BODY_SLIDERS: readonly {
   },
 ]);
 
+const ANATOMY_SLIDERS: readonly {
+  key: StudioMannequinAnatomyParamKey;
+  label: string;
+  step: number;
+}[] = Object.freeze([
+  { key: "torsoDepth", label: "몸통 깊이", step: 0.02 },
+  { key: "waistWidth", label: "허리 볼륨", step: 0.02 },
+  { key: "limbThickness", label: "팔다리 굵기", step: 0.02 },
+  { key: "handScale", label: "손 크기", step: 0.02 },
+  { key: "footScale", label: "발 크기", step: 0.02 },
+  { key: "neckThickness", label: "목 굵기", step: 0.02 },
+]);
+
 const HEAD_SLIDERS: readonly {
   key: keyof StudioMannequinBodyParams;
   label: string;
@@ -266,6 +281,33 @@ export function StudioMannequinBodySection({
             />
           );
         })}
+      </div>
+
+      <div className="space-y-3 border-t border-line/60 pt-3">
+        <StudioSectionHeader
+          title="해부학 비례"
+          description="신장·등신은 유지한 채 흉곽 깊이, 허리 질량, 사지와 말단 크기를 독립 조절합니다."
+        />
+        <div className="space-y-2">
+          {ANATOMY_SLIDERS.map(({ key, label, step }) => {
+            const [min, max] = STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES[key];
+            const value = params[key] ?? 1;
+            return (
+              <StudioSliderRow
+                key={key}
+                label={label}
+                min={min}
+                max={max}
+                step={step}
+                value={value}
+                onChange={(next) =>
+                  onParamsChange(clampStudioMannequinBodyParams({ ...params, [key]: next }))
+                }
+                readout={`${Math.round(value * 100)}%`}
+              />
+            );
+          })}
+        </div>
       </div>
 
       <div className="space-y-3 pt-3 border-t border-line/60">

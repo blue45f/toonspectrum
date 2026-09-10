@@ -9,7 +9,8 @@ name: CI
 # 1시간 반을 기다린 기록도 있다(2026-09-04 run 2602: 19:46 생성, 첫 잡 21:10 시작).
 #
 # 지금은 검사를 하나도 빼지 않고 배치만 바꿨다.
-#   - `concurrency`: 같은 PR 의 진행 중 실행은 새 커밋이 오면 취소한다. main 푸시는 취소하지 않는다.
+#   - `concurrency`: 같은 PR 또는 같은 push branch의 이전 실행은 새 커밋이 오면 취소한다. 최신 main은
+#     이전 main의 변경을 모두 포함하므로 superseded SHA를 끝까지 돌려 러너 대기열을 만들 이유가 없다.
 #   - `core`: lint / typecheck / build / test(3 shard) / test-serial 이 병렬로 돌고, `core` 는 그 결과를
 #     합치는 게이트 잡이다. 브랜치 보호의 필수 체크 이름 `core` 는 그대로다(DEPLOY.md).
 #   - `verify`: core 의 다섯 잡과 `studio-3d-runtime` 을 직접 합치는 릴리스 게이트(판정은 core ∧ 3D
@@ -37,11 +38,11 @@ on:
 permissions:
   contents: read
 
-# PR 는 PR 번호 단위로 묶어 동일 PR의 진행 중인 CI를 취소하고 새 커밋은 새 신호로 갱신합니다.
-# main 푸시는 SHA 단위로 분리해 각 커밋의 변경 신호를 그대로 남겨 둡니다.
+# PR은 PR 번호, push는 branch ref를 concurrency key로 사용합니다.
+# 최신 커밋은 같은 branch의 이전 변경을 모두 포함하므로 superseded 실행을 즉시 취소합니다.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}-release-final-g2
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}-release-final-g3
+  cancel-in-progress: true
 
 # Core is backed by executed checks; no fast-merge bypass is permitted.
 

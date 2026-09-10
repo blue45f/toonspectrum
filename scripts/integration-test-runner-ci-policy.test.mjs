@@ -350,15 +350,15 @@ describe("database integration runner CI policy", () => {
     );
   });
 
-  it("cancels superseded pull request runs without touching main", () => {
+  it("cancels superseded pull request and branch push runs", () => {
     const workflow = readYaml(".github/workflows/ci.yml");
 
-    // A PR is one concurrency group, so a new push frees the six-plus runners its previous run
-    // was holding. A main push is keyed by its own SHA: main runs never cancel or queue behind
-    // each other, because each commit must keep its own red/green signal.
+    // A PR is keyed by PR number; a push is keyed by branch ref. The newest main/release commit
+    // contains all prior branch changes, so superseded runs should free their runners immediately
+    // instead of keeping one 14-job generation per SHA in the queue.
     expect(workflow.concurrency).toEqual({
-      group: "${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}-release-final-g2",
-      "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
+      group: "${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}-release-final-g3",
+      "cancel-in-progress": true,
     });
   });
 

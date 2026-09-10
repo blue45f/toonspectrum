@@ -33,6 +33,7 @@ import { createPortal } from "react-dom";
 import { checkBrowserCompatibility, getBrowserInfo } from "../../compat/browser-check";
 
 import { getStudioGpuFabricCapabilities } from "./render/studio-gpu-fabric";
+import { studioBrowserStorageEstimator } from "./studio-browser-storage-estimator";
 import {
   buildStudioBugReportPackage,
   formatStudioBugReportJson,
@@ -159,11 +160,7 @@ function useStudioDiagnostics(active: boolean) {
           .catch(() => null),
         import("./studio-opfs-asset-store")
           .then((module) =>
-            module.estimateStudioOpfsQuota(
-              typeof navigator !== "undefined" && navigator.storage?.estimate
-                ? { estimate: () => navigator.storage.estimate() }
-                : null,
-            ),
+            module.estimateStudioOpfsQuota(studioBrowserStorageEstimator()),
           )
           .catch(() => null),
       ]);
