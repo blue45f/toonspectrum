@@ -52,7 +52,7 @@ delivery_replacement = '''replace_once(
 '''
 source = source[:start] + delivery_replacement + source[end:]
 
-source += '''
+source += """
 
 # Align pre-existing Studio governance consumers with the current canonical contracts.
 replace_once(
@@ -75,6 +75,6 @@ replace_once(
     'rightsStatus: "unknown",',
     'rightsStatus: "warning",',
 )
-'''
+"""
 
 path.write_text(source, encoding="utf-8")
