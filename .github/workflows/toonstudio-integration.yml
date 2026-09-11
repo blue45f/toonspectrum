@@ -8,6 +8,7 @@ on:
       - "apps/web/src/app/routes/groups/**"
       - "apps/web/src/domains/creator/**"
       - "apps/web/src/shared/components/**"
+      - "apps/web/src/infrastructure/**"
       - "scripts/verify-toonstudio-integration.sh"
       - "tsconfig.toonstudio-core.json"
       - "tsconfig.toonstudio-ui.json"
@@ -27,6 +28,8 @@ jobs:
     name: ${{ matrix.track }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     strategy:
       fail-fast: false
       matrix:
