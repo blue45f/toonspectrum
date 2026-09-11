@@ -1,0 +1,323 @@
+name: PR 1289 CI delta optimizer
+
+on:
+  push:
+    branches:
+      - ops/pr1289-ci-delta-optimizer-20260911
+    paths:
+      - '.github/workflows/pr1289-ci-delta-optimizer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr1289-ci-delta-optimizer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  optimize:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/real-core-and-main-only-20260910
+          fetch-depth: 1
+          persist-credentials: true
+          sparse-checkout: |
+            .github/workflows
+            scripts/integration-test-runner-ci-policy.test.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Convert product regressions to changed-area push checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          WORKFLOW_DIR = Path(".github/workflows")
+          POLICY_PATH = Path("scripts/integration-test-runner-ci-policy.test.mjs")
+          TARGETS = [
+              "marketplace-integrity.yml",
+              "marketplace-authoring.yml",
+              "studio-mesh-sync-repair.yml",
+              "character-merge-validation.yml",
+              "studio-cc0-library.yml",
+              "feedback-community-validation.yml",
+              "studio-manual.yml",
+              "studio-2d-asset-quality.yml",
+              "character-shaper-discovery-quality.yml",
+              "studio-production-integrity.yml",
+              "studio-ai-comic-director-complete.yml",
+              "studio-finishing-quality.yml",
+              "learning-quality.yml",
+              "studio-collaboration-sync.yml",
+              "studio-promo-video.yml",
+              "character-contact-naturalness.yml",
+              "studio-brush-filter-stability.yml",
+              "studio-discovery-ux.yml",
+              "creator-resources.yml",
+              "studio-vrm-asset-quality.yml",
+              "kmas-reference-library.yml",
+          ]
+          PR_TYPES = ["opened", "reopened", "ready_for_review"]
+
+          TOP_LEVEL_KEY = re.compile(r"^[A-Za-z0-9_.-]+:")
+          EVENT_KEY = re.compile(r"^  ([A-Za-z0-9_-]+):(?:\s.*)?$")
+          PROPERTY_KEY = re.compile(r"^    ([A-Za-z0-9_-]+):(?:\s.*)?$")
+          PATH_ITEM = re.compile(r"^      -\s+(.+?)\s*$")
+
+
+          def top_level_range(lines, key):
+              expected = f"{key}:"
+              start = next(
+                  (index for index, line in enumerate(lines) if line.rstrip("\r\n").strip() == expected),
+                  None,
+              )
+              if start is None:
+                  raise RuntimeError(f"missing top-level {key} block")
+              end = len(lines)
+              for index in range(start + 1, len(lines)):
+                  candidate = lines[index].rstrip("\r\n")
+                  if candidate and not candidate.startswith((" ", "\t", "#")) and TOP_LEVEL_KEY.match(candidate):
+                      end = index
+                      break
+              return start, end
+
+
+          def event_blocks(on_lines):
+              starts = []
+              for index, line in enumerate(on_lines):
+                  match = EVENT_KEY.match(line.rstrip("\r\n"))
+                  if match:
+                      starts.append((index, match.group(1)))
+              if not starts:
+                  raise RuntimeError("workflow on block has no expanded event mappings")
+              prefix = on_lines[: starts[0][0]]
+              blocks = {}
+              order = []
+              for offset, (start, name) in enumerate(starts):
+                  end = starts[offset + 1][0] if offset + 1 < len(starts) else len(on_lines)
+                  if name in blocks:
+                      raise RuntimeError(f"duplicate workflow event: {name}")
+                  blocks[name] = on_lines[start:end]
+                  order.append(name)
+              return prefix, blocks, order
+
+
+          def property_range(body, key):
+              start = None
+              for index, line in enumerate(body):
+                  match = PROPERTY_KEY.match(line.rstrip("\r\n"))
+                  if match and match.group(1) == key:
+                      start = index
+                      break
+              if start is None:
+                  raise RuntimeError(f"pull_request event is missing {key}")
+              end = len(body)
+              for index in range(start + 1, len(body)):
+                  match = PROPERTY_KEY.match(body[index].rstrip("\r\n"))
+                  if match:
+                      end = index
+                      break
+              return start, end
+
+
+          def remove_property(body, key):
+              try:
+                  start, end = property_range(body, key)
+              except RuntimeError:
+                  return body
+              return body[:start] + body[end:]
+
+
+          def trim_event(block):
+              block = list(block)
+              while block and not block[-1].strip():
+                  block.pop()
+              return block + ["\n"]
+
+
+          def unquote_path(raw):
+              value = raw.strip()
+              if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+                  value = value[1:-1]
+              return value
+
+
+          def rewrite_workflow(filename):
+              path = WORKFLOW_DIR / filename
+              text = path.read_text(encoding="utf-8")
+              lines = text.splitlines(keepends=True)
+              on_start, on_end = top_level_range(lines, "on")
+              prefix, blocks, order = event_blocks(lines[on_start + 1 : on_end])
+              if "pull_request" not in blocks:
+                  raise RuntimeError(f"{filename}: missing pull_request event")
+
+              pr_block = blocks["pull_request"]
+              pr_body = remove_property(pr_block[1:], "types")
+              paths_start, paths_end = property_range(pr_body, "paths")
+              path_entries = []
+              path_values = []
+              for line in pr_body[paths_start + 1 : paths_end]:
+                  match = PATH_ITEM.match(line.rstrip("\r\n"))
+                  if not match:
+                      if line.strip():
+                          raise RuntimeError(f"{filename}: unsupported paths entry: {line.rstrip()}")
+                      continue
+                  path_entries.append(line if line.endswith("\n") else line + "\n")
+                  path_values.append(unquote_path(match.group(1)))
+              if not path_entries:
+                  raise RuntimeError(f"{filename}: pull_request paths cannot be empty")
+
+              self_path = f".github/workflows/{filename}"
+              if self_path not in path_values:
+                  raise RuntimeError(f"{filename}: pull_request paths must include {self_path}")
+
+              pr_body = (
+                  pr_body[:paths_start]
+                  + [f"    types: [{', '.join(PR_TYPES)}]\n"]
+                  + pr_body[paths_start:]
+              )
+              normalized_pr = trim_event(["  pull_request:\n"] + pr_body)
+              normalized_push = trim_event(
+                  [
+                      "  push:\n",
+                      "    branches:\n",
+                      "      - '**'\n",
+                      "    paths:\n",
+                      *path_entries,
+                  ]
+              )
+
+              preserved = []
+              for name in order:
+                  if name in {"pull_request", "push"}:
+                      continue
+                  preserved.extend(trim_event(blocks[name]))
+              if "workflow_dispatch" not in blocks:
+                  preserved.extend(["  workflow_dispatch:\n", "\n"])
+
+              normalized_on = ["on:\n", *prefix, *normalized_pr, *normalized_push, *preserved]
+              lines = lines[:on_start] + normalized_on + lines[on_end:]
+
+              concurrency = [
+                  "concurrency:\n",
+                  "  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}\n",
+                  "  cancel-in-progress: true\n",
+                  "\n",
+              ]
+              try:
+                  concurrency_start, concurrency_end = top_level_range(lines, "concurrency")
+                  lines = lines[:concurrency_start] + concurrency + lines[concurrency_end:]
+              except RuntimeError:
+                  _, new_on_end = top_level_range(lines, "on")
+                  lines = lines[:new_on_end] + concurrency + lines[new_on_end:]
+
+              updated = "".join(lines)
+              path.write_text(updated, encoding="utf-8")
+              return path_values
+
+
+          def patch_policy():
+              text = POLICY_PATH.read_text(encoding="utf-8")
+              first_test = re.compile(
+                  r'  it\.each\(\[\n.*?\n  \]\)\(\n'
+                  r'    "runs %s for both main and the active integration branch",\n'
+                  r'.*?\n  \);\n',
+                  re.DOTALL,
+              )
+              replacement = """  it.each([
+              "ci.yml", "bg3d-runtime-regression.yml", "studio-ink-live-commit.yml",
+            ])(
+              "runs %s for both main and the active integration branch",
+              (filename) => {
+                const workflow = readYaml(`.github/workflows/${filename}`);
+                for (const event of ["pull_request", "push"]) {
+                  expect(workflow.on[event].branches).toEqual([
+                    "main", "release/salvage-integration-20260908",
+                  ]);
+                }
+              },
+            );
+          """
+              text, count = first_test.subn(replacement, text, count=1)
+              if count != 1:
+                  raise RuntimeError("could not replace the branch-policy test")
+
+              marker = "uses changed-area push filters for %s"
+              if marker not in text:
+                  test = """
+            it.each([
+                "marketplace-integrity.yml",
+                "marketplace-authoring.yml",
+                "studio-mesh-sync-repair.yml",
+                "character-merge-validation.yml",
+                "studio-cc0-library.yml",
+                "feedback-community-validation.yml",
+                "studio-manual.yml",
+                "studio-2d-asset-quality.yml",
+                "character-shaper-discovery-quality.yml",
+                "studio-production-integrity.yml",
+                "studio-ai-comic-director-complete.yml",
+                "studio-finishing-quality.yml",
+                "learning-quality.yml",
+                "studio-collaboration-sync.yml",
+                "studio-promo-video.yml",
+                "character-contact-naturalness.yml",
+                "studio-brush-filter-stability.yml",
+                "studio-discovery-ux.yml",
+                "creator-resources.yml",
+                "studio-vrm-asset-quality.yml",
+                "kmas-reference-library.yml",
+            ])("uses changed-area push filters for %s", (filename) => {
+              const workflow = readYaml(`.github/workflows/${filename}`);
+              const selfPath = `.github/workflows/${filename}`;
+              const pullRequestPaths = workflow.on.pull_request.paths;
+              const pushPaths = workflow.on.push.paths;
+
+              expect(workflow.on.pull_request.types).toEqual([
+                "opened", "reopened", "ready_for_review",
+              ]);
+              expect(workflow.on.push.branches).toEqual(["**"]);
+              expect(workflow.on.push).not.toHaveProperty("tags");
+              expect(pullRequestPaths).toContain(selfPath);
+              expect(pushPaths).toEqual(pullRequestPaths);
+              expect(workflow.on).toHaveProperty("workflow_dispatch");
+              expect(workflow.concurrency).toEqual({
+                group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}",
+                "cancel-in-progress": true,
+              });
+            });
+          """
+                  closing = text.rfind("\n});")
+                  if closing < 0:
+                      raise RuntimeError("could not locate the policy describe closing brace")
+                  text = text[:closing] + test + text[closing:]
+
+              POLICY_PATH.write_text(text, encoding="utf-8")
+
+
+          for workflow_name in TARGETS:
+              rewrite_workflow(workflow_name)
+          patch_policy()
+
+          print(f"optimized {len(TARGETS)} product workflows")
+          PY
+          node --check scripts/integration-test-runner-ci-policy.test.mjs
+          git diff --check
+
+      - name: Publish the atomic CI optimization commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name toonstudio-ci-optimizer
+          git config user.email actions@users.noreply.github.com
+          git add -- .github/workflows scripts/integration-test-runner-ci-policy.test.mjs
+          git diff --cached --check
+          git diff --cached --stat
+          git -c core.hooksPath=/dev/null commit -m 'perf(ci): run product regressions only for changed areas'
+          git push --no-verify origin HEAD:fix/real-core-and-main-only-20260910
