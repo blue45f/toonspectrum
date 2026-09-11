@@ -1,6 +1,7 @@
 import { preloadStudioI18nCore } from "@/domains/creator/studio-i18n-priority-loader";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
+/** Preload only the locale core required before an immersive Studio route mounts. */
 function startStudioI18nCorePreload(): void {
   // Full-catalog compatibility API `loadStudioI18nDictionaries()` remains available for
   // explicit tooling. Route readiness intentionally starts only active-locale core strings.
@@ -81,6 +82,12 @@ export const StudioAssetsPage = lazyRetry(
     default: module.StudioAssetsPage,
   })),
   "StudioAssetsPage",
+);
+export const StudioAssetHubPage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioAssetHubPage").then((module) => ({
+    default: module.StudioAssetHubPage,
+  })),
+  "StudioAssetHubPage",
 );
 export const StudioProjectShellPage = lazyRetry(
   () => import("@/domains/creator/studio-shell/StudioProjectShellPage").then((module) => ({
