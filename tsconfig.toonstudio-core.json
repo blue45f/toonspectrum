@@ -6,6 +6,7 @@
     "noEmit": true,
     "skipLibCheck": true
   },
+  "include": [],
   "files": [
     "apps/web/src/domains/creator/studio-analytics.ts",
     "apps/web/src/domains/creator/studio-archive-manifest.ts",
