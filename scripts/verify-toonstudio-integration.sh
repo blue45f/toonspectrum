@@ -2,9 +2,104 @@
 set -euo pipefail
 
 track="${1:-}"
+temporary_configs=()
+
+cleanup() {
+  if ((${#temporary_configs[@]})); then
+    rm -f "${temporary_configs[@]}"
+  fi
+}
+trap cleanup EXIT
+
+typecheck_group() {
+  local label="$1"
+  shift
+  local config=".toonstudio-tsconfig-${track}-${label}.json"
+  temporary_configs+=("$config")
+
+  node - "$config" "$@" <<'NODE'
+const fs = require("node:fs");
+const [config, ...files] = process.argv.slice(2);
+if (!config || files.length === 0) {
+  throw new Error("A config path and at least one source file are required.");
+}
+fs.writeFileSync(config, `${JSON.stringify({
+  extends: "./tsconfig.json",
+  compilerOptions: {
+    allowJs: false,
+    checkJs: false,
+    incremental: false,
+    noEmit: true,
+    skipLibCheck: true,
+  },
+  include: [],
+  exclude: [],
+  files,
+}, null, 2)}\n`);
+NODE
+
+  echo "::group::Typecheck ${track}/${label}"
+  NODE_OPTIONS=--max-old-space-size=6144 pnpm exec tsc -p "$config" --pretty false
+  echo "::endgroup::"
+  rm -f "$config"
+}
 
 run_core() {
-  NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -p tsconfig.toonstudio-core.json --pretty false
+  typecheck_group foundation \
+    apps/web/src/domains/creator/studio-analytics.ts \
+    apps/web/src/domains/creator/studio-archive-manifest.ts \
+    apps/web/src/domains/creator/studio-automation-recipe.ts \
+    apps/web/src/domains/creator/studio-presentation-layout.ts \
+    apps/web/src/domains/creator/studio-production-pipeline.ts
+
+  typecheck_group assets \
+    apps/web/src/domains/creator/studio-asset-passport.ts \
+    apps/web/src/domains/creator/studio-asset-provider.ts \
+    apps/web/src/domains/creator/studio-font-audit.ts \
+    apps/web/src/domains/creator/studio-marketplace-submission.ts \
+    apps/web/src/domains/creator/studio-plugin-registry.ts \
+    apps/web/src/domains/creator/studio-rights-graph.ts
+
+  typecheck_group localization \
+    apps/web/src/domains/creator/studio-export-preflight.ts \
+    apps/web/src/domains/creator/studio-localization-project-store.ts \
+    apps/web/src/domains/creator/studio-localization-workflow.ts \
+    apps/web/src/domains/creator/studio-publishing-connector.ts \
+    apps/web/src/domains/creator/studio-publishing-package.ts
+
+  typecheck_group diagnostics \
+    apps/web/src/domains/creator/studio-project-diagnostic-source-store.ts \
+    apps/web/src/domains/creator/studio-project-diagnostics.ts \
+    apps/web/src/domains/creator/studio-project-export-snapshot.ts \
+    apps/web/src/domains/creator/studio-project-feature-adapters.ts
+
+  typecheck_group project \
+    apps/web/src/domains/creator/studio-project-readiness-store.ts \
+    apps/web/src/domains/creator/studio-project-readiness.ts \
+    apps/web/src/domains/creator/studio-project-view-destinations.ts \
+    apps/web/src/domains/creator/studio-project-views.ts \
+    apps/web/src/domains/creator/studio-project-workspace-store.ts
+
+  typecheck_group story \
+    apps/web/src/domains/creator/studio-review-history-store.ts \
+    apps/web/src/domains/creator/studio-review-workflow.ts \
+    apps/web/src/domains/creator/studio-series-kit-store.ts \
+    apps/web/src/domains/creator/studio-series-kit.ts \
+    apps/web/src/domains/creator/studio-story-bible.ts \
+    apps/web/src/domains/creator/studio-storyboard-planner.ts \
+    apps/web/src/domains/creator/studio-template-system.ts
+
+  typecheck_group media \
+    apps/web/src/domains/creator/studio-voice-motion.ts \
+    apps/web/src/domains/creator/studio-webtoon-3d-render.ts \
+    apps/web/src/domains/creator/studio-webtoon-quality.ts
+
+  typecheck_group suite \
+    apps/web/src/domains/creator/studio-project-feature-suite-store.ts
+
+  typecheck_group ai \
+    apps/web/src/domains/creator/ai/studio-ai-project-handoff.ts
+
   pnpm exec eslint --max-warnings=0 \
     apps/web/src/domains/creator/ai/studio-ai-project-handoff.ts \
     apps/web/src/domains/creator/studio-analytics.ts \
@@ -75,7 +170,34 @@ run_core() {
 }
 
 run_ui() {
-  NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -p tsconfig.toonstudio-ui.json --pretty false
+  typecheck_group assistant \
+    apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.tsx
+
+  typecheck_group assets \
+    apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioSeriesKitPanel.tsx
+
+  typecheck_group export \
+    apps/web/src/domains/creator/studio-shell/StudioExportPanel.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx
+
+  typecheck_group diagnostics \
+    apps/web/src/domains/creator/studio-shell/StudioProjectDiagnosticsBridge.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.tsx
+
+  typecheck_group features \
+    apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx \
+    apps/web/src/domains/creator/studio-shell/useStudioProjectFeatureSuite.ts
+
+  typecheck_group shell \
+    apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx \
+    apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx \
+    apps/web/src/domains/creator/studio-shell/useStudioProjectWorkspace.ts
+
+  typecheck_group review \
+    apps/web/src/domains/creator/studio-shell/StudioReviewPanel.tsx
+
   pnpm exec eslint --max-warnings=0 \
     apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.tsx \
     apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx \
