@@ -10,6 +10,7 @@ on:
       # The verifier owns apps/web/src/domains/creator/studio-integration-closure.test.ts.
       - "apps/web/src/shared/components/**"
       - "apps/web/src/infrastructure/**"
+      - "apps/web/public/i18n/**"
       - "packages/core/**"
       - "packages/play-core/**"
       - "packages/studio-*/**"
@@ -118,6 +119,10 @@ jobs:
                 apps/web/src/infrastructure/*)
                   ui=true
                   ;;
+                apps/web/public/i18n/*)
+                  ui=true
+                  editor=true
+                  ;;
                 apps/web/src/domains/creator/ai/*)
                   core=true
                   ;;
@@ -183,6 +188,7 @@ jobs:
           sparse-checkout: |
             .github/workflows
             apps/web/src
+            apps/web/public
             packages
             patches
             scripts
