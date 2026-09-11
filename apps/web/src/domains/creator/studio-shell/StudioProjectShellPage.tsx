@@ -31,6 +31,7 @@ import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
 import { STUDIO_PROJECT_NAVIGATION } from "../studio-product-ia";
+import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
 import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
 
 export type StudioProjectSection =
@@ -312,6 +313,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
         </div>
       </nav>
 
+      <StudioProjectDiagnosticsBridge projectId={displayProjectId} />
       <StudioProjectReadinessPanel
         projectId={displayProjectId}
         locale={locale}
