@@ -183,7 +183,7 @@ export function StudioTemplatesPage() {
   const [category, setCategory] = useState<StudioTemplateCategory>("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<readonly string[]>([]);
-  const [selectedId, setSelectedId] = useState(STUDIO_TEMPLATE_CATALOG[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState<string>(STUDIO_TEMPLATE_CATALOG[0]?.id ?? "");
 
   useEffect(() => {
     if (typeof window === "undefined") return;

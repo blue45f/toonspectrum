@@ -171,20 +171,20 @@ function ProjectionContent({
   readonly projectId: string;
   readonly projection: WorkspaceToolProjection;
 }) {
+  if (projection.kind === "suite") {
+    return (
+      <StudioProjectFeatureSuitePanel
+        projectId={projectId}
+        section={projection.section}
+        view={projection.view}
+        locale={locale}
+      />
+    );
+  }
   if (projection.kind === "localization") {
     return <StudioLocalizationPanel projectId={projectId} locale={locale} />;
   }
-  if (projection.kind === "review") {
-    return <StudioReviewPanel projectId={projectId} locale={locale} />;
-  }
-  return (
-    <StudioProjectFeatureSuitePanel
-      projectId={projectId}
-      section={projection.section}
-      view={projection.view}
-      locale={locale}
-    />
-  );
+  return <StudioReviewPanel projectId={projectId} locale={locale} />;
 }
 
 /**

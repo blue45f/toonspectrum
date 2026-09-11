@@ -242,7 +242,7 @@ export function createDefaultStudioAssetGovernance(
   const pluginId = `plugin:${id}:export-helper`;
   const documentId = `document:${id}:episode-1`;
 
-  const passport: StudioAssetPassport = Object.freeze({
+  const passport: StudioAssetPassport = Object.freeze<StudioAssetPassport>({
     schemaVersion: 1,
     assetId,
     versionId: "v1",
@@ -309,7 +309,7 @@ export function createDefaultStudioAssetGovernance(
     updatedAt: now,
   });
 
-  const provider: StudioAssetProviderDefinition = Object.freeze({
+  const provider: StudioAssetProviderDefinition = Object.freeze<StudioAssetProviderDefinition>({
     id: "toonstudio-market",
     name: "ToonStudio Assets",
     mode: "official-api",
@@ -378,7 +378,7 @@ export function createDefaultStudioAssetGovernance(
     }),
   ]);
 
-  const plugin: StudioPluginManifest = Object.freeze({
+  const plugin: StudioPluginManifest = Object.freeze<StudioPluginManifest>({
     id: pluginId,
     version: "1.0.0",
     name: "게시 패키지 도우미",
@@ -419,7 +419,7 @@ export function createDefaultStudioAssetGovernance(
         role: "preview",
         format: "png",
         sizeBytes: 12_000,
-        checksum: CHECKSUM.replace(/a/gu, "b"),
+        checksum: `sha256:${"b".repeat(64)}`,
       }),
     ]),
     moderationNotes: Object.freeze([]),
@@ -506,9 +506,9 @@ export function evaluateStudioAssetGovernance(
   });
   const usage = evaluateStudioAssetUsage(input.passport, usageContext);
   const provider = evaluateStudioAssetProviderRequest(input.provider, {
-    action: "download",
+    action: "sync-entitlements",
     authenticated: preferences.providerAccountConnected,
-    userInitiated: true,
+    userInitiated: false,
     sourceUrl: input.passport.source.sourceUrl ?? null,
     bypassesAccessControl: false,
   });

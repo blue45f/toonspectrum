@@ -96,7 +96,7 @@ function imageSlot(
     defaultValue: {
       kind: "image",
       assetId: `placeholder:${id}`,
-      rightsStatus: "unknown",
+      rightsStatus: "warning",
     },
   };
 }
@@ -265,7 +265,7 @@ export const STUDIO_TEMPLATE_CATALOG = Object.freeze([
   },
 ] as const satisfies readonly StudioTemplateCatalogItem[]);
 
-const TEMPLATE_BY_ID = new Map(
+const TEMPLATE_BY_ID: ReadonlyMap<string, StudioTemplateCatalogItem> = new Map(
   STUDIO_TEMPLATE_CATALOG.map((template) => [template.id, template]),
 );
 

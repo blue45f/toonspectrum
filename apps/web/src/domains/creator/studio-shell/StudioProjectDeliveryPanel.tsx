@@ -172,7 +172,9 @@ export function StudioProjectDeliveryPanel({
 }) {
   const workspace = useStudioProjectWorkspace(projectId, locale);
   const [deliveryView, setDeliveryView] = useState<DeliveryView>(() => defaultDeliveryView(section, view));
-  const [connectorId, setConnectorId] = useState(CONNECTORS[1].id);
+  const [connectorId, setConnectorId] = useState<(typeof CONNECTORS)[number]["id"]>(
+    CONNECTORS[1].id,
+  );
   const [credentialsAvailable, setCredentialsAvailable] = useState(false);
   const [externalWriteConfirmed, setExternalWriteConfirmed] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
@@ -400,8 +402,13 @@ export function StudioProjectDeliveryPanel({
               <select
                 value={connector.id}
                 onChange={(event) => {
-                  setConnectorId(event.target.value);
-                  setExternalWriteConfirmed(false);
+                  const connector = CONNECTORS.find(
+                    (candidate) => candidate.id === event.target.value,
+                  );
+                  if (connector) {
+                    setConnectorId(connector.id);
+                    setExternalWriteConfirmed(false);
+                  }
                 }}
                 className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               >
