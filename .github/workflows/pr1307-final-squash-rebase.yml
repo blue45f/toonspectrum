@@ -50,7 +50,14 @@ jobs:
             exit 1
           fi
 
-          rm -f "$HELPER_WORKFLOW"
+          rm -f \
+            "$HELPER_WORKFLOW" \
+            .github/workflows/pr1307-sync-main-once.yml \
+            .github/workflows/pr1307-integration-validation.yml \
+            .github/workflows/pr1307-integration-validation-v2.yml \
+            .github/workflows/toonstudio-rebase-reconcile.yml \
+            .github/workflows/toonstudio-menu-contract-repair.yml \
+            scripts/repair-studio-menu-contract.mjs
           git add -A
           FINAL_TREE="$(git write-tree)"
 
@@ -60,7 +67,7 @@ jobs:
             echo "final_tree=$FINAL_TREE"
           } >> "$GITHUB_OUTPUT"
 
-          printf 'Frozen feature: %s\nFrozen main: %s\nFinal tree without helper: %s\n' \
+          printf 'Frozen feature: %s\nFrozen main: %s\nFinal tree without temporary automation: %s\n' \
             "$FEATURE_HEAD" "$MAIN_HEAD" "$FINAL_TREE"
 
       - name: Set up pnpm before cache discovery
@@ -99,11 +106,16 @@ jobs:
           grep -F 'StudioBrushIntegratedWorkbench' apps/web/src/domains/creator/brush-lab/StudioBrushLabPage.tsx
           grep -F 'StudioBrushLegacyCataloguePanel' apps/web/src/domains/creator/brush-lab/StudioBrushLabPage.tsx
 
-          test ! -e .github/workflows/toonstudio-rebase-reconcile.yml
-          test ! -e .github/workflows/toonstudio-menu-contract-repair.yml
-          test ! -e scripts/repair-studio-menu-contract.mjs
-          test ! -e .github/workflows/pr1307-integration-validation.yml
-          test ! -e "$HELPER_WORKFLOW"
+          for transient in \
+            .github/workflows/pr1307-sync-main-once.yml \
+            .github/workflows/pr1307-integration-validation.yml \
+            .github/workflows/pr1307-integration-validation-v2.yml \
+            .github/workflows/toonstudio-rebase-reconcile.yml \
+            .github/workflows/toonstudio-menu-contract-repair.yml \
+            scripts/repair-studio-menu-contract.mjs \
+            "$HELPER_WORKFLOW"; do
+            test ! -e "$transient"
+          done
           git diff --cached --check
 
       - name: Run conflict, route, import, brush and project regression tests
