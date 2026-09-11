@@ -80,6 +80,7 @@ jobs:
           filter: blob:none
           sparse-checkout: |
             .github/workflows
+            apps/api/data
             apps/web
             automation/n8n
             media/brand-film
