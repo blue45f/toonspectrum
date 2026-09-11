@@ -1,5 +1,6 @@
 name: ToonStudio follow-up source snapshot
 
+# Refreshed after the integrated templates, asset governance and delivery surfaces landed.
 on:
   push:
     branches:
