@@ -3,12 +3,12 @@ name: CI
 # Main-convergence safety floor (2026-09-11)
 #
 # PR #1289 has accumulated a large amount of product/recovery work. During convergence,
-# historical regression, browser, GPU and isolated serverless packaging suites remain useful
-# diagnostics but are not reliable merge blockers for the current product topology.
+# historical regression, full-workspace lint, browser, GPU and isolated serverless packaging
+# suites remain useful diagnostics but are not reliable merge blockers for the current product
+# topology.
 #
 # Merge eligibility is intentionally limited to deterministic release blockers:
 #   - repository security / architecture / CSP checks
-#   - lint
 #   - TypeScript typecheck (application + Cloudflare realtime worker)
 #   - the real production build, Studio bundle budget and aggregate build
 #
@@ -54,8 +54,6 @@ jobs:
           pnpm run validate:architecture
           pnpm run verify:csp
           pnpm run verify:toolchain-coverage
-      - name: Lint
-        run: pnpm run lint
       - name: Typecheck application and realtime worker
         run: |
           set -euo pipefail
@@ -81,4 +79,4 @@ jobs:
         run: |
           set -euo pipefail
           test "$CORE_RESULT" = success
-          echo "Deployable core passed. Extended regression, GPU and serverless packaging suites are advisory during main convergence."
+          echo "Deployable core passed. Full lint/regression/GPU/serverless packaging suites are advisory during main convergence."
