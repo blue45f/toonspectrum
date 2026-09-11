@@ -16,18 +16,20 @@ concurrency:
 
 jobs:
   finalize:
-    runs-on: macos-15-intel
+    runs-on: ubuntu-24.04
     timeout-minutes: 55
     env:
       CI: "true"
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
+      FEATURE_BRANCH: feat/toonstudio-template-hub-20260912
     steps:
       - name: Checkout exact feature branch
         uses: actions/checkout@v4
         with:
           ref: feat/toonstudio-template-hub-20260912
-          fetch-depth: 0
+          fetch-depth: 1
+          fetch-tags: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -43,16 +45,43 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Merge latest protected main without publishing yet
+      - name: Merge latest protected main and resolve the intentional replacement
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "toonstudio-integration-bot"
           git config user.email "toonstudio-integration-bot@users.noreply.github.com"
-          git fetch origin main:refs/remotes/origin/main
-          git merge --no-commit --no-ff origin/main
+          git fetch --no-tags --deepen=500 origin \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}
 
-      - name: Apply structural product repair
+          merged_main_sha="$(git rev-parse origin/main)"
+          set +e
+          git merge --no-commit --no-ff origin/main
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            mapfile -t unresolved < <(git diff --name-only --diff-filter=U)
+            expected="apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
+            if [ "${#unresolved[@]}" -ne 1 ] || [ "${unresolved[0]}" != "$expected" ]; then
+              printf 'Unexpected merge conflicts:\n%s\n' "${unresolved[*]}" >&2
+              git merge --abort || true
+              exit 1
+            fi
+            # PR #1326 intentionally replaces the legacy template-handoff wrapper
+            # with the full project creation surface, so preserve the feature side.
+            git checkout --ours -- "$expected"
+            git add "$expected"
+          fi
+
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "Unresolved merge conflicts remain" >&2
+            exit 1
+          fi
+          echo "MERGED_MAIN_SHA=$merged_main_sha" >> "$GITHUB_ENV"
+
+      - name: Apply product behavior and accessibility repairs
         shell: bash
         run: |
           set -euo pipefail
@@ -171,21 +200,28 @@ jobs:
           write(library_page, source)
           PY
 
-      - name: Remove every completed branch-specific workflow
+      - name: Remove completed branch-specific workflows
         run: |
-          rm -f .github/workflows/apply-toonstudio-project-lifecycle.yml
-          rm -f .github/workflows/apply-toonstudio-template-hub.yml
-          rm -f .github/workflows/verify-toonstudio-project-lifecycle.yml
-          rm -f .github/workflows/fix-toonstudio-template-hub-tests-once.yml
-          rm -f .github/workflows/fix-toonstudio-template-hub-tests-v2-once.yml
-          rm -f .github/workflows/fix-toonstudio-template-hub-tests-v3-once.yml
-          rm -f .github/workflows/finalize-toonstudio-template-hub-v4-once.yml
+          rm -f \
+            .github/workflows/apply-toonstudio-project-contract-repair.yml \
+            .github/workflows/apply-toonstudio-project-lifecycle.yml \
+            .github/workflows/apply-toonstudio-session-completion-v2.yml \
+            .github/workflows/apply-toonstudio-template-hub.yml \
+            .github/workflows/finalize-toonstudio-template-hub-v4-once.yml \
+            .github/workflows/fix-toonstudio-template-hub-tests-once.yml \
+            .github/workflows/fix-toonstudio-template-hub-tests-v2-once.yml \
+            .github/workflows/fix-toonstudio-template-hub-tests-v3-once.yml \
+            .github/workflows/install-toonstudio-session-gate.yml \
+            .github/workflows/repair-sync-toonstudio-session.yml \
+            .github/workflows/toonstudio-final-sync-v2.yml \
+            .github/workflows/verify-toonstudio-project-lifecycle.yml
 
       - name: Validate focused regressions
         run: |
           pnpm exec vitest run \
             apps/web/src/domains/creator/studio-project-creation.test.ts \
             apps/web/src/domains/creator/studio-project-template-catalog.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx \
             apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
             apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx
 
@@ -194,6 +230,7 @@ jobs:
           pnpm exec eslint \
             apps/web/src/domains/creator/studio-project-creation.ts \
             apps/web/src/domains/creator/studio-project-template-catalog.ts \
+            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx \
             apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
             apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx
           pnpm exec tsc -p tsconfig.json --noEmit
@@ -206,6 +243,12 @@ jobs:
         run: |
           set -euo pipefail
           git diff --check
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          current_main_sha="$(git rev-parse origin/main)"
+          if [ "$current_main_sha" != "$MERGED_MAIN_SHA" ]; then
+            echo "main advanced during validation: $MERGED_MAIN_SHA -> $current_main_sha" >&2
+            exit 1
+          fi
           git add -A
           git commit -m "feat(studio): finalize project lifecycle and template hub"
-          git push origin HEAD:feat/toonstudio-template-hub-20260912
+          git push origin HEAD:${FEATURE_BRANCH}
