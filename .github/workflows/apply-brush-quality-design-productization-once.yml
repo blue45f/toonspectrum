@@ -14,11 +14,11 @@ permissions:
 
 concurrency:
   group: apply-brush-quality-design-productization-once
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply-validate-commit:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 75
     env:
       CI: "true"
