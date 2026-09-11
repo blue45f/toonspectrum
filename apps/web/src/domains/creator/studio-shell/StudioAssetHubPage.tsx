@@ -1,4 +1,4 @@
-import { Boxes, Library, Search, Store } from "lucide-react";
+import { Boxes, Library, Palette, Search, Store } from "lucide-react";
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -11,14 +11,16 @@ import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
 import { StudioAssetsPage } from "./StudioFrontDoorPages";
+import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
 
-const ASSET_HUB_VIEWS = ["overview", "library", "market", "seller"] as const;
+const ASSET_HUB_VIEWS = ["overview", "series-kit", "library", "market", "seller"] as const;
 
 type AssetHubView = (typeof ASSET_HUB_VIEWS)[number];
 type Locale = "ko" | "en";
 
 const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<Record<Locale, string>>>> = {
   overview: { ko: "에셋 홈", en: "Asset home" },
+  "series-kit": { ko: "Series Kit", en: "Series Kit" },
   library: { ko: "내 에셋", en: "My assets" },
   market: { ko: "마켓에서 찾기", en: "Browse market" },
   seller: { ko: "판매자 센터", en: "Seller center" },
@@ -26,6 +28,7 @@ const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<Record<Locale, string>
 
 const VIEW_ICONS = {
   overview: Boxes,
+  "series-kit": Palette,
   library: Library,
   market: Search,
   seller: Store,
@@ -51,16 +54,42 @@ function assetHubHref(view: AssetHubView, projectId: string | null): string {
   return serialized ? `/studio/assets?${serialized}` : "/studio/assets";
 }
 
+function MissingProjectSeriesKit({ locale }: { readonly locale: Locale }) {
+  return (
+    <Container size="wide" className="py-8 sm:py-12">
+      <section className="rounded-3xl border border-line bg-card p-6 text-center shadow-sm sm:p-10">
+        <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
+          <Palette size={21} aria-hidden="true" />
+        </span>
+        <h2 className="mt-4 text-xl font-black text-fg">
+          {locale === "ko" ? "프로젝트에서 Series Kit를 열어 주세요" : "Open Series Kit from a project"}
+        </h2>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-2">
+          {locale === "ko"
+            ? "Series Kit는 작품별 색상·글꼴·말풍선·출력 규칙을 관리합니다. 내 작업에서 프로젝트를 선택한 뒤 에셋의 Series Kit를 열면 됩니다."
+            : "Series Kit manages project colors, typography, balloons and export defaults. Choose a project from My work, then open its Series Kit."}
+        </p>
+        <Link href="/studio" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
+          {locale === "ko" ? "내 작업으로" : "Go to My work"}
+        </Link>
+      </section>
+    </Container>
+  );
+}
+
 /** Render the one canonical Studio asset destination over existing server-backed capabilities. */
 export function StudioAssetHubPage() {
   const [searchParams] = useSearchParams();
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
   const view = resolveStudioAssetHubView(searchParams.get("view"));
-  const projectId = searchParams.get("project");
+  const projectId = searchParams.get("project")?.trim() || null;
   const CurrentViewIcon = VIEW_ICONS[view];
 
   const currentLabel = useMemo(() => VIEW_LABELS[view][locale], [locale, view]);
+  const visibleViews = projectId
+    ? ASSET_HUB_VIEWS
+    : ASSET_HUB_VIEWS.filter((candidate) => candidate !== "series-kit");
 
   return (
     <div data-studio-asset-hub={view}>
@@ -84,7 +113,7 @@ export function StudioAssetHubPage() {
 
             <nav aria-label={locale === "ko" ? "에셋 화면" : "Asset views"} className="overflow-x-auto">
               <div className="flex min-w-max gap-1 rounded-2xl border border-line bg-card p-1">
-                {ASSET_HUB_VIEWS.map((candidate) => {
+                {visibleViews.map((candidate) => {
                   const active = candidate === view;
                   const Icon = VIEW_ICONS[candidate];
                   return (
@@ -112,6 +141,12 @@ export function StudioAssetHubPage() {
       </div>
 
       {view === "overview" ? <StudioAssetsPage /> : null}
+      {view === "series-kit" && projectId ? (
+        <Container size="wide" className="py-7 sm:py-10">
+          <StudioSeriesKitPanel projectId={projectId} locale={locale} />
+        </Container>
+      ) : null}
+      {view === "series-kit" && !projectId ? <MissingProjectSeriesKit locale={locale} /> : null}
       {view === "library" ? <MarketLibraryPage /> : null}
       {view === "market" ? <MarketBrowsePage /> : null}
       {view === "seller" ? <MarketManagePage /> : null}
