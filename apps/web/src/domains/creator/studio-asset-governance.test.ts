@@ -28,7 +28,7 @@ function readyPreferences(): StudioAssetGovernancePreferences {
   return Object.freeze({
     ...createDefaultStudioAssetGovernancePreferences(),
     providerAccountConnected: true,
-    confirmedPluginPermissions: Object.freeze(["document-write"]),
+    confirmedPluginPermissions: Object.freeze(["document-write"] as const),
   });
 }
 
@@ -57,7 +57,7 @@ describe("Studio asset governance", () => {
     );
 
     expect(report.status).toBe("blocked");
-    expect(report.provider).toMatchObject({ status: "blocked", reason: "authentication-required" });
+    expect(report.provider).toMatchObject({ status: "blocked", code: "authentication-required" });
     expect(report.plugin).toMatchObject({ status: "confirmation" });
     expect(report.blockingCount).toBeGreaterThan(0);
     expect(report.reviewCount).toBeGreaterThan(0);
@@ -73,11 +73,12 @@ describe("Studio asset governance", () => {
         usesForAiTraining: true,
       }),
     ));
+    const usageCodes = report.usage.findings.map((finding) => finding.code);
 
     expect(report.status).toBe("blocked");
-    expect(report.usage.reasons).toContain("seat-limit-exceeded");
-    expect(report.usage.reasons).toContain("ai-training-prohibited");
-    expect(report.entitlement.reason).toBe("seat-limit-exceeded");
+    expect(usageCodes).toContain("seat-limit-exceeded");
+    expect(usageCodes).toContain("ai-training-prohibited");
+    expect(report.entitlement.codes).toContain("seat-limit-exceeded");
   });
 
   it("persists only project-scoped governance preferences and recovers malformed data", () => {
