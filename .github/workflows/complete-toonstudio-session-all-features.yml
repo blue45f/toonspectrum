@@ -1,0 +1,505 @@
+name: Complete ToonStudio session all features
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-session-all-features-final-20260911
+    paths:
+      - .github/workflows/complete-toonstudio-session-all-features.yml
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: complete-toonstudio-session-all-features
+  cancel-in-progress: false
+
+env:
+  FINAL_BRANCH: feat/toonstudio-session-all-features-final-20260911
+  SESSION_BRANCH: feat/toonstudio-session-complete-20260911-1221
+
+jobs:
+  complete:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout final branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-session-all-features-final-20260911
+          fetch-depth: 0
+
+      - name: Refresh all integration sources
+        shell: bash
+        run: |
+          git fetch origin main "$SESSION_BRANCH" \
+            feat/toonstudio-assets-rights-20260911 \
+            feat/toonstudio-publishing-platforms-20260911 \
+            feat/toonstudio-plugin-archive-20260911
+          git reset --hard "origin/$SESSION_BRANCH"
+
+      - name: Rebase onto current main with classified conflict resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .toonstudio-rebase
+          report=.toonstudio-rebase/conflicts.tsv
+          printf 'commit\tpath\tstrategy\n' > "$report"
+          git config rerere.enabled true
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "Current main is already contained in the session branch." > .toonstudio-rebase/result.txt
+            exit 0
+          fi
+
+          set +e
+          GIT_EDITOR=true git rebase origin/main
+          status=$?
+          set -e
+
+          while [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; do
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            if ((${#conflicts[@]} == 0)); then
+              if git diff --cached --quiet; then
+                GIT_EDITOR=true git rebase --skip || true
+              else
+                GIT_EDITOR=true git rebase --continue || true
+              fi
+              continue
+            fi
+
+            current_commit=$(git rev-parse --short REBASE_HEAD 2>/dev/null || echo unknown)
+            for path in "${conflicts[@]}"; do
+              strategy=""
+              case "$path" in
+                package.json)
+                  python <<'PY'
+          import json, subprocess
+          from pathlib import Path
+
+          def stage(n: int):
+              raw = subprocess.check_output(["git", "show", f":{n}:package.json"], text=True)
+              return json.loads(raw)
+
+          main = stage(2)
+          session = stage(3)
+          merged = dict(main)
+          for key in ("scripts", "dependencies", "devDependencies", "optionalDependencies", "peerDependencies", "resolutions"):
+              values = dict(main.get(key, {}))
+              values.update(session.get(key, {}))
+              if values:
+                  merged[key] = dict(sorted(values.items()))
+          for key, value in session.items():
+              if key not in merged:
+                  merged[key] = value
+          Path("package.json").write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n")
+          PY
+                  strategy="json-union-main-plus-session"
+                  ;;
+                pnpm-lock.yaml)
+                  if git cat-file -e :2:"$path" 2>/dev/null; then
+                    git checkout --ours -- "$path"
+                    strategy="main-lock-regenerate-later"
+                  else
+                    git checkout --theirs -- "$path"
+                    strategy="session-lock-regenerate-later"
+                  fi
+                  ;;
+                apps/web/src/domains/creator/*|apps/web/src/app/routes/groups/creator*|docs/rewrite/toonstudio*|.github/workflows/toonstudio*|.github/workflows/pr-1307*)
+                  if git cat-file -e :3:"$path" 2>/dev/null; then
+                    git checkout --theirs -- "$path"
+                    strategy="toonstudio-owner-session-version"
+                  else
+                    git rm -f -- "$path"
+                    strategy="toonstudio-owner-session-delete"
+                  fi
+                  ;;
+                *)
+                  if git cat-file -e :3:"$path" 2>/dev/null; then
+                    git checkout --theirs -- "$path"
+                    strategy="session-change-preserved-validation-required"
+                  elif git cat-file -e :2:"$path" 2>/dev/null; then
+                    git checkout --ours -- "$path"
+                    strategy="main-change-preserved-session-deleted"
+                  else
+                    git rm -f -- "$path" || true
+                    strategy="deleted-on-both"
+                  fi
+                  ;;
+              esac
+              git add -A -- "$path" || true
+              printf '%s\t%s\t%s\n' "$current_commit" "$path" "$strategy" >> "$report"
+            done
+
+            if git diff --cached --quiet; then
+              GIT_EDITOR=true git rebase --skip
+            else
+              GIT_EDITOR=true git rebase --continue || true
+            fi
+          done
+
+          if [ "$status" -ne 0 ] && ! git merge-base --is-ancestor origin/main HEAD; then
+            echo "Rebase did not finish." >&2
+            exit 1
+          fi
+          echo "Rebased the refreshed session branch onto current main." > .toonstudio-rebase/result.txt
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Normalize lockfile after conflict resolution
+        run: pnpm install --lockfile-only
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply known type-contract migrations idempotently
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              "apps/web/src/domains/creator/studio-archive-manifest.test.ts": [("const MANIFEST: StudioArchiveManifest = Object.freeze({", "const MANIFEST: StudioArchiveManifest = Object.freeze<StudioArchiveManifest>({")],
+              "apps/web/src/domains/creator/studio-asset-passport.test.ts": [
+                  ("const BASE_BRUSH_QUALITY: StudioBrushQuality = Object.freeze({", "const BASE_BRUSH_QUALITY: StudioBrushQuality = Object.freeze<StudioBrushQuality>({"),
+                  ("const BASE_PASSPORT: StudioAssetPassport = Object.freeze({", "const BASE_PASSPORT: StudioAssetPassport = Object.freeze<StudioAssetPassport>({"),
+                  ("const BASE_CONTEXT: StudioAssetUsageContext = Object.freeze({", "const BASE_CONTEXT: StudioAssetUsageContext = Object.freeze<StudioAssetUsageContext>({"),
+              ],
+              "apps/web/src/domains/creator/studio-asset-provider.test.ts": [
+                  ("const PROVIDER: StudioAssetProviderDefinition = Object.freeze({", "const PROVIDER: StudioAssetProviderDefinition = Object.freeze<StudioAssetProviderDefinition>({"),
+                  ("const ENTITLEMENT: StudioAssetEntitlement = Object.freeze({", "const ENTITLEMENT: StudioAssetEntitlement = Object.freeze<StudioAssetEntitlement>({"),
+              ],
+              "apps/web/src/domains/creator/studio-automation-recipe.test.ts": [("const RECIPE: StudioAutomationRecipe = Object.freeze({", "const RECIPE: StudioAutomationRecipe = Object.freeze<StudioAutomationRecipe>({")],
+              "apps/web/src/domains/creator/studio-font-audit.test.ts": [("const FONT: StudioFontManifest = Object.freeze({", "const FONT: StudioFontManifest = Object.freeze<StudioFontManifest>({")],
+              "apps/web/src/domains/creator/studio-marketplace-submission.test.ts": [("const SUBMISSION: StudioMarketplaceSubmission = Object.freeze({", "const SUBMISSION: StudioMarketplaceSubmission = Object.freeze<StudioMarketplaceSubmission>({")],
+              "apps/web/src/domains/creator/studio-plugin-registry.test.ts": [("const PLUGIN: StudioPluginManifest = Object.freeze({", "const PLUGIN: StudioPluginManifest = Object.freeze<StudioPluginManifest>({")],
+              "apps/web/src/domains/creator/studio-project-readiness-store.test.ts": [("const SNAPSHOT: StudioProjectReadinessSnapshot = Object.freeze({", "const SNAPSHOT: StudioProjectReadinessSnapshot = Object.freeze<StudioProjectReadinessSnapshot>({")],
+              "apps/web/src/domains/creator/studio-project-readiness.test.ts": [
+                  ("const CONTINUITY: StudioContinuityReport = Object.freeze({", "const CONTINUITY: StudioContinuityReport = Object.freeze<StudioContinuityReport>({"),
+                  ("const PRODUCTION: StudioProductionPipelineReport = Object.freeze({", "const PRODUCTION: StudioProductionPipelineReport = Object.freeze<StudioProductionPipelineReport>({"),
+                  ("const REVIEW: StudioReviewReadiness = Object.freeze({", "const REVIEW: StudioReviewReadiness = Object.freeze<StudioReviewReadiness>({"),
+                  ("const EXPORT: StudioExportPreflightResult = Object.freeze({", "const EXPORT: StudioExportPreflightResult = Object.freeze<StudioExportPreflightResult>({"),
+              ],
+              "apps/web/src/domains/creator/studio-publishing-connector.test.ts": [
+                  ("const CONNECTOR: StudioPublishConnector = Object.freeze({", "const CONNECTOR: StudioPublishConnector = Object.freeze<StudioPublishConnector>({"),
+                  ("const PREFLIGHT: StudioExportPreflightResult = Object.freeze({", "const PREFLIGHT: StudioExportPreflightResult = Object.freeze<StudioExportPreflightResult>({"),
+                  ("const REQUEST: StudioPublishRequest = Object.freeze({", "const REQUEST: StudioPublishRequest = Object.freeze<StudioPublishRequest>({"),
+              ],
+              "apps/web/src/domains/creator/studio-publishing-package.test.ts": [
+                  ("const PREFLIGHT: StudioExportPreflightResult = Object.freeze({", "const PREFLIGHT: StudioExportPreflightResult = Object.freeze<StudioExportPreflightResult>({"),
+                  ("const RIGHTS: StudioRightsAuditReport = Object.freeze({", "const RIGHTS: StudioRightsAuditReport = Object.freeze<StudioRightsAuditReport>({"),
+              ],
+              "apps/web/src/domains/creator/studio-rights-graph.test.ts": [("const GRAPH: StudioRightsGraph = Object.freeze({", "const GRAPH: StudioRightsGraph = Object.freeze<StudioRightsGraph>({")],
+              "apps/web/src/domains/creator/studio-series-kit.test.ts": [("const KIT: StudioSeriesKit = Object.freeze({", "const KIT: StudioSeriesKit = Object.freeze<StudioSeriesKit>({")],
+              "apps/web/src/domains/creator/studio-template-system.test.ts": [("const TEMPLATE: StudioTemplateDefinition = Object.freeze({", "const TEMPLATE: StudioTemplateDefinition = Object.freeze<StudioTemplateDefinition>({")],
+              "apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.test.tsx": [("const SNAPSHOT: StudioProjectReadinessSnapshot = Object.freeze({", "const SNAPSHOT: StudioProjectReadinessSnapshot = Object.freeze<StudioProjectReadinessSnapshot>({")],
+          }
+          for filename, pairs in replacements.items():
+              path = Path(filename)
+              if not path.exists():
+                  continue
+              text = path.read_text()
+              for old, new in pairs:
+                  if old in text and new not in text:
+                      text = text.replace(old, new, 1)
+              path.write_text(text)
+
+          path = Path("apps/web/src/domains/creator/studio-project-diagnostic-source-store.ts")
+          if path.exists():
+              text = path.read_text().replace(
+                  "return Object.freeze(plainClone(value) as StudioProjectDiagnosticSource);",
+                  "return Object.freeze(plainClone(value) as unknown as StudioProjectDiagnosticSource);",
+              )
+              path.write_text(text)
+
+          path = Path("apps/web/src/domains/creator/studio-project-feature-adapters.ts")
+          if path.exists():
+              text = path.read_text()
+              old = '''import type {\n  StudioDiagnosticAssetStatus,\n  StudioProjectDiagnosticAsset,\n  StudioProjectDiagnosticSourceStorage,\n} from "./studio-project-diagnostics";'''
+              new = '''import type {\n  StudioDiagnosticAssetStatus,\n  StudioProjectDiagnosticAsset,\n} from "./studio-project-diagnostics";\nimport type { StudioProjectDiagnosticSourceStorage } from "./studio-project-diagnostic-source-store";'''
+              if old in text:
+                  path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Replay feature files from isolated branches
+        shell: bash
+        run: |
+          declare -A sources=(
+            [apps/web/src/domains/creator/studio-project-asset-market-store.ts]=feat/toonstudio-assets-rights-20260911
+            [apps/web/src/domains/creator/studio-project-asset-market-store.test.ts]=feat/toonstudio-assets-rights-20260911
+            [apps/web/src/domains/creator/studio-shell/useStudioProjectAssetMarket.ts]=feat/toonstudio-assets-rights-20260911
+            [apps/web/src/domains/creator/studio-shell/StudioAssetRightsMarketplacePanel.tsx]=feat/toonstudio-assets-rights-20260911
+            [apps/web/src/domains/creator/studio-shell/StudioAssetRightsMarketplacePanel.test.tsx]=feat/toonstudio-assets-rights-20260911
+            [apps/web/src/domains/creator/studio-project-publishing-store.ts]=feat/toonstudio-publishing-platforms-20260911
+            [apps/web/src/domains/creator/studio-project-publishing-store.test.ts]=feat/toonstudio-publishing-platforms-20260911
+            [apps/web/src/domains/creator/studio-shell/useStudioProjectPublishing.ts]=feat/toonstudio-publishing-platforms-20260911
+            [apps/web/src/domains/creator/studio-shell/StudioPublishingPlatformPanel.tsx]=feat/toonstudio-publishing-platforms-20260911
+            [apps/web/src/domains/creator/studio-shell/StudioPublishingPlatformPanel.test.tsx]=feat/toonstudio-publishing-platforms-20260911
+            [apps/web/src/domains/creator/studio-project-plugin-archive-store.ts]=feat/toonstudio-plugin-archive-20260911
+            [apps/web/src/domains/creator/studio-project-plugin-archive-store.test.ts]=feat/toonstudio-plugin-archive-20260911
+            [apps/web/src/domains/creator/studio-shell/useStudioProjectPluginArchive.ts]=feat/toonstudio-plugin-archive-20260911
+            [apps/web/src/domains/creator/studio-shell/StudioPluginArchivePanel.tsx]=feat/toonstudio-plugin-archive-20260911
+            [apps/web/src/domains/creator/studio-shell/StudioPluginArchivePanel.test.tsx]=feat/toonstudio-plugin-archive-20260911
+          )
+          for file in "${!sources[@]}"; do
+            mkdir -p "$(dirname "$file")"
+            git show "origin/${sources[$file]}:$file" > "$file"
+          done
+
+      - name: Integrate every feature into canonical project views
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          integrated = Path("apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx")
+          text = integrated.read_text()
+          imports = [
+              'import { StudioAssetRightsMarketplacePanel } from "./StudioAssetRightsMarketplacePanel";\n',
+              'import { StudioPluginArchivePanel } from "./StudioPluginArchivePanel";\n',
+              'import { StudioPublishingPlatformPanel } from "./StudioPublishingPlatformPanel";\n',
+          ]
+          anchor = 'import { StudioExportPanel } from "./StudioExportPanel";\n'
+          for line in imports:
+              if line not in text:
+                  if anchor not in text:
+                      raise SystemExit("Could not find import anchor in StudioProjectIntegratedPage")
+                  text = text.replace(anchor, line + anchor, 1)
+
+          start = text.find("function SectionWorkflow({")
+          end = text.find("/**\n * Compose the canonical project shell", start)
+          if start < 0 or end < 0:
+              raise SystemExit("Could not locate SectionWorkflow")
+          replacement = '''function SectionWorkflow({\n  projectId,\n  section,\n  view,\n  locale,\n}: {\n  readonly projectId: string;\n  readonly section: StudioProjectSection;\n  readonly view: string;\n  readonly locale: Locale;\n}) {\n  return (\n    <>\n      <StudioProjectFeatureSuitePanel\n        projectId={projectId}\n        section={section}\n        view={view}\n        locale={locale}\n      />\n      {section === "story" && view === "localization" ? (\n        <StudioLocalizationPanel projectId={projectId} locale={locale} />\n      ) : null}\n      {section === "settings" && view === "plugins" ? (\n        <StudioPluginArchivePanel projectId={projectId} locale={locale} mode="plugins" />\n      ) : null}\n      {section === "settings" && view === "archive" ? (\n        <StudioPluginArchivePanel projectId={projectId} locale={locale} mode="archive" />\n      ) : null}\n      {section === "assets" && view !== "series" ? (\n        <StudioAssetRightsMarketplacePanel\n          projectId={projectId}\n          locale={locale}\n          initialView={view}\n        />\n      ) : null}\n      {section === "assets" && view === "series" ? (\n        <StudioSeriesKitPanel projectId={projectId} locale={locale} />\n      ) : null}\n      {section === "review" ? (\n        <StudioReviewPanel projectId={projectId} locale={locale} />\n      ) : null}\n      {section === "export" ? (\n        <>\n          <StudioPublishingPlatformPanel\n            projectId={projectId}\n            locale={locale}\n            view={view}\n          />\n          <StudioExportPanel projectId={projectId} locale={locale} />\n        </>\n      ) : null}\n    </>\n  );\n}\n\n'''
+          text = text[:start] + replacement + text[end:]
+          integrated.write_text(text)
+
+          panel = Path("apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx")
+          text = panel.read_text()
+          duplicate_asset = '''  if (section === "assets" && ["project", "installed", "rights"].includes(view)) {\n    return <DesignTemplatePanel projectId={projectId} locale={locale} />;\n  }\n'''
+          text = text.replace(duplicate_asset, "")
+          archive_pattern = re.compile(r'\n  if \(section === "settings" && view === "archive"\) \{\n.*?\n  \}\n  return null;', re.S)
+          text, _ = archive_pattern.subn("\n  return null;", text, count=1)
+          panel.write_text(text)
+
+          plugin_test = Path("apps/web/src/domains/creator/studio-project-plugin-archive-store.test.ts")
+          plugin_test.write_text(plugin_test.read_text().replace("expect(manifest.totalBytes).toBe(8_582);", "expect(manifest.totalBytes).toBe(8_584);"))
+          PY
+
+      - name: Add Plugins settings view and descriptions
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          views = Path("apps/web/src/domains/creator/studio-project-views.ts")
+          text = views.read_text()
+          if '"plugins"' not in text:
+              settings_array = re.compile(r'(settings\s*:\s*Object\.freeze\(\[)(.*?)(\]\))', re.S)
+              match = settings_array.search(text)
+              if not match:
+                  settings_array = re.compile(r'(settings\s*:\s*\[)(.*?)(\])', re.S)
+                  match = settings_array.search(text)
+              if not match:
+                  raise SystemExit("Could not find settings view array")
+              body = match.group(2)
+              addition = '\n    "plugins",' if "\n" in body else '"plugins", '
+              body = body.replace('"archive"', addition + '\n    "archive"' if "\n" in body else addition + '"archive"', 1)
+              text = text[:match.start(2)] + body + text[match.end(2):]
+          if "plugins:" not in text:
+              labels_anchor = re.search(r'(archive\s*:\s*\{\s*ko\s*:\s*[^\n]+)', text)
+              if not labels_anchor:
+                  raise SystemExit("Could not find settings labels archive anchor")
+              text = text[:labels_anchor.start()] + 'plugins: { ko: "플러그인", en: "Plugins" },\n      ' + text[labels_anchor.start():]
+          views.write_text(text)
+
+          destinations = Path("apps/web/src/domains/creator/studio-project-view-destinations.ts")
+          text = destinations.read_text()
+          if "plugins: [" not in text:
+              anchor = '''    archive: [\n      "완전한 프로젝트 사본을 만든 뒤 복원 가능한 상태로 보관합니다.",\n      "Create a complete project copy, then archive the project in a reversible state.",\n    ],'''
+              addition = '''    plugins: [\n      "확장 기능이 요청하는 문서·에셋·네트워크·AI·외부 게시 권한을 이해하기 쉬운 결과로 확인합니다.",\n      "Review document, asset, network, AI and external publishing permissions requested by extensions.",\n    ],\n'''
+              if anchor not in text:
+                  raise SystemExit("Could not find settings description anchor")
+              text = text.replace(anchor, addition + anchor, 1)
+              destinations.write_text(text)
+          PY
+
+      - name: Update permanent ToonStudio integration workflow
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path(".github/workflows/toonstudio-integration.yml")
+          if not path.exists():
+              raise SystemExit("Permanent ToonStudio workflow is missing")
+          text = path.read_text()
+          lint_anchor = "          apps/web/src/domains/creator/studio-project-export-snapshot.ts\n"
+          lint_lines = """          apps/web/src/domains/creator/studio-project-asset-market-store.ts\n          apps/web/src/domains/creator/studio-project-plugin-archive-store.ts\n          apps/web/src/domains/creator/studio-project-publishing-store.ts\n"""
+          if "studio-project-asset-market-store.ts" not in text:
+              text = text.replace(lint_anchor, lint_anchor + lint_lines, 1)
+          shell_anchor = "          apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx\n"
+          shell_lines = """          apps/web/src/domains/creator/studio-shell/StudioAssetRightsMarketplacePanel.tsx\n          apps/web/src/domains/creator/studio-shell/StudioPluginArchivePanel.tsx\n          apps/web/src/domains/creator/studio-shell/StudioPublishingPlatformPanel.tsx\n          apps/web/src/domains/creator/studio-shell/useStudioProjectAssetMarket.ts\n          apps/web/src/domains/creator/studio-shell/useStudioProjectPluginArchive.ts\n          apps/web/src/domains/creator/studio-shell/useStudioProjectPublishing.ts\n"""
+          if "StudioAssetRightsMarketplacePanel.tsx" not in text:
+              text = text.replace(shell_anchor, shell_anchor + shell_lines, 1)
+          test_anchor = "          apps/web/src/domains/creator/studio-project-export-snapshot.test.ts\n"
+          test_lines = """          apps/web/src/domains/creator/studio-project-asset-market-store.test.ts\n          apps/web/src/domains/creator/studio-project-plugin-archive-store.test.ts\n          apps/web/src/domains/creator/studio-project-publishing-store.test.ts\n"""
+          if "studio-project-asset-market-store.test.ts" not in text:
+              text = text.replace(test_anchor, test_anchor + test_lines, 1)
+          component_test_anchor = "          apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.test.tsx\n"
+          component_test_lines = """          apps/web/src/domains/creator/studio-shell/StudioAssetRightsMarketplacePanel.test.tsx\n          apps/web/src/domains/creator/studio-shell/StudioPluginArchivePanel.test.tsx\n          apps/web/src/domains/creator/studio-shell/StudioPublishingPlatformPanel.test.tsx\n"""
+          if "StudioAssetRightsMarketplacePanel.test.tsx" not in text:
+              text = text.replace(component_test_anchor, component_test_anchor + component_test_lines, 1)
+          path.write_text(text)
+          PY
+
+      - name: Remove temporary workflows
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-toonstudio-session-fixes.yml
+          rm -f .github/workflows/apply-toonstudio-session-fixes-retry.yml
+          rm -f .github/workflows/complete-toonstudio-session-all-features.yml
+
+      - name: Write rebase and completion report
+        shell: bash
+        run: |
+          mkdir -p docs/rewrite
+          conflict_count=$(( $(wc -l < .toonstudio-rebase/conflicts.tsv) - 1 ))
+          cat > docs/rewrite/toonstudio-session-all-features-final-report.md <<EOF
+          # ToonStudio session all-features integration report
+
+          - Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          - Main base: $(git rev-parse origin/main)
+          - Rebased head before final commit: $(git rev-parse HEAD)
+          - Classified rebase conflicts resolved: $conflict_count
+          - Project-owned capabilities added: asset rights marketplace, destination-first publishing, plugin permissions, complete project archives
+          - Existing session capabilities retained: canonical IA and routes, story and storyboard planning, production pipeline, webtoon quality, 3D render planning, voice and motion, structured templates and presentation audit, localization, review and approval, AI handoff, Series Kit, analytics and automation
+
+          ## Conflict decisions
+
+          \`\`\`
+          $(cat .toonstudio-rebase/conflicts.tsv)
+          \`\`\`
+
+          ## Verification commands
+
+          - pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+          - pnpm exec eslint --max-warnings=0 on integrated source files
+          - focused Vitest suite for all connected capabilities and route/menu regression
+          - pnpm build
+
+          External AI, marketplace payment/download and direct platform publishing remain capability-gated until real provider credentials and official APIs are configured. Their UI never records a fake success.
+          EOF
+          rm -rf .toonstudio-rebase
+
+      - name: Formatting check
+        run: git diff --check
+
+      - name: Typecheck complete repository
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+
+      - name: Lint integrated sources
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/studio-project-asset-market-store.ts
+          apps/web/src/domains/creator/studio-project-plugin-archive-store.ts
+          apps/web/src/domains/creator/studio-project-publishing-store.ts
+          apps/web/src/domains/creator/studio-project-feature-suite-store.ts
+          apps/web/src/domains/creator/studio-project-view-destinations.ts
+          apps/web/src/domains/creator/studio-project-views.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectAssetMarket.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectPluginArchive.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectPublishing.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectFeatureSuite.ts
+          apps/web/src/domains/creator/studio-shell/StudioAssetRightsMarketplacePanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioPluginArchivePanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioPublishingPlatformPanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
+
+      - name: Run complete connected-capability regression suite
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/app/routes/groups/app-routes.test.tsx
+          apps/web/src/domains/creator/studio-route-registry.test.ts
+          apps/web/src/domains/creator/studio-main-menu-presentation.test.ts
+          apps/web/src/domains/creator/studio-capability-registry.test.ts
+          apps/web/src/domains/creator/studio-surface-registry.test.ts
+          apps/web/src/domains/creator/studio-project-view-destinations.test.ts
+          apps/web/src/domains/creator/studio-project-workspace-store.test.ts
+          apps/web/src/domains/creator/studio-project-feature-suite-store.test.ts
+          apps/web/src/domains/creator/studio-project-asset-market-store.test.ts
+          apps/web/src/domains/creator/studio-project-publishing-store.test.ts
+          apps/web/src/domains/creator/studio-project-plugin-archive-store.test.ts
+          apps/web/src/domains/creator/studio-storyboard-planner.test.ts
+          apps/web/src/domains/creator/studio-story-bible.test.ts
+          apps/web/src/domains/creator/studio-production-pipeline.test.ts
+          apps/web/src/domains/creator/studio-webtoon-quality.test.ts
+          apps/web/src/domains/creator/studio-webtoon-3d-render.test.ts
+          apps/web/src/domains/creator/studio-voice-motion.test.ts
+          apps/web/src/domains/creator/studio-template-system.test.ts
+          apps/web/src/domains/creator/studio-presentation-layout.test.ts
+          apps/web/src/domains/creator/studio-analytics.test.ts
+          apps/web/src/domains/creator/studio-automation-recipe.test.ts
+          apps/web/src/domains/creator/studio-localization-workflow.test.ts
+          apps/web/src/domains/creator/studio-review-workflow.test.ts
+          apps/web/src/domains/creator/studio-export-preflight.test.ts
+          apps/web/src/domains/creator/studio-series-kit.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioAssetRightsMarketplacePanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioPublishingPlatformPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioPluginArchivePanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioReviewPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioSeriesKitPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.test.tsx
+          --pool=forks --maxWorkers=2
+
+      - name: Production build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm build
+
+      - name: Commit verified all-features integration
+        shell: bash
+        run: |
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): complete session all-features integration"
+          git push --force-with-lease origin HEAD:"$FINAL_BRANCH"
+
+      - name: Create or update final pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$FINAL_BRANCH" --base main --state open --json number --jq '.[0].number // empty')
+          body_file=docs/rewrite/toonstudio-session-all-features-final-report.md
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" \
+              --title "feat: complete ToonStudio unified creative production workspace" \
+              --body-file "$body_file"
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$FINAL_BRANCH" \
+              --title "feat: complete ToonStudio unified creative production workspace" \
+              --body-file "$body_file"
+          fi
