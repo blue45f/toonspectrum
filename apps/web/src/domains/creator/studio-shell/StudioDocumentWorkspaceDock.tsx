@@ -224,6 +224,9 @@ export function StudioDocumentWorkspaceDock() {
 
   const title = locale === "ko" ? projection.titleKo : projection.titleEn;
   const description = locale === "ko" ? projection.descriptionKo : projection.descriptionEn;
+  const triggerLabel = open
+    ? (locale === "ko" ? "문서 도구 닫기" : "Close document tools")
+    : (locale === "ko" ? "문서 도구 열기" : "Open document tools");
 
   return (
     <>
@@ -232,8 +235,9 @@ export function StudioDocumentWorkspaceDock() {
           type="button"
           aria-controls={panelId}
           aria-expanded={open}
+          aria-label={triggerLabel}
           className={cn(
-            buttonClass({ variant: open ? "primary" : "outline", size: "sm" }),
+            buttonClass({ variant: open ? "solid" : "outline", size: "sm" }),
             "pointer-events-auto min-h-11 gap-2 rounded-2xl bg-card/95 shadow-lg backdrop-blur-xl",
           )}
           onClick={() => setOpen((value) => !value)}
@@ -247,10 +251,10 @@ export function StudioDocumentWorkspaceDock() {
         <aside
           id={panelId}
           aria-label={title}
-          className="fixed inset-x-2 bottom-2 top-16 z-[118] overflow-hidden rounded-3xl border border-line bg-card/98 shadow-2xl backdrop-blur-xl print:hidden sm:left-auto sm:right-3 sm:w-[min(46rem,calc(100vw-1.5rem))]"
+          className="fixed inset-x-2 bottom-2 top-16 z-[118] flex flex-col overflow-hidden rounded-3xl border border-line bg-card/95 shadow-2xl backdrop-blur-xl print:hidden sm:left-auto sm:right-3 sm:w-[min(46rem,calc(100vw-1.5rem))]"
           data-studio-document-workspace-dock={workspace}
         >
-          <div className="flex min-h-16 items-start gap-3 border-b border-line bg-panel/80 p-4">
+          <div className="flex min-h-16 shrink-0 items-start gap-3 border-b border-line bg-panel/80 p-4">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
               <PanelRightOpen size={18} aria-hidden="true" />
             </span>
@@ -268,7 +272,7 @@ export function StudioDocumentWorkspaceDock() {
               <X size={18} aria-hidden="true" />
             </button>
           </div>
-          <div className="h-[calc(100%-4rem)] overflow-y-auto p-3 sm:p-5">
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
             <Suspense fallback={<DockLoading locale={locale} />}>
               <ProjectionContent
                 locale={locale}
