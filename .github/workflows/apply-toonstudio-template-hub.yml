@@ -1,4 +1,4 @@
-name: Apply ToonStudio template hub once
+name: Repair and apply ToonStudio template hub once
 
 on:
   push:
@@ -19,15 +19,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 70
     env:
-      CI: "true"
-      HUSKY: "0"
+      CI: true
+      HUSKY: 0
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - name: Checkout exact feature branch
         uses: actions/checkout@v4
         with:
           ref: feat/toonstudio-template-hub-20260912
-          fetch-depth: 0
+          fetch-depth: 2
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -43,280 +43,77 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Connect template and lifecycle owners
+      - name: Recover original integration steps
         shell: bash
         run: |
+          set -euo pipefail
+          git show HEAD^:.github/workflows/apply-toonstudio-template-hub.yml > /tmp/original-template-hub-workflow.yml
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import YAML from "yaml";
+
+          const source = fs.readFileSync("/tmp/original-template-hub-workflow.yml", "utf8");
+          const workflow = YAML.parse(source);
+          const expectedNames = [
+            "Connect template and lifecycle owners",
+            "Normalize changed sources",
+            "Typecheck",
+            "Lint changed sources",
+            "Run lifecycle and template tests",
+            "Verify ToonStudio reachability and contracts",
+            "Build production bundle",
+            "Record validation and remove one-shot workflows",
+          ];
+          const steps = workflow?.jobs?.integrate?.steps ?? [];
+          for (const [index, name] of expectedNames.entries()) {
+            const step = steps.find((candidate) => candidate?.name === name);
+            if (!step || typeof step.run !== "string") {
+              throw new Error(`Original workflow step is missing: ${name}`);
+            }
+            fs.writeFileSync(
+              `/tmp/toonstudio-template-step-${index}.sh`,
+              `set -euo pipefail\n${step.run}\n`,
+            );
+          }
+          NODE
+
+      - name: Apply integration and repair lint blockers
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash /tmp/toonstudio-template-step-0.sh
           python <<'PY'
           from pathlib import Path
-          import re
 
-          def text(path: str) -> str:
-              return Path(path).read_text()
+          creation_path = Path("apps/web/src/domains/creator/studio-project-creation.ts")
+          creation = creation_path.read_text(encoding="utf-8")
+          legacy_storage = '''export interface StudioProjectCreationStorage
+            extends StudioProjectLibraryStorage,
+              StudioProjectDocumentStorage {}'''
+          normalized_storage = '''export type StudioProjectCreationStorage = StudioProjectLibraryStorage &
+            StudioProjectDocumentStorage;'''
+          if legacy_storage in creation:
+              creation = creation.replace(legacy_storage, normalized_storage, 1)
+          elif normalized_storage not in creation:
+              raise SystemExit("studio-project-creation.ts: storage type declaration not recognized")
+          creation_path.write_text(creation, encoding="utf-8")
 
-          def write(path: str, value: str) -> None:
-              Path(path).write_text(value)
-
-          def replace_once(path: str, old: str, new: str, *, optional: bool = False) -> None:
-              value = text(path)
-              count = value.count(old)
-              if count == 0 and optional:
-                  return
-              if count != 1:
-                  raise SystemExit(f"{path}: expected exactly one match, found {count}: {old[:100]!r}")
-              write(path, value.replace(old, new, 1))
-
-          def insert_before_once(path: str, marker: str, addition: str, sentinel: str) -> None:
-              value = text(path)
-              if sentinel in value:
-                  return
-              count = value.count(marker)
-              if count != 1:
-                  raise SystemExit(f"{path}: insertion marker count {count}: {marker[:100]!r}")
-              write(path, value.replace(marker, addition + marker, 1))
-
-          route_pages = "apps/web/src/app/routes/groups/creator-route-pages.ts"
-          replace_once(
-              route_pages,
-              '''export const StudioHomePage = lazyRetry(\n  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({\n    default: module.StudioHomePage,\n  })),\n  "StudioHomePage",\n);''',
-              '''export const StudioHomePage = lazyRetry(\n  () => import("@/domains/creator/studio-shell/StudioProjectLibraryPage").then((module) => ({\n    default: module.StudioProjectLibraryPage,\n  })),\n  "StudioProjectLibraryPage",\n);''',
-              optional=True,
+          page_path = Path(
+              "apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
           )
-          replace_once(
-              route_pages,
-              '''export const StudioNewPage = lazyRetry(\n  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({\n    default: module.StudioNewPage,\n  })),\n  "StudioNewPage",\n);''',
-              '''export const StudioNewPage = lazyRetry(\n  () => import("@/domains/creator/studio-shell/StudioNewIntegratedPage").then((module) => ({\n    default: module.StudioNewIntegratedPage,\n  })),\n  "StudioNewIntegratedPage",\n);''',
-              optional=True,
-          )
-          insert_before_once(
-              route_pages,
-              '''export const StudioAssetsPage = lazyRetry(''',
-              '''export const StudioTemplateHubPage = lazyRetry(\n  () => import("@/domains/creator/studio-shell/StudioTemplateHubPage").then((module) => ({\n    default: module.StudioTemplateHubPage,\n  })),\n  "StudioTemplateHubPage",\n);\n''',
-              "export const StudioTemplateHubPage",
-          )
-
-          routes = "apps/web/src/app/routes/groups/creator.routes.tsx"
-          value = text(routes)
-          if "  StudioTemplateHubPage," not in value:
-              marker = "  StudioNewPage,\n"
-              if marker not in value:
-                  raise SystemExit(f"{routes}: StudioNewPage import marker missing")
-              value = value.replace(marker, marker + "  StudioTemplateHubPage,\n", 1)
-          old_route = '''  { id: "creator-studio-templates", path: "/studio/templates", element: <Navigate to="/market?view=templates" replace /> },'''
-          new_route = '''  { id: "creator-studio-templates", path: "/studio/templates", element: <StudioTemplateHubPage /> },'''
-          if old_route in value:
-              value = value.replace(old_route, new_route, 1)
-          elif new_route not in value:
-              raise SystemExit(f"{routes}: templates route not found")
-          if 'path: "/studio/recovery"' not in value:
-              marker = '''  { id: "creator-studio-import", path: "/studio/import", element: <StudioImportPage /> },\n'''
-              addition = '''  { id: "creator-studio-recovery", path: "/studio/recovery", element: <Navigate to="/studio?view=archived" replace /> },\n  { id: "creator-studio-trash", path: "/studio/trash", element: <Navigate to="/studio?view=trash" replace /> },\n'''
-              if marker not in value:
-                  raise SystemExit(f"{routes}: import route marker missing")
-              value = value.replace(marker, marker + addition, 1)
-          write(routes, value)
-
-          integrated = "apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx"
-          value = text(integrated)
-          if 'import { StudioProjectDocumentsPanel } from "./StudioProjectDocumentsPanel";' not in value:
-              marker = 'import { StudioProjectAssistantPanel } from "./StudioProjectAssistantPanel";\n'
-              if marker not in value:
-                  raise SystemExit(f"{integrated}: assistant import marker missing")
-              value = value.replace(
-                  marker,
-                  marker + 'import { StudioProjectDocumentsPanel } from "./StudioProjectDocumentsPanel";\n',
-                  1,
-              )
-          if "<StudioProjectDocumentsPanel" not in value:
-              marker = '''      {section === "story" && view === "localization" ? ('''
-              addition = '''      {section === "production" && view === "documents" ? (\n        <StudioProjectDocumentsPanel projectId={projectId} locale={locale} />\n      ) : null}\n'''
-              if marker not in value:
-                  raise SystemExit(f"{integrated}: workflow insertion marker missing")
-              value = value.replace(marker, addition + marker, 1)
-          write(integrated, value)
-
-          new_page = "apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
-          value = text(new_page)
-          old_import = '''import {\n  ensureInitialStudioProjectDocument,\n  studioProjectDocumentHref,\n} from "../studio-project-document-store";\nimport {\n  createStudioProject,\n  markStudioProjectOpened,\n  permanentlyDeleteStudioProject,\n  trashStudioProject,\n  type StudioProjectKind,\n} from "../studio-project-library-store";'''
-          new_import = '''import { createStudioProjectWithInitialDocument } from "../studio-project-creation";\nimport type { StudioProjectKind } from "../studio-project-library-store";'''
-          if old_import in value:
-              value = value.replace(old_import, new_import, 1)
-          elif "createStudioProjectWithInitialDocument" not in value:
-              raise SystemExit(f"{new_page}: creation imports not recognized")
-          start = value.find("  const create = () => {")
-          end = value.find("\n\n  return (", start)
-          if start < 0 or end < 0:
-              raise SystemExit(f"{new_page}: create handler boundaries missing")
-          handler = '''  const create = () => {\n    if (typeof window === "undefined" || creating) return;\n    setCreating(true);\n    setError(null);\n    try {\n      const result = createStudioProjectWithInitialDocument(window.localStorage, {\n        title,\n        kind,\n        templateId,\n        description,\n        primaryLocale,\n      }, window);\n      navigate(result.href, { replace: true });\n    } catch (cause) {\n      setError(cause instanceof Error\n        ? cause.message\n        : locale === "ko"\n          ? "프로젝트를 만들지 못했습니다."\n          : "The project could not be created.");\n      setCreating(false);\n    }\n  };'''
-          value = value[:start] + handler + value[end:]
-          write(new_page, value)
-
-          library_store = "apps/web/src/domains/creator/studio-project-library-store.ts"
-          value = text(library_store)
-          value = value.replace(
-              '''    primaryLocale: source.primaryLocale,\n    createdAt: options.at,\n  }, { target: options.target });''',
-              '''    primaryLocale: source.primaryLocale,\n    ...(options.at ? { createdAt: options.at } : {}),\n  }, { target: options.target });''',
-          )
-          write(library_store, value)
-
-          document_store = "apps/web/src/domains/creator/studio-project-document-store.ts"
-          value = text(document_store)
-          value = value.replace(
-              '''    projectKind: input.projectKind,\n    createdAt: input.createdAt,\n    target: input.target,''',
-              '''    projectKind: input.projectKind,\n    ...(input.createdAt ? { createdAt: input.createdAt } : {}),\n    target: input.target,''',
-          )
-          value = value.replace(
-              '''    pageCount: source.pageCount,\n    createdAt: options.at,\n  }, { target: options.target });''',
-              '''    pageCount: source.pageCount,\n    ...(options.at ? { createdAt: options.at } : {}),\n  }, { target: options.target });''',
-          )
-          write(document_store, value)
-
-          creation = "apps/web/src/domains/creator/studio-project-creation.ts"
-          value = text(creation)
-          old_project_call = '''  const project = createStudioProject(storage, {\n    title: input.title,\n    kind: input.kind,\n    templateId: input.templateId,\n    description: input.description,\n    primaryLocale: input.primaryLocale,\n    createdAt,\n  }, { target });'''
-          new_project_call = '''  const project = createStudioProject(storage, {\n    title: input.title,\n    kind: input.kind,\n    createdAt,\n    ...(input.templateId !== undefined ? { templateId: input.templateId } : {}),\n    ...(input.description !== undefined ? { description: input.description } : {}),\n    ...(input.primaryLocale !== undefined ? { primaryLocale: input.primaryLocale } : {}),\n  }, { target });'''
-          if old_project_call in value:
-              value = value.replace(old_project_call, new_project_call, 1)
-          old_document_call = '''      ? createStudioProjectDocument(storage, project.id, {\n        title: input.document.title ?? `${project.title} 작업 문서`,\n        kind: input.document.kind,\n        defaultWorkspace: input.document.defaultWorkspace,\n        width: input.document.width,\n        height: input.document.height,\n        pageCount: input.document.pageCount,\n        createdAt,\n      }, { target })'''
-          new_document_call = '''      ? createStudioProjectDocument(storage, project.id, {\n        title: input.document.title ?? `${project.title} 작업 문서`,\n        kind: input.document.kind,\n        createdAt,\n        ...(input.document.defaultWorkspace !== undefined\n          ? { defaultWorkspace: input.document.defaultWorkspace }\n          : {}),\n        ...(input.document.width !== undefined ? { width: input.document.width } : {}),\n        ...(input.document.height !== undefined ? { height: input.document.height } : {}),\n        ...(input.document.pageCount !== undefined ? { pageCount: input.document.pageCount } : {}),\n      }, { target })'''
-          if old_document_call in value:
-              value = value.replace(old_document_call, new_document_call, 1)
-          write(creation, value)
-
-          product_ia = "apps/web/src/domains/creator/studio-product-ia.ts"
-          value = text(product_ia)
-          value = value.replace(
-              '  { id: "create", label: "새로 만들기", href: "/studio/new" },',
-              '  { id: "templates", label: "템플릿", href: "/studio/templates" },',
-              1,
-          )
-          if 'id: "template.library"' not in value:
-              marker = '''  {\n    id: "project.create",'''
-              addition = '''  {\n    id: "template.library",\n    label: "템플릿",\n    owner: "templates",\n    primaryRoute: "/studio/templates",\n    maturity: "stable",\n    surfaces: [\n      { id: "template-hub", role: "primary" },\n      { id: "header-template-link", role: "projection" },\n      { id: "new-project-template-picker", role: "projection" },\n      { id: "asset-market-templates", role: "projection" },\n    ],\n    aliases: ["템플릿 갤러리", "미리디자인", "presentation template"],\n  },\n'''
-              if marker not in value:
-                  raise SystemExit(f"{product_ia}: project.create capability marker missing")
-              value = value.replace(marker, addition + marker, 1)
-          write(product_ia, value)
-
-          product_test = "apps/web/src/domains/creator/studio-product-ia.test.ts"
-          if Path(product_test).exists():
-              value = text(product_test)
-              value = value.replace('"create", "assets", "learn"', '"templates", "assets", "learn"')
-              value = value.replace('"새로 만들기", "에셋", "배우기"', '"템플릿", "에셋", "배우기"')
-              value = value.replace('"/studio/new", "/studio/assets", "/learn"', '"/studio/templates", "/studio/assets", "/learn"')
-              write(product_test, value)
-
-          reachability = "scripts/verify-toonstudio-feature-reachability.mjs"
-          value = text(reachability)
-          required_additions = [
-              "apps/web/src/domains/creator/studio-project-library-store.ts",
-              "apps/web/src/domains/creator/studio-project-document-store.ts",
-              "apps/web/src/domains/creator/studio-project-creation.ts",
-              "apps/web/src/domains/creator/studio-project-template-catalog.ts",
-              "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",
-              "apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx",
-              "apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx",
-              "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx",
-          ]
-          marker = '  "apps/web/src/domains/creator/studio-project-views.ts",\n'
-          for module in required_additions:
-              quoted = f'  "{module}",\n'
-              if quoted not in value:
-                  if marker not in value:
-                      raise SystemExit(f"{reachability}: required-list marker missing")
-                  value = value.replace(marker, marker + quoted, 1)
-          write(reachability, value)
-
-          closure = "apps/web/src/domains/creator/studio-integration-closure.test.ts"
-          if Path(closure).exists():
-              value = text(closure)
-              if "StudioProjectDocumentsPanel" not in value:
-                  value = value.replace(
-                      '      "StudioProjectFeatureSuitePanel",\n',
-                      '      "StudioProjectFeatureSuitePanel",\n      "StudioProjectDocumentsPanel",\n',
-                      1,
-                  )
-              marker = '  it("mounts recovered import and AI handoffs in the real canvas host", () => {'
-              if "owns project, document and template lifecycle" not in value and marker in value:
-                  addition = '''  it("owns project, document and template lifecycle from canonical Studio routes", () => {\n    const routePages = source("apps/web/src/app/routes/groups/creator-route-pages.ts");\n    const routes = source("apps/web/src/app/routes/groups/creator.routes.tsx");\n    const integrated = source("apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx");\n    const productIa = source("apps/web/src/domains/creator/studio-product-ia.ts");\n\n    expect(routePages).toContain('studio-shell/StudioProjectLibraryPage');\n    expect(routePages).toContain('studio-shell/StudioNewIntegratedPage');\n    expect(routePages).toContain('studio-shell/StudioTemplateHubPage');\n    expect(routes).toContain('path: "/studio/recovery"');\n    expect(routes).toContain('path: "/studio/trash"');\n    expect(routes).toContain('path: "/studio/templates", element: <StudioTemplateHubPage />');\n    expect(integrated).toContain("<StudioProjectDocumentsPanel");\n    expect(productIa).toContain('id: "templates", label: "템플릿", href: "/studio/templates"');\n  });\n\n'''
-                  value = value.replace(marker, addition + marker, 1)
-              write(closure, value)
+          page = page_path.read_text(encoding="utf-8")
+          autofocus = "                  autoFocus\n"
+          if page.count(autofocus) == 1:
+              page = page.replace(autofocus, "", 1)
+          elif "autoFocus" in page:
+              raise SystemExit("StudioNewIntegratedPage.tsx: unexpected autoFocus shape")
+          page_path.write_text(page, encoding="utf-8")
           PY
 
-      - name: Normalize changed sources
+      - name: Validate, finalize and self-remove
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t files < <(git diff --name-only -- '*.ts' '*.tsx')
-          if ((${#files[@]})); then
-            pnpm exec eslint --fix "${files[@]}"
-          fi
-          git diff --check
-
-      - name: Typecheck
-        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
-
-      - name: Lint changed sources
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t files < <(git diff --name-only -- '*.ts' '*.tsx')
-          if ((${#files[@]})); then
-            pnpm exec eslint --max-warnings=0 "${files[@]}"
-          fi
-
-      - name: Run lifecycle and template tests
-        run: >-
-          pnpm exec vitest run
-          apps/web/src/domains/creator/studio-project-library-store.test.ts
-          apps/web/src/domains/creator/studio-project-document-store.test.ts
-          apps/web/src/domains/creator/studio-project-creation.test.ts
-          apps/web/src/domains/creator/studio-project-template-catalog.test.ts
-          apps/web/src/domains/creator/studio-product-ia.test.ts
-          apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx
-          apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx
-          apps/web/src/domains/creator/studio-integration-closure.test.ts
-          apps/web/src/app/routes/groups/app-routes.test.tsx
-          --pool=forks --maxWorkers=2
-
-      - name: Verify ToonStudio reachability and contracts
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/verify-toonstudio-feature-reachability.mjs
-          if pnpm run | grep -q 'verify:studio-session-complete'; then
-            pnpm run verify:studio-session-complete
-          fi
-
-      - name: Build production bundle
-        run: pnpm run build:bundle
-
-      - name: Record validation and remove one-shot workflows
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p docs/rewrite
-          cat > docs/rewrite/toonstudio-template-and-lifecycle-validation.md <<EOF
-          # ToonStudio template and lifecycle validation
-
-          - Validated commit: \`$(git rev-parse HEAD)\`
-          - Validated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-          - Project library and recovery: passed
-          - Document lifecycle and workspace identity: passed
-          - Template catalog and search: passed
-          - Template-based project creation: passed
-          - Canonical routes and IA: passed
-          - TypeScript and ESLint: passed
-          - Feature reachability and session contracts: passed
-          - Production bundle: passed
-          EOF
-          rm -f .github/workflows/apply-toonstudio-project-lifecycle.yml
-          rm -f .github/workflows/verify-toonstudio-project-lifecycle.yml
-          rm -f .github/workflows/apply-toonstudio-template-hub.yml
-          git config user.name "toonstudio-integration-bot"
-          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
-          git add -A
-          git diff --cached --check
-          git commit -m "feat(studio): complete project lifecycle and template hub"
-          git push origin HEAD:feat/toonstudio-template-hub-20260912
+          for step in 1 2 3 4 5 6 7; do
+            bash "/tmp/toonstudio-template-step-${step}.sh"
+          done
