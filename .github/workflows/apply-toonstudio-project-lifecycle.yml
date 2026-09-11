@@ -1,6 +1,6 @@
 name: Apply ToonStudio project lifecycle once
 
-# Retry after aligning the integration script with the canonical route registry.
+# Retry after resolving the verified lifecycle lint blockers.
 on:
   push:
     branches:
@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: feat/toonstudio-project-lifecycle-20260912
-          fetch-depth: 0
+          fetch-depth: 256
 
       - name: Synchronize main and resolve new-project composition
         shell: bash
@@ -41,7 +41,7 @@ jobs:
           cp "$page" "$preserved"
           git config user.name "toonstudio-integration-bot"
           git config user.email "toonstudio-integration-bot@users.noreply.github.com"
-          git fetch origin main
+          git fetch --no-tags --depth=256 origin main:refs/remotes/origin/main
 
           set +e
           git merge --no-edit origin/main
@@ -81,6 +81,42 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Resolve verified lifecycle lint blockers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          autofocus_targets = (
+              "apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",
+          )
+          for path in autofocus_targets:
+              file = Path(path)
+              text = file.read_text()
+              text, count = re.subn(r"(?m)^\s*autoFocus\s*\n", "", text)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one autoFocus prop, found {count}")
+              file.write_text(text)
+
+          panel = Path(
+              "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx"
+          )
+          text = panel.read_text()
+          text, count = re.subn(
+              r"(?m)^\s*studioDocumentWorkspaces,\s*\n",
+              "",
+              text,
+          )
+          if count != 1:
+              raise SystemExit(
+                  f"{panel}: expected one unused studioDocumentWorkspaces import, found {count}"
+              )
+          panel.write_text(text)
+          PY
 
       - name: Normalize lifecycle sources
         run: >-
