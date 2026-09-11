@@ -1,0 +1,33 @@
+name: ToonStudio follow-up source snapshot
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-session-completion-followup-20260911
+    paths:
+      - .github/workflows/toonstudio-followup-source-snapshot.yml
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact follow-up branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-session-completion-followup-20260911
+          fetch-depth: 1
+
+      - name: Pack source without repository metadata
+        run: tar --exclude=.git --exclude=node_modules -czf toonstudio-followup-source.tar.gz .
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: toonstudio-followup-source
+          path: toonstudio-followup-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
