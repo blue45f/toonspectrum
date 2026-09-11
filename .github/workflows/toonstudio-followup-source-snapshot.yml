@@ -22,12 +22,12 @@ jobs:
           fetch-depth: 1
 
       - name: Pack source without repository metadata
-        run: tar --exclude=.git --exclude=node_modules -czf toonstudio-followup-source.tar.gz .
+        run: tar --exclude=.git --exclude=node_modules -czf "$RUNNER_TEMP/toonstudio-followup-source.tar.gz" .
 
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
           name: toonstudio-followup-source
-          path: toonstudio-followup-source.tar.gz
+          path: ${{ runner.temp }}/toonstudio-followup-source.tar.gz
           if-no-files-found: error
           retention-days: 1
