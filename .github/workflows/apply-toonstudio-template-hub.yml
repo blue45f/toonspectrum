@@ -90,6 +90,8 @@ jobs:
             BASE_REF="origin/main"
           fi
 
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
           git checkout -B feat/toonstudio-template-hub-20260912 "${BASE_REF}"
           git merge --no-commit --no-ff -s ours "${SOURCE_TIP}"
           git checkout "${FEATURE_TIP}" -- \
