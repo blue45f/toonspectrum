@@ -22,7 +22,7 @@ export interface StudioProjectCreationStorage
   extends StudioProjectLibraryStorage,
     StudioProjectDocumentStorage {}
 
-export interface StudioProjectCreationTarget extends StudioProjectLibraryEventTarget {}
+export type StudioProjectCreationTarget = StudioProjectLibraryEventTarget;
 
 export interface StudioInitialDocumentInput {
   readonly title?: string;
