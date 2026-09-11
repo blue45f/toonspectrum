@@ -62,7 +62,11 @@ describe("StudioProjectLibraryPage", () => {
     );
 
     expect(await screen.findByText("복원할 작품")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /^복원$|^Restore$/u }));
+    const restoreButton = screen
+      .getAllByRole("button", { name: /^복원$|^Restore$/u })
+      .at(-1);
+    if (!restoreButton) throw new Error("Project restore action was not rendered");
+    fireEvent.click(restoreButton);
 
     await waitFor(() => {
       expect(readStudioProjectLibrary(window.localStorage).projects[0]?.status).toBe("active");
