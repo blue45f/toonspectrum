@@ -1,12 +1,9 @@
 import { useEffect } from "react";
 
-import { createInitialStudioProjectDiagnosticSource } from "../studio-project-diagnostic-source-defaults";
 import {
   STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT,
   STUDIO_PROJECT_DIAGNOSTIC_SOURCE_UPDATED_EVENT,
   parseStudioProjectDiagnosticSource,
-  readStudioProjectDiagnosticSource,
-  writeStudioProjectDiagnosticSource,
 } from "../studio-project-diagnostic-source-store";
 import { diagnoseStudioProject } from "../studio-project-diagnostics";
 import {
@@ -15,6 +12,10 @@ import {
   writeStudioProjectReadinessSnapshot,
   type StudioProjectReadinessSnapshot,
 } from "../studio-project-readiness-store";
+import {
+  ensureStudioProjectWorkspaceState,
+  writeStudioProjectWorkspaceState,
+} from "../studio-project-workspace-store";
 
 interface StudioProjectDiagnosticsFailedDetail {
   readonly projectId: string;
@@ -28,18 +29,10 @@ function dispatchFailure(detail: StudioProjectDiagnosticsFailedDetail): void {
   }));
 }
 
-function ensureDiagnosticSource(projectId: string) {
-  const current = readStudioProjectDiagnosticSource(window.localStorage, projectId);
-  if (current) return current;
-  const initial = createInitialStudioProjectDiagnosticSource(projectId);
-  writeStudioProjectDiagnosticSource(window.localStorage, initial);
-  return initial;
-}
-
 function runDiagnostics(projectId: string): StudioProjectReadinessSnapshot | null {
   let source;
   try {
-    source = ensureDiagnosticSource(projectId);
+    source = ensureStudioProjectWorkspaceState(window.localStorage, projectId);
   } catch (error) {
     dispatchFailure({
       projectId,
@@ -72,7 +65,7 @@ function runDiagnostics(projectId: string): StudioProjectReadinessSnapshot | nul
   }
 }
 
-/** Keeps one persisted readiness source in sync with editor/project events. */
+/** Keeps one persisted project workspace state in sync with the readiness projection. */
 export function StudioProjectDiagnosticsBridge({
   projectId,
 }: {
@@ -101,7 +94,8 @@ export function StudioProjectDiagnosticsBridge({
         return;
       }
       try {
-        writeStudioProjectDiagnosticSource(window.localStorage, next);
+        // Persist without redispatching the same event; the originating feature already emitted it.
+        writeStudioProjectWorkspaceState(window.localStorage, next);
       } catch (error) {
         dispatchFailure({
           projectId,
