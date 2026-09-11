@@ -55,8 +55,8 @@ export const STUDIO_PRO_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
         previewWeight: descriptor.previewWeight,
         previewStyle: descriptor.previewStyle,
         source: "pro" as const,
-      })
-    )
+      }),
+    ),
   );
 
 const STUDIO_REGISTERED_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
@@ -66,13 +66,14 @@ const STUDIO_REGISTERED_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   ]);
 
 /**
- * Complete product catalogue enriched with the 72 Brush Studio quality-design names.
+ * Complete registered product catalogue.
  *
- * The bridge adds search vocabulary only: catalogue ids, renderer ids and saved-document
- * snapshots stay unchanged.
+ * The canonical objects stay byte-for-byte compatible with the core and pro registries. The 72
+ * Brush Studio quality-design names are attached only to the search inventory below, so adding
+ * discovery vocabulary cannot change saved catalogue objects or object-identity contracts.
  */
 export const STUDIO_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
-  attachStudioBrushQualityDesignAliases(STUDIO_REGISTERED_BRUSH_CATALOG_ITEMS);
+  STUDIO_REGISTERED_BRUSH_CATALOG_ITEMS;
 
 export const STUDIO_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze(STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "paint"));
@@ -84,7 +85,7 @@ const STUDIO_BRUSH_CATALOG_BY_ID: ReadonlyMap<string, StudioBrushCatalogItem> =
   new Map(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => [item.id, item]));
 
 export function studioBrushCatalogItemById(
-  brushId: unknown
+  brushId: unknown,
 ): StudioBrushCatalogItem | null {
   return typeof brushId === "string"
     ? STUDIO_BRUSH_CATALOG_BY_ID.get(brushId) ?? null
@@ -98,21 +99,34 @@ export function studioBrushCatalogItemById(
  */
 export const STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze(
-    STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => !isStudioBrushQuarantinedPresetId(item.id)),
+    STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
+      (item) => !isStudioBrushQuarantinedPresetId(item.id),
+    ),
   );
 
 /** Explicit alias for call sites that want to document search/expert-lane intent. */
 export const STUDIO_SEARCHABLE_ALL_BRUSH_CATALOG_ITEMS =
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
 
+/**
+ * Search-only projection enriched with all 72 quality-design names and material descriptions.
+ * It is deliberately private so no persistence or identity-sensitive caller can adopt the clones.
+ */
+const STUDIO_QUALITY_DESIGN_SEARCH_ITEMS: readonly StudioBrushCatalogItem[] =
+  attachStudioBrushQualityDesignAliases(STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS);
+
 export const STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze(
-    STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "paint"),
+    STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
+      (item) => item.operation === "paint",
+    ),
   );
 
 export const STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze(
-    STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "erase"),
+    STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
+      (item) => item.operation === "erase",
+    ),
   );
 
 function materializeDefaultQualityPortfolio(): readonly StudioBrushCatalogItem[] {
@@ -131,7 +145,10 @@ function materializeDefaultQualityPortfolio(): readonly StudioBrushCatalogItem[]
     }
     return item;
   });
-  if (new Set(portfolio.map((item) => item.id)).size !== STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS.length) {
+  if (
+    new Set(portfolio.map((item) => item.id)).size !==
+    STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS.length
+  ) {
     throw new Error("Studio quality portfolio contains duplicate catalogue ids");
   }
   return Object.freeze(portfolio);
@@ -146,21 +163,28 @@ export const STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS: readonly StudioBrushCat
 
 export const STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze(
-    STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "paint"),
+    STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.filter(
+      (item) => item.operation === "paint",
+    ),
   );
 
 export const STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze(
-    STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "erase"),
+    STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.filter(
+      (item) => item.operation === "erase",
+    ),
   );
 
 function operationInventory(
   operation: StudioToolOperation | undefined,
   exhaustive: boolean,
+  qualityDesignSearch: boolean,
 ): readonly StudioBrushCatalogItem[] {
-  const inventory = exhaustive
-    ? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS
-    : STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS;
+  const inventory = qualityDesignSearch
+    ? STUDIO_QUALITY_DESIGN_SEARCH_ITEMS
+    : exhaustive
+      ? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS
+      : STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS;
   return operation === undefined
     ? inventory
     : inventory.filter((item) => item.operation === operation);
@@ -175,7 +199,9 @@ export function filterStudioBrushCatalogItems(options: {
 } = {}): StudioBrushCatalogItem[] {
   const { operation, ...libraryOptions } = options;
   const query = (libraryOptions.query ?? "").trim();
-  const pinnedLane = libraryOptions.category === "favorites" || libraryOptions.category === "recent";
+  const pinnedLane =
+    libraryOptions.category === "favorites" ||
+    libraryOptions.category === "recent";
   // Search escapes material tabs, never a deliberately selected personal collection.
   const category = query && !pinnedLane ? "all" : libraryOptions.category;
   const exhaustive = Boolean(query) || pinnedLane || category === "all";
@@ -185,8 +211,8 @@ export function filterStudioBrushCatalogItems(options: {
     query,
     // Initial and material views use the compact portfolio. Search, user-owned pins, and the
     // explicit "전체" tab retain the complete non-quarantined inventory for compatibility and
-    // exhaustive quality auditing.
-    catalogItems: operationInventory(operation, exhaustive),
+    // exhaustive quality auditing. Only an active query receives the transient 72-design aliases.
+    catalogItems: operationInventory(operation, exhaustive, Boolean(query)),
   }) as StudioBrushCatalogItem[];
 }
 
@@ -195,13 +221,18 @@ function quickCatalogInventory(options: {
   recentIds?: readonly string[];
   limit?: number;
 }): readonly StudioBrushCatalogItem[] {
-  const requestedIds = [...(options.favoriteIds ?? []), ...(options.recentIds ?? [])];
+  const requestedIds = [
+    ...(options.favoriteIds ?? []),
+    ...(options.recentIds ?? []),
+  ];
   const byId = new Map(
     STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.map((item) => [item.id, item]),
   );
   for (const id of requestedIds) {
     const item = STUDIO_BRUSH_CATALOG_BY_ID.get(id);
-    if (item && !isStudioBrushQuarantinedPresetId(item.id)) byId.set(item.id, item);
+    if (item && !isStudioBrushQuarantinedPresetId(item.id)) {
+      byId.set(item.id, item);
+    }
   }
   // Explicit large audit callers historically requested the complete shelf by setting a limit
   // larger than the compact portfolio. Preserve that diagnostic contract without expanding UI.
