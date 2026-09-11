@@ -3,10 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import {
   STUDIO_PROJECT_FEATURE_SUITE_UPDATED_EVENT,
   ensureStudioProjectFeatureSuite,
+  studioProjectFeatureSuiteStorageKey,
   updateStudioProjectFeatureSuite,
   type StudioProjectFeatureSuiteState,
   type StudioProjectFeatureSuiteUpdater,
 } from "../studio-project-feature-suite-store";
+import { matchesStudioProjectStorageEvent } from "../studio-project-storage-event";
 
 export interface StudioProjectFeatureSuiteController {
   readonly state: StudioProjectFeatureSuiteState | null;
@@ -17,8 +19,8 @@ export interface StudioProjectFeatureSuiteController {
 
 function storageError(locale: "ko" | "en"): string {
   return locale === "ko"
-    ? "이 기기에서 프로젝트 기능 상태를 저장하지 못했습니다. 현재 화면의 변경 내용은 유지됩니다."
-    : "Project feature state could not be stored on this device. Current edits remain on screen.";
+    ? "이 기기에서 프로젝트 기능 변경 내용을 저장하지 못했습니다. 브라우저 저장 공간과 권한을 확인해 주세요."
+    : "Project feature changes could not be stored on this device. Check browser storage space and permissions.";
 }
 
 function eventState(value: unknown, projectId: string): StudioProjectFeatureSuiteState | null {
@@ -51,6 +53,13 @@ export function useStudioProjectFeatureSuite(
     reload();
     if (typeof window === "undefined") return undefined;
 
+    let projectStorageKey: string | null = null;
+    try {
+      projectStorageKey = studioProjectFeatureSuiteStorageKey(projectId);
+    } catch {
+      return undefined;
+    }
+
     const handleUpdate = (event: Event) => {
       const next = eventState((event as CustomEvent<unknown>).detail, projectId);
       if (!next) return;
@@ -59,7 +68,7 @@ export function useStudioProjectFeatureSuite(
     };
     const handleStorage = (event: StorageEvent) => {
       if (event.storageArea !== window.localStorage) return;
-      if (event.key === null || event.key.includes(encodeURIComponent(projectId))) reload();
+      if (matchesStudioProjectStorageEvent(event.key, projectStorageKey)) reload();
     };
 
     window.addEventListener(STUDIO_PROJECT_FEATURE_SUITE_UPDATED_EVENT, handleUpdate);
