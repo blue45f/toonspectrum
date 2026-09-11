@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -63,9 +63,11 @@ describe("StudioDocumentWorkspaceRoute", () => {
       "/studio/p/project-1/d/document-1?workspace=3d&focus=hero&language=ko&version=v2&room=team-a",
     );
 
-    expect((await screen.findByLabelText("location")).textContent).toBe(
-      "/studio/p/project-1/d/document-1?focus=hero&language=ko&room=team-a&version=v2&workspace=3d",
-    );
+    await waitFor(() => {
+      expect(screen.getByLabelText("location").textContent).toBe(
+        "/studio/p/project-1/d/document-1?focus=hero&language=ko&room=team-a&version=v2&workspace=3d",
+      );
+    });
     expect(JSON.parse(screen.getByLabelText("editor-resolution").textContent ?? "{}")).toEqual({
       canonicalHref: "/studio/p/project-1/d/document-1?focus=hero&language=ko&room=team-a&version=v2&workspace=3d",
       lifecycleKey: "/studio/project:project-1:document:document-1/editor",
@@ -81,9 +83,11 @@ describe("StudioDocumentWorkspaceRoute", () => {
   it("mounts canonical drafts in the same runtime authority", async () => {
     renderRoute("/studio/draft/draft-1?workspace=slides");
 
-    expect((await screen.findByLabelText("location")).textContent).toBe(
-      "/studio/draft/draft-1?workspace=slides",
-    );
+    await waitFor(() => {
+      expect(screen.getByLabelText("location").textContent).toBe(
+        "/studio/draft/draft-1?workspace=slides",
+      );
+    });
     expect(JSON.parse(screen.getByLabelText("editor-resolution").textContent ?? "{}")).toMatchObject({
       lifecycleKey: "/studio/draft:draft-1/editor",
       documentId: null,
