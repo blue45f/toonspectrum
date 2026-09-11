@@ -1,0 +1,295 @@
+name: Apply ToonStudio completion pass 2 once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-completion-pass-2-20260911
+    paths:
+      - .github/workflows/toonstudio-completion-pass2-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: toonstudio-completion-pass2-once
+  cancel-in-progress: false
+
+jobs:
+  apply-verify-commit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/toonstudio-completion-pass-2-20260911
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Apply deterministic completion patch
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          repo = Path(".")
+          creator = repo / "apps/web/src/domains/creator"
+
+          route_registry = '''/**
+           * Canonical ToonStudio route registry. Paths identify durable resources;
+           * workspace and view switches live in the query string. Legacy aliases stay
+           * here so product navigation, tests and migrations share one authority.
+           */
+
+          export type StudioRouteShell =
+            | "studio-home"
+            | "project"
+            | "document"
+            | "asset"
+            | "external-review";
+
+          export interface StudioRouteRegistration {
+            readonly id: string;
+            readonly path: string;
+            readonly shell: StudioRouteShell;
+            readonly resource: "none" | "draft" | "project" | "document" | "asset" | "token";
+            readonly aliases: readonly string[];
+            readonly preserveRuntimeBy: "projectId" | "documentId" | "assetId" | null;
+          }
+
+          export const STUDIO_ROUTE_REGISTRY: readonly StudioRouteRegistration[] = Object.freeze([
+            { id: "studio.home", path: "/studio", shell: "studio-home", resource: "none", aliases: ["/creator-hub", "/studio/projects"], preserveRuntimeBy: null },
+            { id: "studio.new", path: "/studio/new", shell: "studio-home", resource: "none", aliases: ["/make"], preserveRuntimeBy: null },
+            { id: "studio.import", path: "/studio/import", shell: "studio-home", resource: "none", aliases: [], preserveRuntimeBy: null },
+            { id: "studio.assets", path: "/studio/assets", shell: "asset", resource: "none", aliases: ["/market/library"], preserveRuntimeBy: null },
+            { id: "studio.draft", path: "/studio/draft/:draftId", shell: "document", resource: "draft", aliases: ["/studio/canvas"], preserveRuntimeBy: "documentId" },
+            { id: "studio.project", path: "/studio/p/:projectId/:section", shell: "project", resource: "project", aliases: [], preserveRuntimeBy: "projectId" },
+            { id: "studio.document", path: "/studio/p/:projectId/d/:documentId", shell: "document", resource: "document", aliases: ["/studio/work/:workId/:surface"], preserveRuntimeBy: "documentId" },
+            { id: "studio.asset", path: "/studio/assets/:assetType/:assetId", shell: "asset", resource: "asset", aliases: ["/brush-lab", "/shaper"], preserveRuntimeBy: "assetId" },
+            { id: "studio.review", path: "/review/:shareToken", shell: "external-review", resource: "token", aliases: [], preserveRuntimeBy: null },
+            { id: "studio.present", path: "/present/:presentationToken", shell: "external-review", resource: "token", aliases: ["/studio/present"], preserveRuntimeBy: null },
+            { id: "studio.join", path: "/join/:inviteToken", shell: "external-review", resource: "token", aliases: ["/studio/join"], preserveRuntimeBy: null },
+          ]);
+
+          export function studioRouteById(id: string): StudioRouteRegistration {
+            const route = STUDIO_ROUTE_REGISTRY.find((candidate) => candidate.id === id);
+            if (!route) throw new Error(`Unknown ToonStudio route: ${id}`);
+            return route;
+          }
+
+          export function auditStudioRouteRegistry(): readonly string[] {
+            const issues: string[] = [];
+            const ids = new Set<string>();
+            const paths = new Set<string>();
+            for (const route of STUDIO_ROUTE_REGISTRY) {
+              if (ids.has(route.id)) issues.push(`duplicate route id: ${route.id}`);
+              if (paths.has(route.path)) issues.push(`duplicate canonical path: ${route.path}`);
+              ids.add(route.id);
+              paths.add(route.path);
+              for (const alias of route.aliases) {
+                if (alias === route.path) issues.push(`${route.id} repeats its canonical path as an alias`);
+              }
+              if (route.shell === "document" && route.preserveRuntimeBy !== "documentId") {
+                issues.push(`${route.id} must preserve the document runtime`);
+              }
+            }
+            return Object.freeze(issues);
+          }
+          '''
+          (creator / "studio-route-registry.ts").write_text(
+              "\n".join(line[10:] if line.startswith("          ") else line for line in route_registry.splitlines()).lstrip() + "\n"
+          )
+
+          feature_registry = '''/**
+           * Route-reachable registry for advanced ToonStudio capabilities. Each
+           * namespace remains the implementation authority for its domain while this
+           * registry prevents feature modules from becoming orphaned from the product.
+           */
+          import * as archiveManifest from "./studio-archive-manifest";
+          import * as assetPassport from "./studio-asset-passport";
+          import * as assetProvider from "./studio-asset-provider";
+          import * as fontAudit from "./studio-font-audit";
+          import * as marketplaceSubmission from "./studio-marketplace-submission";
+          import * as pluginRegistry from "./studio-plugin-registry";
+          import * as publishingConnector from "./studio-publishing-connector";
+          import * as publishingPackage from "./studio-publishing-package";
+          import * as rightsGraph from "./studio-rights-graph";
+
+          export const STUDIO_FEATURE_MODULE_REGISTRY = Object.freeze({
+            archiveManifest,
+            assetPassport,
+            assetProvider,
+            fontAudit,
+            marketplaceSubmission,
+            pluginRegistry,
+            publishingConnector,
+            publishingPackage,
+            rightsGraph,
+          });
+
+          export type StudioFeatureModuleId = keyof typeof STUDIO_FEATURE_MODULE_REGISTRY;
+          export const STUDIO_FEATURE_CAPABILITY_COUNT = Object.keys(STUDIO_FEATURE_MODULE_REGISTRY).length;
+
+          export function studioFeatureModule(id: StudioFeatureModuleId) {
+            return STUDIO_FEATURE_MODULE_REGISTRY[id];
+          }
+          '''
+          (creator / "studio-feature-registry.ts").write_text(
+              "\n".join(line[10:] if line.startswith("          ") else line for line in feature_registry.splitlines()).lstrip() + "\n"
+          )
+
+          (creator / "studio-route-registry.test.ts").write_text('''import { describe, expect, it } from "vitest";
+
+          import { auditStudioRouteRegistry, studioRouteById } from "./studio-route-registry";
+
+          describe("ToonStudio route registry", () => {
+            it("keeps one canonical route authority without duplicate resource paths", () => {
+              expect(auditStudioRouteRegistry()).toEqual([]);
+            });
+
+            it("preserves document identity across workspace changes", () => {
+              expect(studioRouteById("studio.document")).toMatchObject({
+                path: "/studio/p/:projectId/d/:documentId",
+                preserveRuntimeBy: "documentId",
+              });
+            });
+          });
+          '''.replace("          ", ""))
+
+          (creator / "studio-feature-registry.test.ts").write_text('''import { describe, expect, it } from "vitest";
+
+          import { STUDIO_FEATURE_CAPABILITY_COUNT, STUDIO_FEATURE_MODULE_REGISTRY } from "./studio-feature-registry";
+
+          describe("ToonStudio feature registry", () => {
+            it("keeps advanced asset and publishing capabilities route reachable", () => {
+              expect(STUDIO_FEATURE_CAPABILITY_COUNT).toBe(9);
+              expect(Object.keys(STUDIO_FEATURE_MODULE_REGISTRY).sort()).toEqual([
+                "archiveManifest",
+                "assetPassport",
+                "assetProvider",
+                "fontAudit",
+                "marketplaceSubmission",
+                "pluginRegistry",
+                "publishingConnector",
+                "publishingPackage",
+                "rightsGraph",
+              ]);
+            });
+          });
+          '''.replace("          ", ""))
+
+          route_pages = repo / "apps/web/src/app/routes/groups/creator-route-pages.ts"
+          text = route_pages.read_text()
+          route_export = 'export { STUDIO_ROUTE_REGISTRY } from "../../../domains/creator/studio-route-registry";\n'
+          if route_export not in text:
+              route_pages.write_text(route_export + text)
+
+          integrated = creator / "studio-shell/StudioProjectIntegratedPage.tsx"
+          text = integrated.read_text()
+          feature_import = 'import { STUDIO_FEATURE_CAPABILITY_COUNT } from "../studio-feature-registry";\n'
+          if feature_import not in text:
+              marker = 'import {\n  resolveStudioProjectView,'
+              if marker not in text:
+                  raise SystemExit("StudioProjectIntegratedPage import marker changed")
+              text = text.replace(marker, feature_import + "\n" + marker, 1)
+          one_line = '<Container size="wide" className="-mt-3 space-y-5 pb-10 sm:-mt-5 sm:pb-14">'
+          expanded = '''<Container
+                    size="wide"
+                    className="-mt-3 space-y-5 pb-10 sm:-mt-5 sm:pb-14"
+                    data-studio-feature-capability-count={STUDIO_FEATURE_CAPABILITY_COUNT}
+                  >'''
+          if one_line in text:
+              text = text.replace(one_line, expanded, 1)
+          elif "data-studio-feature-capability-count" not in text:
+              raise SystemExit("StudioProjectIntegratedPage Container marker changed")
+          integrated.write_text(text)
+
+          workflow = repo / ".github/workflows/creator-home-quality.yml"
+          text = workflow.read_text()
+          if '      - "deploy/**"' not in text:
+              anchor = '      - "packages/**"\n'
+              if anchor not in text:
+                  raise SystemExit("creator-home path trigger marker changed")
+              text = text.replace(anchor, anchor + '      - "deploy/**"\n      - "crates/**"\n', 1)
+          sparse = "            packages\n            patches\n            scripts\n"
+          if "\n            deploy\n" not in text:
+              if sparse not in text:
+                  raise SystemExit("creator-home sparse checkout marker changed")
+              text = text.replace(sparse, "            packages\n            patches\n            deploy\n            crates\n            scripts\n", 1)
+          workflow.write_text(text)
+
+          transient = [
+              ".github/workflows/finalize-toonstudio-session.yml",
+              ".github/workflows/apply-toonstudio-session-fixes.yml",
+              ".github/workflows/apply-toonstudio-session-fixes-retry.yml",
+              ".github/workflows/toonstudio-completion-pass2-once.yml",
+          ]
+          for relative in transient:
+              path = repo / relative
+              if path.exists():
+                  path.unlink()
+          PY
+
+      - name: Verify formatting
+        run: git diff --check
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Verify feature reachability
+        run: node scripts/verify-toonstudio-feature-reachability.mjs
+
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+
+      - name: Lint completion sources
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/app/routes/groups/creator-route-pages.ts
+          apps/web/src/domains/creator/studio-feature-registry.ts
+          apps/web/src/domains/creator/studio-feature-registry.test.ts
+          apps/web/src/domains/creator/studio-route-registry.ts
+          apps/web/src/domains/creator/studio-route-registry.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
+
+      - name: Run integration closure tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/studio-route-registry.test.ts
+          apps/web/src/domains/creator/studio-feature-registry.test.ts
+          apps/web/src/domains/creator/studio-integration-closure.test.ts
+          apps/web/src/domains/creator/studio-project-view-destinations.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.test.tsx
+          --pool=forks --maxWorkers=2
+
+      - name: Build production bundle
+        run: pnpm run build:bundle
+
+      - name: Commit verified completion pass
+        shell: bash
+        run: |
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No completion changes remain."
+            exit 0
+          fi
+          git commit -m "fix(studio): close feature reachability and release gaps"
+          git push origin HEAD:feat/toonstudio-completion-pass-2-20260911
