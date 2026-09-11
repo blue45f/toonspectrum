@@ -7,7 +7,7 @@ import {
 } from "./studio-marketplace-submission";
 
 const HASH = `sha256:${"a".repeat(64)}`;
-const SUBMISSION: StudioMarketplaceSubmission = Object.freeze({
+const SUBMISSION: StudioMarketplaceSubmission = Object.freeze<StudioMarketplaceSubmission>({
   id: "asset-1",
   sellerId: "seller-1",
   title: "웹툰 학교 배경",

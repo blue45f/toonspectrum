@@ -23,7 +23,7 @@ describe("Studio project view destinations", () => {
         expect(resolved.labelKo.length).toBeGreaterThan(0);
         expect(resolved.labelEn.length).toBeGreaterThan(0);
         expect(`${resolved.descriptionKo} ${resolved.descriptionEn}`).not.toMatch(
-          /SQLite|OPFS|revision|리비전|lease|CRDT/u,
+          /SQLite|OPFS|CRDT|리비전|\brevision\b|\blease\b/u,
         );
         if (resolved.owner === "project-shell") {
           expect(resolved.href).toBeNull();

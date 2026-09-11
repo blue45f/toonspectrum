@@ -27,7 +27,7 @@ describe("StudioProjectAssistantPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "대본을 컷으로" }));
     fireEvent.click(screen.getByRole("button", { name: /편집기에서 검토/u }));
 
-    expect(screen.getByLabelText("location")).toHaveTextContent("/studio/work/project-12/comic");
+    expect(screen.getByLabelText("location").textContent).toContain("/studio/work/project-12/comic");
     expect(consumeStudioAiProjectHandoff(window.sessionStorage, "project-12")).toMatchObject({
       tool: "composition",
       source: "story",
@@ -45,8 +45,8 @@ describe("StudioProjectAssistantPanel", () => {
     fireEvent.change(screen.getByLabelText("요청 내용"), { target: { value: " " } });
     fireEvent.click(screen.getByRole("button", { name: /편집기에서 검토/u }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent("요청할 내용을 입력");
-    expect(screen.getByLabelText("location")).toHaveTextContent("/studio/p/project-12/production");
+    expect(screen.getByRole("alert").textContent).toContain("요청할 내용을 입력");
+    expect(screen.getByLabelText("location").textContent).toContain("/studio/p/project-12/production");
     expect(window.sessionStorage.length).toBe(0);
   });
 });

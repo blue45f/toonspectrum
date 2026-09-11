@@ -47,7 +47,7 @@ export function parseStudioProjectDiagnosticSource(
   ) {
     return null;
   }
-  return Object.freeze(plainClone(value) as StudioProjectDiagnosticSource);
+  return Object.freeze(plainClone(value) as unknown as StudioProjectDiagnosticSource);
 }
 
 export function readStudioProjectDiagnosticSource(

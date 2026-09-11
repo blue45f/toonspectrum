@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { aggregateStudioAnalytics } from "./studio-analytics";
 import { planStudioAutomationRecipe } from "./studio-automation-recipe";
 import { auditStudioPresentation } from "./studio-presentation-layout";
+import { matchesStudioProjectStorageEvent } from "./studio-project-storage-event";
 import { planStudioStoryboard } from "./studio-storyboard-planner";
 import { planStudioTemplateApplication } from "./studio-template-system";
 import { buildStudioMotionSchedule, planStudioVoiceRegeneration } from "./studio-voice-motion";
@@ -85,6 +86,16 @@ describe("Studio project feature suite store", () => {
     expect(readStudioProjectFeatureSuite(storage, "project-alpha")?.storyBeats).toHaveLength(4);
     expect(readStudioProjectFeatureSuite(storage, "project-beta")).toBeNull();
     expect(storage.values.has(studioProjectFeatureSuiteStorageKey("project-alpha"))).toBe(true);
+  });
+
+  it("matches storage events exactly instead of using project-id substrings", () => {
+    const key = studioProjectFeatureSuiteStorageKey("project-alpha");
+    const collidingKey = studioProjectFeatureSuiteStorageKey("project-alpha-copy");
+
+    expect(matchesStudioProjectStorageEvent(key, key)).toBe(true);
+    expect(matchesStudioProjectStorageEvent(null, key)).toBe(true);
+    expect(matchesStudioProjectStorageEvent(collidingKey, key)).toBe(false);
+    expect(matchesStudioProjectStorageEvent(`prefix:${key}:suffix`, key)).toBe(false);
   });
 
   it("falls back safely when persisted data is malformed", () => {

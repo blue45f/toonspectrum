@@ -7,14 +7,14 @@ import type { StudioProductionPipelineReport } from "./studio-production-pipelin
 import type { StudioReviewReadiness } from "./studio-review-workflow";
 import type { StudioContinuityReport } from "./studio-story-bible";
 
-const CONTINUITY: StudioContinuityReport = Object.freeze({
+const CONTINUITY: StudioContinuityReport = Object.freeze<StudioContinuityReport>({
   status: "pass",
   blockingCount: 0,
   warningCount: 0,
   issues: [],
 });
 
-const PRODUCTION: StudioProductionPipelineReport = Object.freeze({
+const PRODUCTION: StudioProductionPipelineReport = Object.freeze<StudioProductionPipelineReport>({
   valid: true,
   progress: 0.75,
   readyTaskIds: ["lettering"],
@@ -34,14 +34,14 @@ const PRODUCTION: StudioProductionPipelineReport = Object.freeze({
   workloads: [],
 });
 
-const REVIEW: StudioReviewReadiness = Object.freeze({
+const REVIEW: StudioReviewReadiness = Object.freeze<StudioReviewReadiness>({
   canApprove: true,
   openChangeRequestCount: 0,
   missingApprovalReviewerIds: [],
   reasons: [],
 });
 
-const EXPORT: StudioExportPreflightResult = Object.freeze({
+const EXPORT: StudioExportPreflightResult = Object.freeze<StudioExportPreflightResult>({
   target: "webtoon-platform",
   policyVersion: "2026-09",
   status: "pass",

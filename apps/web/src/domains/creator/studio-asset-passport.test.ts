@@ -9,7 +9,7 @@ import {
   type StudioBrushQuality,
 } from "./studio-asset-passport";
 
-const BASE_BRUSH_QUALITY: StudioBrushQuality = Object.freeze({
+const BASE_BRUSH_QUALITY: StudioBrushQuality = Object.freeze<StudioBrushQuality>({
   kind: "brush",
   engineIds: ["raster-basic"],
   deterministic: true,
@@ -18,7 +18,7 @@ const BASE_BRUSH_QUALITY: StudioBrushQuality = Object.freeze({
   tilt: true,
 });
 
-const BASE_PASSPORT: StudioAssetPassport = Object.freeze({
+const BASE_PASSPORT: StudioAssetPassport = Object.freeze<StudioAssetPassport>({
   schemaVersion: 1,
   assetId: "brush-ink-01",
   versionId: "v3",
@@ -76,7 +76,7 @@ const BASE_PASSPORT: StudioAssetPassport = Object.freeze({
   updatedAt: "2026-09-02T00:00:00.000Z",
 });
 
-const BASE_CONTEXT: StudioAssetUsageContext = Object.freeze({
+const BASE_CONTEXT: StudioAssetUsageContext = Object.freeze<StudioAssetUsageContext>({
   destination: "webtoon",
   commercial: true,
   teamSeats: 3,

@@ -7,7 +7,7 @@ import {
 } from "./studio-archive-manifest";
 
 const HASH = `sha256:${"b".repeat(64)}`;
-const MANIFEST: StudioArchiveManifest = Object.freeze({
+const MANIFEST: StudioArchiveManifest = Object.freeze<StudioArchiveManifest>({
   schemaVersion: 1,
   applicationVersion: "1.0.0",
   projectId: "project-1",
