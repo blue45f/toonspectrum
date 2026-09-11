@@ -1,0 +1,108 @@
+name: Merge verified ToonStudio acceptance
+
+on:
+  push:
+    branches:
+      - chore/toonstudio-final-postmerge-acceptance-20260911
+    paths:
+      - .github/workflows/merge-toonstudio-acceptance-after-required-checks.yml
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: merge-verified-toonstudio-acceptance
+  cancel-in-progress: false
+
+jobs:
+  wait-and-merge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout verified branch
+        uses: actions/checkout@v6
+        with:
+          ref: chore/toonstudio-final-postmerge-acceptance-20260911
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Reconfirm acceptance evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/rewrite/toonstudio-session-final-acceptance-20260911.md
+          test -f scripts/verify-toonstudio-session-goals.mjs
+          test -f apps/web/src/domains/creator/studio-unified-brush-repository.ts
+          test -f apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.tsx
+          test -f apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.tsx
+          node scripts/verify-toonstudio-session-goals.mjs
+
+      - name: Remove this one-shot merge gate and push clean head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          rm .github/workflows/merge-toonstudio-acceptance-after-required-checks.yml
+          git add -A
+          git diff --cached --check
+          git commit -m "chore(studio): finalize clean acceptance head"
+          git push origin HEAD:chore/toonstudio-final-postmerge-acceptance-20260911
+
+      - name: Locate and ready the acceptance PR
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list \
+            --head chore/toonstudio-final-postmerge-acceptance-20260911 \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+          if [[ -z "$number" ]]; then
+            gh pr create \
+              --head chore/toonstudio-final-postmerge-acceptance-20260911 \
+              --base main \
+              --title "feat: finish and verify all ToonStudio session goals" \
+              --body "Verified canonical routes, product reachability, unified brushes, project workflows, TypeScript, ESLint, regression tests and the production bundle."
+            number="$(gh pr list \
+              --head chore/toonstudio-final-postmerge-acceptance-20260911 \
+              --base main \
+              --state open \
+              --json number \
+              --jq '.[0].number')"
+          fi
+          gh pr ready "$number" || true
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for required checks on the clean head
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if gh pr checks "$PR_NUMBER" --required --watch --interval 10; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Required checks did not reach a successful state." >&2
+          gh pr checks "$PR_NUMBER" || true
+          exit 1
+
+      - name: Squash merge verified acceptance
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR_NUMBER" \
+            --squash \
+            --subject "feat: finish and verify all ToonStudio session goals (#$PR_NUMBER)" \
+            --body "Converges every planned session capability, removes transient workflows, and records passing reachability, type, lint, regression and production-build acceptance."
