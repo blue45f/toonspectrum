@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: repair-brush-quality-catalog-test-once
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   repair:
@@ -54,22 +54,26 @@ jobs:
               "apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx"
           )
           source = path.read_text(encoding="utf-8")
-          old = '''    expect(coreItems).toEqual(STUDIO_CORE_BRUSH_CATALOG_ITEMS);
-              expect(proItems).toEqual(STUDIO_PRO_BRUSH_CATALOG_ITEMS);
-              expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toEqual([
-                ...STUDIO_CORE_BRUSH_CATALOG_ITEMS,
-                ...STUDIO_PRO_BRUSH_CATALOG_ITEMS,
-              ]);'''
-          new = '''    expect(coreItems.map((item) => item.id)).toEqual(
-                STUDIO_CORE_BRUSH_CATALOG_ITEMS.map((item) => item.id),
-              );
-              expect(proItems.map((item) => item.id)).toEqual(
-                STUDIO_PRO_BRUSH_CATALOG_ITEMS.map((item) => item.id),
-              );
-              expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id)).toEqual([
-                ...STUDIO_CORE_BRUSH_CATALOG_ITEMS.map((item) => item.id),
-                ...STUDIO_PRO_BRUSH_CATALOG_ITEMS.map((item) => item.id),
-              ]);'''
+          old = "\n".join([
+              "    expect(coreItems).toEqual(STUDIO_CORE_BRUSH_CATALOG_ITEMS);",
+              "    expect(proItems).toEqual(STUDIO_PRO_BRUSH_CATALOG_ITEMS);",
+              "    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toEqual([",
+              "      ...STUDIO_CORE_BRUSH_CATALOG_ITEMS,",
+              "      ...STUDIO_PRO_BRUSH_CATALOG_ITEMS,",
+              "    ]);",
+          ])
+          new = "\n".join([
+              "    expect(coreItems.map((item) => item.id)).toEqual(",
+              "      STUDIO_CORE_BRUSH_CATALOG_ITEMS.map((item) => item.id),",
+              "    );",
+              "    expect(proItems.map((item) => item.id)).toEqual(",
+              "      STUDIO_PRO_BRUSH_CATALOG_ITEMS.map((item) => item.id),",
+              "    );",
+              "    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id)).toEqual([",
+              "      ...STUDIO_CORE_BRUSH_CATALOG_ITEMS.map((item) => item.id),",
+              "      ...STUDIO_PRO_BRUSH_CATALOG_ITEMS.map((item) => item.id),",
+              "    ]);",
+          ])
           if source.count(old) != 1:
               raise SystemExit("stable catalogue assertion block was not found exactly once")
           path.write_text(source.replace(old, new, 1), encoding="utf-8")
