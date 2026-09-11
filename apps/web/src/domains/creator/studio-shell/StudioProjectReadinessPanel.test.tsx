@@ -4,12 +4,13 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
+import { STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT } from "../studio-project-diagnostic-source-store";
 import {
   STUDIO_PROJECT_READINESS_UPDATED_EVENT,
   writeStudioProjectReadinessSnapshot,
   type StudioProjectReadinessSnapshot,
 } from "../studio-project-readiness-store";
+import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
 
 const SNAPSHOT: StudioProjectReadinessSnapshot = Object.freeze({
   schemaVersion: 1,
@@ -51,6 +52,28 @@ describe("StudioProjectReadinessPanel", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("프로젝트 준비도 · 검사 전")).toBeTruthy();
+    expect(screen.queryByText(/프로젝트 준비도 100%/u)).toBeNull();
+  });
+
+  it("shows a missing diagnostic source instead of silently keeping the pre-check state", () => {
+    render(
+      <MemoryRouter>
+        <StudioProjectReadinessPanel projectId="project-1" locale="ko" />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, {
+        detail: {
+          projectId: "project-1",
+          code: "source-missing",
+          message: "Project diagnostic data has not been collected yet.",
+        },
+      }));
+    });
+
+    expect(screen.getByText("프로젝트 준비도 · 연결 데이터 없음")).toBeTruthy();
+    expect(screen.getByText(/source-missing/u)).toBeTruthy();
     expect(screen.queryByText(/프로젝트 준비도 100%/u)).toBeNull();
   });
 
