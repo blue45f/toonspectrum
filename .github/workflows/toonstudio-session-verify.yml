@@ -1,15 +1,19 @@
 name: ToonStudio session verification
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/toonstudio-session-complete-20260911-1221
+  pull_request:
+    branches:
+      - feat/toonstudio-final-ia-20260911
 
 permissions:
   contents: read
 
 concurrency:
-  group: toonstudio-session-verification
+  group: toonstudio-session-verification-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
