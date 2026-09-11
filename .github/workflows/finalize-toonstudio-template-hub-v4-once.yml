@@ -1,6 +1,7 @@
-name: Finalize ToonStudio template hub on latest main once
+name: Finalize ToonStudio project lifecycle on current main once
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/toonstudio-template-hub-20260912
@@ -11,27 +12,251 @@ permissions:
   contents: write
 
 concurrency:
-  group: finalize-toonstudio-template-hub-v4-20260912
+  group: finalize-toonstudio-pr-1326
   cancel-in-progress: false
 
 jobs:
-  finalize:
+  integrate-validate-commit:
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 75
     env:
       CI: "true"
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
       FEATURE_BRANCH: feat/toonstudio-template-hub-20260912
     steps:
-      - name: Checkout exact feature branch
+      - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
           ref: feat/toonstudio-template-hub-20260912
-          fetch-depth: 1
-          fetch-tags: false
+          fetch-depth: 0
 
-      - name: Install pnpm
+      - name: Preserve project creation implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx "$RUNNER_TEMP/StudioProjectCreatePage.tsx"
+          cp apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx "$RUNNER_TEMP/StudioProjectCreatePage.test.tsx"
+
+      - name: Merge current protected main and resolve the intentional page conflict
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          merged_main_sha="$(git rev-parse origin/main)"
+          echo "MERGED_MAIN_SHA=$merged_main_sha" >> "$GITHUB_ENV"
+
+          set +e
+          git merge --no-commit --no-ff origin/main
+          merge_status=$?
+          set -e
+
+          if [[ "$merge_status" -ne 0 ]]; then
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            expected="apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
+            if [[ "${#conflicts[@]}" -ne 1 || "${conflicts[0]}" != "$expected" ]]; then
+              printf 'Unexpected merge conflicts:\n' >&2
+              printf ' - %s\n' "${conflicts[@]}" >&2
+              git merge --abort || true
+              exit 1
+            fi
+            git checkout --theirs -- "$expected"
+            git add "$expected"
+          fi
+
+          # The current main wrapper owns template handoff. The PR page becomes the
+          # actual persistent project creation surface invoked by that wrapper.
+          git show "origin/main:apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx" \
+            > apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx
+          cp "$RUNNER_TEMP/StudioProjectCreatePage.tsx" \
+            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx
+          cp "$RUNNER_TEMP/StudioProjectCreatePage.test.tsx" \
+            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx
+          rm -f apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx
+
+      - name: Compose canonical routes and project surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text()
+              if new in text:
+                  return
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:100]!r}")
+              file.write_text(text.replace(old, new, 1))
+
+          wrapper = "apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
+          replace_once(
+              wrapper,
+              'import { StudioNewPage } from "./StudioFrontDoorPages";',
+              'import { StudioNewIntegratedPage as StudioProjectCreatePage } from "./StudioProjectCreatePage";',
+          )
+          replace_once(wrapper, "<StudioNewPage />", "<StudioProjectCreatePage />")
+
+          create_test = Path(
+              "apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx"
+          )
+          test_source = create_test.read_text()
+          test_source = test_source.replace(
+              'import { StudioNewIntegratedPage } from "./StudioNewIntegratedPage";',
+              'import { StudioNewIntegratedPage as StudioProjectCreatePage } from "./StudioProjectCreatePage";',
+          )
+          test_source = test_source.replace(
+              'describe("StudioNewIntegratedPage"',
+              'describe("StudioProjectCreatePage"',
+          )
+          test_source = test_source.replace(
+              "<StudioNewIntegratedPage />",
+              "<StudioProjectCreatePage />",
+          )
+          create_test.write_text(test_source)
+
+          route_pages = "apps/web/src/app/routes/groups/creator-route-pages.ts"
+          replace_once(
+              route_pages,
+              '''export const StudioHomePage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({
+    default: module.StudioHomePage,
+  })),
+  "StudioHomePage",
+);''',
+              '''export const StudioHomePage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioProjectLibraryPage").then((module) => ({
+    default: module.StudioProjectLibraryPage,
+  })),
+  "StudioProjectLibraryPage",
+);''',
+          )
+          replace_once(
+              route_pages,
+              '''export const StudioNewPage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({
+    default: module.StudioNewPage,
+  })),
+  "StudioNewPage",
+);''',
+              '''export const StudioNewPage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioNewIntegratedPage").then((module) => ({
+    default: module.StudioNewIntegratedPage,
+  })),
+  "StudioNewIntegratedPage",
+);''',
+          )
+          # main already owns one canonical searchable template page. Do not add the
+          # PR's duplicate template-hub component to the production route.
+          template_page = '''export const StudioTemplatesPage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioTemplatesPage").then((module) => ({
+    default: module.StudioTemplatesPage,
+  })),
+  "StudioTemplatesPage",
+);'''
+          route_text = Path(route_pages).read_text()
+          if template_page not in route_text:
+              marker = '''export const StudioNewPage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioNewIntegratedPage").then((module) => ({
+    default: module.StudioNewIntegratedPage,
+  })),
+  "StudioNewIntegratedPage",
+);'''
+              route_text = route_text.replace(marker, marker + "\n\n" + template_page, 1)
+              Path(route_pages).write_text(route_text)
+
+          routes = "apps/web/src/app/routes/groups/creator.routes.tsx"
+          replace_once(
+              routes,
+              '''  StudioProjectShellPage,
+  StudioPromoPage,''',
+              '''  StudioProjectShellPage,
+  StudioPromoPage,
+  StudioTemplatesPage,''',
+          )
+          replace_once(
+              routes,
+              '''  { id: "creator-studio-import", path: studioRoutePath("import"), element: <StudioImportPage /> },
+  { id: "creator-studio-assets", path: studioRoutePath("assets"), element: <StudioAssetHubPage /> },''',
+              '''  { id: "creator-studio-import", path: studioRoutePath("import"), element: <StudioImportPage /> },
+  { id: "creator-studio-recovery", path: studioRoutePath("recovery"), element: <Navigate to="/studio?view=archived" replace /> },
+  { id: "creator-studio-trash", path: studioRoutePath("trash"), element: <Navigate to="/studio?view=trash" replace /> },
+  { id: "creator-studio-assets", path: studioRoutePath("assets"), element: <StudioAssetHubPage /> },''',
+          )
+          replace_once(
+              routes,
+              '''  { id: "creator-studio-templates", path: studioRoutePath("templates"), element: <Navigate to="/market?view=templates" replace /> },''',
+              '''  { id: "creator-studio-templates", path: studioRoutePath("templates"), element: <StudioTemplatesPage /> },''',
+          )
+
+          registry = "apps/web/src/domains/creator/studio-route-registry.ts"
+          replace_once(
+              registry,
+              '''  "templates",
+  "assets",''',
+              '''  "templates",
+  "assets",
+  "recovery",
+  "trash",''',
+          )
+          replace_once(
+              registry,
+              '''  route("assets", "/studio/assets", "asset", "none", "에셋", "Assets", ["/market/library"]),''',
+              '''  route("assets", "/studio/assets", "asset", "none", "에셋", "Assets", ["/market/library"]),
+  route("recovery", "/studio/recovery", "studio", "none", "복구", "Recovery"),
+  route("trash", "/studio/trash", "studio", "none", "휴지통", "Trash"),''',
+          )
+
+          integrated = "apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx"
+          replace_once(
+              integrated,
+              'import { StudioProjectDeliveryPanel } from "./StudioProjectDeliveryPanel";',
+              '''import { StudioProjectDeliveryPanel } from "./StudioProjectDeliveryPanel";
+import { StudioProjectDocumentsPanel } from "./StudioProjectDocumentsPanel";''',
+          )
+          replace_once(
+              integrated,
+              '''      <StudioProjectFeatureSuitePanel
+        projectId={projectId}
+        section={section}
+        view={view}
+        locale={locale}
+      />
+      {section === "story" && view === "localization" ? (''',
+              '''      <StudioProjectFeatureSuitePanel
+        projectId={projectId}
+        section={section}
+        view={view}
+        locale={locale}
+      />
+      {section === "production" && view === "documents" ? (
+        <StudioProjectDocumentsPanel projectId={projectId} locale={locale} />
+      ) : null}
+      {section === "story" && view === "localization" ? (''',
+          )
+          PY
+
+      - name: Remove duplicate template implementation and temporary branch workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            apps/web/src/domains/creator/studio-project-template-catalog.ts \
+            apps/web/src/domains/creator/studio-project-template-catalog.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx \
+            .github/workflows/apply-toonstudio-project-lifecycle.yml \
+            .github/workflows/apply-toonstudio-template-hub.yml \
+            .github/workflows/fix-toonstudio-template-hub-tests-once.yml \
+            .github/workflows/fix-toonstudio-template-hub-tests-v2-once.yml \
+            .github/workflows/fix-toonstudio-template-hub-tests-v3-once.yml \
+            .github/workflows/verify-toonstudio-project-lifecycle.yml
+
+      - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 11.4.0
@@ -45,210 +270,87 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Merge latest protected main and resolve the intentional replacement
+      - name: Normalize and lint product sources
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "toonstudio-integration-bot"
-          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
-          git fetch --no-tags --deepen=500 origin \
-            +refs/heads/main:refs/remotes/origin/main \
-            +refs/heads/${FEATURE_BRANCH}:refs/remotes/origin/${FEATURE_BRANCH}
-
-          merged_main_sha="$(git rev-parse origin/main)"
-          set +e
-          git merge --no-commit --no-ff origin/main
-          merge_status=$?
-          set -e
-
-          if [ "$merge_status" -ne 0 ]; then
-            mapfile -t unresolved < <(git diff --name-only --diff-filter=U)
-            expected="apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
-            if [ "${#unresolved[@]}" -ne 1 ] || [ "${unresolved[0]}" != "$expected" ]; then
-              printf 'Unexpected merge conflicts:\n%s\n' "${unresolved[*]}" >&2
-              git merge --abort || true
-              exit 1
-            fi
-            # PR #1326 intentionally replaces the legacy template-handoff wrapper
-            # with the full project creation surface, so preserve the feature side.
-            git checkout --ours -- "$expected"
-            git add "$expected"
-          fi
-
-          if git diff --name-only --diff-filter=U | grep -q .; then
-            echo "Unresolved merge conflicts remain" >&2
-            exit 1
-          fi
-          echo "MERGED_MAIN_SHA=$merged_main_sha" >> "$GITHUB_ENV"
-
-      - name: Apply product behavior and accessibility repairs
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-
-          def read(path: str) -> str:
-              return Path(path).read_text(encoding="utf-8")
-
-          def write(path: str, source: str) -> None:
-              Path(path).write_text(source, encoding="utf-8")
-
-          creation = "apps/web/src/domains/creator/studio-project-creation.ts"
-          source = read(creation)
-          old = '''    markStudioProjectOpened(storage, project.id, document.id, { at: createdAt, target });
-              return Object.freeze({
-                project,
-                document,
-                href: studioProjectDocumentHref(document),
-              });'''
-          new = '''    const openedProject = markStudioProjectOpened(
-                storage,
-                project.id,
-                document.id,
-                { at: createdAt, target },
-              );
-              return Object.freeze({
-                project: openedProject,
-                document,
-                href: studioProjectDocumentHref(document),
-              });'''
-          if old in source:
-              source = source.replace(old, new, 1)
-          if "project: openedProject" not in source:
-              raise SystemExit("project creation repair was not applied")
-          write(creation, source)
-
-          catalog = "apps/web/src/domains/creator/studio-project-template-catalog.ts"
-          source = read(catalog)
-          anchor = "const TEMPLATE_BY_ID = new Map(STUDIO_PROJECT_TEMPLATES.map((template) => [template.id, template]));"
-          aliases = '''
-
-          const TEMPLATE_CATEGORY_SEARCH_TERMS: Readonly<
-            Record<StudioTemplateCategory, readonly string[]>
-          > = Object.freeze({
-            webtoon: ["웹툰", "만화", "webtoon", "comic"],
-            drawing: ["그리기", "드로잉", "일러스트", "drawing", "illustration"],
-            design: ["디자인", "design"],
-            presentation: ["발표", "발표 자료", "프레젠테이션", "presentation", "slides", "pitch"],
-            storyboard: ["스토리보드", "콘티", "storyboard"],
-            image: ["이미지", "사진", "image", "photo"],
-            "three-d": ["3D", "삼차원", "3d", "three-dimensional"],
-            motion: ["모션", "애니메이션", "motion", "animation"],
-          });'''
-          if "TEMPLATE_CATEGORY_SEARCH_TERMS" not in source:
-              if anchor not in source:
-                  raise SystemExit("template catalogue anchor missing")
-              source = source.replace(anchor, anchor + aliases, 1)
-          if "...TEMPLATE_CATEGORY_SEARCH_TERMS[template.category]," not in source:
-              needle = "      ...template.tagsEn,\n    ].join(\" \").toLocaleLowerCase();"
-              replacement = "      ...template.tagsEn,\n      ...TEMPLATE_CATEGORY_SEARCH_TERMS[template.category],\n    ].join(\" \").toLocaleLowerCase();"
-              if needle not in source:
-                  raise SystemExit("template search haystack anchor missing")
-              source = source.replace(needle, replacement, 1)
-          write(catalog, source)
-
-          template_page = "apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx"
-          source = read(template_page)
-          source = source.replace(
-              'import { useMemo, useState } from "react";',
-              'import { useEffect, useMemo, useState } from "react";',
-              1,
-          )
-          block_start = "  const [selectedId, setSelectedId] = useState(initialTemplate.id);"
-          block_end = "\n\n  const patchQuery"
-          start = source.find(block_start)
-          end = source.find(block_end, start)
-          if start < 0 or end < 0:
-              raise SystemExit("template selection state block missing")
-          replacement = '''  const [selectedId, setSelectedId] = useState(initialTemplate.id);
-              const [projectTitle, setProjectTitle] = useState(() => (
-                locale === "ko" ? `${initialTemplate.titleKo} 프로젝트` : `${initialTemplate.titleEn} project`
-              ));
-              const [creating, setCreating] = useState(false);
-              const [error, setError] = useState<string | null>(null);
-
-              const templates = useMemo(() => searchStudioProjectTemplates({
-                category,
-                query,
-                featuredOnly,
-              }), [category, featuredOnly, query]);
-              const selected = templates.find((template) => template.id === selectedId)
-                ?? templates[0]
-                ?? initialTemplate;
-
-              useEffect(() => {
-                if (selected.id === selectedId) return;
-                setSelectedId(selected.id);
-                setProjectTitle(locale === "ko" ? `${selected.titleKo} 프로젝트` : `${selected.titleEn} project`);
-                setError(null);
-              }, [locale, selected, selectedId]);'''
-          source = source[:start] + replacement + source[end:]
-          write(template_page, source)
-
-          library_page = "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx"
-          source = read(library_page)
-          pattern = re.compile(
-              r'\n\s*<button type="button" onClick=\{onRestore\} className="min-h-10 w-full rounded-lg px-3 text-left text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg">\n'
-              r'\s*\{locale === "ko" \? "복원" : "Restore"\}\n'
-              r'\s*</button>(?=\n\s*<button type="button" onClick=\{onConfirmDelete\})'
-          )
-          source, count = pattern.subn("", source, count=1)
-          if count != 1 and source.count('onClick={onRestore}') != 1:
-              raise SystemExit("trash restore action deduplication failed")
-          write(library_page, source)
-          PY
-
-      - name: Remove completed branch-specific workflows
-        run: |
-          rm -f \
-            .github/workflows/apply-toonstudio-project-contract-repair.yml \
-            .github/workflows/apply-toonstudio-project-lifecycle.yml \
-            .github/workflows/apply-toonstudio-session-completion-v2.yml \
-            .github/workflows/apply-toonstudio-template-hub.yml \
-            .github/workflows/finalize-toonstudio-template-hub-v4-once.yml \
-            .github/workflows/fix-toonstudio-template-hub-tests-once.yml \
-            .github/workflows/fix-toonstudio-template-hub-tests-v2-once.yml \
-            .github/workflows/fix-toonstudio-template-hub-tests-v3-once.yml \
-            .github/workflows/install-toonstudio-session-gate.yml \
-            .github/workflows/repair-sync-toonstudio-session.yml \
-            .github/workflows/toonstudio-final-sync-v2.yml \
-            .github/workflows/verify-toonstudio-project-lifecycle.yml
-
-      - name: Validate focused regressions
-        run: |
-          pnpm exec vitest run \
-            apps/web/src/domains/creator/studio-project-creation.test.ts \
-            apps/web/src/domains/creator/studio-project-template-catalog.test.ts \
-            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx
-
-      - name: Validate types and lint
-        run: |
-          pnpm exec eslint \
+          pnpm exec eslint --fix \
+            apps/web/src/app/routes/groups/creator-route-pages.ts \
+            apps/web/src/app/routes/groups/creator.routes.tsx \
+            apps/web/src/domains/creator/studio-route-registry.ts \
             apps/web/src/domains/creator/studio-project-creation.ts \
-            apps/web/src/domains/creator/studio-project-template-catalog.ts \
+            apps/web/src/domains/creator/studio-project-creation.test.ts \
+            apps/web/src/domains/creator/studio-project-document-store.ts \
+            apps/web/src/domains/creator/studio-project-document-store.test.ts \
+            apps/web/src/domains/creator/studio-project-library-store.ts \
+            apps/web/src/domains/creator/studio-project-library-store.test.ts \
             apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx \
             apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx
-          pnpm exec tsc -p tsconfig.json --noEmit
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts \
+            apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/app/routes/groups/creator-route-pages.ts \
+            apps/web/src/app/routes/groups/creator.routes.tsx \
+            apps/web/src/domains/creator/studio-route-registry.ts \
+            apps/web/src/domains/creator/studio-project-creation.ts \
+            apps/web/src/domains/creator/studio-project-document-store.ts \
+            apps/web/src/domains/creator/studio-project-library-store.ts \
+            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
+            apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts \
+            apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
+          git diff --check
 
-      - name: Validate production bundle
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+
+      - name: Run project lifecycle and route tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/studio-project-creation.test.ts
+          apps/web/src/domains/creator/studio-project-document-store.test.ts
+          apps/web/src/domains/creator/studio-project-library-store.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
+          apps/web/src/app/routes/groups/app-routes.test.tsx
+          apps/web/src/domains/creator/studio-route-registry.test.ts
+          --pool=forks --maxWorkers=2
+
+      - name: Verify ToonStudio contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/verify-toonstudio-feature-reachability.mjs
+          if pnpm run | grep -q 'verify:studio-session-complete'; then
+            pnpm run verify:studio-session-complete
+          fi
+
+      - name: Build production bundle
         run: pnpm run build:bundle
 
-      - name: Commit and publish validated merge
+      - name: Commit clean integrated PR branch
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check
-          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          git fetch --no-tags origin main:refs/remotes/origin/main
           current_main_sha="$(git rev-parse origin/main)"
-          if [ "$current_main_sha" != "$MERGED_MAIN_SHA" ]; then
+          if [[ "$current_main_sha" != "$MERGED_MAIN_SHA" ]]; then
             echo "main advanced during validation: $MERGED_MAIN_SHA -> $current_main_sha" >&2
             exit 1
           fi
+
+          rm -f .github/workflows/finalize-toonstudio-template-hub-v4-once.yml
           git add -A
-          git commit -m "feat(studio): finalize project lifecycle and template hub"
+          git diff --cached --check
+          git commit -m "feat(studio): add project and document lifecycle"
           git push origin HEAD:${FEATURE_BRANCH}
