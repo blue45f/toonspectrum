@@ -1,0 +1,405 @@
+name: ToonStudio rebase reconcile
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-final-ia-20260911
+    paths:
+      - .github/workflows/toonstudio-rebase-reconcile.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: toonstudio-rebase-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      BRANCH: feat/toonstudio-final-ia-20260911
+      MAIN_REF: origin/main
+      HELPER_WORKFLOW: .github/workflows/toonstudio-rebase-reconcile.yml
+    steps:
+      - name: Checkout feature branch with full history
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-final-ia-20260911
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reconcile the final feature tree onto current main
+        id: reconcile
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin main --prune
+
+          FEATURE_HEAD="$(git rev-parse HEAD)"
+          MAIN_HEAD="$(git rev-parse "$MAIN_REF")"
+          MERGE_BASE="$(git merge-base "$FEATURE_HEAD" "$MAIN_HEAD")"
+          export FEATURE_HEAD MAIN_HEAD MERGE_BASE
+
+          echo "feature_head=$FEATURE_HEAD" >> "$GITHUB_OUTPUT"
+          echo "main_head=$MAIN_HEAD" >> "$GITHUB_OUTPUT"
+          echo "merge_base=$MERGE_BASE" >> "$GITHUB_OUTPUT"
+          printf 'Feature head: %s\nMain head: %s\nMerge base: %s\n' \
+            "$FEATURE_HEAD" "$MAIN_HEAD" "$MERGE_BASE"
+
+          git diff --binary --full-index "$MERGE_BASE" "$FEATURE_HEAD" -- \
+            . ":(exclude)$HELPER_WORKFLOW" > /tmp/toonstudio-feature.patch
+          git diff --name-only "$MERGE_BASE" "$FEATURE_HEAD" -- \
+            . ":(exclude)$HELPER_WORKFLOW" | sort -u > /tmp/feature-paths.txt
+          git diff --name-only "$MERGE_BASE" "$MAIN_HEAD" | sort -u > /tmp/main-paths.txt
+          comm -12 /tmp/feature-paths.txt /tmp/main-paths.txt > /tmp/overlap-paths.txt
+
+          cat > /tmp/expected-overlap-paths.txt <<'EOF'
+          apps/web/src/app/routes/groups/creator.routes.tsx
+          apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
+          apps/web/src/shared/components/site-navigation.test.ts
+          apps/web/src/shared/components/site-navigation.ts
+          EOF
+          sed -i 's/^          //' /tmp/expected-overlap-paths.txt
+          sort -u -o /tmp/expected-overlap-paths.txt /tmp/expected-overlap-paths.txt
+
+          echo 'Files changed on both main and the feature branch:'
+          cat /tmp/overlap-paths.txt
+          if ! diff -u /tmp/expected-overlap-paths.txt /tmp/overlap-paths.txt; then
+            echo 'Unexpected overlap detected. The branch was not rewritten.' >&2
+            exit 1
+          fi
+
+          git reset --hard "$MAIN_HEAD"
+          rm -f "$HELPER_WORKFLOW"
+
+          set +e
+          git apply --3way --index --whitespace=nowarn /tmp/toonstudio-feature.patch
+          APPLY_STATUS=$?
+          set -e
+
+          git diff --name-only --diff-filter=U | sort -u > /tmp/unmerged-paths.txt
+          if [[ "$APPLY_STATUS" -ne 0 && ! -s /tmp/unmerged-paths.txt ]]; then
+            echo 'The feature patch failed without producing resolvable conflicts.' >&2
+            exit 1
+          fi
+
+          echo '3-way apply conflicts:'
+          if [[ -s /tmp/unmerged-paths.txt ]]; then
+            cat /tmp/unmerged-paths.txt
+          else
+            echo '(none; the known overlaps merged automatically)'
+          fi
+
+          while IFS= read -r path; do
+            [[ -z "$path" ]] && continue
+            if ! grep -Fxq "$path" /tmp/expected-overlap-paths.txt; then
+              echo "Unexpected conflict: $path" >&2
+              exit 1
+            fi
+          done < /tmp/unmerged-paths.txt
+
+          python3 <<'PY'
+          from __future__ import annotations
+
+          import os
+          import subprocess
+          from pathlib import Path
+
+          root = Path.cwd()
+          feature_head = os.environ["FEATURE_HEAD"]
+          main_head = os.environ["MAIN_HEAD"]
+
+
+          def git_show(ref: str, path: str) -> str:
+              return subprocess.check_output(
+                  ["git", "show", f"{ref}:{path}"],
+                  text=True,
+              )
+
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected one anchor, found {count}")
+              return text.replace(old, new, 1)
+
+
+          def write(path: str, text: str) -> None:
+              destination = root / path
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              destination.write_text(text, encoding="utf-8")
+
+
+          creator_routes_path = "apps/web/src/app/routes/groups/creator.routes.tsx"
+          creator_routes = git_show(main_head, creator_routes_path)
+          creator_routes = replace_once(
+              creator_routes,
+              "  StudioAssetsPage,\n  StudioBrushLabPage,\n",
+              "  StudioAssetsPage,\n  StudioBrushLabPage,\n  StudioProjectShellPage,\n",
+              "creator route page import",
+          )
+          template_route = (
+              '  { id: "creator-studio-templates", path: "/studio/templates", '
+              'element: <Navigate to="/market?view=templates" replace /> },\n\n'
+          )
+          project_routes = template_route + (
+              "  // Canonical six-stage project shell. It reuses existing production/editor capabilities while\n"
+              "  // route and data ownership migrate behind one coherent project navigation model.\n"
+              '  { id: "creator-studio-project-root", path: "/studio/p/:projectId", element: <Navigate to="overview" replace /> },\n'
+              '  { id: "creator-studio-project-overview", path: "/studio/p/:projectId/overview", element: <StudioProjectShellPage section="overview" /> },\n'
+              '  { id: "creator-studio-project-story", path: "/studio/p/:projectId/story", element: <StudioProjectShellPage section="story" /> },\n'
+              '  { id: "creator-studio-project-production", path: "/studio/p/:projectId/production", element: <StudioProjectShellPage section="production" /> },\n'
+              '  { id: "creator-studio-project-assets", path: "/studio/p/:projectId/assets", element: <StudioProjectShellPage section="assets" /> },\n'
+              '  { id: "creator-studio-project-review", path: "/studio/p/:projectId/review", element: <StudioProjectShellPage section="review" /> },\n'
+              '  { id: "creator-studio-project-export", path: "/studio/p/:projectId/export", element: <StudioProjectShellPage section="export" /> },\n'
+              '  { id: "creator-studio-project-settings", path: "/studio/p/:projectId/settings", element: <StudioProjectShellPage section="settings" /> },\n\n'
+          )
+          creator_routes = replace_once(
+              creator_routes,
+              template_route,
+              project_routes,
+              "project route insertion",
+          )
+          write(creator_routes_path, creator_routes)
+
+          route_pages_path = "apps/web/src/app/routes/groups/creator-route-pages.ts"
+          route_pages = git_show(main_head, route_pages_path)
+          learn_anchor = "export const LearnPage = lazyRetry(\n"
+          project_page_export = (
+              "export const StudioProjectShellPage = lazyRetry(\n"
+              '  () => import("@/domains/creator/studio-shell/StudioProjectShellPage").then((module) => ({\n'
+              "    default: module.StudioProjectShellPage,\n"
+              "  })),\n"
+              '  "StudioProjectShellPage",\n'
+              ");\n"
+          )
+          route_pages = replace_once(
+              route_pages,
+              learn_anchor,
+              project_page_export + learn_anchor,
+              "project shell lazy export",
+          )
+          write(route_pages_path, route_pages)
+
+          manual_routes_test_path = "apps/web/src/app/routes/groups/studio-manual.routes.test.tsx"
+          # Main already contains the feature branch's home split assertion and adds /studio/canvas.
+          write(manual_routes_test_path, git_show(main_head, manual_routes_test_path))
+
+          navigation_path = "apps/web/src/shared/components/site-navigation.ts"
+          navigation = git_show(feature_head, navigation_path)
+          navigation = replace_once(
+              navigation,
+              "  MessageSquareQuote,\n  Palette,\n",
+              "  MessageSquareQuote,\n  Moon,\n  Palette,\n",
+              "Moon icon import",
+          )
+          fortune_item = (
+              "  fortune: item(\n"
+              '    "fortune",\n'
+              '    "/fortune",\n'
+              "    Moon,\n"
+              '    "사주·타로 운세",\n'
+              '    "Fortune & tarot",\n'
+              '    "오늘의 운세·별자리·사주·궁합·타로·독서 처방",\n'
+              '    "Explore daily fortune, zodiac, saju, compatibility, tarot and reading prescriptions",\n'
+              "  ),\n"
+          )
+          navigation = replace_once(
+              navigation,
+              "  research: item(\n",
+              fortune_item + "  research: item(\n",
+              "fortune navigation item",
+          )
+          navigation = replace_once(
+              navigation,
+              "    items: [I.library, I.me, I.insights, I.home],\n",
+              "    items: [I.library, I.me, I.fortune, I.insights, I.home],\n",
+              "Spectrum personal navigation",
+          )
+          write(navigation_path, navigation)
+
+          navigation_test_path = "apps/web/src/shared/components/site-navigation.test.ts"
+          navigation_test = git_show(feature_head, navigation_test_path)
+          context_test_anchor = '  it("switches desktop and mobile navigation from the current product context", () => {\n'
+          fortune_test = (
+              '  it("keeps fortune and tarot discoverable in the Spectrum context", () => {\n'
+              "    const personalItems = TOONSPECTRUM_NAVIGATION_GROUPS.find(\n"
+              '      (group) => group.id === "personal"\n'
+              "    )?.items;\n\n"
+              "    expect(personalItems).toContain(SITE_NAVIGATION_ITEMS.fortune);\n"
+              '    expect(SITE_NAVIGATION_ITEMS.fortune.href).toBe("/fortune");\n'
+              '    expect(SITE_NAVIGATION_ITEMS.fortune.label.ko).toContain("타로");\n'
+              '    expect(siteNavigationContextForPath("/fortune")).toBe("spectrum");\n'
+              "  });\n\n"
+          )
+          navigation_test = replace_once(
+              navigation_test,
+              context_test_anchor,
+              fortune_test + context_test_anchor,
+              "fortune navigation regression test",
+          )
+          write(navigation_test_path, navigation_test)
+          PY
+
+          git add -A
+
+          # Every non-conflicting feature path must remain byte-for-byte identical to the old head.
+          while IFS= read -r path; do
+            [[ -z "$path" ]] && continue
+            case "$path" in
+              apps/web/src/app/routes/groups/creator.routes.tsx|\
+              apps/web/src/app/routes/groups/studio-manual.routes.test.tsx|\
+              apps/web/src/shared/components/site-navigation.ts|\
+              apps/web/src/shared/components/site-navigation.test.ts)
+                continue
+                ;;
+            esac
+
+            if git cat-file -e "$FEATURE_HEAD:$path" 2>/dev/null; then
+              if [[ ! -e "$path" && ! -L "$path" ]]; then
+                echo "Feature file disappeared during reconciliation: $path" >&2
+                exit 1
+              fi
+              EXPECTED_BLOB="$(git rev-parse "$FEATURE_HEAD:$path")"
+              ACTUAL_BLOB="$(git hash-object "$path")"
+              if [[ "$EXPECTED_BLOB" != "$ACTUAL_BLOB" ]]; then
+                echo "Unexpected content drift in non-conflicting file: $path" >&2
+                exit 1
+              fi
+            elif [[ -e "$path" || -L "$path" ]]; then
+              echo "Feature deletion was not preserved: $path" >&2
+              exit 1
+            fi
+          done < /tmp/feature-paths.txt
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          required_tokens = {
+              "apps/web/src/app/routes/groups/creator.routes.tsx": [
+                  "StudioProjectShellPage,",
+                  'path: "/studio/p/:projectId/overview"',
+                  'path: "/studio/p/:projectId/export"',
+                  'path: "/studio/p/:projectId/settings"',
+              ],
+              "apps/web/src/app/routes/groups/creator-route-pages.ts": [
+                  "export const StudioProjectShellPage = lazyRetry(",
+                  'import("@/domains/creator/studio-shell/StudioProjectShellPage")',
+              ],
+              "apps/web/src/app/routes/groups/studio-manual.routes.test.tsx": [
+                  'routeId("/studio")',
+                  '"/studio/canvas"',
+                  '"/studio/bg3d"',
+              ],
+              "apps/web/src/shared/components/site-navigation.ts": [
+                  "Moon,",
+                  '"fortune",',
+                  '"/fortune",',
+                  "I.fortune",
+                  'export type SiteNavigationContext = "studio" | "spectrum";',
+              ],
+              "apps/web/src/shared/components/site-navigation.test.ts": [
+                  "SITE_NAVIGATION_ITEMS.fortune",
+                  'siteNavigationContextForPath("/fortune")',
+                  'toBe("spectrum")',
+              ],
+          }
+          for path, tokens in required_tokens.items():
+              text = Path(path).read_text(encoding="utf-8")
+              missing = [token for token in tokens if token not in text]
+              if missing:
+                  raise SystemExit(f"{path}: missing merged semantic tokens: {missing}")
+          PY
+
+          if git grep -n -E '^(<<<<<<<|>>>>>>>|\|\|\|\|\|\|\|)( |$)' -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.mts' '*.json' '*.yml' '*.yaml'; then
+            echo 'Conflict marker found after reconciliation.' >&2
+            exit 1
+          fi
+          git diff --cached --check
+
+          git diff --cached --name-only "$MAIN_HEAD" | sort -u > /tmp/final-paths.txt
+          cp /tmp/feature-paths.txt /tmp/allowed-final-paths.txt
+          echo 'apps/web/src/app/routes/groups/creator-route-pages.ts' >> /tmp/allowed-final-paths.txt
+          sort -u -o /tmp/allowed-final-paths.txt /tmp/allowed-final-paths.txt
+          if comm -23 /tmp/final-paths.txt /tmp/allowed-final-paths.txt | grep -q .; then
+            echo 'Reconciliation changed files outside the reviewed feature and derived route module:' >&2
+            comm -23 /tmp/final-paths.txt /tmp/allowed-final-paths.txt >&2
+            exit 1
+          fi
+
+          echo "final_changed_files=$(wc -l < /tmp/final-paths.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          echo 'Final reconciled paths:'
+          cat /tmp/final-paths.txt
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint manually reconciled files
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/app/routes/groups/creator.routes.tsx
+          apps/web/src/app/routes/groups/creator-route-pages.ts
+          apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
+          apps/web/src/shared/components/site-navigation.ts
+          apps/web/src/shared/components/site-navigation.test.ts
+
+      - name: Run route, navigation and final IA regression tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
+          apps/web/src/app/routes/app-routes.test.tsx
+          apps/web/src/shared/components/site-navigation.test.ts
+          apps/web/src/shared/components/site-shell-mobile-accessibility.test.tsx
+          apps/web/src/domains/creator/studio-and-spectrum-ia-contract.test.ts
+          apps/web/src/domains/creator/studio-route-paths.test.ts
+          apps/web/src/domains/creator/studio-final-integration.test.ts
+          apps/web/src/domains/creator/studio-final-dod-contract.test.ts
+
+      - name: Type-check the integrated application
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Commit and force-push with a lease
+        shell: bash
+        env:
+          FEATURE_HEAD: ${{ steps.reconcile.outputs.feature_head }}
+          MAIN_HEAD: ${{ steps.reconcile.outputs.main_head }}
+        run: |
+          set -euo pipefail
+
+          if ! git diff --quiet; then
+            echo 'Validation modified tracked files after reconciliation.' >&2
+            git diff --stat >&2
+            exit 1
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'rebase: reconcile ToonStudio IA with main'
+
+          NEW_HEAD="$(git rev-parse HEAD)"
+          PARENT_HEAD="$(git rev-parse HEAD^)"
+          if [[ "$PARENT_HEAD" != "$MAIN_HEAD" ]]; then
+            echo "Unexpected parent after squash rebase: $PARENT_HEAD" >&2
+            exit 1
+          fi
+
+          git push \
+            --force-with-lease="refs/heads/$BRANCH:$FEATURE_HEAD" \
+            origin "HEAD:refs/heads/$BRANCH"
+          printf 'Rebased head: %s\nParent main: %s\n' "$NEW_HEAD" "$MAIN_HEAD"
