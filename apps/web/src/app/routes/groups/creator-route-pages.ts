@@ -71,10 +71,10 @@ export const StudioNewPage = lazyRetry(
   "StudioNewPage",
 );
 export const StudioImportPage = lazyRetry(
-  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({
-    default: module.StudioImportPage,
+  () => import("@/domains/creator/studio-shell/StudioImportIntegratedPage").then((module) => ({
+    default: module.StudioImportIntegratedPage,
   })),
-  "StudioImportPage",
+  "StudioImportIntegratedPage",
 );
 export const StudioAssetsPage = lazyRetry(
   () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({
