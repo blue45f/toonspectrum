@@ -10,7 +10,7 @@ import {
 } from "./studio-project-view-destinations";
 
 describe("Studio project view destinations", () => {
-  it("connects every planned project view without placeholder self-loops", () => {
+  it("connects every planned project view without placeholder self-loops or technical copy", () => {
     expect(auditStudioProjectViewDestinations()).toEqual([]);
 
     for (const [section, views] of Object.entries(STUDIO_PROJECT_SECTION_VIEWS)) {
@@ -22,6 +22,9 @@ describe("Studio project view destinations", () => {
         );
         expect(resolved.labelKo.length).toBeGreaterThan(0);
         expect(resolved.labelEn.length).toBeGreaterThan(0);
+        expect(`${resolved.descriptionKo} ${resolved.descriptionEn}`).not.toMatch(
+          /SQLite|OPFS|revision|리비전|lease|CRDT/u,
+        );
         if (resolved.owner === "project-shell") {
           expect(resolved.href).toBeNull();
         } else {
@@ -32,22 +35,28 @@ describe("Studio project view destinations", () => {
     }
   });
 
-  it("routes review, version, publishing and story views into the shipped workspaces", () => {
-    expect(resolveStudioProjectViewDestination("project-1", "review", "comments").href)
-      .toBe("/studio/work/project-1/review");
-    expect(resolveStudioProjectViewDestination("project-1", "review", "versions").href)
-      .toBe("/studio/work/project-1/versions");
-    expect(resolveStudioProjectViewDestination("project-1", "export", "preflight").href)
-      .toBe("/studio/work/project-1/publish");
-    expect(resolveStudioProjectViewDestination("project-1", "story", "world").href)
-      .toBe("/studio/work/project-1/storyworld");
+  it("keeps review, export, story planning and automation inside the project shell", () => {
+    expect(resolveStudioProjectViewDestination("project-1", "review", "comments"))
+      .toMatchObject({ owner: "project-shell", href: null });
+    expect(resolveStudioProjectViewDestination("project-1", "review", "versions"))
+      .toMatchObject({ owner: "project-shell", href: null });
+    expect(resolveStudioProjectViewDestination("project-1", "export", "preflight"))
+      .toMatchObject({ owner: "project-shell", href: null });
+    expect(resolveStudioProjectViewDestination("project-1", "story", "world"))
+      .toMatchObject({ owner: "project-shell", href: null });
+    expect(resolveStudioProjectViewDestination("project-1", "settings", "automation"))
+      .toMatchObject({ owner: "project-shell", href: null });
   });
 
-  it("preserves project identity in query-based production and asset links", () => {
-    expect(resolveStudioProjectViewDestination("series/한글", "production", "board").href)
-      .toBe("/studio/projects?scope=work%3Aseries%2F%ED%95%9C%EA%B8%80");
-    expect(resolveStudioProjectViewDestination("series/한글", "assets", "series").href)
-      .toBe("/studio/assets?project=series%2F%ED%95%9C%EA%B8%80&view=series-kit");
+  it("uses specialist editors only where immersive editing is still required", () => {
+    expect(resolveStudioProjectViewDestination("project-1", "production", "documents").href)
+      .toBe("/studio/work/project-1/canvas");
+    expect(resolveStudioProjectViewDestination("series/한글", "story", "characters").href)
+      .toBe("/studio/assets/characters/new?project=series%2F%ED%95%9C%EA%B8%80");
+    expect(resolveStudioProjectViewDestination("series/한글", "assets", "project").href)
+      .toBe("/studio/assets?project=series%2F%ED%95%9C%EA%B8%80&view=project");
+    expect(resolveStudioProjectViewDestination("series/한글", "assets", "team").href)
+      .toBe("/studio/share?scope=work%3Aseries%2F%ED%95%9C%EA%B8%80");
   });
 
   it("rejects unknown views and unsafe project identities", () => {
