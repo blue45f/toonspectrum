@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
 import {
   STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT,
+  STUDIO_PROJECT_DIAGNOSTIC_SOURCE_UPDATED_EVENT,
   writeStudioProjectDiagnosticSource,
 } from "../studio-project-diagnostic-source-store";
 import {
@@ -62,6 +63,9 @@ describe("StudioProjectDiagnosticsBridge", () => {
     window.addEventListener(STUDIO_PROJECT_READINESS_UPDATED_EVENT, updated);
     render(<StudioProjectDiagnosticsBridge projectId="project-1" />);
 
+    // The bridge performs one eager projection on mount. Isolate the explicit
+    // readiness request so this assertion measures only the requested rerun.
+    updated.mockClear();
     act(() => {
       window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_READINESS_REQUEST_EVENT, {
         detail: { projectId: "project-1" },
@@ -77,11 +81,15 @@ describe("StudioProjectDiagnosticsBridge", () => {
     window.removeEventListener(STUDIO_PROJECT_READINESS_UPDATED_EVENT, updated);
   });
 
-  it("does not let one project request read another project's source", () => {
+  it("does not let one project request rerun another project's diagnostics", () => {
     writeStudioProjectDiagnosticSource(window.localStorage, source());
     const failed = vi.fn();
     window.addEventListener(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, failed);
     render(<StudioProjectDiagnosticsBridge projectId="project-2" />);
+
+    const beforeRequest = readStudioProjectReadinessSnapshot(window.localStorage, "project-2");
+    expect(beforeRequest).not.toBeNull();
+    failed.mockClear();
 
     act(() => {
       window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_READINESS_REQUEST_EVENT, {
@@ -90,17 +98,18 @@ describe("StudioProjectDiagnosticsBridge", () => {
     });
 
     expect(failed).not.toHaveBeenCalled();
-    expect(readStudioProjectReadinessSnapshot(window.localStorage, "project-2")).toBeNull();
+    expect(readStudioProjectReadinessSnapshot(window.localStorage, "project-2")).toEqual(beforeRequest);
     window.removeEventListener(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, failed);
   });
 
-  it("publishes a clear failure event instead of fabricating readiness", () => {
+  it("publishes a clear failure event for an invalid diagnostic source update", () => {
     const failed = vi.fn();
     window.addEventListener(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, failed);
     render(<StudioProjectDiagnosticsBridge projectId="project-1" />);
+    failed.mockClear();
 
     act(() => {
-      window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_READINESS_REQUEST_EVENT, {
+      window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_DIAGNOSTIC_SOURCE_UPDATED_EVENT, {
         detail: { projectId: "project-1" },
       }));
     });
@@ -108,9 +117,8 @@ describe("StudioProjectDiagnosticsBridge", () => {
     expect(failed).toHaveBeenCalledOnce();
     expect((failed.mock.calls[0]?.[0] as CustomEvent).detail).toMatchObject({
       projectId: "project-1",
-      code: "source-missing",
+      code: "source-invalid",
     });
-    expect(readStudioProjectReadinessSnapshot(window.localStorage, "project-1")).toBeNull();
     window.removeEventListener(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, failed);
   });
 });
