@@ -9,6 +9,7 @@ import { STUDIO_BRUSH_PACK_ACCEPT } from "../brush/studio-brush-pack-format";
 import { STUDIO_CANVAS_IMAGE_ACCEPT } from "../studio-legacy-editor-runtime-helpers";
 import { StudioDestructiveConfirmHost } from "../StudioDestructiveConfirmHost";
 import { StudioVrmProjectArchiveAttestationHost } from "../vrm/StudioVrmProjectArchiveAttestationHost";
+import { StudioImportHandoffHost } from "./StudioImportHandoffHost";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
 export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
@@ -41,6 +42,18 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         스튜디오가 살아 있는 동안에만 seam 을 소유하게 한다. */}
     <StudioDestructiveConfirmHost />
     <StudioVrmProjectArchiveAttestationHost />
+    <StudioImportHandoffHost
+      brushPackImporting={brushPackImporting}
+      collaborationDocumentLocked={collaborationDocumentLocked}
+      interchangeImportBusy={interchangeImportBusy}
+      projectArchiveBusy={projectArchiveBusy}
+      psdImportBusy={psdImportBusy}
+      onImage={onPickImage}
+      onBrushPack={handleBrushPackImportFromMenu}
+      onInterchange={handleImportInterchangeArchive}
+      onProjectJson={handleImportProject}
+      onPsd={handleImportPsd}
+    />
     {pagesHistoryDurabilityStatus.state === "memory-only" ? (
       <div
         data-studio-pages-history-durability="memory-only"
