@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { StudioDocumentWorkspaceSwitcher } from "../studio-shell/StudioDocumentWorkspaceSwitcher";
 import {
   readStudioLiveRoomQuery,
   resolveStudioLiveInstantWorkIdForTab,
@@ -39,8 +40,9 @@ function currentStudioSessionStorage(): Storage | null {
  * `studioEditorInstanceKey` (identity + auth + draft epoch) and `RouteStage` keys by the route
  * `lifecycleKey` (identity + presentation, no auth/epoch); collapsing those two layers breaks
  * guest-draft adoption. Sitting inside the boundary means this layout — and everything it owns —
- * tears down before the next identity mounts, while surviving every surface switch within one
- * identity, because the boundary key deliberately ignores canvas/comic/animation/dcc.
+ * tears down before the next identity mounts, while surviving every workspace switch within one
+ * identity. Canonical document routes expose their workspace selector here, inside that preserved
+ * boundary, instead of redirecting through another editor URL.
  */
 export function StudioDocumentLayout({
   children,
@@ -89,6 +91,7 @@ export function StudioDocumentLayout({
 
   return (
     <StudioDocumentLayoutContext value={runtime}>
+      <StudioDocumentWorkspaceSwitcher />
       {children}
     </StudioDocumentLayoutContext>
   );
