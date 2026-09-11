@@ -16,16 +16,64 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v6
 
-      - name: Pack tracked source snapshot
+      - name: Pack code and test snapshot
         shell: bash
         run: |
           set -euo pipefail
-          git archive --format=tar.gz --output="$RUNNER_TEMP/toonspectrum-pr-1307-source.tar.gz" HEAD
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import tarfile
+
+          output = Path("/tmp/toonspectrum-pr-1307-source-lite.tar.gz")
+          tracked = subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
+          source_roots = (
+              ".github/",
+              "apps/web/src/",
+              "apps/web/e2e/",
+              "packages/",
+              "scripts/",
+              "e2e/",
+              "tests/",
+          )
+          suffixes = {
+              ".cjs", ".css", ".graphql", ".html", ".js", ".json", ".jsx",
+              ".md", ".mjs", ".mts", ".scss", ".sh", ".toml", ".ts", ".tsx",
+              ".txt", ".yaml", ".yml",
+          }
+          root_files = {
+              ".coderabbit.yaml", ".editorconfig", ".gitignore", ".npmrc",
+              "eslint.config.js", "package.json", "playwright.config.ts",
+              "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json", "turbo.json",
+              "vite.config.ts", "vitest.config.ts",
+          }
+
+          selected = []
+          for raw_path in tracked:
+              if not raw_path:
+                  continue
+              path = Path(raw_path.decode())
+              value = path.as_posix()
+              if not (value in root_files or value.startswith(source_roots)):
+                  continue
+              if path.suffix.lower() not in suffixes and value not in root_files:
+                  continue
+              if not path.is_file() or path.stat().st_size > 5 * 1024 * 1024:
+                  continue
+              selected.append(path)
+
+          with tarfile.open(output, "w:gz", compresslevel=6) as archive:
+              for path in selected:
+                  archive.add(path, arcname=path.as_posix(), recursive=False)
+
+          print(f"packed {len(selected)} tracked code/test files into {output}")
+          PY
+          mv /tmp/toonspectrum-pr-1307-source-lite.tar.gz "$RUNNER_TEMP/"
 
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: toonspectrum-pr-1307-source
-          path: ${{ runner.temp }}/toonspectrum-pr-1307-source.tar.gz
+          name: toonspectrum-pr-1307-source-lite
+          path: ${{ runner.temp }}/toonspectrum-pr-1307-source-lite.tar.gz
           if-no-files-found: error
           retention-days: 1
