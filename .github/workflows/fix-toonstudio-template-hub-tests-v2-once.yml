@@ -1,0 +1,211 @@
+name: Repair and finalize ToonStudio template hub v2 once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-template-hub-20260912
+    paths:
+      - .github/workflows/fix-toonstudio-template-hub-tests-v2-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-finalize-toonstudio-template-hub-v2-20260912
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout exact feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-template-hub-20260912
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Repair product behavior and accessibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              source = file.read_text(encoding="utf-8")
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:160]!r}")
+              file.write_text(source.replace(old, new, 1), encoding="utf-8")
+
+          creation = "apps/web/src/domains/creator/studio-project-creation.ts"
+          replace_once(
+              creation,
+              '''    markStudioProjectOpened(storage, project.id, document.id, { at: createdAt, target });
+              return Object.freeze({
+                project,
+                document,
+                href: studioProjectDocumentHref(document),
+              });''',
+              '''    const openedProject = markStudioProjectOpened(
+                storage,
+                project.id,
+                document.id,
+                { at: createdAt, target },
+              );
+              return Object.freeze({
+                project: openedProject,
+                document,
+                href: studioProjectDocumentHref(document),
+              });''',
+          )
+
+          catalog = "apps/web/src/domains/creator/studio-project-template-catalog.ts"
+          replace_once(
+              catalog,
+              '''const TEMPLATE_BY_ID = new Map(STUDIO_PROJECT_TEMPLATES.map((template) => [template.id, template]));''',
+              '''const TEMPLATE_BY_ID = new Map(STUDIO_PROJECT_TEMPLATES.map((template) => [template.id, template]));
+
+          const TEMPLATE_CATEGORY_SEARCH_TERMS: Readonly<
+            Record<StudioTemplateCategory, readonly string[]>
+          > = Object.freeze({
+            webtoon: ["웹툰", "만화", "webtoon", "comic"],
+            drawing: ["그리기", "드로잉", "일러스트", "drawing", "illustration"],
+            design: ["디자인", "design"],
+            presentation: ["발표", "발표 자료", "프레젠테이션", "presentation", "slides", "pitch"],
+            storyboard: ["스토리보드", "콘티", "storyboard"],
+            image: ["이미지", "사진", "image", "photo"],
+            "three-d": ["3D", "삼차원", "3d", "three-dimensional"],
+            motion: ["모션", "애니메이션", "motion", "animation"],
+          });''',
+          )
+          replace_once(
+              catalog,
+              '''      ...template.tagsKo,
+                ...template.tagsEn,
+              ].join(" ").toLocaleLowerCase();''',
+              '''      ...template.tagsKo,
+                ...template.tagsEn,
+                ...TEMPLATE_CATEGORY_SEARCH_TERMS[template.category],
+              ].join(" ").toLocaleLowerCase();''',
+          )
+
+          template_page = "apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx"
+          replace_once(
+              template_page,
+              'import { useMemo, useState } from "react";',
+              'import { useEffect, useMemo, useState } from "react";',
+          )
+          replace_once(
+              template_page,
+              '''  const [selectedId, setSelectedId] = useState(initialTemplate.id);
+              const selected = STUDIO_PROJECT_TEMPLATES.find((template) => template.id === selectedId)
+                ?? initialTemplate;
+              const [projectTitle, setProjectTitle] = useState(() => (
+                locale === "ko" ? `${selected.titleKo} 프로젝트` : `${selected.titleEn} project`
+              ));
+              const [creating, setCreating] = useState(false);
+              const [error, setError] = useState<string | null>(null);
+
+              const templates = useMemo(() => searchStudioProjectTemplates({
+                category,
+                query,
+                featuredOnly,
+              }), [category, featuredOnly, query]);''',
+              '''  const [selectedId, setSelectedId] = useState(initialTemplate.id);
+              const [projectTitle, setProjectTitle] = useState(() => (
+                locale === "ko" ? `${initialTemplate.titleKo} 프로젝트` : `${initialTemplate.titleEn} project`
+              ));
+              const [creating, setCreating] = useState(false);
+              const [error, setError] = useState<string | null>(null);
+
+              const templates = useMemo(() => searchStudioProjectTemplates({
+                category,
+                query,
+                featuredOnly,
+              }), [category, featuredOnly, query]);
+              const selected = templates.find((template) => template.id === selectedId)
+                ?? templates[0]
+                ?? initialTemplate;
+
+              useEffect(() => {
+                if (selected.id === selectedId) return;
+                setSelectedId(selected.id);
+                setProjectTitle(locale === "ko" ? `${selected.titleKo} 프로젝트` : `${selected.titleEn} project`);
+                setError(null);
+              }, [locale, selected, selectedId]);''',
+          )
+
+          library_page = "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx"
+          replace_once(
+              library_page,
+              '''                      <>
+                                <button type="button" onClick={onRestore} className="min-h-10 w-full rounded-lg px-3 text-left text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg">
+                                  {locale === "ko" ? "복원" : "Restore"}
+                                </button>
+                                <button type="button" onClick={onConfirmDelete} className="min-h-10 w-full rounded-lg px-3 text-left text-xs font-semibold text-danger hover:bg-danger-soft/20">
+                                  {locale === "ko" ? "완전히 삭제" : "Delete permanently"}
+                                </button>
+                              </>''',
+              '''                      <button type="button" onClick={onConfirmDelete} className="min-h-10 w-full rounded-lg px-3 text-left text-xs font-semibold text-danger hover:bg-danger-soft/20">
+                                {locale === "ko" ? "완전히 삭제" : "Delete permanently"}
+                              </button>''',
+          )
+          PY
+
+      - name: Remove completed one-shot workflows
+        run: |
+          rm -f .github/workflows/apply-toonstudio-template-hub.yml
+          rm -f .github/workflows/fix-toonstudio-template-hub-tests-once.yml
+          rm -f .github/workflows/fix-toonstudio-template-hub-tests-v2-once.yml
+
+      - name: Validate focused regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-project-creation.test.ts \
+            apps/web/src/domains/creator/studio-project-template-catalog.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx
+
+      - name: Validate types and lint
+        run: |
+          pnpm exec eslint \
+            apps/web/src/domains/creator/studio-project-creation.ts \
+            apps/web/src/domains/creator/studio-project-template-catalog.ts \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx
+          pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Validate production bundle
+        run: pnpm run build:bundle
+
+      - name: Commit finalized product branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(studio): finalize project lifecycle and template hub"
+          git push origin HEAD:feat/toonstudio-template-hub-20260912
