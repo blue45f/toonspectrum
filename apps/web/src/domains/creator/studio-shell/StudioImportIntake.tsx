@@ -161,10 +161,7 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
               type="button"
               disabled={selection.item.status === "blocked" || !operational}
               onClick={continueImport}
-              className={buttonClass({
-                className: "shrink-0 gap-2",
-                disabled: selection.item.status === "blocked" || !operational,
-              })}
+              className={buttonClass({ className: "shrink-0 gap-2" })}
             >
               {locale === "ko" ? "편집기에서 가져오기" : "Import in editor"}
               <FileUp size={15} aria-hidden="true" />
