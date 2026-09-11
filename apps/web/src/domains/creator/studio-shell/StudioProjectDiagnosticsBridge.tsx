@@ -1,10 +1,12 @@
 import { useEffect } from "react";
 
+import { createInitialStudioProjectDiagnosticSource } from "../studio-project-diagnostic-source-defaults";
 import {
   STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT,
   STUDIO_PROJECT_DIAGNOSTIC_SOURCE_UPDATED_EVENT,
   parseStudioProjectDiagnosticSource,
   readStudioProjectDiagnosticSource,
+  writeStudioProjectDiagnosticSource,
 } from "../studio-project-diagnostic-source-store";
 import { diagnoseStudioProject } from "../studio-project-diagnostics";
 import {
@@ -16,7 +18,7 @@ import {
 
 interface StudioProjectDiagnosticsFailedDetail {
   readonly projectId: string;
-  readonly code: "source-missing" | "source-invalid" | "diagnostics-failed" | "storage-unavailable";
+  readonly code: "source-invalid" | "diagnostics-failed" | "storage-unavailable";
   readonly message: string;
 }
 
@@ -26,23 +28,23 @@ function dispatchFailure(detail: StudioProjectDiagnosticsFailedDetail): void {
   }));
 }
 
+function ensureDiagnosticSource(projectId: string) {
+  const current = readStudioProjectDiagnosticSource(window.localStorage, projectId);
+  if (current) return current;
+  const initial = createInitialStudioProjectDiagnosticSource(projectId);
+  writeStudioProjectDiagnosticSource(window.localStorage, initial);
+  return initial;
+}
+
 function runDiagnostics(projectId: string): StudioProjectReadinessSnapshot | null {
   let source;
   try {
-    source = readStudioProjectDiagnosticSource(window.localStorage, projectId);
+    source = ensureDiagnosticSource(projectId);
   } catch (error) {
     dispatchFailure({
       projectId,
       code: "storage-unavailable",
       message: error instanceof Error ? error.message : "Project diagnostics storage is unavailable.",
-    });
-    return null;
-  }
-  if (!source) {
-    dispatchFailure({
-      projectId,
-      code: "source-missing",
-      message: "Project diagnostic data has not been collected yet.",
     });
     return null;
   }
@@ -70,12 +72,15 @@ function runDiagnostics(projectId: string): StudioProjectReadinessSnapshot | nul
   }
 }
 
+/** Keeps one persisted readiness source in sync with editor/project events. */
 export function StudioProjectDiagnosticsBridge({
   projectId,
 }: {
   readonly projectId: string;
 }) {
   useEffect(() => {
+    runDiagnostics(projectId);
+
     const onReadinessRequest = (event: Event) => {
       if (!(event instanceof CustomEvent)) return;
       const detail = event.detail;
@@ -87,12 +92,16 @@ export function StudioProjectDiagnosticsBridge({
     const onSourceUpdated = (event: Event) => {
       if (!(event instanceof CustomEvent)) return;
       const next = parseStudioProjectDiagnosticSource(event.detail, projectId);
-      if (!next) return;
+      if (!next) {
+        dispatchFailure({
+          projectId,
+          code: "source-invalid",
+          message: "Project diagnostic data could not be understood.",
+        });
+        return;
+      }
       try {
-        window.localStorage.setItem(
-          `toonstudio:project-diagnostic-source:v1:${encodeURIComponent(projectId)}`,
-          JSON.stringify(next),
-        );
+        writeStudioProjectDiagnosticSource(window.localStorage, next);
       } catch (error) {
         dispatchFailure({
           projectId,
