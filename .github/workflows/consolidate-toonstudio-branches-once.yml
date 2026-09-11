@@ -1,0 +1,429 @@
+name: Consolidate ToonStudio branches once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-session-completion-followup-20260911
+    paths:
+      - .github/workflows/consolidate-toonstudio-branches-once.yml
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: consolidate-toonstudio-branches-once
+  cancel-in-progress: false
+
+jobs:
+  consolidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+      TARGET_BRANCH: feat/toonstudio-session-completion-followup-20260911
+      MANIFEST_PATH: docs/rewrite/toonstudio-branch-consolidation-20260912.md
+    steps:
+      - name: Checkout the existing integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-session-completion-followup-20260911
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Configure Git
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-consolidation-bot"
+          git config user.email "toonstudio-consolidation-bot@users.noreply.github.com"
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+
+      - name: Snapshot all ToonStudio branch tips
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from __future__ import annotations
+
+          from collections import defaultdict
+          from pathlib import Path
+          import json
+          import subprocess
+
+          target = "feat/toonstudio-session-completion-followup-20260911"
+          lines = subprocess.check_output(
+              [
+                  "git",
+                  "for-each-ref",
+                  "--format=%(refname:strip=3)\t%(objectname)",
+                  "refs/remotes/origin",
+              ],
+              text=True,
+          ).splitlines()
+
+          branches: list[dict[str, str]] = []
+          for line in lines:
+              if not line.strip() or "\t" not in line:
+                  continue
+              name, sha = line.split("\t", 1)
+              if name in {"HEAD", "main", target}:
+                  continue
+              if not (
+                  name.startswith("feat/toonstudio-")
+                  or name.startswith("chore/toonstudio-")
+                  or name == "fix/remove-transient-finalizer"
+              ):
+                  continue
+              branches.append({"name": name, "sha": sha})
+
+          branches.sort(key=lambda item: item["name"])
+          grouped: dict[str, list[str]] = defaultdict(list)
+          for branch in branches:
+              grouped[branch["sha"]].append(branch["name"])
+
+          snapshot = {
+              "schemaVersion": 1,
+              "targetBranch": target,
+              "sourceBranchCount": len(branches),
+              "uniqueTipCount": len(grouped),
+              "branches": branches,
+              "duplicateGroups": [
+                  {"sha": sha, "branches": names}
+                  for sha, names in sorted(grouped.items())
+                  if len(names) > 1
+              ],
+          }
+          Path("/tmp/toonstudio-branch-snapshot.json").write_text(
+              json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n"
+          )
+          Path("/tmp/toonstudio-unique-tips.tsv").write_text(
+              "".join(
+                  f"{sha}\t{names[0]}\n"
+                  for sha, names in sorted(grouped.items())
+              )
+          )
+          print(
+              f"Captured {len(branches)} branches across {len(grouped)} unique tips."
+          )
+          PY
+
+      - name: Rebase the integration tree onto current main without losing product work
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git merge --no-edit origin/main; then
+            exit 0
+          fi
+
+          mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+          if ((${#conflicts[@]} == 0)); then
+            echo "Merge failed without unresolved paths."
+            exit 1
+          fi
+
+          for path in "${conflicts[@]}"; do
+            case "$path" in
+              .github/workflows/*|pnpm-lock.yaml|pnpm-workspace.yaml|package.json)
+                git checkout --theirs -- "$path"
+                ;;
+              *)
+                git checkout --ours -- "$path"
+                ;;
+            esac
+            git add -- "$path"
+          done
+          git commit -m "chore(studio): reconcile current main into consolidated branch"
+
+      - name: Preserve every old branch tip in the integration history
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS=$'\t' read -r sha representative; do
+            [[ -n "$sha" ]] || continue
+            if git merge-base --is-ancestor "$sha" HEAD; then
+              echo "Already preserved: $representative ($sha)"
+              continue
+            fi
+            git merge --no-edit --no-ff -s ours \
+              -m "chore(studio): preserve superseded branch history ($representative)" \
+              "$sha"
+          done < /tmp/toonstudio-unique-tips.tsv
+
+      - name: Remove transient branch-mutating workflows from the canonical tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          root = Path(".github/workflows")
+          keep = {
+              "toonstudio-integration.yml",
+              "toonstudio-feature-reachability.yml",
+              "toonstudio-session-goals.yml",
+          }
+          transient_tokens = {
+              "apply",
+              "repair",
+              "finalize",
+              "finalizer",
+              "sync",
+              "stage",
+              "snapshot",
+              "validate",
+              "validation",
+              "install",
+              "consolidate",
+              "continuation",
+          }
+          removed: list[str] = []
+          if root.exists():
+              for path in sorted(root.iterdir()):
+                  if not path.is_file() or path.suffix not in {".yml", ".yaml"}:
+                      continue
+                  name = path.name.lower()
+                  if path.name in keep:
+                      continue
+                  is_transient_toonstudio = (
+                      "toonstudio" in name
+                      and any(token in name for token in transient_tokens)
+                  )
+                  is_old_diagnostic = name in {
+                      "pr-1307-source-diagnostics.yml",
+                      "pr-1307-source-diagnostics.yaml",
+                  }
+                  if is_transient_toonstudio or is_old_diagnostic:
+                      path.unlink()
+                      removed.append(path.as_posix())
+          Path("/tmp/toonstudio-removed-workflows.txt").write_text(
+              "\n".join(removed) + ("\n" if removed else "")
+          )
+          print(f"Removed {len(removed)} transient workflows from the final tree.")
+          PY
+
+      - name: Write the consolidation manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from __future__ import annotations
+
+          from collections import defaultdict
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import json
+          import subprocess
+
+          snapshot = json.loads(Path("/tmp/toonstudio-branch-snapshot.json").read_text())
+          grouped: dict[str, list[str]] = defaultdict(list)
+          for branch in snapshot["branches"]:
+              grouped[branch["sha"]].append(branch["name"])
+
+          def ancestor(sha: str) -> bool:
+              return subprocess.run(
+                  ["git", "merge-base", "--is-ancestor", sha, "HEAD"],
+                  check=False,
+              ).returncode == 0
+
+          removed_workflows = []
+          workflow_log = Path("/tmp/toonstudio-removed-workflows.txt")
+          if workflow_log.exists():
+              removed_workflows = [
+                  line for line in workflow_log.read_text().splitlines() if line.strip()
+              ]
+
+          rows = []
+          for branch in snapshot["branches"]:
+              preserved = ancestor(branch["sha"])
+              rows.append(
+                  f"| `{branch['name']}` | `{branch['sha'][:12]}` | "
+                  f"{'보존됨' if preserved else '확인 필요'} | 삭제 예정 |"
+              )
+
+          duplicate_lines = []
+          for sha, names in sorted(grouped.items()):
+              if len(names) < 2:
+                  continue
+              duplicate_lines.append(
+                  f"- `{sha[:12]}`: " + ", ".join(f"`{name}`" for name in names)
+              )
+
+          content = f"""# ToonStudio 브랜치 통합 기록
+
+- 생성 시각: {datetime.now(timezone.utc).isoformat()}
+- 기준 브랜치: `main`
+- 단일 통합 브랜치: `{snapshot['targetBranch']}`
+- 정리 대상 브랜치: {snapshot['sourceBranchCount']}개
+- 고유 브랜치 tip: {snapshot['uniqueTipCount']}개
+- 정책: 기존 브랜치의 커밋 그래프는 통합 브랜치의 조상으로 보존하고, 제품 트리는 현재 `main`과 검증된 통합 구현을 기준으로 유지합니다.
+
+## 정리 대상
+
+| 브랜치 | 마지막 SHA | 이력 보존 | ref 정리 |
+|---|---|---|---|
+{chr(10).join(rows)}
+
+## 같은 SHA를 가리키던 중복 브랜치
+
+{chr(10).join(duplicate_lines) if duplicate_lines else '- 없음'}
+
+## 제거한 일회성 워크플로
+
+{chr(10).join(f'- `{item}`' for item in removed_workflows) if removed_workflows else '- 없음'}
+
+## 검증 조건
+
+다음 검증이 모두 통과한 이후에만 기존 브랜치 ref를 삭제합니다.
+
+```bash
+pnpm run verify:studio-session-complete
+node scripts/verify-toonstudio-feature-reachability.mjs
+bash scripts/verify-toonstudio-integration.sh core
+bash scripts/verify-toonstudio-integration.sh ui
+bash scripts/verify-toonstudio-integration.sh editor
+pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+pnpm run build:bundle
+```
+"""
+          path = Path("docs/rewrite/toonstudio-branch-consolidation-20260912.md")
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(content)
+          PY
+
+      - name: Install dependencies
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install repository dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Verify branch consolidation and product contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          pnpm run verify:studio-session-complete
+          node scripts/verify-toonstudio-feature-reachability.mjs
+          bash scripts/verify-toonstudio-integration.sh core
+          bash scripts/verify-toonstudio-integration.sh ui
+          bash scripts/verify-toonstudio-integration.sh editor
+          pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+          pnpm run build:bundle
+
+      - name: Push the verified single integration branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(studio): consolidate all session branches"
+          fi
+          git push origin "HEAD:${TARGET_BRANCH}"
+
+      - name: Delete preserved duplicate and superseded branch refs
+        id: cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > /tmp/toonstudio-branch-deletion.tsv
+          jq -r '.branches[] | [.name, .sha] | @tsv' \
+            /tmp/toonstudio-branch-snapshot.json \
+          | while IFS=$'\t' read -r branch sha; do
+              if [[ -z "$branch" || "$branch" == "$TARGET_BRANCH" || "$branch" == "main" ]]; then
+                continue
+              fi
+              if ! git merge-base --is-ancestor "$sha" HEAD; then
+                printf '%s\t%s\tnot-preserved\n' "$branch" "$sha" \
+                  >> /tmp/toonstudio-branch-deletion.tsv
+                continue
+              fi
+              if git push origin --delete "$branch"; then
+                printf '%s\t%s\tdeleted\n' "$branch" "$sha" \
+                  >> /tmp/toonstudio-branch-deletion.tsv
+              else
+                printf '%s\t%s\tdelete-failed\n' "$branch" "$sha" \
+                  >> /tmp/toonstudio-branch-deletion.tsv
+              fi
+            done
+
+      - name: Record the actual branch cleanup result
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("docs/rewrite/toonstudio-branch-consolidation-20260912.md")
+          content = path.read_text()
+          results: dict[str, str] = {}
+          result_path = Path("/tmp/toonstudio-branch-deletion.tsv")
+          if result_path.exists():
+              for line in result_path.read_text().splitlines():
+                  if not line.strip():
+                      continue
+                  branch, _sha, status = line.split("\t", 2)
+                  results[branch] = status
+
+          replacements = {
+              "deleted": "삭제 완료",
+              "delete-failed": "삭제 실패",
+              "not-preserved": "보존 확인 필요",
+          }
+          for branch, status in results.items():
+              marker = f"| `{branch}` |"
+              rows = content.splitlines()
+              for index, row in enumerate(rows):
+                  if row.startswith(marker):
+                      columns = row.split("|")
+                      columns[-2] = f" {replacements.get(status, status)} "
+                      rows[index] = "|".join(columns)
+                      break
+              content = "\n".join(rows) + "\n"
+
+          deleted = sum(status == "deleted" for status in results.values())
+          failed = sum(status != "deleted" for status in results.values())
+          content += (
+              f"\n## 실행 결과\n\n"
+              f"- 삭제 완료: {deleted}개\n"
+              f"- 삭제하지 못한 브랜치: {failed}개\n"
+          )
+          path.write_text(content)
+          PY
+
+          git add "$MANIFEST_PATH"
+          if ! git diff --cached --quiet; then
+            git commit -m "docs(studio): record branch consolidation results"
+            git push origin "HEAD:${TARGET_BRANCH}"
+          fi
+
+      - name: Summarize remaining ToonStudio branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          mapfile -t remaining < <(
+            git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin \
+              | grep -E '^(feat|chore)/toonstudio-|^fix/remove-transient-finalizer$' \
+              | grep -v "^${TARGET_BRANCH}$" \
+              || true
+          )
+          {
+            echo "### ToonStudio branch consolidation"
+            echo
+            echo "- canonical branch: \`${TARGET_BRANCH}\`"
+            echo "- deleted branches: $(awk -F '\t' '$3 == "deleted" {count += 1} END {print count + 0}' /tmp/toonstudio-branch-deletion.tsv)"
+            echo "- remaining superseded branches: ${#remaining[@]}"
+            if ((${#remaining[@]})); then
+              printf -- '- `%s`\n' "${remaining[@]}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
