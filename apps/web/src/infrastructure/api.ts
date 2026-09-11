@@ -12,14 +12,8 @@ import { resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
 import { handleUnauthorizedSession } from "@/compat/auth-session-state";
 import { getRuntimeApiBase } from "@/infrastructure/runtime-api-base";
 
-interface ApiImportMeta extends ImportMeta {
-  readonly env?: {
-    readonly VITE_API_BASE?: string;
-  };
-}
-
 function apiBase() {
-  const env = (import.meta as ApiImportMeta).env?.VITE_API_BASE?.trim().replace(/\/+$/, "");
+  const env = import.meta.env.VITE_API_BASE?.trim().replace(/\/+$/, "");
   return env || getRuntimeApiBase();
 }
 
