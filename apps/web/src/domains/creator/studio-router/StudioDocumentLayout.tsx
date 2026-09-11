@@ -7,6 +7,7 @@ import {
   shouldPublishStudioLiveJamRoom,
   withStudioLiveJamRoom,
 } from "../live/studio-live-jam-session";
+import { StudioDocumentWorkspaceDock } from "../studio-shell/StudioDocumentWorkspaceDock";
 import { StudioDocumentWorkspaceSwitcher } from "../studio-shell/StudioDocumentWorkspaceSwitcher";
 
 import {
@@ -41,8 +42,8 @@ function currentStudioSessionStorage(): Storage | null {
  * `lifecycleKey` (identity + presentation, no auth/epoch); collapsing those two layers breaks
  * guest-draft adoption. Sitting inside the boundary means this layout — and everything it owns —
  * tears down before the next identity mounts, while surviving every workspace switch within one
- * identity. Canonical document routes expose their workspace selector here, inside that preserved
- * boundary, instead of redirecting through another editor URL.
+ * identity. Canonical document routes expose their workspace selector and contextual project tools
+ * here, inside that preserved boundary, instead of redirecting through another editor URL.
  */
 export function StudioDocumentLayout({
   children,
@@ -96,6 +97,7 @@ export function StudioDocumentLayout({
   return (
     <StudioDocumentLayoutContext value={runtime}>
       <StudioDocumentWorkspaceSwitcher />
+      <StudioDocumentWorkspaceDock />
       {children}
     </StudioDocumentLayoutContext>
   );
