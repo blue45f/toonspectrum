@@ -3,7 +3,9 @@ import { useCallback, useEffect, useState } from "react";
 import {
   STUDIO_PROJECT_DIAGNOSTIC_SOURCE_UPDATED_EVENT,
   parseStudioProjectDiagnosticSource,
+  studioProjectDiagnosticSourceStorageKey,
 } from "../studio-project-diagnostic-source-store";
+import { matchesStudioProjectStorageEvent } from "../studio-project-storage-event";
 import {
   ensureStudioProjectWorkspaceState,
   updateStudioProjectWorkspaceState,
@@ -20,8 +22,8 @@ export interface StudioProjectWorkspaceController {
 
 function humanStorageError(locale: "ko" | "en"): string {
   return locale === "ko"
-    ? "이 기기에서 프로젝트 상태를 불러오거나 저장하지 못했습니다. 편집 중인 원고는 닫지 말아 주세요."
-    : "Project state could not be loaded or saved on this device. Keep the current document open.";
+    ? "이 기기에서 프로젝트 상태를 불러오거나 저장하지 못했습니다. 변경 내용이 저장되지 않을 수 있으니 브라우저 저장 공간과 권한을 확인해 주세요."
+    : "Project state could not be loaded or saved on this device. Changes may not be stored; check browser storage space and permissions.";
 }
 
 /**
@@ -48,6 +50,13 @@ export function useStudioProjectWorkspace(
   useEffect(() => {
     reload();
 
+    let projectStorageKey: string | null = null;
+    try {
+      projectStorageKey = studioProjectDiagnosticSourceStorageKey(projectId);
+    } catch {
+      return undefined;
+    }
+
     const handleUpdate = (event: Event) => {
       const detail = (event as CustomEvent<unknown>).detail;
       const parsed = parseStudioProjectDiagnosticSource(detail, projectId);
@@ -57,7 +66,7 @@ export function useStudioProjectWorkspace(
     };
     const handleStorage = (event: StorageEvent) => {
       if (event.storageArea !== window.localStorage) return;
-      if (event.key === null || event.key.includes(encodeURIComponent(projectId))) reload();
+      if (matchesStudioProjectStorageEvent(event.key, projectStorageKey)) reload();
     };
 
     window.addEventListener(STUDIO_PROJECT_DIAGNOSTIC_SOURCE_UPDATED_EVENT, handleUpdate);
