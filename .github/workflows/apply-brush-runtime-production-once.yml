@@ -45,21 +45,50 @@ jobs:
 
           path = Path("scripts/maintenance/apply-brush-runtime-production.py")
           source = path.read_text(encoding="utf-8")
-          replacements = {
-              'route_anchor = "\\nexport function auditStudioRouteRegistry(): StudioRouteRegistryAudit {"':
+
+          simple = (
+              (
+                  'route_anchor = "\\nexport function auditStudioRouteRegistry(): StudioRouteRegistryAudit {"',
                   'route_anchor = "\\nexport function auditStudioRouteRegistry(): readonly string[] {"',
-              'replace_once("apps/web/src/domains/creator/studio-shell/StudioExternalEntryRoutes.tsx", \'<Container size="narrow">\', \'<Container size="prose">\')':
+              ),
+              (
+                  'replace_once("apps/web/src/domains/creator/studio-shell/StudioExternalEntryRoutes.tsx", \'<Container size="narrow">\', \'<Container size="prose">\')',
                   'replace_once("apps/web/src/domains/creator/studio-shell/StudioExternalEntryRoutes.tsx", \'<Container size="narrow"\', \'<Container size="prose"\')',
-              '"onChange={(event) => setConnectorId(event.target.value)}",':
-                  '"""onChange={(event) => {\\n                  setConnectorId(event.target.value);\\n                  setExternalWriteConfirmed(false);\\n                }}""",',
-              '                  if (connector) setConnectorId(connector.id);\\n                }}':
-                  '                  if (connector) {\\n                    setConnectorId(connector.id);\\n                    setExternalWriteConfirmed(false);\\n                  }\\n                }}',
-          }
-          for old, new in replacements.items():
-              count = source.count(old)
-              if count != 1:
-                  raise SystemExit(f"repair guard drifted ({count}): {old[:100]}")
+              ),
+          )
+          for old, new in simple:
+              if old not in source:
+                  raise SystemExit(f"repair guard missing: {old[:100]}")
               source = source.replace(old, new, 1)
+
+          start_marker = '''replace_once(
+    project_delivery,
+    "onChange={(event) => setConnectorId(event.target.value)}",'''
+          end_marker = '''
+replace_once(
+    "apps/web/src/domains/creator/studio-shell/StudioTemplatesPage.tsx",'''
+          start = source.find(start_marker)
+          end = source.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit(f"delivery replacement boundaries missing: start={start} end={end}")
+          delivery_replacement = '''replace_once(
+    project_delivery,
+    """onChange={(event) => {
+                  setConnectorId(event.target.value);
+                  setExternalWriteConfirmed(false);
+                }}""",
+    """onChange={(event) => {
+                  const connector = CONNECTORS.find(
+                    (candidate) => candidate.id === event.target.value,
+                  );
+                  if (connector) {
+                    setConnectorId(connector.id);
+                    setExternalWriteConfirmed(false);
+                  }
+                }}""",
+)
+'''
+          source = source[:start] + delivery_replacement + source[end:]
           path.write_text(source, encoding="utf-8")
           PY
 
