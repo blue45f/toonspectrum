@@ -62,7 +62,7 @@ describe("ToonStudio integration closure", () => {
     expect(routePages).toContain('import("@/domains/creator/studio-shell/StudioProjectIntegratedPage")');
     expect(routePages).toContain("default: module.StudioProjectIntegratedPage");
     for (const section of ["overview", "story", "production", "assets", "review", "export", "settings"]) {
-      expect(routes).toContain(`path: "/studio/p/:projectId/${section}"`);
+      expect(routes).toContain(`path: studioRoutePath("project-${section}")`);
       expect(routes).toContain(`StudioProjectShellPage section="${section}"`);
     }
     expect(productIa).toContain('primaryRoute: "/studio"');
@@ -164,7 +164,7 @@ describe("ToonStudio integration closure", () => {
     expect(workbench).toContain("<MarketplaceBrushStudioBridge");
     expect(versionBridge).toContain("BRUSH_QUALITY_CATALOG");
     expect(versionBridge).toContain("BRUSH_STUDIO_V6_RECIPES");
-    expect(routes).toContain('path: "/studio/assets/brushes/new"');
-    expect(routes).toContain('path: "/studio/assets/brushes/:brushId/edit"');
+    expect(routes).toContain('path: studioRoutePath("asset-brush-new")');
+    expect(routes).toContain('path: studioRoutePath("asset-brush-edit")');
   });
 });
