@@ -156,20 +156,51 @@ jobs:
               raise SystemExit("studio-project-creation.ts: storage type declaration not recognized")
           creation_path.write_text(creation, encoding="utf-8")
 
-          page_path = Path(
+          new_page_path = Path(
               "apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
           )
-          page = page_path.read_text(encoding="utf-8")
-          page, autofocus_count = re.subn(
+          new_page = new_page_path.read_text(encoding="utf-8")
+          new_page, autofocus_count = re.subn(
               r"^\s*autoFocus\s*$\n?",
               "",
-              page,
+              new_page,
               count=1,
               flags=re.MULTILINE,
           )
-          if autofocus_count == 0 and "autoFocus" in page:
+          if autofocus_count == 0 and "autoFocus" in new_page:
               raise SystemExit("StudioNewIntegratedPage.tsx: unexpected autoFocus shape")
-          page_path.write_text(page, encoding="utf-8")
+          new_page_path.write_text(new_page, encoding="utf-8")
+
+          documents_panel_path = Path(
+              "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx"
+          )
+          documents_panel = documents_panel_path.read_text(encoding="utf-8")
+          unused_workspace_import = "  studioDocumentWorkspaces,\n"
+          if documents_panel.count(unused_workspace_import) != 1:
+              raise SystemExit(
+                  "StudioProjectDocumentsPanel.tsx: expected one unused workspace import"
+              )
+          documents_panel_path.write_text(
+              documents_panel.replace(unused_workspace_import, "", 1),
+              encoding="utf-8",
+          )
+
+          library_page_path = Path(
+              "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx"
+          )
+          library_page = library_page_path.read_text(encoding="utf-8")
+          library_page, library_autofocus_count = re.subn(
+              r"^\s*autoFocus\s*$\n?",
+              "",
+              library_page,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          if library_autofocus_count != 1:
+              raise SystemExit(
+                  "StudioProjectLibraryPage.tsx: expected one autoFocus attribute"
+              )
+          library_page_path.write_text(library_page, encoding="utf-8")
 
           document_path = Path(
               "apps/web/src/domains/creator/studio-project-document-store.ts"
