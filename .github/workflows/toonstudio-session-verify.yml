@@ -63,6 +63,7 @@ jobs:
               "apps/web/src/domains/creator/studio-project-feature-suite-store.test.ts",
               "apps/web/src/domains/creator/studio-project-readiness-store.test.ts",
               "apps/web/src/domains/creator/studio-project-readiness.test.ts",
+              "apps/web/src/domains/creator/studio-project-storage-event.ts",
               "apps/web/src/domains/creator/studio-project-view-destinations.ts",
               "apps/web/src/domains/creator/studio-project-view-destinations.test.ts",
               "apps/web/src/domains/creator/studio-publishing-connector.test.ts",
@@ -77,7 +78,8 @@ jobs:
               "apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx",
               "apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.test.tsx",
               "apps/web/src/domains/creator/studio-shell/StudioReviewPanel.test.tsx",
-              "apps/web/src/domains/creator/studio-shell/useStudioProjectFeatureSuite.ts"
+              "apps/web/src/domains/creator/studio-shell/useStudioProjectFeatureSuite.ts",
+              "apps/web/src/domains/creator/studio-shell/useStudioProjectWorkspace.ts"
             ]
           }
           JSON
@@ -114,10 +116,12 @@ jobs:
           apps/web/src/domains/creator/studio-project-diagnostic-source-store.ts
           apps/web/src/domains/creator/studio-project-feature-adapters.ts
           apps/web/src/domains/creator/studio-project-feature-suite-store.ts
+          apps/web/src/domains/creator/studio-project-storage-event.ts
           apps/web/src/domains/creator/studio-project-view-destinations.ts
           apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
           apps/web/src/domains/creator/studio-shell/useStudioProjectFeatureSuite.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectWorkspace.ts
 
   regression:
     runs-on: ubuntu-24.04
