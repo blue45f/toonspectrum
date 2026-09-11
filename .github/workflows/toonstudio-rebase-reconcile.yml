@@ -1,4 +1,4 @@
-name: ToonStudio rebase reconcile
+name: ToonStudio squash rebase reconcile
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: toonstudio-rebase-reconcile
+  group: toonstudio-squash-rebase-reconcile
   cancel-in-progress: false
 
 jobs:
@@ -23,6 +23,8 @@ jobs:
       BRANCH: feat/toonstudio-final-ia-20260911
       MAIN_REF: origin/main
       HELPER_WORKFLOW: .github/workflows/toonstudio-rebase-reconcile.yml
+      STALE_MENU_WORKFLOW: .github/workflows/toonstudio-menu-contract-repair.yml
+      STALE_MENU_SCRIPT: scripts/repair-studio-menu-contract.mjs
     steps:
       - name: Checkout feature branch with full history
         uses: actions/checkout@v4
@@ -31,7 +33,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Reconcile the final feature tree onto current main
+      - name: Rebuild reviewed feature tree directly on current main
         id: reconcile
         shell: bash
         run: |
@@ -41,76 +43,68 @@ jobs:
 
           FEATURE_HEAD="$(git rev-parse HEAD)"
           MAIN_HEAD="$(git rev-parse "$MAIN_REF")"
-          MERGE_BASE="$(git merge-base "$FEATURE_HEAD" "$MAIN_HEAD")"
-          export FEATURE_HEAD MAIN_HEAD MERGE_BASE
-
-          echo "feature_head=$FEATURE_HEAD" >> "$GITHUB_OUTPUT"
-          echo "main_head=$MAIN_HEAD" >> "$GITHUB_OUTPUT"
-          echo "merge_base=$MERGE_BASE" >> "$GITHUB_OUTPUT"
-          printf 'Feature head: %s\nMain head: %s\nMerge base: %s\n' \
-            "$FEATURE_HEAD" "$MAIN_HEAD" "$MERGE_BASE"
-
-          git diff --binary --full-index "$MERGE_BASE" "$FEATURE_HEAD" -- \
-            . ":(exclude)$HELPER_WORKFLOW" > /tmp/toonstudio-feature.patch
-          git diff --name-only "$MERGE_BASE" "$FEATURE_HEAD" -- \
-            . ":(exclude)$HELPER_WORKFLOW" | sort -u > /tmp/feature-paths.txt
-          git diff --name-only "$MERGE_BASE" "$MAIN_HEAD" | sort -u > /tmp/main-paths.txt
-          comm -12 /tmp/feature-paths.txt /tmp/main-paths.txt > /tmp/overlap-paths.txt
-
-          cat > /tmp/expected-overlap-paths.txt <<'EOF'
-          apps/web/src/app/routes/groups/creator.routes.tsx
-          apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
-          apps/web/src/shared/components/site-navigation.test.ts
-          apps/web/src/shared/components/site-navigation.ts
-          EOF
-          sed -i 's/^          //' /tmp/expected-overlap-paths.txt
-          sort -u -o /tmp/expected-overlap-paths.txt /tmp/expected-overlap-paths.txt
-
-          echo 'Files changed on both main and the feature branch:'
-          cat /tmp/overlap-paths.txt
-          if ! diff -u /tmp/expected-overlap-paths.txt /tmp/overlap-paths.txt; then
-            echo 'Unexpected overlap detected. The branch was not rewritten.' >&2
+          SYNC_MERGE="$(
+            git log --merges --format=%H \
+              --grep="Merge remote-tracking branch 'origin/main' into feat/toonstudio-final-ia-20260911" \
+              -1 "$FEATURE_HEAD"
+          )"
+          if [[ -z "$SYNC_MERGE" ]]; then
+            echo 'Could not locate the reviewed main synchronization merge.' >&2
             exit 1
           fi
+
+          FEATURE_SOURCE="$(git rev-parse "${SYNC_MERGE}^1")"
+          SYNC_MAIN="$(git rev-parse "${SYNC_MERGE}^2")"
+          export FEATURE_HEAD MAIN_HEAD SYNC_MERGE FEATURE_SOURCE SYNC_MAIN
+
+          if [[ "$SYNC_MAIN" != "$MAIN_HEAD" ]]; then
+            echo "main advanced after the reviewed synchronization: sync=$SYNC_MAIN current=$MAIN_HEAD" >&2
+            echo 'The branch was not rewritten; the new main delta requires another overlap audit.' >&2
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$SYNC_MERGE" "$FEATURE_HEAD"; then
+            echo 'The synchronization merge is not an ancestor of the feature head.' >&2
+            exit 1
+          fi
+
+          {
+            echo "feature_head=$FEATURE_HEAD"
+            echo "main_head=$MAIN_HEAD"
+            echo "sync_merge=$SYNC_MERGE"
+            echo "feature_source=$FEATURE_SOURCE"
+          } >> "$GITHUB_OUTPUT"
+
+          printf 'Feature head: %s\nCurrent main: %s\nSync merge: %s\nPre-merge feature source: %s\n' \
+            "$FEATURE_HEAD" "$MAIN_HEAD" "$SYNC_MERGE" "$FEATURE_SOURCE"
+
+          git diff --binary --full-index "$SYNC_MAIN" "$FEATURE_HEAD" -- \
+            . \
+            ":(exclude)$HELPER_WORKFLOW" \
+            ":(exclude)$STALE_MENU_WORKFLOW" \
+            ":(exclude)$STALE_MENU_SCRIPT" \
+            > /tmp/toonstudio-final-feature.patch
+          git diff --name-only "$SYNC_MAIN" "$FEATURE_HEAD" -- \
+            . \
+            ":(exclude)$HELPER_WORKFLOW" \
+            ":(exclude)$STALE_MENU_WORKFLOW" \
+            ":(exclude)$STALE_MENU_SCRIPT" \
+            | sort -u > /tmp/feature-paths.txt
 
           git reset --hard "$MAIN_HEAD"
-          rm -f "$HELPER_WORKFLOW"
+          rm -f "$HELPER_WORKFLOW" "$STALE_MENU_WORKFLOW" "$STALE_MENU_SCRIPT"
 
-          set +e
-          git apply --3way --index --whitespace=nowarn /tmp/toonstudio-feature.patch
-          APPLY_STATUS=$?
-          set -e
-
-          git diff --name-only --diff-filter=U | sort -u > /tmp/unmerged-paths.txt
-          if [[ "$APPLY_STATUS" -ne 0 && ! -s /tmp/unmerged-paths.txt ]]; then
-            echo 'The feature patch failed without producing resolvable conflicts.' >&2
-            exit 1
-          fi
-
-          echo '3-way apply conflicts:'
-          if [[ -s /tmp/unmerged-paths.txt ]]; then
-            cat /tmp/unmerged-paths.txt
-          else
-            echo '(none; the known overlaps merged automatically)'
-          fi
-
-          while IFS= read -r path; do
-            [[ -z "$path" ]] && continue
-            if ! grep -Fxq "$path" /tmp/expected-overlap-paths.txt; then
-              echo "Unexpected conflict: $path" >&2
-              exit 1
-            fi
-          done < /tmp/unmerged-paths.txt
+          git apply --index --whitespace=nowarn /tmp/toonstudio-final-feature.patch
 
           python3 <<'PY'
           from __future__ import annotations
 
           import os
+          import re
           import subprocess
           from pathlib import Path
 
           root = Path.cwd()
-          feature_head = os.environ["FEATURE_HEAD"]
+          feature_source = os.environ["FEATURE_SOURCE"]
           main_head = os.environ["MAIN_HEAD"]
 
 
@@ -134,6 +128,8 @@ jobs:
               destination.write_text(text, encoding="utf-8")
 
 
+          # Route conflict: keep main's centralized lazy module while restoring the
+          # feature's canonical six-stage project shell.
           creator_routes_path = "apps/web/src/app/routes/groups/creator.routes.tsx"
           creator_routes = git_show(main_head, creator_routes_path)
           creator_routes = replace_once(
@@ -147,8 +143,8 @@ jobs:
               'element: <Navigate to="/market?view=templates" replace /> },\n\n'
           )
           project_routes = template_route + (
-              "  // Canonical six-stage project shell. It reuses existing production/editor capabilities while\n"
-              "  // route and data ownership migrate behind one coherent project navigation model.\n"
+              "  // Canonical six-stage project shell. Existing editor capabilities remain behind\n"
+              "  // these durable project routes while ownership migrates into the unified shell.\n"
               '  { id: "creator-studio-project-root", path: "/studio/p/:projectId", element: <Navigate to="overview" replace /> },\n'
               '  { id: "creator-studio-project-overview", path: "/studio/p/:projectId/overview", element: <StudioProjectShellPage section="overview" /> },\n'
               '  { id: "creator-studio-project-story", path: "/studio/p/:projectId/story", element: <StudioProjectShellPage section="story" /> },\n'
@@ -186,11 +182,14 @@ jobs:
           write(route_pages_path, route_pages)
 
           manual_routes_test_path = "apps/web/src/app/routes/groups/studio-manual.routes.test.tsx"
-          # Main already contains the feature branch's home split assertion and adds /studio/canvas.
+          # Main's test is the semantic superset: Studio home is separate, while
+          # canvas, character, 3D and publishing remain editor-owned routes.
           write(manual_routes_test_path, git_show(main_head, manual_routes_test_path))
 
+          # Navigation conflict: retain the feature's Studio/Spectrum split and add
+          # main's new Fortune destination to Spectrum's personal group.
           navigation_path = "apps/web/src/shared/components/site-navigation.ts"
-          navigation = git_show(feature_head, navigation_path)
+          navigation = git_show(feature_source, navigation_path)
           navigation = replace_once(
               navigation,
               "  MessageSquareQuote,\n  Palette,\n",
@@ -223,7 +222,7 @@ jobs:
           write(navigation_path, navigation)
 
           navigation_test_path = "apps/web/src/shared/components/site-navigation.test.ts"
-          navigation_test = git_show(feature_head, navigation_test_path)
+          navigation_test = git_show(feature_source, navigation_test_path)
           context_test_anchor = '  it("switches desktop and mobile navigation from the current product context", () => {\n'
           fortune_test = (
               '  it("keeps fortune and tarot discoverable in the Spectrum context", () => {\n'
@@ -244,8 +243,10 @@ jobs:
           )
           write(navigation_test_path, navigation_test)
 
+          # The feature source had a line break between an expression and its `as`
+          # assertion, which TypeScript parsed as an invalid standalone statement.
           project_shell_path = "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx"
-          project_shell = git_show(feature_head, project_shell_path)
+          project_shell = git_show(feature_source, project_shell_path)
           project_shell = replace_once(
               project_shell,
               'const PRIMARY_SECTIONS = STUDIO_PROJECT_NAVIGATION.map((item) => item.id)\n  as readonly Exclude<StudioProjectSection, "settings">[];\n',
@@ -253,26 +254,78 @@ jobs:
               "primary section type assertion",
           )
           write(project_shell_path, project_shell)
+
+          # A failed positional repair workflow left the brush menu specification
+          # ahead of the command inventory. Normalize the inventory at its canonical
+          # position instead of retaining the one-shot automation.
+          catalog_path = "apps/web/src/domains/creator/studio-command-catalog-base.ts"
+          catalog = (root / catalog_path).read_text(encoding="utf-8")
+          brush_lab_line = '  "brush/brush-lab",\n'
+          brush_lab_count = catalog.count(brush_lab_line)
+          if brush_lab_count > 1:
+              raise RuntimeError(
+                  f"brush command inventory: expected at most one brush-lab row, found {brush_lab_count}"
+              )
+          if brush_lab_count == 1:
+              catalog = catalog.replace(brush_lab_line, "", 1)
+
+          comment_pattern = re.compile(r"(?m)^  // brush \(\d+\)([^\n]*)$")
+          comment_matches = list(comment_pattern.finditer(catalog))
+          if len(comment_matches) != 1:
+              raise RuntimeError(
+                  f"brush command inventory: expected one count comment, found {len(comment_matches)}"
+              )
+          catalog = comment_pattern.sub(r"  // brush (15)\1", catalog, count=1)
+          catalog = replace_once(
+              catalog,
+              '  "brush/brush-studio",\n',
+              '  "brush/brush-studio",\n  "brush/brush-lab",\n',
+              "brush-lab canonical inventory position",
+          )
+          write(catalog_path, catalog)
+
+          groups_test_path = "apps/web/src/domains/creator/studio-main-menu-groups.test.ts"
+          groups_test = (root / groups_test_path).read_text(encoding="utf-8")
+          help_product_key = (
+              '      "studio.mainMenu.item.help.product": '
+              '"Help home and guided learning",\n'
+          )
+          if help_product_key not in groups_test:
+              groups_test = replace_once(
+                  groups_test,
+                  '      "studio.mainMenu.item.view.feature-tutorials": "Feature tutorials",\n',
+                  '      "studio.mainMenu.item.view.feature-tutorials": "Feature tutorials",\n'
+                  + help_product_key,
+                  "product help localization fixture",
+              )
+          write(groups_test_path, groups_test)
           PY
 
           git add -A
 
-          # Every non-conflicting feature path must remain byte-for-byte identical to the old head.
+          cat > /tmp/manual-paths.txt <<'EOF'
+          apps/web/src/app/routes/groups/creator-route-pages.ts
+          apps/web/src/app/routes/groups/creator.routes.tsx
+          apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
+          apps/web/src/domains/creator/studio-command-catalog-base.ts
+          apps/web/src/domains/creator/studio-main-menu-groups.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx
+          apps/web/src/shared/components/site-navigation.test.ts
+          apps/web/src/shared/components/site-navigation.ts
+          EOF
+          sed -i 's/^          //' /tmp/manual-paths.txt
+          sort -u -o /tmp/manual-paths.txt /tmp/manual-paths.txt
+
+          # Every non-manual feature path must stay byte-for-byte identical to the
+          # reviewed post-sync feature tree.
           while IFS= read -r path; do
             [[ -z "$path" ]] && continue
-            case "$path" in
-              apps/web/src/app/routes/groups/creator.routes.tsx|\
-              apps/web/src/app/routes/groups/studio-manual.routes.test.tsx|\
-              apps/web/src/shared/components/site-navigation.ts|\
-              apps/web/src/shared/components/site-navigation.test.ts|\
-              apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx)
-                continue
-                ;;
-            esac
-
+            if grep -Fxq "$path" /tmp/manual-paths.txt; then
+              continue
+            fi
             if git cat-file -e "$FEATURE_HEAD:$path" 2>/dev/null; then
               if [[ ! -e "$path" && ! -L "$path" ]]; then
-                echo "Feature file disappeared during reconciliation: $path" >&2
+                echo "Feature file disappeared during squash rebase: $path" >&2
                 exit 1
               fi
               EXPECTED_BLOB="$(git rev-parse "$FEATURE_HEAD:$path")"
@@ -294,6 +347,10 @@ jobs:
               "apps/web/src/app/routes/groups/creator.routes.tsx": [
                   "StudioProjectShellPage,",
                   'path: "/studio/p/:projectId/overview"',
+                  'path: "/studio/p/:projectId/story"',
+                  'path: "/studio/p/:projectId/production"',
+                  'path: "/studio/p/:projectId/assets"',
+                  'path: "/studio/p/:projectId/review"',
                   'path: "/studio/p/:projectId/export"',
                   'path: "/studio/p/:projectId/settings"',
               ],
@@ -304,7 +361,9 @@ jobs:
               "apps/web/src/app/routes/groups/studio-manual.routes.test.tsx": [
                   'routeId("/studio")',
                   '"/studio/canvas"',
+                  '"/studio/character"',
                   '"/studio/bg3d"',
+                  '"/studio/publish"',
               ],
               "apps/web/src/shared/components/site-navigation.ts": [
                   "Moon,",
@@ -323,27 +382,56 @@ jobs:
                   "  (item) => item.id,",
                   ') as readonly Exclude<StudioProjectSection, "settings">[];',
               ],
+              "apps/web/src/domains/creator/studio-main-menu-groups.test.ts": [
+                  '"studio.mainMenu.item.help.product": "Help home and guided learning"',
+                  'expect(menuItem(english, "help", "feature-tutorials").label).toBe(',
+                  "expect(editor.openFeatureTutorial).not.toHaveBeenCalled();",
+              ],
           }
           for path, tokens in required_tokens.items():
               text = Path(path).read_text(encoding="utf-8")
               missing = [token for token in tokens if token not in text]
               if missing:
                   raise SystemExit(f"{path}: missing merged semantic tokens: {missing}")
+
+          catalog_path = Path(
+              "apps/web/src/domains/creator/studio-command-catalog-base.ts"
+          )
+          catalog = catalog_path.read_text(encoding="utf-8")
+          if catalog.count('  "brush/brush-lab",\n') != 1:
+              raise SystemExit("brush-lab must appear exactly once in the command inventory")
+          if '  "brush/brush-studio",\n  "brush/brush-lab",\n' not in catalog:
+              raise SystemExit("brush-lab is not adjacent to brush-studio")
+          if "// brush (15)" not in catalog:
+              raise SystemExit("brush inventory count is not normalized to 15")
+
+          transient = [
+              ".github/workflows/toonstudio-rebase-reconcile.yml",
+              ".github/workflows/toonstudio-menu-contract-repair.yml",
+              "scripts/repair-studio-menu-contract.mjs",
+          ]
+          leaked = [path for path in transient if Path(path).exists()]
+          if leaked:
+              raise SystemExit(f"transient automation leaked into final tree: {leaked}")
           PY
 
-          if git grep -n -E '^(<<<<<<<|>>>>>>>|\|\|\|\|\|\|\|)( |$)' -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.mts' '*.json' '*.yml' '*.yaml'; then
+          if git grep -n -E '^(<<<<<<<|>>>>>>>|\|\|\|\|\|\|\|)( |$)' -- \
+            '*.ts' '*.tsx' '*.js' '*.mjs' '*.mts' '*.json' '*.yml' '*.yaml'; then
             echo 'Conflict marker found after reconciliation.' >&2
             exit 1
           fi
           git diff --cached --check
 
           git diff --cached --name-only "$MAIN_HEAD" | sort -u > /tmp/final-paths.txt
-          cp /tmp/feature-paths.txt /tmp/allowed-final-paths.txt
-          echo 'apps/web/src/app/routes/groups/creator-route-pages.ts' >> /tmp/allowed-final-paths.txt
-          sort -u -o /tmp/allowed-final-paths.txt /tmp/allowed-final-paths.txt
+          cat /tmp/feature-paths.txt /tmp/manual-paths.txt | sort -u > /tmp/allowed-final-paths.txt
           if comm -23 /tmp/final-paths.txt /tmp/allowed-final-paths.txt | grep -q .; then
-            echo 'Reconciliation changed files outside the reviewed feature and derived route module:' >&2
+            echo 'Squash rebase changed files outside the reviewed feature and manual resolutions:' >&2
             comm -23 /tmp/final-paths.txt /tmp/allowed-final-paths.txt >&2
+            exit 1
+          fi
+
+          if git diff --cached --quiet; then
+            echo 'Squash rebase produced no feature changes.' >&2
             exit 1
           fi
 
@@ -374,8 +462,11 @@ jobs:
           apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
           apps/web/src/shared/components/site-navigation.ts
           apps/web/src/shared/components/site-navigation.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx
+          apps/web/src/domains/creator/studio-command-catalog-base.ts
+          apps/web/src/domains/creator/studio-main-menu-groups.test.ts
 
-      - name: Run route, navigation and final IA regression tests
+      - name: Run route, navigation, menu and final IA regression tests
         run: >-
           pnpm exec vitest run
           apps/web/src/app/routes/groups/studio-manual.routes.test.tsx
@@ -386,11 +477,16 @@ jobs:
           apps/web/src/domains/creator/studio-route-paths.test.ts
           apps/web/src/domains/creator/studio-final-integration.test.ts
           apps/web/src/domains/creator/studio-final-dod-contract.test.ts
+          apps/web/src/domains/creator/studio-main-menu-groups.test.ts
+          apps/web/src/domains/creator/studio-main-menu-group-spec.test.ts
 
       - name: Type-check the integrated application
         run: pnpm exec tsc -p tsconfig.json --noEmit
 
-      - name: Commit and force-push with a lease
+      - name: Build the production bundle
+        run: pnpm run build:bundle
+
+      - name: Commit and force-push the squash rebase with a lease
         shell: bash
         env:
           FEATURE_HEAD: ${{ steps.reconcile.outputs.feature_head }}
@@ -401,6 +497,10 @@ jobs:
           if ! git diff --quiet; then
             echo 'Validation modified tracked files after reconciliation.' >&2
             git diff --stat >&2
+            exit 1
+          fi
+          if git diff --cached --quiet; then
+            echo 'No staged feature tree remains to commit.' >&2
             exit 1
           fi
 
