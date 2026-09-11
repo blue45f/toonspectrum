@@ -1,0 +1,291 @@
+name: Apply ToonStudio session goal gate
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-unified-brush-hub-20260911
+    paths:
+      - .github/workflows/apply-toonstudio-session-goal-gate.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-toonstudio-session-goal-gate
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/toonstudio-unified-brush-hub-20260911
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Add executable session goal contract
+        shell: bash
+        run: |
+          cat > scripts/verify-toonstudio-session-goals.mjs <<'EOF'
+          import { existsSync, readFileSync } from "node:fs";
+          import { relative, resolve } from "node:path";
+
+          const root = resolve(process.cwd());
+          const failures = [];
+          const required = {
+            architecture: [
+              "apps/web/src/domains/creator/studio-route-registry.ts",
+              "apps/web/src/domains/creator/studio-project-views.ts",
+              "apps/web/src/domains/creator/studio-project-view-destinations.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx",
+            ],
+            story: [
+              "apps/web/src/domains/creator/studio-story-bible.ts",
+              "apps/web/src/domains/creator/studio-storyboard-planner.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx",
+            ],
+            production: [
+              "apps/web/src/domains/creator/studio-production-pipeline.ts",
+              "apps/web/src/domains/creator/studio-webtoon-quality.ts",
+              "apps/web/src/domains/creator/studio-webtoon-3d-render.ts",
+              "apps/web/src/domains/creator/studio-voice-motion.ts",
+            ],
+            brush: [
+              "apps/web/src/domains/creator/studio-unified-brush-repository.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.tsx",
+              "apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.tsx",
+              "apps/web/src/domains/creator/brush-lab/brush-studio-v6-engine.ts",
+            ],
+            assets: [
+              "apps/web/src/domains/creator/studio-asset-passport.ts",
+              "apps/web/src/domains/creator/studio-asset-provider.ts",
+              "apps/web/src/domains/creator/studio-rights-graph.ts",
+              "apps/web/src/domains/creator/studio-font-audit.ts",
+              "apps/web/src/domains/creator/studio-marketplace-submission.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectGovernancePanel.tsx",
+            ],
+            design: [
+              "apps/web/src/domains/creator/studio-template-system.ts",
+              "apps/web/src/domains/creator/studio-presentation-layout.ts",
+              "apps/web/src/domains/creator/studio-series-kit.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioSeriesKitPanel.tsx",
+            ],
+            ai: [
+              "apps/web/src/domains/creator/studio-ai-provider.ts",
+              "apps/web/src/domains/creator/studio-ai-job.ts",
+              "apps/web/src/domains/creator/ai/studio-ai-project-handoff.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.tsx",
+            ],
+            localization: [
+              "apps/web/src/domains/creator/studio-localization-workflow.ts",
+              "apps/web/src/domains/creator/studio-localization-project-store.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx",
+            ],
+            review: [
+              "apps/web/src/domains/creator/studio-review-workflow.ts",
+              "apps/web/src/domains/creator/studio-review-history-store.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioReviewPanel.tsx",
+            ],
+            delivery: [
+              "apps/web/src/domains/creator/studio-export-preflight.ts",
+              "apps/web/src/domains/creator/studio-archive-manifest.ts",
+              "apps/web/src/domains/creator/studio-publishing-connector.ts",
+              "apps/web/src/domains/creator/studio-publishing-package.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioExportPanel.tsx",
+            ],
+            extensibility: [
+              "apps/web/src/domains/creator/studio-plugin-registry.ts",
+              "apps/web/src/domains/creator/studio-automation-recipe.ts",
+              "apps/web/src/domains/creator/studio-analytics.ts",
+            ],
+            regression: [
+              "apps/web/src/domains/creator/studio-integration-closure.test.ts",
+              "apps/web/src/domains/creator/studio-route-registry.test.ts",
+              "apps/web/src/domains/creator/studio-unified-brush-repository.test.ts",
+              "apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.test.tsx",
+            ],
+          };
+
+          for (const [goal, paths] of Object.entries(required)) {
+            for (const path of paths) {
+              if (!existsSync(resolve(root, path))) failures.push(`${goal}: missing ${path}`);
+            }
+          }
+
+          const transientWorkflows = [
+            ".github/workflows/finalize-toonstudio-session.yml",
+            ".github/workflows/apply-toonstudio-session-fixes.yml",
+            ".github/workflows/apply-toonstudio-session-fixes-retry.yml",
+            ".github/workflows/pr-1307-source-diagnostics.yml",
+            ".github/workflows/apply-toonstudio-session-completion-v2.yml",
+            ".github/workflows/apply-toonstudio-unified-brush-hub.yml",
+            ".github/workflows/apply-toonstudio-brush-editor-bridge.yml",
+            ".github/workflows/apply-toonstudio-session-goal-gate.yml",
+          ];
+          for (const path of transientWorkflows) {
+            if (existsSync(resolve(root, path))) failures.push(`transient workflow remains: ${path}`);
+          }
+
+          const source = (path) => readFileSync(resolve(root, path), "utf8");
+          const contains = (path, tokens) => {
+            const text = source(path);
+            for (const token of tokens) {
+              if (!text.includes(token)) failures.push(`${path}: missing product connection ${token}`);
+            }
+          };
+
+          contains("apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx", [
+            "StudioProjectFeatureSuitePanel",
+            "StudioProjectBrushHubPanel",
+            "StudioProjectGovernancePanel",
+            "StudioLocalizationPanel",
+            "StudioReviewPanel",
+            "StudioExportPanel",
+            "StudioProjectAssistantPanel",
+          ]);
+          contains("apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx", [
+            "StudioUnifiedBrushCanvasBridge",
+            "StudioAiProjectHandoffHost",
+          ]);
+          contains("apps/web/src/domains/creator/studio-route-registry.ts", [
+            "assets.unified-brushes",
+            "assets.quality-passport",
+            "assets.providers",
+            "assets.rights",
+            "assets.font-audit",
+            "assets.marketplace-submission",
+            "settings.plugins",
+            "settings.complete-archive",
+            "export.connectors",
+            "export.reproducible-package",
+          ]);
+          contains("apps/web/src/domains/creator/studio-unified-brush-repository.ts", [
+            '"system"', '"personal"', '"imported"', '"team"', '"market"',
+            "favorites", "recent", "activeByOperation",
+          ]);
+
+          const userFacingFiles = [
+            "apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx",
+            "apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.tsx",
+            "apps/web/src/domains/creator/studio-shell/StudioProjectGovernancePanel.tsx",
+            "apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx",
+            "apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx",
+            "apps/web/src/domains/creator/studio-shell/StudioReviewPanel.tsx",
+            "apps/web/src/domains/creator/studio-shell/StudioExportPanel.tsx",
+          ];
+          const forbiddenUserTerms = /SQLite|OPFS|\blease\b|\bCRDT\b|\brevision\b|비영속 메모리|로컬 SQL/iu;
+          for (const path of userFacingFiles) {
+            if (!existsSync(resolve(root, path))) continue;
+            const match = source(path).match(forbiddenUserTerms);
+            if (match) failures.push(`${path}: exposes implementation term ${match[0]}`);
+          }
+
+          const completionFiles = Object.values(required).flat();
+          const unfinished = /\bTODO\b|\bFIXME\b|NOT_IMPLEMENTED|not implemented|coming soon/iu;
+          for (const path of completionFiles) {
+            if (!existsSync(resolve(root, path))) continue;
+            const match = source(path).match(unfinished);
+            if (match) failures.push(`${path}: unfinished marker ${match[0]}`);
+          }
+
+          if (failures.length) {
+            console.error("ToonStudio session goal verification failed.");
+            for (const failure of failures) console.error(`- ${failure}`);
+            process.exit(1);
+          }
+
+          const goalCount = Object.keys(required).length;
+          const fileCount = new Set(Object.values(required).flat()).size;
+          console.log(`ToonStudio session goals verified: ${goalCount} goal groups, ${fileCount} implementation and regression files.`);
+          EOF
+
+          cat > .github/workflows/toonstudio-session-goals.yml <<'EOF'
+          name: ToonStudio session goals
+
+          on:
+            pull_request:
+              branches: [main]
+              paths:
+                - "apps/web/src/domains/creator/**"
+                - "apps/web/src/app/routes/groups/**"
+                - "scripts/verify-toonstudio-session-goals.mjs"
+                - ".github/workflows/toonstudio-session-goals.yml"
+            push:
+              branches: [main]
+              paths:
+                - "apps/web/src/domains/creator/**"
+                - "apps/web/src/app/routes/groups/**"
+                - "scripts/verify-toonstudio-session-goals.mjs"
+                - ".github/workflows/toonstudio-session-goals.yml"
+            workflow_dispatch:
+
+          permissions:
+            contents: read
+
+          concurrency:
+            group: toonstudio-session-goals-${{ github.event.pull_request.number || github.ref }}
+            cancel-in-progress: true
+
+          jobs:
+            goals:
+              runs-on: ubuntu-24.04
+              timeout-minutes: 8
+              steps:
+                - uses: actions/checkout@v6
+                  with:
+                    persist-credentials: false
+                    fetch-depth: 1
+                    filter: blob:none
+                    sparse-checkout: |
+                      .github/workflows
+                      apps/web/src/domains/creator
+                      apps/web/src/app/routes/groups
+                      scripts
+                - name: Verify product goals and reachability contracts
+                  run: node scripts/verify-toonstudio-session-goals.mjs
+          EOF
+
+      - name: Remove one-shot workflow before verification
+        run: rm .github/workflows/apply-toonstudio-session-goal-gate.yml
+      - name: Verify session goals
+        run: node scripts/verify-toonstudio-session-goals.mjs
+      - name: Verify feature reachability
+        run: node scripts/verify-toonstudio-feature-reachability.mjs
+      - name: Verify formatting
+        run: git diff --check
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+      - name: Run completion regression tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/studio-integration-closure.test.ts
+          apps/web/src/domains/creator/studio-route-registry.test.ts
+          apps/web/src/domains/creator/studio-unified-brush-repository.test.ts
+          apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.integration.test.tsx
+          --pool=forks --maxWorkers=2
+      - name: Commit permanent goal gate
+        shell: bash
+        run: |
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "ci(studio): enforce completed session capabilities"
+          git push origin HEAD:feat/toonstudio-unified-brush-hub-20260911
