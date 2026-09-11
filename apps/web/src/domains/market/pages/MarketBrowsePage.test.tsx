@@ -113,7 +113,7 @@ describe("MarketBrowsePage", () => {
     expect(screen.getByLabelText("현재 검색 쿼리").textContent).toBe("?q=alpha");
   });
 
-  it("keeps baseline and coarse-pointer controls reachable and hides the native cancel button", () => {
+  it("keeps baseline controls reachable and hides the native cancel button", () => {
     render(
       <MemoryRouter initialEntries={["/market/browse?q=ink&kind=brush&license=cc0-1.0"]}>
         <MarketBrowsePage />
@@ -124,21 +124,21 @@ describe("MarketBrowsePage", () => {
     expect(search.getAttribute("maxlength")).toBe(String(
       CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS
     ));
-    expect(search.className).toContain("pointer-coarse:h-11");
+    expect(search.className).toContain("h-12");
     expect(search.className).toContain("[&::-webkit-search-cancel-button]:hidden");
 
     expect(screen.getByRole("button", { name: "검색어 지우기" }).className)
-      .toContain("pointer-coarse:size-11");
-    expect(screen.getByRole("button", { name: "브러시" }).className)
-      .toContain("pointer-coarse:min-h-11");
-    expect(screen.getByRole("button", { name: "브러시 필터 제거" }).className)
-      .toContain("min-h-6");
+      .toContain("size-11");
+    const brushFamily = screen.getByRole("button", { name: "브러시" });
+    expect(brushFamily.className).toContain("min-h-11");
+    expect(brushFamily.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByRole("button", { name: "브러시 필터 제거" })).toBeNull();
     expect(screen.getByRole("button", { name: "검색: “ink” 필터 제거" }).className)
-      .toContain("min-h-6");
-    expect(screen.getByRole("button", { name: "검색: “ink” 필터 제거" }).className)
-      .toContain("pointer-coarse:min-h-11");
+      .toContain("min-h-9");
+    expect(screen.getByRole("button", { name: "CC0 1.0 필터 제거" }).className)
+      .toContain("min-h-9");
     expect(screen.getByRole("button", { name: "조건 초기화" }).className)
-      .toContain("pointer-coarse:min-h-11");
+      .toContain("min-h-9");
     expect(screen.getByText(/현재/).closest("p")?.textContent).toContain("현재 0개 표시");
   });
 

@@ -1,6 +1,7 @@
 name: KMAS reference library
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main]
     paths:
       - 'apps/web/src/shared/lib/kmas-reference.ts'
@@ -14,11 +15,26 @@ on:
       - 'e2e/kmas-references.spec.ts'
       - 'playwright.references.config.ts'
       - '.github/workflows/kmas-reference-library.yml'
+  push:
+    paths:
+      - 'apps/web/src/shared/lib/kmas-reference.ts'
+      - 'apps/web/src/shared/lib/__tests__/kmas-reference*.test.ts'
+      - 'apps/api/src/server/kmas-reference.ts'
+      - 'apps/api/src/modules/catalog/**'
+      - 'apps/web/src/domains/catalog/references/**'
+      - 'apps/web/src/app/routes/**'
+      - 'apps/web/src/domains/legal/SitemapPage.tsx'
+      - 'apps/web/src/shared/components/site-footer.tsx'
+      - 'e2e/kmas-references.spec.ts'
+      - 'playwright.references.config.ts'
+      - '.github/workflows/kmas-reference-library.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: kmas-references-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
 jobs:
   references:
     runs-on: ubuntu-latest
@@ -33,7 +49,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Reference contract tests
         run: pnpm exec vitest run apps/web/src/shared/lib/__tests__/kmas-reference.test.ts apps/web/src/shared/lib/__tests__/kmas-reference-hardening.test.ts apps/web/src/shared/lib/__tests__/kmas-reference-recovery.test.ts apps/web/src/shared/lib/__tests__/kmas-reference-merge-readiness.test.ts
       - name: Zero-warning reference lint

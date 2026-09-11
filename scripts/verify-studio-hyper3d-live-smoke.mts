@@ -3,11 +3,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import {
-  createHyper3dRodinProvider,
-} from "../apps/api/src/modules/studio-ai/studio-hyper3d-rodin-provider";
-import {
   STUDIO_3D_GENERATION_PROVIDER_CONTRACT_VERSION,
 } from "../apps/api/src/modules/studio-ai/studio-3d-generation-provider";
+import {
+  createHyper3dRodinProvider,
+} from "../apps/api/src/modules/studio-ai/studio-hyper3d-rodin-provider";
 
 const outputDir = path.resolve(process.env.STUDIO_HYPER3D_LIVE_OUTPUT ?? "artifacts/studio-hyper3d-live");
 const apiKey = process.env.HYPER3D_API_KEY?.trim() || process.env.RODIN_API_KEY?.trim();

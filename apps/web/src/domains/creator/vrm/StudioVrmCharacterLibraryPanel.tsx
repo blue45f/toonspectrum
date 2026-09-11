@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, type ChangeEventHandler } from "react";
 
 import { presentStudioVrmLicenseAuthority } from "./studio-vrm-license-product-gate";
 import { filterStudioVrmProductionLibraryEntries } from "./studio-vrm-production-catalog";
+import { StudioVrmCharacterPreviewImage } from "./StudioVrmCharacterPreviewImage";
 import { buildFallbackVrmLibraryThumbnail, type VrmLibraryEntry } from "./vrm-library";
 
 const LIBRARY_BATCH_SIZE = 12;
@@ -404,18 +405,11 @@ export function StudioVrmCharacterLibraryPanel({
                 onClick={() => onSelect(entry)}
               >
                 <span className="grid h-[4.5rem] place-items-center overflow-hidden rounded-lg border border-line/80 bg-panel">
-                  <img
+                  <StudioVrmCharacterPreviewImage
                     alt=""
-                    decoding="async"
-                    loading="eager"
-                    className="h-full w-full object-contain"
-                    src={entry.thumbnail ?? buildFallbackVrmLibraryThumbnail(entry.name, entry.id)}
-                    onError={(event) => {
-                      const fallback = buildFallbackVrmLibraryThumbnail(entry.name, entry.id);
-                      if (event.currentTarget.src !== fallback) {
-                        event.currentTarget.src = fallback;
-                      }
-                    }}
+                    className="object-contain"
+                    fallbackSrc={buildFallbackVrmLibraryThumbnail(entry.name, entry.id)}
+                    src={entry.thumbnail}
                   />
                 </span>
                 <span className="min-w-0">

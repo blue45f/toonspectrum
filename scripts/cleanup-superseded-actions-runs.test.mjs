@@ -24,21 +24,27 @@ function run({
 
 describe("selectSupersededActionsRuns", () => {
   it("keeps only the newest run for the same workflow, event and branch", () => {
-    const selected = selectSupersededActionsRuns([
-      run({ id: 1, createdAt: "2026-09-10T00:00:00Z" }),
-      run({ id: 2, createdAt: "2026-09-10T00:01:00Z" }),
-      run({ id: 3, createdAt: "2026-09-10T00:02:00Z" }),
-    ]);
+    const selected = selectSupersededActionsRuns(
+      [
+        run({ id: 1, createdAt: "2026-09-10T00:00:00Z" }),
+        run({ id: 2, createdAt: "2026-09-10T00:01:00Z" }),
+        run({ id: 3, createdAt: "2026-09-10T00:02:00Z" }),
+      ],
+      { pullRequestStates: new Map([[10, "open"]]) },
+    );
     expect(selected.map((item) => item.run.id).sort()).toEqual([1, 2]);
     expect(selected.every((item) => item.reason === "superseded")).toBe(true);
   });
 
   it("does not mix different workflows or branches", () => {
-    const selected = selectSupersededActionsRuns([
-      run({ id: 1, workflow: 1, branch: "feature/a", createdAt: "2026-09-10T00:00:00Z" }),
-      run({ id: 2, workflow: 2, branch: "feature/a", createdAt: "2026-09-10T00:01:00Z" }),
-      run({ id: 3, workflow: 1, branch: "feature/b", createdAt: "2026-09-10T00:02:00Z" }),
-    ]);
+    const selected = selectSupersededActionsRuns(
+      [
+        run({ id: 1, workflow: 1, branch: "feature/a", createdAt: "2026-09-10T00:00:00Z" }),
+        run({ id: 2, workflow: 2, branch: "feature/a", createdAt: "2026-09-10T00:01:00Z" }),
+        run({ id: 3, workflow: 1, branch: "feature/b", createdAt: "2026-09-10T00:02:00Z" }),
+      ],
+      { pullRequestStates: new Map([[10, "open"]]) },
+    );
     expect(selected).toEqual([]);
   });
 

@@ -86,6 +86,7 @@ export function useStudioGenerated3dHostBridge(input: {
   readonly ownerId: string;
   readonly openObjectInsert: () => void | Promise<void>;
 }): void {
+  const { ownerId, openObjectInsert } = input;
   useEffect(() => {
     const active = new Set<AbortController>();
     const listener = (event: Event) => {
@@ -97,7 +98,7 @@ export function useStudioGenerated3dHostBridge(input: {
       void (async () => {
         try {
           const revisionId = validRevisionId(detail.revisionId);
-          await input.openObjectInsert();
+          await openObjectInsert();
           const fileInput = await waitForExistingGlbInput(controller.signal);
           assignFile(fileInput, generatedFile(detail.blob, revisionId));
           fileInput.dataset.generated3dIntent = detail.intent;
@@ -126,5 +127,5 @@ export function useStudioGenerated3dHostBridge(input: {
       active.forEach((controller) => controller.abort());
       active.clear();
     };
-  }, [input.openObjectInsert, input.ownerId]);
+  }, [openObjectInsert, ownerId]);
 }

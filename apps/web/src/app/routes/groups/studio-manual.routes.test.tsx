@@ -19,7 +19,8 @@ describe("independent Studio manual routes", () => {
     expect(routeId("/studio/manual/unknown-article")).toBe("creator-studio-manual-article");
   });
   it("preserves editor, 3D and publish routes", () => {
-    for (const path of ["/studio", "/studio/character", "/studio/bg3d", "/studio/publish"]) {
+    expect(routeId("/studio")).toBe("creator-studio-home");
+    for (const path of ["/studio/canvas", "/studio/character", "/studio/bg3d", "/studio/publish"]) {
       expect(routeId(path)).toBe("creator-studio");
     }
   });

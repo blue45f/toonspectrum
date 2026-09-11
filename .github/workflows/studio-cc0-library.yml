@@ -2,7 +2,18 @@ name: Studio CC0 library regression
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/studio-cc0-library.yml'
+      - 'apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx'
+      - 'apps/web/src/domains/creator/studio-cc0-*.ts'
+      - 'apps/web/src/domains/creator/useStudioModalSheet.ts'
+      - 'scripts/studio-cc0-lifecycle-checks.mjs'
+      - 'scripts/verify-studio-cc0-curated-ui.mjs'
+      - 'apps/web/public/assets/studio/cc0-20260906/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  push:
     paths:
       - '.github/workflows/studio-cc0-library.yml'
       - 'apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx'
@@ -19,7 +30,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: studio-cc0-library-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -41,7 +52,7 @@ jobs:
       - name: Install the locked dependencies
         run: |
           npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
-          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
       - name: Check the asset implementation without rewriting source
         run: |
           pnpm exec eslint --max-warnings=0 apps/web/src/domains/creator/studio-cc0-curation.ts apps/web/src/domains/creator/studio-cc0-curation.test.ts apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx scripts/verify-studio-cc0-curated-ui.mjs scripts/studio-cc0-lifecycle-checks.mjs

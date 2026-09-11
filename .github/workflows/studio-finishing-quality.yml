@@ -2,6 +2,7 @@ name: Studio finishing quality regression
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'vitest.setup.ts'
@@ -22,10 +23,10 @@ on:
       - 'apps/web/src/domains/creator/studio-main-menu-items-production.ts'
       - 'apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig*.tsx'
       - 'scripts/verify-studio-menus.mts'
+      - 'scripts/verify-studio-menus-ci.mjs'
       - 'scripts/studio-quality-bundle-leaves.test.mjs'
       - '.github/workflows/studio-finishing-quality.yml'
   push:
-    branches: [main, release/salvage-integration-20260908]
     paths:
       - 'vitest.setup.ts'
       - 'scripts/check-studio-bundle.mjs'
@@ -45,6 +46,7 @@ on:
       - 'apps/web/src/domains/creator/studio-main-menu-items-production.ts'
       - 'apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig*.tsx'
       - 'scripts/verify-studio-menus.mts'
+      - 'scripts/verify-studio-menus-ci.mjs'
       - 'scripts/studio-quality-bundle-leaves.test.mjs'
       - '.github/workflows/studio-finishing-quality.yml'
   workflow_dispatch:
@@ -57,7 +59,7 @@ permissions:
 # 브랜치 보호의 필수 체크가 아니므로 최신 main 상태만 검증하면 되고, 커밋별 신호가 필요한
 # ci.yml 은 그대로 SHA 로 묶어 둔다.
 concurrency:
-  group: studio-finishing-quality-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -80,7 +82,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Architecture and full zero-warning lint
         run: |
           set -euo pipefail
@@ -117,7 +119,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Run finishing, review ownership, camera and navigation contracts
         run: |
           set -euo pipefail
@@ -152,7 +154,7 @@ jobs:
       - name: Verify production menus, rail and export entry points
         run: |
           set -euo pipefail
-          pnpm run verify:studio-menus 2>&1 | tee "$RUNNER_TEMP/finishing-quality/menus.log"
+          pnpm exec tsx scripts/verify-studio-menus-ci.mjs 2>&1 | tee "$RUNNER_TEMP/finishing-quality/menus.log"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
