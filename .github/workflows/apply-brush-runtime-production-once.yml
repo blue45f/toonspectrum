@@ -49,7 +49,6 @@ jobs:
         run: |
           set -o pipefail
           python3 scripts/maintenance/apply-brush-runtime-production.py 2>&1 | tee apply-brush-runtime-production.log
-          rm -f .github/workflows/apply-toonstudio-session-completion-v2.yml
 
       - name: Normalize changed sources
         run: |
