@@ -118,6 +118,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          step_path = Path("/tmp/toonstudio-template-step-0.sh")
+          step = step_path.read_text(encoding="utf-8")
+          replacements = (
+              ('path: "/studio/templates"', 'path: studioRoutePath("templates")', 3),
+              ('path: "/studio/import"', 'path: studioRoutePath("import")', 1),
+          )
+          for old, new, expected in replacements:
+              count = step.count(old)
+              if count != expected:
+                  raise SystemExit(
+                      f"template integration route adaptation {old!r}: "
+                      f"matches={count}, expected={expected}"
+                  )
+              step = step.replace(old, new)
+          step_path.write_text(step, encoding="utf-8")
+          PY
+
           bash /tmp/toonstudio-template-step-0.sh
           python <<'PY'
           from pathlib import Path
