@@ -1,0 +1,211 @@
+name: Finalize ToonStudio template hub on latest main once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-template-hub-20260912
+    paths:
+      - .github/workflows/finalize-toonstudio-template-hub-v4-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-toonstudio-template-hub-v4-20260912
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: macos-15-intel
+    timeout-minutes: 55
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout exact feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-template-hub-20260912
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Merge latest protected main without publishing yet
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git fetch origin main:refs/remotes/origin/main
+          git merge --no-commit --no-ff origin/main
+
+      - name: Apply structural product repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          def read(path: str) -> str:
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path: str, source: str) -> None:
+              Path(path).write_text(source, encoding="utf-8")
+
+          creation = "apps/web/src/domains/creator/studio-project-creation.ts"
+          source = read(creation)
+          old = '''    markStudioProjectOpened(storage, project.id, document.id, { at: createdAt, target });
+              return Object.freeze({
+                project,
+                document,
+                href: studioProjectDocumentHref(document),
+              });'''
+          new = '''    const openedProject = markStudioProjectOpened(
+                storage,
+                project.id,
+                document.id,
+                { at: createdAt, target },
+              );
+              return Object.freeze({
+                project: openedProject,
+                document,
+                href: studioProjectDocumentHref(document),
+              });'''
+          if old in source:
+              source = source.replace(old, new, 1)
+          if "project: openedProject" not in source:
+              raise SystemExit("project creation repair was not applied")
+          write(creation, source)
+
+          catalog = "apps/web/src/domains/creator/studio-project-template-catalog.ts"
+          source = read(catalog)
+          anchor = "const TEMPLATE_BY_ID = new Map(STUDIO_PROJECT_TEMPLATES.map((template) => [template.id, template]));"
+          aliases = '''
+
+          const TEMPLATE_CATEGORY_SEARCH_TERMS: Readonly<
+            Record<StudioTemplateCategory, readonly string[]>
+          > = Object.freeze({
+            webtoon: ["웹툰", "만화", "webtoon", "comic"],
+            drawing: ["그리기", "드로잉", "일러스트", "drawing", "illustration"],
+            design: ["디자인", "design"],
+            presentation: ["발표", "발표 자료", "프레젠테이션", "presentation", "slides", "pitch"],
+            storyboard: ["스토리보드", "콘티", "storyboard"],
+            image: ["이미지", "사진", "image", "photo"],
+            "three-d": ["3D", "삼차원", "3d", "three-dimensional"],
+            motion: ["모션", "애니메이션", "motion", "animation"],
+          });'''
+          if "TEMPLATE_CATEGORY_SEARCH_TERMS" not in source:
+              if anchor not in source:
+                  raise SystemExit("template catalogue anchor missing")
+              source = source.replace(anchor, anchor + aliases, 1)
+          if "...TEMPLATE_CATEGORY_SEARCH_TERMS[template.category]," not in source:
+              needle = "      ...template.tagsEn,\n    ].join(\" \").toLocaleLowerCase();"
+              replacement = "      ...template.tagsEn,\n      ...TEMPLATE_CATEGORY_SEARCH_TERMS[template.category],\n    ].join(\" \").toLocaleLowerCase();"
+              if needle not in source:
+                  raise SystemExit("template search haystack anchor missing")
+              source = source.replace(needle, replacement, 1)
+          write(catalog, source)
+
+          template_page = "apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx"
+          source = read(template_page)
+          source = source.replace(
+              'import { useMemo, useState } from "react";',
+              'import { useEffect, useMemo, useState } from "react";',
+              1,
+          )
+          block_start = "  const [selectedId, setSelectedId] = useState(initialTemplate.id);"
+          block_end = "\n\n  const patchQuery"
+          start = source.find(block_start)
+          end = source.find(block_end, start)
+          if start < 0 or end < 0:
+              raise SystemExit("template selection state block missing")
+          replacement = '''  const [selectedId, setSelectedId] = useState(initialTemplate.id);
+              const [projectTitle, setProjectTitle] = useState(() => (
+                locale === "ko" ? `${initialTemplate.titleKo} 프로젝트` : `${initialTemplate.titleEn} project`
+              ));
+              const [creating, setCreating] = useState(false);
+              const [error, setError] = useState<string | null>(null);
+
+              const templates = useMemo(() => searchStudioProjectTemplates({
+                category,
+                query,
+                featuredOnly,
+              }), [category, featuredOnly, query]);
+              const selected = templates.find((template) => template.id === selectedId)
+                ?? templates[0]
+                ?? initialTemplate;
+
+              useEffect(() => {
+                if (selected.id === selectedId) return;
+                setSelectedId(selected.id);
+                setProjectTitle(locale === "ko" ? `${selected.titleKo} 프로젝트` : `${selected.titleEn} project`);
+                setError(null);
+              }, [locale, selected, selectedId]);'''
+          source = source[:start] + replacement + source[end:]
+          write(template_page, source)
+
+          library_page = "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx"
+          source = read(library_page)
+          pattern = re.compile(
+              r'\n\s*<button type="button" onClick=\{onRestore\} className="min-h-10 w-full rounded-lg px-3 text-left text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg">\n'
+              r'\s*\{locale === "ko" \? "복원" : "Restore"\}\n'
+              r'\s*</button>(?=\n\s*<button type="button" onClick=\{onConfirmDelete\})'
+          )
+          source, count = pattern.subn("", source, count=1)
+          if count != 1 and source.count('onClick={onRestore}') != 1:
+              raise SystemExit("trash restore action deduplication failed")
+          write(library_page, source)
+          PY
+
+      - name: Remove every completed branch-specific workflow
+        run: |
+          rm -f .github/workflows/apply-toonstudio-project-lifecycle.yml
+          rm -f .github/workflows/apply-toonstudio-template-hub.yml
+          rm -f .github/workflows/verify-toonstudio-project-lifecycle.yml
+          rm -f .github/workflows/fix-toonstudio-template-hub-tests-once.yml
+          rm -f .github/workflows/fix-toonstudio-template-hub-tests-v2-once.yml
+          rm -f .github/workflows/fix-toonstudio-template-hub-tests-v3-once.yml
+          rm -f .github/workflows/finalize-toonstudio-template-hub-v4-once.yml
+
+      - name: Validate focused regressions
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-project-creation.test.ts \
+            apps/web/src/domains/creator/studio-project-template-catalog.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx
+
+      - name: Validate types and lint
+        run: |
+          pnpm exec eslint \
+            apps/web/src/domains/creator/studio-project-creation.ts \
+            apps/web/src/domains/creator/studio-project-template-catalog.ts \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx
+          pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Validate production bundle
+        run: pnpm run build:bundle
+
+      - name: Commit and publish validated merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add -A
+          git commit -m "feat(studio): finalize project lifecycle and template hub"
+          git push origin HEAD:feat/toonstudio-template-hub-20260912
