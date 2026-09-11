@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, waitFor } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -9,7 +10,7 @@ import {
 } from "../studio-import-handoff";
 import { StudioImportHandoffHost } from "./StudioImportHandoffHost";
 
-function props(overrides: Partial<React.ComponentProps<typeof StudioImportHandoffHost>> = {}) {
+function props(overrides: Partial<ComponentProps<typeof StudioImportHandoffHost>> = {}) {
   return {
     brushPackImporting: false,
     collaborationDocumentLocked: false,
