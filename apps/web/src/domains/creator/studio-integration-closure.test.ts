@@ -70,6 +70,43 @@ describe("ToonStudio integration closure", () => {
     expect(productIa).toContain('primaryRoute: "/studio/p/:projectId/export"');
   });
 
+  it("keeps canonical document URLs mounted on one editor runtime across workspace changes", () => {
+    const route = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceRoute.tsx");
+    const layout = source("apps/web/src/domains/creator/studio-router/StudioDocumentLayout.tsx");
+    const switcher = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceSwitcher.tsx");
+    const dock = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceDock.tsx");
+
+    expect(route).toContain("<StudioEditorRoute resolution={routeResolution} />");
+    expect(route).toContain("resolveStudioRoute");
+    expect(route).not.toContain("legacyEditorHref");
+    expect(layout).toContain("<StudioDocumentWorkspaceSwitcher />");
+    expect(layout).toContain("<StudioDocumentWorkspaceDock />");
+    expect(switcher).toContain("studioDocumentHref");
+    expect(switcher).toContain("STUDIO_DOCUMENT_WORKSPACES");
+    expect(switcher).toContain("projectId: resolution.projectId");
+    expect(switcher).toContain("documentId: resolution.documentId");
+    expect(switcher).toContain("draftId: resolution.draftId");
+
+    for (const workspace of [
+      "comic",
+      "design",
+      "slides",
+      "storyboard",
+      "whiteboard",
+      '"3d"',
+      "animation",
+      "motion",
+      "audio",
+      "localization",
+      "review",
+    ]) {
+      expect(dock).toContain(`${workspace}: {`);
+    }
+    expect(dock).toContain("StudioProjectFeatureSuitePanel");
+    expect(dock).toContain("StudioLocalizationPanel");
+    expect(dock).toContain("StudioReviewPanel");
+  });
+
   it("mounts persisted project workflows, diagnostics and feature implementations on route-reachable pages", () => {
     const integrated = source("apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx");
     const shell = source("apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx");
