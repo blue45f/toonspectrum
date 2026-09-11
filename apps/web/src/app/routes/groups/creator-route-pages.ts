@@ -82,6 +82,18 @@ export const StudioAssetsPage = lazyRetry(
   })),
   "StudioAssetsPage",
 );
+export const StudioProjectShellPage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioProjectShellPage").then((module) => ({
+    default: module.StudioProjectShellPage,
+  })),
+  "StudioProjectShellPage",
+);
+export const StudioDocumentWorkspaceRoute = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioDocumentWorkspaceRoute").then((module) => ({
+    default: module.StudioDocumentWorkspaceRoute,
+  })),
+  "StudioDocumentWorkspaceRoute",
+);
 export const LearnPage = lazyRetry(
   () => import("@/domains/learn/LearnPage").then((module) => ({
     default: module.LearnPage,
