@@ -3,8 +3,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const SOURCE = readFileSync(new URL("./creator.routes.tsx", import.meta.url), "utf8");
+const PAGE_SOURCE = readFileSync(
+  new URL("../../../domains/creator/brush-lab/StudioBrushLabPage.tsx", import.meta.url),
+  "utf8",
+);
 
 const CANONICAL_BRUSH_EDITOR_ROUTE = "/studio/assets/brushes/new";
+const CANONICAL_BRUSH_EDIT_ROUTE = "/studio/assets/brushes/:brushId/edit";
 const LEGACY_BRUSH_LAB_ROUTES = [
   "/brush-lab",
   "/studio/brush-lab",
@@ -13,8 +18,9 @@ const LEGACY_BRUSH_LAB_ROUTES = [
 ] as const;
 
 describe("unified Brush Editor route contract", () => {
-  it("owns one canonical asset-editor route and keeps legacy entry routes compatible", () => {
+  it("owns canonical create/edit asset routes and keeps legacy entry routes compatible", () => {
     expect(SOURCE).toContain(`path: "${CANONICAL_BRUSH_EDITOR_ROUTE}"`);
+    expect(SOURCE).toContain(`path: "${CANONICAL_BRUSH_EDIT_ROUTE}"`);
     for (const path of LEGACY_BRUSH_LAB_ROUTES) {
       expect(SOURCE, path).toContain(`path: "${path}"`);
     }
@@ -26,6 +32,7 @@ describe("unified Brush Editor route contract", () => {
 
     const studioRoutes = [
       CANONICAL_BRUSH_EDITOR_ROUTE,
+      CANONICAL_BRUSH_EDIT_ROUTE,
       ...LEGACY_BRUSH_LAB_ROUTES.slice(1),
     ];
     for (const path of studioRoutes) {
@@ -48,5 +55,11 @@ describe("unified Brush Editor route contract", () => {
     );
     expect(SOURCE.slice(scopedWorkStart, scopedRemixStart)).toContain("<StudioBrushLabPage />");
     expect(SOURCE.slice(scopedRemixStart)).toContain("<StudioBrushLabPage />");
+  });
+
+  it("renders the V6 integration bridge and keeps all V5 quality designs discoverable", () => {
+    expect(PAGE_SOURCE).toContain("<StudioBrushIntegratedWorkbench");
+    expect(PAGE_SOURCE).toContain("<StudioBrushLegacyCataloguePanel");
+    expect(PAGE_SOURCE).toContain("brushId?: string");
   });
 });
