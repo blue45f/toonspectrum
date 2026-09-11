@@ -1,5 +1,6 @@
 name: Apply ToonStudio project lifecycle once
 
+# Retry after aligning the integration script with the canonical route registry.
 on:
   push:
     branches:
