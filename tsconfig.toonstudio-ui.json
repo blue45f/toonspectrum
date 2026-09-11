@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "incremental": false,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "files": [
+    "apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioExportPanel.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioProjectDiagnosticsBridge.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioReviewPanel.tsx",
+    "apps/web/src/domains/creator/studio-shell/StudioSeriesKitPanel.tsx",
+    "apps/web/src/domains/creator/studio-shell/useStudioProjectFeatureSuite.ts",
+    "apps/web/src/domains/creator/studio-shell/useStudioProjectWorkspace.ts"
+  ]
+}
