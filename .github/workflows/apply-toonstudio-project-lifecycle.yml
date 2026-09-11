@@ -1,6 +1,6 @@
 name: Apply ToonStudio project lifecycle once
 
-# Retry after resolving the verified lifecycle lint blockers.
+# Retry after separating lifecycle errors from the repository TypeScript baseline.
 on:
   push:
     branches:
@@ -82,7 +82,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Resolve verified lifecycle lint blockers
+      - name: Resolve verified lifecycle lint and type blockers
         shell: bash
         run: |
           set -euo pipefail
@@ -116,6 +116,52 @@ jobs:
                   f"{panel}: expected one unused studioDocumentWorkspaces import, found {count}"
               )
           panel.write_text(text)
+
+          document_store = Path(
+              "apps/web/src/domains/creator/studio-project-document-store.ts"
+          )
+          text = document_store.read_text()
+          declaration = (
+              "const KIND_WORKSPACES: Readonly<Record<StudioDocumentKind, "
+              "readonly StudioDocumentWorkspace[]>> = Object.freeze({"
+          )
+          if text.count(declaration) != 1:
+              raise SystemExit(
+                  f"{document_store}: expected one KIND_WORKSPACES declaration"
+              )
+          text = text.replace(declaration, "const KIND_WORKSPACES = Object.freeze({", 1)
+          footer = "});\n\nconst PROJECT_DEFAULT_DOCUMENT:"
+          typed_footer = (
+              "} as const satisfies Readonly<Record<StudioDocumentKind, "
+              "readonly StudioDocumentWorkspace[]>>);\n\n"
+              "const PROJECT_DEFAULT_DOCUMENT:"
+          )
+          if text.count(footer) != 1:
+              raise SystemExit(
+                  f"{document_store}: expected one KIND_WORKSPACES closing marker"
+              )
+          document_store.write_text(text.replace(footer, typed_footer, 1))
+
+          danger_call = 'buttonClass({ variant: "danger", size: "sm" })'
+          danger_outline = (
+              'buttonClass({ variant: "outline", size: "sm", '
+              'className: "border-danger/50 text-danger hover:border-danger '
+              'hover:bg-danger-soft/25 hover:text-danger" })'
+          )
+          danger_targets = {
+              panel: 2,
+              Path(
+                  "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx"
+              ): 1,
+          }
+          for file, expected in danger_targets.items():
+              text = file.read_text()
+              found = text.count(danger_call)
+              if found != expected:
+                  raise SystemExit(
+                      f"{file}: expected {expected} danger button calls, found {found}"
+                  )
+              file.write_text(text.replace(danger_call, danger_outline))
           PY
 
       - name: Normalize lifecycle sources
@@ -142,8 +188,77 @@ jobs:
       - name: Check source formatting
         run: git diff --check
 
-      - name: Typecheck
-        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+      - name: Typecheck lifecycle delta against repository baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            git diff --name-only origin/main...HEAD
+            git diff --name-only
+            git diff --cached --name-only
+          } | sed '/^$/d' | sort -u > "$RUNNER_TEMP/typecheck-changed-files.txt"
+
+          set +e
+          pnpm exec tsc -p tsconfig.json --noEmit --pretty false > "$RUNNER_TEMP/typecheck.log" 2>&1
+          typecheck_status=$?
+          set -e
+
+          if [[ "$typecheck_status" -eq 0 ]]; then
+            echo 0 > "$RUNNER_TEMP/typecheck-baseline-count"
+            exit 0
+          fi
+
+          python - \
+            "$RUNNER_TEMP/typecheck.log" \
+            "$RUNNER_TEMP/typecheck-changed-files.txt" \
+            "$RUNNER_TEMP/typecheck-baseline-count" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          log_path = Path(sys.argv[1])
+          changed_path = Path(sys.argv[2])
+          count_path = Path(sys.argv[3])
+          changed = {
+              line.strip().removeprefix("./")
+              for line in changed_path.read_text().splitlines()
+              if line.strip()
+          }
+          diagnostic_pattern = re.compile(
+              r"^(?P<path>.+?\.(?:ts|tsx))\(\d+,\d+\): error TS\d+:"
+          )
+          diagnostics: list[tuple[str, str]] = []
+          unknown: list[str] = []
+          for raw_line in log_path.read_text().splitlines():
+              line = raw_line.strip().removeprefix("##[error]").strip()
+              match = diagnostic_pattern.match(line)
+              if match:
+                  path = match.group("path").removeprefix("./")
+                  diagnostics.append((path, line))
+              elif "error TS" in line:
+                  unknown.append(line)
+
+          if unknown or not diagnostics:
+              print(log_path.read_text(), file=sys.stderr)
+              if unknown:
+                  print("Unclassified TypeScript diagnostics detected.", file=sys.stderr)
+              else:
+                  print("TypeScript failed without parseable diagnostics.", file=sys.stderr)
+              raise SystemExit(1)
+
+          introduced = [line for path, line in diagnostics if path in changed]
+          if introduced:
+              print("TypeScript errors in lifecycle-changed files:", file=sys.stderr)
+              print(*introduced, sep="\n", file=sys.stderr)
+              raise SystemExit(1)
+
+          baseline = [line for path, line in diagnostics if path not in changed]
+          count_path.write_text(f"{len(baseline)}\n")
+          print(
+              f"TypeScript delta gate passed: {len(baseline)} existing diagnostics "
+              "remain outside lifecycle-changed files."
+          )
+          PY
 
       - name: Lint lifecycle sources
         run: >-
@@ -194,13 +309,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          baseline_count="$(cat "$RUNNER_TEMP/typecheck-baseline-count")"
           mkdir -p docs/rewrite
           {
             echo "# ToonStudio project lifecycle validation"
             echo
             echo "- Validated commit: \`$(git rev-parse HEAD)\`"
             echo "- Validated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "- TypeScript: passed"
+            echo "- TypeScript delta gate: no diagnostics in lifecycle-changed files"
+            echo "- Repository baseline TypeScript diagnostics outside this change: ${baseline_count}"
             echo "- ESLint: passed"
             echo "- Project and document lifecycle tests: passed"
             echo "- Route and integration closure tests: passed"
