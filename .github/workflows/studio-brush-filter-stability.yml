@@ -18,6 +18,7 @@ on:
       - 'scripts/verify-studio-filter-dialog.mts'
       - '.github/workflows/studio-brush-filter-stability.yml'
   push:
+    branches: [main, release/salvage-integration-20260908]
     paths:
       - 'apps/web/src/domains/creator/brush/**'
       - 'apps/web/src/domains/creator/brush-lab/**'
