@@ -17,9 +17,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  typecheck:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,8 +84,29 @@ jobs:
 
       - name: Typecheck scoped project
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
+          NODE_OPTIONS: --max-old-space-size=8192
         run: pnpm exec tsc -p tsconfig.toonstudio-session.json --pretty false
+
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Lint session sources
         run: >-
@@ -97,6 +118,27 @@ jobs:
           apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
           apps/web/src/domains/creator/studio-shell/useStudioProjectFeatureSuite.ts
+
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Run session regression tests
         run: >-
