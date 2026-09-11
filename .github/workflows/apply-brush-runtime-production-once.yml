@@ -7,6 +7,8 @@ on:
       - fix/brush-runtime-production-20260912
     paths:
       - .github/workflows/apply-brush-runtime-production-once.yml
+      - scripts/maintenance/align-brush-runtime-repair.py
+      - scripts/maintenance/apply-brush-runtime-production.py
 
 permissions:
   contents: write
@@ -47,12 +49,14 @@ jobs:
         run: |
           set -o pipefail
           python3 scripts/maintenance/apply-brush-runtime-production.py 2>&1 | tee apply-brush-runtime-production.log
+          rm -f .github/workflows/apply-toonstudio-session-completion-v2.yml
 
       - name: Normalize changed sources
         run: |
           set -o pipefail
           pnpm exec eslint --fix --max-warnings=0 \
             apps/web/src/domains/creator/studio-asset-governance.ts \
+            apps/web/src/domains/creator/studio-asset-governance.test.ts \
             apps/web/src/domains/creator/studio-feature-registry.ts \
             apps/web/src/domains/creator/studio-feature-registry.test.ts \
             apps/web/src/domains/creator/studio-route-registry.ts \
@@ -77,6 +81,7 @@ jobs:
           set -o pipefail
           pnpm exec eslint --max-warnings=0 \
             apps/web/src/domains/creator/studio-asset-governance.ts \
+            apps/web/src/domains/creator/studio-asset-governance.test.ts \
             apps/web/src/domains/creator/studio-feature-registry.ts \
             apps/web/src/domains/creator/studio-feature-registry.test.ts \
             apps/web/src/domains/creator/studio-route-registry.ts \
@@ -107,8 +112,10 @@ jobs:
         run: |
           set -o pipefail
           pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-asset-governance.test.ts \
             apps/web/src/domains/creator/studio-feature-registry.test.ts \
             apps/web/src/domains/creator/studio-external-route.test.ts \
+            apps/web/src/domains/creator/studio-template-catalog.test.ts \
             apps/web/src/domains/creator/brush/studio-brush-composition-catalog.test.ts \
             apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts \
             apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts \
