@@ -38,6 +38,10 @@ describe("StudioTemplateHubPage", () => {
     expect(screen.queryByText(/세로 웹툰 표준|Vertical webtoon standard/u)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /^전체$|^All$/u }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^전체$|^All$/u }).getAttribute("aria-pressed"))
+        .toBe("true");
+    });
     const search = screen.getByRole("textbox", { name: /템플릿 검색|Search templates/u });
     fireEvent.change(search, { target: { value: "production" } });
     expect(await screen.findByRole("heading", {
