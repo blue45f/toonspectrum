@@ -1,0 +1,88 @@
+name: Diagnose ToonStudio session types
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-session-complete-20260911-1221
+    paths:
+      - .github/workflows/diagnose-toonstudio-session-types.yml
+
+permissions:
+  contents: read
+
+actions:
+  read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-session-complete-20260911-1221
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply pending deterministic migration in worktree
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+          import textwrap
+
+          workflow = Path('.github/workflows/apply-toonstudio-session-fixes.yml').read_text()
+          block = re.search(
+              r'- name: Apply deterministic source fixes\n.*?run: \|\n(?P<body>.*?)\n\s+- name: Verify source formatting',
+              workflow,
+              re.S,
+          )
+          if block is None:
+              raise SystemExit('Could not locate deterministic migration block')
+          body = textwrap.dedent(block.group('body'))
+          prefix = "python <<'PY'\n"
+          if not body.startswith(prefix) or not body.rstrip().endswith('\nPY'):
+              raise SystemExit('Unexpected deterministic migration block format')
+          script = body[len(prefix):body.rfind('\nPY')]
+          exec(compile(script, 'toonstudio-session-migration.py', 'exec'), {})
+          PY
+
+      - name: Capture typecheck output
+        id: typecheck
+        shell: bash
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          set +e
+          pnpm exec tsc -p tsconfig.json --noEmit --pretty false > toonstudio-typecheck.log 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          printf '\n--- changed files ---\n' >> toonstudio-typecheck.log
+          git diff --name-only >> toonstudio-typecheck.log
+          exit 0
+
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: toonstudio-session-typecheck-diagnostics
+          path: toonstudio-typecheck.log
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Report failure after upload
+        if: steps.typecheck.outputs.status != '0'
+        run: exit 1
