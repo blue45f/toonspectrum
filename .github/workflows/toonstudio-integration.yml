@@ -63,6 +63,8 @@ jobs:
           apps/web/src/domains/creator/brush-lab/StudioBrushLabPage.tsx
           apps/web/src/domains/creator/brush-lab/StudioBrushLegacyCataloguePanel.tsx
           apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.ts
+          apps/web/src/domains/creator/canvas/studio-transient-canvas.ts
+          apps/web/src/domains/creator/canvas/studio-transient-canvas.test.ts
           apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx
           apps/web/src/domains/creator/studio-cuttoon-editor/StudioImportHandoffHost.tsx
           apps/web/src/domains/creator/studio-integration-closure.test.ts
@@ -93,6 +95,7 @@ jobs:
           apps/web/src/domains/creator/ai/studio-ai-project-handoff.test.ts
           apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.test.tsx
           apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts
+          apps/web/src/domains/creator/canvas/studio-transient-canvas.test.ts
           apps/web/src/domains/creator/studio-ai-job.test.ts
           apps/web/src/domains/creator/studio-ai-provider.test.ts
           apps/web/src/domains/creator/studio-export-preflight.test.ts
