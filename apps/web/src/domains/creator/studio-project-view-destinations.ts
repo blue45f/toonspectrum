@@ -374,7 +374,7 @@ export function auditStudioProjectViewDestinations(projectId = "audit-project"):
           issues.push(`${section}.${view} loops back to its own view`);
         }
         const copy = `${resolved.descriptionKo} ${resolved.descriptionEn}`;
-        if (/SQLite|OPFS|revision|리비전|lease|CRDT/u.test(copy)) {
+        if (/SQLite|OPFS|CRDT|리비전|\brevision\b|\blease\b/u.test(copy)) {
           issues.push(`${section}.${view} exposes implementation terminology`);
         }
       } catch (error) {
