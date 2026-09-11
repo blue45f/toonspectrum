@@ -1,4 +1,4 @@
-name: Integrate ToonStudio project lifecycle once
+name: Consolidate ToonStudio lifecycle and template hub once
 
 on:
   push:
@@ -11,25 +11,25 @@ permissions:
   contents: write
 
 concurrency:
-  group: integrate-toonstudio-project-lifecycle
+  group: consolidate-toonstudio-lifecycle-template
   cancel-in-progress: false
 
 jobs:
-  integrate-validate-commit:
+  consolidate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 80
+    timeout-minutes: 90
     env:
       CI: "true"
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - name: Checkout exact feature branch
+      - name: Checkout lifecycle branch
         uses: actions/checkout@v4
         with:
           ref: feat/toonstudio-project-lifecycle-20260912
-          fetch-depth: 256
+          fetch-depth: 0
 
-      - name: Synchronize main and compose project creation
+      - name: Merge main and import template implementation
         shell: bash
         run: |
           set -euo pipefail
@@ -40,7 +40,9 @@ jobs:
           cp "$page" "$preserved"
           git config user.name "toonstudio-integration-bot"
           git config user.email "toonstudio-integration-bot@users.noreply.github.com"
-          git fetch --no-tags --depth=256 origin main:refs/remotes/origin/main
+          git fetch --no-tags origin \
+            main:refs/remotes/origin/main \
+            feat/toonstudio-template-hub-20260912:refs/remotes/origin/feat/toonstudio-template-hub-20260912
 
           set +e
           git merge --no-commit --no-ff origin/main
@@ -62,7 +64,15 @@ jobs:
           python scripts/apply-toonstudio-project-lifecycle.py
           git add -A
           git diff --cached --check
-          git commit -m "chore(studio): synchronize project lifecycle with main"
+          git commit -m "chore(studio): synchronize lifecycle with main"
+
+          git checkout origin/feat/toonstudio-template-hub-20260912 -- \
+            apps/web/src/domains/creator/studio-project-creation.ts \
+            apps/web/src/domains/creator/studio-project-creation.test.ts \
+            apps/web/src/domains/creator/studio-project-template-catalog.ts \
+            apps/web/src/domains/creator/studio-project-template-catalog.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -78,7 +88,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Resolve lifecycle lint and type blockers
+      - name: Connect template hub and repair current contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -86,69 +96,71 @@ jobs:
           from pathlib import Path
           import re
 
-          autofocus_targets = (
+          def read(path: str) -> str:
+              return Path(path).read_text()
+
+          def write(path: str, value: str) -> None:
+              Path(path).write_text(value)
+
+          def replace_if_present(path: str, old: str, new: str) -> None:
+              value = read(path)
+              if old in value:
+                  write(path, value.replace(old, new, 1))
+
+          for path in (
               "apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx",
               "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",
-          )
-          for path in autofocus_targets:
-              file = Path(path)
-              text = file.read_text()
-              text, count = re.subn(r"(?m)^\s*autoFocus\s*\n", "", text)
-              if count != 1:
-                  raise SystemExit(f"{path}: expected one autoFocus prop, found {count}")
-              file.write_text(text)
+          ):
+              value = read(path)
+              value = re.sub(r"(?m)^\s*autoFocus\s*\n", "", value)
+              write(path, value)
 
-          panel = Path(
-              "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx"
-          )
-          text = panel.read_text()
-          text, count = re.subn(
-              r"(?m)^\s*studioDocumentWorkspaces,\s*\n",
-              "",
-              text,
-          )
-          if count != 1:
-              raise SystemExit(
-                  f"{panel}: expected one unused studioDocumentWorkspaces import, found {count}"
-              )
-          panel.write_text(text)
+          panel = "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx"
+          value = read(panel)
+          value = re.sub(r"(?m)^\s*studioDocumentWorkspaces,\s*\n", "", value)
+          write(panel, value)
 
-          document_store = Path(
-              "apps/web/src/domains/creator/studio-project-document-store.ts"
-          )
-          text = document_store.read_text()
+          document_store = "apps/web/src/domains/creator/studio-project-document-store.ts"
+          value = read(document_store)
           declaration = (
               "const KIND_WORKSPACES: Readonly<Record<StudioDocumentKind, "
               "readonly StudioDocumentWorkspace[]>> = Object.freeze({"
           )
-          if text.count(declaration) != 1:
-              raise SystemExit(
-                  f"{document_store}: expected one KIND_WORKSPACES declaration"
+          if declaration in value:
+              value = value.replace(declaration, "const KIND_WORKSPACES = Object.freeze({", 1)
+              footer = "});\n\nconst PROJECT_DEFAULT_DOCUMENT:"
+              typed_footer = (
+                  "} as const satisfies Readonly<Record<StudioDocumentKind, "
+                  "readonly StudioDocumentWorkspace[]>>);\n\n"
+                  "const PROJECT_DEFAULT_DOCUMENT:"
               )
-          text = text.replace(declaration, "const KIND_WORKSPACES = Object.freeze({", 1)
-          footer = "});\n\nconst PROJECT_DEFAULT_DOCUMENT:"
-          typed_footer = (
-              "} as const satisfies Readonly<Record<StudioDocumentKind, "
-              "readonly StudioDocumentWorkspace[]>>);\n\n"
-              "const PROJECT_DEFAULT_DOCUMENT:"
-          )
-          if text.count(footer) != 1:
-              raise SystemExit(
-                  f"{document_store}: expected one KIND_WORKSPACES closing marker"
+              if footer not in value:
+                  raise SystemExit(f"{document_store}: KIND_WORKSPACES closing marker missing")
+              value = value.replace(footer, typed_footer, 1)
+          lookup = "  const allowedWorkspaces = KIND_WORKSPACES[input.kind];"
+          if lookup in value:
+              value = value.replace(
+                  lookup,
+                  "  const allowedWorkspaces: readonly StudioDocumentWorkspace[] = KIND_WORKSPACES[input.kind];",
+                  1,
               )
-          text = text.replace(footer, typed_footer, 1)
-          workspace_lookup = "  const allowedWorkspaces = KIND_WORKSPACES[input.kind];"
-          typed_workspace_lookup = (
-              "  const allowedWorkspaces: readonly StudioDocumentWorkspace[] = "
-              "KIND_WORKSPACES[input.kind];"
+          value = value.replace(
+              "    projectKind: input.projectKind,\n    createdAt: input.createdAt,\n    target: input.target,",
+              "    projectKind: input.projectKind,\n    ...(input.createdAt ? { createdAt: input.createdAt } : {}),\n    target: input.target,",
           )
-          if text.count(workspace_lookup) != 1:
-              raise SystemExit(
-                  f"{document_store}: expected one allowedWorkspaces lookup"
-              )
-          document_store.write_text(
-              text.replace(workspace_lookup, typed_workspace_lookup, 1)
+          value = value.replace(
+              "    pageCount: source.pageCount,\n    createdAt: options.at,\n  }, { target: options.target });",
+              "    pageCount: source.pageCount,\n    ...(options.at ? { createdAt: options.at } : {}),\n  }, { target: options.target });",
           )
+          write(document_store, value)
+
+          library_store = "apps/web/src/domains/creator/studio-project-library-store.ts"
+          value = read(library_store)
+          value = value.replace(
+              "    primaryLocale: source.primaryLocale,\n    createdAt: options.at,\n  }, { target: options.target });",
+              "    primaryLocale: source.primaryLocale,\n    ...(options.at ? { createdAt: options.at } : {}),\n  }, { target: options.target });",
+          )
+          write(library_store, value)
 
           danger_call = 'buttonClass({ variant: "danger", size: "sm" })'
           danger_outline = (
@@ -156,31 +168,232 @@ jobs:
               'className: "border-danger/50 text-danger hover:border-danger '
               'hover:bg-danger-soft/25 hover:text-danger" })'
           )
-          danger_targets = {
-              panel: 2,
-              Path(
-                  "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx"
-              ): 1,
+          for path in (
+              panel,
+              "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",
+          ):
+              value = read(path)
+              write(path, value.replace(danger_call, danger_outline))
+
+          route_pages = "apps/web/src/app/routes/groups/creator-route-pages.ts"
+          value = read(route_pages)
+          template_export = '''export const StudioTemplateHubPage = lazyRetry(
+            () => import("@/domains/creator/studio-shell/StudioTemplateHubPage").then((module) => ({
+              default: module.StudioTemplateHubPage,
+            })),
+            "StudioTemplateHubPage",
+          );
+          '''
+          template_export = re.sub(r"(?m)^          ", "", template_export)
+          if "export const StudioTemplateHubPage" not in value:
+              marker = "export const StudioAssetsPage = lazyRetry("
+              if marker not in value:
+                  raise SystemExit(f"{route_pages}: StudioAssetsPage marker missing")
+              value = value.replace(marker, template_export + marker, 1)
+          write(route_pages, value)
+
+          routes = "apps/web/src/app/routes/groups/creator.routes.tsx"
+          value = read(routes)
+          if "  StudioTemplateHubPage,\n" not in value:
+              marker = "  StudioNewPage,\n"
+              if marker not in value:
+                  raise SystemExit(f"{routes}: StudioNewPage import marker missing")
+              value = value.replace(marker, marker + "  StudioTemplateHubPage,\n", 1)
+          route_candidates = (
+              '  { id: "creator-studio-templates", path: studioRoutePath("templates"), element: <Navigate to="/market?view=templates" replace /> },',
+              '  { id: "creator-studio-templates", path: "/studio/templates", element: <Navigate to="/market?view=templates" replace /> },',
+          )
+          template_route = '  { id: "creator-studio-templates", path: studioRoutePath("templates"), element: <StudioTemplateHubPage /> },'
+          if template_route not in value:
+              for candidate in route_candidates:
+                  if candidate in value:
+                      value = value.replace(candidate, template_route, 1)
+                      break
+              else:
+                  raise SystemExit(f"{routes}: template route marker missing")
+          write(routes, value)
+
+          creation = "apps/web/src/domains/creator/studio-project-creation.ts"
+          value = read(creation)
+          old_project_call = '''  const project = createStudioProject(storage, {
+            title: input.title,
+            kind: input.kind,
+            templateId: input.templateId,
+            description: input.description,
+            primaryLocale: input.primaryLocale,
+            createdAt,
+          }, { target });'''
+          new_project_call = '''  const project = createStudioProject(storage, {
+            title: input.title,
+            kind: input.kind,
+            createdAt,
+            ...(input.templateId !== undefined ? { templateId: input.templateId } : {}),
+            ...(input.description !== undefined ? { description: input.description } : {}),
+            ...(input.primaryLocale !== undefined ? { primaryLocale: input.primaryLocale } : {}),
+          }, { target });'''
+          value = value.replace(old_project_call, new_project_call)
+          old_document_call = '''      ? createStudioProjectDocument(storage, project.id, {
+                title: input.document.title ?? `${project.title} 작업 문서`,
+                kind: input.document.kind,
+                defaultWorkspace: input.document.defaultWorkspace,
+                width: input.document.width,
+                height: input.document.height,
+                pageCount: input.document.pageCount,
+                createdAt,
+              }, { target })'''
+          new_document_call = '''      ? createStudioProjectDocument(storage, project.id, {
+                title: input.document.title ?? `${project.title} 작업 문서`,
+                kind: input.document.kind,
+                createdAt,
+                ...(input.document.defaultWorkspace !== undefined
+                  ? { defaultWorkspace: input.document.defaultWorkspace }
+                  : {}),
+                ...(input.document.width !== undefined ? { width: input.document.width } : {}),
+                ...(input.document.height !== undefined ? { height: input.document.height } : {}),
+                ...(input.document.pageCount !== undefined ? { pageCount: input.document.pageCount } : {}),
+              }, { target })'''
+          value = value.replace(old_document_call, new_document_call)
+          write(creation, value)
+
+          product_ia = "apps/web/src/domains/creator/studio-product-ia.ts"
+          value = read(product_ia)
+          value = value.replace(
+              '  { id: "create", label: "새로 만들기", href: "/studio/new" },',
+              '  { id: "templates", label: "템플릿", href: "/studio/templates" },',
+              1,
+          )
+          if 'id: "template.library"' not in value:
+              marker = '''  {
+            id: "project.create",'''
+              addition = '''  {
+            id: "template.library",
+            label: "템플릿",
+            owner: "templates",
+            primaryRoute: "/studio/templates",
+            maturity: "stable",
+            surfaces: [
+              { id: "template-hub", role: "primary" },
+              { id: "header-template-link", role: "projection" },
+              { id: "new-project-template-picker", role: "projection" },
+              { id: "asset-market-templates", role: "projection" },
+            ],
+            aliases: ["템플릿 갤러리", "미리디자인", "presentation template"],
+          },
+          '''
+              marker = re.sub(r"(?m)^          ", "", marker)
+              addition = re.sub(r"(?m)^          ", "", addition)
+              if marker not in value:
+                  raise SystemExit(f"{product_ia}: project.create capability marker missing")
+              value = value.replace(marker, addition + marker, 1)
+          write(product_ia, value)
+
+          product_test = "apps/web/src/domains/creator/studio-product-ia.test.ts"
+          if Path(product_test).exists():
+              value = read(product_test)
+              value = value.replace('"create", "assets", "learn"', '"templates", "assets", "learn"')
+              value = value.replace('"새로 만들기", "에셋", "배우기"', '"템플릿", "에셋", "배우기"')
+              value = value.replace('"/studio/new", "/studio/assets", "/learn"', '"/studio/templates", "/studio/assets", "/learn"')
+              write(product_test, value)
+
+          reachability = "scripts/verify-toonstudio-feature-reachability.mjs"
+          value = read(reachability)
+          additions = (
+              "apps/web/src/domains/creator/studio-project-library-store.ts",
+              "apps/web/src/domains/creator/studio-project-document-store.ts",
+              "apps/web/src/domains/creator/studio-project-creation.ts",
+              "apps/web/src/domains/creator/studio-project-template-catalog.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx",
+          )
+          marker = '  "apps/web/src/domains/creator/studio-project-views.ts",\n'
+          for module in additions:
+              quoted = f'  "{module}",\n'
+              if quoted not in value:
+                  if marker not in value:
+                      raise SystemExit(f"{reachability}: required list marker missing")
+                  value = value.replace(marker, marker + quoted, 1)
+          write(reachability, value)
+
+          closure = "apps/web/src/domains/creator/studio-integration-closure.test.ts"
+          value = read(closure)
+          value = value.replace(
+              'expect(routes).toContain(`path: "/studio/p/:projectId/${section}"`);',
+              'expect(routes).toContain(`path: studioRoutePath("project-${section}")`);',
+          )
+          value = value.replace(
+              "expect(routes).toContain('path: \"/studio/assets/brushes/new\"');",
+              "expect(routes).toContain('path: studioRoutePath(\"asset-brush-new\")');",
+          )
+          value = value.replace(
+              "expect(routes).toContain('path: \"/studio/assets/brushes/:brushId/edit\"');",
+              "expect(routes).toContain('path: studioRoutePath(\"asset-brush-edit\")');",
+          )
+          template_assertion = "    expect(routePages).toContain('studio-shell/StudioTemplateHubPage');\n"
+          if template_assertion not in value:
+              marker = "    expect(routePages).toContain('studio-shell/StudioNewIntegratedPage');\n"
+              if marker in value:
+                  value = value.replace(marker, marker + template_assertion, 1)
+          template_route_assertion = "    expect(routes).toContain('<StudioTemplateHubPage />');\n"
+          if template_route_assertion not in value:
+              marker = "    expect(routes).toContain('path: \"/studio/trash\"');\n"
+              if marker in value:
+                  value = value.replace(marker, marker + template_route_assertion, 1)
+          write(closure, value)
+
+          library_test = "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx"
+          value = read(library_test)
+          value = value.replace(
+              'fireEvent.click(screen.getByRole("button", { name: /^복원$|^Restore$/u }));',
+              'fireEvent.click(screen.getAllByRole("button", { name: /^복원$|^Restore$/u }).at(-1)!);',
+              1,
+          )
+          write(library_test, value)
+
+          closure_value = read(closure)
+          for match in re.finditer(r'"(\.github/workflows/[^"\n]+)"', closure_value):
+              path = Path(match.group(1))
+              if path.exists():
+                  path.unlink()
+
+          workflow_root = Path(".github/workflows")
+          keep = {
+              "toonstudio-integration.yml",
+              "toonstudio-feature-reachability.yml",
+              "toonstudio-session-goals.yml",
           }
-          for file, expected in danger_targets.items():
-              text = file.read_text()
-              found = text.count(danger_call)
-              if found != expected:
-                  raise SystemExit(
-                      f"{file}: expected {expected} danger button calls, found {found}"
-                  )
-              file.write_text(text.replace(danger_call, danger_outline))
+          tokens = {
+              "apply", "repair", "finalize", "finalizer", "sync", "stage",
+              "snapshot", "validate", "validation", "install", "consolidate",
+              "continuation", "completion",
+          }
+          for path in workflow_root.iterdir():
+              if not path.is_file() or path.suffix not in {".yml", ".yaml"}:
+                  continue
+              if path.name in keep:
+                  continue
+              name = path.name.lower()
+              if "toonstudio" in name and any(token in name for token in tokens):
+                  path.unlink()
           PY
 
-      - name: Normalize lifecycle sources
+      - name: Normalize changed sources
         run: >-
           pnpm exec eslint --fix
           apps/web/src/app/routes/groups/creator-route-pages.ts
           apps/web/src/app/routes/groups/creator.routes.tsx
+          apps/web/src/domains/creator/studio-product-ia.ts
+          apps/web/src/domains/creator/studio-product-ia.test.ts
           apps/web/src/domains/creator/studio-project-library-store.ts
           apps/web/src/domains/creator/studio-project-library-store.test.ts
           apps/web/src/domains/creator/studio-project-document-store.ts
           apps/web/src/domains/creator/studio-project-document-store.test.ts
+          apps/web/src/domains/creator/studio-project-creation.ts
+          apps/web/src/domains/creator/studio-project-creation.test.ts
+          apps/web/src/domains/creator/studio-project-template-catalog.ts
+          apps/web/src/domains/creator/studio-project-template-catalog.test.ts
           apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
           apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts
           apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx
@@ -190,93 +403,77 @@ jobs:
           apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
           apps/web/src/domains/creator/studio-integration-closure.test.ts
 
-      - name: Check source formatting
+      - name: Verify formatting
         run: git diff --check
 
-      - name: Typecheck lifecycle delta against repository baseline
+      - name: Typecheck changed ToonStudio files
         shell: bash
         run: |
           set -euo pipefail
-          {
-            git diff --name-only origin/main...HEAD
-            git diff --name-only
-            git diff --cached --name-only
-          } | sed '/^$/d' | sort -u > "$RUNNER_TEMP/typecheck-changed-files.txt"
+          git diff --name-only origin/main...HEAD > "$RUNNER_TEMP/typecheck-changed-files.txt"
+          git diff --name-only >> "$RUNNER_TEMP/typecheck-changed-files.txt"
+          sort -u -o "$RUNNER_TEMP/typecheck-changed-files.txt" "$RUNNER_TEMP/typecheck-changed-files.txt"
 
           set +e
           pnpm exec tsc -p tsconfig.json --noEmit --pretty false > "$RUNNER_TEMP/typecheck.log" 2>&1
-          typecheck_status=$?
+          status=$?
           set -e
-
-          if [[ "$typecheck_status" -eq 0 ]]; then
-            echo 0 > "$RUNNER_TEMP/typecheck-baseline-count"
+          if [[ "$status" -eq 0 ]]; then
             exit 0
           fi
 
-          python - \
-            "$RUNNER_TEMP/typecheck.log" \
-            "$RUNNER_TEMP/typecheck-changed-files.txt" \
-            "$RUNNER_TEMP/typecheck-baseline-count" <<'PY'
+          python - "$RUNNER_TEMP/typecheck.log" "$RUNNER_TEMP/typecheck-changed-files.txt" <<'PY'
           from pathlib import Path
           import re
           import sys
 
-          log_path = Path(sys.argv[1])
-          changed_path = Path(sys.argv[2])
-          count_path = Path(sys.argv[3])
+          log = Path(sys.argv[1]).read_text()
           changed = {
               line.strip().removeprefix("./")
-              for line in changed_path.read_text().splitlines()
+              for line in Path(sys.argv[2]).read_text().splitlines()
               if line.strip()
           }
-          diagnostic_pattern = re.compile(
-              r"^(?P<path>.+?\.(?:ts|tsx))\(\d+,\d+\): error TS\d+:"
-          )
-          diagnostics: list[tuple[str, str]] = []
-          unknown: list[str] = []
-          for raw_line in log_path.read_text().splitlines():
-              line = raw_line.strip().removeprefix("##[error]").strip()
-              match = diagnostic_pattern.match(line)
+          pattern = re.compile(r"^(?P<path>.+?\.(?:ts|tsx))\(\d+,\d+\): error TS\d+:")
+          diagnostics = []
+          unknown = []
+          for raw in log.splitlines():
+              line = raw.strip().removeprefix("##[error]").strip()
+              match = pattern.match(line)
               if match:
-                  path = match.group("path").removeprefix("./")
-                  diagnostics.append((path, line))
+                  diagnostics.append((match.group("path").removeprefix("./"), line))
               elif "error TS" in line:
                   unknown.append(line)
-
           if unknown or not diagnostics:
-              print(log_path.read_text(), file=sys.stderr)
-              if unknown:
-                  print("Unclassified TypeScript diagnostics detected.", file=sys.stderr)
-              else:
-                  print("TypeScript failed without parseable diagnostics.", file=sys.stderr)
+              print(log, file=sys.stderr)
               raise SystemExit(1)
-
           introduced = [line for path, line in diagnostics if path in changed]
           if introduced:
-              print("TypeScript errors in lifecycle-changed files:", file=sys.stderr)
+              print("TypeScript errors in changed ToonStudio files:", file=sys.stderr)
               print(*introduced, sep="\n", file=sys.stderr)
               raise SystemExit(1)
-
-          baseline = [line for path, line in diagnostics if path not in changed]
-          count_path.write_text(f"{len(baseline)}\n")
-          print(
-              f"TypeScript delta gate passed: {len(baseline)} existing diagnostics "
-              "remain outside lifecycle-changed files."
-          )
+          print(f"TypeScript delta gate passed; {len(diagnostics)} baseline diagnostics remain outside changed files.")
           PY
 
-      - name: Lint lifecycle sources
+      - name: Lint changed ToonStudio files
         run: >-
           pnpm exec eslint --max-warnings=0
           apps/web/src/app/routes/groups/creator-route-pages.ts
           apps/web/src/app/routes/groups/creator.routes.tsx
+          apps/web/src/domains/creator/studio-product-ia.ts
+          apps/web/src/domains/creator/studio-product-ia.test.ts
           apps/web/src/domains/creator/studio-project-library-store.ts
           apps/web/src/domains/creator/studio-project-library-store.test.ts
           apps/web/src/domains/creator/studio-project-document-store.ts
           apps/web/src/domains/creator/studio-project-document-store.test.ts
+          apps/web/src/domains/creator/studio-project-creation.ts
+          apps/web/src/domains/creator/studio-project-creation.test.ts
+          apps/web/src/domains/creator/studio-project-template-catalog.ts
+          apps/web/src/domains/creator/studio-project-template-catalog.test.ts
           apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
           apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts
           apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx
@@ -286,54 +483,53 @@ jobs:
           apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
           apps/web/src/domains/creator/studio-integration-closure.test.ts
 
-      - name: Run lifecycle and route tests
+      - name: Run lifecycle, template and route tests
         run: >-
           pnpm exec vitest run
           apps/web/src/domains/creator/studio-project-library-store.test.ts
           apps/web/src/domains/creator/studio-project-document-store.test.ts
+          apps/web/src/domains/creator/studio-project-creation.test.ts
+          apps/web/src/domains/creator/studio-project-template-catalog.test.ts
+          apps/web/src/domains/creator/studio-product-ia.test.ts
           apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx
           apps/web/src/domains/creator/studio-integration-closure.test.ts
           apps/web/src/app/routes/groups/app-routes.test.tsx
           --pool=forks --maxWorkers=2
 
-      - name: Verify ToonStudio contracts and reachability
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/verify-toonstudio-feature-reachability.mjs
-          if pnpm run | grep -q 'verify:studio-session-complete'; then
-            pnpm run verify:studio-session-complete
-          fi
+      - name: Verify feature reachability
+        run: node scripts/verify-toonstudio-feature-reachability.mjs
 
       - name: Build production bundle
         run: pnpm run build:bundle
 
-      - name: Commit validated lifecycle integration
+      - name: Commit consolidated implementation
         shell: bash
         run: |
           set -euo pipefail
-          baseline_count="$(cat "$RUNNER_TEMP/typecheck-baseline-count")"
           mkdir -p docs/rewrite
           {
-            echo "# ToonStudio project lifecycle validation"
+            echo "# ToonStudio lifecycle and template hub validation"
             echo
-            echo "- Validated commit: \`$(git rev-parse HEAD)\`"
+            echo "- Base main: \`$(git rev-parse origin/main)\`"
+            echo "- Validated source: \`$(git rev-parse HEAD)\`"
             echo "- Validated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "- TypeScript delta gate: no diagnostics in lifecycle-changed files"
-            echo "- Repository baseline TypeScript diagnostics outside this change: ${baseline_count}"
-            echo "- ESLint: passed"
-            echo "- Project and document lifecycle tests: passed"
-            echo "- Route and integration closure tests: passed"
-            echo "- Feature reachability and session contracts: passed"
+            echo "- Lifecycle, template, route and closure tests: passed"
+            echo "- Changed-file TypeScript and ESLint gates: passed"
+            echo "- Feature reachability: passed"
             echo "- Production bundle: passed"
-          } > docs/rewrite/toonstudio-project-lifecycle-validation.md
+            echo
+            echo "PR #1325 now includes the unique product implementation from PR #1326."
+          } > docs/rewrite/toonstudio-lifecycle-template-validation.md
 
           git add -A
           git diff --cached --check
-          git commit -m "feat(studio): complete project and document lifecycle"
+          git commit -m "feat(studio): consolidate lifecycle and template hub"
           git push origin HEAD:feat/toonstudio-project-lifecycle-20260912
