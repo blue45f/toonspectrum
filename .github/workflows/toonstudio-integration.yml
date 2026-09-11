@@ -1,0 +1,287 @@
+name: ToonStudio integration
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/web/src/app/routes/groups/**"
+      - "apps/web/src/domains/creator/**"
+      # The verifier owns apps/web/src/domains/creator/studio-integration-closure.test.ts.
+      - "apps/web/src/shared/components/**"
+      - "apps/web/src/infrastructure/**"
+      - "apps/web/public/i18n/**"
+      - "packages/core/**"
+      - "packages/play-core/**"
+      - "packages/studio-*/**"
+      - "patches/**"
+      - "scripts/verify-toonstudio-integration.sh"
+      - "eslint.config.mjs"
+      - "tsconfig.json"
+      - "tsconfig.toonstudio-core.json"
+      - "tsconfig.toonstudio-ui.json"
+      - "vitest.config.*"
+      - ".github/workflows/toonstudio-integration.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: toonstudio-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scope:
+    name: changed-scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      tracks: ${{ steps.detect.outputs.tracks }}
+    steps:
+      - name: Detect affected integration tracks
+        id: detect
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          core=false
+          ui=false
+          editor=false
+          all=false
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            all=true
+          else
+            changed_file_path="$RUNNER_TEMP/toonstudio-changed-files.txt"
+            : > "$changed_file_path"
+            page=1
+
+            while :; do
+              response="$(curl --fail-with-body --silent --show-error --retry 3 \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100&page=$page")"
+              count="$(jq 'length' <<< "$response")"
+              jq -r '.[].filename' <<< "$response" >> "$changed_file_path"
+              (( count < 100 )) && break
+              ((page += 1))
+            done
+
+            mapfile -t changed < "$changed_file_path"
+            if ((${#changed[@]} == 0)); then
+              all=true
+            fi
+
+            for file in "${changed[@]}"; do
+              case "$file" in
+                .github/workflows/toonstudio-integration.yml|\
+                scripts/verify-toonstudio-integration.sh|\
+                eslint.config.mjs|\
+                tsconfig.json|\
+                tsconfig.toonstudio-core.json|\
+                tsconfig.toonstudio-ui.json|\
+                vitest.config.*|\
+                package.json|\
+                pnpm-lock.yaml|\
+                pnpm-workspace.yaml|\
+                patches/*|\
+                packages/core/*|\
+                packages/play-core/*|\
+                packages/studio-*/*)
+                  all=true
+                  ;;
+                apps/web/src/domains/creator/studio-shell/*|\
+                apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.tsx|\
+                apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.test.tsx)
+                  ui=true
+                  ;;
+                apps/web/src/domains/creator/brush-lab/*|\
+                apps/web/src/domains/creator/canvas/*|\
+                apps/web/src/domains/creator/studio-cuttoon-editor/*)
+                  editor=true
+                  ;;
+                apps/web/src/app/routes/groups/*)
+                  ui=true
+                  editor=true
+                  ;;
+                apps/web/src/shared/components/*)
+                  ui=true
+                  editor=true
+                  ;;
+                apps/web/src/infrastructure/*)
+                  ui=true
+                  ;;
+                apps/web/public/i18n/*)
+                  ui=true
+                  editor=true
+                  ;;
+                apps/web/src/domains/creator/ai/*)
+                  core=true
+                  ;;
+                apps/web/src/domains/creator/*)
+                  if [[ "$file" =~ ^apps/web/src/domains/creator/[^/]+\.(ts|tsx)$ ]]; then
+                    core=true
+                  else
+                    all=true
+                  fi
+                  ;;
+                *)
+                  all=true
+                  ;;
+              esac
+            done
+          fi
+
+          if [[ "$all" == "true" ]]; then
+            core=true
+            ui=true
+            editor=true
+          fi
+
+          tracks=()
+          [[ "$core" == "true" ]] && tracks+=("\"core\"")
+          [[ "$ui" == "true" ]] && tracks+=("\"ui\"")
+          [[ "$editor" == "true" ]] && tracks+=("\"editor\"")
+
+          if ((${#tracks[@]} == 0)); then
+            tracks=("\"core\"" "\"ui\"" "\"editor\"")
+          fi
+
+          joined="$(IFS=,; echo "${tracks[*]}")"
+          echo "tracks=[$joined]" >> "$GITHUB_OUTPUT"
+          {
+            echo "### ToonStudio validation scope"
+            echo
+            echo "- tracks: [$joined]"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  validate:
+    name: ${{ matrix.track }}
+    needs: scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    strategy:
+      fail-fast: false
+      matrix:
+        track: ${{ fromJSON(needs.scope.outputs.tracks) }}
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+      GITHUB_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Checkout focused source tree
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            .github/workflows
+            apps/web/src
+            apps/web/public
+            packages
+            patches
+            scripts
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Restore focused analysis cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/ci/toonstudio
+          key: toonstudio-${{ matrix.track }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs', 'tsconfig.json', 'scripts/verify-toonstudio-integration.sh') }}-${{ github.sha }}
+          restore-keys: |
+            toonstudio-${{ matrix.track }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs', 'tsconfig.json', 'scripts/verify-toonstudio-integration.sh') }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Lint changed files first
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          TRACK: ${{ matrix.track }}
+        run: |
+          set -euo pipefail
+
+          changed_file_path="$RUNNER_TEMP/toonstudio-${TRACK}-changed-files.txt"
+          : > "$changed_file_path"
+          page=1
+          while :; do
+            response="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100&page=$page")"
+            count="$(jq 'length' <<< "$response")"
+            jq -r '.[].filename' <<< "$response" >> "$changed_file_path"
+            (( count < 100 )) && break
+            ((page += 1))
+          done
+
+          files=()
+          while IFS= read -r file; do
+            [[ -f "$file" ]] || continue
+            case "$file" in
+              *.js|*.jsx|*.mjs|*.cjs|*.ts|*.tsx|*.mts|*.cts) ;;
+              *) continue ;;
+            esac
+
+            include=false
+            case "$TRACK:$file" in
+              core:apps/web/src/domains/creator/ai/*)
+                [[ "$file" != *"/StudioAiProjectHandoffHost."* ]] && include=true
+                ;;
+              core:apps/web/src/domains/creator/*)
+                [[ "$file" =~ ^apps/web/src/domains/creator/[^/]+\.(ts|tsx)$ ]] && include=true
+                ;;
+              ui:apps/web/src/domains/creator/studio-shell/*|\
+              ui:apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.*|\
+              ui:apps/web/src/app/routes/groups/*|\
+              ui:apps/web/src/shared/components/*|\
+              ui:apps/web/src/infrastructure/*)
+                include=true
+                ;;
+              editor:apps/web/src/domains/creator/brush-lab/*|\
+              editor:apps/web/src/domains/creator/canvas/*|\
+              editor:apps/web/src/domains/creator/studio-cuttoon-editor/*|\
+              editor:apps/web/src/app/routes/groups/*|\
+              editor:apps/web/src/shared/components/*)
+                include=true
+                ;;
+            esac
+            [[ "$include" == "true" ]] && files+=("$file")
+          done < "$changed_file_path"
+
+          if ((${#files[@]} == 0)); then
+            echo "No changed JavaScript or TypeScript files for $TRACK."
+            exit 0
+          fi
+
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored \
+            --cache --cache-strategy content \
+            --cache-location ".cache/ci/toonstudio/$TRACK/eslint-changed/" \
+            -- "${files[@]}"
+
+      - name: Verify ${{ matrix.track }} integration
+        run: bash scripts/verify-toonstudio-integration.sh "${{ matrix.track }}"

@@ -37,6 +37,7 @@ type FrontDoorCard = Readonly<{
   badge?: Readonly<Record<StudioFrontDoorLocale, string>>;
 }>;
 
+/** Normalize an application language tag to a supported Studio front-door locale. */
 function studioFrontDoorLocale(language: string): StudioFrontDoorLocale {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
@@ -201,6 +202,7 @@ const ASSET_CATEGORIES: readonly FrontDoorCard[] = [
   },
 ];
 
+/** Render a localized action card for a Studio front-door destination. */
 function FrontDoorCardView({ card, locale }: { readonly card: FrontDoorCard; readonly locale: StudioFrontDoorLocale }) {
   const Icon = card.icon;
   return (
@@ -228,6 +230,7 @@ function FrontDoorCardView({ card, locale }: { readonly card: FrontDoorCard; rea
   );
 }
 
+/** Render the shared localized heading and command-search action for Studio entry pages. */
 function PageHeader({
   eyebrow,
   title,
@@ -265,6 +268,7 @@ function PageHeader({
   );
 }
 
+/** Render the Studio home with recent work, primary actions, and workflow shortcuts. */
 export function StudioHomePage() {
   const language = useI18n((state) => state.lang);
   const locale = studioFrontDoorLocale(language);
@@ -327,6 +331,7 @@ export function StudioHomePage() {
   );
 }
 
+/** Render creation choices that route users to the appropriate Studio workspace. */
 export function StudioNewPage() {
   const language = useI18n((state) => state.lang);
   const locale = studioFrontDoorLocale(language);
@@ -374,6 +379,7 @@ export function StudioNewPage() {
   );
 }
 
+/** Render supported import workflows for projects, media, brushes, and 3D assets. */
 export function StudioImportPage() {
   const language = useI18n((state) => state.lang);
   const locale = studioFrontDoorLocale(language);
@@ -429,6 +435,7 @@ export function StudioImportPage() {
   );
 }
 
+/** Render the Studio asset hub and its canonical category destinations. */
 export function StudioAssetsPage() {
   const language = useI18n((state) => state.lang);
   const locale = studioFrontDoorLocale(language);

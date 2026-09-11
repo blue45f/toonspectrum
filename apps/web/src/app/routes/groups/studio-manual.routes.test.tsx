@@ -14,6 +14,7 @@ describe("independent Studio manual routes", () => {
     expect(routeId("/studio/manual")).toBe("creator-studio-manual");
     expect(routeId("/studio/manual/")).toBe("creator-studio-manual");
   });
+
   it("owns article deep links, including a friendly unknown article", () => {
     expect(routeId("/studio/manual/brushes")).toBe("creator-studio-manual-article");
     expect(routeId("/studio/manual/unknown-article")).toBe("creator-studio-manual-article");
@@ -24,6 +25,7 @@ describe("independent Studio manual routes", () => {
       expect(routeId(path)).toBe("creator-studio");
     }
   });
+
   it("lets the manual own its article title without matching similar prefixes", () => {
     expect(shouldAppRouterOwnDocumentTitle({ pathname: "/studio/manual" })).toBe(false);
     expect(shouldAppRouterOwnDocumentTitle({ pathname: "/studio/manual/brushes" })).toBe(false);

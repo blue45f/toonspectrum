@@ -9,8 +9,9 @@ import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from 
 import { AuthMenuShell } from "../../domains/auth/components/auth-menu-shell";
 
 import {
-  PRIMARY_SITE_NAVIGATION,
   SITE_NAVIGATION_ITEMS,
+  primarySiteNavigationForPath,
+  siteNavigationContextForPath,
   siteNavigationLocale,
   siteNavigationText,
 } from "./site-navigation";
@@ -42,23 +43,37 @@ const DISCOVER_PURPOSE_PREFIXES = [
   "/author",
   "/title",
 ] as const;
-const STUDIO_PURPOSE_PREFIXES = [
-  "/studio",
-  "/shaper",
+const STUDIO_ASSET_PREFIXES = [
+  "/studio/assets",
+  "/studio/brushes",
+  "/studio/bg3d",
+  "/studio/poser",
+  "/studio/character",
   "/brush-lab",
+  "/shaper",
   "/music",
+  "/market",
 ] as const;
-const CREATE_PURPOSE_PREFIXES = [
+const STUDIO_CREATE_PREFIXES = [
+  "/studio/new",
+  "/studio/import",
   "/make",
-  "/research",
-  "/story-lab",
-  "/publishing",
-  "/opportunities",
 ] as const;
-const MARKET_PURPOSE_PREFIXES = ["/market"] as const;
+const STUDIO_LEARN_PREFIXES = [
+  "/learn",
+  "/help",
+  "/studio/manual",
+] as const;
+const STUDIO_WORK_EXCLUDED_PREFIXES = [
+  ...STUDIO_CREATE_PREFIXES,
+  ...STUDIO_ASSET_PREFIXES,
+  ...STUDIO_LEARN_PREFIXES,
+  "/studio/templates",
+] as const;
 const COMMUNITY_PURPOSE_PREFIXES = [
   "/community",
   "/reviews",
+  "/showcase",
   "/create",
   "/pencafe",
 ] as const;
@@ -77,26 +92,35 @@ function pathMatchesAny(pathname: string, prefixes: readonly string[]): boolean 
   return prefixes.some((prefix) => matchesPrefix(pathname, prefix));
 }
 
+/** Return whether a pathname belongs to the Studio work purpose in the header. */
+function isStudioWorkPurpose(pathname: string): boolean {
+  if (!matchesPrefix(pathname, "/studio")) return false;
+  return !pathMatchesAny(pathname, STUDIO_WORK_EXCLUDED_PREFIXES);
+}
+
 /** Exact destination state for drawer/utility items. A child page must not make
  * both its purpose hub and the child destination announce aria-current="page". */
 function useDestinationActive() {
   const path = usePathname();
   return (href: string, exact?: boolean) => {
     if (exact) return path === href;
-    if (href === "/studio/projects") return path === href;
     return path === href || path.startsWith(`${href}/`);
   };
 }
 
 /** Broader state used only by the top-level purpose choices. */
 function purposeActive(pathname: string, href: string, exact?: boolean): boolean {
+  if (href === "/studio") return isStudioWorkPurpose(pathname);
+  if (href === "/studio/new") return pathMatchesAny(pathname, STUDIO_CREATE_PREFIXES);
+  if (href === "/studio/assets") return pathMatchesAny(pathname, STUDIO_ASSET_PREFIXES);
+  if (href === "/learn") return pathMatchesAny(pathname, STUDIO_LEARN_PREFIXES);
   if (exact || href === "/") return pathname === href;
   if (href === "/discover") return pathMatchesAny(pathname, DISCOVER_PURPOSE_PREFIXES);
-  if (href === "/studio/projects") return pathMatchesAny(pathname, STUDIO_PURPOSE_PREFIXES);
-  if (href === "/make") return pathMatchesAny(pathname, CREATE_PURPOSE_PREFIXES);
-  if (href === "/market") return pathMatchesAny(pathname, MARKET_PURPOSE_PREFIXES);
+  if (href === "/ranking") return matchesPrefix(pathname, "/ranking");
   if (href === "/community") return pathMatchesAny(pathname, COMMUNITY_PURPOSE_PREFIXES);
+  if (href === "/library") return matchesPrefix(pathname, "/library");
   if (href === "/my") return pathMatchesAny(pathname, MY_PURPOSE_PREFIXES);
+  if (href === "/market") return matchesPrefix(pathname, "/market");
   return matchesPrefix(pathname, href);
 }
 
@@ -129,6 +153,7 @@ function MobileNavigationFallback() {
   );
 }
 
+/** Render the responsive site header for the active Studio or Spectrum context. */
 export function SiteHeader() {
   const isActive = useDestinationActive();
   const pathname = usePathname();
@@ -144,7 +169,17 @@ export function SiteHeader() {
   const panelRef = useRef<HTMLDivElement>(null);
   const shouldRenderMobileNavigation = menuOpen || isMobileNavigationViewport;
   const hideBottomTabs = isImmersiveMobileRoute(pathname);
+  const navigationContext = siteNavigationContextForPath(pathname);
+  const primaryNavigation = primarySiteNavigationForPath(pathname);
   const create = SITE_NAVIGATION_ITEMS.make;
+  const brandHref = navigationContext === "studio" ? "/studio" : "/";
+  const brandName = navigationContext === "studio" ? "ToonStudio" : t("app.name");
+  const brandDescription = navigationContext === "studio"
+    ? SITE_NAVIGATION_ITEMS.studio.description
+    : SITE_NAVIGATION_ITEMS.home.description;
+  const brandTagline = navigationContext === "studio"
+    ? (locale === "ko" ? "만들기 · 검토 · 내보내기" : "Create · Review · Publish")
+    : "Discover · Read · Share";
   const isPurposeActive = (href: string, exact?: boolean) => purposeActive(pathname, href, exact);
 
   const closeMenu = useCallback(() => {
@@ -170,12 +205,13 @@ export function SiteHeader() {
     <>
       <header
         data-site-chrome="header"
+        data-site-product={navigationContext}
         className="sticky top-0 z-50 border-b border-line/70 bg-canvas/80 shadow-sm backdrop-blur-2xl"
       >
         <div className="mx-auto flex h-[4.25rem] max-w-[1320px] items-center gap-2 px-4 sm:px-6">
           <Link
-            href="/"
-            aria-label={`${t("app.name")} · ${siteNavigationText(SITE_NAVIGATION_ITEMS.home.description, locale)}`}
+            href={brandHref}
+            aria-label={`${brandName} · ${siteNavigationText(brandDescription, locale)}`}
             className="group flex min-w-0 shrink-0 items-center gap-2.5 whitespace-nowrap pr-1 sm:pr-3"
           >
             <span className="relative grid size-9 shrink-0 place-items-center rounded-xl border border-line/70 bg-panel/85 shadow-sm transition-transform duration-200 ease-out-expo group-hover:-rotate-3 group-hover:scale-[1.03]">
@@ -185,7 +221,7 @@ export function SiteHeader() {
             <span className="min-w-0">
               <span className="flex items-center gap-1.5">
                 <span className="truncate font-display text-[1.05rem] font-bold tracking-[-0.02em] text-fg transition-colors group-hover:text-accent sm:text-lg">
-                  {t("app.name")}
+                  {brandName}
                 </span>
                 <span
                   className="hidden rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-display text-[0.55rem] font-bold uppercase leading-none tracking-[0.12em] text-accent min-[410px]:inline"
@@ -195,7 +231,7 @@ export function SiteHeader() {
                 </span>
               </span>
               <span className="hidden font-display text-[0.56rem] font-semibold uppercase tracking-[0.16em] text-fg-3 lg:block">
-                Create · Share · Discover
+                {brandTagline}
               </span>
             </span>
           </Link>
@@ -204,7 +240,7 @@ export function SiteHeader() {
             aria-label={locale === "ko" ? "주요 메뉴" : "Primary navigation"}
             className="ml-2 hidden items-center gap-0.5 rounded-2xl border border-line/60 bg-panel/60 p-1 shadow-sm min-[1180px]:flex"
           >
-            {PRIMARY_SITE_NAVIGATION.map((item) => {
+            {primaryNavigation.map((item) => {
               const active = isPurposeActive(item.href, item.exact);
               return (
                 <Link

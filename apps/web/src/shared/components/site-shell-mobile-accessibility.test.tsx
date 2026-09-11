@@ -17,11 +17,12 @@ vi.mock("../../domains/auth/components/auth-menu-shell", () => ({
 const mediaMatches = new Map<string, boolean>();
 const mediaListeners = new Map<string, Set<(event: MediaQueryListEvent) => void>>();
 
+/** Install a controllable mobile `matchMedia` test double. */
 function installMobileMatchMedia(): void {
   mediaMatches.clear();
   mediaListeners.clear();
   mediaMatches.set("(max-width: 767px)", true);
-  mediaMatches.set("(min-width: 1360px)", false);
+  mediaMatches.set("(min-width: 1180px)", false);
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: vi.fn().mockImplementation((query: string) => {
@@ -83,8 +84,10 @@ describe("mobile site shell accessibility", () => {
     expect(quickNavigation?.hasAttribute("inert")).toBe(true);
     expect(quickNavigation?.getAttribute("aria-hidden")).toBe("true");
 
-    const lastLink = within(dialog).getByRole("link", { name: "내 서재" });
-    lastLink.focus();
+    const dialogLinks = within(dialog).getAllByRole("link");
+    const lastLink = dialogLinks.at(-1);
+    expect(lastLink).toBeDefined();
+    lastLink?.focus();
     fireEvent.keyDown(document, { key: "Tab" });
     expect(document.activeElement).toBe(close);
 
@@ -133,7 +136,7 @@ describe("mobile site shell accessibility", () => {
     expect(quickNavigation?.hasAttribute("inert")).toBe(true);
     expect(document.body.style.overflow).toBe("hidden");
 
-    act(() => setMediaMatch("(min-width: 1360px)", true));
+    act(() => setMediaMatch("(min-width: 1180px)", true));
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "전체 메뉴" })).toBeNull());
     expect(quickNavigation?.hasAttribute("inert")).toBe(false);

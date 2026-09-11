@@ -5,58 +5,59 @@ on:
   push:
     branches: [main]
     paths:
-      - 'apps/web/src/domains/marketing/**'
-      - 'apps/web/src/domains/creator-resources/CreatorHomePage.tsx'
-      - 'apps/web/src/domains/creator-resources/ProductIntentStart.tsx'
-      - 'apps/web/src/shared/components/site-header*'
-      - 'apps/web/src/shared/components/site-footer.tsx'
-      - 'apps/web/src/shared/components/pwa-install-nudge*'
-      - 'apps/web/src/shared/lib/creator-continuity*'
-      - 'apps/web/src/shared/lib/pwa-install-store*'
-      - 'apps/web/src/app/AppShell.tsx'
-      - 'apps/web/src/app/main.tsx'
-      - 'apps/web/src/app/routes/groups/catalog.routes.tsx'
-      - 'apps/web/public/brand/**'
-      - 'apps/web/public/i18n/app/**'
-      - 'apps/web/public/manifest.webmanifest'
-      - 'media/brand-film/**'
-      - 'automation/n8n/**'
-      - 'scripts/verify-purpose-first-home.mjs'
-      - 'scripts/verify-creator-home.mjs'
-      - 'scripts/verify-creator-film-upgrades.mjs'
-      - 'scripts/verify-creator-home-navigation.mjs'
-      - 'scripts/verify-creator-continuity.mjs'
-      - 'scripts/creator-film-automation.test.mjs'
-      - '.github/workflows/creator-home-quality.yml'
+      - "apps/web/src/domains/marketing/**"
+      - "apps/web/src/domains/creator-resources/CreatorHomePage.tsx"
+      - "apps/web/src/domains/creator-resources/ProductIntentStart.tsx"
+      - "apps/web/src/shared/components/site-header*"
+      - "apps/web/src/shared/components/site-footer.tsx"
+      - "apps/web/src/shared/components/pwa-install-nudge*"
+      - "apps/web/src/shared/lib/creator-continuity*"
+      - "apps/web/src/shared/lib/pwa-install-store*"
+      - "apps/web/src/app/AppShell.tsx"
+      - "apps/web/src/app/main.tsx"
+      - "apps/web/src/app/routes/groups/catalog.routes.tsx"
+      - "apps/web/public/brand/**"
+      - "apps/web/public/i18n/app/**"
+      - "apps/web/public/manifest.webmanifest"
+      - "media/brand-film/**"
+      - "automation/n8n/**"
+      - "scripts/verify-purpose-first-home.mjs"
+      - "scripts/verify-creator-home.mjs"
+      - "scripts/verify-creator-film-upgrades.mjs"
+      - "scripts/verify-creator-home-navigation.mjs"
+      - "scripts/verify-creator-continuity.mjs"
+      - "scripts/creator-film-automation.test.mjs"
+      - ".github/workflows/creator-home-quality.yml"
   pull_request:
     branches: [main]
     paths:
-      - 'apps/web/src/domains/marketing/**'
-      - 'apps/web/src/domains/creator-resources/CreatorHomePage.tsx'
-      - 'apps/web/src/domains/creator-resources/ProductIntentStart.tsx'
-      - 'apps/web/src/shared/components/site-header*'
-      - 'apps/web/src/shared/components/site-footer.tsx'
-      - 'apps/web/src/shared/components/pwa-install-nudge*'
-      - 'apps/web/src/shared/lib/creator-continuity*'
-      - 'apps/web/src/shared/lib/pwa-install-store*'
-      - 'apps/web/src/app/AppShell.tsx'
-      - 'apps/web/src/app/main.tsx'
-      - 'apps/web/src/app/routes/groups/catalog.routes.tsx'
-      - 'apps/web/public/brand/**'
-      - 'apps/web/public/i18n/app/**'
-      - 'apps/web/public/manifest.webmanifest'
-      - 'media/brand-film/**'
-      - 'automation/n8n/**'
-      - 'scripts/verify-purpose-first-home.mjs'
-      - 'scripts/verify-creator-home.mjs'
-      - 'scripts/verify-creator-film-upgrades.mjs'
-      - 'scripts/verify-creator-home-navigation.mjs'
-      - 'scripts/verify-creator-continuity.mjs'
-      - 'scripts/creator-film-automation.test.mjs'
-      - '.github/workflows/creator-home-quality.yml'
+      - "apps/web/src/domains/marketing/**"
+      - "apps/web/src/domains/creator-resources/CreatorHomePage.tsx"
+      - "apps/web/src/domains/creator-resources/ProductIntentStart.tsx"
+      - "apps/web/src/shared/components/site-header*"
+      - "apps/web/src/shared/components/site-footer.tsx"
+      - "apps/web/src/shared/components/pwa-install-nudge*"
+      - "apps/web/src/shared/lib/creator-continuity*"
+      - "apps/web/src/shared/lib/pwa-install-store*"
+      - "apps/web/src/app/AppShell.tsx"
+      - "apps/web/src/app/main.tsx"
+      - "apps/web/src/app/routes/groups/catalog.routes.tsx"
+      - "apps/web/public/brand/**"
+      - "apps/web/public/i18n/app/**"
+      - "apps/web/public/manifest.webmanifest"
+      - "media/brand-film/**"
+      - "automation/n8n/**"
+      - "scripts/verify-purpose-first-home.mjs"
+      - "scripts/verify-creator-home.mjs"
+      - "scripts/verify-creator-film-upgrades.mjs"
+      - "scripts/verify-creator-home-navigation.mjs"
+      - "scripts/verify-creator-continuity.mjs"
+      - "scripts/creator-film-automation.test.mjs"
+      - ".github/workflows/creator-home-quality.yml"
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: creator-home-quality-${{ github.event.pull_request.number || github.ref }}
@@ -65,22 +66,278 @@ concurrency:
 jobs:
   creator-home:
     runs-on: ubuntu-24.04
-    timeout-minutes: 28
+    timeout-minutes: 24
     env:
+      CI: "true"
+      HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout focused source tree
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            .github/workflows
+            apps/api/data
+            apps/web
+            automation/n8n
+            media/brand-film
+            packages
+            patches
+            scripts
+
+      - name: Detect changed verification scope
+        id: scope
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          install=true
+          unit=true
+          purpose=true
+          navigation=true
+          continuity=true
+          film=true
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            install=false
+            unit=false
+            purpose=false
+            navigation=false
+            continuity=false
+            film=false
+
+            changed_file_path="$RUNNER_TEMP/creator-home-changed-files.txt"
+            : > "$changed_file_path"
+            page=1
+            while :; do
+              response="$(curl --fail-with-body --silent --show-error --retry 3 \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100&page=$page")"
+              count="$(jq 'length' <<< "$response")"
+              jq -r '.[].filename' <<< "$response" >> "$changed_file_path"
+              (( count < 100 )) && break
+              ((page += 1))
+            done
+
+            mapfile -t changed < "$changed_file_path"
+            for file in "${changed[@]}"; do
+              case "$file" in
+                .github/workflows/creator-home-quality.yml)
+                  ;;
+                scripts/creator-film-automation.test.mjs)
+                  install=true
+                  film=true
+                  ;;
+                media/brand-film/*|automation/n8n/*|scripts/verify-creator-film-upgrades.mjs)
+                  install=true
+                  purpose=true
+                  film=true
+                  ;;
+                apps/web/src/domains/marketing/*)
+                  install=true
+                  unit=true
+                  purpose=true
+                  navigation=true
+                  continuity=true
+                  film=true
+                  ;;
+                apps/web/src/domains/creator-resources/CreatorHomePage.tsx)
+                  install=true
+                  unit=true
+                  purpose=true
+                  navigation=true
+                  continuity=true
+                  ;;
+                apps/web/src/domains/creator-resources/ProductIntentStart.tsx)
+                  install=true
+                  unit=true
+                  purpose=true
+                  continuity=true
+                  ;;
+                apps/web/src/shared/components/site-header*|\
+                apps/web/src/shared/components/site-footer.tsx|\
+                apps/web/src/app/routes/groups/catalog.routes.tsx)
+                  install=true
+                  unit=true
+                  purpose=true
+                  navigation=true
+                  ;;
+                apps/web/src/shared/components/pwa-install-nudge*|\
+                apps/web/src/shared/lib/creator-continuity*|\
+                apps/web/src/shared/lib/pwa-install-store*)
+                  install=true
+                  unit=true
+                  purpose=true
+                  continuity=true
+                  ;;
+                apps/web/src/app/AppShell.tsx|apps/web/src/app/main.tsx)
+                  install=true
+                  unit=true
+                  purpose=true
+                  navigation=true
+                  continuity=true
+                  ;;
+                apps/web/public/brand/*|\
+                apps/web/public/i18n/app/*|\
+                apps/web/public/manifest.webmanifest|\
+                scripts/verify-purpose-first-home.mjs|\
+                scripts/verify-creator-home.mjs)
+                  install=true
+                  purpose=true
+                  ;;
+                scripts/verify-creator-home-navigation.mjs)
+                  install=true
+                  navigation=true
+                  ;;
+                scripts/verify-creator-continuity.mjs)
+                  install=true
+                  continuity=true
+                  ;;
+                *)
+                  install=true
+                  unit=true
+                  purpose=true
+                  navigation=true
+                  continuity=true
+                  film=true
+                  ;;
+              esac
+            done
+          fi
+
+          browser=false
+          if [[ "$purpose" == "true" || "$navigation" == "true" || "$continuity" == "true" || "$film" == "true" ]]; then
+            browser=true
+          fi
+
+          {
+            echo "install=$install"
+            echo "unit=$unit"
+            echo "browser=$browser"
+            echo "purpose=$purpose"
+            echo "navigation=$navigation"
+            echo "continuity=$continuity"
+            echo "film=$film"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Creator homepage validation scope"
+            echo
+            echo "- install: $install"
+            echo "- unit: $unit"
+            echo "- browser build: $browser"
+            echo "- purpose verifier: $purpose"
+            echo "- navigation verifier: $navigation"
+            echo "- continuity verifier: $continuity"
+            echo "- film verifier: $film"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install pnpm
+        if: steps.scope.outputs.install == 'true'
+        uses: pnpm/action-setup@v6
         with:
-          node-version: 24
+          version: 11.4.0
+
+      - name: Set up Node
+        if: steps.scope.outputs.install == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Focused homepage lint
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Restore homepage lint cache
+        if: steps.scope.outputs.install == 'true'
+        uses: actions/cache@v4
+        with:
+          path: .cache/ci/creator-home/eslint
+          key: creator-home-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-${{ github.sha }}
+          restore-keys: |
+            creator-home-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-
+
+      - name: Install dependencies
+        if: steps.scope.outputs.install == 'true'
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Lint changed homepage files
+        if: steps.scope.outputs.install == 'true' && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          changed_file_path="$RUNNER_TEMP/creator-home-lint-files.txt"
+          : > "$changed_file_path"
+          page=1
+          while :; do
+            response="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100&page=$page")"
+            count="$(jq 'length' <<< "$response")"
+            jq -r '.[].filename' <<< "$response" >> "$changed_file_path"
+            (( count < 100 )) && break
+            ((page += 1))
+          done
+
+          files=()
+          while IFS= read -r file; do
+            [[ -f "$file" ]] || continue
+            case "$file" in
+              *.js|*.jsx|*.mjs|*.cjs|*.ts|*.tsx|*.mts|*.cts) ;;
+              *) continue ;;
+            esac
+            case "$file" in
+              apps/web/src/domains/marketing/*|\
+              apps/web/src/domains/creator-resources/CreatorHomePage.tsx|\
+              apps/web/src/domains/creator-resources/ProductIntentStart.tsx|\
+              apps/web/src/shared/components/site-header*|\
+              apps/web/src/shared/components/site-footer.tsx|\
+              apps/web/src/shared/components/pwa-install-nudge*|\
+              apps/web/src/shared/lib/creator-continuity*|\
+              apps/web/src/shared/lib/pwa-install-store*|\
+              apps/web/src/app/AppShell.tsx|\
+              apps/web/src/app/main.tsx|\
+              apps/web/src/app/routes/groups/catalog.routes.tsx|\
+              scripts/verify-purpose-first-home.mjs|\
+              scripts/verify-creator-home.mjs|\
+              scripts/verify-creator-film-upgrades.mjs|\
+              scripts/verify-creator-home-navigation.mjs|\
+              scripts/verify-creator-continuity.mjs|\
+              scripts/creator-film-automation.test.mjs|\
+              media/brand-film/src/*|\
+              media/brand-film/render.mjs)
+                files+=("$file")
+                ;;
+            esac
+          done < "$changed_file_path"
+
+          if ((${#files[@]} == 0)); then
+            echo "No changed creator-home JavaScript or TypeScript files require lint."
+            exit 0
+          fi
+
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored \
+            --cache --cache-strategy content \
+            --cache-location .cache/ci/creator-home/eslint/ \
+            -- "${files[@]}"
+
+      - name: Lint all homepage surfaces
+        if: steps.scope.outputs.install == 'true' && github.event_name != 'pull_request'
         run: >-
           pnpm exec eslint --max-warnings=0
+          --cache --cache-strategy content
+          --cache-location .cache/ci/creator-home/eslint/
           apps/web/src/domains/marketing
           apps/web/src/domains/creator-resources/CreatorHomePage.tsx
           apps/web/src/domains/creator-resources/ProductIntentStart.tsx
@@ -105,40 +362,68 @@ jobs:
           scripts/creator-film-automation.test.mjs
           media/brand-film/src
           media/brand-film/render.mjs
+
       - name: Focused homepage unit contracts
+        if: steps.scope.outputs.unit == 'true'
         run: >-
           pnpm exec vitest run
           apps/web/src/domains/marketing
           apps/web/src/shared/components/pwa-install-nudge.test.tsx
           apps/web/src/shared/lib/creator-continuity.test.ts
           apps/web/src/shared/lib/pwa-install-store.test.ts
-          scripts/creator-film-automation.test.mjs
-      - run: node --test scripts/creator-film-automation.test.mjs
+
+      - name: Verify film automation contract
+        if: steps.scope.outputs.film == 'true'
+        run: node --test scripts/creator-film-automation.test.mjs
+
       - name: Build production homepage assets
+        if: steps.scope.outputs.browser == 'true'
         run: pnpm run build:bundle
+
       - name: Ensure ffmpeg is available
+        if: steps.scope.outputs.film == 'true'
         run: command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y ffmpeg)
+
       - name: Cache Playwright Chromium
+        if: steps.scope.outputs.browser == 'true'
         id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install Chromium browser
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        if: steps.scope.outputs.browser == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium
+
       - name: Install Chromium system dependencies
+        if: steps.scope.outputs.browser == 'true'
         run: pnpm exec playwright install-deps chromium
-      - name: Verify purpose-first home, films, continuity and navigation
+
+      - name: Verify selected homepage contracts
+        if: steps.scope.outputs.browser == 'true'
+        shell: bash
         run: |
+          set -euo pipefail
           pnpm exec vite preview --host 127.0.0.1 --port 4173 > /tmp/creator-home-preview.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" || true' EXIT
-          node scripts/verify-purpose-first-home.mjs
-          node scripts/verify-creator-film-upgrades.mjs
-          node scripts/verify-creator-home-navigation.mjs
-          node scripts/verify-creator-continuity.mjs
-      - uses: actions/upload-artifact@v6
+
+          if [[ "${{ steps.scope.outputs.purpose }}" == "true" ]]; then
+            node scripts/verify-purpose-first-home.mjs
+          fi
+          if [[ "${{ steps.scope.outputs.film }}" == "true" ]]; then
+            node scripts/verify-creator-film-upgrades.mjs
+          fi
+          if [[ "${{ steps.scope.outputs.navigation }}" == "true" ]]; then
+            node scripts/verify-creator-home-navigation.mjs
+          fi
+          if [[ "${{ steps.scope.outputs.continuity }}" == "true" ]]; then
+            node scripts/verify-creator-continuity.mjs
+          fi
+
+      - name: Upload failure artifacts
+        uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: creator-home-${{ github.run_id }}-${{ github.run_attempt }}
@@ -148,5 +433,11 @@ jobs:
             /tmp/creator-home-preview.log
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Explain skipped validation
+        if: steps.scope.outputs.install != 'true'
+        run: echo "Only workflow metadata changed; dependency installation and product validation were skipped."
+
       - name: Explain global gate ownership
-        run: echo 'Repository-wide typecheck and release build remain owned once by required CI/core.'
+        if: always()
+        run: echo "Repository-wide typecheck and release build remain owned once by required CI/core."

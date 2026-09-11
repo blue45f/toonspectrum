@@ -1,6 +1,7 @@
 import { preloadStudioI18nCore } from "@/domains/creator/studio-i18n-priority-loader";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
+/** Preload only the locale core required before an immersive Studio route mounts. */
 function startStudioI18nCorePreload(): void {
   // Full-catalog compatibility API `loadStudioI18nDictionaries()` remains available for
   // explicit tooling. Route readiness intentionally starts only active-locale core strings.
@@ -71,16 +72,34 @@ export const StudioNewPage = lazyRetry(
   "StudioNewPage",
 );
 export const StudioImportPage = lazyRetry(
-  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({
-    default: module.StudioImportPage,
+  () => import("@/domains/creator/studio-shell/StudioImportIntegratedPage").then((module) => ({
+    default: module.StudioImportIntegratedPage,
   })),
-  "StudioImportPage",
+  "StudioImportIntegratedPage",
 );
 export const StudioAssetsPage = lazyRetry(
   () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({
     default: module.StudioAssetsPage,
   })),
   "StudioAssetsPage",
+);
+export const StudioAssetHubPage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioAssetHubPage").then((module) => ({
+    default: module.StudioAssetHubPage,
+  })),
+  "StudioAssetHubPage",
+);
+export const StudioProjectShellPage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioProjectIntegratedPage").then((module) => ({
+    default: module.StudioProjectIntegratedPage,
+  })),
+  "StudioProjectIntegratedPage",
+);
+export const StudioDocumentWorkspaceRoute = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioDocumentWorkspaceRoute").then((module) => ({
+    default: module.StudioDocumentWorkspaceRoute,
+  })),
+  "StudioDocumentWorkspaceRoute",
 );
 export const LearnPage = lazyRetry(
   () => import("@/domains/learn/LearnPage").then((module) => ({

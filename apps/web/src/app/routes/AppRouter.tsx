@@ -1,5 +1,5 @@
-import { Suspense } from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Suspense, useEffect } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { appRoutes } from "./groups/app-routes";
 import { RouteFallback } from "./route-fallback";
@@ -7,8 +7,29 @@ import { RouteStage } from "./route-stage";
 import { useRouteTitle } from "./route-titles";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
+import { useUi } from "@/shared/lib/ui-store";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
+import {
+  STUDIO_DRAFT_CANVAS_PATHNAME,
+  STUDIO_HOME_PATHNAME,
+  isStudioWorkspaceLocation,
+  isStudioWorkspaceRoutePathname,
+} from "@/domains/creator/studio-workspace-route";
+
+export const OPEN_COMMAND_PALETTE_EVENT = "toonspectrum:command-palette:open" as const;
+
+const LEGACY_STUDIO_EDITOR_QUERY_KEYS = new Set([
+  "id",
+  "remix",
+  "mode",
+  "preset",
+  "room",
+  "page",
+  "tool",
+  "surface",
+  "document",
+  "demo",
+]);
 
 function readInitialDocumentPathname(): string | null {
   try {
@@ -20,8 +41,31 @@ function readInitialDocumentPathname(): string | null {
   }
 }
 
-// This module lives for one browser document. Retain the initial delivery mode across SPA
-// transitions because a document opened on `/studio` may keep COOP even when COEP is unavailable.
+/** Redirect a legacy `/studio` editor query to the canonical draft-canvas route. */
+function legacyStudioEditorHref(pathname: string, search: string): string | null {
+  if (pathname !== STUDIO_HOME_PATHNAME || search.length === 0) return null;
+  const params = new URLSearchParams(search);
+  const hasLegacyEditorState = [...params.keys()].some((key) =>
+    LEGACY_STUDIO_EDITOR_QUERY_KEYS.has(key)
+  );
+  return hasLegacyEditorState ? `${STUDIO_DRAFT_CANVAS_PATHNAME}${search}` : null;
+}
+
+/** Bridge route-level command-palette events into the shared UI store. */
+function CommandPaletteEventBridge() {
+  const openCommandPalette = useUi((state) => state.openCommandPalette);
+
+  useEffect(() => {
+    const open = () => openCommandPalette();
+    globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, open);
+    return () => globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, open);
+  }, [openCommandPalette]);
+
+  return null;
+}
+
+// This module lives for one browser document. Retain editor delivery mode across SPA transitions,
+// but do not load cross-origin isolation for the lightweight Studio home, assets or learning pages.
 const INITIAL_DOCUMENT_PATHNAME = readInitialDocumentPathname();
 
 const StudioCrossOriginIsolationGate = lazyRetry(
@@ -31,6 +75,7 @@ const StudioCrossOriginIsolationGate = lazyRetry(
   "StudioCrossOriginIsolationGate",
 );
 
+/** Render the registered application routes inside their loading and error boundaries. */
 function AppRouteTree({ pathname, search }: {
   readonly pathname: string;
   readonly search: string;
@@ -38,6 +83,7 @@ function AppRouteTree({ pathname, search }: {
   return (
     <RouteStage pathname={pathname} search={search}>
       <ErrorBoundary resetKey={`${pathname}${search}`}>
+        <CommandPaletteEventBridge />
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             {appRoutes.map(({ element, id, path }) => (
@@ -50,17 +96,22 @@ function AppRouteTree({ pathname, search }: {
   );
 }
 
+/** Render application routing with cross-origin isolation limited to editor workspaces. */
 export function AppRouter() {
   const { pathname, search } = useLocation();
   useRouteTitle(pathname, search);
 
-  const documentWasStudio = isStudioRoutePathname(
+  const legacyEditorHref = legacyStudioEditorHref(pathname, search);
+  if (legacyEditorHref) return <Navigate replace to={legacyEditorHref} />;
+
+  const documentWasStudioEditor = isStudioWorkspaceRoutePathname(
     INITIAL_DOCUMENT_PATHNAME ?? pathname,
   );
+  const currentIsStudioEditor = isStudioWorkspaceLocation({ pathname, search });
   const routeTree = <AppRouteTree pathname={pathname} search={search} />;
   const needsIsolationGate =
-    isStudioRoutePathname(pathname)
-    || documentWasStudio
+    currentIsStudioEditor
+    || documentWasStudioEditor
     || globalThis.crossOriginIsolated === true;
 
   if (!needsIsolationGate) return routeTree;
@@ -69,7 +120,7 @@ export function AppRouter() {
     <Suspense fallback={<RouteFallback />}>
       <StudioCrossOriginIsolationGate
         pathname={pathname}
-        documentWasStudio={documentWasStudio}
+        documentWasStudio={documentWasStudioEditor}
         pending={<RouteFallback />}
       >
         {routeTree}

@@ -5,10 +5,12 @@
 // React Compiler 옵트아웃: 가변 호스트 백(h) 을 렌더마다 재대입해 공유하는 추출 패턴이라,
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
+import { StudioAiProjectHandoffHost } from "../ai/StudioAiProjectHandoffHost";
 import { STUDIO_BRUSH_PACK_ACCEPT } from "../brush/studio-brush-pack-format";
 import { STUDIO_CANVAS_IMAGE_ACCEPT } from "../studio-legacy-editor-runtime-helpers";
 import { StudioDestructiveConfirmHost } from "../StudioDestructiveConfirmHost";
 import { StudioVrmProjectArchiveAttestationHost } from "../vrm/StudioVrmProjectArchiveAttestationHost";
+import { StudioImportHandoffHost } from "./StudioImportHandoffHost";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
 export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
@@ -33,7 +35,15 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
     psdImportInputRef,
     retryStudioHistoryDurability,
     retryWatermarkPreferenceRuntime,
+    setAiAssistTool,
+    setAiBgPrompt,
+    setAiCharacterPrompt,
+    setAiCompositionDraft,
+    setAiDialogueSuggestSituation,
+    setAiPaletteSuggestMood,
+    setMenu,
     watermarkPreferenceSnapshot,
+    workId,
   } = s;
   return (
     <>
@@ -41,6 +51,28 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         스튜디오가 살아 있는 동안에만 seam 을 소유하게 한다. */}
     <StudioDestructiveConfirmHost />
     <StudioVrmProjectArchiveAttestationHost />
+    <StudioImportHandoffHost
+      brushPackImporting={brushPackImporting}
+      collaborationDocumentLocked={collaborationDocumentLocked}
+      interchangeImportBusy={interchangeImportBusy}
+      projectArchiveBusy={projectArchiveBusy}
+      psdImportBusy={psdImportBusy}
+      onImage={onPickImage}
+      onBrushPack={handleBrushPackImportFromMenu}
+      onInterchange={handleImportInterchangeArchive}
+      onProjectJson={handleImportProject}
+      onPsd={handleImportPsd}
+    />
+    <StudioAiProjectHandoffHost
+      projectId={typeof workId === "string" ? workId : null}
+      setActiveTool={setAiAssistTool}
+      setBackgroundPrompt={setAiBgPrompt}
+      setCharacterPrompt={setAiCharacterPrompt}
+      setCompositionDraft={setAiCompositionDraft}
+      setDialogueSituation={setAiDialogueSuggestSituation}
+      setPaletteMood={setAiPaletteSuggestMood}
+      openAssistant={() => setMenu("aiAssist")}
+    />
     {pagesHistoryDurabilityStatus.state === "memory-only" ? (
       <div
         data-studio-pages-history-durability="memory-only"
@@ -49,15 +81,15 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         className="mx-3 mt-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-danger/40 bg-danger-soft/20 px-3 py-2 text-xs text-danger"
       >
         <span className="min-w-0 flex-1 font-medium leading-relaxed">
-          페이지 실행 취소 기록을 영구 저장하지 못하고 있습니다. 편집은 이 탭의 메모리에서
-          계속되지만, 탭을 닫기 전에 프로젝트를 저장하거나 JSON 백업을 만들어 주세요.
+          이 기기에 복구 기록을 저장하지 못했습니다. 편집은 계속할 수 있지만, 탭을 닫기 전에
+          프로젝트를 저장하거나 완전한 사본을 받아 주세요.
         </span>
         <button
           type="button"
           onClick={retryStudioHistoryDurability}
           className="min-h-11 shrink-0 rounded-lg bg-danger/15 px-3 py-2 font-bold hover:bg-danger/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
         >
-          복구 기록 저장소 다시 연결
+          다시 저장
         </button>
       </div>
     ) : pagesHistoryDurabilityStatus.state === "retrying" ? (
@@ -67,7 +99,7 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         aria-live="polite"
         className="mx-3 mt-2 shrink-0 rounded-xl border border-warning/35 bg-warning-soft/20 px-3 py-2 text-xs font-medium text-warning"
       >
-        복구 기록 저장소에 다시 연결하는 중입니다. 편집은 계속할 수 있습니다.
+        복구 기록을 다시 저장하고 있습니다. 편집은 계속할 수 있습니다.
       </div>
     ) : null}
     {watermarkPreferenceSnapshot.state === "memory-only" ? (
@@ -85,7 +117,7 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
           onClick={() => void retryWatermarkPreferenceRuntime()}
           className="min-h-11 shrink-0 rounded-lg bg-danger/15 px-3 py-2 font-bold hover:bg-danger/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
         >
-          워터마크 저장소 다시 연결
+          다시 저장
         </button>
       </div>
     ) : null}

@@ -1,3 +1,9 @@
+import {
+  parseStudioDocumentLocation,
+  studioDocumentWorkspaceToLegacySurface,
+  type StudioDocumentWorkspaceId,
+} from "./studio-document-workspace";
+
 export const STUDIO_DCC_WORKBENCH_MODES = [
   "model",
   "build",
@@ -16,6 +22,9 @@ export const STUDIO_2D_WORKSPACE_SURFACES = [
   "poser",
   "character",
 ] as const;
+
+export const STUDIO_HOME_PATHNAME = "/studio" as const;
+export const STUDIO_DRAFT_CANVAS_PATHNAME = "/studio/canvas" as const;
 
 export type StudioDccWorkbenchMode =
   (typeof STUDIO_DCC_WORKBENCH_MODES)[number];
@@ -38,10 +47,14 @@ export type StudioWorkspaceRouteErrorCode =
 export interface StudioWorkspaceRoute {
   readonly canonicalPathname: string;
   readonly dccMode: StudioDccWorkbenchMode | null;
+  readonly documentId: string | null;
+  readonly documentWorkspace: StudioDocumentWorkspaceId | null;
+  readonly draftId: string | null;
   readonly legacyPublishQuery: boolean;
   readonly legacyRemixQuery: boolean;
   readonly legacyWorkIdQuery: boolean;
   readonly presentation: StudioWorkspacePresentation;
+  readonly projectId: string | null;
   readonly remixSourceWorkId: string | null;
   readonly surface: StudioWorkspaceSurface;
   readonly valid: true;
@@ -151,8 +164,9 @@ function singleQueryIdentity(
   return normalizeStudioIdentity(values[0] ?? null);
 }
 
+/** Return whether a pathname belongs to the Studio route namespace. */
 export function isStudioRoutePathname(pathname: string): boolean {
-  return pathname === "/studio" || pathname.startsWith("/studio/");
+  return pathname === STUDIO_HOME_PATHNAME || pathname.startsWith(`${STUDIO_HOME_PATHNAME}/`);
 }
 
 function studioWorkspaceLocation(
@@ -181,8 +195,13 @@ export function isStudioUploadWorkspaceLocation(
 }
 
 export function studioWorkspaceDocumentIdentity(
-  route: Pick<StudioWorkspaceRoute, "remixSourceWorkId" | "workId">,
+  route: Pick<StudioWorkspaceRoute, "remixSourceWorkId" | "workId">
+    & Partial<Pick<StudioWorkspaceRoute, "documentId" | "draftId" | "projectId">>,
 ): string {
+  if (route.projectId && route.documentId) {
+    return `project:${encodeURIComponent(route.projectId)}:document:${encodeURIComponent(route.documentId)}`;
+  }
+  if (route.draftId) return `draft:${encodeURIComponent(route.draftId)}`;
   if (route.remixSourceWorkId !== null) {
     return `remix:${encodeURIComponent(route.remixSourceWorkId)}`;
   }
@@ -254,6 +273,7 @@ function assertStudioHrefIdentity(
   }
 }
 
+/** Build the canonical 2D editor pathname for a draft, work, or remix identity. */
 export function studio2dPathname(
   workId: string | null,
   surface: Studio2dWorkspaceSurface,
@@ -266,7 +286,7 @@ export function studio2dPathname(
   if (workId !== null) {
     return `/studio/work/${encodeURIComponent(workId)}/${surface}`;
   }
-  return surface === "canvas" ? "/studio" : `/studio/${surface}`;
+  return `/studio/${surface}`;
 }
 
 export function studioCanvasPathname(
@@ -330,6 +350,21 @@ export function studioWorkspaceCanonicalHref(
   route: StudioWorkspaceRoute,
   search?: string | URLSearchParams,
 ): string {
+  if (route.documentWorkspace !== null) {
+    const params = queryParams(search);
+    params.delete("id");
+    params.delete("mode");
+    params.delete("remix");
+    params.delete("project");
+    params.delete("draft");
+    params.delete("workspace");
+    params.set("workspace", route.documentWorkspace);
+    params.sort();
+    const serialized = params.toString();
+    return serialized.length > 0
+      ? `${route.canonicalPathname}?${serialized}`
+      : route.canonicalPathname;
+  }
   return `${route.canonicalPathname}${workspaceQuery(search)}`;
 }
 
@@ -369,7 +404,9 @@ interface ParsedSurface {
   readonly surface: StudioWorkspaceSurface;
 }
 
+/** Parse the optional workspace surface suffix from a Studio route tail. */
 function parseSurface(tail: readonly string[]): ParsedSurface | null {
+  // Work/remix routes may omit the surface and still mean their primary canvas.
   if (tail.length === 0) return { dccMode: null, surface: "canvas" };
   if (tail.length === 1 && isStudio2dWorkspaceSurface(tail[0])) {
     return { dccMode: null, surface: tail[0] };
@@ -388,12 +425,36 @@ function parseSurface(tail: readonly string[]): ParsedSurface | null {
   return null;
 }
 
+/** Parse and validate a Studio workspace location into its canonical route identity. */
 export function parseStudioWorkspaceRoute({
   pathname,
   search,
 }: StudioWorkspaceLocationInput): StudioWorkspaceRouteResolution {
   if (!isStudioRoutePathname(pathname)) {
     return invalidStudioWorkspaceRoute("invalid-path");
+  }
+
+  const documentRoute = parseStudioDocumentLocation({ pathname, search });
+  if (documentRoute.kind === "invalid-document") {
+    return invalidStudioWorkspaceRoute("invalid-path");
+  }
+  if (documentRoute.kind === "document") {
+    return Object.freeze({
+      canonicalPathname: documentRoute.canonicalPathname,
+      dccMode: null,
+      documentId: documentRoute.documentId,
+      documentWorkspace: documentRoute.workspace,
+      draftId: documentRoute.draftId,
+      legacyPublishQuery: false,
+      legacyRemixQuery: false,
+      legacyWorkIdQuery: false,
+      presentation: "editor",
+      projectId: documentRoute.projectId,
+      remixSourceWorkId: null,
+      surface: studioDocumentWorkspaceToLegacySurface(documentRoute.workspace),
+      valid: true,
+      workId: documentRoute.documentId,
+    });
   }
 
   const rawSegments = pathname.split("/");
@@ -403,6 +464,9 @@ export function parseStudioWorkspaceRoute({
   if (segments.some((segment) => segment.length === 0) || segments[0] !== "studio") {
     return invalidStudioWorkspaceRoute("invalid-path");
   }
+
+  // Bare /studio is the product front door. Editor workspaces always have an explicit surface.
+  if (segments.length === 1) return invalidStudioWorkspaceRoute("invalid-path");
 
   const pathIdentity = parsePathIdentity(segments);
   if ("valid" in pathIdentity) return pathIdentity;
@@ -457,11 +521,15 @@ export function parseStudioWorkspaceRoute({
   return Object.freeze({
     canonicalPathname,
     dccMode: parsedSurface.dccMode,
+    documentId: null,
+    documentWorkspace: null,
+    draftId: null,
     legacyPublishQuery,
     legacyRemixQuery:
       pathIdentity.remixSourceWorkId === null && queryRemixId !== null,
     legacyWorkIdQuery: pathIdentity.workId === null && queryWorkId !== null,
     presentation: legacyPublishQuery ? "publish" : "editor",
+    projectId: null,
     remixSourceWorkId,
     surface: parsedSurface.surface,
     valid: true,
@@ -493,6 +561,7 @@ function ownData(value: object, key: PropertyKey): unknown {
   return descriptor && "value" in descriptor ? descriptor.value : undefined;
 }
 
+/** Resolve a safe return URL from Studio navigation state with a canonical fallback. */
 export function studioWorkspaceReturnHref(
   state: unknown,
   currentRoute: StudioWorkspaceRoute,
@@ -521,7 +590,12 @@ export function studioWorkspaceReturnHref(
   ) {
     return null;
   }
-  const returnRoute = parseStudioWorkspaceRoute({ pathname, search });
+
+  // Older draft sessions stored /studio as the return path. Canonicalize them to /studio/canvas.
+  const normalizedPathname = pathname === STUDIO_HOME_PATHNAME
+    ? STUDIO_DRAFT_CANVAS_PATHNAME
+    : pathname;
+  const returnRoute = parseStudioWorkspaceRoute({ pathname: normalizedPathname, search });
   if (!returnRoute.valid || returnRoute.surface === "dcc") return null;
   if (
     returnRoute.workId !== currentRoute.workId
@@ -529,5 +603,5 @@ export function studioWorkspaceReturnHref(
   ) {
     return null;
   }
-  return `${pathname}${search}`;
+  return studioWorkspaceCanonicalHref(returnRoute, search);
 }

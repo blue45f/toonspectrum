@@ -11,16 +11,27 @@ interface RouteSurface {
   readonly path: string;
 }
 
-function byId(a: RouteSurface, b: RouteSurface): number {
-  return a.id.localeCompare(b.id);
-}
-
-const STUDIO_PUBLIC_SURFACES: readonly RouteSurface[] = [
+const REQUIRED_STUDIO_FRONT_DOOR_SURFACES: readonly RouteSurface[] = [
+  { id: "creator-studio-home", path: "/studio" },
+  { id: "creator-studio-new", path: "/studio/new" },
+  { id: "creator-studio-import", path: "/studio/import" },
+  { id: "creator-studio-assets", path: "/studio/assets" },
+  { id: "creator-studio-assets-brush-new", path: "/studio/assets/brushes/new" },
+  { id: "creator-studio-assets-character-new", path: "/studio/assets/characters/new" },
+  { id: "creator-studio-assets-audio", path: "/studio/assets/audio" },
   { id: "creator-studio-manual", path: "/studio/manual" },
   { id: "creator-studio-manual-article", path: "/studio/manual/:articleId" },
-  { id: "creator-studio-brush-lab", path: "/studio/brush-lab" },
-  { id: "creator-studio-work-brush-lab", path: "/studio/work/:workId/brush-lab" },
-  { id: "creator-studio-remix-brush-lab", path: "/studio/remix/:sourceWorkId/brush-lab" },
+];
+
+const REQUIRED_PROJECT_SURFACES: readonly RouteSurface[] = [
+  { id: "creator-studio-project-root", path: "/studio/p/:projectId" },
+  { id: "creator-studio-project-overview", path: "/studio/p/:projectId/overview" },
+  { id: "creator-studio-project-story", path: "/studio/p/:projectId/story" },
+  { id: "creator-studio-project-production", path: "/studio/p/:projectId/production" },
+  { id: "creator-studio-project-assets", path: "/studio/p/:projectId/assets" },
+  { id: "creator-studio-project-review", path: "/studio/p/:projectId/review" },
+  { id: "creator-studio-project-export", path: "/studio/p/:projectId/export" },
+  { id: "creator-studio-project-settings", path: "/studio/p/:projectId/settings" },
 ];
 
 describe("application route registry", () => {
@@ -33,9 +44,15 @@ describe("application route registry", () => {
     expect(appRoutes.at(-1)).toMatchObject({ id: "not-found", path: "*" });
   });
 
-  it("keeps Character Shaper in the creator route registry", () => {
+  it("keeps Character Shaper as a compatible creator route while using Studio assets canonically", () => {
     expect(appRoutes).toContainEqual(
       expect.objectContaining({ id: "creator-character-shaper", path: "/shaper" }),
+    );
+    expect(appRoutes).toContainEqual(
+      expect.objectContaining({
+        id: "creator-studio-assets-character-new",
+        path: "/studio/assets/characters/new",
+      }),
     );
   });
 
@@ -46,19 +63,48 @@ describe("application route registry", () => {
     ]);
   });
 
-  it("keeps Studio behind one canonical wildcard entry", () => {
+  it("keeps one Studio wildcard after explicit front-door, project and compatibility routes", () => {
     const studioRoutes = appRoutes.filter((route) => route.path.startsWith("/studio"));
-    const editorEntries = studioRoutes.filter((route) => route.path.includes("*"));
+    const wildcardEntries = studioRoutes.filter((route) => route.path.includes("*"));
 
-    expect(editorEntries).toEqual([
+    expect(wildcardEntries).toEqual([
       expect.objectContaining({ id: "creator-studio", path: "/studio/*" }),
     ]);
     expect(studioRoutes.at(-1)).toMatchObject({ id: "creator-studio", path: "/studio/*" });
 
-    const publicSurfaces = studioRoutes
-      .filter((route) => route.path !== "/studio/*")
-      .map(({ id, path }) => ({ id, path }))
-      .sort(byId);
-    expect(publicSurfaces).toEqual([...STUDIO_PUBLIC_SURFACES].sort(byId));
+    for (const required of [
+      ...REQUIRED_STUDIO_FRONT_DOOR_SURFACES,
+      ...REQUIRED_PROJECT_SURFACES,
+    ]) {
+      expect(studioRoutes, required.id).toContainEqual(expect.objectContaining(required));
+    }
+  });
+
+  it("owns the canonical six-stage project route family", () => {
+    const routeIds = appRoutes.map((route) => route.id);
+    expect(routeIds).toEqual(expect.arrayContaining(
+      REQUIRED_PROJECT_SURFACES.map((route) => route.id),
+    ));
+  });
+
+  it("owns the canonical Showcase namespace without removing legacy creator-gallery URLs", () => {
+    expect(appRoutes).toContainEqual(
+      expect.objectContaining({ id: "creator-showcase", path: "/showcase" }),
+    );
+    expect(appRoutes).toContainEqual(
+      expect.objectContaining({ id: "creator-gallery", path: "/create" }),
+    );
+  });
+
+  it("routes legacy creator hubs to canonical Studio destinations", () => {
+    expect(appRoutes).toContainEqual(
+      expect.objectContaining({ id: "resources-make", path: "/make" }),
+    );
+    expect(appRoutes).toContainEqual(
+      expect.objectContaining({ id: "resources-hub", path: "/creator-hub" }),
+    );
+    expect(appRoutes).toContainEqual(
+      expect.objectContaining({ id: "resources-publishing", path: "/publishing" }),
+    );
   });
 });
