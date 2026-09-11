@@ -40,8 +40,19 @@ jobs:
 
       - name: Apply ordered repair
         run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("scripts/maintenance/apply-brush-runtime-production.py")
+          source = path.read_text(encoding="utf-8")
+          old = 'route_anchor = "\\nexport function auditStudioRouteRegistry(): StudioRouteRegistryAudit {"'
+          new = 'route_anchor = "\\nexport function auditStudioRouteRegistry(): readonly string[] {"'
+          if source.count(old) != 1:
+              raise SystemExit("route anchor patch drifted")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
           set -o pipefail
           python3 scripts/maintenance/apply-brush-runtime-production.py 2>&1 | tee apply-brush-runtime-production.log
+          rm -f .github/workflows/apply-toonstudio-session-completion-v2.yml
 
       - name: Upload repair diagnostics
         if: failure()
