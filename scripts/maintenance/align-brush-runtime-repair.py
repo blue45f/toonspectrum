@@ -118,3 +118,9 @@ replace_normalized(
     '    expect(usageCodes).toContain("ai-training");',
     "AI training reason assertion",
 )
+replace_normalized(
+    governance_test_path,
+    '    expect(report.plugin.status).toBe("allowed");',
+    '    expect(report.plugin.status).toBe("ready");',
+    "plugin readiness status assertion",
+)
