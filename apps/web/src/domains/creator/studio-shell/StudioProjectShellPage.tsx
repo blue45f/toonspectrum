@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useLocation, useParams } from "react-router-dom";
 
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -31,17 +31,17 @@ import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
 import { STUDIO_PROJECT_NAVIGATION } from "../studio-product-ia";
+import {
+  STUDIO_PROJECT_SECTION_VIEWS,
+  resolveStudioProjectView,
+  studioProjectDefaultView,
+  type StudioProjectSection as StudioProjectSectionId,
+} from "../studio-project-views";
+import { resolveStudioProjectViewDestination } from "../studio-project-view-destinations";
 import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
 import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
 
-export type StudioProjectSection =
-  | "overview"
-  | "story"
-  | "production"
-  | "assets"
-  | "review"
-  | "export"
-  | "settings";
+export type StudioProjectSection = StudioProjectSectionId;
 
 type Locale = "ko" | "en";
 
@@ -82,8 +82,23 @@ function workHref(projectId: string, surface = "canvas"): string {
   return `/studio/work/${encodeURIComponent(projectId)}/${surface}`;
 }
 
-function projectViewHref(projectId: string, section: StudioProjectSection, view: string): string {
-  return `/studio/p/${encodeURIComponent(projectId)}/${section}?view=${encodeURIComponent(view)}`;
+function queryHref(pathname: string, values: Readonly<Record<string, string>>): string {
+  const params = new URLSearchParams(values);
+  params.sort();
+  return `${pathname}?${params.toString()}`;
+}
+
+function projectViewHref(
+  projectId: string,
+  section: StudioProjectSection,
+  view: string,
+  currentSearch = "",
+): string {
+  const params = new URLSearchParams(currentSearch);
+  params.delete("view");
+  params.set("view", view);
+  params.sort();
+  return `/studio/p/${encodeURIComponent(projectId)}/${section}?${params.toString()}`;
 }
 
 const SECTION_DEFINITIONS: Readonly<Record<StudioProjectSection, SectionDefinition>> = {
@@ -113,10 +128,10 @@ const SECTION_DEFINITIONS: Readonly<Record<StudioProjectSection, SectionDefiniti
     },
     icon: BookOpen,
     actions: [
-      action(BookOpen, "대본·에피소드", "Scripts & episodes", "장면과 대사를 구조화하고 원고 말풍선과 연결합니다.", "Structure scenes and dialogue, then connect them to manuscript balloons.", (id) => projectViewHref(id, "story", "script")),
-      action(Users, "캐릭터·관계", "Characters & relations", "말투·외형·관계·등장 이력을 작품 기준으로 정리합니다.", "Organize voice, appearance, relationships and appearances as project data.", (id) => projectViewHref(id, "story", "characters")),
-      action(Sparkles, "세계관·연속성", "World & continuity", "설정 충돌과 장면 간 불일치를 근거와 함께 확인합니다.", "Review continuity and story conflicts with supporting references.", (id) => projectViewHref(id, "story", "continuity")),
-      action(ImagePlus, "참고자료", "References", "출처와 사용 조건을 유지하며 자료를 모읍니다.", "Collect references while preserving source and usage information.", (id) => projectViewHref(id, "story", "references")),
+      action(BookOpen, "대본·에피소드", "Scripts & episodes", "장면과 대사를 구조화하고 원고 말풍선과 연결합니다.", "Structure scenes and dialogue, then connect them to manuscript balloons.", (id) => queryHref("/story-lab", { project: id })),
+      action(Users, "캐릭터·관계", "Characters & relations", "말투·외형·관계·등장 이력을 작품 기준으로 정리합니다.", "Organize voice, appearance, relationships and appearances as project data.", (id) => queryHref("/studio/assets/characters/new", { project: id })),
+      action(Sparkles, "세계관·연속성", "World & continuity", "설정 충돌과 장면 간 불일치를 근거와 함께 확인합니다.", "Review continuity and story conflicts with supporting references.", (id) => workHref(id, "storyworld")),
+      action(ImagePlus, "참고자료", "References", "출처와 사용 조건을 유지하며 자료를 모읍니다.", "Collect references while preserving source and usage information.", (id) => queryHref(workHref(id, "storyworld"), { focus: "references" })),
     ],
   },
   production: {
@@ -145,10 +160,10 @@ const SECTION_DEFINITIONS: Readonly<Record<StudioProjectSection, SectionDefiniti
     },
     icon: Boxes,
     actions: [
-      action(Boxes, "프로젝트 에셋", "Project assets", "현재 프로젝트에 설치·사용된 에셋을 확인합니다.", "Review installed and used assets for this project.", (id) => projectViewHref(id, "assets", "project")),
+      action(Boxes, "프로젝트 에셋", "Project assets", "현재 프로젝트에 설치·사용된 에셋을 확인합니다.", "Review installed and used assets for this project.", (id) => queryHref("/studio/assets", { project: id })),
       action(Brush, "브러시", "Brushes", "전체·내 브러시·팀 브러시를 하나의 라이브러리에서 찾습니다.", "Find built-in, personal and team brushes in one library.", () => "/studio/assets/brushes"),
-      action(Palette, "Series Kit", "Series Kit", "작품 로고·색상·글꼴·말풍선·출력 규칙을 재사용합니다.", "Reuse logos, colors, fonts, balloons and export rules.", (id) => projectViewHref(id, "assets", "series-kit")),
-      action(WandSparkles, "새 에셋 찾기", "Discover assets", "호환성과 상업 이용 조건을 확인한 뒤 프로젝트에 설치합니다.", "Check compatibility and commercial-use terms before installing.", (id) => `/market?project=${encodeURIComponent(id)}`),
+      action(Palette, "Series Kit", "Series Kit", "작품 로고·색상·글꼴·말풍선·출력 규칙을 재사용합니다.", "Reuse logos, colors, fonts, balloons and export rules.", (id) => queryHref("/studio/assets", { project: id, view: "series-kit" })),
+      action(WandSparkles, "새 에셋 찾기", "Discover assets", "호환성과 상업 이용 조건을 확인한 뒤 프로젝트에 설치합니다.", "Check compatibility and commercial-use terms before installing.", (id) => queryHref("/market", { project: id })),
     ],
   },
   review: {
@@ -161,10 +176,10 @@ const SECTION_DEFINITIONS: Readonly<Record<StudioProjectSection, SectionDefiniti
     },
     icon: ClipboardCheck,
     actions: [
-      action(MessageSquareCheck, "댓글·수정 요청", "Comments & changes", "위치·컷·대사에 연결된 검토 내용을 해결합니다.", "Resolve review notes attached to positions, panels and dialogue.", (id) => projectViewHref(id, "review", "comments")),
-      action(CheckCircle2, "승인", "Approvals", "단계별 승인 상태를 확인하고 승인본을 자동 보관합니다.", "Review stage approvals and preserve approved versions automatically.", (id) => projectViewHref(id, "review", "approvals")),
-      action(LayoutGrid, "버전 비교", "Version comparison", "두 결과를 좌우·오버레이·변경 영역으로 비교합니다.", "Compare versions side by side, overlaid or by changed areas.", (id) => projectViewHref(id, "review", "compare")),
-      action(Users, "공유·외부 검토", "Share & external review", "편집 권한 또는 가벼운 검토 링크를 만듭니다.", "Invite editors or create a lightweight review link.", (id) => projectViewHref(id, "review", "share")),
+      action(MessageSquareCheck, "댓글·수정 요청", "Comments & changes", "위치·컷·대사에 연결된 검토 내용을 해결합니다.", "Resolve review notes attached to positions, panels and dialogue.", (id) => workHref(id, "review")),
+      action(CheckCircle2, "승인", "Approvals", "단계별 승인 상태를 확인하고 승인본을 자동 보관합니다.", "Review stage approvals and preserve approved versions automatically.", (id) => workHref(id, "review")),
+      action(LayoutGrid, "버전 비교", "Version comparison", "두 결과를 좌우·오버레이·변경 영역으로 비교합니다.", "Compare versions side by side, overlaid or by changed areas.", (id) => workHref(id, "versions")),
+      action(Users, "공유·외부 검토", "Share & external review", "편집 권한 또는 가벼운 검토 링크를 만듭니다.", "Invite editors or create a lightweight review link.", (id) => queryHref("/studio/share", { scope: `work:${id}` })),
     ],
   },
   export: {
@@ -177,10 +192,10 @@ const SECTION_DEFINITIONS: Readonly<Record<StudioProjectSection, SectionDefiniti
     },
     icon: FileOutput,
     actions: [
-      action(LayoutGrid, "웹툰 플랫폼", "Webtoon platforms", "분할·용량·썸네일·글자 가독성을 자동 검사합니다.", "Check slicing, file size, thumbnails and text readability automatically.", (id) => projectViewHref(id, "export", "platforms")),
-      action(ImagePlus, "이미지·PDF", "Images & PDF", "SNS 공유와 검토용 이미지·PDF를 만듭니다.", "Create image and PDF packages for sharing and review.", (id) => projectViewHref(id, "export", "image-pdf")),
-      action(Presentation, "PPTX·피칭", "PPTX & pitch", "작품 소개와 피칭 자료를 편집 가능한 문서로 내보냅니다.", "Export project introductions and pitches as editable documents.", (id) => projectViewHref(id, "export", "presentation")),
-      action(FileOutput, "전체 프로젝트 백업", "Full project backup", "원고·에셋·설정·권리 정보를 포함한 완전한 사본을 만듭니다.", "Create a complete copy with documents, assets, settings and rights data.", (id) => projectViewHref(id, "export", "archive")),
+      action(LayoutGrid, "웹툰 플랫폼", "Webtoon platforms", "분할·용량·썸네일·글자 가독성을 자동 검사합니다.", "Check slicing, file size, thumbnails and text readability automatically.", (id) => workHref(id, "publish")),
+      action(ImagePlus, "이미지·PDF", "Images & PDF", "SNS 공유와 검토용 이미지·PDF를 만듭니다.", "Create image and PDF packages for sharing and review.", (id) => workHref(id, "publish")),
+      action(Presentation, "PPTX·피칭", "PPTX & pitch", "작품 소개와 피칭 자료를 편집 가능한 문서로 내보냅니다.", "Export project introductions and pitches as editable documents.", (id) => workHref(id, "present")),
+      action(FileOutput, "전체 프로젝트 백업", "Full project backup", "원고·에셋·설정·권리 정보를 포함한 완전한 사본을 만듭니다.", "Create a complete copy with documents, assets, settings and rights data.", (id) => workHref(id, "publish")),
     ],
   },
   settings: {
@@ -194,9 +209,9 @@ const SECTION_DEFINITIONS: Readonly<Record<StudioProjectSection, SectionDefiniti
     icon: Settings,
     actions: [
       action(Settings, "프로젝트 정보", "Project information", "작품명·설명·대표 이미지와 기본 규격을 관리합니다.", "Manage title, description, cover image and default specifications.", (id) => projectViewHref(id, "settings", "general")),
-      action(Users, "팀·권한", "Team & permissions", "역할과 편집·검토·게시 권한을 관리합니다.", "Manage roles and edit, review and publish permissions.", (id) => projectViewHref(id, "settings", "team")),
+      action(Users, "팀·권한", "Team & permissions", "역할과 편집·검토·게시 권한을 관리합니다.", "Manage roles and edit, review and publish permissions.", (id) => queryHref("/studio/share", { scope: `work:${id}` })),
       action(Sparkles, "자동화", "Automation", "자동 버전·작업 단계·출력 규칙을 설정합니다.", "Configure automatic versions, workflow stages and export rules.", (id) => projectViewHref(id, "settings", "automation")),
-      action(MoreHorizontal, "보관·삭제", "Archive & delete", "복구 가능한 상태로 보관하거나 휴지통으로 이동합니다.", "Archive safely or move the project to trash with recovery available.", (id) => projectViewHref(id, "settings", "lifecycle")),
+      action(MoreHorizontal, "보관·삭제", "Archive & delete", "복구 가능한 상태로 보관하거나 휴지통으로 이동합니다.", "Archive safely or move the project to trash with recovery available.", (id) => projectViewHref(id, "settings", "archive")),
     ],
   },
 };
@@ -212,8 +227,29 @@ function projectSectionHref(projectId: string, section: StudioProjectSection): s
   return `/studio/p/${encodeURIComponent(projectId)}/${section}`;
 }
 
+function InvalidProject({ locale }: { readonly locale: Locale }) {
+  return (
+    <Container size="wide" className="py-10">
+      <section className="rounded-3xl border border-line bg-card p-6" role="alert">
+        <h1 className="text-xl font-bold text-fg">
+          {locale === "ko" ? "프로젝트를 찾을 수 없어요." : "Project not found."}
+        </h1>
+        <p className="mt-2 text-sm text-fg-3">
+          {locale === "ko"
+            ? "저장된 작업은 변경하지 않았습니다. 내 작업에서 프로젝트를 다시 선택하세요."
+            : "No saved work was changed. Choose the project again from My work."}
+        </p>
+        <Link href="/studio" className={buttonClass({ className: "mt-5" })}>
+          {locale === "ko" ? "내 작업으로" : "Go to My work"}
+        </Link>
+      </section>
+    </Container>
+  );
+}
+
 export function StudioProjectShellPage({ section }: { readonly section: StudioProjectSection }) {
   const { projectId = "" } = useParams<{ projectId: string }>();
+  const location = useLocation();
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
   const definition = SECTION_DEFINITIONS[section];
@@ -225,29 +261,28 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
       return projectId;
     }
   }, [projectId]);
+  const viewResolution = useMemo(() => {
+    try {
+      return resolveStudioProjectView(displayProjectId, section, location.search);
+    } catch {
+      return null;
+    }
+  }, [displayProjectId, location.search, section]);
+  const selectedView = viewResolution?.view ?? studioProjectDefaultView(section);
+  const destination = useMemo(() => {
+    try {
+      return resolveStudioProjectViewDestination(displayProjectId, section, selectedView);
+    } catch {
+      return null;
+    }
+  }, [displayProjectId, section, selectedView]);
 
   useDocumentTitle(`${definition.label[locale]} · ToonStudio`);
 
-  if (!projectId) {
-    return (
-      <Container size="wide" className="py-10">
-        <section className="rounded-3xl border border-line bg-card p-6" role="alert">
-          <h1 className="text-xl font-bold text-fg">
-            {locale === "ko" ? "프로젝트를 찾을 수 없어요." : "Project not found."}
-          </h1>
-          <p className="mt-2 text-sm text-fg-3">
-            {locale === "ko"
-              ? "저장된 작업은 변경하지 않았습니다. 내 작업에서 프로젝트를 다시 선택하세요."
-              : "No saved work was changed. Choose the project again from My work."}
-          </p>
-          <Link href="/studio" className={buttonClass({ className: "mt-5" })}>
-            {locale === "ko" ? "내 작업으로" : "Go to My work"}
-          </Link>
-        </section>
-      </Container>
-    );
-  }
+  if (!projectId || !viewResolution || !destination) return <InvalidProject locale={locale} />;
+  if (viewResolution.changed) return <Navigate to={viewResolution.canonicalHref} replace />;
 
+  const sectionViews = STUDIO_PROJECT_SECTION_VIEWS[section];
   return (
     <Container size="wide" className="py-6 sm:py-8 lg:py-10">
       <header className="rounded-3xl border border-line bg-panel/60 p-5 shadow-sm sm:p-7">
@@ -269,7 +304,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               {locale === "ko" ? "프로젝트" : "Project"} · {displayProjectId}
             </p>
           </div>
-          <Link href={workHref(projectId)} className={buttonClass({ size: "lg", className: "gap-2" })}>
+          <Link href={workHref(displayProjectId)} className={buttonClass({ size: "lg", className: "gap-2" })}>
             <Brush size={17} aria-hidden="true" />
             {locale === "ko" ? "원고 열기" : "Open manuscript"}
           </Link>
@@ -286,7 +321,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
             return (
               <Link
                 key={id}
-                href={projectSectionHref(projectId, id)}
+                href={projectSectionHref(displayProjectId, id)}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-10 items-center rounded-xl px-3.5 text-sm font-semibold transition-colors",
@@ -298,7 +333,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
             );
           })}
           <Link
-            href={projectSectionHref(projectId, "settings")}
+            href={projectSectionHref(displayProjectId, "settings")}
             aria-current={section === "settings" ? "page" : undefined}
             aria-label={locale === "ko" ? "프로젝트 설정" : "Project settings"}
             className={cn(
@@ -312,6 +347,62 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
           </Link>
         </div>
       </nav>
+
+      <nav
+        aria-label={locale === "ko" ? `${definition.label.ko} 세부 화면` : `${definition.label.en} views`}
+        className="mt-3 overflow-x-auto"
+      >
+        <div className="flex min-w-max gap-2">
+          {sectionViews.map((view) => {
+            const active = view === selectedView;
+            const viewLabel = resolveStudioProjectViewDestination(displayProjectId, section, view);
+            return (
+              <Link
+                key={view}
+                href={projectViewHref(displayProjectId, section, view, location.search)}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold transition-colors",
+                  active
+                    ? "border-accent/50 bg-accent-soft text-accent"
+                    : "border-line bg-card text-fg-3 hover:border-line-strong hover:text-fg",
+                )}
+              >
+                {locale === "ko" ? viewLabel.labelKo : viewLabel.labelEn}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      <section
+        data-studio-project-view={selectedView}
+        className="mt-4 rounded-2xl border border-accent/25 bg-accent-soft/25 p-4 sm:p-5"
+      >
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
+              {destination.owner === "project-shell" ? "PROJECT OWNED" : "CONNECTED WORKSPACE"}
+            </p>
+            <h2 className="mt-1 text-lg font-black text-fg">
+              {locale === "ko" ? destination.labelKo : destination.labelEn}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-fg-2">
+              {locale === "ko" ? destination.descriptionKo : destination.descriptionEn}
+            </p>
+          </div>
+          {destination.href ? (
+            <Link href={destination.href} className={buttonClass({ className: "shrink-0 gap-2" })}>
+              {locale === "ko" ? destination.ctaKo : destination.ctaEn}
+              <ArrowRight size={15} aria-hidden="true" />
+            </Link>
+          ) : (
+            <span className="rounded-full border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2">
+              {locale === "ko" ? destination.ctaKo : destination.ctaEn}
+            </span>
+          )}
+        </div>
+      </section>
 
       <StudioProjectDiagnosticsBridge projectId={displayProjectId} />
       <StudioProjectReadinessPanel
@@ -354,11 +445,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                 </span>
                 <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">
                   {locale === "ko" ? "열기" : "Open"}
-                  <ArrowRight
-                    size={13}
-                    className="transition-transform group-hover:translate-x-1"
-                    aria-hidden="true"
-                  />
+                  <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
                 </span>
               </Link>
             );
