@@ -10,6 +10,7 @@ import {
 import { StudioExportPanel } from "./StudioExportPanel";
 import { StudioLocalizationPanel } from "./StudioLocalizationPanel";
 import { StudioProjectAssistantPanel } from "./StudioProjectAssistantPanel";
+import { StudioProjectDeliveryPanel } from "./StudioProjectDeliveryPanel";
 import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel";
 import { StudioReviewPanel } from "./StudioReviewPanel";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
@@ -43,6 +44,8 @@ function SectionWorkflow({
   readonly view: string;
   readonly locale: Locale;
 }) {
+  const showDelivery = section === "export" || (section === "settings" && view === "archive");
+
   return (
     <>
       <StudioProjectFeatureSuitePanel
@@ -62,6 +65,14 @@ function SectionWorkflow({
       ) : null}
       {section === "export" ? (
         <StudioExportPanel projectId={projectId} locale={locale} />
+      ) : null}
+      {showDelivery ? (
+        <StudioProjectDeliveryPanel
+          projectId={projectId}
+          section={section}
+          view={view}
+          locale={locale}
+        />
       ) : null}
     </>
   );

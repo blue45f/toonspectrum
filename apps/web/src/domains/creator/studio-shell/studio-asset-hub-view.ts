@@ -3,6 +3,7 @@ export const ASSET_HUB_VIEWS = [
   "series-kit",
   "library",
   "market",
+  "safety",
   "seller",
 ] as const;
 
