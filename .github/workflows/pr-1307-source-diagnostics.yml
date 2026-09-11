@@ -1,0 +1,31 @@
+name: PR 1307 source diagnostics
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-final-ia-20260911
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+
+      - name: Pack tracked source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz --output="$RUNNER_TEMP/toonspectrum-pr-1307-source.tar.gz" HEAD
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: toonspectrum-pr-1307-source
+          path: ${{ runner.temp }}/toonspectrum-pr-1307-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
