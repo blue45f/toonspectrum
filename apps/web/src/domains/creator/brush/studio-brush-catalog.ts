@@ -20,6 +20,7 @@ import {
   type StudioBrushCatalogItem,
 } from "./studio-brush-catalog-core";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
+import { attachStudioBrushQualityDesignAliases } from "./studio-brush-quality-design-bridge";
 import {
   STUDIO_BRUSH_QUALITY_PORTFOLIO,
   STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS,
@@ -58,10 +59,20 @@ export const STUDIO_PRO_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
     )
   );
 
-export const STUDIO_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] = [
-  ...STUDIO_CORE_BRUSH_CATALOG_ITEMS,
-  ...STUDIO_PRO_BRUSH_CATALOG_ITEMS,
-];
+const STUDIO_REGISTERED_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze([
+    ...STUDIO_CORE_BRUSH_CATALOG_ITEMS,
+    ...STUDIO_PRO_BRUSH_CATALOG_ITEMS,
+  ]);
+
+/**
+ * Complete product catalogue enriched with the 72 Brush Studio quality-design names.
+ *
+ * The bridge adds search vocabulary only: catalogue ids, renderer ids and saved-document
+ * snapshots stay unchanged.
+ */
+export const STUDIO_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  attachStudioBrushQualityDesignAliases(STUDIO_REGISTERED_BRUSH_CATALOG_ITEMS);
 
 export const STUDIO_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   Object.freeze(STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "paint"));
