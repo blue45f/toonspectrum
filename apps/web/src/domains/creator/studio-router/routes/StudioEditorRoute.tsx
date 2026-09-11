@@ -1,6 +1,5 @@
 import { Suspense, useEffect } from "react";
 
-
 import { studioEditorInstanceKey } from "../../studio-editor-scope";
 import { studioWorkspaceDocumentIdentity } from "../../studio-workspace-route";
 import { StudioRouteLoading } from "../../StudioLazySurfaceFallback";
@@ -10,8 +9,8 @@ import { useStudioDraftScope } from "../useStudioDraftScope";
 
 import type { StudioEditorRouteResolution } from "../studio-route-manifest";
 
-import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { useSession } from "@/compat/auth-session-store";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const LegacyStudioEditorAdapter = lazyRetry(
   () => import("../../studio-legacy-editor-adapter").then((module) => ({
@@ -30,6 +29,7 @@ export function StudioEditorRoute({ resolution }: {
   const draftScope = useStudioDraftScope(identity, authScopeKey);
   const editorKey = studioEditorInstanceKey({
     authScopeKey,
+    canonicalDocumentIdentity: route.projectId && route.documentId ? identity : null,
     draftSessionEpoch: draftScope.epoch,
     remixId: route.remixSourceWorkId,
     workId: route.workId,

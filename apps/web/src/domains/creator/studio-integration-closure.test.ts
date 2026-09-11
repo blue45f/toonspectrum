@@ -27,6 +27,12 @@ const TRANSIENT_WORKFLOWS = [
   ".github/workflows/verify-toonstudio-pr-head.yml",
   ".github/workflows/apply-ci-optimization-fixes-once.yml",
   ".github/workflows/apply-ci-source-fixes-once.yml",
+  ".github/workflows/apply-toonstudio-project-contract-repair.yml",
+  ".github/workflows/complete-toonstudio-session-all-features.yml",
+  ".github/workflows/finalize-toonstudio-session-integration.yml",
+  ".github/workflows/finalize-toonstudio-session-integration-v2.yml",
+  ".github/workflows/repair-toonstudio-session-all-features.yml",
+  ".github/workflows/verify-and-autofix-toonstudio-final.yml",
 ] as const;
 
 function source(path: string): string {
@@ -62,6 +68,43 @@ describe("ToonStudio integration closure", () => {
     expect(productIa).toContain('primaryRoute: "/studio"');
     expect(productIa).toContain('primaryRoute: "/studio/p/:projectId/story"');
     expect(productIa).toContain('primaryRoute: "/studio/p/:projectId/export"');
+  });
+
+  it("keeps canonical document URLs mounted on one editor runtime across workspace changes", () => {
+    const route = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceRoute.tsx");
+    const layout = source("apps/web/src/domains/creator/studio-router/StudioDocumentLayout.tsx");
+    const switcher = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceSwitcher.tsx");
+    const dock = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceDock.tsx");
+
+    expect(route).toContain("<StudioEditorRoute resolution={routeResolution} />");
+    expect(route).toContain("resolveStudioRoute");
+    expect(route).not.toContain("legacyEditorHref");
+    expect(layout).toContain("<StudioDocumentWorkspaceSwitcher />");
+    expect(layout).toContain("<StudioDocumentWorkspaceDock />");
+    expect(switcher).toContain("studioDocumentHref");
+    expect(switcher).toContain("STUDIO_DOCUMENT_WORKSPACES");
+    expect(switcher).toContain("projectId: resolution.projectId");
+    expect(switcher).toContain("documentId: resolution.documentId");
+    expect(switcher).toContain("draftId: resolution.draftId");
+
+    for (const workspace of [
+      "comic",
+      "design",
+      "slides",
+      "storyboard",
+      "whiteboard",
+      '"3d"',
+      "animation",
+      "motion",
+      "audio",
+      "localization",
+      "review",
+    ]) {
+      expect(dock).toContain(`${workspace}: {`);
+    }
+    expect(dock).toContain("StudioProjectFeatureSuitePanel");
+    expect(dock).toContain("StudioLocalizationPanel");
+    expect(dock).toContain("StudioReviewPanel");
   });
 
   it("mounts persisted project workflows, diagnostics and feature implementations on route-reachable pages", () => {

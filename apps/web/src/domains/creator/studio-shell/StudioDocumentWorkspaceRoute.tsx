@@ -7,33 +7,51 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
 
 import { parseStudioDocumentLocation } from "../studio-document-workspace";
+import { StudioEditorRoute } from "../studio-router/routes/StudioEditorRoute";
+import { resolveStudioRoute } from "../studio-router/studio-route-manifest";
+import { useStudioI18nPriorityLoading } from "../studio-router/useStudioI18nPriorityLoading";
 
 function localeFromLanguage(language: string): "ko" | "en" {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
 /**
- * Canonical document URLs own project/document/workspace identity, while the established editor
- * keeps rendering and persistence authority. Until that editor consumes canonical document URLs
- * directly, this route performs one explicit, lossless bridge instead of falling through to an
- * unrelated Studio wildcard screen.
+ * Canonical project/document and draft URLs mount the established editor runtime directly.
+ * Workspace changes update only query state, so the runtime boundary stays keyed by the same
+ * document identity instead of navigating through a second legacy URL and remounting the editor.
  */
 export function StudioDocumentWorkspaceRoute() {
+  useStudioI18nPriorityLoading();
   const location = useLocation();
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
-  const resolution = parseStudioDocumentLocation({
+  const documentResolution = parseStudioDocumentLocation({
     pathname: location.pathname,
     search: location.search,
   });
 
-  if (resolution.kind === "document") {
-    return <Navigate to={resolution.legacyEditorHref} replace />;
+  if (documentResolution.kind === "document") {
+    const routeResolution = resolveStudioRoute({
+      hash: location.hash,
+      pathname: location.pathname,
+      search: location.search,
+    });
+    if (routeResolution.kind === "editor") {
+      const currentHref = `${location.pathname}${location.search}`;
+      if (currentHref !== routeResolution.canonicalHref) {
+        return <Navigate replace state={location.state} to={routeResolution.canonicalHref} />;
+      }
+      return <StudioEditorRoute resolution={routeResolution} />;
+    }
   }
 
-  if (resolution.kind === "not-document") {
+  if (documentResolution.kind === "not-document") {
     return <Navigate to="/studio" replace />;
   }
+
+  const errorCode = documentResolution.kind === "invalid-document"
+    ? documentResolution.errorCode
+    : "invalid-path";
 
   return (
     <Container size="wide" className="py-10">
@@ -53,7 +71,7 @@ export function StudioDocumentWorkspaceRoute() {
             : "No project or manuscript data was changed. Check the document and workspace address, or reopen it from My work."}
         </p>
         <p className="mt-3 rounded-xl border border-line bg-panel/60 px-3 py-2 text-xs font-mono text-fg-3">
-          {resolution.errorCode}
+          {errorCode}
         </p>
         <Link href="/studio" className={buttonClass({ className: "mt-5 gap-2" })}>
           <ArrowLeft size={15} aria-hidden="true" />

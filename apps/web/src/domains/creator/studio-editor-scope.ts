@@ -2,6 +2,8 @@ export interface StudioEditorInstanceScope {
   authScopeKey: string | null;
   workId: string | null;
   remixId: string | null;
+  /** Stable project+document identity. Workspace is deliberately excluded. */
+  canonicalDocumentIdentity?: string | null;
   draftSessionEpoch?: number;
 }
 
@@ -138,14 +140,24 @@ export function isStudioCuttoonSourceFormat(format: unknown): format is "cuttoon
 
 /**
  * 저장된 원고는 계정과 작품을 React instance 경계에 포함해 이전 scope의 문서 state가 단 한
- * 프레임도 재사용되지 않게 한다. 신규·리믹스는 로그인 전 로컬 편집을 보존해야 해 계정과 분리한다.
+ * 프레임도 재사용되지 않게 한다. Canonical 문서는 프로젝트+문서 identity를 우선 사용하고
+ * 작업공간은 제외해 draw/comic/3d/slides 전환에서 같은 instance를 보존한다. 신규·리믹스는
+ * 로그인 전 로컬 편집을 보존해야 해 계정과 분리한다.
  */
 export function studioEditorInstanceKey({
   authScopeKey,
   workId,
   remixId,
+  canonicalDocumentIdentity = null,
   draftSessionEpoch = 0,
 }: StudioEditorInstanceScope): string {
+  if (canonicalDocumentIdentity) {
+    return JSON.stringify([
+      "document",
+      authScopeKey ?? "guest",
+      canonicalDocumentIdentity,
+    ]);
+  }
   if (workId) return JSON.stringify(["work", authScopeKey ?? "guest", workId]);
   if (remixId) return JSON.stringify(["remix", remixId, draftSessionEpoch]);
   return JSON.stringify(["new", draftSessionEpoch]);

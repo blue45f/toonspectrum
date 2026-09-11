@@ -1,15 +1,25 @@
 import { createContext, useContext } from "react";
 
+import type { StudioDocumentWorkspaceId } from "../studio-document-workspace";
+
 /**
  * Document-identity-scoped runtime published by `StudioDocumentLayout`.
  *
  * `StudioDocumentRuntimeContext` (sibling module) answers "which document instance am I?" for the
- * boundary itself. This one answers "what live-session identity does that instance own?" and is the
- * single owner of the `?room=` query for the editor tree — StudioPage no longer parses it.
+ * boundary itself. This one answers "which canonical project/document/workspace and live session
+ * does that instance own?" and is the single owner of the `?room=` query for the editor tree.
  */
 export interface StudioDocumentLayoutRuntime {
   /** Boundary key of the enclosing `StudioDocumentRuntimeBoundary` (identity + auth + epoch). */
   readonly documentKey: string;
+  /** Canonical project identity; null for drafts, remixes, and legacy routes. */
+  readonly projectId: string | null;
+  /** Canonical document identity inside a project; null for drafts and legacy routes. */
+  readonly documentId: string | null;
+  /** Canonical draft identity; null for project documents and legacy routes. */
+  readonly draftId: string | null;
+  /** User-facing workspace projection. It never participates in the document runtime key. */
+  readonly documentWorkspace: StudioDocumentWorkspaceId | null;
   /** Guest-draft adoption epoch. A bump rotates `documentKey` and remounts this layout. */
   readonly draftSessionEpoch: number;
   /**
