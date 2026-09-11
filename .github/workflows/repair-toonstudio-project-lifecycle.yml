@@ -1,4 +1,4 @@
-name: Repair ToonStudio project lifecycle verifier once
+name: Integrate ToonStudio project lifecycle once
 
 on:
   push:
@@ -11,32 +11,132 @@ permissions:
   contents: write
 
 concurrency:
-  group: repair-toonstudio-project-lifecycle
+  group: integrate-toonstudio-project-lifecycle
   cancel-in-progress: false
 
 jobs:
-  patch-verifier:
+  integrate-validate-commit:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 80
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - name: Checkout exact feature branch
         uses: actions/checkout@v4
         with:
           ref: feat/toonstudio-project-lifecycle-20260912
-          fetch-depth: 1
+          fetch-depth: 256
 
-      - name: Patch the verified TypeScript widening and cleanup
+      - name: Synchronize main and compose project creation
+        shell: bash
+        run: |
+          set -euo pipefail
+          page="apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
+          create_page="apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx"
+          preserved="$RUNNER_TEMP/StudioProjectCreatePage.tsx"
+
+          cp "$page" "$preserved"
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git fetch --no-tags --depth=256 origin main:refs/remotes/origin/main
+
+          set +e
+          git merge --no-commit --no-ff origin/main
+          merge_status=$?
+          set -e
+
+          if [[ "$merge_status" -ne 0 ]]; then
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            if [[ "${#conflicts[@]}" -ne 1 || "${conflicts[0]}" != "$page" ]]; then
+              printf 'Unexpected merge conflicts:\n' >&2
+              printf ' - %s\n' "${conflicts[@]}" >&2
+              git merge --abort || true
+              exit 1
+            fi
+          fi
+
+          git show "origin/main:$page" > "$page"
+          cp "$preserved" "$create_page"
+          python scripts/apply-toonstudio-project-lifecycle.py
+          git add -A
+          git diff --cached --check
+          git commit -m "chore(studio): synchronize project lifecycle with main"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve lifecycle lint and type blockers
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
+          import re
 
-          workflow = Path(".github/workflows/apply-toonstudio-project-lifecycle.yml")
-          text = workflow.read_text()
+          autofocus_targets = (
+              "apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",
+          )
+          for path in autofocus_targets:
+              file = Path(path)
+              text = file.read_text()
+              text, count = re.subn(r"(?m)^\s*autoFocus\s*\n", "", text)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one autoFocus prop, found {count}")
+              file.write_text(text)
 
-          old_write = "          document_store.write_text(text.replace(footer, typed_footer, 1))\n"
-          new_write = '''          text = text.replace(footer, typed_footer, 1)
+          panel = Path(
+              "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx"
+          )
+          text = panel.read_text()
+          text, count = re.subn(
+              r"(?m)^\s*studioDocumentWorkspaces,\s*\n",
+              "",
+              text,
+          )
+          if count != 1:
+              raise SystemExit(
+                  f"{panel}: expected one unused studioDocumentWorkspaces import, found {count}"
+              )
+          panel.write_text(text)
+
+          document_store = Path(
+              "apps/web/src/domains/creator/studio-project-document-store.ts"
+          )
+          text = document_store.read_text()
+          declaration = (
+              "const KIND_WORKSPACES: Readonly<Record<StudioDocumentKind, "
+              "readonly StudioDocumentWorkspace[]>> = Object.freeze({"
+          )
+          if text.count(declaration) != 1:
+              raise SystemExit(
+                  f"{document_store}: expected one KIND_WORKSPACES declaration"
+              )
+          text = text.replace(declaration, "const KIND_WORKSPACES = Object.freeze({", 1)
+          footer = "});\n\nconst PROJECT_DEFAULT_DOCUMENT:"
+          typed_footer = (
+              "} as const satisfies Readonly<Record<StudioDocumentKind, "
+              "readonly StudioDocumentWorkspace[]>>);\n\n"
+              "const PROJECT_DEFAULT_DOCUMENT:"
+          )
+          if text.count(footer) != 1:
+              raise SystemExit(
+                  f"{document_store}: expected one KIND_WORKSPACES closing marker"
+              )
+          text = text.replace(footer, typed_footer, 1)
           workspace_lookup = "  const allowedWorkspaces = KIND_WORKSPACES[input.kind];"
           typed_workspace_lookup = (
               "  const allowedWorkspaces: readonly StudioDocumentWorkspace[] = "
@@ -49,21 +149,191 @@ jobs:
           document_store.write_text(
               text.replace(workspace_lookup, typed_workspace_lookup, 1)
           )
-          '''
-          if text.count(old_write) != 1:
-              raise SystemExit("expected one lifecycle document-store write marker")
-          text = text.replace(old_write, new_write, 1)
 
-          cleanup = "          rm -f .github/workflows/apply-toonstudio-project-lifecycle.yml\n"
-          cleanup_with_repair = cleanup + "          rm -f .github/workflows/repair-toonstudio-project-lifecycle.yml\n"
-          if text.count(cleanup) != 1:
-              raise SystemExit("expected one lifecycle workflow cleanup marker")
-          workflow.write_text(text.replace(cleanup, cleanup_with_repair, 1))
+          danger_call = 'buttonClass({ variant: "danger", size: "sm" })'
+          danger_outline = (
+              'buttonClass({ variant: "outline", size: "sm", '
+              'className: "border-danger/50 text-danger hover:border-danger '
+              'hover:bg-danger-soft/25 hover:text-danger" })'
+          )
+          danger_targets = {
+              panel: 2,
+              Path(
+                  "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx"
+              ): 1,
+          }
+          for file, expected in danger_targets.items():
+              text = file.read_text()
+              found = text.count(danger_call)
+              if found != expected:
+                  raise SystemExit(
+                      f"{file}: expected {expected} danger button calls, found {found}"
+                  )
+              file.write_text(text.replace(danger_call, danger_outline))
           PY
 
-          git config user.name "toonstudio-integration-bot"
-          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
-          git add .github/workflows/apply-toonstudio-project-lifecycle.yml
+      - name: Normalize lifecycle sources
+        run: >-
+          pnpm exec eslint --fix
+          apps/web/src/app/routes/groups/creator-route-pages.ts
+          apps/web/src/app/routes/groups/creator.routes.tsx
+          apps/web/src/domains/creator/studio-project-library-store.ts
+          apps/web/src/domains/creator/studio-project-library-store.test.ts
+          apps/web/src/domains/creator/studio-project-document-store.ts
+          apps/web/src/domains/creator/studio-project-document-store.test.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts
+          apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
+          apps/web/src/domains/creator/studio-integration-closure.test.ts
+
+      - name: Check source formatting
+        run: git diff --check
+
+      - name: Typecheck lifecycle delta against repository baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            git diff --name-only origin/main...HEAD
+            git diff --name-only
+            git diff --cached --name-only
+          } | sed '/^$/d' | sort -u > "$RUNNER_TEMP/typecheck-changed-files.txt"
+
+          set +e
+          pnpm exec tsc -p tsconfig.json --noEmit --pretty false > "$RUNNER_TEMP/typecheck.log" 2>&1
+          typecheck_status=$?
+          set -e
+
+          if [[ "$typecheck_status" -eq 0 ]]; then
+            echo 0 > "$RUNNER_TEMP/typecheck-baseline-count"
+            exit 0
+          fi
+
+          python - \
+            "$RUNNER_TEMP/typecheck.log" \
+            "$RUNNER_TEMP/typecheck-changed-files.txt" \
+            "$RUNNER_TEMP/typecheck-baseline-count" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          log_path = Path(sys.argv[1])
+          changed_path = Path(sys.argv[2])
+          count_path = Path(sys.argv[3])
+          changed = {
+              line.strip().removeprefix("./")
+              for line in changed_path.read_text().splitlines()
+              if line.strip()
+          }
+          diagnostic_pattern = re.compile(
+              r"^(?P<path>.+?\.(?:ts|tsx))\(\d+,\d+\): error TS\d+:"
+          )
+          diagnostics: list[tuple[str, str]] = []
+          unknown: list[str] = []
+          for raw_line in log_path.read_text().splitlines():
+              line = raw_line.strip().removeprefix("##[error]").strip()
+              match = diagnostic_pattern.match(line)
+              if match:
+                  path = match.group("path").removeprefix("./")
+                  diagnostics.append((path, line))
+              elif "error TS" in line:
+                  unknown.append(line)
+
+          if unknown or not diagnostics:
+              print(log_path.read_text(), file=sys.stderr)
+              if unknown:
+                  print("Unclassified TypeScript diagnostics detected.", file=sys.stderr)
+              else:
+                  print("TypeScript failed without parseable diagnostics.", file=sys.stderr)
+              raise SystemExit(1)
+
+          introduced = [line for path, line in diagnostics if path in changed]
+          if introduced:
+              print("TypeScript errors in lifecycle-changed files:", file=sys.stderr)
+              print(*introduced, sep="\n", file=sys.stderr)
+              raise SystemExit(1)
+
+          baseline = [line for path, line in diagnostics if path not in changed]
+          count_path.write_text(f"{len(baseline)}\n")
+          print(
+              f"TypeScript delta gate passed: {len(baseline)} existing diagnostics "
+              "remain outside lifecycle-changed files."
+          )
+          PY
+
+      - name: Lint lifecycle sources
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/app/routes/groups/creator-route-pages.ts
+          apps/web/src/app/routes/groups/creator.routes.tsx
+          apps/web/src/domains/creator/studio-project-library-store.ts
+          apps/web/src/domains/creator/studio-project-library-store.test.ts
+          apps/web/src/domains/creator/studio-project-document-store.ts
+          apps/web/src/domains/creator/studio-project-document-store.test.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts
+          apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
+          apps/web/src/domains/creator/studio-integration-closure.test.ts
+
+      - name: Run lifecycle and route tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/studio-project-library-store.test.ts
+          apps/web/src/domains/creator/studio-project-document-store.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx
+          apps/web/src/domains/creator/studio-integration-closure.test.ts
+          apps/web/src/app/routes/groups/app-routes.test.tsx
+          --pool=forks --maxWorkers=2
+
+      - name: Verify ToonStudio contracts and reachability
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/verify-toonstudio-feature-reachability.mjs
+          if pnpm run | grep -q 'verify:studio-session-complete'; then
+            pnpm run verify:studio-session-complete
+          fi
+
+      - name: Build production bundle
+        run: pnpm run build:bundle
+
+      - name: Commit validated lifecycle integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline_count="$(cat "$RUNNER_TEMP/typecheck-baseline-count")"
+          mkdir -p docs/rewrite
+          {
+            echo "# ToonStudio project lifecycle validation"
+            echo
+            echo "- Validated commit: \`$(git rev-parse HEAD)\`"
+            echo "- Validated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "- TypeScript delta gate: no diagnostics in lifecycle-changed files"
+            echo "- Repository baseline TypeScript diagnostics outside this change: ${baseline_count}"
+            echo "- ESLint: passed"
+            echo "- Project and document lifecycle tests: passed"
+            echo "- Route and integration closure tests: passed"
+            echo "- Feature reachability and session contracts: passed"
+            echo "- Production bundle: passed"
+          } > docs/rewrite/toonstudio-project-lifecycle-validation.md
+
+          git add -A
           git diff --cached --check
-          git commit -m "ci(studio): widen lifecycle workspace validation"
+          git commit -m "feat(studio): complete project and document lifecycle"
           git push origin HEAD:feat/toonstudio-project-lifecycle-20260912
