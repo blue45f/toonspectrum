@@ -243,6 +243,16 @@ jobs:
               "fortune navigation regression test",
           )
           write(navigation_test_path, navigation_test)
+
+          project_shell_path = "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx"
+          project_shell = git_show(feature_head, project_shell_path)
+          project_shell = replace_once(
+              project_shell,
+              'const PRIMARY_SECTIONS = STUDIO_PROJECT_NAVIGATION.map((item) => item.id)\n  as readonly Exclude<StudioProjectSection, "settings">[];\n',
+              'const PRIMARY_SECTIONS = STUDIO_PROJECT_NAVIGATION.map(\n  (item) => item.id,\n) as readonly Exclude<StudioProjectSection, "settings">[];\n',
+              "primary section type assertion",
+          )
+          write(project_shell_path, project_shell)
           PY
 
           git add -A
@@ -254,7 +264,8 @@ jobs:
               apps/web/src/app/routes/groups/creator.routes.tsx|\
               apps/web/src/app/routes/groups/studio-manual.routes.test.tsx|\
               apps/web/src/shared/components/site-navigation.ts|\
-              apps/web/src/shared/components/site-navigation.test.ts)
+              apps/web/src/shared/components/site-navigation.test.ts|\
+              apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx)
                 continue
                 ;;
             esac
@@ -306,6 +317,11 @@ jobs:
                   "SITE_NAVIGATION_ITEMS.fortune",
                   'siteNavigationContextForPath("/fortune")',
                   'toBe("spectrum")',
+              ],
+              "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx": [
+                  "const PRIMARY_SECTIONS = STUDIO_PROJECT_NAVIGATION.map(",
+                  "  (item) => item.id,",
+                  ') as readonly Exclude<StudioProjectSection, "settings">[];',
               ],
           }
           for path, tokens in required_tokens.items():
