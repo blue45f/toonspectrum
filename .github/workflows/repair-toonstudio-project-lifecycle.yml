@@ -1,0 +1,69 @@
+name: Repair ToonStudio project lifecycle verifier once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-project-lifecycle-20260912
+    paths:
+      - .github/workflows/repair-toonstudio-project-lifecycle.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-toonstudio-project-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  patch-verifier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-project-lifecycle-20260912
+          fetch-depth: 1
+
+      - name: Patch the verified TypeScript widening and cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/apply-toonstudio-project-lifecycle.yml")
+          text = workflow.read_text()
+
+          old_write = "          document_store.write_text(text.replace(footer, typed_footer, 1))\n"
+          new_write = '''          text = text.replace(footer, typed_footer, 1)
+          workspace_lookup = "  const allowedWorkspaces = KIND_WORKSPACES[input.kind];"
+          typed_workspace_lookup = (
+              "  const allowedWorkspaces: readonly StudioDocumentWorkspace[] = "
+              "KIND_WORKSPACES[input.kind];"
+          )
+          if text.count(workspace_lookup) != 1:
+              raise SystemExit(
+                  f"{document_store}: expected one allowedWorkspaces lookup"
+              )
+          document_store.write_text(
+              text.replace(workspace_lookup, typed_workspace_lookup, 1)
+          )
+'''
+          if text.count(old_write) != 1:
+              raise SystemExit("expected one lifecycle document-store write marker")
+          text = text.replace(old_write, new_write, 1)
+
+          cleanup = "          rm -f .github/workflows/apply-toonstudio-project-lifecycle.yml\n"
+          cleanup_with_repair = cleanup + "          rm -f .github/workflows/repair-toonstudio-project-lifecycle.yml\n"
+          if text.count(cleanup) != 1:
+              raise SystemExit("expected one lifecycle workflow cleanup marker")
+          workflow.write_text(text.replace(cleanup, cleanup_with_repair, 1))
+          PY
+
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add .github/workflows/apply-toonstudio-project-lifecycle.yml
+          git diff --cached --check
+          git commit -m "ci(studio): widen lifecycle workspace validation"
+          git push origin HEAD:feat/toonstudio-project-lifecycle-20260912
