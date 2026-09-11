@@ -6,7 +6,17 @@ import {
   validateStudioAssetPassport,
   type StudioAssetPassport,
   type StudioAssetUsageContext,
+  type StudioBrushQuality,
 } from "./studio-asset-passport";
+
+const BASE_BRUSH_QUALITY: StudioBrushQuality = Object.freeze({
+  kind: "brush",
+  engineIds: ["raster-basic"],
+  deterministic: true,
+  gpuCost: "low",
+  pressure: true,
+  tilt: true,
+});
 
 const BASE_PASSPORT: StudioAssetPassport = Object.freeze({
   schemaVersion: 1,
@@ -33,14 +43,7 @@ const BASE_PASSPORT: StudioAssetPassport = Object.freeze({
       supportedPlatforms: ["web", "desktop", "mobile"],
       supportedFormats: ["toon-brush"],
     },
-    details: {
-      kind: "brush",
-      engineIds: ["raster-basic"],
-      deterministic: true,
-      gpuCost: "low",
-      pressure: true,
-      tilt: true,
-    },
+    details: BASE_BRUSH_QUALITY,
   },
   rights: {
     verified: true,
@@ -193,7 +196,7 @@ describe("Studio asset quality and rights passport", () => {
       type: "3d",
       quality: {
         ...BASE_PASSPORT.quality,
-        details: BASE_PASSPORT.quality.details,
+        details: BASE_BRUSH_QUALITY,
       },
     });
     expect(validateStudioAssetPassport(mismatched)).toContainEqual(
@@ -204,8 +207,7 @@ describe("Studio asset quality and rights passport", () => {
       quality: {
         ...BASE_PASSPORT.quality,
         details: {
-          ...BASE_PASSPORT.quality.details,
-          kind: "brush",
+          ...BASE_BRUSH_QUALITY,
           engineIds: [],
         },
       },
