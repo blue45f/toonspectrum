@@ -1,4 +1,4 @@
-name: Rebase and apply ToonStudio template hub once
+name: Finalize ToonStudio template hub once
 
 on:
   push:
@@ -43,227 +43,56 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Rebuild on validated brush runtime and recover integration steps
+      - name: Recover the validated integration pipeline
         shell: bash
         run: |
           set -euo pipefail
-          SOURCE_TIP="$(git rev-parse HEAD)"
-          FEATURE_TIP="7dd8de201a6b17252c2d16d312f1c4345690ba10"
-          git cat-file -e "${FEATURE_TIP}^{commit}"
-          git show "${FEATURE_TIP}:.github/workflows/apply-toonstudio-template-hub.yml" > /tmp/original-template-hub-workflow.yml
-
+          WRAPPER_TIP="f27f0e86a4512abc6fed070b3af6b08788b5ec67"
+          git cat-file -e "${WRAPPER_TIP}^{commit}"
+          git show "${WRAPPER_TIP}:.github/workflows/apply-toonstudio-template-hub.yml" > /tmp/template-wrapper.yml
           node --input-type=module <<'NODE'
           import fs from "node:fs";
           import YAML from "yaml";
 
-          const source = fs.readFileSync("/tmp/original-template-hub-workflow.yml", "utf8");
-          const workflow = YAML.parse(source);
-          const expectedNames = [
-            "Connect template and lifecycle owners",
-            "Normalize changed sources",
-            "Typecheck",
-            "Lint changed sources",
-            "Run lifecycle and template tests",
-            "Verify ToonStudio reachability and contracts",
-            "Build production bundle",
-            "Record validation and remove one-shot workflows",
+          const workflow = YAML.parse(fs.readFileSync("/tmp/template-wrapper.yml", "utf8"));
+          const names = [
+            "Rebuild on validated brush runtime and recover integration steps",
+            "Connect owners and repair strict contracts",
+            "Validate, finalize and self-remove",
           ];
           const steps = workflow?.jobs?.integrate?.steps ?? [];
-          for (const [index, name] of expectedNames.entries()) {
+          for (const [index, name] of names.entries()) {
             const step = steps.find((candidate) => candidate?.name === name);
             if (!step || typeof step.run !== "string") {
-              throw new Error(`Original workflow step is missing: ${name}`);
+              throw new Error(`Wrapper step is missing: ${name}`);
             }
-            fs.writeFileSync(
-              `/tmp/toonstudio-template-step-${index}.sh`,
-              `set -euo pipefail\n${step.run}\n`,
-            );
+            fs.writeFileSync(`/tmp/template-wrapper-${index}.sh`, `set -euo pipefail\n${step.run}\n`);
           }
           NODE
 
-          git fetch origin main
-          if git fetch origin \
-            refs/heads/fix/brush-runtime-production-20260912:refs/remotes/origin/fix/brush-runtime-production-20260912
-          then
-            BASE_REF="origin/fix/brush-runtime-production-20260912"
-          else
-            BASE_REF="origin/main"
-          fi
-
-          git config user.name "toonstudio-integration-bot"
-          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
-          git checkout -B feat/toonstudio-template-hub-20260912 "${BASE_REF}"
-          git merge --no-commit --no-ff -s ours "${SOURCE_TIP}"
-          git checkout "${FEATURE_TIP}" -- \
-            apps/web/src/domains/creator/studio-project-creation.test.ts \
-            apps/web/src/domains/creator/studio-project-creation.ts \
-            apps/web/src/domains/creator/studio-project-document-store.test.ts \
-            apps/web/src/domains/creator/studio-project-document-store.ts \
-            apps/web/src/domains/creator/studio-project-library-store.test.ts \
-            apps/web/src/domains/creator/studio-project-library-store.ts \
-            apps/web/src/domains/creator/studio-project-template-catalog.test.ts \
-            apps/web/src/domains/creator/studio-project-template-catalog.ts \
-            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx \
-            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx \
-            apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts \
-            apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
-
-      - name: Connect owners and repair strict contracts
+      - name: Rebuild and repair workspace typing
         shell: bash
         run: |
           set -euo pipefail
+          bash /tmp/template-wrapper-0.sh
+          bash /tmp/template-wrapper-1.sh
           python <<'PY'
           from pathlib import Path
 
-          step_path = Path("/tmp/toonstudio-template-step-0.sh")
-          step = step_path.read_text(encoding="utf-8")
-          replacements = (
-              ('path: "/studio/templates"', 'path: studioRoutePath("templates")', 3),
-              ('path: "/studio/import"', 'path: studioRoutePath("import")', 1),
+          path = Path("apps/web/src/domains/creator/studio-project-document-store.ts")
+          source = path.read_text(encoding="utf-8")
+          old = "  const allowedWorkspaces = KIND_WORKSPACES[input.kind];"
+          new = (
+              "  const allowedWorkspaces: readonly StudioDocumentWorkspace[] =\n"
+              "    KIND_WORKSPACES[input.kind];"
           )
-          for old, new, expected in replacements:
-              count = step.count(old)
-              if count != expected:
-                  raise SystemExit(
-                      f"template integration route adaptation {old!r}: "
-                      f"matches={count}, expected={expected}"
-                  )
-              step = step.replace(old, new)
-          step_path.write_text(step, encoding="utf-8")
+          if source.count(old) != 1:
+              raise SystemExit(
+                  "studio-project-document-store.ts: expected one allowed workspace declaration"
+              )
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
           PY
 
-          bash /tmp/toonstudio-template-step-0.sh
-          python <<'PY'
-          from pathlib import Path
-          import re
-
-          creation_path = Path("apps/web/src/domains/creator/studio-project-creation.ts")
-          creation = creation_path.read_text(encoding="utf-8")
-          legacy_storage = '''export interface StudioProjectCreationStorage
-            extends StudioProjectLibraryStorage,
-              StudioProjectDocumentStorage {}'''
-          normalized_storage = '''export type StudioProjectCreationStorage = StudioProjectLibraryStorage &
-            StudioProjectDocumentStorage;'''
-          if legacy_storage in creation:
-              creation = creation.replace(legacy_storage, normalized_storage, 1)
-          elif normalized_storage not in creation:
-              raise SystemExit("studio-project-creation.ts: storage type declaration not recognized")
-          creation_path.write_text(creation, encoding="utf-8")
-
-          new_page_path = Path(
-              "apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
-          )
-          new_page = new_page_path.read_text(encoding="utf-8")
-          new_page, autofocus_count = re.subn(
-              r"^\s*autoFocus\s*$\n?",
-              "",
-              new_page,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          if autofocus_count == 0 and "autoFocus" in new_page:
-              raise SystemExit("StudioNewIntegratedPage.tsx: unexpected autoFocus shape")
-          new_page_path.write_text(new_page, encoding="utf-8")
-
-          documents_panel_path = Path(
-              "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx"
-          )
-          documents_panel = documents_panel_path.read_text(encoding="utf-8")
-          unused_workspace_import = "  studioDocumentWorkspaces,\n"
-          if documents_panel.count(unused_workspace_import) != 1:
-              raise SystemExit(
-                  "StudioProjectDocumentsPanel.tsx: expected one unused workspace import"
-              )
-          documents_panel_path.write_text(
-              documents_panel.replace(unused_workspace_import, "", 1),
-              encoding="utf-8",
-          )
-
-          library_page_path = Path(
-              "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx"
-          )
-          library_page = library_page_path.read_text(encoding="utf-8")
-          library_page, library_autofocus_count = re.subn(
-              r"^\s*autoFocus\s*$\n?",
-              "",
-              library_page,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          if library_autofocus_count != 1:
-              raise SystemExit(
-                  "StudioProjectLibraryPage.tsx: expected one autoFocus attribute"
-              )
-          library_page_path.write_text(library_page, encoding="utf-8")
-
-          document_path = Path(
-              "apps/web/src/domains/creator/studio-project-document-store.ts"
-          )
-          document = document_path.read_text(encoding="utf-8")
-          workspace_pattern = re.compile(
-              r"const KIND_WORKSPACES:.*?\n\}\);\n\nconst PROJECT_DEFAULT_DOCUMENT",
-              re.DOTALL,
-          )
-          workspace_replacement = '''const KIND_WORKSPACES = {
-            webtoon: ["comic", "draw", "image", "localization", "review"],
-            illustration: ["draw", "image", "review"],
-            image: ["image", "draw", "review"],
-            design: ["design", "image", "slides", "review"],
-            slides: ["slides", "design", "review"],
-            storyboard: ["storyboard", "draw", "motion", "review"],
-            whiteboard: ["whiteboard", "design", "review"],
-            "three-d": ["3d", "image", "review"],
-            animation: ["animation", "motion", "audio", "review"],
-            motion: ["motion", "audio", "review"],
-            audio: ["audio", "motion", "review"],
-            localization: ["localization", "review"],
-          } as const satisfies Readonly<
-            Record<StudioDocumentKind, readonly StudioDocumentWorkspace[]>
-          >;
-
-          const PROJECT_DEFAULT_DOCUMENT'''
-          document, workspace_count = workspace_pattern.subn(
-              workspace_replacement,
-              document,
-              count=1,
-          )
-          if workspace_count != 1:
-              raise SystemExit(
-                  f"studio-project-document-store.ts: workspace map replacements={workspace_count}"
-              )
-          document_path.write_text(document, encoding="utf-8")
-
-          old_button = 'buttonClass({ variant: "danger", size: "sm" })'
-          new_button = (
-              'buttonClass({ variant: "quiet", size: "sm", '
-              'className: "text-danger hover:text-danger" })'
-          )
-          destructive_count = 0
-          for relative_path in (
-              "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx",
-              "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",
-          ):
-              path = Path(relative_path)
-              value = path.read_text(encoding="utf-8")
-              count = value.count(old_button)
-              destructive_count += count
-              path.write_text(value.replace(old_button, new_button), encoding="utf-8")
-          if destructive_count != 3:
-              raise SystemExit(
-                  f"destructive button variant replacements={destructive_count}, expected=3"
-              )
-          PY
-
-      - name: Validate, finalize and self-remove
+      - name: Validate, commit and self-remove
         shell: bash
-        run: |
-          set -euo pipefail
-          for step in 1 2 3 4 5 6 7; do
-            bash "/tmp/toonstudio-template-step-${step}.sh"
-          done
+        run: bash /tmp/template-wrapper-2.sh
