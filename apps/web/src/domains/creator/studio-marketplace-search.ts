@@ -175,14 +175,17 @@ export function searchStudioMarketplace(
   });
   const hits = filtered.map((item) => Object.freeze({ item, relevance: relevance(item, query.text) }));
   hits.sort((left, right) => {
-    let value = 0;
-    if (query.sort === "relevance") value = right.relevance - left.relevance;
-    else if (query.sort === "quality") value = right.item.qualityScore - left.item.qualityScore;
-    else if (query.sort === "rating") value = right.item.rating - left.item.rating
-      || right.item.reviewCount - left.item.reviewCount;
-    else if (query.sort === "newest") value = Date.parse(right.item.updatedAt) - Date.parse(left.item.updatedAt);
-    else if (query.sort === "price-asc") value = left.item.priceMinor - right.item.priceMinor;
-    else value = right.item.priceMinor - left.item.priceMinor;
+    const value = query.sort === "relevance"
+      ? right.relevance - left.relevance
+      : query.sort === "quality"
+        ? right.item.qualityScore - left.item.qualityScore
+        : query.sort === "rating"
+          ? right.item.rating - left.item.rating || right.item.reviewCount - left.item.reviewCount
+          : query.sort === "newest"
+            ? Date.parse(right.item.updatedAt) - Date.parse(left.item.updatedAt)
+            : query.sort === "price-asc"
+              ? left.item.priceMinor - right.item.priceMinor
+              : right.item.priceMinor - left.item.priceMinor;
     return value || left.item.id.localeCompare(right.item.id);
   });
   return Object.freeze({
