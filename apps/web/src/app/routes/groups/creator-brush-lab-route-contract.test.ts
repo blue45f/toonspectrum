@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_ROUTE_REGISTRY,
+  auditStudioRouteRegistry,
   studioRoutePath,
 } from "../../../domains/creator/studio-route-registry";
 
@@ -28,6 +29,7 @@ function sourceIndex(routeId: string): number {
 
 describe("unified Brush Editor route contract", () => {
   it("owns canonical create/edit routes in the registry and retains legacy aliases", () => {
+    expect(auditStudioRouteRegistry()).toEqual([]);
     expect(studioRoutePath("asset-brush-new")).toBe(CANONICAL_BRUSH_EDITOR_ROUTE);
     expect(studioRoutePath("asset-brush-edit")).toBe(CANONICAL_BRUSH_EDIT_ROUTE);
 
