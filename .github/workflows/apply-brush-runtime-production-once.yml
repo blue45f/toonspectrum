@@ -50,6 +50,7 @@ jobs:
 
       - name: Format changed sources
         run: |
+          set -o pipefail
           pnpm exec prettier --write \
             apps/web/src/domains/creator/studio-asset-governance.ts \
             apps/web/src/domains/creator/studio-feature-registry.ts \
@@ -68,7 +69,7 @@ jobs:
             apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx \
             apps/web/src/domains/creator/brush/StudioDrawNode.tsx \
             apps/web/src/domains/creator/live/studio-live-retained-media-overlay.ts \
-            apps/web/src/domains/creator/export/studio-svg-export-freehand-media.ts
+            apps/web/src/domains/creator/export/studio-svg-export-freehand-media.ts 2>&1 | tee validation-format.log
 
       - name: Strict lint changed sources
         run: |
