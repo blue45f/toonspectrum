@@ -90,10 +90,10 @@ export const StudioAssetHubPage = lazyRetry(
   "StudioAssetHubPage",
 );
 export const StudioProjectShellPage = lazyRetry(
-  () => import("@/domains/creator/studio-shell/StudioProjectShellPage").then((module) => ({
-    default: module.StudioProjectShellPage,
+  () => import("@/domains/creator/studio-shell/StudioProjectIntegratedPage").then((module) => ({
+    default: module.StudioProjectIntegratedPage,
   })),
-  "StudioProjectShellPage",
+  "StudioProjectIntegratedPage",
 );
 export const StudioDocumentWorkspaceRoute = lazyRetry(
   () => import("@/domains/creator/studio-shell/StudioDocumentWorkspaceRoute").then((module) => ({
