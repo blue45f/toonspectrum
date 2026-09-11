@@ -21,13 +21,42 @@ jobs:
           ref: feat/toonstudio-session-completion-followup-20260911
           fetch-depth: 1
 
-      - name: Pack source without repository metadata
-        run: tar --exclude=.git --exclude=node_modules -czf "$RUNNER_TEMP/toonstudio-followup-source.tar.gz" .
+      - name: Pack validation source
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            package.json
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            eslint.config.mjs
+            tsconfig.json
+            tsconfig.toonstudio-core.json
+            tsconfig.toonstudio-ui.json
+            vitest.config.ts
+            vite.config.ts
+            apps/web/package.json
+            apps/web/tsconfig.json
+            apps/web/src
+            apps/web/public/i18n
+            packages
+            patches
+            scripts
+            deploy/cloudflare-realtime/src
+            crates/studio-engine-vello/pkg
+            crates/studio-engine-vello/pkg-gpu
+            .github/workflows
+          )
+          paths=()
+          for candidate in "${candidates[@]}"; do
+            [[ -e "$candidate" ]] && paths+=("$candidate")
+          done
+          tar -czf "$RUNNER_TEMP/toonstudio-followup-source.tar.gz" "${paths[@]}"
 
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: toonstudio-followup-source
+          name: toonstudio-followup-source-lite
           path: ${{ runner.temp }}/toonstudio-followup-source.tar.gz
           if-no-files-found: error
           retention-days: 1
