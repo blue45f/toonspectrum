@@ -37,23 +37,17 @@ describe("site navigation information architecture", () => {
     expect(SITE_NAVIGATION_ITEMS.studioAssets.href).toBe("/studio/assets");
   });
 
-  it("keeps the Studio drawer bounded while retaining all advanced destinations", () => {
-    expect(TOONSTUDIO_NAVIGATION_GROUPS.map((group) => group.id)).toEqual([
-      "studio-work",
-      "studio-create",
-      "studio-ecosystem",
-    ]);
-    expect(TOONSTUDIO_NAVIGATION_GROUPS[0]?.items).toEqual([
-      SITE_NAVIGATION_ITEMS.studio,
-      SITE_NAVIGATION_ITEMS.make,
-      SITE_NAVIGATION_ITEMS.studioAssets,
-      SITE_NAVIGATION_ITEMS.learn,
-    ]);
+  it("keeps the fortune and tarot experience discoverable from the shared directory", () => {
+    const growItems = SITE_NAVIGATION_GROUPS.find((group) => group.id === "grow")?.items;
 
-    const groupedIds = TOONSTUDIO_NAVIGATION_GROUPS.flatMap((group) =>
-      group.items.map((item) => item.id)
-    );
-    expect(groupedIds).toEqual(expect.arrayContaining([
+    expect(growItems).toContain(SITE_NAVIGATION_ITEMS.fortune);
+    expect(SITE_NAVIGATION_ITEMS.fortune.href).toBe("/fortune");
+    expect(SITE_NAVIGATION_ITEMS.fortune.label.ko).toContain("타로");
+  });
+
+  it("uses the desktop Home logo space for Studio while keeping Market first-class", () => {
+    expect(PRIMARY_SITE_NAVIGATION.map((item) => item.id)).toEqual([
+      "explore",
       "studio",
       "make",
       "studio-assets",

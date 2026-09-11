@@ -2,7 +2,19 @@ name: Studio manual
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
+    paths:
+      - 'apps/web/src/domains/creator/manual/**'
+      - 'apps/web/src/domains/creator/studio-help-menu-items*'
+      - 'apps/web/src/domains/creator/studio-command-catalog*'
+      - 'apps/web/src/domains/creator/studio-main-menu-group-spec-help.ts'
+      - 'apps/web/src/app/routes/groups/creator.routes.tsx'
+      - 'apps/web/src/app/routes/groups/studio-manual.routes.test.tsx'
+      - 'apps/web/src/app/routes/app-route-title-ownership.ts'
+      - 'scripts/verify-studio-manual.mjs'
+      - '.github/workflows/studio-manual.yml'
+  push:
     paths:
       - 'apps/web/src/domains/creator/manual/**'
       - 'apps/web/src/domains/creator/studio-help-menu-items*'
@@ -18,7 +30,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: studio-manual-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -35,7 +47,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Manual, route and existing menu/catalog regression tests
         run: >-
           pnpm exec vitest run

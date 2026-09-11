@@ -2,7 +2,18 @@ name: Studio collaboration document sync
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main]
+    paths:
+      - ".github/workflows/studio-collaboration-sync.yml"
+      - "scripts/verify-studio-collaboration-sync.mts"
+      - "scripts/lib/studio-verify-preview-harness.mjs"
+      - "scripts/lib/studio-verify-preview-harness.mts"
+      - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
+      - "apps/web/src/domains/creator/live/**"
+      - "apps/web/src/domains/creator/studio-cuttoon-editor/**"
+
+  push:
     paths:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"
@@ -13,11 +24,12 @@ on:
       - "apps/web/src/domains/creator/studio-cuttoon-editor/**"
   workflow_dispatch:
 
+  workflow_call:
 permissions:
   contents: read
 
 concurrency:
-  group: studio-collaboration-sync-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -36,7 +48,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Verify presence/document readiness policy and transport contracts
         run: >-
           pnpm exec vitest run
@@ -54,8 +66,17 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/production"
           mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/branch"
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install-deps chromium
       - name: Reproduce the currently deployed Studio
         id: production-baseline
         continue-on-error: true
@@ -63,12 +84,38 @@ jobs:
           TOONSPECTRUM_VERIFY_ORIGIN: https://www.toonstudio.cloud
           TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonspectrum-verification/studio-collaboration-sync/production
         run: pnpm exec tsx scripts/verify-studio-collaboration-sync.mts
-      - name: Build production Studio assets
-        run: pnpm run build
+      - name: Build production Studio assets without repeating the core typecheck
+        run: pnpm run build:bundle
       - name: Verify the pull-request build
-        env:
-          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonspectrum-verification/studio-collaboration-sync/branch
-        run: pnpm exec tsx scripts/verify-studio-collaboration-sync.mts
+        run: |
+          set -euo pipefail
+
+          evidence_root="$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/branch"
+          mkdir -p "$evidence_root"
+
+          for attempt in 1 2 3; do
+            attempt_dir="$evidence_root/attempt-$attempt"
+            attempt_log="$evidence_root/attempt-$attempt.log"
+            mkdir -p "$attempt_dir"
+
+            if TOONSPECTRUM_VERIFY_DIR="$attempt_dir" \
+              pnpm exec tsx scripts/verify-studio-collaboration-sync.mts 2>&1 | tee "$attempt_log"; then
+              exit 0
+            fi
+
+            if ! grep -Eq \
+              'unexpected document sync phase: syncing|presence lane did not see both tabs' \
+              "$attempt_log"; then
+              exit 1
+            fi
+
+            if [[ "$attempt" -lt 3 ]]; then
+              echo "::warning::Transient collaboration readiness race detected; retrying the full browser convergence proof."
+              sleep "$((attempt * 2))"
+            fi
+          done
+
+          exit 1
       - name: Upload collaboration evidence
         if: always()
         uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action

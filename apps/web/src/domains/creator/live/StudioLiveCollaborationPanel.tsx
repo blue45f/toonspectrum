@@ -55,6 +55,7 @@ import {
 } from "./studio-live-view-preferences";
 import { StudioLiveCollaborationCommandCenter } from "./StudioLiveCollaborationCommandCenter";
 import { useStudioLiveCursorQuality } from "./use-studio-live-cursor-quality";
+import { useStudioLiveDisplaySync } from "./use-studio-live-display-sync";
 
 import type {
   StudioLiveChatMessage,
@@ -246,8 +247,9 @@ export function StudioLiveCollaborationPanelView({
   const watching = screenState.watching;
   const chatLogRef = useRef<HTMLUListElement>(null);
   const chatDraftReady = chatDraft.trim().length > 0;
-  const syncPresentation = syncSnapshot
-    ? presentStudioLiveSyncSnapshot(syncSnapshot)
+  const displaySyncSnapshot = useStudioLiveDisplaySync(syncSnapshot);
+  const syncPresentation = displaySyncSnapshot
+    ? presentStudioLiveSyncSnapshot(displaySyncSnapshot)
     : null;
   const syncStatusCopy = syncPresentation?.shortLabel ?? statusCopy(availability, mode);
   const screenConnectionLoading =

@@ -411,7 +411,7 @@ async function main(): Promise<void> {
   const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim().replace(/\/+$/, "");
   const port = externalOrigin ? null : await findFreePort({ unavailableMessage: "could not allocate preview port" });
   const origin = externalOrigin ?? `http://127.0.0.1:${port}`;
-  const url = `${origin}/studio`;
+  const url = `${origin}/studio/canvas`;
   let child: ChildProcess | null = null;
   let browser: Browser | null = null;
 

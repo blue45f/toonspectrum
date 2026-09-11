@@ -122,8 +122,11 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
   Object.freeze([...NORMALIZED_BASE_CATALOG, MANUAL_COMMAND, BRUSH_LAB_COMMAND]);
 
 export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
-  ...BASE_MENU_INVENTORY.flatMap((id) => id === "help/current-tool" ? [id, MANUAL_MENU_ID] : [id]),
-  BRUSH_LAB_MENU_ID,
+  ...BASE_MENU_INVENTORY.flatMap((id) => {
+    if (id === "help/current-tool") return [id, MANUAL_MENU_ID];
+    if (id === "brush/brush-studio") return [id, BRUSH_LAB_MENU_ID];
+    return [id];
+  }),
 ]);
 
 export const STUDIO_COMMAND_SOURCES = Object.freeze({

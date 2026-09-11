@@ -101,7 +101,7 @@ function marqueeMatchesBounds(
   mode: Exclude<MarqueeHitMode, "auto">,
   minimumOverlapRatio: number
 ): boolean {
-  let matches = false;
+  let matches: boolean;
   if (mode === "contain") matches = rectContainsRect(marquee, bounds);
   else if (mode === "center") {
     const normalized = normalizeRectGeometry(bounds);

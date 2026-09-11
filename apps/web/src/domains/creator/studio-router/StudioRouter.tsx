@@ -36,8 +36,17 @@ export function StudioRouter() {
   }
 
   const currentHref = `${location.pathname}${location.search}`;
-  if (currentHref !== resolution.canonicalHref) {
-    return <Navigate replace state={location.state} to={resolution.canonicalHref} />;
+  const canonicalHref =
+    resolution.kind === "editor"
+    && resolution.workspaceRoute.surface === "canvas"
+    && resolution.workspaceRoute.workId === null
+    && resolution.workspaceRoute.remixSourceWorkId === null
+      // `/studio` is the product front door now. Keep the legacy workspace parser compatible,
+      // while mounting an identity-free draft editor at its explicit, non-conflicting URL.
+      ? `/studio/canvas${location.search}`
+      : resolution.canonicalHref;
+  if (currentHref !== canonicalHref) {
+    return <Navigate replace state={location.state} to={canonicalHref} />;
   }
 
   switch (resolution.kind) {

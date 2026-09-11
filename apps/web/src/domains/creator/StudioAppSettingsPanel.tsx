@@ -33,7 +33,6 @@ import { createPortal } from "react-dom";
 import {
   STUDIO_APP_SETTINGS_TABS,
   studioAppSettingsTabLabel,
-  type StudioAppSettings,
   type StudioAppSettingsTab,
 } from "./studio-app-settings";
 import {

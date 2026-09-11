@@ -247,10 +247,10 @@ describe("buildStudioMainMenuGroups", () => {
     expect(english.find((group) => group.id === "layer")?.label).toBe("Layer");
     expect(english.find((group) => group.id === "window")?.label).toBe("Window");
     expect(korean.find((group) => group.id === "layer")?.label).toBe("레이어");
-    expect(menuItem(english, "help", "feature-tutorials").label).toBe("Feature tutorials");
+    expect(menuItem(english, "help", "feature-tutorials").label).toBe("Help home and guided learning");
     expect(menuItem(english, "help", "shortcuts").label).toBe("Shortcut help");
     expect(korean.find((group) => group.id === "help")?.label).toBe("도움말");
-    expect(menuItem(korean, "help", "feature-tutorials").label).toBe("사용법 · 기능 튜토리얼");
+    expect(menuItem(korean, "help", "feature-tutorials").label).toBe("도움말 홈 · 단계별 가이드");
     expect(menuItem(korean, "help", "shortcuts").label).toBe("단축키 · 기본 조작");
   });
 
@@ -678,7 +678,7 @@ describe("buildStudioMainMenuGroups", () => {
     );
     expect(ui.openToolsCompanion).toHaveBeenCalledOnce();
     expect(ui.toggleQuickAccessPalette).toHaveBeenCalledOnce();
-    expect(editor.openFeatureTutorial).toHaveBeenCalledOnce();
+    expect(editor.openFeatureTutorial).not.toHaveBeenCalled();
     expect(ui.openShortcuts).toHaveBeenCalledOnce();
     expect(ui.openAppSettings).toHaveBeenCalledWith("general");
     expect(editor.openStudioFilter).toHaveBeenNthCalledWith(

@@ -1,5 +1,4 @@
 import {
-  Boxes,
   ChevronDown,
   Eraser,
   Film,
@@ -10,10 +9,7 @@ import {
   Plus,
   Pencil,
   Palette,
-  UsersRound,
-  PersonStanding,
   PictureInPicture2,
-  Sparkles,
   SquareSplitHorizontal,
   WandSparkles,
 } from "lucide-react";
@@ -83,24 +79,16 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
     activeToolbarGroup,
     advancedFillActive,
     advancedFillUnsupportedReason,
-    bg3dOpen,
     drawMode,
     frameAnimOpen,
     frameAnimTargetId,
     menuRef,
-    mannequinPoserOpen,
-    poserVrmOpen,
-    characterShaperOpen,
     referencePanelOpen,
     selected,
     stableHandlers,
     tool,
     uiDensityMode,
-    setBg3dOpen,
-    setMannequinPoserOpen,
     setMenu,
-    setPoserVrmOpen,
-    setCharacterShaperOpen,
     setReferencePanelOpen,
   } = toolBelt;
 
@@ -359,96 +347,36 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
       ) : null}
 
       {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
-        <>
-          <StudioToolbarDivider label="참조" />
-          <StudioToolbarCluster label="참조·3D">
-            <StudioToolBeltHintTarget hint={hints.character3d}>
-              <button
-                type="button"
-                onClick={() => setPoserVrmOpen(true)}
-                className={cn(toolBtn(poserVrmOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-              >
-                <UsersRound
-                  size={STUDIO_ICON_SIZE.toolCompact}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioToolIconClass({ tone: "accent" })}
-                />
-                3D 캐릭터
-              </button>
-            </StudioToolBeltHintTarget>
-            <StudioToolBeltHintTarget hint={hints.characterShaper}>
-              <button
-                type="button"
-                onClick={() => setCharacterShaperOpen(true)}
-                className={cn(toolBtn(characterShaperOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-              >
-                <Sparkles
-                  size={STUDIO_ICON_SIZE.toolCompact}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioToolIconClass({ tone: "accent" })}
-                />
-                캐릭터 셰이퍼
-              </button>
-            </StudioToolBeltHintTarget>
-            <StudioToolBeltHintTarget hint={hints.mannequin3d}>
-              <button
-                type="button"
-                onClick={() => setMannequinPoserOpen(true)}
-                className={cn(toolBtn(mannequinPoserOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-              >
-                <PersonStanding
-                  size={STUDIO_ICON_SIZE.toolCompact}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioToolIconClass({ tone: "accent" })}
-                />
-                3D 데생 인형
-              </button>
-            </StudioToolBeltHintTarget>
-            <StudioToolBeltHintTarget hint={hints.bg3d}>
-              <button
-                type="button"
-                onClick={() => setBg3dOpen(true)}
-                className={cn(toolBtn(bg3dOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-              >
-                <Boxes
-                  size={STUDIO_ICON_SIZE.toolCompact}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioToolIconClass({ tone: "accent" })}
-                />
-                3D 배경
-              </button>
-            </StudioToolBeltHintTarget>
-            <StudioToolBeltHintTarget hint={hints.reference}>
-              <button
-                type="button"
-                onClick={() => setReferencePanelOpen((v) => !v)}
-                onMouseEnter={preloadStudioReferencePanel}
-                onFocus={preloadStudioReferencePanel}
-                className={cn(toolBtn(referencePanelOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-                aria-pressed={referencePanelOpen}
-              >
-                <PictureInPicture2
-                  size={STUDIO_ICON_SIZE.toolCompact}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioToolIconClass({ tone: "accent" })}
-                />
-                참고
-              </button>
-            </StudioToolBeltHintTarget>
-          </StudioToolbarCluster>
-        </>
-      ) : null}
+      <>
+        <StudioToolbarDivider label="참조" />
+        <StudioToolbarCluster label="참고 이미지">
+          <StudioToolBeltHintTarget hint={hints.reference}>
+            <button
+              type="button"
+              onClick={() => setReferencePanelOpen((v) => !v)}
+              onMouseEnter={preloadStudioReferencePanel}
+              onFocus={preloadStudioReferencePanel}
+              className={cn(toolBtn(referencePanelOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
+              aria-pressed={referencePanelOpen}
+            >
+              <PictureInPicture2
+                size={STUDIO_ICON_SIZE.toolCompact}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioToolIconClass({ tone: "accent" })}
+              />
+              참고 이미지
+            </button>
+          </StudioToolBeltHintTarget>
+        </StudioToolbarCluster>
+      </>
+    ) : null}
 
       {(studioUiDensityAllows(uiDensityMode, "toolbar-scene") || activeToolbarGroup === "bgGroup") ? (
         <>
-          {studioUiDensityAllows(uiDensityMode, "toolbar-scene") ? <StudioToolbarDivider label="장면" /> : null}
+          {studioUiDensityAllows(uiDensityMode, "toolbar-scene") ? <StudioToolbarDivider label="3D" /> : null}
           <StudioToolbarCluster
-            label="배경·톤"
+            label="3D 제작·배경"
             className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "border-0 bg-transparent p-0 shadow-none")}
           >
             <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
@@ -475,7 +403,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                       active: activeToolbarGroup === "bgGroup",
                     })}
                   />
-                  배경
+                  3D 스튜디오
                   <ChevronDown
                     size={STUDIO_ICON_SIZE.subtab}
                     strokeWidth={STUDIO_ICON_STROKE}
@@ -489,7 +417,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 id="bg-group"
                 className={groupPopoverClass("w-80")}
               >
-                <Suspense fallback={<StudioPanelLoading label="배경 메뉴를 여는 중..." />}>
+                <Suspense fallback={<StudioPanelLoading label="3D 스튜디오를 여는 중..." />}>
                   <LazyStudioSceneToolPopoverBody toolBelt={toolBelt} />
                 </Suspense>
               </StudioFloatingToolPopover>

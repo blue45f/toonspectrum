@@ -893,7 +893,7 @@ async function assertExportOptions(page: Page): Promise<string[]> {
 
 async function main() {
   const port = await findFreePort({ unavailableMessage: "could not allocate port" });
-  const url = `http://127.0.0.1:${port}/studio`;
+  const url = `http://127.0.0.1:${port}/studio/canvas`;
   let child: ChildProcess | null = null;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
   let exitCode: number;

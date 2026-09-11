@@ -2,11 +2,24 @@ name: Character Shaper discovery quality
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main]
     paths:
       - "apps/web/src/domains/creator/character-shaper/**"
-      - "apps/web/src/domains/creator/studio-router/**"
-      - "apps/web/src/domains/creator/studio-production/**"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteFallbacks*"
+      - "apps/web/src/domains/creator/studio-router/studio-route-manifest*"
+      - ".github/workflows/character-shaper-discovery-quality.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "vitest.config.ts"
+      - "vitest.setup.ts"
+  push:
+    paths:
+      - "apps/web/src/domains/creator/character-shaper/**"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway*"
+      - "apps/web/src/domains/creator/studio-router/StudioRouteFallbacks*"
+      - "apps/web/src/domains/creator/studio-router/studio-route-manifest*"
       - ".github/workflows/character-shaper-discovery-quality.yml"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -18,7 +31,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: shaper-discovery-quality-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -39,7 +52,7 @@ jobs:
           cache: pnpm
       - name: Install locked workspace dependencies
         id: install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --prefer-offline
       - name: Lint discovery, recovery and precision changes
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         shell: bash
@@ -74,6 +87,7 @@ jobs:
             apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx \
             apps/web/src/domains/creator/studio-router/StudioRouteFallbacks.test.tsx \
             apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
-      - name: Typecheck the complete frontend
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+      # Required CI/core owns the repository-wide PR typecheck.
+      - name: Typecheck the complete frontend (manual diagnostic)
+        if: ${{ github.event_name == 'workflow_dispatch' && !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm exec tsc -p tsconfig.json

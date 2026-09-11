@@ -1,6 +1,7 @@
 name: Feedback community validation
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'apps/api/src/**'
@@ -12,7 +13,19 @@ on:
       - 'scripts/verify-feedback-community-db.mts'
       - '*feedback*.ts'
       - '.github/workflows/feedback-community-validation.yml'
+  push:
+    paths:
+      - 'apps/api/src/**'
+      - 'packages/core/src/**'
+      - 'apps/web/src/domains/legal/**'
+      - 'apps/web/src/shared/components/inquiry-form.tsx'
+      - 'apps/web/src/shared/components/site-header*.tsx'
+      - 'e2e/feedback-community*'
+      - 'scripts/verify-feedback-community-db.mts'
+      - '*feedback*.ts'
+      - '.github/workflows/feedback-community-validation.yml'
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 # A failed test piped through tee must fail its step, not just appear in a log.
@@ -20,8 +33,9 @@ defaults:
   run:
     shell: bash
 concurrency:
-  group: feedback-community-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
 jobs:
   feedback-community:
     name: Feedback community regression gate
@@ -91,7 +105,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --prefer-offline
       - name: Lint changed feature surfaces
         id: lint
         continue-on-error: true

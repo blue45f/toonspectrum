@@ -17,14 +17,15 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { chromium, type Browser, type CDPSession, type Locator, type Page } from "playwright";
 import { decodePng } from "image-js";
+import { chromium, type Browser, type CDPSession, type Locator, type Page } from "playwright";
 
 import {
   STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
 } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
+
 import {
   collectStudioInAppRuntimeErrors,
   installStudioInAppFirstRunState,

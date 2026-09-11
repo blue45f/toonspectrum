@@ -19,10 +19,9 @@ describe("independent Studio manual routes", () => {
     expect(routeId("/studio/manual/brushes")).toBe("creator-studio-manual-article");
     expect(routeId("/studio/manual/unknown-article")).toBe("creator-studio-manual-article");
   });
-
-  it("separates the Studio home from legacy editor, 3D and publish routes", () => {
+  it("preserves editor, 3D and publish routes", () => {
     expect(routeId("/studio")).toBe("creator-studio-home");
-    for (const path of ["/studio/character", "/studio/bg3d", "/studio/publish"]) {
+    for (const path of ["/studio/canvas", "/studio/character", "/studio/bg3d", "/studio/publish"]) {
       expect(routeId(path)).toBe("creator-studio");
     }
   });

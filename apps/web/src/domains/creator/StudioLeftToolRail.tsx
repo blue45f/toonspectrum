@@ -499,6 +499,7 @@ function StudioLeftToolRailConnected() {
   useEffect(() => {
     if (!railMoreOpen) return;
     const dialog = railMoreDialogRef.current;
+    let positionFrame: number | null = null;
     const updatePosition = () => {
       const trigger = document.getElementById(railMoreTriggerId);
       if (!trigger) return;
@@ -514,6 +515,13 @@ function StudioLeftToolRailConnected() {
           ? current
           : next
       );
+    };
+    const schedulePosition = () => {
+      if (positionFrame !== null) return;
+      positionFrame = globalThis.requestAnimationFrame(() => {
+        positionFrame = null;
+        updatePosition();
+      });
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -531,10 +539,10 @@ function StudioLeftToolRailConnected() {
     updatePosition();
     dialog?.addEventListener("keydown", handleKeyDown);
     document.addEventListener("pointerdown", handlePointerDown, true);
-    globalThis.addEventListener("resize", updatePosition);
-    globalThis.addEventListener("scroll", updatePosition, true);
-    globalThis.visualViewport?.addEventListener("resize", updatePosition);
-    globalThis.visualViewport?.addEventListener("scroll", updatePosition);
+    globalThis.addEventListener("resize", schedulePosition);
+    globalThis.addEventListener("scroll", schedulePosition, true);
+    globalThis.visualViewport?.addEventListener("resize", schedulePosition);
+    globalThis.visualViewport?.addEventListener("scroll", schedulePosition);
     const frame = requestAnimationFrame(() => {
       dialog
         ?.querySelector<HTMLElement>('button:not([disabled]), [href], input:not([disabled])')
@@ -542,12 +550,13 @@ function StudioLeftToolRailConnected() {
     });
     return () => {
       cancelAnimationFrame(frame);
+      if (positionFrame !== null) globalThis.cancelAnimationFrame(positionFrame);
       dialog?.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("pointerdown", handlePointerDown, true);
-      globalThis.removeEventListener("resize", updatePosition);
-      globalThis.removeEventListener("scroll", updatePosition, true);
-      globalThis.visualViewport?.removeEventListener("resize", updatePosition);
-      globalThis.visualViewport?.removeEventListener("scroll", updatePosition);
+      globalThis.removeEventListener("resize", schedulePosition);
+      globalThis.removeEventListener("scroll", schedulePosition, true);
+      globalThis.visualViewport?.removeEventListener("resize", schedulePosition);
+      globalThis.visualViewport?.removeEventListener("scroll", schedulePosition);
     };
   }, [railMoreOpen, railMoreTriggerId, setRailMoreOpen]);
 

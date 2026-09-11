@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   marketSceneCompletionBrowseHref,
   marketSceneCompletionSequenceForKind,
-} from "./MarketSceneCompletionJourney";
+} from "../models/market-scene-completion";
 
 describe("market scene completion journey", () => {
   it("moves template users into assets, brushes and finishing resources", () => {

@@ -283,7 +283,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     // are product gaps, not routing gaps, and each says which.
     rows: [
       has("Preset Browser", "brush/preset-browser"),
-      has("Brush Studio/Brush DNA", "brush/brush-studio"),
+      has("Brush Studio/Brush DNA", "brush/brush-studio", "brush/brush-lab"),
       // 한 항목은 한 행만 주장한다. 아래 셋은 조정 수단이 Brush Studio 행 안에 있을
       // 뿐 전용 행이 없으므로, 커버된 척하지 않고 위치만 기록한다.
       gap(

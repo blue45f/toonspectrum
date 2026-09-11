@@ -520,11 +520,13 @@ function collectFatalErrors(page: Page): string[] {
 }
 
 async function openStudio(page: Page): Promise<void> {
-  await page.goto("/studio", { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => document.querySelectorAll("button").length > 20, null, {
+  await page.goto("/studio/canvas?preset=illustration", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(STUDIO_DOCUMENT_SCOPE).first()).toBeVisible({
     timeout: 180_000,
   });
-  await page.waitForTimeout(2_500);
+  await expect(
+    page.locator('[data-studio-tool-rail-settings="true"]').getByRole("button").first(),
+  ).toBeVisible({ timeout: 180_000 });
 }
 
 async function openStudio3dRailTool(
@@ -738,7 +740,7 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
   });
 
   /**
-   * 이 회귀가 이 스위트를 만든 이유다. `/studio`는 저장된 작품 id가 없는 모든 세션에
+   * 이 회귀가 이 스위트를 만든 이유다. 저장된 작품 id가 없는 기본 일러스트 작업공간은
    * `?room=work-instant-…` 잼을 발행하므로 `isRealtimeTeamSession`이 참이고, 그 분기가 실패로
    * 닫혀 있는 동안에는 3D 배경을 캔버스에 붙이는 경로가 어디에도 없었다.
    */

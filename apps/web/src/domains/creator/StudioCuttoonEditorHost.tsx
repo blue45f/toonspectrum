@@ -1390,7 +1390,6 @@ import type { SceneTemplate } from "./studio-scene-templates";
 import type { SfxPreset } from "./studio-sfx-presets";
 import type { StudioSharedDocument } from "./studio-shared-document-client";
 import type { StudioStockPhoto } from "./studio-stock-image-client";
-import type { ScenarioBeatType } from "./studio-story-beats";
 import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutation-plan";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { StudioVelocityPressureState } from "./studio-velocity-pressure-response";
