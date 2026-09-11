@@ -1,0 +1,124 @@
+name: Apply ToonStudio completion pass 3 once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-completion-pass-3-20260911
+    paths:
+      - .github/workflows/toonstudio-completion-pass3-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: toonstudio-completion-pass3-once
+  cancel-in-progress: false
+
+jobs:
+  connect-verify-commit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/toonstudio-completion-pass-3-20260911
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Connect operations to the canonical project page
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx")
+          text = path.read_text()
+          import_line = 'import { StudioFeatureOperationsPanel } from "./StudioFeatureOperationsPanel";\n'
+          if import_line not in text:
+              marker = 'import { StudioExportPanel } from "./StudioExportPanel";\n'
+              if marker not in text:
+                  raise SystemExit("StudioProjectIntegratedPage import marker changed")
+              text = text.replace(marker, marker + import_line, 1)
+
+          feature_suite = '''      <StudioProjectFeatureSuitePanel
+                projectId={projectId}
+                section={section}
+                view={view}
+                locale={locale}
+              />
+          '''.replace("          ", "")
+          operations = feature_suite + '''      <StudioFeatureOperationsPanel
+                projectId={projectId}
+                section={section}
+                view={view}
+                locale={locale}
+              />
+          '''.replace("          ", "")
+          if "<StudioFeatureOperationsPanel" not in text:
+              if feature_suite not in text:
+                  raise SystemExit("StudioProjectIntegratedPage feature suite marker changed")
+              text = text.replace(feature_suite, operations, 1)
+          path.write_text(text)
+
+          transient = Path(".github/workflows/toonstudio-completion-pass3-once.yml")
+          if transient.exists():
+              transient.unlink()
+          PY
+
+      - name: Verify formatting
+        run: git diff --check
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+
+      - name: Lint connected operations
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/studio-feature-surface-registry.ts
+          apps/web/src/domains/creator/studio-feature-surface-registry.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioFeatureOperationsPanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioFeatureOperationsPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
+
+      - name: Run connected operation tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/studio-feature-surface-registry.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioFeatureOperationsPanel.test.tsx
+          apps/web/src/domains/creator/studio-integration-closure.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.test.tsx
+          --pool=forks --maxWorkers=2
+
+      - name: Verify feature reachability
+        run: node scripts/verify-toonstudio-feature-reachability.mjs
+
+      - name: Build production bundle
+        run: pnpm run build:bundle
+
+      - name: Commit verified operation surfaces
+        shell: bash
+        run: |
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): expose governance and publishing operations"
+          git push origin HEAD:feat/toonstudio-completion-pass-3-20260911
