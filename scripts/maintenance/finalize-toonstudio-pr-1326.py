@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 
 def replace_once(path: str, old: str, new: str) -> None:
@@ -14,6 +15,15 @@ def replace_once(path: str, old: str, new: str) -> None:
             f"{path}: expected one match, found {count}: {old[:100]!r}"
         )
     file.write_text(text.replace(old, new, 1))
+
+
+def remove_once(path: str, pattern: str, label: str) -> None:
+    file = Path(path)
+    text = file.read_text()
+    next_text, count = re.subn(pattern, "", text, count=1, flags=re.MULTILINE)
+    if count != 1:
+        raise SystemExit(f"{path}: expected one {label}, found {count}")
+    file.write_text(next_text)
 
 
 wrapper = "apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
@@ -167,4 +177,20 @@ replace_once(
         <StudioProjectDocumentsPanel projectId={projectId} locale={locale} />
       ) : null}
       {section === "story" && view === "localization" ? (''',
+)
+
+remove_once(
+    "apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx",
+    r"^\s*autoFocus\s*\n",
+    "autoFocus prop",
+)
+remove_once(
+    "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",
+    r"^\s*autoFocus\s*\n",
+    "autoFocus prop",
+)
+remove_once(
+    "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx",
+    r"^\s*studioDocumentWorkspaces,\s*\n",
+    "unused studioDocumentWorkspaces import",
 )
