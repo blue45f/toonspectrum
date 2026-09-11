@@ -1,0 +1,127 @@
+name: Finalize eligible pull request merging
+
+on:
+  push:
+    branches:
+      - chore/merge-open-prs-20260912
+    paths:
+      - .github/workflows/merge-open-prs-finalize.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  actions: read
+
+concurrency:
+  group: finalize-eligible-open-pull-requests
+  cancel-in-progress: false
+
+jobs:
+  merge-and-report:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      CONTROL_BRANCH: chore/merge-open-prs-20260912
+    steps:
+      - name: Recheck and merge eligible pull requests
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          merged="$RUNNER_TEMP/merged.txt"
+          skipped="$RUNNER_TEMP/skipped.txt"
+          : > "$merged"
+          : > "$skipped"
+
+          for round in 1 2 3 4 5; do
+            progress=0
+            mapfile -t numbers < <(gh pr list --repo "$REPOSITORY" --state open --limit 100 \
+              --json number,createdAt,headRefName \
+              --jq 'sort_by(.createdAt)[] | select(.headRefName != env.CONTROL_BRANCH) | .number')
+
+            for number in "${numbers[@]}"; do
+              detail="$(gh pr view "$number" --repo "$REPOSITORY" \
+                --json number,title,url,isDraft,baseRefName,headRefName,mergeStateStatus,reviewDecision,statusCheckRollup,labels)"
+              title="$(jq -r '.title' <<< "$detail")"
+              url="$(jq -r '.url' <<< "$detail")"
+              reasons=()
+
+              [[ "$(jq -r '.baseRefName' <<< "$detail")" == main ]] || reasons+=("base-not-main")
+              [[ "$(jq -r '.isDraft' <<< "$detail")" == false ]] || reasons+=("draft")
+              review="$(jq -r '.reviewDecision // ""' <<< "$detail")"
+              [[ "$review" != CHANGES_REQUESTED && "$review" != REVIEW_REQUIRED ]] || reasons+=("review:$review")
+              merge_state="$(jq -r '.mergeStateStatus // "UNKNOWN"' <<< "$detail")"
+              [[ ! "$merge_state" =~ ^(DIRTY|BLOCKED|UNSTABLE|UNKNOWN)$ ]] || reasons+=("merge-state:$merge_state")
+              labels="$(jq -r '[.labels[].name | ascii_downcase] | join(",")' <<< "$detail")"
+              grep -Eq '(^|,)(do-not-merge|do not merge|hold|blocked|wip)(,|$)' <<< "$labels" && reasons+=("blocking-label") || true
+
+              bad_checks="$(jq -r '[.statusCheckRollup[]? | {
+                name:(.name // .context // .workflowName // "check"),
+                status:(.status // "COMPLETED"),
+                result:((.conclusion // .state // "SUCCESS") | ascii_upcase)
+              } | select(.status != "COMPLETED" or (.result | IN("FAILURE","CANCELLED","TIMED_OUT","ACTION_REQUIRED","STARTUP_FAILURE","STALE","ERROR","PENDING","EXPECTED","QUEUED","IN_PROGRESS")))] | map(.name) | unique | join(",")' <<< "$detail")"
+              [[ -z "$bad_checks" ]] || reasons+=("checks:$bad_checks")
+
+              if ((${#reasons[@]})); then
+                printf '#%s\t%s\t%s\t%s\n' "$number" "$title" "$(IFS=';'; echo "${reasons[*]}")" "$url" >> "$skipped"
+                continue
+              fi
+
+              if gh pr merge "$number" --repo "$REPOSITORY" --squash --delete-branch; then
+                merged_detail="$(gh pr view "$number" --repo "$REPOSITORY" --json mergeCommit,mergedAt)"
+                printf '#%s\t%s\t%s\t%s\n' "$number" "$title" "$(jq -r '.mergeCommit.oid // ""' <<< "$merged_detail")" "$url" >> "$merged"
+                progress=1
+                sleep 2
+              else
+                printf '#%s\t%s\tmerge-refused\t%s\n' "$number" "$title" "$url" >> "$skipped"
+              fi
+            done
+
+            (( progress == 1 )) || break
+          done
+
+          open_json="$(gh pr list --repo "$REPOSITORY" --state open --limit 100 \
+            --json number,title,url,isDraft,baseRefName,headRefName,mergeStateStatus,reviewDecision)"
+          jq -n \
+            --arg completedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg mergedText "$(cat "$merged")" \
+            --arg skippedText "$(cat "$skipped")" \
+            --argjson remaining "$open_json" \
+            '{completedAt:$completedAt,mergedText:$mergedText,skippedText:$skippedText,remaining:$remaining}' \
+            > "$RUNNER_TEMP/pr-merge-final.json"
+
+          {
+            echo '# PR merge final report'
+            echo
+            echo '## Merged in this pass'
+            if [[ -s "$merged" ]]; then sed 's/^/- /' "$merged"; else echo '- None'; fi
+            echo
+            echo '## Not merged in this pass'
+            if [[ -s "$skipped" ]]; then sed 's/^/- /' "$skipped"; else echo '- None'; fi
+            echo
+            echo '## Remaining open pull requests'
+            jq -r '.[] | "- #\(.number)\t\(.title)\tdraft=\(.isDraft)\tstate=\(.mergeStateStatus)\t\(.url)"' <<< "$open_json"
+          } | tee "$RUNNER_TEMP/pr-merge-final.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload final report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pull-request-merge-final-report
+          path: |
+            ${{ runner.temp }}/pr-merge-final.json
+            ${{ runner.temp }}/pr-merge-final.md
+          retention-days: 3
+
+      - name: Close temporary control pull request
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list --repo "$REPOSITORY" --state open --head "$CONTROL_BRANCH" --json number --jq '.[0].number // empty')"
+          [[ -n "$number" ]] || exit 0
+          gh pr comment "$number" --repo "$REPOSITORY" --body-file "$RUNNER_TEMP/pr-merge-final.md" || true
+          gh pr close "$number" --repo "$REPOSITORY" --comment "Temporary control PR closed after the merge pass." || true
