@@ -35,7 +35,7 @@ concurrency:
 jobs:
   core:
     name: core
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       NODE_OPTIONS: --max-old-space-size=8192
@@ -75,7 +75,7 @@ jobs:
     name: verify
     needs: core
     if: ${{ always() }}
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - name: Require deployable core
