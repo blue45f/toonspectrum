@@ -120,3 +120,39 @@ jobs:
           apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.integration.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioReviewPanel.test.tsx
           --pool=forks --maxWorkers=2
+
+  transient-canvas-regression:
+    name: transient-canvas-regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint transient canvas lifecycle
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/domains/creator/canvas/studio-transient-canvas.ts
+          apps/web/src/domains/creator/canvas/studio-transient-canvas.test.ts
+
+      - name: Verify idle and active canvas presentation lifecycle
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/canvas/studio-transient-canvas.test.ts
+          --pool=forks --maxWorkers=1
