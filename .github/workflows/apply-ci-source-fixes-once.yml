@@ -1,0 +1,391 @@
+name: Apply CI source fixes once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-session-complete-20260911-1221
+    paths:
+      - ".github/workflows/apply-ci-source-fixes-once.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-ci-source-fixes-once
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      HUSKY: "0"
+      TARGET_BRANCH: feat/toonstudio-session-complete-20260911-1221
+    steps:
+      - name: Checkout focused target files
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/workflows/**
+            /scripts/verify-toonstudio-integration.sh
+            /apps/web/src/domains/creator/studio-integration-closure.test.ts
+            /apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx
+            /apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.test.tsx
+            /apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx
+            /apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.tsx
+            /apps/web/src/domains/creator/studio-shell/studio-asset-hub-view.ts
+            /docs/rewrite/toonstudio-session-trigger-20260911-1.txt
+            /docs/rewrite/toonstudio-session-trigger-20260911-2.txt
+
+      - name: Apply idempotent source fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from __future__ import annotations
+
+          from pathlib import Path
+          from textwrap import dedent
+          import re
+
+
+          def read(path: str) -> str:
+              return Path(path).read_text(encoding="utf-8")
+
+
+          def write(path: str, content: str) -> None:
+              target = Path(path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(content, encoding="utf-8")
+
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              text = read(path)
+              if old in text:
+                  count = text.count(old)
+                  if count != 1:
+                      raise RuntimeError(f"{path}: expected one occurrence, found {count}")
+                  write(path, text.replace(old, new, 1))
+              elif new not in text:
+                  raise RuntimeError(f"{path}: neither old nor new text was found")
+
+
+          # Make isolated typechecks cacheable, include Vite ImportMeta declarations and
+          # reuse ESLint's content cache across reruns.
+          script_path = "scripts/verify-toonstudio-integration.sh"
+          replace_once(
+              script_path,
+              'track="${1:-}"\ntemporary_configs=()\n',
+              'track="${1:-}"\nmkdir -p ".cache/ci/toonstudio/${track}/eslint"\ntemporary_configs=()\n',
+          )
+          replace_once(
+              script_path,
+              'const [config, ...files] = process.argv.slice(2);\n'
+              'if (!config || files.length === 0) {',
+              'const [config, ...files] = process.argv.slice(2);\n'
+              'const cacheName = config.replace(/^\\.toonstudio-tsconfig-/, "").replace(/\\.json$/, "");\n'
+              'fs.mkdirSync(".cache/ci/toonstudio", { recursive: true });\n'
+              'if (!config || files.length === 0) {',
+          )
+          replace_once(
+              script_path,
+              '    incremental: false,\n'
+              '    noEmit: true,\n'
+              '    skipLibCheck: true,\n',
+              '    incremental: true,\n'
+              '    noEmit: true,\n'
+              '    skipLibCheck: true,\n'
+              '    tsBuildInfoFile: `.cache/ci/toonstudio/${cacheName}.tsbuildinfo`,\n',
+          )
+          replace_once(
+              script_path,
+              '  files,\n'
+              '}, null, 2)}\\n`);',
+              '  files: ["apps/web/src/vite-env.d.ts", ...files],\n'
+              '}, null, 2)}\\n`);',
+          )
+          script = read(script_path)
+          old_lint = '  pnpm exec eslint --max-warnings=0 \\\n'
+          new_lint = (
+              '  pnpm exec eslint --max-warnings=0 \\\n'
+              '    --cache --cache-strategy content \\\n'
+              '    --cache-location ".cache/ci/toonstudio/${track}/eslint/.eslintcache" \\\n'
+          )
+          if old_lint in script:
+              count = script.count(old_lint)
+              if count != 3:
+                  raise RuntimeError(f"{script_path}: expected three lint commands, found {count}")
+              script = script.replace(old_lint, new_lint)
+              write(script_path, script)
+          elif script.count(new_lint) != 3:
+              raise RuntimeError(f"{script_path}: cached lint commands were not found")
+
+
+          # Remove unnecessary escapes and guard against every known branch-mutating
+          # helper so they cannot silently return to the product branch.
+          closure_path = "apps/web/src/domains/creator/studio-integration-closure.test.ts"
+          closure = read(closure_path)
+          closure = closure.replace(
+              r'expect(routes).toContain(`path: \"/studio/p/:projectId/${section}\"`);',
+              'expect(routes).toContain(`path: "/studio/p/:projectId/${section}"`);',
+          )
+          closure = closure.replace(
+              r'expect(routes).toContain(`StudioProjectShellPage section=\"${section}\"`);',
+              'expect(routes).toContain(`StudioProjectShellPage section="${section}"`);',
+          )
+          transient = dedent(
+              """\
+              const TRANSIENT_WORKFLOWS = [
+                ".github/workflows/pr1307-final-squash-rebase.yml",
+                ".github/workflows/pr1307-integration-validation.yml",
+                ".github/workflows/pr1307-integration-validation-v2.yml",
+                ".github/workflows/pr1307-sync-main-once.yml",
+                ".github/workflows/toonstudio-menu-contract-repair.yml",
+                ".github/workflows/toonstudio-rebase-reconcile.yml",
+                ".github/workflows/apply-toonstudio-ui-lint-fixes.yml",
+                ".github/workflows/attest-toonstudio-session-complete.yml",
+                ".github/workflows/cleanup-toonstudio-session-workflows.yml",
+                ".github/workflows/commit-toonstudio-session-fixes.yml",
+                ".github/workflows/diagnose-toonstudio-session-types.yml",
+                ".github/workflows/ensure-toonstudio-session-complete.yml",
+                ".github/workflows/finalize-toonstudio-session-verified.yml",
+                ".github/workflows/finalize-toonstudio-session.yml",
+                ".github/workflows/pr1289-ci-delta-optimizer.yml",
+                ".github/workflows/repair-and-publish-toonstudio-session.yml",
+                ".github/workflows/retire-toonstudio-session-branch.yml",
+                ".github/workflows/toonstudio-session-orchestrator.yml",
+                ".github/workflows/toonstudio-session-self-heal.yml",
+                ".github/workflows/toonstudio-session-verify.yml",
+                ".github/workflows/verify-toonstudio-pr-head.yml",
+                ".github/workflows/apply-ci-optimization-fixes-once.yml",
+                ".github/workflows/apply-ci-source-fixes-once.yml",
+              ] as const;
+              """
+          ).strip()
+          closure, count = re.subn(
+              r"const TRANSIENT_WORKFLOWS = \[\n.*?\n\] as const;",
+              transient,
+              closure,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise RuntimeError(f"{closure_path}: transient workflow list was not found")
+          write(closure_path, closure)
+
+
+          # Keep non-component helpers outside the React Fast Refresh boundary.
+          helper_path = "apps/web/src/domains/creator/studio-shell/studio-asset-hub-view.ts"
+          helper = dedent(
+              """\
+              export const ASSET_HUB_VIEWS = [
+                "overview",
+                "series-kit",
+                "library",
+                "market",
+                "seller",
+              ] as const;
+
+              export type AssetHubView = (typeof ASSET_HUB_VIEWS)[number];
+
+              /** Resolve a user-supplied query value without allowing unknown asset-hub surfaces. */
+              export function resolveStudioAssetHubView(value: string | null): AssetHubView {
+                return ASSET_HUB_VIEWS.includes(value as AssetHubView)
+                  ? value as AssetHubView
+                  : "overview";
+              }
+              """
+          )
+          write(helper_path, helper)
+
+          asset_path = "apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx"
+          asset = read(asset_path)
+          helper_import = (
+              'import { ASSET_HUB_VIEWS, resolveStudioAssetHubView, type AssetHubView } '
+              'from "./studio-asset-hub-view";\n'
+          )
+          anchor = 'import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";\n'
+          if helper_import not in asset:
+              if anchor not in asset:
+                  raise RuntimeError(f"{asset_path}: import anchor was not found")
+              asset = asset.replace(anchor, anchor + helper_import, 1)
+          asset, count = re.subn(
+              r'\nconst ASSET_HUB_VIEWS = \["overview", "series-kit", "library", "market", "seller"\] as const;\n\n'
+              r'type AssetHubView = \(typeof ASSET_HUB_VIEWS\)\[number\];',
+              "",
+              asset,
+              count=1,
+          )
+          if count == 0 and "const ASSET_HUB_VIEWS =" in asset:
+              raise RuntimeError(f"{asset_path}: local asset view declarations were not removed")
+          asset, count = re.subn(
+              r'\n/\*\* Resolve a user-supplied query value without allowing unknown asset-hub surfaces\. \*/\n'
+              r'(?:/\/[^\n]*\n)*'
+              r'export function resolveStudioAssetHubView\(value: string \| null\): AssetHubView \{\n'
+              r'  return ASSET_HUB_VIEWS\.includes\(value as AssetHubView\) \? value as AssetHubView : "overview";\n'
+              r'\}\n',
+              "\n",
+              asset,
+              count=1,
+          )
+          if count == 0 and "export function resolveStudioAssetHubView" in asset:
+              raise RuntimeError(f"{asset_path}: local resolver was not removed")
+          asset = re.sub(re.escape(helper_import) + r"\n{2,}", helper_import + "\n", asset, count=1)
+          write(asset_path, asset)
+
+          asset_test_path = "apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.test.tsx"
+          replace_once(
+              asset_test_path,
+              'import { resolveStudioAssetHubView, StudioAssetHubPage } from "./StudioAssetHubPage";',
+              'import { StudioAssetHubPage } from "./StudioAssetHubPage";\n'
+              'import { resolveStudioAssetHubView } from "./studio-asset-hub-view";',
+          )
+
+          replace_once(
+              "apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx",
+              "  }, [selected?.id, selected?.translatedText, selected?.updatedAt]);",
+              "  }, [selected]);",
+          )
+
+
+          # Render concrete icon elements instead of creating component types during a
+          # component render, satisfying the React hooks/static-components lint rule.
+          readiness_path = "apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.tsx"
+          readiness = read(readiness_path)
+          old_status_icon = dedent(
+              """\
+              function statusIcon(status: StudioProjectReadinessStatus) {
+                if (status === "ready") return CheckCircle2;
+                if (status === "warning") return AlertTriangle;
+                return ShieldAlert;
+              }
+              """
+          ).strip()
+          new_status_icon = dedent(
+              """\
+              function ReadinessStatusIcon({
+                status,
+                size = 14,
+                className,
+              }: {
+                readonly status: StudioProjectReadinessStatus;
+                readonly size?: number;
+                readonly className?: string;
+              }) {
+                if (status === "ready") {
+                  return <CheckCircle2 size={size} className={className} aria-hidden="true" />;
+                }
+                if (status === "warning") {
+                  return <AlertTriangle size={size} className={className} aria-hidden="true" />;
+                }
+                return <ShieldAlert size={size} className={className} aria-hidden="true" />;
+              }
+              """
+          ).strip()
+          if old_status_icon in readiness:
+              readiness = readiness.replace(old_status_icon, new_status_icon, 1)
+              icon_component = "ReadinessStatusIcon"
+          elif "function ReadinessStatusIcon({" in readiness:
+              icon_component = "ReadinessStatusIcon"
+          elif "function StatusIcon({" in readiness:
+              # A concurrent one-shot fixer may already have introduced a static icon.
+              icon_component = "StatusIcon"
+          else:
+              raise RuntimeError(f"{readiness_path}: static status icon helper was not found")
+
+          readiness = readiness.replace(
+              "    const FailureIcon = failure ? AlertTriangle : RefreshCw;\n",
+              "",
+              1,
+          )
+          readiness = readiness.replace(
+              '              <FailureIcon size={17} className={failure ? "text-warning" : "text-fg-3"} aria-hidden="true" />',
+              '              {failure ? (\n'
+              '                <AlertTriangle size={17} className="text-warning" aria-hidden="true" />\n'
+              '              ) : (\n'
+              '                <RefreshCw size={17} className="text-fg-3" aria-hidden="true" />\n'
+              '              )}',
+              1,
+          )
+          readiness = readiness.replace(
+              "  const StatusIcon = statusIcon(report.status);\n",
+              "",
+              1,
+          )
+          readiness = readiness.replace(
+              '              <StatusIcon size={14} aria-hidden="true" />',
+              f'              <{icon_component} status={{report.status}} size={{14}} />',
+              1,
+          )
+          readiness = readiness.replace(
+              "            const Icon = statusIcon(section.status);\n",
+              "",
+              1,
+          )
+          readiness = readiness.replace(
+              '                  <Icon size={14} className={statusClasses(section.status).split(" ").at(-1)} aria-hidden="true" />',
+              f'                  <{icon_component}\n'
+              '                    status={section.status}\n'
+              '                    size={14}\n'
+              '                    className={statusClasses(section.status).split(" ").at(-1)}\n'
+              '                  />',
+              1,
+          )
+          if (
+              "statusIcon(" in readiness
+              or "<FailureIcon" in readiness
+              or "const Icon =" in readiness
+              or "<Icon size=" in readiness
+              or '<StatusIcon size={14} aria-hidden="true"' in readiness
+          ):
+              raise RuntimeError(f"{readiness_path}: dynamic readiness icons remain")
+          write(readiness_path, readiness)
+          PY
+
+      - name: Remove temporary session automation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/workflows/apply-toonstudio-ui-lint-fixes.yml \
+            .github/workflows/attest-toonstudio-session-complete.yml \
+            .github/workflows/cleanup-toonstudio-session-workflows.yml \
+            .github/workflows/commit-toonstudio-session-fixes.yml \
+            .github/workflows/diagnose-toonstudio-session-types.yml \
+            .github/workflows/ensure-toonstudio-session-complete.yml \
+            .github/workflows/finalize-toonstudio-session-verified.yml \
+            .github/workflows/finalize-toonstudio-session.yml \
+            .github/workflows/pr1289-ci-delta-optimizer.yml \
+            .github/workflows/repair-and-publish-toonstudio-session.yml \
+            .github/workflows/retire-toonstudio-session-branch.yml \
+            .github/workflows/toonstudio-session-orchestrator.yml \
+            .github/workflows/toonstudio-session-self-heal.yml \
+            .github/workflows/toonstudio-session-verify.yml \
+            .github/workflows/verify-toonstudio-pr-head.yml \
+            docs/rewrite/toonstudio-session-trigger-20260911-1.txt \
+            docs/rewrite/toonstudio-session-trigger-20260911-2.txt \
+            .github/workflows/apply-ci-source-fixes-once.yml
+
+      - name: Commit and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit --no-verify -m "fix(ci): remove transient automation and unblock scoped checks"
+
+          for attempt in 1 2 3; do
+            git fetch --no-tags origin "$TARGET_BRANCH"
+            if git rebase "origin/$TARGET_BRANCH" && git push origin "HEAD:$TARGET_BRANCH"; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+          done
+          echo "Could not publish the one-time CI source-fix commit." >&2
+          exit 1
