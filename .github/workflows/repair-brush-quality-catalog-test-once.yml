@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   repair:
-    runs-on: ubuntu-24.04
+    runs-on: macos-14
     timeout-minutes: 70
     env:
       CI: "true"
