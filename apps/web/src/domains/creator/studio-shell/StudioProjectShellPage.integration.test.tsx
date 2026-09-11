@@ -35,7 +35,7 @@ describe("StudioProjectShellPage integration", () => {
     const view = renderReview("/studio/p/project-1/review?view=versions");
     expect(view.container.querySelector("[data-studio-project-view=versions]")).toBeTruthy();
 
-    const target = screen.getByRole("link", { name: /버전·비교 화면 열기|Open versions and comparison/u });
+    const target = screen.getByRole("link", { name: /버전 비교|Version comparison/u });
     expect(target.getAttribute("href")).toBe("/studio/work/project-1/versions");
   });
 
