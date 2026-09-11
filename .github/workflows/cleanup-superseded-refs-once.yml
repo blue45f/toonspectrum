@@ -1,0 +1,135 @@
+name: Cleanup superseded tags and branch once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-session-complete-20260911-1221
+    paths:
+      - .github/workflows/cleanup-superseded-refs-once.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: cleanup-superseded-refs-once-20260911
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete only verified obsolete refs
+    if: ${{ github.repository == 'blue45f/toonspectrum' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verify and delete obsolete tags and superseded branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          repo="$GITHUB_REPOSITORY"
+          tags=(
+            "branch-cleanup-backup-20260910-v2"
+            "branch-cleanup-backup/20260910-macos-1606/fix/production-api-studio-closeout-20260910"
+            "recovery/2026-09-10/pre-recovery-main"
+            "recovery/2026-09-10/pre-recovery-pr1289"
+          )
+          expected_tag_shas=(
+            "a98cc3b7cefa3db754903bb108947366c16524f7"
+            "de34a1c90226e556d529947a768a650e917c841f"
+            "d110925528e8ab2c485d5502cef7eae0e8d056dc"
+            "89fd666a84bc606295ddf6ffab4e69bd6274cfda"
+          )
+          old_branch="feat/toonstudio-final-ia-20260911"
+          expected_old_branch_sha="c7ac1582154e19391668072f3bda61a43361b645"
+
+          release_count="$(gh api "repos/${repo}/releases?per_page=100" --jq 'length')"
+          if [[ "$release_count" != "0" ]]; then
+            echo "A GitHub Release now exists; refusing to remove any tag."
+            exit 1
+          fi
+
+          tag_pages="$(gh api --paginate --slurp "repos/${repo}/git/matching-refs/tags/?per_page=100")"
+          tag_node_ids=()
+          for i in "${!tags[@]}"; do
+            tag="${tags[$i]}"
+            expected_sha="${expected_tag_shas[$i]}"
+            ref="refs/tags/${tag}"
+            current_sha="$(jq -r --arg ref "$ref" '.[][] | select(.ref == $ref) | .object.sha' <<<"$tag_pages")"
+            object_type="$(jq -r --arg ref "$ref" '.[][] | select(.ref == $ref) | .object.type' <<<"$tag_pages")"
+            node_id="$(jq -r --arg ref "$ref" '.[][] | select(.ref == $ref) | .node_id' <<<"$tag_pages")"
+
+            if [[ -z "$current_sha" || "$current_sha" == "null" || -z "$node_id" || "$node_id" == "null" ]]; then
+              echo "Expected tag is missing: ${tag}"
+              exit 1
+            fi
+            if [[ "$object_type" != "commit" ]]; then
+              echo "Tag ${tag} changed object type to ${object_type}; refusing cleanup."
+              exit 1
+            fi
+            if [[ "$current_sha" != "$expected_sha" ]]; then
+              echo "Tag ${tag} moved: expected ${expected_sha}, found ${current_sha}."
+              exit 1
+            fi
+            tag_node_ids+=("$node_id")
+          done
+
+          pr_json="$(gh api "repos/${repo}/pulls/1307")"
+          pr_state="$(jq -r '.state' <<<"$pr_json")"
+          pr_head_ref="$(jq -r '.head.ref' <<<"$pr_json")"
+          pr_head_sha="$(jq -r '.head.sha' <<<"$pr_json")"
+          if [[ "$pr_state" != "closed" || "$pr_head_ref" != "$old_branch" || "$pr_head_sha" != "$expected_old_branch_sha" ]]; then
+            echo "PR #1307 no longer matches the verified superseded state; refusing cleanup."
+            exit 1
+          fi
+
+          head_pages="$(gh api --paginate --slurp "repos/${repo}/git/matching-refs/heads/?per_page=100")"
+          old_branch_ref="refs/heads/${old_branch}"
+          current_old_branch_sha="$(jq -r --arg ref "$old_branch_ref" '.[][] | select(.ref == $ref) | .object.sha' <<<"$head_pages")"
+          old_branch_node_id="$(jq -r --arg ref "$old_branch_ref" '.[][] | select(.ref == $ref) | .node_id' <<<"$head_pages")"
+          delete_old_branch=0
+          if [[ -n "$current_old_branch_sha" && "$current_old_branch_sha" != "null" ]]; then
+            if [[ "$current_old_branch_sha" != "$expected_old_branch_sha" || -z "$old_branch_node_id" || "$old_branch_node_id" == "null" ]]; then
+              echo "Superseded branch moved or cannot be identified; refusing cleanup."
+              exit 1
+            fi
+            delete_old_branch=1
+          fi
+
+          mutation='mutation($id:ID!){deleteRef(input:{refId:$id}){clientMutationId}}'
+          for i in "${!tags[@]}"; do
+            gh api graphql -f query="$mutation" -f id="${tag_node_ids[$i]}" >/dev/null
+            echo "Deleted tag: ${tags[$i]}"
+          done
+
+          if [[ "$delete_old_branch" == "1" ]]; then
+            gh api graphql -f query="$mutation" -f id="$old_branch_node_id" >/dev/null
+            echo "Deleted superseded branch: ${old_branch}"
+          else
+            echo "Superseded branch was already absent: ${old_branch}"
+          fi
+
+          remaining_tags="$(gh api --paginate --slurp "repos/${repo}/git/matching-refs/tags/?per_page=100")"
+          for tag in "${tags[@]}"; do
+            if jq -e --arg ref "refs/tags/${tag}" '.[][] | any(.ref == $ref)' <<<"$remaining_tags" >/dev/null; then
+              echo "Tag still exists after deletion: ${tag}"
+              exit 1
+            fi
+          done
+
+          remaining_heads="$(gh api --paginate --slurp "repos/${repo}/git/matching-refs/heads/?per_page=100")"
+          if jq -e --arg ref "$old_branch_ref" '.[][] | any(.ref == $ref)' <<<"$remaining_heads" >/dev/null; then
+            echo "Superseded branch still exists after deletion: ${old_branch}"
+            exit 1
+          fi
+
+          {
+            echo "## Obsolete ref cleanup completed"
+            echo
+            echo "- Deleted verified temporary tags: ${#tags[@]}"
+            echo "- Deleted superseded PR #1307 branch: ${old_branch}"
+            echo "- Preserved canonical PR branch: feat/toonstudio-session-complete-20260911-1221"
+          } >> "$GITHUB_STEP_SUMMARY"
