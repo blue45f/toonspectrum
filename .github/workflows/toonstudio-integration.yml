@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: toonstudio-integration-${{ github.event.pull_request.number || github.ref }}
@@ -40,22 +41,12 @@ jobs:
     outputs:
       tracks: ${{ steps.detect.outputs.tracks }}
     steps:
-      - name: Checkout only workflow metadata
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-          fetch-depth: 2
-          filter: blob:none
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /.github/workflows/toonstudio-integration.yml
-
       - name: Detect affected integration tracks
         id: detect
         shell: bash
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
@@ -67,74 +58,81 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             all=true
           else
-            if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
-              || ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
-              git fetch --no-tags --depth=2 origin "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1 || true
-            fi
+            changed_file_path="$RUNNER_TEMP/toonstudio-changed-files.txt"
+            : > "$changed_file_path"
+            page=1
 
-            if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
-              && git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
-              mapfile -t changed < <(
-                git diff --name-only --diff-filter=ACMRD "$BASE_SHA...$HEAD_SHA"
-              )
+            while :; do
+              response="$(curl --fail-with-body --silent --show-error --retry 3 \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100&page=$page")"
+              count="$(jq 'length' <<< "$response")"
+              jq -r '.[].filename' <<< "$response" >> "$changed_file_path"
+              (( count < 100 )) && break
+              ((page += 1))
+            done
 
-              for file in "${changed[@]}"; do
-                case "$file" in
-                  .github/workflows/toonstudio-integration.yml|\
-                  scripts/verify-toonstudio-integration.sh|\
-                  eslint.config.mjs|\
-                  tsconfig.json|\
-                  tsconfig.toonstudio-core.json|\
-                  tsconfig.toonstudio-ui.json|\
-                  vitest.config.*|\
-                  package.json|\
-                  pnpm-lock.yaml|\
-                  pnpm-workspace.yaml|\
-                  patches/*|\
-                  packages/core/*|\
-                  packages/play-core/*|\
-                  packages/studio-*/*)
-                    all=true
-                    ;;
-                  apps/web/src/domains/creator/studio-shell/*|\
-                  apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.tsx|\
-                  apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.test.tsx)
-                    ui=true
-                    ;;
-                  apps/web/src/domains/creator/brush-lab/*|\
-                  apps/web/src/domains/creator/canvas/*|\
-                  apps/web/src/domains/creator/studio-cuttoon-editor/*)
-                    editor=true
-                    ;;
-                  apps/web/src/app/routes/groups/*)
-                    ui=true
-                    editor=true
-                    ;;
-                  apps/web/src/shared/components/*)
-                    ui=true
-                    editor=true
-                    ;;
-                  apps/web/src/infrastructure/*)
-                    ui=true
-                    ;;
-                  apps/web/src/domains/creator/ai/*)
-                    core=true
-                    ;;
-                  apps/web/src/domains/creator/*)
-                    if [[ "$file" =~ ^apps/web/src/domains/creator/[^/]+\.(ts|tsx)$ ]]; then
-                      core=true
-                    else
-                      all=true
-                    fi
-                    ;;
-                  *)
-                    all=true
-                    ;;
-                esac
-              done
-            else
+            mapfile -t changed < "$changed_file_path"
+            if ((${#changed[@]} == 0)); then
               all=true
             fi
+
+            for file in "${changed[@]}"; do
+              case "$file" in
+                .github/workflows/toonstudio-integration.yml|\
+                scripts/verify-toonstudio-integration.sh|\
+                eslint.config.mjs|\
+                tsconfig.json|\
+                tsconfig.toonstudio-core.json|\
+                tsconfig.toonstudio-ui.json|\
+                vitest.config.*|\
+                package.json|\
+                pnpm-lock.yaml|\
+                pnpm-workspace.yaml|\
+                patches/*|\
+                packages/core/*|\
+                packages/play-core/*|\
+                packages/studio-*/*)
+                  all=true
+                  ;;
+                apps/web/src/domains/creator/studio-shell/*|\
+                apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.tsx|\
+                apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.test.tsx)
+                  ui=true
+                  ;;
+                apps/web/src/domains/creator/brush-lab/*|\
+                apps/web/src/domains/creator/canvas/*|\
+                apps/web/src/domains/creator/studio-cuttoon-editor/*)
+                  editor=true
+                  ;;
+                apps/web/src/app/routes/groups/*)
+                  ui=true
+                  editor=true
+                  ;;
+                apps/web/src/shared/components/*)
+                  ui=true
+                  editor=true
+                  ;;
+                apps/web/src/infrastructure/*)
+                  ui=true
+                  ;;
+                apps/web/src/domains/creator/ai/*)
+                  core=true
+                  ;;
+                apps/web/src/domains/creator/*)
+                  if [[ "$file" =~ ^apps/web/src/domains/creator/[^/]+\.(ts|tsx)$ ]]; then
+                    core=true
+                  else
+                    all=true
+                  fi
+                  ;;
+                *)
+                  all=true
+                  ;;
+              esac
+            done
           fi
 
           if [[ "$all" == "true" ]]; then
@@ -173,14 +171,14 @@ jobs:
       CI: "true"
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
-      BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      GITHUB_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - name: Checkout focused source tree
         uses: actions/checkout@v6
         with:
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 1
           filter: blob:none
           sparse-checkout: |
             .github/workflows
@@ -220,10 +218,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
-            || ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
-            git fetch --no-tags --depth=2 origin "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1 || true
-          fi
+          changed_file_path="$RUNNER_TEMP/toonstudio-${TRACK}-changed-files.txt"
+          : > "$changed_file_path"
+          page=1
+          while :; do
+            response="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100&page=$page")"
+            count="$(jq 'length' <<< "$response")"
+            jq -r '.[].filename' <<< "$response" >> "$changed_file_path"
+            (( count < 100 )) && break
+            ((page += 1))
+          done
 
           files=()
           while IFS= read -r file; do
@@ -257,7 +265,7 @@ jobs:
                 ;;
             esac
             [[ "$include" == "true" ]] && files+=("$file")
-          done < <(git diff --name-only --diff-filter=ACMR "$BASE_SHA...$HEAD_SHA")
+          done < "$changed_file_path"
 
           if ((${#files[@]} == 0)); then
             echo "No changed JavaScript or TypeScript files for $TRACK."
