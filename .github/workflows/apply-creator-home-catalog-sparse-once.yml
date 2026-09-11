@@ -1,0 +1,69 @@
+name: Apply creator-home catalog sparse checkout once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-session-complete-20260911-1221
+    paths:
+      - ".github/workflows/apply-creator-home-catalog-sparse-once.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-creator-home-catalog-sparse-once
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      HUSKY: "0"
+      TARGET_BRANCH: feat/toonstudio-session-complete-20260911-1221
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          sparse-checkout: |
+            .github/workflows
+
+      - name: Add the production catalog build input
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/creator-home-quality.yml')
+          text = path.read_text(encoding='utf-8')
+          old = '''          sparse-checkout: |
+            .github/workflows
+            apps/web
+            automation/n8n
+'''
+          new = '''          sparse-checkout: |
+            .github/workflows
+            apps/api/data
+            apps/web
+            automation/n8n
+'''
+          if old in text:
+              text = text.replace(old, new, 1)
+              path.write_text(text, encoding='utf-8')
+          elif new not in text:
+              raise SystemExit('creator-home sparse checkout anchor was not found')
+          PY
+          rm -f .github/workflows/apply-creator-home-catalog-sparse-once.yml
+
+      - name: Commit and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit --no-verify -m "fix(ci): include catalog data in focused homepage build"
+          git push origin "HEAD:$TARGET_BRANCH"
