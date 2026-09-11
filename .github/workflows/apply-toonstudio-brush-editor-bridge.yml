@@ -1,0 +1,235 @@
+name: Apply ToonStudio brush editor bridge
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-unified-brush-hub-20260911
+    paths:
+      - .github/workflows/apply-toonstudio-brush-editor-bridge.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-toonstudio-brush-editor-bridge
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/toonstudio-unified-brush-hub-20260911
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Add editor handoff bridge
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+          repository = root / 'apps/web/src/domains/creator/studio-unified-brush-repository.ts'
+          if not repository.exists():
+              raise SystemExit('Unified brush repository must be committed before the editor bridge')
+
+          event_names = set()
+          for path in (root / 'apps/web/src/domains/creator').rglob('*'):
+              if path.suffix not in {'.ts', '.tsx'} or path == repository:
+                  continue
+              text = path.read_text(errors='ignore')
+              for match in re.finditer(r'["\'](toonspectrum:[^"\']*brush[^"\']*)["\']', text, re.I):
+                  event_names.add(match.group(1))
+          event_names.discard('toonspectrum:studio-unified-brush-updated')
+          event_names.discard('toonspectrum:studio-unified-brush-selected')
+          serialized = ',\n'.join(f'  {name!r}' for name in sorted(event_names))
+
+          legacy = f'''/** Existing editor event names discovered from the product source.\n * The unified repository fans out to these during migration, so old consumers keep working.\n */\nexport const STUDIO_UNIFIED_BRUSH_LEGACY_EVENTS = Object.freeze([\n{serialized}\n] as const);\n'''
+          (root / 'apps/web/src/domains/creator/studio-unified-brush-legacy-events.ts').write_text(legacy)
+
+          bridge = r'''import { useEffect } from "react";
+          import { useLocation } from "react-router-dom";
+
+          import { STUDIO_UNIFIED_BRUSH_LEGACY_EVENTS } from "../studio-unified-brush-legacy-events";
+          import {
+            STUDIO_UNIFIED_BRUSH_SELECTED_EVENT,
+            ensureStudioUnifiedBrushState,
+            selectStudioUnifiedBrush,
+            writeStudioUnifiedBrushState,
+            type StudioUnifiedBrushDefinition,
+            type StudioUnifiedBrushOperation,
+          } from "../studio-unified-brush-repository";
+
+          function projectIdFromPath(pathname: string): string | null {
+            const match = pathname.match(/^\/studio\/(?:work|project|p)\/([^/]+)/u);
+            if (!match?.[1]) return null;
+            try {
+              return decodeURIComponent(match[1]);
+            } catch {
+              return match[1];
+            }
+          }
+
+          function operationFor(definition: StudioUnifiedBrushDefinition): StudioUnifiedBrushOperation {
+            if (definition.material === "eraser") return "erase";
+            if (definition.material === "blend") return "blend";
+            return "paint";
+          }
+
+          function fanOutLegacyEvents(detail: unknown): void {
+            for (const eventName of STUDIO_UNIFIED_BRUSH_LEGACY_EVENTS) {
+              window.dispatchEvent(new CustomEvent(eventName, { detail }));
+            }
+          }
+
+          /**
+           * Connect project Brush Hub selections to the mounted editor without creating another brush state owner.
+           * URL handoffs are consumed once into the same repository and every legacy editor consumer receives the
+           * canonical definition while migration is in progress.
+           */
+          export function StudioUnifiedBrushCanvasBridge() {
+            const location = useLocation();
+
+            useEffect(() => {
+              const handleSelection = (event: Event) => {
+                fanOutLegacyEvents((event as CustomEvent<unknown>).detail);
+              };
+              window.addEventListener(STUDIO_UNIFIED_BRUSH_SELECTED_EVENT, handleSelection);
+              return () => window.removeEventListener(STUDIO_UNIFIED_BRUSH_SELECTED_EVENT, handleSelection);
+            }, []);
+
+            useEffect(() => {
+              const projectId = projectIdFromPath(location.pathname);
+              const brushId = new URLSearchParams(location.search).get("brush")?.trim();
+              if (!projectId || !brushId) return;
+              try {
+                const state = ensureStudioUnifiedBrushState(window.localStorage, projectId);
+                const definition = state.definitions.find((item) => item.brushId === brushId);
+                if (!definition) return;
+                const operation = operationFor(definition);
+                const selected = selectStudioUnifiedBrush(state, definition.brushId, operation);
+                writeStudioUnifiedBrushState(window.localStorage, selected, window);
+                const detail = Object.freeze({ projectId, operation, definition, source: "url-handoff" as const });
+                window.dispatchEvent(new CustomEvent(STUDIO_UNIFIED_BRUSH_SELECTED_EVENT, { detail }));
+              } catch {
+                // Keep the editor usable when a stale or malformed brush handoff is encountered.
+              }
+            }, [location.pathname, location.search]);
+
+            return null;
+          }
+          '''
+          bridge = re.sub(r'^          ', '', bridge, flags=re.M)
+          bridge_path = root / 'apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.tsx'
+          bridge_path.write_text(bridge)
+
+          bridge_test = r'''// @vitest-environment jsdom
+
+          import { cleanup, render, waitFor } from "@testing-library/react";
+          import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+          import { MemoryRouter } from "react-router-dom";
+
+          import { readStudioUnifiedBrushState } from "../studio-unified-brush-repository";
+          import { StudioUnifiedBrushCanvasBridge } from "./StudioUnifiedBrushCanvasBridge";
+
+          beforeEach(() => window.localStorage.clear());
+          afterEach(() => { cleanup(); window.localStorage.clear(); vi.restoreAllMocks(); });
+
+          describe("StudioUnifiedBrushCanvasBridge", () => {
+            it("consumes a project brush URL into the canonical active brush state", async () => {
+              render(
+                <MemoryRouter initialEntries={["/studio/work/project-1/canvas?brush=system%3Arough-pencil"]}>
+                  <StudioUnifiedBrushCanvasBridge />
+                </MemoryRouter>,
+              );
+              await waitFor(() => {
+                expect(readStudioUnifiedBrushState(window.localStorage, "project-1")?.activeByOperation.paint.brushId)
+                  .toBe("system:rough-pencil");
+              });
+            });
+
+            it("ignores stale brush ids without breaking the editor", async () => {
+              render(
+                <MemoryRouter initialEntries={["/studio/work/project-2/canvas?brush=missing"]}>
+                  <StudioUnifiedBrushCanvasBridge />
+                </MemoryRouter>,
+              );
+              await waitFor(() => {
+                expect(readStudioUnifiedBrushState(window.localStorage, "project-2")?.activeByOperation.paint.brushId)
+                  .toBe("system:g-pen");
+              });
+            });
+          });
+          '''
+          bridge_test = re.sub(r'^          ', '', bridge_test, flags=re.M)
+          (root / 'apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.test.tsx').write_text(bridge_test)
+
+          hosts = root / 'apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx'
+          text = hosts.read_text()
+          import_line = 'import { StudioUnifiedBrushCanvasBridge } from "./StudioUnifiedBrushCanvasBridge";\n'
+          if import_line not in text:
+              imports = list(re.finditer(r'^import .*?;\n', text, re.M))
+              if not imports:
+                  raise SystemExit('Could not locate editor host imports')
+              insertion = imports[-1].end()
+              text = text[:insertion] + import_line + text[insertion:]
+          if '<StudioUnifiedBrushCanvasBridge />' not in text:
+              match = re.search(r'(<StudioAiProjectHandoffHost[\s\S]*?\/>)', text)
+              if match:
+                  text = text[:match.end()] + '\n      <StudioUnifiedBrushCanvasBridge />' + text[match.end():]
+              else:
+                  match = re.search(r'(return\s*\(\s*<>)', text)
+                  if not match:
+                      raise SystemExit('Could not locate editor host JSX insertion point')
+                  text = text[:match.end()] + '\n      <StudioUnifiedBrushCanvasBridge />' + text[match.end():]
+          hosts.write_text(text)
+          PY
+
+      - name: Verify formatting
+        run: git diff --check
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+      - name: Lint
+        run: >-
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored
+          apps/web/src/domains/creator/studio-unified-brush-legacy-events.ts
+          apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.tsx
+          apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.test.tsx
+          apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx
+      - name: Test editor handoff
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/studio-unified-brush-repository.test.ts
+          apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.test.tsx
+          apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.test.tsx
+          apps/web/src/domains/creator/studio-integration-closure.test.ts
+          --pool=forks --maxWorkers=2
+      - name: Verify reachability
+        run: node scripts/verify-toonstudio-feature-reachability.mjs
+      - name: Build production bundle
+        run: pnpm run build:bundle
+      - name: Commit verified editor bridge
+        shell: bash
+        run: |
+          rm .github/workflows/apply-toonstudio-brush-editor-bridge.yml
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): bridge unified brush selection into editor"
+          git push origin HEAD:feat/toonstudio-unified-brush-hub-20260911
