@@ -80,7 +80,7 @@ jobs:
           pnpm exec vitest run \
             apps/web/src/domains/creator/brush/studio-brush-quality-design-bridge.test.ts \
             apps/web/src/domains/creator/brush/studio-brush-selection.test.ts \
-            apps/web/src/domains/creator/brush/studio-brush-catalog.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-catalog-core.test.ts \
             apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts \
             apps/web/src/domains/creator/brush-lab/brush-studio-v6-engine.test.ts
 
