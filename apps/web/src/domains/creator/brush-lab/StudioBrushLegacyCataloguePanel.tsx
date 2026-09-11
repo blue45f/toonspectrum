@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 
 import Link from "@/compat/router-link";
 
+import { studioBrushCatalogItemById } from "../brush/studio-brush-catalog";
+import { studioBrushQualityDesignProductId } from "../brush/studio-brush-quality-design-bridge";
 import { BRUSH_QUALITY_CATALOG } from "./brush-studio-v5-quality-catalog";
 import { BRUSH_STUDIO_V6_RECIPES } from "./brush-studio-v6-engine";
 import { resolveLegacyBrushV6RecipeId } from "./brush-studio-version-integration";
@@ -45,8 +47,9 @@ export function StudioBrushLegacyCataloguePanel({ baseHref }: { readonly baseHre
           </p>
           <h2 className="mt-1 text-sm font-black text-fg">V5 품질 브러시 72종 승계 카탈로그</h2>
           <p className="mt-1 max-w-4xl text-xs leading-5 text-fg-3">
-            과거 72종 설계를 숨기지 않고 모두 검색할 수 있습니다. 선택하면 재료·물리·패턴 의미가
-            가장 가까운 V6 레시피에서 시작하며, 픽셀 동일 변환으로 표시하지 않습니다.
+            72종 설계 이름·ID·재질 설명은 이제 일반 브러시 선택 창에서도 검색할 수 있습니다.
+            여기서는 각 설계가 실제 렌더러를 가진 제품 브러시와 어떤 V6 편집 시작점으로 이어지는지
+            함께 확인하며, 픽셀 동일 변환으로 표시하지 않습니다.
           </p>
         </div>
         <button
@@ -75,10 +78,15 @@ export function StudioBrushLegacyCataloguePanel({ baseHref }: { readonly baseHre
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((entry) => {
               const recipeId = resolveLegacyBrushV6RecipeId(entry);
+              const productCatalogId = studioBrushQualityDesignProductId(entry.id);
+              const productBrush = productCatalogId
+                ? studioBrushCatalogItemById(productCatalogId)
+                : null;
               return (
                 <Link
                   key={entry.id}
                   href={successionHref(baseHref, entry.id, recipeId)}
+                  data-studio-brush-quality-product-target={productCatalogId ?? undefined}
                   className="group rounded-2xl border border-line bg-panel/55 p-3.5 transition-colors hover:border-accent/45 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 >
                   <span className="flex items-start justify-between gap-3">
@@ -91,8 +99,11 @@ export function StudioBrushLegacyCataloguePanel({ baseHref }: { readonly baseHre
                     </span>
                   </span>
                   <span className="mt-2 block text-xs leading-5 text-fg-3">{entry.signature}</span>
+                  <span className="mt-2 block rounded-lg border border-line bg-card/70 px-2.5 py-1.5 text-[0.68rem] font-semibold text-fg-2">
+                    일반 브러시 · {productBrush?.name ?? productCatalogId ?? "연결 확인 필요"}
+                  </span>
                   <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">
-                    {recipeNames.get(recipeId) ?? recipeId}로 열기
+                    {recipeNames.get(recipeId) ?? recipeId}로 편집하기
                     <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
                   </span>
                 </Link>
