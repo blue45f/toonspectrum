@@ -31,7 +31,7 @@ describe("StudioDocumentWorkspaceRoute", () => {
       "/studio/p/project-1/d/document-1?workspace=3d&focus=hero&language=ko&version=v2&room=team-a",
     );
 
-    expect(await screen.findByLabelText("location")).toHaveTextContent(
+    expect((await screen.findByLabelText("location")).textContent).toBe(
       "/studio/work/document-1/bg3d?focus=hero&language=ko&project=project-1&room=team-a&version=v2&workspace=3d",
     );
   });
@@ -39,7 +39,7 @@ describe("StudioDocumentWorkspaceRoute", () => {
   it("bridges canonical drafts into the same editor authority", async () => {
     renderRoute("/studio/draft/draft-1?workspace=slides");
 
-    expect(await screen.findByLabelText("location")).toHaveTextContent(
+    expect((await screen.findByLabelText("location")).textContent).toBe(
       "/studio/canvas?draft=draft-1&workspace=slides",
     );
   });
