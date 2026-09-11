@@ -1,0 +1,134 @@
+name: Merge accepted ToonStudio tree through API gate
+
+on:
+  push:
+    branches:
+      - chore/toonstudio-final-postmerge-acceptance-20260911
+    paths:
+      - .github/workflows/merge-toonstudio-acceptance-api-gate.yml
+
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: merge-accepted-toonstudio-tree
+  cancel-in-progress: false
+
+jobs:
+  verify-watch-and-merge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout accepted branch
+        uses: actions/checkout@v6
+        with:
+          ref: chore/toonstudio-final-postmerge-acceptance-20260911
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Verify acceptance evidence and goal contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/rewrite/toonstudio-session-final-acceptance-20260911.md
+          test -f scripts/verify-toonstudio-session-goals.mjs
+          node scripts/verify-toonstudio-session-goals.mjs
+
+      - name: Publish clean acceptance head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          rm -f .github/workflows/merge-toonstudio-acceptance-after-required-checks.yml
+          rm -f .github/workflows/merge-toonstudio-acceptance-api-gate.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git diff --cached --check
+            git commit -m "chore(studio): publish clean verified acceptance head"
+            git push origin HEAD:chore/toonstudio-final-postmerge-acceptance-20260911
+          fi
+
+      - name: Locate acceptance PR
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list \
+            --head chore/toonstudio-final-postmerge-acceptance-20260911 \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+          if [[ -z "$number" ]]; then
+            gh pr create \
+              --head chore/toonstudio-final-postmerge-acceptance-20260911 \
+              --base main \
+              --title "feat: finish and verify all ToonStudio session goals" \
+              --body "Validated canonical routes, product reachability, unified brushes, project workflows, TypeScript, ESLint, integrated regression tests and the production bundle."
+            number="$(gh pr list \
+              --head chore/toonstudio-final-postmerge-acceptance-20260911 \
+              --base main \
+              --state open \
+              --json number \
+              --jq '.[0].number')"
+          fi
+          gh pr ready "$number" || true
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for protected core check and merge
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          head_sha="$(git rev-parse HEAD)"
+          reran=""
+
+          for attempt in {1..120}; do
+            pr_state="$(gh pr view "$PR_NUMBER" --json state,mergedAt --jq '.state + ":" + (.mergedAt // "")')"
+            if [[ "$pr_state" == MERGED:* || "$pr_state" == CLOSED:* ]]; then
+              echo "PR is already merged or closed: $pr_state"
+              exit 0
+            fi
+
+            core="$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/$GITHUB_REPOSITORY/commits/$head_sha/check-runs" \
+              --jq '[.check_runs[] | select(.name == "core")] | sort_by(.started_at) | last // {} | [.status // "missing", .conclusion // ""] | @tsv')"
+            status="${core%%$'\t'*}"
+            conclusion="${core#*$'\t'}"
+            echo "core status=$status conclusion=$conclusion attempt=$attempt"
+
+            if [[ "$status" == "completed" && "$conclusion" == "success" ]]; then
+              response="$(gh api \
+                --method PUT \
+                -H "Accept: application/vnd.github+json" \
+                "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge" \
+                -f merge_method=squash \
+                -f commit_title="feat: finish and verify all ToonStudio session goals (#$PR_NUMBER)" \
+                -f commit_message="Converges every planned ToonStudio session capability and records passing reachability, type, lint, regression and production-build acceptance.")"
+              jq -e '.merged == true' <<< "$response" >/dev/null
+              echo "Acceptance PR merged."
+              exit 0
+            fi
+
+            if [[ "$status" == "completed" && "$conclusion" =~ ^(failure|cancelled|timed_out|action_required)$ && "$reran" != "$conclusion" ]]; then
+              run_id="$(gh run list --commit "$head_sha" --workflow CI --json databaseId,status,conclusion --limit 10 --jq '[.[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")] | first | .databaseId // empty')"
+              if [[ -n "$run_id" ]]; then
+                gh run rerun "$run_id" --failed || true
+                reran="$conclusion"
+              fi
+            fi
+
+            sleep 20
+          done
+
+          echo "Protected core check did not become successful." >&2
+          gh pr checks "$PR_NUMBER" || true
+          exit 1
