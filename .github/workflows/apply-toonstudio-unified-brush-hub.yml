@@ -1,0 +1,1078 @@
+name: Apply ToonStudio unified brush hub
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-unified-brush-hub-20260911
+    paths:
+      - .github/workflows/apply-toonstudio-unified-brush-hub.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-toonstudio-unified-brush-hub
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/toonstudio-unified-brush-hub-20260911
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Add unified brush repository and product surface
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          ROOT = Path('.')
+
+          repository = r'''export const STUDIO_UNIFIED_BRUSH_UPDATED_EVENT =
+            "toonspectrum:studio-unified-brush-updated";
+          export const STUDIO_UNIFIED_BRUSH_SELECTED_EVENT =
+            "toonspectrum:studio-unified-brush-selected";
+
+          export type StudioUnifiedBrushSource =
+            | "system"
+            | "personal"
+            | "imported"
+            | "team"
+            | "market";
+          export type StudioUnifiedBrushOperation = "paint" | "erase" | "blend";
+          export type StudioUnifiedBrushScope = "recommended" | "all" | "mine" | "team" | "market";
+          export type StudioUnifiedBrushMaterial =
+            | "ink"
+            | "pencil"
+            | "marker"
+            | "watercolor"
+            | "oil"
+            | "air"
+            | "pastel"
+            | "texture"
+            | "tone"
+            | "effect"
+            | "eraser"
+            | "blend";
+
+          export interface StudioUnifiedBrushRef {
+            readonly brushId: string;
+            readonly versionId: string;
+            readonly source: StudioUnifiedBrushSource;
+          }
+
+          export interface StudioUnifiedBrushProvenance {
+            readonly providerId: string | null;
+            readonly externalId: string | null;
+            readonly originalFileName: string | null;
+            readonly licenseReceiptId: string | null;
+            readonly importedAt: string | null;
+          }
+
+          export interface StudioUnifiedBrushDefinition {
+            readonly brushId: string;
+            readonly versionId: string;
+            readonly source: StudioUnifiedBrushSource;
+            readonly name: string;
+            readonly description: string;
+            readonly material: StudioUnifiedBrushMaterial;
+            readonly tags: readonly string[];
+            readonly readonly: boolean;
+            readonly createdAt: string;
+            readonly updatedAt: string;
+            readonly payload: Readonly<Record<string, unknown>>;
+            readonly provenance: StudioUnifiedBrushProvenance;
+          }
+
+          export interface StudioUnifiedBrushDraft {
+            readonly draftId: string;
+            readonly baseRef: StudioUnifiedBrushRef;
+            readonly name: string;
+            readonly payload: Readonly<Record<string, unknown>>;
+            readonly dirty: boolean;
+            readonly updatedAt: string;
+          }
+
+          export interface StudioUnifiedBrushBrowserView {
+            readonly scope: StudioUnifiedBrushScope;
+            readonly material: StudioUnifiedBrushMaterial | null;
+            readonly query: string;
+          }
+
+          export interface StudioUnifiedBrushState {
+            readonly schemaVersion: 1;
+            readonly projectId: string;
+            readonly updatedAt: string;
+            readonly definitions: readonly StudioUnifiedBrushDefinition[];
+            readonly favorites: readonly string[];
+            readonly recent: readonly string[];
+            readonly activeByOperation: Readonly<Record<StudioUnifiedBrushOperation, StudioUnifiedBrushRef>>;
+            readonly draft: StudioUnifiedBrushDraft | null;
+            readonly browserView: StudioUnifiedBrushBrowserView;
+          }
+
+          export interface StudioUnifiedBrushStorage {
+            getItem(key: string): string | null;
+            setItem(key: string, value: string): void;
+          }
+
+          export interface StudioUnifiedBrushEventTarget {
+            dispatchEvent(event: Event): boolean;
+          }
+
+          export interface StudioUnifiedBrushSearchOptions {
+            readonly scope?: StudioUnifiedBrushScope;
+            readonly material?: StudioUnifiedBrushMaterial | null;
+            readonly limit?: number;
+          }
+
+          const EMPTY_PROVENANCE: StudioUnifiedBrushProvenance = Object.freeze({
+            providerId: null,
+            externalId: null,
+            originalFileName: null,
+            licenseReceiptId: null,
+            importedAt: null,
+          });
+
+          function requireProjectId(projectId: string): string {
+            const value = projectId.trim();
+            if (!value || value === "." || value === ".." || value.includes("\\")) {
+              throw new Error("A valid project id is required.");
+            }
+            return value;
+          }
+
+          function requireText(value: string, label: string): string {
+            const normalized = value.trim();
+            if (!normalized) throw new Error(`${label} is required.`);
+            return normalized;
+          }
+
+          function validTimestamp(value: string): string {
+            if (!Number.isFinite(Date.parse(value))) throw new Error("A valid timestamp is required.");
+            return value;
+          }
+
+          function record(value: unknown): Record<string, unknown> | null {
+            return value !== null && typeof value === "object" && !Array.isArray(value)
+              ? value as Record<string, unknown>
+              : null;
+          }
+
+          function unique(values: readonly string[]): readonly string[] {
+            return Object.freeze([...new Set(values.filter(Boolean))]);
+          }
+
+          function ref(definition: StudioUnifiedBrushDefinition): StudioUnifiedBrushRef {
+            return Object.freeze({
+              brushId: definition.brushId,
+              versionId: definition.versionId,
+              source: definition.source,
+            });
+          }
+
+          function systemBrush(
+            brushId: string,
+            name: string,
+            description: string,
+            material: StudioUnifiedBrushMaterial,
+            tags: readonly string[],
+            payload: Readonly<Record<string, unknown>>,
+            at: string,
+          ): StudioUnifiedBrushDefinition {
+            return Object.freeze({
+              brushId,
+              versionId: "system-v1",
+              source: "system",
+              name,
+              description,
+              material,
+              tags: Object.freeze([...tags]),
+              readonly: true,
+              createdAt: at,
+              updatedAt: at,
+              payload: Object.freeze({ ...payload }),
+              provenance: EMPTY_PROVENANCE,
+            });
+          }
+
+          export function studioUnifiedBrushStorageKey(projectId: string): string {
+            return `toonspectrum:studio-unified-brush:v1:${encodeURIComponent(requireProjectId(projectId))}`;
+          }
+
+          export function createDefaultStudioUnifiedBrushState(
+            projectId: string,
+            updatedAt = new Date().toISOString(),
+          ): StudioUnifiedBrushState {
+            const id = requireProjectId(projectId);
+            const at = validTimestamp(updatedAt);
+            const definitions = Object.freeze([
+              systemBrush("system:g-pen", "G펜", "깨끗한 웹툰 선화와 강약 표현", "ink", ["선화", "잉크", "웹툰"], { size: 12, opacity: 1, stabilization: 0.38 }, at),
+              systemBrush("system:round-pen", "둥근 펜", "일정하고 매끄러운 외곽선", "ink", ["외곽선", "균일"], { size: 10, opacity: 1, stabilization: 0.46 }, at),
+              systemBrush("system:rough-pencil", "거친 연필", "콘티와 러프 스케치를 위한 흑연 질감", "pencil", ["스케치", "러프", "흑연"], { size: 18, opacity: 0.84, grain: 0.62 }, at),
+              systemBrush("system:watercolor", "번지는 수채", "색이 자연스럽게 섞이는 수채 브러시", "watercolor", ["채색", "수채", "번짐"], { size: 42, opacity: 0.72, water: 0.68 }, at),
+              systemBrush("system:soft-air", "부드러운 에어", "빛과 그림자 보정용 부드러운 분사", "air", ["명암", "빛", "에어"], { size: 90, opacity: 0.28, hardness: 0.08 }, at),
+              systemBrush("system:eraser", "기본 지우개", "필압에 반응하는 깨끗한 지우개", "eraser", ["지우개"], { size: 28, opacity: 1, pressure: true }, at),
+              systemBrush("system:blend", "색 경계 섞기", "색상 경계를 자연스럽게 혼합", "blend", ["혼합", "블렌드"], { size: 36, strength: 0.45 }, at),
+            ]);
+            const paint = definitions[0]!;
+            const eraser = definitions.find((brush) => brush.material === "eraser")!;
+            const blend = definitions.find((brush) => brush.material === "blend")!;
+            return Object.freeze({
+              schemaVersion: 1,
+              projectId: id,
+              updatedAt: at,
+              definitions,
+              favorites: Object.freeze([paint.brushId]),
+              recent: Object.freeze([paint.brushId]),
+              activeByOperation: Object.freeze({ paint: ref(paint), erase: ref(eraser), blend: ref(blend) }),
+              draft: null,
+              browserView: Object.freeze({ scope: "recommended", material: null, query: "" }),
+            });
+          }
+
+          function normalizeDefinition(value: unknown): StudioUnifiedBrushDefinition | null {
+            const input = record(value);
+            if (!input) return null;
+            const source = input.source;
+            const material = input.material;
+            const sources: readonly StudioUnifiedBrushSource[] = ["system", "personal", "imported", "team", "market"];
+            const materials: readonly StudioUnifiedBrushMaterial[] = ["ink", "pencil", "marker", "watercolor", "oil", "air", "pastel", "texture", "tone", "effect", "eraser", "blend"];
+            if (typeof input.brushId !== "string" || typeof input.versionId !== "string" || typeof input.name !== "string") return null;
+            if (!sources.includes(source as StudioUnifiedBrushSource) || !materials.includes(material as StudioUnifiedBrushMaterial)) return null;
+            const provenance = record(input.provenance);
+            return Object.freeze({
+              brushId: input.brushId,
+              versionId: input.versionId,
+              source: source as StudioUnifiedBrushSource,
+              name: input.name,
+              description: typeof input.description === "string" ? input.description : "",
+              material: material as StudioUnifiedBrushMaterial,
+              tags: Object.freeze(Array.isArray(input.tags) ? input.tags.filter((item): item is string => typeof item === "string") : []),
+              readonly: input.readonly === true || source === "system" || source === "market",
+              createdAt: typeof input.createdAt === "string" && Number.isFinite(Date.parse(input.createdAt)) ? input.createdAt : new Date(0).toISOString(),
+              updatedAt: typeof input.updatedAt === "string" && Number.isFinite(Date.parse(input.updatedAt)) ? input.updatedAt : new Date(0).toISOString(),
+              payload: Object.freeze({ ...(record(input.payload) ?? {}) }),
+              provenance: Object.freeze({
+                providerId: typeof provenance?.providerId === "string" ? provenance.providerId : null,
+                externalId: typeof provenance?.externalId === "string" ? provenance.externalId : null,
+                originalFileName: typeof provenance?.originalFileName === "string" ? provenance.originalFileName : null,
+                licenseReceiptId: typeof provenance?.licenseReceiptId === "string" ? provenance.licenseReceiptId : null,
+                importedAt: typeof provenance?.importedAt === "string" ? provenance.importedAt : null,
+              }),
+            });
+          }
+
+          function normalizeState(value: unknown, projectId: string): StudioUnifiedBrushState | null {
+            const input = record(value);
+            if (!input || input.schemaVersion !== 1 || input.projectId !== projectId || !Array.isArray(input.definitions)) return null;
+            const defaults = createDefaultStudioUnifiedBrushState(projectId);
+            const parsed = input.definitions.map(normalizeDefinition).filter((item): item is StudioUnifiedBrushDefinition => item !== null);
+            const definitions = [...defaults.definitions];
+            for (const definition of parsed) {
+              const index = definitions.findIndex((item) => item.brushId === definition.brushId);
+              if (index >= 0) definitions[index] = definition;
+              else definitions.push(definition);
+            }
+            const known = new Set(definitions.map((definition) => definition.brushId));
+            const favorites = unique(Array.isArray(input.favorites) ? input.favorites.filter((item): item is string => typeof item === "string" && known.has(item)) : defaults.favorites);
+            const recent = unique(Array.isArray(input.recent) ? input.recent.filter((item): item is string => typeof item === "string" && known.has(item)).slice(0, 24) : defaults.recent);
+            const activeInput = record(input.activeByOperation);
+            const resolveActive = (operation: StudioUnifiedBrushOperation): StudioUnifiedBrushRef => {
+              const candidate = record(activeInput?.[operation]);
+              const match = candidate && typeof candidate.brushId === "string"
+                ? definitions.find((definition) => definition.brushId === candidate.brushId)
+                : null;
+              return ref(match ?? definitions.find((definition) => operation === "erase"
+                ? definition.material === "eraser"
+                : operation === "blend"
+                  ? definition.material === "blend"
+                  : definition.material !== "eraser" && definition.material !== "blend")!);
+            };
+            const browser = record(input.browserView);
+            const scopes: readonly StudioUnifiedBrushScope[] = ["recommended", "all", "mine", "team", "market"];
+            const material = typeof browser?.material === "string" && defaults.definitions.some((definition) => definition.material === browser.material)
+              ? browser.material as StudioUnifiedBrushMaterial
+              : null;
+            return Object.freeze({
+              schemaVersion: 1,
+              projectId,
+              updatedAt: typeof input.updatedAt === "string" && Number.isFinite(Date.parse(input.updatedAt)) ? input.updatedAt : defaults.updatedAt,
+              definitions: Object.freeze(definitions),
+              favorites,
+              recent,
+              activeByOperation: Object.freeze({ paint: resolveActive("paint"), erase: resolveActive("erase"), blend: resolveActive("blend") }),
+              draft: null,
+              browserView: Object.freeze({
+                scope: typeof browser?.scope === "string" && scopes.includes(browser.scope as StudioUnifiedBrushScope) ? browser.scope as StudioUnifiedBrushScope : "recommended",
+                material,
+                query: typeof browser?.query === "string" ? browser.query : "",
+              }),
+            });
+          }
+
+          export function readStudioUnifiedBrushState(storage: StudioUnifiedBrushStorage, projectId: string): StudioUnifiedBrushState | null {
+            const id = requireProjectId(projectId);
+            const raw = storage.getItem(studioUnifiedBrushStorageKey(id));
+            if (!raw) return null;
+            try {
+              return normalizeState(JSON.parse(raw), id);
+            } catch {
+              return null;
+            }
+          }
+
+          function dispatch(target: StudioUnifiedBrushEventTarget | undefined, type: string, detail: unknown): void {
+            if (!target || typeof CustomEvent === "undefined") return;
+            target.dispatchEvent(new CustomEvent(type, { detail }));
+          }
+
+          export function writeStudioUnifiedBrushState(
+            storage: StudioUnifiedBrushStorage,
+            state: StudioUnifiedBrushState,
+            target?: StudioUnifiedBrushEventTarget,
+          ): StudioUnifiedBrushState {
+            const next = normalizeState(state, requireProjectId(state.projectId));
+            if (!next) throw new Error("The brush state is invalid.");
+            storage.setItem(studioUnifiedBrushStorageKey(next.projectId), JSON.stringify(next));
+            dispatch(target, STUDIO_UNIFIED_BRUSH_UPDATED_EVENT, next);
+            return next;
+          }
+
+          export function ensureStudioUnifiedBrushState(storage: StudioUnifiedBrushStorage, projectId: string): StudioUnifiedBrushState {
+            const current = readStudioUnifiedBrushState(storage, projectId);
+            if (current) return current;
+            return writeStudioUnifiedBrushState(storage, createDefaultStudioUnifiedBrushState(projectId));
+          }
+
+          export function updateStudioUnifiedBrushState(
+            storage: StudioUnifiedBrushStorage,
+            projectId: string,
+            updater: (current: StudioUnifiedBrushState) => StudioUnifiedBrushState,
+            target?: StudioUnifiedBrushEventTarget,
+          ): StudioUnifiedBrushState {
+            const id = requireProjectId(projectId);
+            const current = ensureStudioUnifiedBrushState(storage, id);
+            const updated = updater(current);
+            if (updated.projectId !== id) throw new Error("A brush update cannot change project identity.");
+            return writeStudioUnifiedBrushState(storage, { ...updated, updatedAt: new Date().toISOString() }, target);
+          }
+
+          function matchesScope(definition: StudioUnifiedBrushDefinition, scope: StudioUnifiedBrushScope): boolean {
+            if (scope === "all" || scope === "recommended") return true;
+            if (scope === "mine") return definition.source === "personal" || definition.source === "imported";
+            return definition.source === scope;
+          }
+
+          export function searchStudioUnifiedBrushes(
+            state: StudioUnifiedBrushState,
+            query: string,
+            options: StudioUnifiedBrushSearchOptions = {},
+          ): readonly StudioUnifiedBrushDefinition[] {
+            const scope = options.scope ?? state.browserView.scope;
+            const material = options.material === undefined ? state.browserView.material : options.material;
+            const normalized = query.trim().toLocaleLowerCase("ko-KR");
+            const favorite = new Set(state.favorites);
+            const recentRank = new Map(state.recent.map((id, index) => [id, index] as const));
+            const result = state.definitions
+              .filter((definition) => matchesScope(definition, scope))
+              .filter((definition) => material === null || definition.material === material)
+              .filter((definition) => !normalized || [definition.name, definition.description, definition.material, ...definition.tags]
+                .join(" ")
+                .toLocaleLowerCase("ko-KR")
+                .includes(normalized))
+              .sort((left, right) => {
+                const favoriteDelta = Number(favorite.has(right.brushId)) - Number(favorite.has(left.brushId));
+                if (favoriteDelta !== 0) return favoriteDelta;
+                const leftRecent = recentRank.get(left.brushId) ?? Number.MAX_SAFE_INTEGER;
+                const rightRecent = recentRank.get(right.brushId) ?? Number.MAX_SAFE_INTEGER;
+                if (leftRecent !== rightRecent) return leftRecent - rightRecent;
+                if (scope === "recommended" && left.source !== right.source) return left.source === "system" ? -1 : 1;
+                return left.name.localeCompare(right.name, "ko");
+              });
+            return Object.freeze(result.slice(0, options.limit ?? result.length));
+          }
+
+          export function selectStudioUnifiedBrush(
+            state: StudioUnifiedBrushState,
+            brushId: string,
+            operation: StudioUnifiedBrushOperation = "paint",
+            target?: StudioUnifiedBrushEventTarget,
+          ): StudioUnifiedBrushState {
+            const definition = state.definitions.find((item) => item.brushId === brushId);
+            if (!definition) throw new Error(`Unknown brush: ${brushId}`);
+            const next = Object.freeze({
+              ...state,
+              activeByOperation: Object.freeze({ ...state.activeByOperation, [operation]: ref(definition) }),
+              recent: unique([brushId, ...state.recent]).slice(0, 24),
+              updatedAt: new Date().toISOString(),
+            });
+            dispatch(target, STUDIO_UNIFIED_BRUSH_SELECTED_EVENT, Object.freeze({ operation, definition }));
+            return next;
+          }
+
+          export function toggleStudioUnifiedBrushFavorite(state: StudioUnifiedBrushState, brushId: string): StudioUnifiedBrushState {
+            if (!state.definitions.some((definition) => definition.brushId === brushId)) throw new Error(`Unknown brush: ${brushId}`);
+            const favorites = state.favorites.includes(brushId)
+              ? state.favorites.filter((id) => id !== brushId)
+              : [brushId, ...state.favorites];
+            return Object.freeze({ ...state, favorites: unique(favorites), updatedAt: new Date().toISOString() });
+          }
+
+          export function setStudioUnifiedBrushBrowserView(
+            state: StudioUnifiedBrushState,
+            browserView: Partial<StudioUnifiedBrushBrowserView>,
+          ): StudioUnifiedBrushState {
+            return Object.freeze({
+              ...state,
+              browserView: Object.freeze({ ...state.browserView, ...browserView }),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+
+          export function duplicateStudioUnifiedBrush(
+            state: StudioUnifiedBrushState,
+            brushId: string,
+            newBrushId: string,
+            at = new Date().toISOString(),
+          ): StudioUnifiedBrushState {
+            const source = state.definitions.find((definition) => definition.brushId === brushId);
+            if (!source) throw new Error(`Unknown brush: ${brushId}`);
+            const id = requireText(newBrushId, "Brush id");
+            if (state.definitions.some((definition) => definition.brushId === id)) throw new Error(`Brush already exists: ${id}`);
+            const definition: StudioUnifiedBrushDefinition = Object.freeze({
+              ...source,
+              brushId: id,
+              versionId: `personal-${validTimestamp(at)}`,
+              source: "personal",
+              name: `${source.name} 사본`,
+              readonly: false,
+              createdAt: at,
+              updatedAt: at,
+              payload: Object.freeze({ ...source.payload }),
+              provenance: EMPTY_PROVENANCE,
+            });
+            return Object.freeze({
+              ...state,
+              definitions: Object.freeze([...state.definitions, definition]),
+              activeByOperation: Object.freeze({ ...state.activeByOperation, paint: ref(definition) }),
+              recent: unique([id, ...state.recent]).slice(0, 24),
+              updatedAt: at,
+            });
+          }
+
+          export function importStudioUnifiedBrush(
+            state: StudioUnifiedBrushState,
+            input: {
+              readonly brushId: string;
+              readonly name: string;
+              readonly description?: string;
+              readonly material?: StudioUnifiedBrushMaterial;
+              readonly tags?: readonly string[];
+              readonly payload?: Readonly<Record<string, unknown>>;
+              readonly originalFileName?: string | null;
+              readonly providerId?: string | null;
+              readonly externalId?: string | null;
+              readonly licenseReceiptId?: string | null;
+            },
+            at = new Date().toISOString(),
+          ): StudioUnifiedBrushState {
+            const id = requireText(input.brushId, "Brush id");
+            if (state.definitions.some((definition) => definition.brushId === id)) throw new Error(`Brush already exists: ${id}`);
+            const definition: StudioUnifiedBrushDefinition = Object.freeze({
+              brushId: id,
+              versionId: `import-${validTimestamp(at)}`,
+              source: "imported",
+              name: requireText(input.name, "Brush name"),
+              description: input.description?.trim() ?? "",
+              material: input.material ?? "ink",
+              tags: unique(input.tags ?? []),
+              readonly: false,
+              createdAt: at,
+              updatedAt: at,
+              payload: Object.freeze({ ...(input.payload ?? {}) }),
+              provenance: Object.freeze({
+                providerId: input.providerId ?? null,
+                externalId: input.externalId ?? null,
+                originalFileName: input.originalFileName ?? null,
+                licenseReceiptId: input.licenseReceiptId ?? null,
+                importedAt: at,
+              }),
+            });
+            return Object.freeze({
+              ...state,
+              definitions: Object.freeze([...state.definitions, definition]),
+              activeByOperation: Object.freeze({ ...state.activeByOperation, paint: ref(definition) }),
+              recent: unique([id, ...state.recent]).slice(0, 24),
+              updatedAt: at,
+            });
+          }
+
+          export function renameStudioUnifiedBrush(
+            state: StudioUnifiedBrushState,
+            brushId: string,
+            name: string,
+          ): StudioUnifiedBrushState {
+            const current = state.definitions.find((definition) => definition.brushId === brushId);
+            if (!current) throw new Error(`Unknown brush: ${brushId}`);
+            if (current.readonly) throw new Error("A read-only brush cannot be renamed.");
+            const updatedAt = new Date().toISOString();
+            return Object.freeze({
+              ...state,
+              definitions: Object.freeze(state.definitions.map((definition) => definition.brushId === brushId
+                ? Object.freeze({ ...definition, name: requireText(name, "Brush name"), updatedAt })
+                : definition)),
+              updatedAt,
+            });
+          }
+
+          export function deleteStudioUnifiedBrush(state: StudioUnifiedBrushState, brushId: string): StudioUnifiedBrushState {
+            const current = state.definitions.find((definition) => definition.brushId === brushId);
+            if (!current) return state;
+            if (current.readonly) throw new Error("A read-only brush cannot be deleted.");
+            const definitions = state.definitions.filter((definition) => definition.brushId !== brushId);
+            const fallback = definitions.find((definition) => definition.source === "system" && definition.material === "ink")!;
+            const activeByOperation = Object.fromEntries(Object.entries(state.activeByOperation).map(([operation, active]) => [
+              operation,
+              active.brushId === brushId ? ref(fallback) : active,
+            ])) as unknown as Readonly<Record<StudioUnifiedBrushOperation, StudioUnifiedBrushRef>>;
+            return Object.freeze({
+              ...state,
+              definitions: Object.freeze(definitions),
+              favorites: Object.freeze(state.favorites.filter((id) => id !== brushId)),
+              recent: Object.freeze(state.recent.filter((id) => id !== brushId)),
+              activeByOperation: Object.freeze(activeByOperation),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+          '''
+          repository = re.sub(r'^          ', '', repository, flags=re.M)
+          (ROOT / 'apps/web/src/domains/creator/studio-unified-brush-repository.ts').write_text(repository)
+
+          hook = r'''import { useCallback, useEffect, useState } from "react";
+
+          import {
+            STUDIO_UNIFIED_BRUSH_UPDATED_EVENT,
+            ensureStudioUnifiedBrushState,
+            updateStudioUnifiedBrushState,
+            type StudioUnifiedBrushState,
+          } from "../studio-unified-brush-repository";
+
+          type Locale = "ko" | "en";
+
+          export function useStudioUnifiedBrushRepository(projectId: string, locale: Locale) {
+            const [state, setState] = useState<StudioUnifiedBrushState | null>(null);
+            const [error, setError] = useState<string | null>(null);
+
+            const reload = useCallback(() => {
+              if (typeof window === "undefined" || !projectId.trim()) return;
+              try {
+                setState(ensureStudioUnifiedBrushState(window.localStorage, projectId));
+                setError(null);
+              } catch {
+                setError(locale === "ko" ? "브러시 목록을 불러오지 못했습니다." : "Could not load brushes.");
+              }
+            }, [locale, projectId]);
+
+            useEffect(() => {
+              reload();
+              if (typeof window === "undefined") return undefined;
+              const handleUpdate = (event: Event) => {
+                const detail = (event as CustomEvent<unknown>).detail;
+                if (!detail || typeof detail !== "object") return;
+                const candidate = detail as Partial<StudioUnifiedBrushState>;
+                if (candidate.projectId === projectId && candidate.schemaVersion === 1) {
+                  setState(candidate as StudioUnifiedBrushState);
+                  setError(null);
+                }
+              };
+              const handleStorage = (event: StorageEvent) => {
+                if (event.storageArea === window.localStorage && event.key?.includes(encodeURIComponent(projectId))) reload();
+              };
+              window.addEventListener(STUDIO_UNIFIED_BRUSH_UPDATED_EVENT, handleUpdate);
+              window.addEventListener("storage", handleStorage);
+              return () => {
+                window.removeEventListener(STUDIO_UNIFIED_BRUSH_UPDATED_EVENT, handleUpdate);
+                window.removeEventListener("storage", handleStorage);
+              };
+            }, [projectId, reload]);
+
+            const update = useCallback((updater: (current: StudioUnifiedBrushState) => StudioUnifiedBrushState) => {
+              if (typeof window === "undefined") return null;
+              try {
+                const next = updateStudioUnifiedBrushState(window.localStorage, projectId, updater, window);
+                setState(next);
+                setError(null);
+                return next;
+              } catch (cause) {
+                setError(cause instanceof Error ? cause.message : (locale === "ko" ? "브러시 변경을 저장하지 못했습니다." : "Could not save brush changes."));
+                return null;
+              }
+            }, [locale, projectId]);
+
+            return Object.freeze({ state, error, reload, update });
+          }
+          '''
+          hook = re.sub(r'^          ', '', hook, flags=re.M)
+          (ROOT / 'apps/web/src/domains/creator/studio-shell/useStudioUnifiedBrushRepository.ts').write_text(hook)
+
+          panel = r'''import { Brush, Copy, Download, Heart, Search, Trash2, Upload } from "lucide-react";
+          import { useMemo, useRef, useState } from "react";
+          import { Link } from "react-router-dom";
+
+          import {
+            deleteStudioUnifiedBrush,
+            duplicateStudioUnifiedBrush,
+            importStudioUnifiedBrush,
+            searchStudioUnifiedBrushes,
+            selectStudioUnifiedBrush,
+            setStudioUnifiedBrushBrowserView,
+            toggleStudioUnifiedBrushFavorite,
+            type StudioUnifiedBrushDefinition,
+            type StudioUnifiedBrushMaterial,
+            type StudioUnifiedBrushScope,
+          } from "../studio-unified-brush-repository";
+          import { buttonClass } from "@/shared/components/ui/button-utils";
+          import { cn } from "@/shared/lib/utils";
+
+          import { useStudioUnifiedBrushRepository } from "./useStudioUnifiedBrushRepository";
+
+          type Locale = "ko" | "en";
+
+          const SCOPES: readonly StudioUnifiedBrushScope[] = ["recommended", "all", "mine", "team", "market"];
+          const MATERIALS: readonly StudioUnifiedBrushMaterial[] = ["ink", "pencil", "marker", "watercolor", "oil", "air", "pastel", "texture", "tone", "effect", "eraser", "blend"];
+          const SCOPE_LABEL: Readonly<Record<StudioUnifiedBrushScope, readonly [string, string]>> = {
+            recommended: ["추천", "Recommended"],
+            all: ["전체", "All"],
+            mine: ["내 브러시", "Mine"],
+            team: ["팀", "Team"],
+            market: ["마켓", "Market"],
+          };
+          const MATERIAL_LABEL: Readonly<Record<StudioUnifiedBrushMaterial, readonly [string, string]>> = {
+            ink: ["잉크", "Ink"], pencil: ["연필", "Pencil"], marker: ["마커", "Marker"], watercolor: ["수채", "Watercolor"],
+            oil: ["유화", "Oil"], air: ["에어", "Air"], pastel: ["파스텔", "Pastel"], texture: ["질감", "Texture"],
+            tone: ["톤", "Tone"], effect: ["효과", "Effect"], eraser: ["지우개", "Eraser"], blend: ["혼합", "Blend"],
+          };
+          const FIELD_CLASS = "min-h-10 rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
+
+          function sourceLabel(source: StudioUnifiedBrushDefinition["source"], locale: Locale): string {
+            const labels = {
+              system: ["기본", "System"], personal: ["내가 만든", "Personal"], imported: ["가져옴", "Imported"], team: ["팀", "Team"], market: ["마켓", "Market"],
+            } as const;
+            return labels[source][locale === "ko" ? 0 : 1];
+          }
+
+          export function StudioProjectBrushHubPanel({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
+            const repository = useStudioUnifiedBrushRepository(projectId, locale);
+            const [query, setQuery] = useState("");
+            const [scope, setScope] = useState<StudioUnifiedBrushScope>("recommended");
+            const [material, setMaterial] = useState<StudioUnifiedBrushMaterial | null>(null);
+            const [selectedId, setSelectedId] = useState<string | null>(null);
+            const [notice, setNotice] = useState<string | null>(null);
+            const fileRef = useRef<HTMLInputElement>(null);
+            const results = useMemo(
+              () => repository.state ? searchStudioUnifiedBrushes(repository.state, query, { scope, material }) : [],
+              [material, query, repository.state, scope],
+            );
+            const selected = repository.state?.definitions.find((definition) => definition.brushId === selectedId)
+              ?? results[0]
+              ?? null;
+
+            if (!repository.state) return null;
+            const state = repository.state;
+
+            const persistView = (nextScope: StudioUnifiedBrushScope, nextMaterial: StudioUnifiedBrushMaterial | null, nextQuery: string) => {
+              repository.update((current) => setStudioUnifiedBrushBrowserView(current, { scope: nextScope, material: nextMaterial, query: nextQuery }));
+            };
+            const chooseScope = (next: StudioUnifiedBrushScope) => {
+              setScope(next);
+              persistView(next, material, query);
+            };
+            const chooseMaterial = (next: StudioUnifiedBrushMaterial | null) => {
+              setMaterial(next);
+              persistView(scope, next, query);
+            };
+            const chooseBrush = (brushId: string) => {
+              setSelectedId(brushId);
+              const definition = state.definitions.find((item) => item.brushId === brushId);
+              const operation = definition?.material === "eraser" ? "erase" : definition?.material === "blend" ? "blend" : "paint";
+              repository.update((current) => selectStudioUnifiedBrush(current, brushId, operation, window));
+              setNotice(locale === "ko" ? "현재 프로젝트 브러시로 선택했습니다." : "Selected for this project.");
+            };
+            const duplicate = (brushId: string) => {
+              const id = `personal:${Date.now()}`;
+              const next = repository.update((current) => duplicateStudioUnifiedBrush(current, brushId, id));
+              if (next) {
+                setScope("mine");
+                setSelectedId(id);
+                setNotice(locale === "ko" ? "수정 가능한 사본을 만들었습니다." : "Created an editable copy.");
+              }
+            };
+            const remove = (brushId: string) => {
+              repository.update((current) => deleteStudioUnifiedBrush(current, brushId));
+              setSelectedId(null);
+            };
+            const exportBrush = (definition: StudioUnifiedBrushDefinition) => {
+              const blob = new Blob([JSON.stringify(definition, null, 2)], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const anchor = document.createElement("a");
+              anchor.href = url;
+              anchor.download = `${definition.name.replace(/[^a-zA-Z0-9가-힣_-]+/gu, "-")}.toonbrush.json`;
+              anchor.click();
+              URL.revokeObjectURL(url);
+            };
+            const importFile = async (file: File) => {
+              try {
+                const parsed = JSON.parse(await file.text()) as Record<string, unknown>;
+                const name = typeof parsed.name === "string" ? parsed.name : file.name.replace(/\.[^.]+$/u, "");
+                const materialValue = typeof parsed.material === "string" && MATERIALS.includes(parsed.material as StudioUnifiedBrushMaterial)
+                  ? parsed.material as StudioUnifiedBrushMaterial
+                  : "ink";
+                const id = `imported:${Date.now()}`;
+                const next = repository.update((current) => importStudioUnifiedBrush(current, {
+                  brushId: id,
+                  name,
+                  description: typeof parsed.description === "string" ? parsed.description : "",
+                  material: materialValue,
+                  tags: Array.isArray(parsed.tags) ? parsed.tags.filter((item): item is string => typeof item === "string") : [],
+                  payload: typeof parsed.payload === "object" && parsed.payload !== null ? parsed.payload as Record<string, unknown> : parsed,
+                  originalFileName: file.name,
+                }));
+                if (next) {
+                  setScope("mine");
+                  setSelectedId(id);
+                  setNotice(locale === "ko" ? "브러시를 가져와 내 브러시에 추가했습니다." : "Imported into My brushes.");
+                }
+              } catch {
+                setNotice(locale === "ko" ? "지원되는 브러시 JSON 파일인지 확인해 주세요." : "Check that this is a supported brush JSON file.");
+              }
+            };
+
+            return (
+              <section className="rounded-3xl border border-line bg-card p-4 shadow-sm sm:p-6" data-testid="unified-brush-hub">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex items-start gap-3">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><Brush size={18} aria-hidden="true" /></span>
+                    <div>
+                      <p className="text-[0.62rem] font-black uppercase tracking-[0.16em] text-accent">BRUSH HUB</p>
+                      <h2 className="mt-1 text-xl font-black tracking-tight text-fg">{locale === "ko" ? "브러시 선택" : "Choose a brush"}</h2>
+                      <p className="mt-1 text-sm leading-6 text-fg-2">
+                        {locale === "ko" ? "기본·내 브러시·가져온·팀·마켓 브러시를 같은 검색과 즐겨찾기에서 관리합니다." : "Manage system, personal, imported, team and market brushes through one search and favorites model."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <input ref={fileRef} type="file" accept=".json,.toonbrush" className="sr-only" onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void importFile(file);
+                      event.currentTarget.value = "";
+                    }} />
+                    <button type="button" onClick={() => fileRef.current?.click()} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}>
+                      <Upload size={15} aria-hidden="true" />{locale === "ko" ? "가져오기" : "Import"}
+                    </button>
+                    {selected ? (
+                      <button type="button" onClick={() => exportBrush(selected)} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}>
+                        <Download size={15} aria-hidden="true" />{locale === "ko" ? "내보내기" : "Export"}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2" role="tablist" aria-label={locale === "ko" ? "브러시 범위" : "Brush scope"}>
+                  {SCOPES.map((item) => (
+                    <button key={item} type="button" role="tab" aria-selected={scope === item} onClick={() => chooseScope(item)} className={cn(
+                      "min-h-10 rounded-full border px-4 text-xs font-bold transition-colors",
+                      scope === item ? "border-accent/50 bg-accent-soft text-accent" : "border-line bg-panel text-fg-3 hover:text-fg",
+                    )}>{SCOPE_LABEL[item][locale === "ko" ? 0 : 1]}</button>
+                  ))}
+                </div>
+
+                <div className="mt-3 grid gap-2 lg:grid-cols-[1fr_12rem]">
+                  <label className="relative block">
+                    <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" aria-hidden="true" />
+                    <input value={query} onChange={(event) => {
+                      setQuery(event.target.value);
+                      persistView(scope, material, event.target.value);
+                    }} placeholder={locale === "ko" ? "이름·용도·재질 검색" : "Search name, use or material"} className={`${FIELD_CLASS} w-full pl-9`} />
+                  </label>
+                  <select value={material ?? ""} onChange={(event) => chooseMaterial(event.target.value ? event.target.value as StudioUnifiedBrushMaterial : null)} className={FIELD_CLASS} aria-label={locale === "ko" ? "재질 필터" : "Material filter"}>
+                    <option value="">{locale === "ko" ? "모든 재질" : "All materials"}</option>
+                    {MATERIALS.map((item) => <option key={item} value={item}>{MATERIAL_LABEL[item][locale === "ko" ? 0 : 1]}</option>)}
+                  </select>
+                </div>
+
+                <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {results.map((definition) => {
+                      const active = Object.values(state.activeByOperation).some((item) => item.brushId === definition.brushId);
+                      const favorite = state.favorites.includes(definition.brushId);
+                      return (
+                        <article key={definition.brushId} className={cn("rounded-2xl border bg-panel p-3", active ? "border-accent/55 ring-2 ring-accent/10" : "border-line")}>
+                          <button type="button" onClick={() => setSelectedId(definition.brushId)} className="w-full text-left">
+                            <div className="h-14 overflow-hidden rounded-xl border border-line bg-card p-2" aria-hidden="true">
+                              <svg viewBox="0 0 180 40" className="h-full w-full"><path d="M8 29 C38 4, 65 36, 94 13 S145 32, 172 10" fill="none" stroke="currentColor" strokeWidth={Math.max(2, Number(definition.payload.size ?? 12) / 5)} strokeLinecap="round" className="text-fg" /></svg>
+                            </div>
+                            <div className="mt-3 flex items-start justify-between gap-2">
+                              <div className="min-w-0"><b className="block truncate text-sm text-fg">{definition.name}</b><span className="mt-1 block text-[0.65rem] font-semibold text-fg-3">{sourceLabel(definition.source, locale)} · {MATERIAL_LABEL[definition.material][locale === "ko" ? 0 : 1]}</span></div>
+                              {active ? <span className="rounded-full bg-accent-soft px-2 py-1 text-[0.6rem] font-black text-accent">{locale === "ko" ? "사용 중" : "Active"}</span> : null}
+                            </div>
+                          </button>
+                          <div className="mt-3 flex gap-1.5">
+                            <button type="button" onClick={() => chooseBrush(definition.brushId)} className={buttonClass({ size: "sm", className: "flex-1" })}>{locale === "ko" ? "사용" : "Use"}</button>
+                            <button type="button" onClick={() => repository.update((current) => toggleStudioUnifiedBrushFavorite(current, definition.brushId))} aria-label={favorite ? (locale === "ko" ? "즐겨찾기 해제" : "Remove favorite") : (locale === "ko" ? "즐겨찾기" : "Favorite")} className={buttonClass({ variant: "quiet", size: "icon" })}><Heart size={15} fill={favorite ? "currentColor" : "none"} aria-hidden="true" /></button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+
+                  <aside className="rounded-2xl border border-line bg-panel p-4">
+                    {selected ? (
+                      <>
+                        <p className="text-[0.62rem] font-black uppercase tracking-wide text-accent">{sourceLabel(selected.source, locale)}</p>
+                        <h3 className="mt-1 text-lg font-black text-fg">{selected.name}</h3>
+                        <p className="mt-2 text-sm leading-6 text-fg-2">{selected.description}</p>
+                        <div className="mt-3 flex flex-wrap gap-1.5">{selected.tags.map((tag) => <span key={tag} className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] text-fg-3">{tag}</span>)}</div>
+                        <div className="mt-5 grid gap-2">
+                          <button type="button" onClick={() => chooseBrush(selected.brushId)} className={buttonClass({ className: "w-full" })}>{locale === "ko" ? "현재 브러시로 사용" : "Use current brush"}</button>
+                          <Link to={`/studio/work/${encodeURIComponent(projectId)}/canvas?brush=${encodeURIComponent(selected.brushId)}`} className={buttonClass({ variant: "outline", className: "w-full" })}>{locale === "ko" ? "편집기에서 열기" : "Open in editor"}</Link>
+                          <button type="button" onClick={() => duplicate(selected.brushId)} className={buttonClass({ variant: "outline", className: "w-full gap-1.5" })}><Copy size={15} aria-hidden="true" />{locale === "ko" ? "수정 가능한 사본" : "Editable copy"}</button>
+                          {!selected.readonly ? <button type="button" onClick={() => remove(selected.brushId)} className={buttonClass({ variant: "danger", className: "w-full gap-1.5" })}><Trash2 size={15} aria-hidden="true" />{locale === "ko" ? "삭제" : "Delete"}</button> : null}
+                        </div>
+                        {selected.provenance.originalFileName ? <p className="mt-4 break-all text-[0.65rem] text-fg-3">{locale === "ko" ? "원본" : "Source"}: {selected.provenance.originalFileName}</p> : null}
+                      </>
+                    ) : <p className="text-sm text-fg-3">{locale === "ko" ? "브러시를 선택해 주세요." : "Select a brush."}</p>}
+                  </aside>
+                </div>
+                {results.length === 0 ? <p className="mt-5 rounded-xl border border-line bg-panel p-4 text-sm text-fg-3">{locale === "ko" ? "조건에 맞는 브러시가 없습니다." : "No brushes match the current filters."}</p> : null}
+                {notice ? <p role="status" className="mt-4 text-xs font-semibold text-accent">{notice}</p> : null}
+                {repository.error ? <p role="alert" className="mt-2 text-xs font-semibold text-danger">{repository.error}</p> : null}
+              </section>
+            );
+          }
+          '''
+          panel = re.sub(r'^          ', '', panel, flags=re.M)
+          (ROOT / 'apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.tsx').write_text(panel)
+
+          repository_test = r'''import { describe, expect, it } from "vitest";
+
+          import {
+            createDefaultStudioUnifiedBrushState,
+            deleteStudioUnifiedBrush,
+            duplicateStudioUnifiedBrush,
+            ensureStudioUnifiedBrushState,
+            importStudioUnifiedBrush,
+            readStudioUnifiedBrushState,
+            searchStudioUnifiedBrushes,
+            selectStudioUnifiedBrush,
+            toggleStudioUnifiedBrushFavorite,
+            updateStudioUnifiedBrushState,
+          } from "./studio-unified-brush-repository";
+
+          class MemoryStorage {
+            readonly values = new Map<string, string>();
+            getItem(key: string) { return this.values.get(key) ?? null; }
+            setItem(key: string, value: string) { this.values.set(key, value); }
+          }
+
+          describe("unified Studio brush repository", () => {
+            it("searches every source through one catalogue and selects per operation", () => {
+              let state = createDefaultStudioUnifiedBrushState("project-1", "2026-09-11T00:00:00.000Z");
+              state = importStudioUnifiedBrush(state, {
+                brushId: "imported:rough",
+                name: "Rough Pencil Pro",
+                material: "pencil",
+                tags: ["rough", "storyboard"],
+                payload: { size: 20 },
+                originalFileName: "rough.toonbrush",
+              }, "2026-09-11T01:00:00.000Z");
+              expect(searchStudioUnifiedBrushes(state, "rough", { scope: "all" }).map((brush) => brush.brushId))
+                .toEqual(["imported:rough"]);
+              state = selectStudioUnifiedBrush(state, "imported:rough", "paint");
+              expect(state.activeByOperation.paint.brushId).toBe("imported:rough");
+              expect(state.recent[0]).toBe("imported:rough");
+            });
+
+            it("creates editable copies without mutating read-only system brushes", () => {
+              const initial = createDefaultStudioUnifiedBrushState("project-1", "2026-09-11T00:00:00.000Z");
+              const next = duplicateStudioUnifiedBrush(initial, "system:g-pen", "personal:g-pen", "2026-09-11T02:00:00.000Z");
+              const copy = next.definitions.find((brush) => brush.brushId === "personal:g-pen");
+              expect(copy).toMatchObject({ source: "personal", readonly: false, name: "G펜 사본" });
+              expect(() => deleteStudioUnifiedBrush(next, "system:g-pen")).toThrow("read-only");
+              expect(deleteStudioUnifiedBrush(next, "personal:g-pen").definitions.some((brush) => brush.brushId === "personal:g-pen")).toBe(false);
+            });
+
+            it("persists favorites, imports and active selection per project", () => {
+              const storage = new MemoryStorage();
+              ensureStudioUnifiedBrushState(storage, "project-1");
+              const updated = updateStudioUnifiedBrushState(storage, "project-1", (current) => {
+                const imported = importStudioUnifiedBrush(current, { brushId: "imported:ink", name: "Imported Ink" }, "2026-09-11T03:00:00.000Z");
+                return toggleStudioUnifiedBrushFavorite(selectStudioUnifiedBrush(imported, "imported:ink"), "imported:ink");
+              });
+              expect(updated.favorites).toContain("imported:ink");
+              expect(readStudioUnifiedBrushState(storage, "project-1")?.activeByOperation.paint.brushId).toBe("imported:ink");
+              expect(readStudioUnifiedBrushState(storage, "project-2")).toBeNull();
+            });
+          });
+          '''
+          repository_test = re.sub(r'^          ', '', repository_test, flags=re.M)
+          (ROOT / 'apps/web/src/domains/creator/studio-unified-brush-repository.test.ts').write_text(repository_test)
+
+          panel_test = r'''// @vitest-environment jsdom
+
+          import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+          import { afterEach, beforeEach, describe, expect, it } from "vitest";
+          import { MemoryRouter } from "react-router-dom";
+
+          import { StudioProjectBrushHubPanel } from "./StudioProjectBrushHubPanel";
+
+          beforeEach(() => window.localStorage.clear());
+          afterEach(() => { cleanup(); window.localStorage.clear(); });
+
+          describe("StudioProjectBrushHubPanel", () => {
+            it("searches and selects a brush through one project-owned surface", async () => {
+              render(<MemoryRouter><StudioProjectBrushHubPanel projectId="project-1" locale="ko" /></MemoryRouter>);
+              await screen.findByRole("heading", { name: "브러시 선택" });
+              fireEvent.change(screen.getByPlaceholderText("이름·용도·재질 검색"), { target: { value: "거친 연필" } });
+              expect(await screen.findByText("거친 연필")).toBeTruthy();
+              fireEvent.click(screen.getByRole("button", { name: "사용" }));
+              expect(await screen.findByText("현재 프로젝트 브러시로 선택했습니다.")).toBeTruthy();
+            });
+
+            it("creates an editable personal copy from a system brush", async () => {
+              render(<MemoryRouter><StudioProjectBrushHubPanel projectId="project-2" locale="ko" /></MemoryRouter>);
+              await screen.findByRole("heading", { name: "브러시 선택" });
+              fireEvent.click(screen.getByRole("button", { name: "수정 가능한 사본" }));
+              expect(await screen.findByText("수정 가능한 사본을 만들었습니다.")).toBeTruthy();
+              expect(screen.getByRole("tab", { name: "내 브러시" }).getAttribute("aria-selected")).toBe("false");
+              expect(window.localStorage.length).toBeGreaterThan(0);
+            });
+          });
+          '''
+          panel_test = re.sub(r'^          ', '', panel_test, flags=re.M)
+          (ROOT / 'apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.test.tsx').write_text(panel_test)
+
+          integrated = ROOT / 'apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx'
+          text = integrated.read_text()
+          import_line = 'import { StudioProjectBrushHubPanel } from "./StudioProjectBrushHubPanel";\n'
+          if import_line not in text:
+            marker = 'import { StudioProjectAssistantPanel } from "./StudioProjectAssistantPanel";\n'
+            if marker not in text:
+              raise SystemExit('Could not find assistant import marker')
+            text = text.replace(marker, marker + import_line, 1)
+          marker = '''      <StudioProjectFeatureSuitePanel
+        projectId={projectId}
+        section={section}
+        view={view}
+        locale={locale}
+      />
+'''
+          addition = marker + '''      {section === "assets" && ["project", "installed"].includes(view) ? (
+        <StudioProjectBrushHubPanel projectId={projectId} locale={locale} />
+      ) : null}
+'''
+          if 'StudioProjectBrushHubPanel projectId=' not in text:
+            if marker not in text:
+              raise SystemExit('Could not find feature panel marker')
+            text = text.replace(marker, addition, 1)
+          integrated.write_text(text)
+
+          registry = ROOT / 'apps/web/src/domains/creator/studio-route-registry.ts'
+          if registry.exists():
+            text = registry.read_text()
+            import_line = 'import * as unifiedBrushRepository from "./studio-unified-brush-repository";\n'
+            if import_line not in text:
+              marker = 'import * as rightsGraph from "./studio-rights-graph";\n'
+              text = text.replace(marker, marker + import_line, 1)
+            capability = '''            {
+              id: "assets.unified-brushes",
+              primaryRouteId: "project.assets",
+              owner: "assets",
+              labelKo: "통합 브러시",
+              labelEn: "Unified brushes",
+              descriptionKo: "기본·개인·가져온·팀·마켓 브러시의 검색·즐겨찾기·최근 사용·활성 선택을 하나로 관리합니다.",
+              descriptionEn: "Manage search, favorites, recents and active selection for system, personal, imported, team and market brushes in one repository.",
+              implementation: unifiedBrushRepository,
+            },
+'''
+            if 'assets.unified-brushes' not in text:
+              marker = '''            {
+              id: "assets.rights",
+'''
+              text = text.replace(marker, capability + marker, 1)
+            registry.write_text(text)
+
+          registry_test = ROOT / 'apps/web/src/domains/creator/studio-route-registry.test.ts'
+          if registry_test.exists():
+            text = registry_test.read_text()
+            if '"assets.unified-brushes"' not in text:
+              text = text.replace('                "assets.rights",', '                "assets.unified-brushes",\n                "assets.rights",', 1)
+            registry_test.write_text(text)
+
+          workflow = ROOT / '.github/workflows/apply-toonstudio-unified-brush-hub.yml'
+          # Removed only after every verification step succeeds.
+          PY
+
+      - name: Verify formatting
+        run: git diff --check
+
+      - name: Verify reachability
+        run: node scripts/verify-toonstudio-feature-reachability.mjs
+
+      - name: Typecheck
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+
+      - name: Lint changed source
+        shell: bash
+        run: |
+          mapfile -t files < <(git diff --name-only -- '*.ts' '*.tsx')
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored -- "${files[@]}"
+
+      - name: Run brush and integration tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/domains/creator/studio-unified-brush-repository.test.ts
+          apps/web/src/domains/creator/studio-route-registry.test.ts
+          apps/web/src/domains/creator/studio-integration-closure.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.integration.test.tsx
+          apps/web/src/app/routes/groups/app-routes.test.tsx
+          --pool=forks --maxWorkers=2
+
+      - name: Build production bundle
+        run: pnpm run build:bundle
+
+      - name: Commit verified brush integration
+        shell: bash
+        run: |
+          rm .github/workflows/apply-toonstudio-unified-brush-hub.yml
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): unify brush catalogue and project selection"
+          git push origin HEAD:feat/toonstudio-unified-brush-hub-20260911
