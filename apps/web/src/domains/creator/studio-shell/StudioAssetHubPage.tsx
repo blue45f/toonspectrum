@@ -12,10 +12,8 @@ import { cn } from "@/shared/lib/utils";
 
 import { StudioAssetsPage } from "./StudioFrontDoorPages";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
+import { ASSET_HUB_VIEWS, resolveStudioAssetHubView, type AssetHubView } from "./studio-asset-hub-view";
 
-const ASSET_HUB_VIEWS = ["overview", "series-kit", "library", "market", "seller"] as const;
-
-type AssetHubView = (typeof ASSET_HUB_VIEWS)[number];
 type Locale = "ko" | "en";
 
 const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<Record<Locale, string>>>> = {
@@ -39,10 +37,6 @@ function localeFromLanguage(language: string): Locale {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
-/** Resolve a user-supplied query value without allowing unknown asset-hub surfaces. */
-export function resolveStudioAssetHubView(value: string | null): AssetHubView {
-  return ASSET_HUB_VIEWS.includes(value as AssetHubView) ? value as AssetHubView : "overview";
-}
 
 /** Build a canonical link while preserving the optional project context. */
 function assetHubHref(view: AssetHubView, projectId: string | null): string {

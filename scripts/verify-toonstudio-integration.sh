@@ -2,6 +2,7 @@
 set -euo pipefail
 
 track="${1:-}"
+mkdir -p ".cache/ci/toonstudio/${track}/eslint"
 temporary_configs=()
 
 cleanup() {
@@ -20,6 +21,8 @@ typecheck_group() {
   node - "$config" "$@" <<'NODE'
 const fs = require("node:fs");
 const [config, ...files] = process.argv.slice(2);
+const cacheName = config.replace(/^\.toonstudio-tsconfig-/, "").replace(/\.json$/, "");
+fs.mkdirSync(".cache/ci/toonstudio", { recursive: true });
 if (!config || files.length === 0) {
   throw new Error("A config path and at least one source file are required.");
 }
@@ -28,13 +31,14 @@ fs.writeFileSync(config, `${JSON.stringify({
   compilerOptions: {
     allowJs: false,
     checkJs: false,
-    incremental: false,
+    incremental: true,
     noEmit: true,
     skipLibCheck: true,
+    tsBuildInfoFile: `.cache/ci/toonstudio/${cacheName}.tsbuildinfo`,
   },
   include: [],
   exclude: [],
-  files,
+  files: ["apps/web/src/vite-env.d.ts", ...files],
 }, null, 2)}\n`);
 NODE
 
@@ -101,6 +105,8 @@ run_core() {
     apps/web/src/domains/creator/ai/studio-ai-project-handoff.ts
 
   pnpm exec eslint --max-warnings=0 \
+    --cache --cache-strategy content \
+    --cache-location ".cache/ci/toonstudio/${track}/eslint/.eslintcache" \
     apps/web/src/domains/creator/ai/studio-ai-project-handoff.ts \
     apps/web/src/domains/creator/studio-analytics.ts \
     apps/web/src/domains/creator/studio-archive-manifest.ts \
@@ -199,6 +205,8 @@ run_ui() {
     apps/web/src/domains/creator/studio-shell/StudioReviewPanel.tsx
 
   pnpm exec eslint --max-warnings=0 \
+    --cache --cache-strategy content \
+    --cache-location ".cache/ci/toonstudio/${track}/eslint/.eslintcache" \
     apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.tsx \
     apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx \
     apps/web/src/domains/creator/studio-shell/StudioExportPanel.tsx \
@@ -231,6 +239,8 @@ run_ui() {
 
 run_editor() {
   pnpm exec eslint --max-warnings=0 \
+    --cache --cache-strategy content \
+    --cache-location ".cache/ci/toonstudio/${track}/eslint/.eslintcache" \
     apps/web/src/app/routes/groups/creator-route-pages.ts \
     apps/web/src/app/routes/groups/creator.routes.tsx \
     apps/web/src/domains/creator/brush-lab/StudioBrushIntegratedWorkbench.tsx \

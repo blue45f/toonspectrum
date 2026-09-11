@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useI18n } from "@/shared/lib/i18n";
 
-import { resolveStudioAssetHubView, StudioAssetHubPage } from "./StudioAssetHubPage";
+import { StudioAssetHubPage } from "./StudioAssetHubPage";
+import { resolveStudioAssetHubView } from "./studio-asset-hub-view";
 
 vi.mock("./StudioFrontDoorPages", () => ({
   StudioAssetsPage: () => <div>asset overview content</div>,

@@ -184,7 +184,7 @@ export function StudioLocalizationPanel({
   useEffect(() => {
     setTranslationDraft(selected?.translatedText ?? "");
     setLayoutDraft(layoutDraftFor(selected));
-  }, [selected?.id, selected?.translatedText, selected?.updatedAt]);
+  }, [selected]);
 
   const summary = useMemo(() => summarizeStudioLocalization(document.units), [document.units]);
   const qa = useMemo(() => selected ? evaluateStudioLocalizationQa(selected) : [], [selected]);

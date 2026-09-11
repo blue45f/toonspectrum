@@ -59,10 +59,22 @@ function statusClasses(status: StudioProjectReadinessStatus): string {
   return "border-danger/35 bg-danger/10 text-danger";
 }
 
-function statusIcon(status: StudioProjectReadinessStatus) {
-  if (status === "ready") return CheckCircle2;
-  if (status === "warning") return AlertTriangle;
-  return ShieldAlert;
+function ReadinessStatusIcon({
+  status,
+  size = 14,
+  className,
+}: {
+  readonly status: StudioProjectReadinessStatus;
+  readonly size?: number;
+  readonly className?: string;
+}) {
+  if (status === "ready") {
+    return <CheckCircle2 size={size} className={className} aria-hidden="true" />;
+  }
+  if (status === "warning") {
+    return <AlertTriangle size={size} className={className} aria-hidden="true" />;
+  }
+  return <ShieldAlert size={size} className={className} aria-hidden="true" />;
 }
 
 function readBrowserSnapshot(projectId: string): StudioProjectReadinessSnapshot | null {
@@ -149,7 +161,6 @@ export function StudioProjectReadinessPanel({
   };
 
   if (!snapshot) {
-    const FailureIcon = failure ? AlertTriangle : RefreshCw;
     return (
       <section
         className={cn(
@@ -162,7 +173,11 @@ export function StudioProjectReadinessPanel({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <FailureIcon size={17} className={failure ? "text-warning" : "text-fg-3"} aria-hidden="true" />
+              {failure ? (
+                <AlertTriangle size={17} className="text-warning" aria-hidden="true" />
+              ) : (
+                <RefreshCw size={17} className="text-fg-3" aria-hidden="true" />
+              )}
               <h2 className="text-sm font-bold text-fg">
                 {failure
                   ? (locale === "ko" ? "프로젝트 준비도 · 연결 데이터 없음" : "Project readiness · Source unavailable")
@@ -200,7 +215,6 @@ export function StudioProjectReadinessPanel({
   }
 
   const { report } = snapshot;
-  const StatusIcon = statusIcon(report.status);
   const percentage = Math.round(report.completion * 100);
   return (
     <section className="mt-5 rounded-2xl border border-line bg-card p-4 sm:p-5" aria-live="polite">
@@ -219,7 +233,7 @@ export function StudioProjectReadinessPanel({
               "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-bold",
               statusClasses(report.status),
             )}>
-              <StatusIcon size={14} aria-hidden="true" />
+              <ReadinessStatusIcon status={report.status} size={14} />
               {statusLabel(report.status, locale)}
             </span>
             <h2 className="text-sm font-bold text-fg">
@@ -245,7 +259,6 @@ export function StudioProjectReadinessPanel({
       {!compact ? (
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
           {report.sections.map((section) => {
-            const Icon = statusIcon(section.status);
             return (
               <Link
                 key={section.id}
@@ -254,7 +267,11 @@ export function StudioProjectReadinessPanel({
               >
                 <span className="flex items-center justify-between gap-2">
                   <strong className="text-xs text-fg">{SECTION_LABELS[section.id][locale]}</strong>
-                  <Icon size={14} className={statusClasses(section.status).split(" ").at(-1)} aria-hidden="true" />
+                  <ReadinessStatusIcon
+                    status={section.status}
+                    size={14}
+                    className={statusClasses(section.status).split(" ").at(-1)}
+                  />
                 </span>
                 <span className="mt-2 block text-lg font-black text-fg">
                   {Math.round(section.completion * 100)}%

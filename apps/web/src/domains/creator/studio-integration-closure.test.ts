@@ -10,6 +10,23 @@ const TRANSIENT_WORKFLOWS = [
   ".github/workflows/pr1307-sync-main-once.yml",
   ".github/workflows/toonstudio-menu-contract-repair.yml",
   ".github/workflows/toonstudio-rebase-reconcile.yml",
+  ".github/workflows/apply-toonstudio-ui-lint-fixes.yml",
+  ".github/workflows/attest-toonstudio-session-complete.yml",
+  ".github/workflows/cleanup-toonstudio-session-workflows.yml",
+  ".github/workflows/commit-toonstudio-session-fixes.yml",
+  ".github/workflows/diagnose-toonstudio-session-types.yml",
+  ".github/workflows/ensure-toonstudio-session-complete.yml",
+  ".github/workflows/finalize-toonstudio-session-verified.yml",
+  ".github/workflows/finalize-toonstudio-session.yml",
+  ".github/workflows/pr1289-ci-delta-optimizer.yml",
+  ".github/workflows/repair-and-publish-toonstudio-session.yml",
+  ".github/workflows/retire-toonstudio-session-branch.yml",
+  ".github/workflows/toonstudio-session-orchestrator.yml",
+  ".github/workflows/toonstudio-session-self-heal.yml",
+  ".github/workflows/toonstudio-session-verify.yml",
+  ".github/workflows/verify-toonstudio-pr-head.yml",
+  ".github/workflows/apply-ci-optimization-fixes-once.yml",
+  ".github/workflows/apply-ci-source-fixes-once.yml",
 ] as const;
 
 function source(path: string): string {
@@ -39,8 +56,8 @@ describe("ToonStudio integration closure", () => {
     expect(routePages).toContain('import("@/domains/creator/studio-shell/StudioProjectIntegratedPage")');
     expect(routePages).toContain("default: module.StudioProjectIntegratedPage");
     for (const section of ["overview", "story", "production", "assets", "review", "export", "settings"]) {
-      expect(routes).toContain(`path: \"/studio/p/:projectId/${section}\"`);
-      expect(routes).toContain(`StudioProjectShellPage section=\"${section}\"`);
+      expect(routes).toContain(`path: "/studio/p/:projectId/${section}"`);
+      expect(routes).toContain(`StudioProjectShellPage section="${section}"`);
     }
     expect(productIa).toContain('primaryRoute: "/studio"');
     expect(productIa).toContain('primaryRoute: "/studio/p/:projectId/story"');
