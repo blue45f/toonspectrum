@@ -79,10 +79,25 @@ export interface StudioExportPreflightResult {
   readonly summaryEn: string;
 }
 
+const MIB = 1024 * 1024;
+const GIB = 1024 * MIB;
+
+function profile(
+  value: StudioExportTargetProfile,
+): StudioExportTargetProfile {
+  return Object.freeze({
+    ...value,
+    allowedFormats: Object.freeze([...value.allowedFormats]),
+    ...(value.allowedColorSpaces
+      ? { allowedColorSpaces: Object.freeze([...value.allowedColorSpaces]) }
+      : {}),
+  });
+}
+
 export const STUDIO_EXPORT_TARGET_PROFILES: Readonly<
   Record<StudioExportTargetId, StudioExportTargetProfile>
 > = Object.freeze({
-  "webtoon-platform": Object.freeze({
+  "webtoon-platform": profile({
     id: "webtoon-platform",
     policyVersion: "2026-09",
     labelKo: "웹툰 플랫폼",
@@ -90,7 +105,7 @@ export const STUDIO_EXPORT_TARGET_PROFILES: Readonly<
     allowedFormats: ["png", "jpg", "jpeg", "webp"],
     exactWidth: 800,
     maxSegmentHeight: 12_800,
-    maxFileSizeBytes: 20 * 1024 * 1024,
+    maxFileSizeBytes: 20 * MIB,
     allowedColorSpaces: ["srgb"],
     minimumTextPx: 18,
     requireReadingOrder: true,
@@ -100,14 +115,14 @@ export const STUDIO_EXPORT_TARGET_PROFILES: Readonly<
     requireCaptions: false,
     preserveEditableStructure: false,
   }),
-  social: Object.freeze({
+  social: profile({
     id: "social",
     policyVersion: "2026-09",
     labelKo: "SNS",
     labelEn: "Social",
     allowedFormats: ["png", "jpg", "jpeg", "webp", "mp4"],
     maxWidth: 4096,
-    maxFileSizeBytes: 100 * 1024 * 1024,
+    maxFileSizeBytes: 100 * MIB,
     allowedColorSpaces: ["srgb"],
     minimumTextPx: 16,
     requireReadingOrder: false,
@@ -117,13 +132,13 @@ export const STUDIO_EXPORT_TARGET_PROFILES: Readonly<
     requireCaptions: true,
     preserveEditableStructure: false,
   }),
-  print: Object.freeze({
+  print: profile({
     id: "print",
     policyVersion: "2026-09",
     labelKo: "인쇄",
     labelEn: "Print",
     allowedFormats: ["pdf", "tif", "tiff", "psd"],
-    maxFileSizeBytes: 2 * 1024 * 1024 * 1024,
+    maxFileSizeBytes: 2 * GIB,
     minimumDpi: 300,
     allowedColorSpaces: ["cmyk", "gray"],
     minimumTextPx: 12,
@@ -134,14 +149,14 @@ export const STUDIO_EXPORT_TARGET_PROFILES: Readonly<
     requireCaptions: false,
     preserveEditableStructure: false,
   }),
-  "image-pdf": Object.freeze({
+  "image-pdf": profile({
     id: "image-pdf",
     policyVersion: "2026-09",
     labelKo: "이미지·PDF",
     labelEn: "Image & PDF",
     allowedFormats: ["png", "jpg", "jpeg", "webp", "pdf", "svg"],
     maxWidth: 65_535,
-    maxFileSizeBytes: 2 * 1024 * 1024 * 1024,
+    maxFileSizeBytes: 2 * GIB,
     allowedColorSpaces: ["srgb", "display-p3", "cmyk", "gray"],
     minimumTextPx: 12,
     requireReadingOrder: false,
@@ -151,13 +166,13 @@ export const STUDIO_EXPORT_TARGET_PROFILES: Readonly<
     requireCaptions: false,
     preserveEditableStructure: false,
   }),
-  editable: Object.freeze({
+  editable: profile({
     id: "editable",
     policyVersion: "2026-09",
     labelKo: "다른 편집기",
     labelEn: "Editable handoff",
     allowedFormats: ["psd", "ora", "svg", "pptx", "json"],
-    maxFileSizeBytes: 4 * 1024 * 1024 * 1024,
+    maxFileSizeBytes: 4 * GIB,
     allowedColorSpaces: ["srgb", "display-p3", "cmyk", "gray"],
     requireReadingOrder: false,
     requireRightsClearance: true,
@@ -166,13 +181,13 @@ export const STUDIO_EXPORT_TARGET_PROFILES: Readonly<
     requireCaptions: false,
     preserveEditableStructure: true,
   }),
-  ebook: Object.freeze({
+  ebook: profile({
     id: "ebook",
     policyVersion: "2026-09",
     labelKo: "전자책",
     labelEn: "E-book",
     allowedFormats: ["epub", "pdf"],
-    maxFileSizeBytes: 2 * 1024 * 1024 * 1024,
+    maxFileSizeBytes: 2 * GIB,
     allowedColorSpaces: ["srgb"],
     minimumTextPx: 16,
     requireReadingOrder: true,
@@ -182,14 +197,14 @@ export const STUDIO_EXPORT_TARGET_PROFILES: Readonly<
     requireCaptions: true,
     preserveEditableStructure: false,
   }),
-  video: Object.freeze({
+  video: profile({
     id: "video",
     policyVersion: "2026-09",
     labelKo: "영상",
     labelEn: "Video",
     allowedFormats: ["mp4", "webm", "gif"],
     maxWidth: 7680,
-    maxFileSizeBytes: 8 * 1024 * 1024 * 1024,
+    maxFileSizeBytes: 8 * GIB,
     allowedColorSpaces: ["srgb", "display-p3", "rec709"],
     minimumTextPx: 18,
     requireReadingOrder: false,
@@ -199,13 +214,13 @@ export const STUDIO_EXPORT_TARGET_PROFILES: Readonly<
     requireCaptions: true,
     preserveEditableStructure: false,
   }),
-  archive: Object.freeze({
+  archive: profile({
     id: "archive",
     policyVersion: "2026-09",
     labelKo: "완전한 백업",
     labelEn: "Complete archive",
     allowedFormats: ["zip", "toonstudio", "json"],
-    maxFileSizeBytes: 16 * 1024 * 1024 * 1024,
+    maxFileSizeBytes: 16 * GIB,
     allowedColorSpaces: ["srgb", "display-p3", "cmyk", "gray", "rec709"],
     requireReadingOrder: false,
     requireRightsClearance: false,
@@ -240,78 +255,88 @@ function validPositive(value: number): boolean {
   return Number.isFinite(value) && value > 0;
 }
 
-export function studioExportTargetProfile(
-  target: StudioExportTargetId,
-): StudioExportTargetProfile {
-  const profile = STUDIO_EXPORT_TARGET_PROFILES[target];
-  if (!profile) throw new Error(`Unknown Studio export target: ${target}`);
-  return profile;
-}
-
-export function runStudioExportPreflight(
-  target: StudioExportTargetId,
-  document: StudioExportDocumentSnapshot,
-): StudioExportPreflightResult {
-  const profile = studioExportTargetProfile(target);
+function validateSnapshot(document: StudioExportDocumentSnapshot): void {
+  const counts = [document.localizationBlockingIssues, document.unresolvedComments];
   if (
     !document.documentId.trim()
+    || !document.format.trim()
     || !validPositive(document.width)
     || !validPositive(document.height)
     || !validPositive(document.estimatedFileSizeBytes)
     || !Number.isFinite(document.altTextCoverage)
     || document.altTextCoverage < 0
     || document.altTextCoverage > 1
+    || counts.some((value) => !Number.isInteger(value) || value < 0)
   ) {
     throw new Error("Export preflight requires a valid document snapshot.");
   }
+}
+
+export function studioExportTargetProfile(
+  target: StudioExportTargetId,
+): StudioExportTargetProfile {
+  const targetProfile = STUDIO_EXPORT_TARGET_PROFILES[target];
+  if (!targetProfile) throw new Error(`Unknown Studio export target: ${target}`);
+  return targetProfile;
+}
+
+export function runStudioExportPreflight(
+  target: StudioExportTargetId,
+  document: StudioExportDocumentSnapshot,
+): StudioExportPreflightResult {
+  const targetProfile = studioExportTargetProfile(target);
+  validateSnapshot(document);
+
   const findings: StudioExportPreflightFinding[] = [];
   const format = document.format.toLowerCase();
-  if (!profile.allowedFormats.includes(format)) {
+  if (!targetProfile.allowedFormats.includes(format)) {
     findings.push(finding(
       "format",
       "error",
-      `${profile.labelKo}에서 ${format.toUpperCase()} 형식을 사용할 수 없습니다.`,
-      `${format.toUpperCase()} is not supported for ${profile.labelEn}.`,
+      `${targetProfile.labelKo}에서 ${format.toUpperCase()} 형식을 사용할 수 없습니다.`,
+      `${format.toUpperCase()} is not supported for ${targetProfile.labelEn}.`,
       "지원 형식으로 변경하세요.",
       "Choose a supported output format.",
     ));
   }
-  if (profile.exactWidth !== undefined && document.width !== profile.exactWidth) {
+
+  const exactWidth = targetProfile.exactWidth;
+  const maxWidth = targetProfile.maxWidth;
+  if (exactWidth !== undefined && document.width !== exactWidth) {
     findings.push(finding(
       "width-exact",
       "error",
-      `가로 폭을 ${profile.exactWidth}px로 맞춰야 합니다.`,
-      `The document width must be ${profile.exactWidth}px.`,
+      `가로 폭을 ${exactWidth}px로 맞춰야 합니다.`,
+      `The document width must be ${exactWidth}px.`,
       "안전한 비율로 자동 크기 조정을 실행하세요.",
       "Run safe automatic resizing.",
     ));
-  } else if (profile.maxWidth !== undefined && document.width > profile.maxWidth) {
+  } else if (maxWidth !== undefined && document.width > maxWidth) {
     findings.push(finding(
       "width-max",
       "error",
-      `가로 폭이 최대 ${profile.maxWidth}px를 넘습니다.`,
-      `The document exceeds the ${profile.maxWidth}px width limit.`,
+      `가로 폭이 최대 ${maxWidth}px를 넘습니다.`,
+      `The document exceeds the ${maxWidth}px width limit.`,
       "대상 규격에 맞게 축소하세요.",
       "Resize to the destination limit.",
     ));
   }
+
+  const maxSegmentHeight = targetProfile.maxSegmentHeight;
   if (
-    profile.maxSegmentHeight !== undefined
-    && document.segmentHeights.some((height) => height > profile.maxSegmentHeight)
+    maxSegmentHeight !== undefined
+    && document.segmentHeights.some((height) => height > maxSegmentHeight)
   ) {
     findings.push(finding(
       "segment-height",
       "error",
-      `분할 이미지 중 최대 ${profile.maxSegmentHeight}px를 넘는 항목이 있습니다.`,
-      `One or more segments exceed ${profile.maxSegmentHeight}px.`,
+      `분할 이미지 중 최대 ${maxSegmentHeight}px를 넘는 항목이 있습니다.`,
+      `One or more segments exceed ${maxSegmentHeight}px.`,
       "원고를 안전한 위치에서 다시 분할하세요.",
       "Split the manuscript again at safe boundaries.",
     ));
   }
-  if (
-    document.segmentHeights.length > 0
-    && document.segmentHeights.some((height) => !validPositive(height))
-  ) {
+  if (document.segmentHeights.some((height) => !validPositive(height))) {
     findings.push(finding(
       "segment-invalid",
       "error",
@@ -321,10 +346,9 @@ export function runStudioExportPreflight(
       "Recalculate output segmentation.",
     ));
   }
-  if (
-    profile.maxFileSizeBytes !== undefined
-    && document.estimatedFileSizeBytes > profile.maxFileSizeBytes
-  ) {
+
+  const maxFileSizeBytes = targetProfile.maxFileSizeBytes;
+  if (maxFileSizeBytes !== undefined && document.estimatedFileSizeBytes > maxFileSizeBytes) {
     findings.push(finding(
       "file-size",
       "error",
@@ -334,22 +358,25 @@ export function runStudioExportPreflight(
       "Optimize without visible quality loss or split the output.",
     ));
   }
-  if (
-    profile.minimumDpi !== undefined
-    && (document.dpi === null || document.dpi < profile.minimumDpi)
-  ) {
+
+  const minimumDpi = targetProfile.minimumDpi;
+  if (minimumDpi !== undefined && (document.dpi === null || document.dpi < minimumDpi)) {
     findings.push(finding(
       "dpi",
       "error",
-      `최소 ${profile.minimumDpi} DPI가 필요합니다.`,
-      `At least ${profile.minimumDpi} DPI is required.`,
+      `최소 ${minimumDpi} DPI가 필요합니다.`,
+      `At least ${minimumDpi} DPI is required.`,
       "출력 해상도와 실제 인쇄 크기를 다시 확인하세요.",
       "Review output resolution and physical print size.",
     ));
   }
+
+  const allowedColorSpaces = targetProfile.allowedColorSpaces;
   if (
-    profile.allowedColorSpaces
-    && !profile.allowedColorSpaces.map((value) => value.toLowerCase()).includes(document.colorSpace.toLowerCase())
+    allowedColorSpaces
+    && !allowedColorSpaces
+      .map((value) => value.toLowerCase())
+      .includes(document.colorSpace.toLowerCase())
   ) {
     findings.push(finding(
       "color-space",
@@ -360,20 +387,23 @@ export function runStudioExportPreflight(
       "Preview and convert to a supported color space.",
     ));
   }
+
+  const minimumTextPx = targetProfile.minimumTextPx;
   if (
-    profile.minimumTextPx !== undefined
+    minimumTextPx !== undefined
     && document.minimumTextPx !== null
-    && document.minimumTextPx < profile.minimumTextPx
+    && document.minimumTextPx < minimumTextPx
   ) {
     findings.push(finding(
       "text-size",
       "warning",
-      `일부 글자가 권장 크기 ${profile.minimumTextPx}px보다 작습니다.`,
-      `Some text is smaller than the recommended ${profile.minimumTextPx}px.`,
+      `일부 글자가 권장 크기 ${minimumTextPx}px보다 작습니다.`,
+      `Some text is smaller than the recommended ${minimumTextPx}px.`,
       "휴대폰·출력 미리보기에서 가독성을 확인하세요.",
       "Review readability in device or print preview.",
     ));
   }
+
   if (document.missingFontIds.length > 0) {
     findings.push(finding(
       "missing-fonts",
@@ -396,7 +426,7 @@ export function runStudioExportPreflight(
       document.missingAssetIds,
     ));
   }
-  if (profile.requireRightsClearance && document.rightsBlockedAssetIds.length > 0) {
+  if (targetProfile.requireRightsClearance && document.rightsBlockedAssetIds.length > 0) {
     findings.push(finding(
       "rights-blocked",
       "error",
@@ -407,7 +437,7 @@ export function runStudioExportPreflight(
       document.rightsBlockedAssetIds,
     ));
   }
-  if (profile.requireRightsClearance && document.rightsWarningAssetIds.length > 0) {
+  if (targetProfile.requireRightsClearance && document.rightsWarningAssetIds.length > 0) {
     findings.push(finding(
       "rights-warning",
       "warning",
@@ -419,7 +449,7 @@ export function runStudioExportPreflight(
     ));
   }
   if (
-    profile.requireAiDisclosure
+    targetProfile.requireAiDisclosure
     && document.aiGeneratedObjectIds.length > 0
     && !document.aiDisclosurePrepared
   ) {
@@ -433,7 +463,7 @@ export function runStudioExportPreflight(
       document.aiGeneratedObjectIds,
     ));
   }
-  if (profile.requireReadingOrder && !document.readingOrderComplete) {
+  if (targetProfile.requireReadingOrder && !document.readingOrderComplete) {
     findings.push(finding(
       "reading-order",
       "error",
@@ -443,7 +473,7 @@ export function runStudioExportPreflight(
       "Review panel, balloon and alternative-text order.",
     ));
   }
-  if (profile.requireAltText && document.altTextCoverage < 1) {
+  if (targetProfile.requireAltText && document.altTextCoverage < 1) {
     findings.push(finding(
       "alt-text",
       "warning",
@@ -453,7 +483,7 @@ export function runStudioExportPreflight(
       "Review generated drafts and complete alternative text.",
     ));
   }
-  if (profile.requireCaptions && !document.captionsComplete) {
+  if (targetProfile.requireCaptions && !document.captionsComplete) {
     findings.push(finding(
       "captions",
       "warning",
@@ -463,7 +493,7 @@ export function runStudioExportPreflight(
       "Review captions and speaker information.",
     ));
   }
-  if (profile.preserveEditableStructure && !document.editableStructurePreserved) {
+  if (targetProfile.preserveEditableStructure && !document.editableStructurePreserved) {
     findings.push(finding(
       "editable-structure",
       "error",
@@ -501,9 +531,10 @@ export function runStudioExportPreflight(
     : warningCount > 0
       ? "warning"
       : "pass";
+
   return Object.freeze({
     target,
-    policyVersion: profile.policyVersion,
+    policyVersion: targetProfile.policyVersion,
     status,
     blockingCount,
     warningCount,
