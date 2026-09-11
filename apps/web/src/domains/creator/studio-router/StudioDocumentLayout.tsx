@@ -1,13 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { StudioDocumentWorkspaceSwitcher } from "../studio-shell/StudioDocumentWorkspaceSwitcher";
 import {
   readStudioLiveRoomQuery,
   resolveStudioLiveInstantWorkIdForTab,
   shouldPublishStudioLiveJamRoom,
   withStudioLiveJamRoom,
 } from "../live/studio-live-jam-session";
+import { StudioDocumentWorkspaceSwitcher } from "../studio-shell/StudioDocumentWorkspaceSwitcher";
 
 import {
   StudioDocumentLayoutContext,
@@ -82,9 +82,13 @@ export function StudioDocumentLayout({
 
   const runtime: StudioDocumentLayoutRuntime = {
     documentKey,
+    documentId: studioRoute.documentId,
+    documentWorkspace: studioRoute.documentWorkspace,
+    draftId: studioRoute.draftId,
     draftSessionEpoch,
     instantWorkId,
     liveRoomParam,
+    projectId: studioRoute.projectId,
     remixId,
     workId,
   };
