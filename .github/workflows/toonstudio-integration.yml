@@ -8,8 +8,10 @@ on:
       - "apps/web/src/app/routes/groups/**"
       - "apps/web/src/domains/creator/**"
       - "apps/web/src/shared/components/**"
+      - "scripts/verify-toonstudio-integration.sh"
+      - "tsconfig.toonstudio-core.json"
+      - "tsconfig.toonstudio-ui.json"
       - ".github/workflows/toonstudio-integration.yml"
-      - "docs/rewrite/toonstudio-integration-gap-audit-2026-09-11.md"
       - "package.json"
       - "pnpm-lock.yaml"
 
@@ -21,14 +23,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  focused-validation:
-    name: focused-validation
+  validate:
+    name: ${{ matrix.track }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    env:
-      # The repository-wide TypeScript graph is larger than Node's default ~4 GiB heap.
-      # Without this, the gate exits before lint and integration tests and provides no product signal.
-      NODE_OPTIONS: --max-old-space-size=8192
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        track: [core, ui, editor]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,110 +51,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck web application
-        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
-
-      - name: Lint integrated surfaces
-        run: >-
-          pnpm exec eslint --max-warnings=0
-          apps/web/src/app/routes/groups/creator-route-pages.ts
-          apps/web/src/app/routes/groups/creator.routes.tsx
-          apps/web/src/domains/creator/ai/studio-ai-project-handoff.ts
-          apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.tsx
-          apps/web/src/domains/creator/brush-lab/StudioBrushIntegratedWorkbench.tsx
-          apps/web/src/domains/creator/brush-lab/StudioBrushLabPage.tsx
-          apps/web/src/domains/creator/brush-lab/StudioBrushLegacyCataloguePanel.tsx
-          apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.ts
-          apps/web/src/domains/creator/canvas/studio-transient-canvas.ts
-          apps/web/src/domains/creator/canvas/studio-transient-canvas.test.ts
-          apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx
-          apps/web/src/domains/creator/studio-cuttoon-editor/StudioImportHandoffHost.tsx
-          apps/web/src/domains/creator/studio-integration-closure.test.ts
-          apps/web/src/domains/creator/studio-localization-project-store.ts
-          apps/web/src/domains/creator/studio-product-ia.ts
-          apps/web/src/domains/creator/studio-project-export-snapshot.ts
-          apps/web/src/domains/creator/studio-review-history-store.ts
-          apps/web/src/domains/creator/studio-series-kit-store.ts
-          apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx
-          apps/web/src/domains/creator/studio-shell/StudioExportPanel.tsx
-          apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectDiagnosticsBridge.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx
-          apps/web/src/domains/creator/studio-shell/StudioReviewPanel.tsx
-          apps/web/src/domains/creator/studio-shell/StudioSeriesKitPanel.tsx
-          apps/web/src/domains/creator/studio-shell/useStudioProjectFeatureSuite.ts
-          apps/web/src/domains/creator/studio-shell/useStudioProjectWorkspace.ts
-
-      - name: Run focused integration tests
-        run: >-
-          pnpm exec vitest run
-          apps/web/src/app/routes/groups/app-routes.test.tsx
-          apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts
-          apps/web/src/domains/creator/ai/studio-ai-project-handoff.test.ts
-          apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.test.tsx
-          apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts
-          apps/web/src/domains/creator/canvas/studio-transient-canvas.test.ts
-          apps/web/src/domains/creator/studio-ai-job.test.ts
-          apps/web/src/domains/creator/studio-ai-provider.test.ts
-          apps/web/src/domains/creator/studio-export-preflight.test.ts
-          apps/web/src/domains/creator/studio-import-handoff.test.ts
-          apps/web/src/domains/creator/studio-integration-closure.test.ts
-          apps/web/src/domains/creator/studio-localization-workflow.test.ts
-          apps/web/src/domains/creator/studio-localization-project-store.test.ts
-          apps/web/src/domains/creator/studio-project-diagnostics.test.ts
-          apps/web/src/domains/creator/studio-project-export-snapshot.test.ts
-          apps/web/src/domains/creator/studio-project-feature-suite-store.test.ts
-          apps/web/src/domains/creator/studio-project-view-destinations.test.ts
-          apps/web/src/domains/creator/studio-project-workspace-store.test.ts
-          apps/web/src/domains/creator/studio-review-workflow.test.ts
-          apps/web/src/domains/creator/studio-series-kit.test.ts
-          apps/web/src/domains/creator/studio-series-kit-store.test.ts
-          apps/web/src/domains/creator/studio-cuttoon-editor/StudioImportHandoffHost.test.tsx
-          apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.test.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.test.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectDiagnosticsBridge.test.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.test.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.test.tsx
-          apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.integration.test.tsx
-          apps/web/src/domains/creator/studio-shell/StudioReviewPanel.test.tsx
-          --pool=forks --maxWorkers=2
-
-  transient-canvas-regression:
-    name: transient-canvas-regression
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.4.0
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24.16.0
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint transient canvas lifecycle
-        run: >-
-          pnpm exec eslint --max-warnings=0
-          apps/web/src/domains/creator/canvas/studio-transient-canvas.ts
-          apps/web/src/domains/creator/canvas/studio-transient-canvas.test.ts
-
-      - name: Verify idle and active canvas presentation lifecycle
-        run: >-
-          pnpm exec vitest run
-          apps/web/src/domains/creator/canvas/studio-transient-canvas.test.ts
-          --pool=forks --maxWorkers=1
+      - name: Verify ${{ matrix.track }} integration
+        run: bash scripts/verify-toonstudio-integration.sh "${{ matrix.track }}"
