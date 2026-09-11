@@ -8,7 +8,7 @@ import {
   type StudioSeriesKit,
 } from "./studio-series-kit";
 
-const KIT: StudioSeriesKit = Object.freeze({
+const KIT: StudioSeriesKit = Object.freeze<StudioSeriesKit>({
   schemaVersion: 1,
   id: "series-kit-1",
   projectId: "project-1",

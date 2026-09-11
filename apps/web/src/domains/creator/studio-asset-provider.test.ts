@@ -8,7 +8,7 @@ import {
   type StudioAssetProviderDefinition,
 } from "./studio-asset-provider";
 
-const PROVIDER: StudioAssetProviderDefinition = Object.freeze({
+const PROVIDER: StudioAssetProviderDefinition = Object.freeze<StudioAssetProviderDefinition>({
   id: "official-market",
   name: "Official Market",
   mode: "official-api",
@@ -18,7 +18,7 @@ const PROVIDER: StudioAssetProviderDefinition = Object.freeze({
   allowsBackgroundSync: true,
 });
 
-const ENTITLEMENT: StudioAssetEntitlement = Object.freeze({
+const ENTITLEMENT: StudioAssetEntitlement = Object.freeze<StudioAssetEntitlement>({
   providerId: "official-market",
   assetId: "asset-1",
   versionId: "v2",

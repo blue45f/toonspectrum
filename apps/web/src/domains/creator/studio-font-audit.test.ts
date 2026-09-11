@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { auditStudioFonts, type StudioFontManifest } from "./studio-font-audit";
 
-const FONT: StudioFontManifest = Object.freeze({
+const FONT: StudioFontManifest = Object.freeze<StudioFontManifest>({
   id: "dialogue-font",
   family: "Dialogue Sans",
   source: "font-provider",

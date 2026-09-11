@@ -65,7 +65,7 @@ describe("StudioReviewPanel approval eligibility", () => {
 
     render(<StudioReviewPanel projectId="project-12" locale="ko" />);
 
-    expect(screen.getByRole("button", { name: "승인" })).toBeEnabled();
+    expect((screen.getByRole("button", { name: "승인" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("blocks approval while a change request remains open", () => {
@@ -78,7 +78,7 @@ describe("StudioReviewPanel approval eligibility", () => {
 
     render(<StudioReviewPanel projectId="project-12" locale="ko" />);
 
-    expect(screen.getByRole("button", { name: "승인" })).toBeDisabled();
+    expect((screen.getByRole("button", { name: "승인" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/열린 수정 요청 1개/u)).toBeTruthy();
   });
 });

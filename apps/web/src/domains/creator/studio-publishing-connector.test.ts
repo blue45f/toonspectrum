@@ -10,7 +10,7 @@ import {
 
 import type { StudioExportPreflightResult } from "./studio-export-preflight";
 
-const CONNECTOR: StudioPublishConnector = Object.freeze({
+const CONNECTOR: StudioPublishConnector = Object.freeze<StudioPublishConnector>({
   id: "webtoon-api",
   platformName: "Webtoon API",
   mode: "direct-api",
@@ -20,7 +20,7 @@ const CONNECTOR: StudioPublishConnector = Object.freeze({
   credentialsRequired: true,
 });
 
-const PREFLIGHT: StudioExportPreflightResult = Object.freeze({
+const PREFLIGHT: StudioExportPreflightResult = Object.freeze<StudioExportPreflightResult>({
   target: "webtoon-platform",
   policyVersion: "2026-09",
   status: "pass",
@@ -31,7 +31,7 @@ const PREFLIGHT: StudioExportPreflightResult = Object.freeze({
   summaryEn: "Ready",
 });
 
-const REQUEST: StudioPublishRequest = Object.freeze({
+const REQUEST: StudioPublishRequest = Object.freeze<StudioPublishRequest>({
   projectId: "project-1",
   documentId: "document-1",
   locales: ["ko", "en"],

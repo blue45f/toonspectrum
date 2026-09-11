@@ -15,8 +15,8 @@ import type { StudioExportPreflightResult } from "./studio-export-preflight";
 import type {
   StudioDiagnosticAssetStatus,
   StudioProjectDiagnosticAsset,
-  StudioProjectDiagnosticSourceStorage,
 } from "./studio-project-diagnostics";
+import type { StudioProjectDiagnosticSourceStorage } from "./studio-project-diagnostic-source-store";
 
 interface MutationOptions {
   readonly updatedAt?: string;

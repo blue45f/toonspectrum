@@ -6,7 +6,7 @@ import {
   type StudioPluginManifest,
 } from "./studio-plugin-registry";
 
-const PLUGIN: StudioPluginManifest = Object.freeze({
+const PLUGIN: StudioPluginManifest = Object.freeze<StudioPluginManifest>({
   id: "speech-balloon-checker",
   version: "1.2.0",
   name: "말풍선 검사",

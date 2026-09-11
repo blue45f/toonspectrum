@@ -10,7 +10,7 @@ import {
   type StudioProjectReadinessStorage,
 } from "./studio-project-readiness-store";
 
-const SNAPSHOT: StudioProjectReadinessSnapshot = Object.freeze({
+const SNAPSHOT: StudioProjectReadinessSnapshot = Object.freeze<StudioProjectReadinessSnapshot>({
   schemaVersion: 1,
   projectId: "project-1",
   updatedAt: "2026-09-11T00:00:00.000Z",

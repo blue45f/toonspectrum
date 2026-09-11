@@ -1,5 +1,4 @@
 import {
-  Activity,
   BarChart3,
   Boxes,
   CheckCircle2,
@@ -12,7 +11,8 @@ import {
   WandSparkles,
   Workflow,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import type { LucideIcon } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { aggregateStudioAnalytics, type StudioAnalyticsEventType } from "../studio-analytics";
 import { planStudioAutomationRecipe } from "../studio-automation-recipe";
@@ -91,11 +91,11 @@ function FeatureCard({
   description,
   children,
 }: {
-  readonly icon: typeof Activity;
+  readonly icon: LucideIcon;
   readonly eyebrow: string;
   readonly title: string;
   readonly description: string;
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) {
   return (
     <section className="rounded-3xl border border-line bg-card p-4 shadow-sm sm:p-6">
@@ -133,9 +133,10 @@ function OverviewSuite({
   readonly view: string;
 }) {
   const suite = useStudioProjectFeatureSuite(projectId, locale);
+  const state = suite.state;
   const report = useMemo(
-    () => suite.state ? safeResult(() => aggregateStudioAnalytics(suite.state.analyticsEvents)) : null,
-    [suite.state],
+    () => state ? safeResult(() => aggregateStudioAnalytics(state.analyticsEvents)) : null,
+    [state],
   );
   const episode = report?.episodes[0] ?? null;
 
@@ -161,7 +162,7 @@ function OverviewSuite({
     }));
   };
 
-  if (!suite.state) {
+  if (!state) {
     return <p className="text-sm text-fg-2">{suite.error ?? (locale === "ko" ? "성과 데이터를 준비하고 있습니다." : "Preparing project analytics.")}</p>;
   }
 
@@ -212,21 +213,23 @@ function StorySuite({
 }) {
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const workspace = useStudioProjectWorkspace(projectId, locale);
+  const state = suite.state;
+  const workspaceState = workspace.state;
   const [kind, setKind] = useState<StudioStoryBeatKind>("dialogue");
   const [summary, setSummary] = useState("");
   const [dialogue, setDialogue] = useState("");
 
   const storyboard = useMemo(
-    () => suite.state ? safeResult(() => planStudioStoryboard(suite.state.storyBeats)) : null,
-    [suite.state],
+    () => state ? safeResult(() => planStudioStoryboard(state.storyBeats)) : null,
+    [state],
   );
-  const continuity = useMemo(() => workspace.state
+  const continuity = useMemo(() => workspaceState
     ? safeResult(() => analyzeStudioStoryContinuity(
-      workspace.state.story.bible,
-      workspace.state.story.states,
-      workspace.state.story.transitions,
+      workspaceState.story.bible,
+      workspaceState.story.states,
+      workspaceState.story.transitions,
     ))
-    : null, [workspace.state]);
+    : null, [workspaceState]);
 
   const addBeat = () => {
     if (!summary.trim()) return;
@@ -259,7 +262,7 @@ function StorySuite({
     }));
   };
 
-  if (!suite.state) return null;
+  if (!state) return null;
   const showPlanner = ["overview", "episodes", "script"].includes(view);
   const showContinuity = ["overview", "characters", "world", "timeline", "relations", "references"].includes(view);
 
@@ -293,14 +296,14 @@ function StorySuite({
             </button>
           </div>
           <div className="mt-4 space-y-2">
-            {suite.state.storyBeats.map((beat) => (
+            {state.storyBeats.map((beat) => (
               <div key={beat.id} className="flex items-start gap-3 rounded-xl border border-line bg-panel p-3">
                 <span className="mt-0.5 rounded-full bg-accent-soft px-2 py-1 text-[0.62rem] font-black text-accent">{beat.order + 1}</span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-fg">{beat.summary}</p>
                   {beat.dialogue ? <p className="mt-1 truncate text-xs text-fg-3">“{beat.dialogue}”</p> : null}
                 </div>
-                <button type="button" onClick={() => removeBeat(beat.id)} disabled={suite.state!.storyBeats.length <= 1} aria-label={locale === "ko" ? "장면 삭제" : "Remove beat"} className={buttonClass({ variant: "quiet", size: "icon" })}>
+                <button type="button" onClick={() => removeBeat(beat.id)} disabled={state.storyBeats.length <= 1} aria-label={locale === "ko" ? "장면 삭제" : "Remove beat"} className={buttonClass({ variant: "quiet", size: "icon" })}>
                   <Trash2 size={15} aria-hidden="true" />
                 </button>
               </div>
@@ -326,9 +329,9 @@ function StorySuite({
             : "Detect unexplained changes in costume, appearance, injuries, props, knowledge and location."}
         >
           <div className="grid gap-3 sm:grid-cols-3">
-            <Metric label={locale === "ko" ? "캐릭터" : "Characters"} value={workspace.state?.story.bible.characters.length ?? 0} />
-            <Metric label={locale === "ko" ? "장소" : "Locations"} value={workspace.state?.story.bible.locations.length ?? 0} />
-            <Metric label={locale === "ko" ? "설정 사실" : "Facts"} value={workspace.state?.story.bible.facts.length ?? 0} />
+            <Metric label={locale === "ko" ? "캐릭터" : "Characters"} value={workspaceState?.story.bible.characters.length ?? 0} />
+            <Metric label={locale === "ko" ? "장소" : "Locations"} value={workspaceState?.story.bible.locations.length ?? 0} />
+            <Metric label={locale === "ko" ? "설정 사실" : "Facts"} value={workspaceState?.story.bible.facts.length ?? 0} />
           </div>
           <div className="mt-4 flex items-center justify-between rounded-xl border border-line bg-panel p-3">
             <div>
@@ -356,9 +359,10 @@ function StorySuite({
 
 function ProductionPipeline({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
   const workspace = useStudioProjectWorkspace(projectId, locale);
+  const workspaceState = workspace.state;
   const report = useMemo(
-    () => workspace.state ? safeResult(() => analyzeStudioProductionPipeline(workspace.state.productionTasks)) : null,
-    [workspace.state],
+    () => workspaceState ? safeResult(() => analyzeStudioProductionPipeline(workspaceState.productionTasks)) : null,
+    [workspaceState],
   );
 
   const advance = (taskId: string) => {
@@ -374,7 +378,7 @@ function ProductionPipeline({ projectId, locale }: { readonly projectId: string;
     }));
   };
 
-  if (!workspace.state || !report) return null;
+  if (!workspaceState || !report) return null;
   return (
     <FeatureCard
       icon={Workflow}
@@ -390,7 +394,7 @@ function ProductionPipeline({ projectId, locale }: { readonly projectId: string;
         <Metric label={locale === "ko" ? "막힌 작업" : "Blocked"} value={report.dependencyBlockedTaskIds.length} />
       </div>
       <div className="mt-4 space-y-2">
-        {workspace.state.productionTasks.map((task) => (
+        {workspaceState.productionTasks.map((task) => (
           <div key={task.id} className="flex flex-col gap-3 rounded-xl border border-line bg-panel p-3 sm:flex-row sm:items-center">
             <div className="min-w-0 flex-1">
               <p className="text-[0.62rem] font-black uppercase tracking-wide text-accent">{task.stage}</p>
@@ -411,11 +415,12 @@ function ProductionPipeline({ projectId, locale }: { readonly projectId: string;
 
 function QualityPanel({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
   const suite = useStudioProjectFeatureSuite(projectId, locale);
+  const state = suite.state;
   const report = useMemo(
-    () => suite.state ? safeResult(() => analyzeStudioWebtoonQuality(suite.state.quality)) : null,
-    [suite.state],
+    () => state ? safeResult(() => analyzeStudioWebtoonQuality(state.quality)) : null,
+    [state],
   );
-  if (!suite.state || !report) return null;
+  if (!state || !report) return null;
 
   const updateBalloon = (id: string, key: "fontSize" | "readingOrder", value: number) => {
     suite.update((current) => ({
@@ -447,7 +452,7 @@ function QualityPanel({ projectId, locale }: { readonly projectId: string; reado
         <StatusBadge status={report.blockingCount > 0 ? "blocked" : report.warningCount > 0 ? "review" : "ready"} locale={locale} />
       </div>
       <div className="mt-4 space-y-2">
-        {suite.state.quality.balloons.map((balloon) => (
+        {state.quality.balloons.map((balloon) => (
           <div key={balloon.id} className="grid gap-2 rounded-xl border border-line bg-card p-3 sm:grid-cols-[1fr_7rem_7rem]">
             <div className="min-w-0">
               <b className="block truncate text-sm text-fg">{balloon.text}</b>
@@ -480,24 +485,25 @@ function QualityPanel({ projectId, locale }: { readonly projectId: string; reado
 
 function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
   const suite = useStudioProjectFeatureSuite(projectId, locale);
+  const state = suite.state;
   const renderPlan = useMemo(
-    () => suite.state ? safeResult(() => planStudioWebtoon3dRender(suite.state.render3d.scene, suite.state.render3d.request)) : null,
-    [suite.state],
+    () => state ? safeResult(() => planStudioWebtoon3dRender(state.render3d.scene, state.render3d.request)) : null,
+    [state],
   );
-  const voicePlan = useMemo(() => suite.state
+  const voicePlan = useMemo(() => state
     ? safeResult(() => planStudioVoiceRegeneration({
-      profiles: suite.state.voiceMotion.profiles,
-      lines: suite.state.voiceMotion.lines,
-      existingSegments: suite.state.voiceMotion.segments,
+      profiles: state.voiceMotion.profiles,
+      lines: state.voiceMotion.lines,
+      existingSegments: state.voiceMotion.segments,
       commercialUse: true,
       now: new Date().toISOString(),
     }))
-    : null, [suite.state]);
+    : null, [state]);
   const schedule = useMemo(
-    () => suite.state ? safeResult(() => buildStudioMotionSchedule(suite.state.voiceMotion.cues)) : null,
-    [suite.state],
+    () => state ? safeResult(() => buildStudioMotionSchedule(state.voiceMotion.cues)) : null,
+    [state],
   );
-  if (!suite.state || !renderPlan || !voicePlan || !schedule) return null;
+  if (!state || !renderPlan || !voicePlan || !schedule) return null;
 
   const togglePass = (pass: StudioWebtoon3dPass) => {
     suite.update((current) => {
@@ -540,7 +546,7 @@ function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: strin
       >
         <div className="flex flex-wrap gap-2">
           {STUDIO_WEBTOON_3D_PASSES.map((pass) => {
-            const selected = suite.state!.render3d.request.passes.includes(pass);
+            const selected = state.render3d.request.passes.includes(pass);
             return (
               <button key={pass} type="button" onClick={() => togglePass(pass)} className={cn(
                 "min-h-10 rounded-full border px-3 text-xs font-bold transition-colors",
@@ -571,7 +577,7 @@ function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: strin
       >
         <label className="text-xs font-bold text-fg-2">
           {locale === "ko" ? "대표 대사" : "Sample dialogue"}
-          <textarea value={suite.state.voiceMotion.lines[0]?.text ?? ""} onChange={(event) => updateVoiceText(event.target.value)} rows={3} className={`${FIELD_CLASS} mt-2 py-2`} />
+          <textarea value={state.voiceMotion.lines[0]?.text ?? ""} onChange={(event) => updateVoiceText(event.target.value)} rows={3} className={`${FIELD_CLASS} mt-2 py-2`} />
         </label>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <Metric label={locale === "ko" ? "다시 생성" : "Regenerate"} value={voicePlan.regenerateLineIds.length} />
@@ -588,16 +594,17 @@ function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: strin
 
 function DesignTemplatePanel({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
   const suite = useStudioProjectFeatureSuite(projectId, locale);
+  const state = suite.state;
   const templatePlan = useMemo(
-    () => suite.state ? safeResult(() => planStudioTemplateApplication(suite.state.design.template, suite.state.design.values)) : null,
-    [suite.state],
+    () => state ? safeResult(() => planStudioTemplateApplication(state.design.template, state.design.values)) : null,
+    [state],
   );
   const presentation = useMemo(
-    () => suite.state ? safeResult(() => auditStudioPresentation(suite.state.design.slides)) : null,
-    [suite.state],
+    () => state ? safeResult(() => auditStudioPresentation(state.design.slides)) : null,
+    [state],
   );
-  if (!suite.state || !templatePlan || !presentation) return null;
-  const titleValue = suite.state.design.values.title;
+  if (!state || !templatePlan || !presentation) return null;
+  const titleValue = state.design.values.title;
   const title = titleValue?.kind === "text" ? titleValue.value : "";
 
   const updateTitle = (value: string) => {
@@ -647,14 +654,15 @@ function DesignTemplatePanel({ projectId, locale }: { readonly projectId: string
 
 function AutomationPanel({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
   const suite = useStudioProjectFeatureSuite(projectId, locale);
-  const plan = useMemo(() => suite.state
+  const state = suite.state;
+  const plan = useMemo(() => state
     ? safeResult(() => planStudioAutomationRecipe(
-      suite.state.automation.recipe,
-      suite.state.automation.recipe.steps.map((step) => step.commandId),
-      suite.state.automation.context,
+      state.automation.recipe,
+      state.automation.recipe.steps.map((step) => step.commandId),
+      state.automation.context,
     ))
-    : null, [suite.state]);
-  if (!suite.state || !plan) return null;
+    : null, [state]);
+  if (!state || !plan) return null;
 
   const toggleConfirmation = (stepId: string) => {
     suite.update((current) => {
@@ -683,14 +691,14 @@ function AutomationPanel({ projectId, locale }: { readonly projectId: string; re
     >
       <div className="flex items-center justify-between rounded-xl border border-line bg-panel p-3">
         <div>
-          <b className="text-sm text-fg">{suite.state.automation.recipe.name}</b>
-          <p className="mt-1 text-xs text-fg-3">{suite.state.automation.recipe.steps.length} steps</p>
+          <b className="text-sm text-fg">{state.automation.recipe.name}</b>
+          <p className="mt-1 text-xs text-fg-3">{state.automation.recipe.steps.length} steps</p>
         </div>
         <StatusBadge status={plan.status === "confirmation" ? "review" : plan.status} locale={locale} />
       </div>
       <div className="mt-4 space-y-2">
         {plan.steps.map((step) => {
-          const definition = suite.state!.automation.recipe.steps.find((item) => item.id === step.stepId);
+          const definition = state.automation.recipe.steps.find((item) => item.id === step.stepId);
           return (
             <div key={step.stepId} className="flex flex-col gap-3 rounded-xl border border-line bg-card p-3 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">

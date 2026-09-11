@@ -6,7 +6,7 @@ import type { StudioExportPreflightResult } from "./studio-export-preflight";
 import type { StudioRightsAuditReport } from "./studio-rights-graph";
 
 const HASH = `sha256:${"c".repeat(64)}`;
-const PREFLIGHT: StudioExportPreflightResult = Object.freeze({
+const PREFLIGHT: StudioExportPreflightResult = Object.freeze<StudioExportPreflightResult>({
   target: "webtoon-platform",
   policyVersion: "2026-09",
   status: "pass",
@@ -16,7 +16,7 @@ const PREFLIGHT: StudioExportPreflightResult = Object.freeze({
   summaryKo: "준비 완료",
   summaryEn: "Ready",
 });
-const RIGHTS: StudioRightsAuditReport = Object.freeze({
+const RIGHTS: StudioRightsAuditReport = Object.freeze<StudioRightsAuditReport>({
   status: "allowed",
   rootIds: ["document"],
   entries: [{

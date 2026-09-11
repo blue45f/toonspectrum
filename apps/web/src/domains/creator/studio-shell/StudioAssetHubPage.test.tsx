@@ -44,15 +44,12 @@ describe("StudioAssetHubPage", () => {
 
     expect(screen.getByText("cloud library content")).toBeTruthy();
     expect(screen.getByText("프로젝트 project-12에 연결")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /마켓에서 찾기/u })).toHaveAttribute(
-      "href",
-      "/studio/assets?project=project-12&view=market",
-    );
-    expect(screen.getByRole("link", { name: /내 에셋/u })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Series Kit" })).toHaveAttribute(
-      "href",
-      "/studio/assets?project=project-12&view=series-kit",
-    );
+    expect(screen.getByRole("link", { name: /마켓에서 찾기/u }).getAttribute("href"))
+      .toBe("/studio/assets?project=project-12&view=market");
+    expect(screen.getByRole("link", { name: /내 에셋/u }).getAttribute("aria-current"))
+      .toBe("page");
+    expect(screen.getByRole("link", { name: "Series Kit" }).getAttribute("href"))
+      .toBe("/studio/assets?project=project-12&view=series-kit");
   });
 
   it("renders a project Series Kit without creating a second settings route", () => {
@@ -84,6 +81,7 @@ describe("StudioAssetHubPage", () => {
     );
 
     expect(screen.getByText("seller center content")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /에셋 홈/u })).toHaveAttribute("href", "/studio/assets");
+    expect(screen.getByRole("link", { name: /에셋 홈/u }).getAttribute("href"))
+      .toBe("/studio/assets");
   });
 });

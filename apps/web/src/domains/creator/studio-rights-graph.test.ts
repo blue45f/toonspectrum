@@ -6,7 +6,7 @@ import {
   type StudioRightsGraph,
 } from "./studio-rights-graph";
 
-const GRAPH: StudioRightsGraph = Object.freeze({
+const GRAPH: StudioRightsGraph = Object.freeze<StudioRightsGraph>({
   nodes: [
     { id: "document", kind: "document", title: "1화", status: "allowed", licenseId: null, attributionText: null, sourceUrl: null },
     { id: "background", kind: "asset", title: "학교 배경", status: "warning", licenseId: "commercial", attributionText: "Background by Artist", sourceUrl: "https://example.com/background" },

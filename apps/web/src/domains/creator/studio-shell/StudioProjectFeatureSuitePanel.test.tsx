@@ -34,7 +34,7 @@ describe("StudioProjectFeatureSuitePanel", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "추가" }));
 
-    expect(await screen.findByText("새로운 장면을 발견한다")).toBeInTheDocument();
+    expect(await screen.findByText("새로운 장면을 발견한다")).toBeTruthy();
     expect(window.localStorage.length).toBeGreaterThan(0);
   });
 
@@ -49,9 +49,9 @@ describe("StudioProjectFeatureSuitePanel", () => {
     );
 
     await screen.findByRole("heading", { name: "웹툰용 3D 분리 출력" });
-    expect(screen.getByRole("heading", { name: "대사와 장면 타이밍 연결" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "color" })).toBeInTheDocument();
-    expect(screen.getByLabelText("대표 대사")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "대사와 장면 타이밍 연결" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "color" })).toBeTruthy();
+    expect(screen.getByLabelText("대표 대사")).toBeTruthy();
   });
 
   it("requires confirmation only for external automation steps", async () => {
@@ -70,7 +70,7 @@ describe("StudioProjectFeatureSuitePanel", () => {
 
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: "이 단계 허용" })).toBeNull();
-      expect(screen.getByRole("button", { name: "허용 취소" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "허용 취소" })).toBeTruthy();
     });
   });
 });

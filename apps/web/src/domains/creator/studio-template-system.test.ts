@@ -6,7 +6,7 @@ import {
   type StudioTemplateDefinition,
 } from "./studio-template-system";
 
-const TEMPLATE: StudioTemplateDefinition = Object.freeze({
+const TEMPLATE: StudioTemplateDefinition = Object.freeze<StudioTemplateDefinition>({
   id: "cover-template",
   version: 2,
   title: "작품 표지",

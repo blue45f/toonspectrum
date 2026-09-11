@@ -7,7 +7,7 @@ import {
 } from "./studio-automation-recipe";
 
 const COMMANDS = ["selection.trim", "filter.clean-lines", "publish.upload"];
-const RECIPE: StudioAutomationRecipe = Object.freeze({
+const RECIPE: StudioAutomationRecipe = Object.freeze<StudioAutomationRecipe>({
   id: "episode-cleanup",
   version: 1,
   name: "원고 정리와 게시",
