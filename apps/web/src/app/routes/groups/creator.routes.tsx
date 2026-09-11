@@ -10,11 +10,13 @@ import {
   LearnPage,
   StudioAssetsPage,
   StudioBrushLabPage,
+  StudioDocumentWorkspaceRoute,
   StudioHomePage,
   StudioImportPage,
   StudioManualPage,
   StudioMusicPage,
   StudioNewPage,
+  StudioProjectShellPage,
   StudioPromoPage,
   StudioRouter,
 } from "./creator-route-pages";
@@ -27,10 +29,15 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-studio-assets", path: "/studio/assets", element: <StudioAssetsPage /> },
   { id: "creator-studio-assets-brushes", path: "/studio/assets/brushes", element: <Navigate to="/studio/brushes" replace /> },
   { id: "creator-studio-assets-brush-new", path: "/studio/assets/brushes/new", element: <StudioBrushLabPage /> },
+  { id: "creator-studio-assets-brush-edit", path: "/studio/assets/brushes/:brushId/edit", element: <StudioBrushLabPage /> },
   { id: "creator-studio-assets-character-new", path: "/studio/assets/characters/new", element: <CharacterShaperLandingPage /> },
   { id: "creator-studio-assets-audio", path: "/studio/assets/audio", element: <StudioMusicPage /> },
   { id: "creator-studio-assets-3d", path: "/studio/assets/3d", element: <Navigate to="/studio/bg3d" replace /> },
   { id: "creator-studio-templates", path: "/studio/templates", element: <Navigate to="/market?view=templates" replace /> },
+
+  // Canonical document identities bridge losslessly into the established editor authority.
+  { id: "creator-studio-project-document", path: "/studio/p/:projectId/d/:documentId", element: <StudioDocumentWorkspaceRoute /> },
+  { id: "creator-studio-draft-document", path: "/studio/draft/:draftId", element: <StudioDocumentWorkspaceRoute /> },
 
   // Canonical six-stage project shell. It reuses existing production/editor capabilities while
   // route and data ownership migrate behind one coherent project navigation model.
