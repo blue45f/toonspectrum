@@ -10,6 +10,7 @@ import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
+import { STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT } from "../studio-project-diagnostic-source-store";
 import {
   STUDIO_PROJECT_READINESS_REQUEST_EVENT,
   STUDIO_PROJECT_READINESS_UPDATED_EVENT,
@@ -25,6 +26,12 @@ import type {
 } from "../studio-project-readiness";
 
 export type StudioProjectReadinessLocale = "ko" | "en";
+
+interface DiagnosticsFailureDetail {
+  readonly projectId: string;
+  readonly code: string;
+  readonly message: string;
+}
 
 const SECTION_LABELS: Readonly<
   Record<StudioProjectReadinessSectionId, Readonly<Record<StudioProjectReadinessLocale, string>>>
@@ -71,6 +78,21 @@ function projectSectionHref(projectId: string, section: StudioProjectReadinessSe
   return `/studio/p/${encodeURIComponent(projectId)}/${section}`;
 }
 
+function parseFailure(event: Event, projectId: string): DiagnosticsFailureDetail | null {
+  if (!(event instanceof CustomEvent)) return null;
+  const detail = event.detail;
+  if (!detail || typeof detail !== "object") return null;
+  const source = detail as Partial<DiagnosticsFailureDetail>;
+  if (
+    source.projectId !== projectId
+    || typeof source.code !== "string"
+    || typeof source.message !== "string"
+  ) {
+    return null;
+  }
+  return Object.freeze({ projectId, code: source.code, message: source.message });
+}
+
 export function StudioProjectReadinessPanel({
   projectId,
   locale,
@@ -83,22 +105,33 @@ export function StudioProjectReadinessPanel({
   const [snapshot, setSnapshot] = useState<StudioProjectReadinessSnapshot | null>(
     () => readBrowserSnapshot(projectId),
   );
+  const [failure, setFailure] = useState<DiagnosticsFailureDetail | null>(null);
 
   useEffect(() => {
     setSnapshot(readBrowserSnapshot(projectId));
+    setFailure(null);
     const onUpdated = (event: Event) => {
       if (!(event instanceof CustomEvent)) return;
       const next = parseStudioProjectReadinessSnapshot(event.detail, projectId);
-      if (next) setSnapshot(next);
+      if (next) {
+        setSnapshot(next);
+        setFailure(null);
+      }
+    };
+    const onFailed = (event: Event) => {
+      const next = parseFailure(event, projectId);
+      if (next) setFailure(next);
     };
     const onStorage = (event: StorageEvent) => {
       if (event.key !== studioProjectReadinessStorageKey(projectId)) return;
       setSnapshot(readBrowserSnapshot(projectId));
     };
     window.addEventListener(STUDIO_PROJECT_READINESS_UPDATED_EVENT, onUpdated);
+    window.addEventListener(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, onFailed);
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener(STUDIO_PROJECT_READINESS_UPDATED_EVENT, onUpdated);
+      window.removeEventListener(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, onFailed);
       window.removeEventListener("storage", onStorage);
     };
   }, [projectId]);
@@ -109,27 +142,47 @@ export function StudioProjectReadinessPanel({
   );
 
   const requestRefresh = () => {
+    setFailure(null);
     window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_READINESS_REQUEST_EVENT, {
       detail: Object.freeze({ projectId }),
     }));
   };
 
   if (!snapshot) {
+    const FailureIcon = failure ? AlertTriangle : RefreshCw;
     return (
-      <section className="mt-5 rounded-2xl border border-line bg-card p-4 sm:p-5" aria-live="polite">
+      <section
+        className={cn(
+          "mt-5 rounded-2xl border bg-card p-4 sm:p-5",
+          failure ? "border-warning/40" : "border-line",
+        )}
+        aria-live={failure ? "assertive" : "polite"}
+        role={failure ? "alert" : undefined}
+      >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <RefreshCw size={17} className="text-fg-3" aria-hidden="true" />
+              <FailureIcon size={17} className={failure ? "text-warning" : "text-fg-3"} aria-hidden="true" />
               <h2 className="text-sm font-bold text-fg">
-                {locale === "ko" ? "프로젝트 준비도 · 검사 전" : "Project readiness · Not checked"}
+                {failure
+                  ? (locale === "ko" ? "프로젝트 준비도 · 연결 데이터 없음" : "Project readiness · Source unavailable")
+                  : (locale === "ko" ? "프로젝트 준비도 · 검사 전" : "Project readiness · Not checked")}
               </h2>
             </div>
             <p className="mt-2 max-w-3xl text-xs leading-5 text-fg-3">
-              {locale === "ko"
-                ? "스토리·제작·권리·검토·현지화·출력 상태가 연결되면 실제 결과를 계산합니다. 데이터가 없을 때 준비 완료로 표시하지 않습니다."
-                : "Readiness is calculated from connected story, production, rights, review, localization and export data. Missing data is never shown as ready."}
+              {failure
+                ? (locale === "ko"
+                    ? "현재 프로젝트의 스토리·제작·에셋·검토·현지화·출력 데이터가 아직 진단 경계에 연결되지 않았습니다. 준비 완료로 추정하지 않았으며 저장된 작업도 변경하지 않았습니다."
+                    : "This project has not yet supplied connected story, production, asset, review, localization and export data. It was not guessed ready and no saved work was changed.")
+                : (locale === "ko"
+                    ? "스토리·제작·권리·검토·현지화·출력 상태가 연결되면 실제 결과를 계산합니다. 데이터가 없을 때 준비 완료로 표시하지 않습니다."
+                    : "Readiness is calculated from connected story, production, rights, review, localization and export data. Missing data is never shown as ready.")}
             </p>
+            {failure ? (
+              <p className="mt-2 rounded-lg border border-line bg-panel/60 px-2.5 py-2 text-[0.68rem] text-fg-3">
+                {failure.code} · {failure.message}
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -137,7 +190,9 @@ export function StudioProjectReadinessPanel({
             className={buttonClass({ variant: "outline", className: "shrink-0 gap-2" })}
           >
             <RefreshCw size={15} aria-hidden="true" />
-            {locale === "ko" ? "상태 검사" : "Check status"}
+            {failure
+              ? (locale === "ko" ? "다시 연결 확인" : "Check connection again")
+              : (locale === "ko" ? "상태 검사" : "Check status")}
           </button>
         </div>
       </section>
@@ -149,6 +204,14 @@ export function StudioProjectReadinessPanel({
   const percentage = Math.round(report.completion * 100);
   return (
     <section className="mt-5 rounded-2xl border border-line bg-card p-4 sm:p-5" aria-live="polite">
+      {failure ? (
+        <div className="mb-4 rounded-xl border border-warning/40 bg-warning-soft/15 px-3 py-2 text-xs text-warning" role="alert">
+          {locale === "ko"
+            ? `최신 재검사에 실패해 ${new Date(snapshot.updatedAt).toLocaleString("ko-KR")}의 마지막 정상 결과를 유지합니다.`
+            : `The latest refresh failed, so the last valid result from ${new Date(snapshot.updatedAt).toLocaleString("en-US")} remains visible.`}
+          <span className="ml-1 text-fg-3">({failure.code})</span>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
