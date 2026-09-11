@@ -1,4 +1,4 @@
-name: Repair and apply ToonStudio template hub once
+name: Rebase and apply ToonStudio template hub once
 
 on:
   push:
@@ -17,17 +17,17 @@ concurrency:
 jobs:
   integrate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 70
+    timeout-minutes: 80
     env:
-      CI: true
-      HUSKY: 0
+      CI: "true"
+      HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - name: Checkout exact feature branch
         uses: actions/checkout@v4
         with:
           ref: feat/toonstudio-template-hub-20260912
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -43,11 +43,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Recover original integration steps
+      - name: Rebuild on validated brush runtime and recover integration steps
         shell: bash
         run: |
           set -euo pipefail
-          git show HEAD^:.github/workflows/apply-toonstudio-template-hub.yml > /tmp/original-template-hub-workflow.yml
+          SOURCE_TIP="$(git rev-parse HEAD)"
+          FEATURE_TIP="7dd8de201a6b17252c2d16d312f1c4345690ba10"
+          git cat-file -e "${FEATURE_TIP}^{commit}"
+          git show "${FEATURE_TIP}:.github/workflows/apply-toonstudio-template-hub.yml" > /tmp/original-template-hub-workflow.yml
+
           node --input-type=module <<'NODE'
           import fs from "node:fs";
           import YAML from "yaml";
@@ -77,13 +81,45 @@ jobs:
           }
           NODE
 
-      - name: Apply integration and repair lint blockers
+          git fetch origin main
+          if git fetch origin \
+            refs/heads/fix/brush-runtime-production-20260912:refs/remotes/origin/fix/brush-runtime-production-20260912
+          then
+            BASE_REF="origin/fix/brush-runtime-production-20260912"
+          else
+            BASE_REF="origin/main"
+          fi
+
+          git checkout -B feat/toonstudio-template-hub-20260912 "${BASE_REF}"
+          git merge --no-commit --no-ff -s ours "${SOURCE_TIP}"
+          git checkout "${FEATURE_TIP}" -- \
+            apps/web/src/domains/creator/studio-project-creation.test.ts \
+            apps/web/src/domains/creator/studio-project-creation.ts \
+            apps/web/src/domains/creator/studio-project-document-store.test.ts \
+            apps/web/src/domains/creator/studio-project-document-store.ts \
+            apps/web/src/domains/creator/studio-project-library-store.test.ts \
+            apps/web/src/domains/creator/studio-project-library-store.ts \
+            apps/web/src/domains/creator/studio-project-template-catalog.test.ts \
+            apps/web/src/domains/creator/studio-project-template-catalog.ts \
+            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplateHubPage.tsx \
+            apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts \
+            apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
+
+      - name: Connect owners and repair strict contracts
         shell: bash
         run: |
           set -euo pipefail
           bash /tmp/toonstudio-template-step-0.sh
           python <<'PY'
           from pathlib import Path
+          import re
 
           creation_path = Path("apps/web/src/domains/creator/studio-project-creation.ts")
           creation = creation_path.read_text(encoding="utf-8")
@@ -102,12 +138,73 @@ jobs:
               "apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
           )
           page = page_path.read_text(encoding="utf-8")
-          autofocus = "                  autoFocus\n"
-          if page.count(autofocus) == 1:
-              page = page.replace(autofocus, "", 1)
-          elif "autoFocus" in page:
+          page, autofocus_count = re.subn(
+              r"^\s*autoFocus\s*$\n?",
+              "",
+              page,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          if autofocus_count == 0 and "autoFocus" in page:
               raise SystemExit("StudioNewIntegratedPage.tsx: unexpected autoFocus shape")
           page_path.write_text(page, encoding="utf-8")
+
+          document_path = Path(
+              "apps/web/src/domains/creator/studio-project-document-store.ts"
+          )
+          document = document_path.read_text(encoding="utf-8")
+          workspace_pattern = re.compile(
+              r"const KIND_WORKSPACES:.*?\n\}\);\n\nconst PROJECT_DEFAULT_DOCUMENT",
+              re.DOTALL,
+          )
+          workspace_replacement = '''const KIND_WORKSPACES = {
+            webtoon: ["comic", "draw", "image", "localization", "review"],
+            illustration: ["draw", "image", "review"],
+            image: ["image", "draw", "review"],
+            design: ["design", "image", "slides", "review"],
+            slides: ["slides", "design", "review"],
+            storyboard: ["storyboard", "draw", "motion", "review"],
+            whiteboard: ["whiteboard", "design", "review"],
+            "three-d": ["3d", "image", "review"],
+            animation: ["animation", "motion", "audio", "review"],
+            motion: ["motion", "audio", "review"],
+            audio: ["audio", "motion", "review"],
+            localization: ["localization", "review"],
+          } as const satisfies Readonly<
+            Record<StudioDocumentKind, readonly StudioDocumentWorkspace[]>
+          >;
+
+          const PROJECT_DEFAULT_DOCUMENT'''
+          document, workspace_count = workspace_pattern.subn(
+              workspace_replacement,
+              document,
+              count=1,
+          )
+          if workspace_count != 1:
+              raise SystemExit(
+                  f"studio-project-document-store.ts: workspace map replacements={workspace_count}"
+              )
+          document_path.write_text(document, encoding="utf-8")
+
+          old_button = 'buttonClass({ variant: "danger", size: "sm" })'
+          new_button = (
+              'buttonClass({ variant: "quiet", size: "sm", '
+              'className: "text-danger hover:text-danger" })'
+          )
+          destructive_count = 0
+          for relative_path in (
+              "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",
+          ):
+              path = Path(relative_path)
+              value = path.read_text(encoding="utf-8")
+              count = value.count(old_button)
+              destructive_count += count
+              path.write_text(value.replace(old_button, new_button), encoding="utf-8")
+          if destructive_count != 3:
+              raise SystemExit(
+                  f"destructive button variant replacements={destructive_count}, expected=3"
+              )
           PY
 
       - name: Validate, finalize and self-remove
