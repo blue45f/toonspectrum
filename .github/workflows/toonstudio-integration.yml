@@ -1,0 +1,89 @@
+name: ToonStudio integration
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/web/src/app/routes/groups/**"
+      - "apps/web/src/domains/creator/**"
+      - "apps/web/src/shared/components/**"
+      - ".github/workflows/toonstudio-integration.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toonstudio-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-validation:
+    name: focused-validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck web application
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+
+      - name: Lint integrated surfaces
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/web/src/app/routes/groups/creator-route-pages.ts
+          apps/web/src/app/routes/groups/creator.routes.tsx
+          apps/web/src/domains/creator/ai/studio-ai-project-handoff.ts
+          apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.tsx
+          apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx
+          apps/web/src/domains/creator/studio-localization-project-store.ts
+          apps/web/src/domains/creator/studio-project-export-snapshot.ts
+          apps/web/src/domains/creator/studio-review-history-store.ts
+          apps/web/src/domains/creator/studio-series-kit-store.ts
+          apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioExportPanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioReviewPanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioSeriesKitPanel.tsx
+          apps/web/src/domains/creator/studio-shell/useStudioProjectWorkspace.ts
+
+      - name: Run focused integration tests
+        run: >-
+          pnpm exec vitest run
+          apps/web/src/app/routes/groups/app-routes.test.tsx
+          apps/web/src/domains/creator/ai/studio-ai-project-handoff.test.ts
+          apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.test.tsx
+          apps/web/src/domains/creator/studio-ai-job.test.ts
+          apps/web/src/domains/creator/studio-ai-provider.test.ts
+          apps/web/src/domains/creator/studio-export-preflight.test.ts
+          apps/web/src/domains/creator/studio-localization-workflow.test.ts
+          apps/web/src/domains/creator/studio-localization-project-store.test.ts
+          apps/web/src/domains/creator/studio-project-diagnostics.test.ts
+          apps/web/src/domains/creator/studio-project-export-snapshot.test.ts
+          apps/web/src/domains/creator/studio-project-workspace-store.test.ts
+          apps/web/src/domains/creator/studio-review-workflow.test.ts
+          apps/web/src/domains/creator/studio-series-kit.test.ts
+          apps/web/src/domains/creator/studio-series-kit-store.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioReviewPanel.test.tsx
+          --pool=forks --maxWorkers=2
