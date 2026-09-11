@@ -3,6 +3,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createInitialStudioProjectDiagnosticSource } from "../studio-project-diagnostic-source-defaults";
 import type { StudioProjectWorkspaceState } from "../studio-project-workspace-store";
 import { StudioReviewPanel } from "./StudioReviewPanel";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
@@ -14,19 +15,14 @@ vi.mock("./useStudioProjectWorkspace", () => ({
 const useWorkspaceMock = vi.mocked(useStudioProjectWorkspace);
 
 function workspaceState(openChangeRequest: boolean): StudioProjectWorkspaceState {
+  const initial = createInitialStudioProjectDiagnosticSource(
+    "project-12",
+    "2026-09-11T03:00:00.000Z",
+  );
   return {
-    schemaVersion: 1,
-    projectId: "project-12",
-    story: {
-      synopsisComplete: true,
-      episodeCount: 1,
-      sceneCount: 1,
-      characterCount: 2,
-      unresolvedContinuityIssueCount: 0,
-    },
-    productionTasks: [],
-    assets: [],
+    ...initial,
     reviewSession: {
+      ...initial.reviewSession,
       documentId: "document-1",
       versionId: "version-1",
       status: openChangeRequest ? "changes-requested" : "in-review",
@@ -48,8 +44,6 @@ function workspaceState(openChangeRequest: boolean): StudioProjectWorkspaceState
       decisions: [],
       updatedAt: "2026-09-11T03:00:00.000Z",
     },
-    localization: [],
-    exportPreflights: [],
   };
 }
 
