@@ -42,7 +42,8 @@ describe("ToonStudio integration closure", () => {
       expect(routes).toContain(`path: \"/studio/p/:projectId/${section}\"`);
       expect(routes).toContain(`StudioProjectShellPage section=\"${section}\"`);
     }
-    expect(productIa).toContain('primaryRoute: "/studio/p/:projectId/overview"');
+    expect(productIa).toContain('primaryRoute: "/studio"');
+    expect(productIa).toContain('primaryRoute: "/studio/p/:projectId/story"');
     expect(productIa).toContain('primaryRoute: "/studio/p/:projectId/export"');
   });
 
