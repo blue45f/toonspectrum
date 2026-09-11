@@ -49,7 +49,7 @@ jobs:
           document_store.write_text(
               text.replace(workspace_lookup, typed_workspace_lookup, 1)
           )
-'''
+          '''
           if text.count(old_write) != 1:
               raise SystemExit("expected one lifecycle document-store write marker")
           text = text.replace(old_write, new_write, 1)
