@@ -17,7 +17,7 @@ concurrency:
 jobs:
   integrate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 70
     env:
       CI: "true"
       HUSKY: "0"
@@ -28,6 +28,44 @@ jobs:
         with:
           ref: feat/toonstudio-project-lifecycle-20260912
           fetch-depth: 0
+
+      - name: Synchronize main and resolve new-project composition
+        shell: bash
+        run: |
+          set -euo pipefail
+          page="apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx"
+          create_page="apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx"
+          preserved="$RUNNER_TEMP/StudioProjectCreatePage.tsx"
+
+          cp "$page" "$preserved"
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git fetch origin main
+
+          set +e
+          git merge --no-edit origin/main
+          merge_status=$?
+          set -e
+
+          if [[ "$merge_status" -eq 0 ]]; then
+            echo "Expected the known add/add conflict, but main merged without it." >&2
+            exit 1
+          fi
+
+          mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+          if [[ "${#conflicts[@]}" -ne 1 || "${conflicts[0]}" != "$page" ]]; then
+            printf 'Unexpected merge conflicts:\n' >&2
+            printf ' - %s\n' "${conflicts[@]}" >&2
+            git merge --abort || true
+            exit 1
+          fi
+
+          git checkout --theirs -- "$page"
+          cp "$preserved" "$create_page"
+          python scripts/apply-toonstudio-project-lifecycle.py
+          git add -A
+          git diff --cached --check
+          git commit --no-edit
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -43,77 +81,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Connect lifecycle surfaces to canonical routes
-        shell: bash
-        run: |
-          python <<'PY'
-          from pathlib import Path
-
-          def replace_once(path: str, old: str, new: str) -> None:
-              file = Path(path)
-              text = file.read_text()
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f"{path}: expected exactly one match, found {count}: {old[:100]!r}")
-              file.write_text(text.replace(old, new, 1))
-
-          route_pages = "apps/web/src/app/routes/groups/creator-route-pages.ts"
-          replace_once(
-              route_pages,
-              '''export const StudioHomePage = lazyRetry(\n  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({\n    default: module.StudioHomePage,\n  })),\n  "StudioHomePage",\n);''',
-              '''export const StudioHomePage = lazyRetry(\n  () => import("@/domains/creator/studio-shell/StudioProjectLibraryPage").then((module) => ({\n    default: module.StudioProjectLibraryPage,\n  })),\n  "StudioProjectLibraryPage",\n);''',
-          )
-          replace_once(
-              route_pages,
-              '''export const StudioNewPage = lazyRetry(\n  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({\n    default: module.StudioNewPage,\n  })),\n  "StudioNewPage",\n);''',
-              '''export const StudioNewPage = lazyRetry(\n  () => import("@/domains/creator/studio-shell/StudioNewIntegratedPage").then((module) => ({\n    default: module.StudioNewIntegratedPage,\n  })),\n  "StudioNewIntegratedPage",\n);''',
-          )
-
-          routes = "apps/web/src/app/routes/groups/creator.routes.tsx"
-          replace_once(
-              routes,
-              '''  { id: "creator-studio-import", path: "/studio/import", element: <StudioImportPage /> },\n  { id: "creator-studio-assets", path: "/studio/assets", element: <StudioAssetHubPage /> },''',
-              '''  { id: "creator-studio-import", path: "/studio/import", element: <StudioImportPage /> },\n  { id: "creator-studio-recovery", path: "/studio/recovery", element: <Navigate to="/studio?view=archived" replace /> },\n  { id: "creator-studio-trash", path: "/studio/trash", element: <Navigate to="/studio?view=trash" replace /> },\n  { id: "creator-studio-assets", path: "/studio/assets", element: <StudioAssetHubPage /> },''',
-          )
-
-          integrated = "apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx"
-          replace_once(
-              integrated,
-              '''import { StudioProjectAssistantPanel } from "./StudioProjectAssistantPanel";\nimport { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel";''',
-              '''import { StudioProjectAssistantPanel } from "./StudioProjectAssistantPanel";\nimport { StudioProjectDocumentsPanel } from "./StudioProjectDocumentsPanel";\nimport { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel";''',
-          )
-          replace_once(
-              integrated,
-              '''      <StudioProjectFeatureSuitePanel\n        projectId={projectId}\n        section={section}\n        view={view}\n        locale={locale}\n      />\n      {section === "story" && view === "localization" ? (''',
-              '''      <StudioProjectFeatureSuitePanel\n        projectId={projectId}\n        section={section}\n        view={view}\n        locale={locale}\n      />\n      {section === "production" && view === "documents" ? (\n        <StudioProjectDocumentsPanel projectId={projectId} locale={locale} />\n      ) : null}\n      {section === "story" && view === "localization" ? (''',
-          )
-
-          reachability = "scripts/verify-toonstudio-feature-reachability.mjs"
-          replace_once(
-              reachability,
-              '''  "apps/web/src/domains/creator/studio-project-workspace-store.ts",\n  "apps/web/src/domains/creator/studio-project-diagnostics.ts",''',
-              '''  "apps/web/src/domains/creator/studio-project-workspace-store.ts",\n  "apps/web/src/domains/creator/studio-project-library-store.ts",\n  "apps/web/src/domains/creator/studio-project-document-store.ts",\n  "apps/web/src/domains/creator/studio-project-diagnostics.ts",''',
-          )
-          replace_once(
-              reachability,
-              '''  "apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx",\n  "apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.tsx",''',
-              '''  "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx",\n  "apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx",\n  "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx",\n  "apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx",\n  "apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.tsx",''',
-          )
-
-          closure = "apps/web/src/domains/creator/studio-integration-closure.test.ts"
-          if Path(closure).exists():
-              replace_once(
-                  closure,
-                  '''      "StudioProjectFeatureSuitePanel",\n      "StudioLocalizationPanel",''',
-                  '''      "StudioProjectFeatureSuitePanel",\n      "StudioProjectDocumentsPanel",\n      "StudioLocalizationPanel",''',
-              )
-              text = Path(closure).read_text()
-              marker = '''  it("mounts recovered import and AI handoffs in the real canvas host", () => {'''
-              addition = '''  it("owns project and document lifecycle from the canonical front door", () => {\n    const routePages = source("apps/web/src/app/routes/groups/creator-route-pages.ts");\n    const routes = source("apps/web/src/app/routes/groups/creator.routes.tsx");\n    const integrated = source("apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx");\n\n    expect(routePages).toContain('studio-shell/StudioProjectLibraryPage');\n    expect(routePages).toContain('studio-shell/StudioNewIntegratedPage');\n    expect(routes).toContain('path: "/studio/recovery"');\n    expect(routes).toContain('path: "/studio/trash"');\n    expect(integrated).toContain("<StudioProjectDocumentsPanel");\n  });\n\n'''
-              if marker not in text:
-                  raise SystemExit(f"{closure}: insertion marker not found")
-              Path(closure).write_text(text.replace(marker, addition + marker, 1))
-          PY
+      - name: Normalize lifecycle sources
+        run: >-
+          pnpm exec eslint --fix
+          apps/web/src/app/routes/groups/creator-route-pages.ts
+          apps/web/src/app/routes/groups/creator.routes.tsx
+          apps/web/src/domains/creator/studio-project-library-store.ts
+          apps/web/src/domains/creator/studio-project-library-store.test.ts
+          apps/web/src/domains/creator/studio-project-document-store.ts
+          apps/web/src/domains/creator/studio-project-document-store.test.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
+          apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts
+          apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
+          apps/web/src/domains/creator/studio-integration-closure.test.ts
 
       - name: Check source formatting
         run: git diff --check
@@ -133,6 +120,7 @@ jobs:
           apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.ts
           apps/web/src/domains/creator/studio-shell/useStudioProjectDocuments.ts
           apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.tsx
           apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
@@ -165,13 +153,32 @@ jobs:
       - name: Build production bundle
         run: pnpm run build:bundle
 
-      - name: Commit verified integration and remove one-shot workflow
+      - name: Commit verified integration and remove temporary automation
         shell: bash
         run: |
           set -euo pipefail
-          rm .github/workflows/apply-toonstudio-project-lifecycle.yml
-          git config user.name "toonstudio-integration-bot"
-          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          mkdir -p docs/rewrite
+          {
+            echo "# ToonStudio project lifecycle validation"
+            echo
+            echo "- Validated commit: \`$(git rev-parse HEAD)\`"
+            echo "- Validated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "- TypeScript: passed"
+            echo "- ESLint: passed"
+            echo "- Project and document lifecycle tests: passed"
+            echo "- Route and integration closure tests: passed"
+            echo "- Feature reachability and session contracts: passed"
+            echo "- Production bundle: passed"
+            echo
+            echo "The canonical Studio front door owns persistent project creation, duplication,"
+            echo "archive, Trash and recovery. Production > Documents owns document creation and"
+            echo "workspace switching while preserving document identity. Template intent remains"
+            echo "visible and persisted before the full project creation surface opens."
+          } > docs/rewrite/toonstudio-project-lifecycle-validation.md
+
+          rm -f .github/workflows/apply-toonstudio-project-lifecycle.yml
+          rm -f .github/workflows/verify-toonstudio-project-lifecycle.yml
+          rm -f scripts/apply-toonstudio-project-lifecycle.py
           git add -A
           git diff --cached --check
           git commit -m "feat(studio): complete project and document lifecycle"
