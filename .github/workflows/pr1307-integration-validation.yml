@@ -1,0 +1,124 @@
+name: Validate PR 1307 integration closure
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-final-ia-20260911
+    paths:
+      - .github/workflows/pr1307-integration-validation.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr1307-integration-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-final-ia-20260911
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run integration validation matrix
+        id: matrix
+        shell: bash
+        run: |
+          set +e
+          failures=0
+
+          pnpm exec vitest run \
+            apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts \
+            apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts \
+            apps/web/src/domains/creator/studio-import-handoff.test.ts \
+            apps/web/src/domains/creator/studio-project-view-destinations.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceRoute.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.integration.test.tsx \
+            apps/web/src/domains/creator/studio-cuttoon-editor/StudioImportHandoffHost.test.tsx
+          tests=$?
+          failures=$((failures + (tests != 0)))
+
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/app/routes/groups/creator-route-pages.ts \
+            apps/web/src/app/routes/groups/creator.routes.tsx \
+            apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts \
+            apps/web/src/domains/creator/brush-lab/StudioBrushIntegratedWorkbench.tsx \
+            apps/web/src/domains/creator/brush-lab/StudioBrushLabPage.tsx \
+            apps/web/src/domains/creator/brush-lab/StudioBrushLegacyCataloguePanel.tsx \
+            apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts \
+            apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.ts \
+            apps/web/src/domains/creator/studio-import-handoff.test.ts \
+            apps/web/src/domains/creator/studio-import-handoff.ts \
+            apps/web/src/domains/creator/studio-project-view-destinations.test.ts \
+            apps/web/src/domains/creator/studio-project-view-destinations.ts \
+            apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceRoute.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceRoute.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioImportIntegratedPage.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioImportIntake.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.integration.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx \
+            apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx \
+            apps/web/src/domains/creator/studio-cuttoon-editor/StudioImportHandoffHost.test.tsx \
+            apps/web/src/domains/creator/studio-cuttoon-editor/StudioImportHandoffHost.tsx
+          lint=$?
+          failures=$((failures + (lint != 0)))
+
+          NODE_OPTIONS=--max-old-space-size=8192 pnpm run typecheck
+          types=$?
+          failures=$((failures + (types != 0)))
+
+          NODE_OPTIONS=--max-old-space-size=8192 pnpm run build
+          build=$?
+          failures=$((failures + (build != 0)))
+
+          {
+            echo "tests=$tests"
+            echo "lint=$lint"
+            echo "types=$types"
+            echo "build=$build"
+            echo "failures=$failures"
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Remove one-time validation workflow
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/pr1307-integration-validation.yml
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(ci): remove completed PR 1307 integration validator"
+            git push origin HEAD:feat/toonstudio-final-ia-20260911
+          fi
+
+      - name: Fail on any validation error
+        if: always()
+        shell: bash
+        run: |
+          echo "tests=${{ steps.matrix.outputs.tests }} lint=${{ steps.matrix.outputs.lint }} types=${{ steps.matrix.outputs.types }} build=${{ steps.matrix.outputs.build }}"
+          test "${{ steps.matrix.outputs.failures }}" = "0"
