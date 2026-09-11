@@ -68,12 +68,12 @@ describe("StudioDocumentWorkspaceDock", () => {
   it("opens the webtoon quality projection without replacing the document route", async () => {
     render(<DockFixture value={runtime("comic")} />);
 
-    const trigger = screen.getByRole("button", { name: /문서 도구|Document tools/u });
+    const trigger = screen.getByRole("button", { name: /문서 도구|document tools/iu });
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(trigger);
 
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(await screen.findByLabelText("suite-projection")).toHaveTextContent(
+    expect((await screen.findByLabelText("suite-projection")).textContent).toBe(
       "project-1:production:documents",
     );
 
@@ -83,38 +83,38 @@ describe("StudioDocumentWorkspaceDock", () => {
 
   it("projects localization and review into their document workspaces", async () => {
     const view = render(<DockFixture value={runtime("localization")} />);
-    fireEvent.click(screen.getByRole("button", { name: /문서 도구|Document tools/u }));
-    expect(await screen.findByLabelText("localization-projection")).toHaveTextContent("project-1");
+    fireEvent.click(screen.getByRole("button", { name: /문서 도구|document tools/iu }));
+    expect((await screen.findByLabelText("localization-projection")).textContent).toBe("project-1");
 
     view.rerender(<DockFixture value={runtime("review")} />);
     await waitFor(() => {
       expect(screen.queryByLabelText("localization-projection")).toBeNull();
     });
-    fireEvent.click(screen.getByRole("button", { name: /문서 도구|Document tools/u }));
-    expect(await screen.findByLabelText("review-projection")).toHaveTextContent("project-1");
+    fireEvent.click(screen.getByRole("button", { name: /문서 도구|document tools/iu }));
+    expect((await screen.findByLabelText("review-projection")).textContent).toBe("project-1");
   });
 
   it("keeps direct drawing, image editing and unsaved drafts uncluttered", () => {
     const view = render(<DockFixture value={runtime("draw")} />);
-    expect(screen.queryByRole("button", { name: /문서 도구|Document tools/u })).toBeNull();
+    expect(screen.queryByRole("button", { name: /문서 도구|document tools/iu })).toBeNull();
 
     view.rerender(<DockFixture value={runtime("image")} />);
-    expect(screen.queryByRole("button", { name: /문서 도구|Document tools/u })).toBeNull();
+    expect(screen.queryByRole("button", { name: /문서 도구|document tools/iu })).toBeNull();
 
     view.rerender(<DockFixture value={runtime("storyboard", null)} />);
-    expect(screen.queryByRole("button", { name: /문서 도구|Document tools/u })).toBeNull();
+    expect(screen.queryByRole("button", { name: /문서 도구|document tools/iu })).toBeNull();
   });
 
   it("closes the projection when the workspace changes", async () => {
     const view = render(<DockFixture value={runtime("storyboard")} />);
-    fireEvent.click(screen.getByRole("button", { name: /문서 도구|Document tools/u }));
-    expect(await screen.findByLabelText("suite-projection")).toHaveTextContent(
+    fireEvent.click(screen.getByRole("button", { name: /문서 도구|document tools/iu }));
+    expect((await screen.findByLabelText("suite-projection")).textContent).toBe(
       "project-1:story:script",
     );
 
     view.rerender(<DockFixture value={runtime("3d")} />);
     await waitFor(() => expect(screen.queryByLabelText("suite-projection")).toBeNull());
-    expect(screen.getByRole("button", { name: /문서 도구|Document tools/u }).getAttribute("aria-expanded"))
+    expect(screen.getByRole("button", { name: /문서 도구|document tools/iu }).getAttribute("aria-expanded"))
       .toBe("false");
   });
 });
