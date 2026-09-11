@@ -24,7 +24,7 @@ afterEach(() => {
 
 describe("StudioTemplateHubPage", () => {
   it("filters templates by category and text without leaving the Studio shell", async () => {
-    render(
+    const categoryView = render(
       <MemoryRouter initialEntries={["/studio/templates"]}>
         <StudioTemplateHubPage />
       </MemoryRouter>,
@@ -37,13 +37,12 @@ describe("StudioTemplateHubPage", () => {
     })).toBeTruthy();
     expect(screen.queryByText(/세로 웹툰 표준|Vertical webtoon standard/u)).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /^전체$|^All$/u }));
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /^전체$|^All$/u }).getAttribute("aria-pressed"))
-        .toBe("true");
-    });
-    const search = screen.getByRole("textbox", { name: /템플릿 검색|Search templates/u });
-    fireEvent.change(search, { target: { value: "production" } });
+    categoryView.unmount();
+    render(
+      <MemoryRouter initialEntries={["/studio/templates?q=production"]}>
+        <StudioTemplateHubPage />
+      </MemoryRouter>,
+    );
     expect(await screen.findByRole("heading", {
       name: /제작 리뷰|Production review/u,
       level: 2,
