@@ -1,0 +1,117 @@
+name: Apply brush runtime production repair once
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/brush-runtime-production-20260912
+    paths:
+      - .github/workflows/apply-brush-runtime-production-once.yml
+      - scripts/maintenance/apply-brush-runtime-production.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-brush-runtime-production-once
+  cancel-in-progress: false
+
+jobs:
+  apply-validate-commit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/brush-runtime-production-20260912
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.4.0 --activate
+
+      - name: Install workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply ordered repair
+        run: python3 scripts/maintenance/apply-brush-runtime-production.py
+
+      - name: Format changed sources
+        run: |
+          pnpm exec prettier --write \
+            apps/web/src/domains/creator/studio-asset-governance.ts \
+            apps/web/src/domains/creator/studio-feature-registry.ts \
+            apps/web/src/domains/creator/studio-feature-registry.test.ts \
+            apps/web/src/domains/creator/studio-route-registry.ts \
+            apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceDock.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioExternalEntryRoutes.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectDeliveryPanel.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplatesPage.tsx \
+            apps/web/src/domains/creator/studio-template-catalog.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-catalog.ts \
+            apps/web/src/domains/creator/brush/StudioBrushCompositionComposer.tsx \
+            apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx \
+            apps/web/src/domains/creator/brush/StudioDrawNode.tsx \
+            apps/web/src/domains/creator/live/studio-live-retained-media-overlay.ts \
+            apps/web/src/domains/creator/export/studio-svg-export-freehand-media.ts
+
+      - name: Strict lint changed sources
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/studio-asset-governance.ts \
+            apps/web/src/domains/creator/studio-feature-registry.ts \
+            apps/web/src/domains/creator/studio-feature-registry.test.ts \
+            apps/web/src/domains/creator/studio-route-registry.ts \
+            apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceDock.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioExternalEntryRoutes.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectDeliveryPanel.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioTemplatesPage.tsx \
+            apps/web/src/domains/creator/studio-template-catalog.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-catalog.ts \
+            apps/web/src/domains/creator/brush/StudioBrushCompositionComposer.tsx \
+            apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx \
+            apps/web/src/domains/creator/brush/StudioDrawNode.tsx \
+            apps/web/src/domains/creator/live/studio-live-retained-media-overlay.ts \
+            apps/web/src/domains/creator/export/studio-svg-export-freehand-media.ts
+
+      - name: Root typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Focused regression suite
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-feature-registry.test.ts \
+            apps/web/src/domains/creator/studio-external-route.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-catalog.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx
+
+      - name: Vercel-equivalent production build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm --filter @webtoon-nest/api build && pnpm run build
+
+      - name: Commit validated repair
+        run: |
+          rm scripts/maintenance/apply-brush-runtime-production.py
+          rm .github/workflows/apply-brush-runtime-production-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(brush): connect composition to production render paths"
+          git push origin HEAD:fix/brush-runtime-production-20260912
