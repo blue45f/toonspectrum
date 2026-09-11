@@ -14,6 +14,10 @@ name: CI
 #
 # Extended suites can continue to be repaired after convergence. The protected `core` check
 # below still executes real release validation and is not a synthetic status bypass.
+#
+# Do not use a shared convergence concurrency group here. Superseded PR runs from the earlier
+# topology can remain queued while GitHub drains their runners; sharing a group with them can
+# keep the newest required `core` check pending indefinitely.
 
 on:
   workflow_dispatch:
@@ -24,10 +28,6 @@ on:
 
 permissions:
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 jobs:
   core:
