@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PRIMARY_SITE_NAVIGATION,
+  SITE_NAVIGATION_GROUPS,
   SITE_NAVIGATION_ITEMS,
   SITE_UTILITY_NAVIGATION,
   TOONSPECTRUM_MOBILE_TABS,
@@ -35,35 +37,35 @@ describe("site navigation information architecture", () => {
     expect(SITE_NAVIGATION_ITEMS.studio.href).toBe("/studio");
     expect(SITE_NAVIGATION_ITEMS.make.href).toBe("/studio/new");
     expect(SITE_NAVIGATION_ITEMS.studioAssets.href).toBe("/studio/assets");
+    expect(SITE_NAVIGATION_ITEMS.learn.href).toBe("/learn");
   });
 
-  it("keeps the fortune and tarot experience discoverable from the shared directory", () => {
-    const growItems = SITE_NAVIGATION_GROUPS.find((group) => group.id === "grow")?.items;
+  it("keeps fortune and tarot in Spectrum's research and growth directory", () => {
+    const growItems = TOONSPECTRUM_NAVIGATION_GROUPS.find(
+      (group) => group.id === "grow",
+    )?.items;
 
-    expect(growItems).toContain(SITE_NAVIGATION_ITEMS.fortune);
+    expect(growItems?.map((item) => item.id)).toEqual([
+      "now",
+      "fortune",
+      "research",
+      "opportunities",
+      "insights",
+    ]);
     expect(SITE_NAVIGATION_ITEMS.fortune.href).toBe("/fortune");
     expect(SITE_NAVIGATION_ITEMS.fortune.label.ko).toContain("타로");
+    expect(siteNavigationContextForPath("/fortune")).toBe("spectrum");
   });
 
-  it("uses the desktop Home logo space for Studio while keeping Market first-class", () => {
-    expect(PRIMARY_SITE_NAVIGATION.map((item) => item.id)).toEqual([
-      "explore",
-      "studio",
-      "make",
-      "studio-assets",
-      "learn",
-      "comic",
-      "shaper",
-      "research",
-      "market",
-      "gallery",
-      "opportunities",
-    ]));
+  it("keeps compatibility exports attached to the Spectrum product context", () => {
+    expect(PRIMARY_SITE_NAVIGATION).toBe(TOONSPECTRUM_PRIMARY_NAVIGATION);
+    expect(SITE_NAVIGATION_GROUPS).toBe(TOONSPECTRUM_NAVIGATION_GROUPS);
   });
 
-  it("keeps the Spectrum drawer focused on discovery, community and personal history", () => {
+  it("keeps the Spectrum drawer focused on discovery, growth, community and history", () => {
     expect(TOONSPECTRUM_NAVIGATION_GROUPS.map((group) => group.id)).toEqual([
       "discover",
+      "grow",
       "connect",
       "personal",
     ]);
@@ -82,6 +84,7 @@ describe("site navigation information architecture", () => {
     expect(siteNavigationContextForPath("/market")).toBe("studio");
     expect(siteNavigationContextForPath("/discover")).toBe("spectrum");
     expect(siteNavigationContextForPath("/community")).toBe("spectrum");
+    expect(siteNavigationContextForPath("/fortune")).toBe("spectrum");
 
     expect(primarySiteNavigationForPath("/studio")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
     expect(primarySiteNavigationForPath("/help")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
