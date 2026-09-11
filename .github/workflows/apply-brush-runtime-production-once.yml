@@ -38,30 +38,36 @@ jobs:
       - name: Install workspace
         run: pnpm install --frozen-lockfile
 
-      - name: Apply ordered repair
+      - name: Align repair guards with current source
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           path = Path("scripts/maintenance/apply-brush-runtime-production.py")
           source = path.read_text(encoding="utf-8")
-          old = 'route_anchor = "\\nexport function auditStudioRouteRegistry(): StudioRouteRegistryAudit {"'
-          new = 'route_anchor = "\\nexport function auditStudioRouteRegistry(): readonly string[] {"'
-          if source.count(old) != 1:
-              raise SystemExit("route anchor patch drifted")
-          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          replacements = {
+              'route_anchor = "\\nexport function auditStudioRouteRegistry(): StudioRouteRegistryAudit {"':
+                  'route_anchor = "\\nexport function auditStudioRouteRegistry(): readonly string[] {"',
+              'replace_once("apps/web/src/domains/creator/studio-shell/StudioExternalEntryRoutes.tsx", \'<Container size="narrow">\', \'<Container size="prose">\')':
+                  'replace_once("apps/web/src/domains/creator/studio-shell/StudioExternalEntryRoutes.tsx", \'<Container size="narrow"\', \'<Container size="prose"\')',
+              '"onChange={(event) => setConnectorId(event.target.value)}",':
+                  '"""onChange={(event) => {\\n                  setConnectorId(event.target.value);\\n                  setExternalWriteConfirmed(false);\\n                }}""",',
+              '                  if (connector) setConnectorId(connector.id);\\n                }}':
+                  '                  if (connector) {\\n                    setConnectorId(connector.id);\\n                    setExternalWriteConfirmed(false);\\n                  }\\n                }}',
+          }
+          for old, new in replacements.items():
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"repair guard drifted ({count}): {old[:100]}")
+              source = source.replace(old, new, 1)
+          path.write_text(source, encoding="utf-8")
           PY
+
+      - name: Apply ordered repair
+        run: |
           set -o pipefail
           python3 scripts/maintenance/apply-brush-runtime-production.py 2>&1 | tee apply-brush-runtime-production.log
           rm -f .github/workflows/apply-toonstudio-session-completion-v2.yml
-
-      - name: Upload repair diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: brush-runtime-production-repair-log
-          path: apply-brush-runtime-production.log
-          if-no-files-found: error
-          retention-days: 1
 
       - name: Format changed sources
         run: |
@@ -87,6 +93,7 @@ jobs:
 
       - name: Strict lint changed sources
         run: |
+          set -o pipefail
           pnpm exec eslint --max-warnings=0 \
             apps/web/src/domains/creator/studio-asset-governance.ts \
             apps/web/src/domains/creator/studio-feature-registry.ts \
@@ -105,33 +112,49 @@ jobs:
             apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx \
             apps/web/src/domains/creator/brush/StudioDrawNode.tsx \
             apps/web/src/domains/creator/live/studio-live-retained-media-overlay.ts \
-            apps/web/src/domains/creator/export/studio-svg-export-freehand-media.ts
+            apps/web/src/domains/creator/export/studio-svg-export-freehand-media.ts 2>&1 | tee validation-lint.log
 
       - name: Root typecheck
         env:
           NODE_OPTIONS: --max-old-space-size=8192
-        run: pnpm exec tsc -p tsconfig.json --noEmit
+        run: |
+          set -o pipefail
+          pnpm exec tsc -p tsconfig.json --noEmit 2>&1 | tee validation-typecheck.log
 
       - name: Focused regression suite
         run: |
+          set -o pipefail
           pnpm exec vitest run \
             apps/web/src/domains/creator/studio-feature-registry.test.ts \
             apps/web/src/domains/creator/studio-external-route.test.ts \
             apps/web/src/domains/creator/brush/studio-brush-composition-catalog.test.ts \
             apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts \
             apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts \
-            apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx
+            apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx 2>&1 | tee validation-tests.log
 
       - name: Vercel-equivalent production build
         env:
           NODE_OPTIONS: --max-old-space-size=8192
-        run: pnpm --filter @webtoon-nest/api build && pnpm run build
+        run: |
+          set -o pipefail
+          (pnpm --filter @webtoon-nest/api build && pnpm run build) 2>&1 | tee validation-build.log
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brush-runtime-production-diagnostics
+          path: |
+            apply-brush-runtime-production.log
+            validation-*.log
+          if-no-files-found: warn
+          retention-days: 1
 
       - name: Commit validated repair
         run: |
           rm scripts/maintenance/apply-brush-runtime-production.py
           rm .github/workflows/apply-brush-runtime-production-once.yml
-          rm -f apply-brush-runtime-production.log
+          rm -f apply-brush-runtime-production.log validation-*.log
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
