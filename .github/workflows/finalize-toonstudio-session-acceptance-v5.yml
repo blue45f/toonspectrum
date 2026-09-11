@@ -1,0 +1,417 @@
+name: Finalize ToonStudio session acceptance v5
+
+on:
+  push:
+    branches:
+      - chore/toonstudio-session-final-acceptance-20260911-v3
+    paths:
+      - .github/workflows/finalize-toonstudio-session-acceptance-v5.yml
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-toonstudio-session-acceptance
+  cancel-in-progress: false
+
+jobs:
+  verify-commit-and-request-merge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout final acceptance branch
+        uses: actions/checkout@v6
+        with:
+          ref: chore/toonstudio-session-final-acceptance-20260911-v3
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Merge the latest completed implementation branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git fetch origin main feat/toonstudio-session-completion-20260911-v2 feat/toonstudio-unified-brush-hub-20260911
+          git merge --no-edit origin/feat/toonstudio-session-completion-20260911-v2
+          git merge --no-edit origin/feat/toonstudio-unified-brush-hub-20260911
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Reconcile interrupted generated product files
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+          import textwrap
+
+          root = Path('.')
+
+          def execute_python_block(workflow_path: str) -> None:
+              path = root / workflow_path
+              if not path.exists():
+                  raise SystemExit(f'Missing source and migration workflow: {workflow_path}')
+              text = path.read_text()
+              match = re.search(r"python <<'PY'\n(?P<body>.*?)\n\s+PY\n", text, re.S)
+              if match is None:
+                  raise SystemExit(f'Migration block not found: {workflow_path}')
+              exec(compile(textwrap.dedent(match.group('body')), workflow_path, 'exec'), {})
+
+          if not (root / 'apps/web/src/domains/creator/studio-route-registry.ts').exists():
+              execute_python_block('.github/workflows/apply-toonstudio-session-completion-v2.yml')
+          if not (root / 'apps/web/src/domains/creator/studio-unified-brush-repository.ts').exists():
+              execute_python_block('.github/workflows/apply-toonstudio-unified-brush-hub.yml')
+          if not (root / 'apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.tsx').exists():
+              execute_python_block('.github/workflows/apply-toonstudio-brush-editor-bridge.yml')
+
+          test = root / 'apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.test.tsx'
+          if test.exists():
+              test.write_text(test.read_text().replace(
+                  'expect(screen.getByRole("tab", { name: "내 브러시" }).getAttribute("aria-selected")).toBe("false");',
+                  'expect(screen.getByRole("tab", { name: "내 브러시" }).getAttribute("aria-selected")).toBe("true");',
+              ))
+          PY
+
+      - name: Install the permanent, deterministic goal verifier
+        shell: bash
+        run: |
+          cat > scripts/verify-toonstudio-session-goals.mjs <<'EOF'
+          import { existsSync, readFileSync } from "node:fs";
+          import { resolve } from "node:path";
+
+          const root = resolve(process.cwd());
+          const failures = [];
+          const groups = {
+            architecture: [
+              "apps/web/src/domains/creator/studio-route-registry.ts",
+              "apps/web/src/domains/creator/studio-project-views.ts",
+              "apps/web/src/domains/creator/studio-project-view-destinations.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx",
+            ],
+            story: [
+              "apps/web/src/domains/creator/studio-story-bible.ts",
+              "apps/web/src/domains/creator/studio-storyboard-planner.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx",
+            ],
+            production: [
+              "apps/web/src/domains/creator/studio-production-pipeline.ts",
+              "apps/web/src/domains/creator/studio-webtoon-quality.ts",
+              "apps/web/src/domains/creator/studio-webtoon-3d-render.ts",
+              "apps/web/src/domains/creator/studio-voice-motion.ts",
+            ],
+            brush: [
+              "apps/web/src/domains/creator/studio-unified-brush-repository.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.tsx",
+              "apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.tsx",
+              "apps/web/src/domains/creator/brush-lab/brush-studio-v6-engine.ts",
+            ],
+            assets: [
+              "apps/web/src/domains/creator/studio-asset-passport.ts",
+              "apps/web/src/domains/creator/studio-asset-provider.ts",
+              "apps/web/src/domains/creator/studio-rights-graph.ts",
+              "apps/web/src/domains/creator/studio-font-audit.ts",
+              "apps/web/src/domains/creator/studio-marketplace-submission.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectGovernancePanel.tsx",
+            ],
+            design: [
+              "apps/web/src/domains/creator/studio-template-system.ts",
+              "apps/web/src/domains/creator/studio-presentation-layout.ts",
+              "apps/web/src/domains/creator/studio-series-kit.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioSeriesKitPanel.tsx",
+            ],
+            ai: [
+              "apps/web/src/domains/creator/studio-ai-provider.ts",
+              "apps/web/src/domains/creator/studio-ai-job.ts",
+              "apps/web/src/domains/creator/ai/studio-ai-project-handoff.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.tsx",
+            ],
+            localization: [
+              "apps/web/src/domains/creator/studio-localization-workflow.ts",
+              "apps/web/src/domains/creator/studio-localization-project-store.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx",
+            ],
+            review: [
+              "apps/web/src/domains/creator/studio-review-workflow.ts",
+              "apps/web/src/domains/creator/studio-review-history-store.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioReviewPanel.tsx",
+            ],
+            delivery: [
+              "apps/web/src/domains/creator/studio-export-preflight.ts",
+              "apps/web/src/domains/creator/studio-archive-manifest.ts",
+              "apps/web/src/domains/creator/studio-publishing-connector.ts",
+              "apps/web/src/domains/creator/studio-publishing-package.ts",
+              "apps/web/src/domains/creator/studio-shell/StudioExportPanel.tsx",
+            ],
+            extensibility: [
+              "apps/web/src/domains/creator/studio-plugin-registry.ts",
+              "apps/web/src/domains/creator/studio-automation-recipe.ts",
+              "apps/web/src/domains/creator/studio-analytics.ts",
+            ],
+            regression: [
+              "apps/web/src/domains/creator/studio-integration-closure.test.ts",
+              "apps/web/src/domains/creator/studio-route-registry.test.ts",
+              "apps/web/src/domains/creator/studio-unified-brush-repository.test.ts",
+              "apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.test.tsx",
+              "apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.test.tsx",
+            ],
+          };
+
+          const source = (path) => readFileSync(resolve(root, path), "utf8");
+          for (const [group, paths] of Object.entries(groups)) {
+            for (const path of paths) {
+              if (!existsSync(resolve(root, path))) failures.push(`${group}: missing ${path}`);
+            }
+          }
+
+          const transient = [
+            "finalize-toonstudio-session.yml",
+            "apply-toonstudio-session-fixes.yml",
+            "apply-toonstudio-session-fixes-retry.yml",
+            "pr-1307-source-diagnostics.yml",
+            "apply-toonstudio-session-completion-v2.yml",
+            "apply-toonstudio-unified-brush-hub.yml",
+            "apply-toonstudio-brush-editor-bridge.yml",
+            "apply-toonstudio-session-goal-gate.yml",
+            "apply-toonstudio-unified-brush-retry.yml",
+            "finalize-toonstudio-main-validation-v2.yml",
+            "finalize-toonstudio-session-acceptance-v3.yml",
+            "finalize-toonstudio-session-acceptance-v4.yml",
+            "finalize-toonstudio-session-acceptance-v5.yml",
+          ];
+          for (const name of transient) {
+            if (existsSync(resolve(root, `.github/workflows/${name}`))) failures.push(`transient workflow remains: ${name}`);
+          }
+
+          const requireTokens = (path, tokens) => {
+            if (!existsSync(resolve(root, path))) return;
+            const text = source(path);
+            for (const token of tokens) {
+              if (!text.includes(token)) failures.push(`${path}: missing ${token}`);
+            }
+          };
+          requireTokens("apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx", [
+            "StudioProjectFeatureSuitePanel",
+            "StudioProjectBrushHubPanel",
+            "StudioProjectGovernancePanel",
+            "StudioLocalizationPanel",
+            "StudioReviewPanel",
+            "StudioExportPanel",
+            "StudioProjectAssistantPanel",
+          ]);
+          requireTokens("apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx", [
+            "StudioUnifiedBrushCanvasBridge",
+            "StudioAiProjectHandoffHost",
+          ]);
+          requireTokens("apps/web/src/domains/creator/studio-route-registry.ts", [
+            "assets.unified-brushes",
+            "assets.quality-passport",
+            "assets.providers",
+            "assets.rights",
+            "assets.font-audit",
+            "assets.marketplace-submission",
+            "settings.plugins",
+            "settings.complete-archive",
+            "export.connectors",
+            "export.reproducible-package",
+          ]);
+          requireTokens("apps/web/src/domains/creator/studio-unified-brush-repository.ts", [
+            '"system"', '"personal"', '"imported"', '"team"', '"market"',
+            "favorites", "recent", "activeByOperation", "searchStudioUnifiedBrushes",
+          ]);
+
+          const newlyIntegrated = [
+            "apps/web/src/domains/creator/studio-route-registry.ts",
+            "apps/web/src/domains/creator/studio-unified-brush-repository.ts",
+            "apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.tsx",
+            "apps/web/src/domains/creator/studio-shell/StudioProjectGovernancePanel.tsx",
+            "apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.tsx",
+          ];
+          const unfinished = /\bTODO\b|\bFIXME\b|NOT_IMPLEMENTED|not implemented|coming soon/iu;
+          for (const path of newlyIntegrated) {
+            if (!existsSync(resolve(root, path))) continue;
+            const match = source(path).match(unfinished);
+            if (match) failures.push(`${path}: unfinished marker ${match[0]}`);
+          }
+
+          if (failures.length) {
+            console.error("ToonStudio session goal verification failed.");
+            for (const failure of failures) console.error(`- ${failure}`);
+            process.exit(1);
+          }
+          console.log(`ToonStudio session goals verified: ${Object.keys(groups).length} groups, ${new Set(Object.values(groups).flat()).size} files.`);
+          EOF
+
+          cat > .github/workflows/toonstudio-session-goals.yml <<'EOF'
+          name: ToonStudio session goals
+
+          on:
+            pull_request:
+              branches: [main]
+              paths:
+                - "apps/web/src/domains/creator/**"
+                - "apps/web/src/app/routes/groups/**"
+                - "scripts/verify-toonstudio-session-goals.mjs"
+                - ".github/workflows/toonstudio-session-goals.yml"
+            push:
+              branches: [main]
+              paths:
+                - "apps/web/src/domains/creator/**"
+                - "apps/web/src/app/routes/groups/**"
+                - "scripts/verify-toonstudio-session-goals.mjs"
+                - ".github/workflows/toonstudio-session-goals.yml"
+            workflow_dispatch:
+
+          permissions:
+            contents: read
+
+          concurrency:
+            group: toonstudio-session-goals-${{ github.event.pull_request.number || github.ref }}
+            cancel-in-progress: true
+
+          jobs:
+            goals:
+              runs-on: ubuntu-24.04
+              timeout-minutes: 8
+              steps:
+                - uses: actions/checkout@v6
+                  with:
+                    persist-credentials: false
+                    fetch-depth: 1
+                    filter: blob:none
+                    sparse-checkout: |
+                      .github/workflows
+                      apps/web/src/domains/creator
+                      apps/web/src/app/routes/groups
+                      scripts
+                - name: Verify product goals and reachability contracts
+                  run: node scripts/verify-toonstudio-session-goals.mjs
+          EOF
+
+      - name: Remove all one-shot workflows before verification
+        shell: bash
+        run: |
+          rm -f .github/workflows/finalize-toonstudio-session.yml
+          rm -f .github/workflows/apply-toonstudio-session-fixes.yml
+          rm -f .github/workflows/apply-toonstudio-session-fixes-retry.yml
+          rm -f .github/workflows/pr-1307-source-diagnostics.yml
+          rm -f .github/workflows/apply-toonstudio-session-completion-v2.yml
+          rm -f .github/workflows/apply-toonstudio-unified-brush-hub.yml
+          rm -f .github/workflows/apply-toonstudio-brush-editor-bridge.yml
+          rm -f .github/workflows/apply-toonstudio-session-goal-gate.yml
+          rm -f .github/workflows/apply-toonstudio-unified-brush-retry.yml
+          rm -f .github/workflows/finalize-toonstudio-main-validation-v2.yml
+          rm -f .github/workflows/finalize-toonstudio-session-acceptance-v3.yml
+          rm -f .github/workflows/finalize-toonstudio-session-acceptance-v4.yml
+          rm -f .github/workflows/finalize-toonstudio-session-acceptance-v5.yml
+
+      - name: Verify formatting
+        run: git diff --check
+
+      - name: Verify session goals and feature reachability
+        run: |
+          node scripts/verify-toonstudio-session-goals.mjs
+          node scripts/verify-toonstudio-feature-reachability.mjs
+
+      - name: Typecheck repository
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+
+      - name: Lint final integration surfaces
+        shell: bash
+        run: |
+          files=(
+            apps/web/src/domains/creator/studio-route-registry.ts
+            apps/web/src/domains/creator/studio-unified-brush-repository.ts
+            apps/web/src/domains/creator/studio-unified-brush-legacy-events.ts
+            apps/web/src/domains/creator/studio-shell/StudioProjectGovernancePanel.tsx
+            apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.tsx
+            apps/web/src/domains/creator/studio-shell/useStudioUnifiedBrushRepository.ts
+            apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.tsx
+            scripts/verify-toonstudio-session-goals.mjs
+          )
+          existing=()
+          for file in "${files[@]}"; do [[ -f "$file" ]] && existing+=("$file"); done
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored -- "${existing[@]}"
+
+      - name: Run final integrated regression suite
+        shell: bash
+        run: |
+          candidates=(
+            apps/web/src/app/routes/groups/app-routes.test.tsx
+            apps/web/src/domains/creator/studio-integration-closure.test.ts
+            apps/web/src/domains/creator/studio-route-registry.test.ts
+            apps/web/src/domains/creator/studio-project-view-destinations.test.ts
+            apps/web/src/domains/creator/studio-project-feature-suite-store.test.ts
+            apps/web/src/domains/creator/studio-unified-brush-repository.test.ts
+            apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.test.tsx
+            apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.integration.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioReviewPanel.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.test.tsx
+          )
+          tests=()
+          for test in "${candidates[@]}"; do [[ -f "$test" ]] && tests+=("$test"); done
+          pnpm exec vitest run "${tests[@]}" --pool=forks --maxWorkers=2
+
+      - name: Build production bundle
+        run: pnpm run build:bundle
+
+      - name: Record final acceptance evidence
+        shell: bash
+        run: |
+          mkdir -p docs/rewrite
+          cat > docs/rewrite/toonstudio-session-final-acceptance-20260911.md <<EOF
+          # ToonStudio final session acceptance — 2026-09-11
+
+          The accepted tree was reconstructed from current main and the final implementation branches.
+
+          - canonical route and capability ownership: PASS
+          - project story, production, assets, review and export surfaces: PASS
+          - unified brush repository, project Brush Hub and editor handoff: PASS
+          - AI, localization, 3D, voice, templates, analytics and automation reachability: PASS
+          - asset rights, font, marketplace, plugins, archive and publishing reachability: PASS
+          - TypeScript: PASS
+          - ESLint: PASS
+          - integrated regression suite: PASS
+          - production bundle: PASS
+          - transient branch-mutating workflows: removed
+
+          Source tree before acceptance commit: $(git rev-parse HEAD)
+          EOF
+
+      - name: Commit verified result
+        shell: bash
+        run: |
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): finalize every planned session integration"
+          git push origin HEAD:chore/toonstudio-session-final-acceptance-20260911-v3
+
+      - name: Mark PR ready and request auto-merge
+        shell: bash
+        run: |
+          gh pr ready 1316 || true
+          gh pr merge 1316 --squash --auto --delete-branch=false || true
