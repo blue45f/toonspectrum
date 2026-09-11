@@ -1,0 +1,78 @@
+name: Preseed ToonStudio template IA once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-project-lifecycle-20260912
+    paths:
+      - .github/workflows/preseed-toonstudio-template-ia.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: preseed-toonstudio-template-ia
+  cancel-in-progress: false
+
+jobs:
+  preseed:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout lifecycle branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-project-lifecycle-20260912
+          fetch-depth: 0
+
+      - name: Add template ownership and retrigger consolidation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          product_ia = Path("apps/web/src/domains/creator/studio-product-ia.ts")
+          value = product_ia.read_text()
+          value = value.replace(
+              '  { id: "create", label: "새로 만들기", href: "/studio/new" },',
+              '  { id: "templates", label: "템플릿", href: "/studio/templates" },',
+              1,
+          )
+          if 'id: "template.library"' not in value:
+              marker = '  {\n    id: "project.create",'
+              addition = (
+                  '  {\n'
+                  '    id: "template.library",\n'
+                  '    label: "템플릿",\n'
+                  '    owner: "templates",\n'
+                  '    primaryRoute: "/studio/templates",\n'
+                  '    maturity: "stable",\n'
+                  '    surfaces: [\n'
+                  '      { id: "template-hub", role: "primary" },\n'
+                  '      { id: "header-template-link", role: "projection" },\n'
+                  '      { id: "new-project-template-picker", role: "projection" },\n'
+                  '      { id: "asset-market-templates", role: "projection" },\n'
+                  '    ],\n'
+                  '    aliases: ["템플릿 갤러리", "미리디자인", "presentation template"],\n'
+                  '  },\n'
+              )
+              if marker not in value:
+                  raise SystemExit("studio-product-ia.ts: project.create marker missing")
+              value = value.replace(marker, addition + marker, 1)
+          product_ia.write_text(value)
+
+          consolidation = Path(".github/workflows/repair-toonstudio-project-lifecycle.yml")
+          workflow = consolidation.read_text()
+          trigger = "# Template IA preseeded; rerun consolidated validation."
+          if trigger not in workflow:
+              consolidation.write_text(workflow.rstrip() + "\n\n" + trigger + "\n")
+
+          Path(".github/workflows/preseed-toonstudio-template-ia.yml").unlink()
+          PY
+
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(studio): register template hub ownership"
+          git push origin HEAD:feat/toonstudio-project-lifecycle-20260912
