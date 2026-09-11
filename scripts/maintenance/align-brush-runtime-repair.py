@@ -51,4 +51,30 @@ delivery_replacement = '''replace_once(
 )
 '''
 source = source[:start] + delivery_replacement + source[end:]
+
+source += '''
+
+# Align pre-existing Studio governance consumers with the current canonical contracts.
+replace_once(
+    "apps/web/src/domains/creator/studio-asset-governance.test.ts",
+    'confirmedPluginPermissions: Object.freeze(["document-write"]),',
+    'confirmedPluginPermissions: Object.freeze(["document-write"] as const),',
+)
+replace_once(
+    "apps/web/src/domains/creator/studio-asset-governance.test.ts",
+    '''    expect(report.usage.reasons).toContain("seat-limit-exceeded");
+    expect(report.usage.reasons).toContain("ai-training-prohibited");
+    expect(report.entitlement.reason).toBe("seat-limit-exceeded");''',
+    '''    const usageCodes = report.usage.findings.map(({ code }) => code);
+    expect(usageCodes).toContain("seat-limit-exceeded");
+    expect(usageCodes).toContain("ai-training-prohibited");
+    expect(report.entitlement.codes).toContain("seat-limit-exceeded");''',
+)
+replace_once(
+    "apps/web/src/domains/creator/studio-template-catalog.ts",
+    'rightsStatus: "unknown",',
+    'rightsStatus: "warning",',
+)
+'''
+
 path.write_text(source, encoding="utf-8")
