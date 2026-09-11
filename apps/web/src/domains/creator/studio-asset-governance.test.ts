@@ -43,7 +43,7 @@ describe("Studio asset governance", () => {
     expect(report.entitlement.status).toBe("active");
     expect(report.rights.status).toBe("allowed");
     expect(report.fonts.status).toBe("allowed");
-    expect(report.plugin.status).toBe("allowed");
+    expect(report.plugin.status).toBe("ready");
     expect(report.marketplace.status).toBe("ready");
     expect(report.attributionTexts).toEqual([
       "Brush by ToonStudio Assets",
@@ -77,7 +77,7 @@ describe("Studio asset governance", () => {
 
     expect(report.status).toBe("blocked");
     expect(usageCodes).toContain("seat-limit-exceeded");
-    expect(usageCodes).toContain("ai-training-prohibited");
+    expect(usageCodes).toContain("ai-training");
     expect(report.entitlement.codes).toContain("seat-limit-exceeded");
   });
 

@@ -2,10 +2,6 @@
 
 import {
   STUDIO_BRUSH_COMPOSITION_SLOT_IDS,
-  STUDIO_BRUSH_OIL_PROGRAM_KEYS,
-  studioBrushEngineProgramSetWithComposition,
-  studioBrushEngineProgramSetWithOil,
-  studioBrushEngineProgramSetWithWatercolor,
   studioBrushEngineProgramSetWithoutComposition,
   studioBrushEngineProgramSetWithoutOil,
   studioBrushEngineProgramSetWithoutWatercolor,
@@ -13,8 +9,8 @@ import {
   type StudioBrushCompositionProgramSet,
   type StudioBrushCompositionSlotId,
   type StudioBrushEngineProgramSet,
-  type StudioBrushOilProgramSet,
 } from "./studio-brush-engine-program-set";
+import { compileStudioBrushCompositionRuntimeProgramSet } from "./studio-brush-composition-runtime";
 import { STUDIO_BRUSH_COMPOSITION_NODES_A } from "./studio-brush-composition-nodes-a";
 import { STUDIO_BRUSH_COMPOSITION_NODES_B } from "./studio-brush-composition-nodes-b";
 import {
@@ -176,6 +172,7 @@ export function createStudioBrushCompositionBaseline(
 
 export interface StudioBrushCompositionRecipe {
   readonly id: string;
+  readonly families: readonly string[];
   readonly name: string;
   readonly description: string;
   readonly composition: CompleteStudioBrushComposition;
@@ -183,13 +180,13 @@ export interface StudioBrushCompositionRecipe {
 
 export const STUDIO_BRUSH_COMPOSITION_RECIPES: readonly StudioBrushCompositionRecipe[] =
   Object.freeze([
-    Object.freeze({ id: "clean-ink", name: "클린 WebGPU 잉크", description: "낮은 지연과 편집 가능한 선화", composition: DEFAULT_COMPOSITION }),
-    Object.freeze({ id: "living-chroma", name: "리빙 크로마 잉크", description: "Inkwash 유체와 섬유·색분리", composition: completeComposition({ motion: "adaptive-ema", carrier: "webgpu-wet-dabs", tip: "bristle-tuft", surface: "paper-fiber-field", deposition: "wet-pigment", pigment: "inkwash-optical-density", pickup: "simple-reservoir", physics: "inkwash-fluid", pattern: "no-pattern", feedback: "hover-footprint", output: "raster-tiles" }) }),
-    Object.freeze({ id: "mineral-wash", name: "미네랄 수채", description: "과립 종이와 스펙트럼 안료 워시", composition: completeComposition({ motion: "adaptive-ema", carrier: "webgpu-wet-dabs", tip: "sponge-sdf", surface: "watercolor-paper", deposition: "wet-pigment", pigment: "spectral-wgsl", pickup: "no-pickup", physics: "wet-diffusion-webgpu", pattern: "no-pattern", feedback: "hover-footprint", output: "raster-tiles" }) }),
-    Object.freeze({ id: "natural-graphite", name: "천연 흑연", description: "종이 높이·마찰·실물형 그레인", composition: completeComposition({ motion: "adaptive-ema", carrier: "webgpu-stamp-carrier", tip: "image-alpha-stamp", surface: "paper-height-field", deposition: "dry-pigment", pigment: "rgb-color", pickup: "no-pickup", physics: "dry-contact-webgpu", pattern: "no-pattern", feedback: "scratch-audio", output: "raster-tiles" }) }),
-    Object.freeze({ id: "impasto-mixer", name: "강모 임파스토 믹서", description: "강모·reservoir·높이 안료 도포", composition: completeComposition({ motion: "brush-inertia", carrier: "webgpu-bristle-ribbon", tip: "normal-map-tip", surface: "canvas-weave", deposition: "height-paint", pigment: "open-km-wgsl", pickup: "pigment-painter-reservoir", physics: "bristle-webgpu", pattern: "no-pattern", feedback: "hover-footprint", output: "hybrid-proxy" }) }),
-    Object.freeze({ id: "dripping-neon", name: "드리핑 네온", description: "얇은 물감막과 중력 드립", composition: completeComposition({ motion: "spring-modeler", carrier: "webgpu-wet-dabs", tip: "round-sdf", surface: "smooth-paper", deposition: "wet-pigment", pigment: "rainbow-arc-length", pickup: "no-pickup", physics: "thin-film-drip", pattern: "no-pattern", feedback: "visual-only", output: "raster-tiles" }) }),
-    Object.freeze({ id: "foliage-flow", name: "폴리지 플로우", description: "플로우필드와 잎 군집 문양", composition: completeComposition({ motion: "adaptive-ema", carrier: "p5-flow-field-generator", tip: "image-alpha-stamp", surface: "smooth-paper", deposition: "motif-deposit", pigment: "rainbow-arc-length", pickup: "no-pickup", physics: "particle-webgpu", pattern: "foliage-cluster", feedback: "visual-only", output: "settled-generator" }) }),
+    Object.freeze({ id: "clean-ink", families: Object.freeze(["pen", "gpen", "perfect", "calligraphy"]), name: "클린 WebGPU 잉크", description: "낮은 지연과 편집 가능한 선화", composition: DEFAULT_COMPOSITION }),
+    Object.freeze({ id: "living-chroma", families: Object.freeze(["watercolor"]), name: "리빙 크로마 잉크", description: "Inkwash 유체와 섬유·색분리", composition: completeComposition({ motion: "adaptive-ema", carrier: "webgpu-wet-dabs", tip: "bristle-tuft", surface: "paper-fiber-field", deposition: "wet-pigment", pigment: "inkwash-optical-density", pickup: "simple-reservoir", physics: "inkwash-fluid", pattern: "no-pattern", feedback: "hover-footprint", output: "raster-tiles" }) }),
+    Object.freeze({ id: "mineral-wash", families: Object.freeze(["watercolor"]), name: "미네랄 수채", description: "과립 종이와 스펙트럼 안료 워시", composition: completeComposition({ motion: "adaptive-ema", carrier: "webgpu-wet-dabs", tip: "sponge-sdf", surface: "watercolor-paper", deposition: "wet-pigment", pigment: "spectral-wgsl", pickup: "no-pickup", physics: "wet-diffusion-webgpu", pattern: "no-pattern", feedback: "hover-footprint", output: "raster-tiles" }) }),
+    Object.freeze({ id: "natural-graphite", families: Object.freeze(["pencil", "pastel", "dry-media"]), name: "천연 흑연", description: "종이 높이·마찰·실물형 그레인", composition: completeComposition({ motion: "adaptive-ema", carrier: "webgpu-stamp-carrier", tip: "image-alpha-stamp", surface: "paper-height-field", deposition: "dry-pigment", pigment: "rgb-color", pickup: "no-pickup", physics: "dry-contact-webgpu", pattern: "no-pattern", feedback: "scratch-audio", output: "raster-tiles" }) }),
+    Object.freeze({ id: "impasto-mixer", families: Object.freeze(["oil", "brush"]), name: "강모 임파스토 믹서", description: "강모·reservoir·높이 안료 도포", composition: completeComposition({ motion: "brush-inertia", carrier: "webgpu-bristle-ribbon", tip: "bristle-tuft", surface: "canvas-weave", deposition: "height-paint", pigment: "rgb-color", pickup: "simple-reservoir", physics: "bristle-webgpu", pattern: "no-pattern", feedback: "hover-footprint", output: "raster-tiles" }) }),
+    Object.freeze({ id: "dripping-neon", families: Object.freeze(["watercolor"]), name: "드리핑 네온", description: "얇은 물감막과 중력 드립", composition: completeComposition({ motion: "spring-modeler", carrier: "webgpu-wet-dabs", tip: "round-sdf", surface: "smooth-paper", deposition: "wet-pigment", pigment: "rainbow-arc-length", pickup: "no-pickup", physics: "thin-film-drip", pattern: "no-pattern", feedback: "visual-only", output: "raster-tiles" }) }),
+    Object.freeze({ id: "foliage-flow", families: Object.freeze(["stamp", "screentone"]), name: "폴리지 플로우", description: "플로우필드와 잎 군집 문양", composition: completeComposition({ motion: "adaptive-ema", carrier: "p5-flow-field-generator", tip: "image-alpha-stamp", surface: "smooth-paper", deposition: "motif-deposit", pigment: "rainbow-arc-length", pickup: "no-pickup", physics: "particle-webgpu", pattern: "foliage-cluster", feedback: "visual-only", output: "settled-generator" }) }),
   ]);
 
 export function studioBrushCompositionRecipeById(
@@ -353,14 +350,7 @@ export function planStudioBrushComposition(input: {
   });
 }
 
-function oilProgramsEqual(left: StudioBrushOilProgramSet, right: StudioBrushOilProgramSet): boolean {
-  return STUDIO_BRUSH_OIL_PROGRAM_KEYS.every((key) => left[key] === right[key]);
-}
-
-/**
- * Persist the graph and compile the choices that already have a real runtime program seam.
- * Other nodes remain explicit adapter/Lab selections rather than being silently replaced.
- */
+/** Persist the graph and compile only choices backed by current product renderers. */
 export function compileStudioBrushCompositionProgramSet(input: {
   readonly brushId: string;
   readonly family: string;
@@ -368,38 +358,7 @@ export function compileStudioBrushCompositionProgramSet(input: {
   readonly composition: StudioBrushCompositionProgramSet;
 }): StudioBrushEngineProgramSet {
   const complete = completeSelection(input.brushId, input.family, input.composition);
-  let next = studioBrushEngineProgramSetWithComposition(input.current, complete);
-
-  if (input.family === "oil" || input.family === "brush") {
-    const baseline = studioOilProgramSetForBrush(input.brushId);
-    const derived: StudioBrushOilProgramSet = {
-      bristlePhysics: complete.physics === "bristle-webgpu"
-        || complete.carrier === "krita-hairy-carrier",
-      bristleLoadDynamics: complete.pickup !== "no-pickup",
-      impastoRelief: complete.deposition === "height-paint"
-        || complete.tip === "normal-map-tip",
-    };
-    next = oilProgramsEqual(derived, baseline)
-      ? studioBrushEngineProgramSetWithoutOil(next) ?? studioBrushEngineProgramSetWithComposition(null, complete)
-      : studioBrushEngineProgramSetWithOil(next, derived);
-  }
-
-  if (input.family === "watercolor") {
-    if (complete.physics === "inkwash-fluid") {
-      next = studioBrushEngineProgramSetWithWatercolor(next, {
-        livingInkBakeProgramId: "sumi-flow-bake",
-      });
-    } else if (complete.surface === "paper-fiber-field") {
-      next = studioBrushEngineProgramSetWithWatercolor(next, {
-        wetEdgeBloomProgramId: "fiber-feather",
-      });
-    } else {
-      next = studioBrushEngineProgramSetWithoutWatercolor(next)
-        ?? studioBrushEngineProgramSetWithComposition(null, complete);
-    }
-  }
-
-  return next;
+  return compileStudioBrushCompositionRuntimeProgramSet({ ...input, composition: complete });
 }
 
 export function resetStudioBrushCompositionProgramSet(input: {

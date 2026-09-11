@@ -145,6 +145,41 @@ export function canonicalStudioRoutePath(pathname: string): string | null {
   return registration.pattern;
 }
 
+
+const STUDIO_EXTERNAL_TOKEN_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{7,255}$/u;
+
+export function validateStudioExternalToken(value: unknown): value is string {
+  return typeof value === "string" && STUDIO_EXTERNAL_TOKEN_PATTERN.test(value);
+}
+
+function requireStudioExternalToken(token: string): string {
+  if (!validateStudioExternalToken(token)) {
+    throw new Error("A valid external token is required.");
+  }
+  return token;
+}
+
+function studioExternalEntryHref(
+  path: "/studio/review" | "/studio/present" | "/studio/join",
+  parameter: "shareToken" | "presentationToken" | "invite",
+  token: string,
+): string {
+  const query = new URLSearchParams({ [parameter]: requireStudioExternalToken(token) });
+  return `${path}?${query.toString()}`;
+}
+
+export function studioExternalReviewHref(token: string): string {
+  return studioExternalEntryHref("/studio/review", "shareToken", token);
+}
+
+export function studioExternalPresentationHref(token: string): string {
+  return studioExternalEntryHref("/studio/present", "presentationToken", token);
+}
+
+export function studioExternalJoinHref(token: string): string {
+  return studioExternalEntryHref("/studio/join", "invite", token);
+}
+
 export function auditStudioRouteRegistry(): readonly string[] {
   const issues: string[] = [];
   const ids = STUDIO_ROUTE_REGISTRY.map((registration) => registration.id);

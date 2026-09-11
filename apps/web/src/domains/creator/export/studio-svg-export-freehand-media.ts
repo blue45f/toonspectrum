@@ -23,6 +23,7 @@ import {
   planStudioAngledNibStrokeLocalCoverage,
   type StudioStrokeLocalCoveragePolygon,
 } from "../brush/studio-stroke-local-coverage";
+import { resolveStudioBrushRuntimeProgramSet } from "../brush/studio-brush-composition-runtime";
 import { isStudioStrokePaintModelCompatible } from "../brush/studio-stroke-paint-model";
 import {
   planWatercolorBrushDabs,
@@ -127,6 +128,10 @@ export function serializeFreehandMedia(
   renderSampleDistance: number,
   aliasStrokeWidth: number,
 ): string {
+  const runtimeEnginePrograms = resolveStudioBrushRuntimeProgramSet(
+    brush,
+    el.brushEnginePrograms,
+  );
   const perfectProfile = resolveStudioPerfectFreehandProfile(brush);
   if (perfectProfile) {
     // perfect 잉크와 G펜 계열 — 캔버스와 같은 연속 가변 폭 아웃라인을 선 색으로 채운다.
@@ -193,7 +198,7 @@ export function serializeFreehandMedia(
         plannedDabs,
         watercolorSeed,
         "settled",
-        el.brushEnginePrograms,
+        runtimeEnginePrograms,
       );
       const wetRibbonPlan = planStudioWetRibbonCarrier(dabs, {
         seed: watercolorSeed,
@@ -220,7 +225,7 @@ export function serializeFreehandMedia(
       plannedDabs,
       watercolorSeed,
       "settled",
-      el.brushEnginePrograms,
+      runtimeEnginePrograms,
     );
     if (dabs.length === 0) return "";
     const diffuseId = nextId(ctx, "sw");
@@ -652,7 +657,7 @@ export function serializeFreehandMedia(
     // 바이트 안정성보다 우선한다는 기존 결정(크레용 5레인)과 같은 판단.
     const carrier = planStudioOilRibbonCarrier(
       dabs,
-      studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id), el.brushEnginePrograms?.oil),
+      studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id), runtimeEnginePrograms?.oil),
     );
     if (!carrier.body) return "";
     const body = `<path data-paint-carrier="contiguous-variable-width-ribbon" d="${studioOilRibbonPathData(carrier.body, true)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(carrier.bodyOpacity * strokeOpacity)}"/>`;
