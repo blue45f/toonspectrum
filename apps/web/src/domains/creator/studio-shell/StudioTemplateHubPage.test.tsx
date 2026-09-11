@@ -31,12 +31,18 @@ describe("StudioTemplateHubPage", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /^발표 자료$|^Presentation$/u }));
-    expect(await screen.findByText(/웹툰 작품 피칭|Webtoon series pitch/u)).toBeTruthy();
+    expect(await screen.findByRole("heading", {
+      name: /웹툰 작품 피칭|Webtoon series pitch/u,
+      level: 2,
+    })).toBeTruthy();
     expect(screen.queryByText(/세로 웹툰 표준|Vertical webtoon standard/u)).toBeNull();
 
     const search = screen.getByRole("textbox", { name: /템플릿 검색|Search templates/u });
     fireEvent.change(search, { target: { value: "production" } });
-    expect(await screen.findByText(/제작 리뷰|Production review/u)).toBeTruthy();
+    expect(await screen.findByRole("heading", {
+      name: /제작 리뷰|Production review/u,
+      level: 2,
+    })).toBeTruthy();
   });
 
   it("creates the selected template as a project and opens its canonical document route", async () => {
