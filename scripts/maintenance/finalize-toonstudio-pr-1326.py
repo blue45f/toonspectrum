@@ -194,3 +194,67 @@ remove_once(
     r"^\s*studioDocumentWorkspaces,\s*\n",
     "unused studioDocumentWorkspaces import",
 )
+
+document_store = Path(
+    "apps/web/src/domains/creator/studio-project-document-store.ts"
+)
+document_source = document_store.read_text()
+declaration = (
+    "const KIND_WORKSPACES: Readonly<Record<StudioDocumentKind, "
+    "readonly StudioDocumentWorkspace[]>> = Object.freeze({"
+)
+if document_source.count(declaration) != 1:
+    raise SystemExit(
+        f"{document_store}: expected one KIND_WORKSPACES declaration"
+    )
+document_source = document_source.replace(
+    declaration,
+    "const KIND_WORKSPACES = Object.freeze({",
+    1,
+)
+footer = "});\n\nconst PROJECT_DEFAULT_DOCUMENT:"
+typed_footer = (
+    "} as const satisfies Readonly<Record<StudioDocumentKind, "
+    "readonly StudioDocumentWorkspace[]>>);\n\n"
+    "const PROJECT_DEFAULT_DOCUMENT:"
+)
+if document_source.count(footer) != 1:
+    raise SystemExit(
+        f"{document_store}: expected one KIND_WORKSPACES closing marker"
+    )
+document_source = document_source.replace(footer, typed_footer, 1)
+workspace_lookup = "  const allowedWorkspaces = KIND_WORKSPACES[input.kind];"
+typed_workspace_lookup = (
+    "  const allowedWorkspaces: readonly StudioDocumentWorkspace[] = "
+    "KIND_WORKSPACES[input.kind];"
+)
+if document_source.count(workspace_lookup) != 1:
+    raise SystemExit(
+        f"{document_store}: expected one allowedWorkspaces lookup"
+    )
+document_store.write_text(
+    document_source.replace(workspace_lookup, typed_workspace_lookup, 1)
+)
+
+danger_call = 'buttonClass({ variant: "danger", size: "sm" })'
+danger_outline = (
+    'buttonClass({ variant: "outline", size: "sm", '
+    'className: "border-danger/50 text-danger hover:border-danger '
+    'hover:bg-danger-soft/25 hover:text-danger" })'
+)
+danger_targets = {
+    Path(
+        "apps/web/src/domains/creator/studio-shell/StudioProjectDocumentsPanel.tsx"
+    ): 2,
+    Path(
+        "apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.tsx"
+    ): 1,
+}
+for file, expected in danger_targets.items():
+    source = file.read_text()
+    found = source.count(danger_call)
+    if found != expected:
+        raise SystemExit(
+            f"{file}: expected {expected} danger button calls, found {found}"
+        )
+    file.write_text(source.replace(danger_call, danger_outline))
