@@ -27,6 +27,12 @@ const TRANSIENT_WORKFLOWS = [
   ".github/workflows/verify-toonstudio-pr-head.yml",
   ".github/workflows/apply-ci-optimization-fixes-once.yml",
   ".github/workflows/apply-ci-source-fixes-once.yml",
+  ".github/workflows/apply-toonstudio-project-contract-repair.yml",
+  ".github/workflows/complete-toonstudio-session-all-features.yml",
+  ".github/workflows/finalize-toonstudio-session-integration.yml",
+  ".github/workflows/finalize-toonstudio-session-integration-v2.yml",
+  ".github/workflows/repair-toonstudio-session-all-features.yml",
+  ".github/workflows/verify-and-autofix-toonstudio-final.yml",
 ] as const;
 
 function source(path: string): string {
