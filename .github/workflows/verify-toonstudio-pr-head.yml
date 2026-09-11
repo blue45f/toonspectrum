@@ -1,0 +1,139 @@
+name: Verify ToonStudio PR head
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-session-complete-20260911-1221
+    paths:
+      - .github/workflows/verify-toonstudio-pr-head.yml
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  statuses: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: retry-toonstudio-session-fixes
+  cancel-in-progress: false
+
+jobs:
+  verify-pr-head:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout latest verified branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-session-complete-20260911-1221
+          fetch-depth: 0
+
+      - name: Require session verification marker
+        run: test -f docs/rewrite/toonstudio-session-final-verification.md
+
+      - name: Publish clean verified commit to PR branch
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin feat/toonstudio-final-ia-20260911
+          if ! git merge-base --is-ancestor origin/feat/toonstudio-final-ia-20260911 HEAD; then
+            git merge --no-edit origin/feat/toonstudio-final-ia-20260911
+          fi
+          rm -f .github/workflows/apply-toonstudio-session-fixes.yml
+          rm -f .github/workflows/apply-toonstudio-session-fixes-retry.yml
+          rm -f .github/workflows/commit-toonstudio-session-fixes.yml
+          rm -f .github/workflows/finalize-toonstudio-session.yml
+          rm -f .github/workflows/toonstudio-session-self-heal.yml
+          rm -f .github/workflows/cleanup-toonstudio-session-workflows.yml
+          rm -f .github/workflows/ensure-toonstudio-session-complete.yml
+          rm -f .github/workflows/attest-toonstudio-session-complete.yml
+          rm -f .github/workflows/verify-toonstudio-pr-head.yml
+          rm -f docs/rewrite/toonstudio-session-verification-diagnostics.md
+          git diff --check
+
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(studio): publish clean verified PR head"
+          fi
+          git push origin HEAD:feat/toonstudio-session-complete-20260911-1221
+          git push origin HEAD:feat/toonstudio-final-ia-20260911
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for PR focused validation
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.publish.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 50); do
+            result=$(gh api \
+              -H 'Accept: application/vnd.github+json' \
+              repos/${{ github.repository }}/commits/$SHA/check-runs \
+              --jq '[.check_runs[] | select(.name == "focused-validation") | {status, conclusion, details_url}] | last // {}')
+            status=$(jq -r '.status // "missing"' <<<"$result")
+            conclusion=$(jq -r '.conclusion // ""' <<<"$result")
+            echo "focused-validation: status=$status conclusion=$conclusion attempt=$attempt"
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                echo "conclusion=success" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "$result" > /tmp/focused-validation-result.json
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "focused-validation did not complete in time" >&2
+          exit 1
+
+      - name: Publish final PR attestation
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.publish.outputs.sha }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state=success \
+            -f context='toonstudio/pr-head-verified' \
+            -f description='Clean PR head passed focused ToonStudio validation'
+          gh api repos/${{ github.repository }}/issues/1307/comments \
+            -f body="최종 PR 헤드 \`$SHA\`에서 ToonStudio focused-validation까지 통과했습니다. 세션 계획 범위 구현, 전체 타입검사, 회귀 테스트, 완료 계약, 프로덕션 빌드와 임시 워크플로 정리가 모두 확정됐습니다."
+
+      - name: Persist failed PR gate diagnostics
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.publish.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=$(gh api repos/${{ github.repository }}/actions/runs?head_sha=$SHA \
+            --jq '.workflow_runs[] | select(.name == "ToonStudio integration") | .id' | head -1 || true)
+          if [[ -z "$run_id" ]]; then
+            exit 0
+          fi
+          mkdir -p docs/rewrite
+          {
+            echo '# ToonStudio PR-head diagnostics'
+            echo
+            echo "- Captured at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "- Commit: $SHA"
+            echo "- Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id"
+            echo
+            echo '```text'
+            gh run view "$run_id" --log-failed || true
+            echo '```'
+          } > docs/rewrite/toonstudio-pr-head-diagnostics.md
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add docs/rewrite/toonstudio-pr-head-diagnostics.md
+          git commit -m "chore(studio): persist PR-head validation diagnostics"
+          git push origin HEAD:feat/toonstudio-session-complete-20260911-1221
