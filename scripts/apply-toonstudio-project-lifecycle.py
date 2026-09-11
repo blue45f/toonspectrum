@@ -62,22 +62,20 @@ replace_once(
 routes = "apps/web/src/app/routes/groups/creator.routes.tsx"
 replace_once(
     routes,
-    '''  { id: "creator-studio-import", path: "/studio/import", element: <StudioImportPage /> },
-  { id: "creator-studio-assets", path: "/studio/assets", element: <StudioAssetHubPage /> },''',
-    '''  { id: "creator-studio-import", path: "/studio/import", element: <StudioImportPage /> },
+    '''  { id: "creator-studio-import", path: studioRoutePath("import"), element: <StudioImportPage /> },
+  { id: "creator-studio-assets", path: studioRoutePath("assets"), element: <StudioAssetHubPage /> },''',
+    '''  { id: "creator-studio-import", path: studioRoutePath("import"), element: <StudioImportPage /> },
   { id: "creator-studio-recovery", path: "/studio/recovery", element: <Navigate to="/studio?view=archived" replace /> },
   { id: "creator-studio-trash", path: "/studio/trash", element: <Navigate to="/studio?view=trash" replace /> },
-  { id: "creator-studio-assets", path: "/studio/assets", element: <StudioAssetHubPage /> },''',
+  { id: "creator-studio-assets", path: studioRoutePath("assets"), element: <StudioAssetHubPage /> },''',
 )
 
 integrated = "apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx"
 replace_once(
     integrated,
+    'import { StudioProjectAssistantPanel } from "./StudioProjectAssistantPanel";',
     '''import { StudioProjectAssistantPanel } from "./StudioProjectAssistantPanel";
-import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel";''',
-    '''import { StudioProjectAssistantPanel } from "./StudioProjectAssistantPanel";
-import { StudioProjectDocumentsPanel } from "./StudioProjectDocumentsPanel";
-import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel";''',
+import { StudioProjectDocumentsPanel } from "./StudioProjectDocumentsPanel";''',
 )
 replace_once(
     integrated,
