@@ -1,0 +1,136 @@
+name: Apply ToonStudio project contract repair once
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-session-complete-20260911-1221
+    paths:
+      - .github/workflows/apply-toonstudio-project-contract-repair.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-toonstudio-project-contract-repair
+  cancel-in-progress: false
+
+jobs:
+  repair-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/toonstudio-session-complete-20260911-1221
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply deterministic source repairs
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:120]!r}")
+              file.write_text(text.replace(old, new, 1))
+
+          bridge = "apps/web/src/domains/creator/studio-shell/StudioProjectDiagnosticsBridge.tsx"
+          replace_once(
+              bridge,
+              '''function dispatchFailure(detail: StudioProjectDiagnosticsFailedDetail): void {\n  window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, {\n    detail: Object.freeze(detail),\n  }));\n}\n\nfunction runDiagnostics''',
+              '''function dispatchFailure(detail: StudioProjectDiagnosticsFailedDetail): void {\n  window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, {\n    detail: Object.freeze(detail),\n  }));\n}\n\nfunction eventProjectId(detail: unknown): string | null {\n  if (!detail || typeof detail !== "object") return null;\n  const value = Object.getOwnPropertyDescriptor(detail, "projectId")?.value;\n  return typeof value === "string" && value.trim() ? value : null;\n}\n\nfunction runDiagnostics''',
+          )
+          replace_once(
+              bridge,
+              '''    const onSourceUpdated = (event: Event) => {\n      if (!(event instanceof CustomEvent)) return;\n      const next = parseStudioProjectDiagnosticSource(event.detail, projectId);\n      if (!next) {''',
+              '''    const onSourceUpdated = (event: Event) => {\n      if (!(event instanceof CustomEvent)) return;\n      if (eventProjectId(event.detail) !== projectId) return;\n      const next = parseStudioProjectDiagnosticSource(event.detail, projectId);\n      if (!next) {''',
+          )
+
+          Path("apps/web/src/domains/creator/studio-shell/StudioProjectDiagnosticsBridge.test.tsx").write_text('''// @vitest-environment jsdom\n\nimport { act, cleanup, render } from "@testing-library/react";\nimport { afterEach, beforeEach, describe, expect, it, vi } from "vitest";\n\nimport { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";\nimport {\n  STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT,\n  STUDIO_PROJECT_DIAGNOSTIC_SOURCE_UPDATED_EVENT,\n} from "../studio-project-diagnostic-source-store";\nimport {\n  STUDIO_PROJECT_READINESS_REQUEST_EVENT,\n  STUDIO_PROJECT_READINESS_UPDATED_EVENT,\n  readStudioProjectReadinessSnapshot,\n} from "../studio-project-readiness-store";\n\nimport type { StudioProjectDiagnosticSource } from "../studio-project-diagnostics";\n\nfunction source(projectId = "project-1"): StudioProjectDiagnosticSource {\n  return {\n    schemaVersion: 1,\n    projectId,\n    capturedAt: "2026-09-11T00:00:00.000Z",\n    story: {\n      bible: { projectId, characters: [], locations: [], facts: [] },\n      states: [],\n      transitions: [],\n    },\n    productionTasks: [],\n    assets: [],\n    reviewSession: {\n      documentId: "document-1",\n      versionId: "v1",\n      basedOnVersionId: null,\n      status: "approved",\n      requiredReviewerIds: [],\n      threads: [],\n      decisions: [],\n      submittedAt: "2026-09-11T00:00:00.000Z",\n      approvedAt: "2026-09-11T00:00:00.000Z",\n      updatedAt: "2026-09-11T00:00:00.000Z",\n    },\n    localization: [],\n    exportPreflights: [],\n  };\n}\n\nbeforeEach(() => {\n  window.localStorage.clear();\n});\n\nafterEach(() => {\n  cleanup();\n  window.localStorage.clear();\n});\n\ndescribe("StudioProjectDiagnosticsBridge", () => {\n  it("keeps the canonical workspace projection current on mount and explicit requests", () => {\n    const updated = vi.fn();\n    window.addEventListener(STUDIO_PROJECT_READINESS_UPDATED_EVENT, updated);\n    render(<StudioProjectDiagnosticsBridge projectId="project-1" />);\n\n    act(() => {\n      window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_READINESS_REQUEST_EVENT, {\n        detail: { projectId: "project-1" },\n      }));\n    });\n\n    expect(readStudioProjectReadinessSnapshot(window.localStorage, "project-1")).toMatchObject({\n      projectId: "project-1",\n      report: { status: "warning" },\n    });\n    expect(updated).toHaveBeenCalledTimes(2);\n    window.removeEventListener(STUDIO_PROJECT_READINESS_UPDATED_EVENT, updated);\n  });\n\n  it("ignores requests and source events owned by another project", () => {\n    const failed = vi.fn();\n    window.addEventListener(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, failed);\n    render(<StudioProjectDiagnosticsBridge projectId="project-2" />);\n    const before = readStudioProjectReadinessSnapshot(window.localStorage, "project-2");\n\n    act(() => {\n      window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_READINESS_REQUEST_EVENT, {\n        detail: { projectId: "project-1" },\n      }));\n      window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_DIAGNOSTIC_SOURCE_UPDATED_EVENT, {\n        detail: source("project-1"),\n      }));\n    });\n\n    expect(failed).not.toHaveBeenCalled();\n    expect(readStudioProjectReadinessSnapshot(window.localStorage, "project-2")).toEqual(before);\n    expect(readStudioProjectReadinessSnapshot(window.localStorage, "project-1")).toBeNull();\n    window.removeEventListener(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, failed);\n  });\n\n  it("reports malformed same-project source updates without replacing valid readiness", () => {\n    const failed = vi.fn();\n    window.addEventListener(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, failed);\n    render(<StudioProjectDiagnosticsBridge projectId="project-1" />);\n    const before = readStudioProjectReadinessSnapshot(window.localStorage, "project-1");\n\n    act(() => {\n      window.dispatchEvent(new CustomEvent(STUDIO_PROJECT_DIAGNOSTIC_SOURCE_UPDATED_EVENT, {\n        detail: { projectId: "project-1", schemaVersion: 1 },\n      }));\n    });\n\n    expect(failed).toHaveBeenCalledOnce();\n    expect((failed.mock.calls[0]?.[0] as CustomEvent).detail).toMatchObject({\n      projectId: "project-1",\n      code: "source-invalid",\n    });\n    expect(readStudioProjectReadinessSnapshot(window.localStorage, "project-1")).toEqual(before);\n    window.removeEventListener(STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT, failed);\n  });\n});\n''')
+
+          shell = "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx"
+          replacements = [
+              ('(id) => queryHref("/story-lab", { project: id })', '(id) => projectViewHref(id, "story", "script")'),
+              ('(id) => workHref(id, "storyworld")', '(id) => projectViewHref(id, "story", "world")'),
+              ('(id) => queryHref(workHref(id, "storyworld"), { focus: "references" })', '(id) => projectViewHref(id, "story", "references")'),
+              ('(id) => queryHref("/studio/assets", { project: id, view: "series-kit" })', '(id) => projectViewHref(id, "assets", "series")'),
+              ('(id) => workHref(id, "review")', '(id) => projectViewHref(id, "review", "comments")'),
+              ('(id) => workHref(id, "review")', '(id) => projectViewHref(id, "review", "approvals")'),
+              ('(id) => workHref(id, "versions")', '(id) => projectViewHref(id, "review", "compare")'),
+              ('(id) => queryHref("/studio/share", { scope: `work:${id}` })', '(id) => projectViewHref(id, "review", "share")'),
+              ('(id) => workHref(id, "publish")', '(id) => projectViewHref(id, "export", "targets")'),
+              ('(id) => workHref(id, "publish")', '(id) => projectViewHref(id, "export", "packages")'),
+              ('(id) => workHref(id, "present")', '(id) => projectViewHref(id, "export", "packages", "focus=pptx")'),
+              ('(id) => workHref(id, "publish")', '(id) => projectViewHref(id, "export", "packages", "focus=backup")'),
+          ]
+          for old, new in replacements:
+              replace_once(shell, old, new)
+
+          Path("apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.integration.test.tsx").write_text('''// @vitest-environment jsdom\n\nimport { cleanup, render, screen, waitFor } from "@testing-library/react";\nimport { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";\nimport { afterEach, describe, expect, it } from "vitest";\n\nimport { StudioProjectShellPage } from "./StudioProjectShellPage";\n\nfunction LocationProbe() {\n  const location = useLocation();\n  return <output aria-label="location">{`${location.pathname}${location.search}`}</output>;\n}\n\nfunction renderReview(entry: string) {\n  return render(\n    <MemoryRouter initialEntries={[entry]}>\n      <LocationProbe />\n      <Routes>\n        <Route\n          path="/studio/p/:projectId/review"\n          element={<StudioProjectShellPage section="review" />}\n        />\n      </Routes>\n    </MemoryRouter>,\n  );\n}\n\nafterEach(() => {\n  cleanup();\n  window.localStorage.clear();\n});\n\ndescribe("StudioProjectShellPage integration", () => {\n  it("keeps versions and comparison inside the canonical project review flow", () => {\n    const view = renderReview("/studio/p/project-1/review?view=versions");\n    expect(view.container.querySelector("[data-studio-project-view=versions]")).toBeTruthy();\n    expect(screen.getByLabelText("location").textContent).toBe(\n      "/studio/p/project-1/review?view=versions",\n    );\n    expect(view.container.querySelector('a[href="/studio/work/project-1/versions"]')).toBeNull();\n    expect(view.container.querySelector('a[href="/studio/p/project-1/review?view=compare"]')).toBeTruthy();\n  });\n\n  it("canonicalizes missing view state instead of leaving an inert query", async () => {\n    renderReview("/studio/p/project-1/review?view=missing&focus=comment-1");\n    await waitFor(() => {\n      expect(screen.getByLabelText("location").textContent).toBe(\n        "/studio/p/project-1/review?focus=comment-1&view=inbox",\n      );\n    });\n    expect(document.querySelector("[data-studio-project-view=inbox]")).toBeTruthy();\n  });\n});\n''')
+
+          replace_once(
+              "apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx",
+              "/** Resolve a user-supplied query value without allowing unknown asset-hub surfaces. */\nexport function resolveStudioAssetHubView",
+              "/** Resolve a user-supplied query value without allowing unknown asset-hub surfaces. */\n// Exported for focused route normalization tests; this module remains the canonical asset surface.\n// eslint-disable-next-line react-refresh/only-export-components\nexport function resolveStudioAssetHubView",
+          )
+          replace_once(
+              "apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx",
+              "  }, [selected?.id, selected?.translatedText, selected?.updatedAt]);",
+              "  }, [selected]);",
+          )
+
+          readiness = "apps/web/src/domains/creator/studio-shell/StudioProjectReadinessPanel.tsx"
+          replace_once(
+              readiness,
+              '''function statusIcon(status: StudioProjectReadinessStatus) {\n  if (status === "ready") return CheckCircle2;\n  if (status === "warning") return AlertTriangle;\n  return ShieldAlert;\n}''',
+              '''function StatusIcon({\n  status,\n  size,\n  className,\n}: {\n  readonly status: StudioProjectReadinessStatus;\n  readonly size: number;\n  readonly className?: string;\n}) {\n  if (status === "ready") return <CheckCircle2 size={size} className={className} aria-hidden="true" />;\n  if (status === "warning") return <AlertTriangle size={size} className={className} aria-hidden="true" />;\n  return <ShieldAlert size={size} className={className} aria-hidden="true" />;\n}''',
+          )
+          replace_once(readiness, '''  if (!snapshot) {\n    const FailureIcon = failure ? AlertTriangle : RefreshCw;\n    return (''', '''  if (!snapshot) {\n    return (''')
+          replace_once(readiness, '''              <FailureIcon size={17} className={failure ? "text-warning" : "text-fg-3"} aria-hidden="true" />''', '''              {failure\n                ? <AlertTriangle size={17} className="text-warning" aria-hidden="true" />\n                : <RefreshCw size={17} className="text-fg-3" aria-hidden="true" />}''')
+          replace_once(readiness, '''  const { report } = snapshot;\n  const StatusIcon = statusIcon(report.status);\n  const percentage = Math.round(report.completion * 100);''', '''  const { report } = snapshot;\n  const percentage = Math.round(report.completion * 100);''')
+          replace_once(readiness, '''              <StatusIcon size={14} aria-hidden="true" />''', '''              <StatusIcon status={report.status} size={14} />''')
+          replace_once(readiness, '''          {report.sections.map((section) => {\n            const Icon = statusIcon(section.status);\n            return (''', '''          {report.sections.map((section) => {\n            return (''')
+          replace_once(readiness, '''                  <Icon size={14} className={statusClasses(section.status).split(" ").at(-1)} aria-hidden="true" />''', '''                  <StatusIcon\n                    status={section.status}\n                    size={14}\n                    className={statusClasses(section.status).split(" ").at(-1)}\n                  />''')
+
+          for workflow in [
+              ".github/workflows/apply-toonstudio-project-contract-repair.yml",
+              ".github/workflows/apply-toonstudio-ui-lint-fixes.yml",
+              ".github/workflows/apply-toonstudio-session-fixes.yml",
+              ".github/workflows/apply-toonstudio-session-fixes-retry.yml",
+          ]:
+              Path(workflow).unlink(missing_ok=True)
+          PY
+
+      - name: Verify complete UI integration
+        run: bash scripts/verify-toonstudio-integration.sh ui
+
+      - name: Commit verified project contract repair
+        shell: bash
+        run: |
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(studio): unify project diagnostics and canonical view flows"
+          git push origin HEAD:feat/toonstudio-session-complete-20260911-1221
