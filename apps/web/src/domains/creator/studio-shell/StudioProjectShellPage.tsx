@@ -62,7 +62,7 @@ interface SectionDefinition {
   actions: readonly ProjectAction[];
 }
 
-const action = (
+function action(
   icon: LucideIcon,
   koTitle: string,
   enTitle: string,
@@ -70,13 +70,15 @@ const action = (
   enDescription: string,
   href: (projectId: string) => string,
   badge?: Record<Locale, string>,
-): ProjectAction => ({
-  icon,
-  title: { ko: koTitle, en: enTitle },
-  description: { ko: koDescription, en: enDescription },
-  href,
-  ...(badge ? { badge } : {}),
-});
+): ProjectAction {
+  return {
+    icon,
+    title: { ko: koTitle, en: enTitle },
+    description: { ko: koDescription, en: enDescription },
+    href,
+    ...(badge ? { badge } : {}),
+  };
+}
 
 function workHref(projectId: string, surface = "canvas"): string {
   return `/studio/work/${encodeURIComponent(projectId)}/${surface}`;
@@ -216,8 +218,9 @@ const SECTION_DEFINITIONS: Readonly<Record<StudioProjectSection, SectionDefiniti
   },
 };
 
-const PRIMARY_SECTIONS = STUDIO_PROJECT_NAVIGATION.map((item) => item.id)
-  as readonly Exclude<StudioProjectSection, "settings">[];
+const PRIMARY_SECTIONS = STUDIO_PROJECT_NAVIGATION.map(
+  (item) => item.id,
+) as readonly Exclude<StudioProjectSection, "settings">[];
 
 function localeFromLanguage(language: string): Locale {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
