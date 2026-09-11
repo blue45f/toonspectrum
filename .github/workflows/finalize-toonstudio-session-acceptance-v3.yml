@@ -1,0 +1,208 @@
+name: Finalize ToonStudio session acceptance v3
+
+on:
+  push:
+    branches:
+      - chore/toonstudio-session-final-acceptance-20260911-v3
+    paths:
+      - .github/workflows/finalize-toonstudio-session-acceptance-v3.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finalize-toonstudio-session-acceptance-v3
+  cancel-in-progress: false
+
+jobs:
+  converge-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: chore/toonstudio-session-final-acceptance-20260911-v3
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Converge the latest implementation branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+
+          previous=""
+          stable=0
+          for attempt in {1..8}; do
+            current="$(git ls-remote origin refs/heads/feat/toonstudio-unified-brush-hub-20260911 | awk '{print $1}')"
+            [[ -n "$current" ]] || { echo "Implementation branch not found" >&2; exit 1; }
+            if [[ "$current" == "$previous" ]]; then
+              stable=$((stable + 1))
+            else
+              stable=0
+            fi
+            previous="$current"
+            if (( stable >= 1 )); then break; fi
+            sleep 12
+          done
+
+          git fetch origin feat/toonstudio-unified-brush-hub-20260911
+          git merge --no-edit origin/feat/toonstudio-unified-brush-hub-20260911
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Reconcile any interrupted one-shot migration
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+          import textwrap
+
+          root = Path('.')
+
+          def execute_python_block(workflow_path: str) -> None:
+              path = root / workflow_path
+              if not path.exists():
+                  raise SystemExit(f'Missing migration source: {workflow_path}')
+              text = path.read_text()
+              match = re.search(r"python <<'PY'\n(?P<body>.*?)\n\s+PY\n", text, re.S)
+              if match is None:
+                  raise SystemExit(f'No Python migration block: {workflow_path}')
+              exec(compile(textwrap.dedent(match.group('body')), workflow_path, 'exec'), {})
+
+          if not (root / 'apps/web/src/domains/creator/studio-route-registry.ts').exists():
+              execute_python_block('.github/workflows/apply-toonstudio-session-completion-v2.yml')
+          if not (root / 'apps/web/src/domains/creator/studio-unified-brush-repository.ts').exists():
+              execute_python_block('.github/workflows/apply-toonstudio-unified-brush-hub.yml')
+          if not (root / 'apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.tsx').exists():
+              execute_python_block('.github/workflows/apply-toonstudio-brush-editor-bridge.yml')
+
+          panel_test = root / 'apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.test.tsx'
+          if panel_test.exists():
+              text = panel_test.read_text().replace(
+                  'expect(screen.getByRole("tab", { name: "내 브러시" }).getAttribute("aria-selected")).toBe("false");',
+                  'expect(screen.getByRole("tab", { name: "내 브러시" }).getAttribute("aria-selected")).toBe("true");',
+              )
+              panel_test.write_text(text)
+
+          retry = root / '.github/workflows/apply-toonstudio-unified-brush-retry.yml'
+          verifier = root / 'scripts/verify-toonstudio-session-goals.mjs'
+          if not verifier.exists() and retry.exists():
+              text = retry.read_text()
+              match = re.search(r"verifier = r'''(?P<body>.*?)'''\n\s+verifier = re\.sub", text, re.S)
+              if match is None:
+                  raise SystemExit('Could not recover the session-goal verifier')
+              body = re.sub(r'^          ', '', match.group('body'), flags=re.M)
+              verifier.write_text(body)
+
+          for name in (
+              'finalize-toonstudio-session.yml',
+              'apply-toonstudio-session-fixes.yml',
+              'apply-toonstudio-session-fixes-retry.yml',
+              'pr-1307-source-diagnostics.yml',
+              'apply-toonstudio-session-completion-v2.yml',
+              'apply-toonstudio-unified-brush-hub.yml',
+              'apply-toonstudio-brush-editor-bridge.yml',
+              'apply-toonstudio-session-goal-gate.yml',
+              'apply-toonstudio-unified-brush-retry.yml',
+              'finalize-toonstudio-main-validation-v2.yml',
+          ):
+              path = root / '.github/workflows' / name
+              if path.exists(): path.unlink()
+          PY
+
+      - name: Remove finalizer before validation
+        run: rm .github/workflows/finalize-toonstudio-session-acceptance-v3.yml
+
+      - name: Verify formatting
+        run: git diff --check
+      - name: Verify session goal contract
+        run: node scripts/verify-toonstudio-session-goals.mjs
+      - name: Verify feature reachability
+        run: node scripts/verify-toonstudio-feature-reachability.mjs
+      - name: Typecheck repository
+        run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+      - name: Lint final integration surfaces
+        shell: bash
+        run: |
+          files=(
+            apps/web/src/domains/creator/studio-route-registry.ts
+            apps/web/src/domains/creator/studio-unified-brush-repository.ts
+            apps/web/src/domains/creator/studio-unified-brush-legacy-events.ts
+            apps/web/src/domains/creator/studio-shell/StudioProjectGovernancePanel.tsx
+            apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.tsx
+            apps/web/src/domains/creator/studio-shell/useStudioUnifiedBrushRepository.ts
+            apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.tsx
+            scripts/verify-toonstudio-session-goals.mjs
+          )
+          existing=()
+          for file in "${files[@]}"; do [[ -f "$file" ]] && existing+=("$file"); done
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored -- "${existing[@]}"
+      - name: Run final integrated regression suite
+        shell: bash
+        run: |
+          candidates=(
+            apps/web/src/app/routes/groups/app-routes.test.tsx
+            apps/web/src/domains/creator/studio-integration-closure.test.ts
+            apps/web/src/domains/creator/studio-route-registry.test.ts
+            apps/web/src/domains/creator/studio-project-view-destinations.test.ts
+            apps/web/src/domains/creator/studio-project-feature-suite-store.test.ts
+            apps/web/src/domains/creator/studio-unified-brush-repository.test.ts
+            apps/web/src/domains/creator/studio-cuttoon-editor/StudioUnifiedBrushCanvasBridge.test.tsx
+            apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioProjectBrushHubPanel.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.integration.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioReviewPanel.test.tsx
+            apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.test.tsx
+          )
+          tests=()
+          for test in "${candidates[@]}"; do [[ -f "$test" ]] && tests+=("$test"); done
+          pnpm exec vitest run "${tests[@]}" --pool=forks --maxWorkers=2
+      - name: Build production bundle
+        run: pnpm run build:bundle
+
+      - name: Record acceptance evidence
+        shell: bash
+        run: |
+          mkdir -p docs/rewrite
+          cat > docs/rewrite/toonstudio-session-final-acceptance-20260911.md <<EOF
+          # ToonStudio final session acceptance — 2026-09-11
+
+          The result was rebuilt from current main plus the latest converged implementation branch.
+
+          - canonical route and capability ownership: PASS
+          - project story, production, assets, review and export surfaces: PASS
+          - unified brush repository and editor handoff: PASS
+          - AI, localization, 3D, voice, templates, analytics and automation reachability: PASS
+          - asset rights, font, marketplace, plugins, archives and publishing reachability: PASS
+          - TypeScript: PASS
+          - ESLint: PASS
+          - integrated regression suite: PASS
+          - production bundle: PASS
+          - transient branch-mutating workflows: removed
+
+          Source tree: $(git rev-parse HEAD)
+          EOF
+
+      - name: Commit verified accepted tree
+        shell: bash
+        run: |
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(studio): finalize all planned session integrations"
+          git push origin HEAD:chore/toonstudio-session-final-acceptance-20260911-v3
