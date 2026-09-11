@@ -1,0 +1,116 @@
+name: Repair brush quality catalogue test once
+
+on:
+  push:
+    branches:
+      - feat/brush-quality-design-productization-20260912
+    paths:
+      - .github/workflows/repair-brush-quality-catalog-test-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-brush-quality-catalog-test-once
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Checkout exact feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/brush-quality-design-productization-20260912
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compare stable catalogue identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path(
+              "apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx"
+          )
+          source = path.read_text(encoding="utf-8")
+          old = '''    expect(coreItems).toEqual(STUDIO_CORE_BRUSH_CATALOG_ITEMS);
+              expect(proItems).toEqual(STUDIO_PRO_BRUSH_CATALOG_ITEMS);
+              expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toEqual([
+                ...STUDIO_CORE_BRUSH_CATALOG_ITEMS,
+                ...STUDIO_PRO_BRUSH_CATALOG_ITEMS,
+              ]);'''
+          new = '''    expect(coreItems.map((item) => item.id)).toEqual(
+                STUDIO_CORE_BRUSH_CATALOG_ITEMS.map((item) => item.id),
+              );
+              expect(proItems.map((item) => item.id)).toEqual(
+                STUDIO_PRO_BRUSH_CATALOG_ITEMS.map((item) => item.id),
+              );
+              expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id)).toEqual([
+                ...STUDIO_CORE_BRUSH_CATALOG_ITEMS.map((item) => item.id),
+                ...STUDIO_PRO_BRUSH_CATALOG_ITEMS.map((item) => item.id),
+              ]);'''
+          if source.count(old) != 1:
+              raise SystemExit("stable catalogue assertion block was not found exactly once")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+          pnpm exec prettier --write \
+            apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+
+      - name: Strict lint changed brush surfaces
+        run: |
+          pnpm exec eslint --max-warnings=0 \
+            apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx \
+            apps/web/src/domains/creator/brush/studio-brush-catalog.ts \
+            apps/web/src/domains/creator/brush/studio-brush-quality-design-bridge.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-quality-design-bridge.ts \
+            apps/web/src/domains/creator/brush/studio-brush-quality-design-catalog.ts \
+            apps/web/src/domains/creator/brush-lab/StudioBrushLegacyCataloguePanel.tsx \
+            apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality-catalog.ts
+
+      - name: Root typecheck
+        run: pnpm typecheck
+
+      - name: Focused brush regression suite
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-catalog-core.test.ts \
+            apps/web/src/domains/creator/brush/studio-sub-tool-palette-data.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx \
+            apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx \
+            apps/web/src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-quality-design-bridge.test.ts
+
+      - name: Commit validated test and self-remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "toonstudio-integration-bot"
+          git config user.email "toonstudio-integration-bot@users.noreply.github.com"
+          git rm .github/workflows/repair-brush-quality-catalog-test-once.yml
+          git add apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+          git commit -m "test(brush): compare stable catalogue identities"
+          git push origin HEAD:feat/brush-quality-design-productization-20260912
