@@ -1,0 +1,41 @@
+name: ToonStudio one-time menu contract repair
+
+on:
+  push:
+    branches:
+      - feat/toonstudio-final-ia-20260911
+    paths:
+      - .github/workflows/toonstudio-menu-contract-repair.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: toonstudio-menu-contract-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/toonstudio-final-ia-20260911
+          fetch-depth: 0
+      - name: Repair menu ownership and tests
+        run: node scripts/repair-studio-menu-contract.mjs
+      - name: Remove one-time repair files
+        run: rm scripts/repair-studio-menu-contract.mjs .github/workflows/toonstudio-menu-contract-repair.yml
+      - name: Commit repaired contracts
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "fix(studio): repair menu and help contracts"
+          git push origin HEAD:feat/toonstudio-final-ia-20260911
