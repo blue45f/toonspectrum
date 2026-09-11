@@ -55,15 +55,19 @@ jobs:
           apps/web/src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx
           apps/web/src/domains/creator/studio-localization-project-store.ts
           apps/web/src/domains/creator/studio-project-export-snapshot.ts
+          apps/web/src/domains/creator/studio-project-feature-suite-store.ts
+          apps/web/src/domains/creator/studio-project-view-destinations.ts
           apps/web/src/domains/creator/studio-review-history-store.ts
           apps/web/src/domains/creator/studio-series-kit-store.ts
           apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.tsx
           apps/web/src/domains/creator/studio-shell/StudioExportPanel.tsx
           apps/web/src/domains/creator/studio-shell/StudioLocalizationPanel.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectIntegratedPage.tsx
           apps/web/src/domains/creator/studio-shell/StudioReviewPanel.tsx
           apps/web/src/domains/creator/studio-shell/StudioSeriesKitPanel.tsx
+          apps/web/src/domains/creator/studio-shell/useStudioProjectFeatureSuite.ts
           apps/web/src/domains/creator/studio-shell/useStudioProjectWorkspace.ts
 
       - name: Run focused integration tests
@@ -79,11 +83,14 @@ jobs:
           apps/web/src/domains/creator/studio-localization-project-store.test.ts
           apps/web/src/domains/creator/studio-project-diagnostics.test.ts
           apps/web/src/domains/creator/studio-project-export-snapshot.test.ts
+          apps/web/src/domains/creator/studio-project-feature-suite-store.test.ts
+          apps/web/src/domains/creator/studio-project-view-destinations.test.ts
           apps/web/src/domains/creator/studio-project-workspace-store.test.ts
           apps/web/src/domains/creator/studio-review-workflow.test.ts
           apps/web/src/domains/creator/studio-series-kit.test.ts
           apps/web/src/domains/creator/studio-series-kit-store.test.ts
           apps/web/src/domains/creator/studio-shell/StudioAssetHubPage.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioProjectAssistantPanel.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.test.tsx
           apps/web/src/domains/creator/studio-shell/StudioReviewPanel.test.tsx
           --pool=forks --maxWorkers=2
