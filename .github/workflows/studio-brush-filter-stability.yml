@@ -2,11 +2,16 @@ name: Studio brush and filter stability
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main, release/salvage-integration-20260908]
     paths:
       - 'apps/web/src/domains/creator/brush/**'
+      - 'apps/web/src/domains/creator/brush-lab/**'
       - 'apps/web/src/domains/creator/filter/**'
+      - 'apps/web/src/domains/creator/live/studio-live-retained-media-overlay.ts'
+      - 'apps/web/src/domains/creator/export/studio-svg-export-freehand-media.ts'
+      - 'apps/web/src/domains/creator/StudioBrushHubPanel*'
+      - 'apps/web/src/domains/creator/studio-brush-*'
       - 'apps/web/src/domains/creator/studio-image-filter*'
       - 'apps/web/src/domains/creator/studio-detail*'
       - 'scripts/verify-studio-brushes.mts'
@@ -15,7 +20,12 @@ on:
   push:
     paths:
       - 'apps/web/src/domains/creator/brush/**'
+      - 'apps/web/src/domains/creator/brush-lab/**'
       - 'apps/web/src/domains/creator/filter/**'
+      - 'apps/web/src/domains/creator/live/studio-live-retained-media-overlay.ts'
+      - 'apps/web/src/domains/creator/export/studio-svg-export-freehand-media.ts'
+      - 'apps/web/src/domains/creator/StudioBrushHubPanel*'
+      - 'apps/web/src/domains/creator/studio-brush-*'
       - 'apps/web/src/domains/creator/studio-image-filter*'
       - 'apps/web/src/domains/creator/studio-detail*'
       - 'scripts/verify-studio-brushes.mts'
@@ -48,6 +58,18 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Product brush taxonomy, succession and render boundary contracts
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/studio-stability-unit-evidence
+          git rev-parse HEAD > /tmp/studio-stability-unit-evidence/commit.txt
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/brush/studio-brush-quality-design-bridge.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts \
+            apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts \
+            apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx \
+            apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts \
+            2>&1 | tee /tmp/studio-stability-unit-evidence/brush-product-contracts.log
       - name: Worker recovery, exact median pixels, texture loading and verifier regressions
         run: |
           set -o pipefail
