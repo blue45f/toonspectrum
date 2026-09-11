@@ -2,6 +2,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
+
+def replace_normalized(
+    path: Path,
+    legacy: str,
+    normalized: str,
+    label: str,
+) -> None:
+    source = path.read_text(encoding="utf-8")
+    legacy_count = source.count(legacy)
+    if legacy_count == 1:
+        path.write_text(source.replace(legacy, normalized, 1), encoding="utf-8")
+        return
+    if legacy_count != 0 or normalized not in source:
+        raise RuntimeError(f"{path}: expected one legacy or normalized {label}")
+
+
 path = Path("scripts/maintenance/apply-brush-runtime-production.py")
 source = path.read_text(encoding="utf-8")
 
@@ -57,19 +73,48 @@ elif corrected_marker not in source:
 
 path.write_text(source, encoding="utf-8")
 
-# A placeholder image has not been rights-cleared yet. The template contract represents that state
-# as a review warning rather than the removed legacy `unknown` value.
 catalog_path = Path("apps/web/src/domains/creator/studio-template-catalog.ts")
-catalog = catalog_path.read_text(encoding="utf-8")
-legacy_rights = 'rightsStatus: "unknown",'
-review_rights = 'rightsStatus: "warning",'
-legacy_count = catalog.count(legacy_rights)
-if legacy_count == 1:
-    catalog_path.write_text(
-        catalog.replace(legacy_rights, review_rights, 1),
-        encoding="utf-8",
-    )
-elif legacy_count != 0 or review_rights not in catalog:
-    raise RuntimeError(
-        "studio-template-catalog.ts: expected one legacy or normalized image rights status"
-    )
+replace_normalized(
+    catalog_path,
+    'rightsStatus: "unknown",',
+    'rightsStatus: "warning",',
+    "image rights status",
+)
+
+governance_path = Path(
+    "apps/web/src/domains/creator/studio-asset-governance.ts"
+)
+replace_normalized(
+    governance_path,
+    '''  const provider = evaluateStudioAssetProviderRequest(input.provider, {
+    action: "download",
+    authenticated: preferences.providerAccountConnected,
+    userInitiated: true,
+    sourceUrl: input.passport.source.sourceUrl ?? null,
+    bypassesAccessControl: false,
+  });''',
+    '''  const provider = evaluateStudioAssetProviderRequest(input.provider, {
+    action: "sync-entitlements",
+    authenticated: preferences.providerAccountConnected,
+    userInitiated: false,
+    sourceUrl: input.passport.source.sourceUrl ?? null,
+    bypassesAccessControl: false,
+  });''',
+    "provider entitlement audit request",
+)
+replace_normalized(
+    governance_path,
+    '        checksum: CHECKSUM.replace(/a/gu, "b"),',
+    '        checksum: `sha256:${"b".repeat(64)}`,',
+    "preview checksum",
+)
+
+governance_test_path = Path(
+    "apps/web/src/domains/creator/studio-asset-governance.test.ts"
+)
+replace_normalized(
+    governance_test_path,
+    '    expect(usageCodes).toContain("ai-training-prohibited");',
+    '    expect(usageCodes).toContain("ai-training");',
+    "AI training reason assertion",
+)
