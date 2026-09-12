@@ -56,17 +56,19 @@ export function CreatorWorkspaceReadiness({ locale }: { locale: "ko" | "en" }) {
     }
   }, []);
 
-  useEffect(() => {
-    lifetime.current++;
-    void refresh();
-    const update = () => { void refresh(); };
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    const serviceWorker = creatorServiceWorker();
-    serviceWorker?.addEventListener("controllerchange", update);
-    return () => {
-      request.current++;
-      lifetime.current++;
+useEffect(() => {
+  const requestRef = request;
+  const lifetimeRef = lifetime;
+  lifetimeRef.current++;
+  void refresh();
+  const update = () => { void refresh(); };
+  window.addEventListener("online", update);
+  window.addEventListener("offline", update);
+  const serviceWorker = creatorServiceWorker();
+  serviceWorker?.addEventListener("controllerchange", update);
+  return () => {
+      requestRef.current++;
+      lifetimeRef.current++;
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
       serviceWorker?.removeEventListener("controllerchange", update);
