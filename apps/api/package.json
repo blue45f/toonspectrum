@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "node --test ../../scripts/verify-api-runtime-imports.test.mjs && tsc -p tsconfig.json && node ../../scripts/verify-api-runtime-imports.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/apps/api/src/main.js"
   },

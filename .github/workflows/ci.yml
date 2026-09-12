@@ -22,7 +22,23 @@ env:
   NODE_OPTIONS: --max-old-space-size=8192
 
 jobs:
+  preflight:
+    name: Core workflow contract preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Verify mandatory CI wiring before installing dependencies
+        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs
+
   static:
+    needs: preflight
     name: Core static and product checks
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -36,8 +52,6 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Verify that required checks cannot silently pass
-        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs
       - name: Studio 3D production audit policy regressions
         run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs
       - name: Studio home and production route regressions
@@ -128,6 +142,7 @@ jobs:
           pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
 
   serial:
+    needs: preflight
     name: Core serial performance regressions
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -156,6 +171,7 @@ jobs:
           if-no-files-found: error
 
   build:
+    needs: preflight
     name: Core production build
     runs-on: ubuntu-24.04
     timeout-minutes: 35
