@@ -1,0 +1,241 @@
+name: Verify health schema recovery candidate
+on:
+  push:
+    branches: [ops/toonstudio-db-recovery-inspect-20260913]
+    paths: [.github/workflows/toonstudio-health-repair-candidate.yml]
+permissions:
+  contents: read
+concurrency:
+  group: toonstudio-health-schema-candidate
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.repository == 'blue45f/toonspectrum'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated_ci_only
+          POSTGRES_DB: toonspectrum_health_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d toonspectrum_health_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      CI: "1"
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 9e6494f233257e57cc61750249abdc539538436f
+          persist-credentials: false
+      - name: Prepare exact-source candidate without moving any Git reference
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 9e6494f233257e57cc61750249abdc539538436f
+          mkdir -p artifacts/health-candidate
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, re
+          expected = '9e6494f233257e57cc61750249abdc539538436f'
+          tables = sorted(['studio_ai_comic_director_session','studio_ai_visual_bible_revision','studio_ai_comic_director_job','studio_ai_comic_director_job_event','studio_ai_comic_director_artifact','studio_ai_comic_director_approval'])
+          changed = []
+          def save(path, text):
+              Path(path).write_text(text)
+              changed.append(path)
+          health = 'apps/api/src/modules/health/health-readiness.repository.ts'
+          text = Path(health).read_text()
+          assert text.count('  "studio_ai_daily_quota",') == 1
+          before = [t for t in tables if t < 'studio_ai_daily_quota']
+          text = text.replace('  "studio_ai_daily_quota",', ''.join('  "'+t+'",\n' for t in before)+'  "studio_ai_daily_quota",')
+          assert text.count('  "subscription",') == 1
+          text = text.replace('  "subscription",', '  "studio_ai_visual_bible_revision",\n  "subscription",')
+          save(health, text)
+          preflight = 'apps/api/src/modules/studio-ai/studio-ai-comic-director-schema-preflight.ts'
+          text = Path(preflight).read_text()
+          original = text.encode()
+          assert hashlib.sha1(b'blob '+str(len(original)).encode()+b'\0'+original).hexdigest() == 'aab2a343f7e5e4d61f310d99c257c32cdc8452d0'
+          match = re.search(r'const DDL = `\n(.*?)\n`;', text, re.S)
+          assert match
+          ddl = match.group(1)
+          assert sorted(re.findall(r'CREATE TABLE IF NOT EXISTS "([^"]+)"', ddl)) == tables
+          assert not re.search(r'\b(?:DROP|DELETE|TRUNCATE|UPDATE)\b', ddl, re.I)
+          migration = 'apps/api/src/db/migrations/0045_studio_ai_comic_director_schema.sql'
+          assert not Path(migration).exists()
+          save(migration, '-- Forward provision the six existing Comic Director relations through the owner migration boundary.\n-- Existing rows are retained; runtime requests no longer attempt production DDL.\nBEGIN;\nSELECT pg_advisory_xact_lock(82361743);\nSET LOCAL search_path = pg_catalog, public;\n\n'+ddl+'\n\nREVOKE ALL ON TABLE '+', '.join('public."'+t+'"' for t in tables)+' FROM PUBLIC;\nCOMMIT;\n')
+          assert text.count('  await dbPool.query(DDL);') == 1
+          text = text.replace('  await dbPool.query(DDL);', '  // Production schema changes belong to the checksum-verified owner migration runner.\n  if (process.env.NODE_ENV !== "production") await dbPool.query(DDL);')
+          text = text.replace('if (result.rows.some(({ relation }) => relation === null)) {', 'if (result.rows.length !== REQUIRED_RELATIONS.length || result.rows.some(({ relation }) => relation === null)) {')
+          save(preflight, text)
+          manifest = 'scripts/production-database-migrations.manifest'
+          text = Path(manifest).read_text()
+          assert len(text.strip().splitlines()) == 44
+          save(manifest, text.rstrip()+'\n'+migration+'\n')
+          contract = 'scripts/comic-director-database-contract.mjs'
+          save(contract, 'export const COMIC_DIRECTOR_DATABASE_RELATIONS = Object.freeze('+json.dumps(tables,indent=2)+');\n\nexport function buildComicDirectorRuntimeAclSql(role) {\n  if (typeof role !== "string" || !/^[a-z_][a-z0-9_]{0,62}$/u.test(role)) throw new Error("A validated runtime role is required");\n  const relations = COMIC_DIRECTOR_DATABASE_RELATIONS.map((name) => `public."${name}"`).join(", ");\n  return `REVOKE ALL ON TABLE ${relations} FROM PUBLIC;\nREVOKE ALL ON TABLE ${relations} FROM "${role}";\nGRANT SELECT, INSERT, UPDATE, DELETE ON TABLE ${relations} TO "${role}";`;\n}\n')
+          runner = 'scripts/run-production-database-migrations.mjs'
+          text = Path(runner).read_text()
+          anchor = 'import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";'
+          assert text.count(anchor) == 1
+          text = text.replace(anchor, anchor+'\nimport { buildComicDirectorRuntimeAclSql } from "./comic-director-database-contract.mjs";')
+          anchor = '    psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));'
+          assert text.count(anchor) == 1
+          text = text.replace(anchor, anchor+'\n    psql(databaseUrl, buildComicDirectorRuntimeAclSql(runtimeDatabaseRole));')
+          save(runner, text)
+          workflow = '.github/workflows/health-recovery-diagnostics.yml'
+          text = Path(workflow).read_text()
+          anchor = '    timeout-minutes: 20\n    steps:'
+          replacement = '''    timeout-minutes: 30
+              services:
+                postgres:
+                  image: postgres:17
+                  env:
+                    POSTGRES_USER: postgres
+                    POSTGRES_PASSWORD: isolated_ci_only
+                    POSTGRES_DB: toonspectrum_health_test
+                  ports: [5432:5432]
+                  options: >-
+                    --health-cmd "pg_isready -U postgres -d toonspectrum_health_test"
+                    --health-interval 5s --health-timeout 5s --health-retries 12
+              env:
+                CI: "1"
+                NODE_OPTIONS: --max-old-space-size=8192
+                TEST_DATABASE_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/toonspectrum_health_test
+                STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/toonspectrum_health_test
+                STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: toonspectrum_health_runtime
+              steps:'''
+          replacement = '\n'.join(line[10:] if line.startswith('          ') else line for line in replacement.splitlines())
+          assert text.count(anchor) == 1
+          text = text.replace(anchor,replacement)
+          anchor = '      - name: Verify health boundaries and migration contracts'
+          bootstrap = '''      - name: Bootstrap disposable local PostgreSQL with canonical migrations
+                  env:
+                    MIGRATION_DATABASE_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/toonspectrum_health_test
+                    BOOTSTRAP_RUNTIME_DATABASE_PASSWORD: isolated_runtime_ci_only
+                  run: |
+                    set -euo pipefail
+                    node scripts/bootstrap-empty-production-database.mjs --execute --allow-loopback --runtime-database-role toonspectrum_health_runtime --release-sha "$(git rev-parse HEAD)" --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE
+          '''
+          bootstrap = '\n'.join(line[10:] if line.startswith('          ') else line for line in bootstrap.splitlines()).rstrip()+'\n'
+          assert text.count(anchor) == 1
+          text = text.replace(anchor,bootstrap+anchor)
+          text = text.replace('scripts/verify-production-database-capabilities.test.mjs\n','scripts/verify-production-database-capabilities.test.mjs scripts/comic-director-database-contract.test.mjs apps/api/src/modules/studio-ai/studio-ai-comic-director-schema-preflight.test.ts\n')
+          save(workflow,text)
+          save('scripts/comic-director-database-contract.test.mjs', '''import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+          import { COMIC_DIRECTOR_DATABASE_RELATIONS, buildComicDirectorRuntimeAclSql } from "./comic-director-database-contract.mjs";
+          describe("Comic Director migration authority", () => {
+            it("preserves every declared table in the forward owner migration", () => {
+              const source = readFileSync("apps/api/src/db/migrations/0045_studio_ai_comic_director_schema.sql", "utf8");
+              const declared = [...readFileSync("apps/api/src/db/schema/studio-ai-comic-director.schema.ts", "utf8").matchAll(/pgTable\\(\\s*"([^"]+)"/gu)].map((match) => match[1]).sort();
+              expect(COMIC_DIRECTOR_DATABASE_RELATIONS).toEqual(declared);
+              for (const name of declared) expect(source).toContain(`CREATE TABLE IF NOT EXISTS "${name}"`);
+              expect(source).toContain("REVOKE ALL ON TABLE");
+              expect(source).not.toMatch(/\\b(?:DROP|DELETE|TRUNCATE)\\b/iu);
+            });
+            it("limits grants to DML on the six explicit relations", () => {
+              const sql = buildComicDirectorRuntimeAclSql("runtime_user");
+              for (const name of COMIC_DIRECTOR_DATABASE_RELATIONS) expect(sql).toContain(`public."${name}"`);
+              expect(sql).toContain("GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE");
+              expect(sql).not.toMatch(/GRANT ALL|WITH GRANT OPTION|ON ALL TABLES|ALTER ROLE|CREATE ROLE/u);
+            });
+            it.each(["", "bad;DROP TABLE x", "runtime role", "UPPER", "a".repeat(64), null])("rejects unsafe role: %s", (role) => {
+              expect(() => buildComicDirectorRuntimeAclSql(role)).toThrow();
+            });
+          });
+          '''.replace('\n          ','\n'))
+          save('apps/api/src/modules/studio-ai/studio-ai-comic-director-schema-preflight.test.ts', '''import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+          import { preflightStudioAiComicDirectorSchema } from "./studio-ai-comic-director-schema-preflight";
+          const state = vi.hoisted(() => ({ query: vi.fn() }));
+          vi.mock("../../db", () => ({ dbPool: { query: state.query } }));
+          beforeEach(() => { state.query.mockReset(); vi.stubEnv("NODE_ENV", "production"); });
+          afterEach(() => { vi.unstubAllEnvs(); });
+          describe("production Comic Director schema preflight", () => {
+            it("only reads catalog metadata and never provisions production tables", async () => {
+              state.query.mockResolvedValue({ rows: Array.from({ length: 6 }, () => ({ relation: "present" })) });
+              await preflightStudioAiComicDirectorSchema();
+              expect(state.query).toHaveBeenCalledTimes(1);
+              expect(state.query.mock.calls[0]?.[0]).toContain("pg_catalog.to_regclass");
+              expect(state.query.mock.calls[0]?.[0]).not.toMatch(/CREATE|ALTER|GRANT|DROP/u);
+            });
+            it.each([[], [{ relation: null }]])("fails closed for missing catalog evidence", async (rows) => {
+              state.query.mockResolvedValue({ rows });
+              await expect(preflightStudioAiComicDirectorSchema()).rejects.toThrow("incomplete");
+            });
+          });
+          '''.replace('\n          ','\n'))
+          Path('artifacts/health-candidate/files.json').write_text(json.dumps(changed,indent=2))
+          Path('artifacts/health-candidate/base.txt').write_text(expected+'\n')
+          PY
+          git diff --check
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Validate generated workflow and local-only bootstrap target
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import assert from 'node:assert/strict';
+          import YAML from 'yaml';
+          const workflow=YAML.parse(readFileSync('.github/workflows/health-recovery-diagnostics.yml','utf8'));
+          assert.equal(workflow.jobs.verify.services.postgres.image,'postgres:17');
+          assert.equal(workflow.jobs.verify.env.STUDIO_LIVE_POSTGRES_RUNTIME_ROLE,'toonspectrum_health_runtime');
+          assert.equal(workflow.jobs['production-inspect'].environment,'production-database');
+          assert.equal(workflow.jobs.verify.steps.filter(s=>s.name==='Bootstrap disposable local PostgreSQL with canonical migrations').length,1);
+          NODE
+      - name: Bootstrap disposable service, never a production database
+        env:
+          MIGRATION_DATABASE_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/toonspectrum_health_test
+          BOOTSTRAP_RUNTIME_DATABASE_PASSWORD: isolated_runtime_ci_only
+        run: |
+          set -euo pipefail
+          node scripts/bootstrap-empty-production-database.mjs --execute --allow-loopback --runtime-database-role toonspectrum_health_runtime --release-sha "$(git rev-parse HEAD)" --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE 2>&1 | tee artifacts/health-candidate/bootstrap.log
+      - name: Execute every health boundary including real PostgreSQL tests
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/toonspectrum_health_test
+          STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/toonspectrum_health_test
+          STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: toonspectrum_health_runtime
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run apps/api/src/modules/health scripts/run-production-database-migrations.test.mjs scripts/validate-production-database-url.test.mjs scripts/verify-production-database-capabilities.test.mjs scripts/comic-director-database-contract.test.mjs apps/api/src/modules/studio-ai/studio-ai-comic-director-schema-preflight.test.ts --reporter=default --reporter=json --outputFile=artifacts/health-candidate/vitest.json 2>&1 | tee artifacts/health-candidate/tests.log
+          pnpm --filter @webtoon-nest/api build 2>&1 | tee artifacts/health-candidate/build.log
+      - name: Save candidate bytes and unreferenced Git blobs for reviewed CAS application
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          const names=JSON.parse(readFileSync('artifacts/health-candidate/files.json','utf8'));
+          const results=[];
+          for (const path of names) {
+            const bytes=readFileSync(path);
+            const expected=createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${bytes.length}\0`),bytes])).digest('hex');
+            const res=await fetch('https://api.github.com/repos/blue45f/toonspectrum/git/blobs',{method:'POST',headers:{Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({content:bytes.toString('base64'),encoding:'base64'})});
+            if(!res.ok) throw new Error(`Unable to preserve candidate blob (${res.status})`);
+            const data=await res.json();
+            if(data.sha!==expected) throw new Error('Git blob hash mismatch');
+            results.push({path,sha:expected,bytes:bytes.length});
+          }
+          writeFileSync('artifacts/health-candidate/blobs.json',JSON.stringify(results,null,2));
+          writeFileSync('artifacts/health-candidate/files.txt',names.join('\n')+'\n');
+          execFileSync('tar',['-czf','artifacts/health-candidate/changed-files.tgz','-T','artifacts/health-candidate/files.txt']);
+          // No commits, branch updates, PR changes, status writes or deployments occur here.
+          NODE
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: health-schema-candidate-${{ github.run_id }}
+          path: artifacts/health-candidate
+          retention-days: 3
+          if-no-files-found: error
