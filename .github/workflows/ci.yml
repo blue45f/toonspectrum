@@ -94,6 +94,29 @@ jobs:
             apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts \
             packages/core/src/search-normalization.test.ts \
             packages/core/src/server/home.cpu-cache.test.ts
+      - name: API runtime follow-up regressions
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test scripts/api-followup-unit.test.mjs
+          node --test scripts/api-followup-ci-policy.test.mjs
+          pnpm exec vitest run \
+            apps/api/src/modules/catalog/catalog-search-cache.test.ts \
+            apps/api/src/runtime/serverless-partitions.test.ts \
+            apps/api/src/runtime/runtime-boundary.test.ts \
+            apps/api/src/server/marketplace-og.test.ts \
+            apps/api/src/modules/catalog/catalog-pagination.test.ts \
+            apps/web/src/shared/catalog/catalog-pagination.test.ts \
+            apps/web/src/infrastructure/use-paginated-search.test.tsx \
+            apps/web/src/infrastructure/search-client.test.ts \
+            apps/web/src/shared/lib/__tests__/og-ssr.test.ts \
+            apps/web/src/shared/lib/__tests__/search.test.ts \
+            apps/api/src/serverless.test.ts \
+            apps/api/src/csrf-middleware.test.ts \
+            apps/api/src/session-middleware.test.ts \
+            apps/api/src/config/security-headers.test.ts \
+            apps/api/src/config/cors.test.ts \
+            apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts \
+            apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.test.ts
       - name: Material brush execution and saved recipe regressions
         run: pnpm run test:studio-material-brush
       - name: Non-3D Studio editing and export regressions
@@ -236,7 +259,7 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/core
           git rev-parse HEAD > artifacts/core/commit.txt
-          (pnpm --filter @webtoon-nest/api build && pnpm run build && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json) 2>&1 | tee artifacts/core/build.log
+          (pnpm --filter @webtoon-nest/api build && pnpm run build && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json && pnpm run verify:api-serverless-build) 2>&1 | tee artifacts/core/build.log
       - uses: actions/upload-artifact@v6
         if: always()
         with:

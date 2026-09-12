@@ -1,4 +1,7 @@
+import type { SearchPagination } from "../../../../packages/core/src/search-pagination";
 import type { PlatformId, Title } from "@/shared/lib/types";
+
+import { withCsrfProtection } from "@/shared/lib/csrf";
 
 import { apiPath } from "@/infrastructure/api";
 
@@ -14,6 +17,9 @@ export type SearchCatalogMeta = {
 
 export interface SearchResponse {
   items: Title[];
+  total?: number;
+  pagination?: SearchPagination;
+  typeCountScope?: "all" | "page";
   typeCount: { webtoon: number; webnovel: number };
   topTags: string[];
   catalog?: SearchCatalogMeta;
@@ -87,7 +93,13 @@ export async function fetchSearchResponse(
 
   let request = inFlight.get(key);
   if (!request) {
-    request = fetch(apiPath(`/search?${key}`), { cache: "no-store" })
+    const params = new URLSearchParams(key);
+    const savedQuery = params.has("ids");
+    const init: RequestInit = savedQuery ? withCsrfProtection({
+      method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.fromEntries(params)),
+    }) : { cache: "no-store" };
+    request = fetch(apiPath(savedQuery ? "/search" : `/search?${key}`), init)
       .then((response) => {
         if (!response.ok) throw new Error("search_request_failed");
         return response.json() as Promise<SearchResponse>;

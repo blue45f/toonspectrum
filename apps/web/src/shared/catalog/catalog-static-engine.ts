@@ -1,3 +1,4 @@
+import { parseSearchPageQuery, searchPageItems, searchPagination, searchPageQueryFromParams, searchParamsFromBody, SearchPaginationError } from "../../../../../packages/core/src/search-pagination";
 import { getRandomData } from "@toonspectrum/core/server";
 
 // Dynamic static-catalog engine. This module intentionally contains the heavy
@@ -77,7 +78,7 @@ function list<T extends string>(raw: string | null | undefined, allowed?: Set<st
   const filtered = allowed ? values.filter((v) => allowed.has(v)) : values;
   return filtered.length ? filtered : undefined;
 }
-const numberParam = (raw: string | null | undefined) => (Number.isFinite(Number(raw)) ? Number(raw) : undefined);
+const numberParam = (raw: string | null | undefined) => (raw != null && raw !== "" && Number.isFinite(Number(raw)) ? Number(raw) : undefined);
 const boolParam = (raw: string | null | undefined) => raw === "true";
 function clampLimit(raw: string | null | undefined) {
   const n = Number(raw);
@@ -129,6 +130,7 @@ function platformCoverage(titles: Title[]) {
 const bayes = (t: Title) => (4 * 800 + t.stats.ratingAvg * t.stats.ratingCount) / (800 + t.stats.ratingCount);
 
 function searchData(sp: URLSearchParams) {
+  const page = parseSearchPageQuery(searchPageQueryFromParams(sp));
   const sort = validSorts.has(sp.get("sort") as SortKey) ? (sp.get("sort") as SortKey) : "popular";
   const filters: SearchFilters = {
     q: sp.get("q") ?? "",
@@ -144,7 +146,7 @@ function searchData(sp: URLSearchParams) {
     freeOnly: boolParam(sp.get("freeOnly")),
     adaptedOnly: boolParam(sp.get("adaptedOnly")),
   };
-  const items = searchTitles(TITLES, filters, sort);
+  const items = searchTitles(TITLES, { ...filters, ids: page.ids }, sort);
   let webtoonCount = 0;
   let webnovelCount = 0;
   const iLen = items.length;
@@ -154,8 +156,10 @@ function searchData(sp: URLSearchParams) {
   }
 
   return {
-    items,
+    items: searchPageItems(items, page),
     total: iLen,
+    pagination: searchPagination(iLen, page),
+    typeCountScope: "all",
     typeCount: {
       webtoon: webtoonCount,
       webnovel: webnovelCount,
@@ -302,20 +306,31 @@ export async function handleStaticCatalogRequest(
   init: RequestInit | undefined,
   origFetch: typeof fetch
 ): Promise<Response> {
-  const handler = matchEngine(pathname, sp);
+  let handler = matchEngine(pathname, sp);
   if (!handler) {
     const query = sp.toString();
     return origFetch(`${pathname}${query ? `?${query}` : ""}`, init);
   }
 
   try {
+    if (pathname === "/api/search") {
+      if (init?.method?.toUpperCase() === "POST") {
+        try {
+          sp = searchParamsFromBody(typeof init.body === "string" ? JSON.parse(init.body) : null);
+        } catch (error) {
+          throw new SearchPaginationError(error instanceof Error ? error.message : "Invalid search body");
+        }
+      }
+      parseSearchPageQuery(searchPageQueryFromParams(sp));
+      handler = () => searchData(sp);
+    }
     await ensureCatalog(origFetch);
     const data = await handler(init, origFetch);
     if (data === NOT_FOUND) return new Response("null", { status: 404, headers: JSON_HEADERS });
     return new Response(JSON.stringify(data), { status: 200, headers: JSON_HEADERS });
   } catch (error) {
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "static catalog error" }), {
-      status: 500,
+      status: error instanceof SearchPaginationError ? 400 : 500,
       headers: JSON_HEADERS,
     });
   }

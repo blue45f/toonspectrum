@@ -205,7 +205,7 @@ function hasKmasQueryValue(query: KmasBookAndWebtoonQuery): boolean {
 }
 
 export async function getKmasSearchData(
-  query: { q?: string; limit?: number | string },
+  query: { q?: string; limit?: number | string; page?: number },
   env: EnvLike = process.env
 ): Promise<{
   items: Title[];
@@ -218,9 +218,12 @@ export async function getKmasSearchData(
   if (!shouldUseKmasLiveSearch(env)) return null;
   const q = query.q?.trim();
   if (!q) return null;
+  if ((query.page ?? 1) > 10_000) {
+    throw new RangeError("KMAS page exceeds 10000");
+  }
   const limit = boundInt(Number(query.limit), DEFAULT_PAGE_SIZE, 1, 100);
-  const response = await fetchKmasBookAndWebtoon({ title: q, pageNo: 1, viewItemCnt: limit }, env);
-  const items = dedupeTitles(kmasItems(response).map((item, index) => kmasItemToTitle(item, index)));
+  const response = await fetchKmasBookAndWebtoon({ title: q, pageNo: query.page ?? 1, viewItemCnt: limit }, env);
+  const items = dedupeTitles(kmasItems(response).map((item, index) => kmasItemToTitle(item, index))).slice(0, limit);
   const total = Number(response.result.totalCount) || items.length;
   const coverage = platformCoverage(items);
   return {

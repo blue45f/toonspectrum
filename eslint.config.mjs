@@ -183,6 +183,12 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
 
+  {
+    files: ['apps/api/og-title-files.cjs', 'scripts/build-og-title-shards.cjs'],
+    ...js.configs.recommended,
+    languageOptions: { sourceType: 'commonjs', globals: globals.node },
+  },
+
   // JS/MJS(스크립트·SW 등) — TS 파서 밖이라 js.recommended + Node globals 로 별도 처리.
   {
     files: ['**/*.{js,mjs}'],
