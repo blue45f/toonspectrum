@@ -1,5 +1,6 @@
 /* A luminous atelier, isolated from every Studio route. No new imagery or JS loops. */
-.creator-home.creator-experience.creator-flagship {
+.creator-home.creator-experience.creator-flagship,
+html[data-theme="dark"] .creator-home.creator-experience.creator-flagship {
   --cf-paper: oklch(0.17 0.018 285);
   --cf-card: oklch(0.225 0.023 283);
   --cf-raised: oklch(0.275 0.028 282);
@@ -14,15 +15,6 @@
     radial-gradient(ellipse 780px 700px at -10% 340px, oklch(0.65 0.2 38 / 0.14), transparent 70%),
     radial-gradient(ellipse 850px 780px at 95% 2200px, oklch(0.65 0.13 225 / 0.1), transparent 80%),
     var(--cf-paper);
-}
-/* Match the flagship dark-selector specificity: its intentional dark art stage stays dark. */
-html[data-theme="dark"] .creator-home.creator-experience.creator-flagship {
-  --cf-paper: oklch(0.17 0.018 285);
-  --cf-card: oklch(0.225 0.023 283);
-  --cf-raised: oklch(0.275 0.028 282);
-  --cf-line: oklch(0.36 0.035 286);
-  --cf-muted: oklch(0.79 0.025 290);
-  --cf-faint: oklch(0.71 0.025 290);
 }
 .creator-flagship .cf-hero { padding-block: 70px 60px; }
 .creator-flagship .cf-kicker { color: var(--cf-muted); }

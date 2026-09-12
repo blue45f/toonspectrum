@@ -6,10 +6,13 @@ import { expect, test } from "@playwright/test";
 const ROOT = resolve(import.meta.dirname, "..");
 const routeDirectory = resolve(ROOT, "apps/web/src/app/routes/groups");
 const EXCLUDED = /^\/(?:studio|admin|make|shaper|brush-lab|music|creator-hub|publishing|auth)(?:\/|$)/u;
-const routes = [...new Set(readdirSync(routeDirectory)
+const routes = [...new Set([...readdirSync(routeDirectory)
   .filter((name) => name.endsWith(".routes.tsx"))
   .flatMap((name) => [...readFileSync(resolve(routeDirectory, name), "utf8").matchAll(/path:\s*["']([^"']+)["']/gu)].map((match) => match[1]))
-  .filter((path) => path.startsWith("/") && !/[:*]/u.test(path) && !EXCLUDED.test(path)))].sort();
+  .filter((path) => path.startsWith("/") && !/[:*]/u.test(path) && !EXCLUDED.test(path)),
+  // Learn is registered lazily as /learn/*; enumerate its public static views too.
+  "/learn", "/learn/glossary", "/learn/records", "/learn/studio",
+])].sort();
 
 // Production bundle, actual router and actual UI. Anonymous state is intentional.
 // Public APIs are deterministic outage fixtures, not claims of live backend success.
